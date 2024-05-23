@@ -5,65 +5,25 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.literal.*
-import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
-import lucuma.odb.data.OdbError
-import lucuma.odb.service.ProposalService.UpdateProposalError
+import lucuma.odb.data.CallForProposalsType
 
 class updateProposal extends OdbSuite {
   
-  val pi       = TestUsers.Standard.pi(1, 101)
-  val pi2      = TestUsers.Standard.pi(2, 102)
-  val guest    = TestUsers.guest(3)
+  val pi    = TestUsers.Standard.pi(nextId, nextId)
+  val pi2   = TestUsers.Standard.pi(nextId, nextId)
+  val guest = TestUsers.guest(nextId)
+  val staff = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, guest)
+  val validUsers = List(pi, pi2, guest, staff)
 
-  test("update proposal (non-class properties)") {
+  test("✓ generic properties") {
     createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 50
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                category
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "category": "COSMOLOGY"
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it, but not the class
+      addProposal(pi, pid, title = "initial title") *>
+      // Now update it, but not the call type
       expect(
         user = pi,
         query = s"""
@@ -74,121 +34,33 @@ class updateProposal extends OdbSuite {
                 SET: {
                   title: "updated title"
                   category: SMALL_BODIES
-                  toOActivation: RAPID
-                  partnerSplits: [
-                    {
-                      partner: AR
-                      percent: 70
-                    }
-                    {
-                      partner: KECK
-                      percent: 30
-                    }
-                  ]
                 }
               }
             ) {
               proposal {
                 title
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
                 category
-                toOActivation
-                partnerSplits {
-                  partner
-                  percent
-                }
               }
             }
           }
         """,
-        expected =
-          Right(json"""
-            {
-              "updateProposal" : {
-                "proposal" : {
-                  "title" : "updated title",
-                  "proposalClass" : {
-                    "__typename" : "Queue",
-                    "minPercentTime" : 50
-                  },
-                  "category" : "SMALL_BODIES",
-                  "toOActivation" : "RAPID",
-                  "partnerSplits" : [
-                    {
-                      "partner" : "AR",
-                      "percent" : 70
-                    },
-                    {
-                      "partner" : "KECK",
-                      "percent" : 30
-                    }
-                  ]
-                }
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES"
               }
             }
-          """)
+          }
+        """.asRight
       )
     }
   }
-  
-  test("update proposal (proposal class, type A -> type A)") {
+
+  test("✓ type-specific properties") {
     createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with a different type-A proposal class
+      addProposal(pi, pid, title = "initial title") *>
       expect(
         user = pi,
         query = s"""
@@ -197,8 +69,76 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  proposalClass: {
-                    classical: {
+                  type: {
+                    queue: {
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 70
+                        },
+                        {
+                          partner: CA
+                          percent: 30
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on Queue {
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "partnerSplits": [
+                    {
+                      "partner": "US",
+                      "percent": 70
+                    },
+                    {
+                      "partner": "CA",
+                      "percent": 30
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    demoScience: {
+                      toOActivation: STANDARD
                       minPercentTime: 50
                     }
                   }
@@ -206,8 +146,227 @@ class updateProposal extends OdbSuite {
               }
             ) {
               proposal {
-                proposalClass {
-                  __typename
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on DemoScience {
+                    toOActivation
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES",
+                "type": {
+                  "scienceSubtype": "DEMO_SCIENCE",
+                  "toOActivation": "STANDARD",
+                  "minPercentTime": 50
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type to LP") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    largeProgram: {
+                      minPercentTotalTime: 25
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                title
+                category
+                type {
+                  scienceSubtype
+                  ... on LargeProgram {
+                    minPercentTotalTime
+                    totalTime { hours }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "title": "updated title",
+                "category": "SMALL_BODIES",
+                "type": {
+                  "scienceSubtype": "LARGE_PROGRAM",
+                  "minPercentTotalTime": 25,
+                  "totalTime": { "hours": 0.000000 }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type from LP") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    demoScience: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on DemoScience {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "DEMO_SCIENCE",
+                  "minPercentTime": 100
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type to PW") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTime: 50
+             toOActivation: STANDARD
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    poorWeather: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "POOR_WEATHER"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type to C") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTime: 50
+             toOActivation: STANDARD
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    classical: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
                   ... on Classical {
                     minPercentTime
                   }
@@ -216,76 +375,47 @@ class updateProposal extends OdbSuite {
             }
           }
         """,
-        expected =
-          Right(json"""
-            {
-              "updateProposal" : {
-                "proposal" : {
-                  "proposalClass" : {
-                    "__typename" : "Classical",
-                    "minPercentTime" : 50
-                  }
-                }
-              }
-            }
-          """)
-      )
-    }
-  }
-  
-  test("update proposal (proposal class, type A -> type B)") {
-    createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "CLASSICAL",
+                  "minPercentTime": 100
                 }
               }
             }
           }
+        """.asRight
+      )
+    }
+  }
+
+  test("⨯ missing proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: { title: "updated title" }
+              }
+            ) {
+              proposal { title }
+            }
+          }
         """,
         expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with a type-B proposal class
+          List(s"Proposal update failed because program $pid does not have a proposal.").asLeft
+      )
+    }
+  }
+
+  test("⨯ splits sum to 100") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       expect(
         user = pi,
         query = s"""
@@ -294,229 +424,282 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  proposalClass: {
-                    intensive: {
-                      minPercentTime: 60
-                      minPercentTotalTime: 10
-                      totalTime: {
-                        hours: 10.5
+                  type: {
+                    queue: {
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 70
+                        },
+                        {
+                          partner: CA
+                          percent: 20
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { title }
+            }
+          }
+        """,
+        expected =
+          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+      )
+    }
+  }
+
+  test("⨯ set invalid cfp id") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "c-123" }
+              }
+            ) {
+              proposal { title }
+            }
+          }
+        """,
+        expected =
+          List("The specified Call for Proposals c-123 was not found.").asLeft
+      )
+    }
+  }
+
+  test("⨯ set mismatched cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """,
+          expected =
+            List(s"The Call for Proposals $cid is a Demo Science call and cannot be used with a Queue proposal.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓ set matching cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { type { scienceSubtype } }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "updateProposal": {
+                "proposal": {
+                  "type": {
+                    "scienceSubtype": "QUEUE"
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ invalid type change") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """
+        ) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: {
+                    type: {
+                      demoScience: {
+                        toOActivation: STANDARD
+                        minPercentTime: 50
                       }
                     }
                   }
                 }
+              ) {
+                proposal { title }
               }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Intensive {
-                    minPercentTime
-                    minPercentTotalTime
-                    totalTime {
-                      hours
-                      iso
+            }
+          """,
+          expected =
+            List(s"The Call for Proposals $cid is a Regular Semester call and cannot be used with a Demo Science proposal.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓ change call and type") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
+            }
+          """
+        ) *>
+        createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                updateProposal(
+                  input: {
+                    programId: "$pid"
+                    SET: {
+                      callId: "$cid2"
+                      type: {
+                        demoScience: {
+                          toOActivation: STANDARD
+                          minPercentTime: 50
+                        }
+                      }
+                    }
+                  }
+                ) {
+                  proposal { type { scienceSubtype } }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "updateProposal": {
+                  "proposal": {
+                    "type": {
+                      "scienceSubtype": "DEMO_SCIENCE"
                     }
                   }
                 }
               }
+            """.asRight
+          )
+        }
+      }
+    }
+  }
+
+  test("✓ delete cfp") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, title = "initial title") *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { title }
+              }
             }
-          }
-        """,
-        expected =
-          Right(json"""
+          """
+        ) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: {
+                    callId: null
+                    type: {
+                      demoScience: {
+                        toOActivation: STANDARD
+                        minPercentTime: 50
+                      }
+                    }
+                  }
+                }
+              ) {
+                proposal { type { scienceSubtype } }
+              }
+            }
+          """,
+          expected = json"""
             {
-              "updateProposal" : {
-                "proposal" : {
-                  "proposalClass" : {
-                    "__typename" : "Intensive",
-                    "minPercentTime" : 60,
-                    "minPercentTotalTime" : 10,
-                    "totalTime" : {
-                      "hours" : 10.500000,
-                      "iso" : "PT10H30M"
-                    }
+              "updateProposal": {
+                "proposal": {
+                  "type": {
+                    "scienceSubtype": "DEMO_SCIENCE"
                   }
                 }
               }
             }
-          """)
-      )
+          """.asRight
+        )
+      }
     }
+
   }
-  
-  test("update proposal (proposal class, type A -> type B, incomplete)") {
+
+  test("⨯ update proposal in another user's program") {
     createProgramAs(pi).flatMap { pid =>
-      // First add the proposal
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    queue: {
-                      minPercentTime: 40
-                    }
-                  }
-                  category: COSMOLOGY
-                  toOActivation: NONE
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 100
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Queue {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected =
-          Right(json"""
-            {
-              "createProposal" : {
-                "proposal": { 
-                  "proposalClass": {
-                    "__typename" : "Queue",
-                    "minPercentTime": 40
-                  }
-                }
-              }
-            }
-          """)
-      ) >>
-      // Now update it with an incomplete type-B proposal class
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  proposalClass: {
-                    intensive: {
-                      minPercentTime: 60
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                proposalClass {
-                  __typename
-                  ... on Intensive {
-                    minPercentTime
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = Left(List(UpdateProposalError.InconsistentUpdate(pid).message))
-      )
-    }
-  }
-  
-  test("update fails with no existing proposal") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  title: "updated title"
-                }
-              }
-            ) {
-              proposal {
-                title
-              }
-            }
-          }
-        """,
-        expected = Left(List(UpdateProposalError.UpdateFailed(pid).message))
-      )
-    }
-  }
-  
-  test("partner splits must sum to 100") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
-      expect(
-        user = pi2,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  partnerSplits: [
-                    {
-                      partner: AR
-                      percent: 70
-                    }
-                    {
-                      partner: KECK
-                      percent: 31
-                    }
-                  ]
-                }
-              }
-            ) {
-              proposal {
-                title
-              }
-            }
-          }
-        """,
-        expected =
-          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
-      )
-    }
-  }
-  
-  test("partner splits cannot be empty") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
-      expect(
-        user = pi2,
-        query = s"""
-          mutation {
-            updateProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  partnerSplits: []
-                }
-              }
-            ) {
-              proposal {
-                title
-              }
-            }
-          }
-        """,
-        expected =
-          Left(List("Argument 'input.SET.partnerSplits' is invalid: Percentages must sum to exactly 100."))
-      )
-    }
-  }
-  
-  test("user cannot update proposal in another user's program") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       expect(
         user = pi2,
         query = s"""
@@ -529,19 +712,19 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(OdbError.InvalidProgram(pid).message))
+        expected =
+          List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
       )
     }
   }
-  
-  test("guest cannot update proposal") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
+
+  test("⨯ guest update proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, title = "initial title") *>
       // the non-guest requirement gets caught before it even gets to the service.
       expect(
         user = guest,
@@ -555,18 +738,17 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(OdbError.NotAuthorized(guest.id).message))
+        expected =
+          List(s"User ${guest.id} is not authorized to perform this operation.").asLeft
       )
     }
   }
-  
-  test("attempt to update proposal in non-existent program") {
+
+  test("⨯ update proposal in non-existent program") {
     val badPid = Program.Id.fromLong(Long.MaxValue).get
     expect(
       user = pi,
@@ -580,19 +762,18 @@ class updateProposal extends OdbSuite {
               }
             }
           ) {
-            proposal {
-              title
-            }
+            proposal { title }
           }
         }
       """,
-      expected = Left(List(OdbError.InvalidProgram(badPid).message))
+      expected =
+        List(s"Program $badPid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
     )
   }
-  
-  test("Attempt to update proposal in non-science program") {
-    createProgramWithProposalAs(pi).flatMap { pid =>
-      setProgramReference(pi, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
+
+  test("⨯ update proposal in non-science program") {
+    createProgramAs(pi).flatMap { pid =>
+      setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
         query = s"""
@@ -605,14 +786,14 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal {
-                title
-              }
+              proposal { title }
             }
           }
         """,
-        expected = Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Engineering).message))
+        expected =
+          List(s"Program $pid is of type Engineering. Only Science programs can have proposals.").asLeft
       )
     }
   }
+
 }

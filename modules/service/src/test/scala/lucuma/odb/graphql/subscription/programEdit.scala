@@ -241,7 +241,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            addProposal(pi, pid, "initial") >>
+            addProposal(pi, pid, title = "initial") >>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
             query(
               pi,
@@ -271,6 +271,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
 
   test("edit event should show up for updating the partner splits") {
     import Group2.pi
+    import Group2.service
     subscriptionExpect(
       user = pi,
       query =
@@ -281,9 +282,13 @@ class programEdit extends OdbSuite with SubscriptionUtils {
               value {
                 name
                 proposal {
-                  partnerSplits {
-                    partner
-                    percent
+                  type {
+                    ... on Queue {
+                      partnerSplits {
+                        partner
+                        percent
+                      }
+                    }
                   }
                 }
               }
@@ -294,7 +299,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            addProposal(pi, pid, "initial") >>
+            createCallForProposalsAs(service).flatMap(addQueueProposal(pi, pid, _)) >>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
             query(
               pi,
@@ -303,16 +308,20 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                 updateProposal(input: {
                   programId: "$pid"
                   SET: {
-                    partnerSplits: [
-                      {
-                        partner: US
-                        percent: 60
-                      },
-                      {
-                        partner: AR
-                        percent: 40
+                    type: {
+                      queue: {
+                        partnerSplits: [
+                          {
+                            partner: US
+                            percent: 60
+                          },
+                          {
+                            partner: AR
+                            percent: 40
+                          }
+                        ]
                       }
-                    ]
+                    }
                   }
                 }) {
                   proposal {
@@ -327,8 +336,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "partnerSplits": [] } } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } }"""
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [] } } } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
         )
     )
   }

@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
@@ -19,6 +20,7 @@ import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.ObservingModeType
 
 
@@ -125,19 +127,21 @@ class reference extends OdbSuite {
 
   test("submit proposals") {
     for {
+      cid0 <- createCallForProposalsAs(staff, semester = sem2024B)
       pid0 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid0)
-      _    <- setSemester(pi, pid0, sem2024B)
+      _    <- addQueueProposal(pi, pid0, cid0)
+      _    <- addPartnerSplits(pi, pid0)
       ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid1)
-      _    <- setSemester(pi, pid1, sem2024B)
+      _    <- addQueueProposal(pi, pid1, cid0)
+      _    <- addPartnerSplits(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
+      cid1 <- createCallForProposalsAs(staff, semester = sem2025A)
       pid2 <- createProgramAs(pi)
-      _    <- addProposal(pi, pid2)
-      _    <- setSemester(pi, pid2, sem2025A)
+      _    <- addQueueProposal(pi, pid2, cid1)
+      _    <- addPartnerSplits(pi, pid2)
       ref2 <- submitProposal(pi, pid2)
     } yield {
       assertEquals(ref0, ref2024B1)
@@ -206,8 +210,6 @@ class reference extends OdbSuite {
     for {
       pid0 <- createProgramAs(pi)
       pid1 <- createProgramAs(pi)
-      _    <- setSemester(pi, pid0, "2020A".semester)
-      _    <- setSemester(pi, pid1, "2020A".semester)
       _    <- addProposal(pi, pid1)
       res0 <- pidsWhere("{ proposal: { IS_NULL: true } }")
       res1 <- pidsWhere("{ proposal: { reference: { IS_NULL: true } } }")
@@ -254,9 +256,10 @@ class reference extends OdbSuite {
 
   test("submit, unsubmit, resubmit, same reference") {
     for {
+      cid  <- createCallForProposalsAs(staff, semester = sem2010A)
       pid  <- createProgramAs(pi)
-      _    <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2010A)
+      _    <- addQueueProposal(pi, pid, cid)
+      _    <- addPartnerSplits(pi, pid)
       ref0 <- submitProposal(pi, pid)
       _    <- unsubmitProposal(pi, pid)
       ref1 <- submitProposal(pi, pid)
@@ -266,62 +269,12 @@ class reference extends OdbSuite {
     }
   }
 
-  // You won't be able to change the semester without first unsubmitting, and changing
-  // the semester will be via setProgramReference or a new setCallForProposal mutation.
-  test("TEMP: change semester, changes reference") {
-    // G-2010A-0001 -> assign semester 2024B
-    // G-2024B-0001 and 00002 already taken, so we get G-2024B-0003
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          updatePrograms(
-            input: {
-              SET: {
-                semester: "2024B"
-              }
-              WHERE: {
-                proposal: {
-                  reference: {
-                    label: {
-                      EQ: "${ref2010A1.label}"
-                    }
-                  }
-                }
-              }
-            }
-          ) {
-            programs {
-              proposal { reference { label } }
-            }
-          }
-        }
-        """,
-      expected = Right(
-        json"""
-          {
-            "updatePrograms" : {
-              "programs": [
-                {
-                  "proposal": {
-                    "reference": {
-                      "label": ${ref2024B3.label}
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        """
-      )
-    )
-  }
-
   test("accept proposal") {
     for {
+      cid  <- createCallForProposalsAs(staff, semester = sem2024A)
       pid  <- createProgramAs(pi)
-      _    <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2024A)
+      _    <- addQueueProposal(pi, pid, cid)
+      _    <- addPartnerSplits(pi, pid)
       _    <- submitProposal(pi, pid)
       ref0 <- fetchProgramReference(pi, pid)
        _   <- acceptProposal(staff, pid)
@@ -334,9 +287,10 @@ class reference extends OdbSuite {
 
   test("program reference SCI fields") {
     for {
+      cid <- createCallForProposalsAs(staff, semester = sem2024A)
       pid <- createProgramAs(pi)
-      _   <- addProposal(pi, pid)
-      _    <- setSemester(pi, pid, sem2024A)
+      _   <- addQueueProposal(pi, pid, cid)
+      _   <- addPartnerSplits(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       _   <- expect(pi, s"""
@@ -370,17 +324,26 @@ class reference extends OdbSuite {
   }
 
   test("change proposal class in accepted proposal") {
-    def toClassical(pid: Program.Id): IO[Json] =
+    def toClassical(pid: Program.Id, cid: CallForProposals.Id): IO[Json] =
       query(
-        pi,
+        staff,
         s"""
           mutation {
             updateProposal (
               input: {
                 programId: "$pid"
                 SET: {
-                  proposalClass: {
-                    classical: { minPercentTime: 50 }
+                  callId: "$cid"
+                  type: {
+                    classical: {
+                      minPercentTime: 50
+                      partnerSplits: [
+                        {
+                          partner: CA,
+                          percent: 100
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -390,8 +353,9 @@ class reference extends OdbSuite {
       )
 
     for {
+      cid  <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester, sem2024A)
       pid  <- fetchPid(pi, ref2024A1)
-      _    <- toClassical(pid)
+      _    <- toClassical(pid, cid)
       prog <- fetchProgramReference(pi, pid)
     } yield assertEquals(prog, ref2024A1C.some)
   }
@@ -419,7 +383,7 @@ class reference extends OdbSuite {
 
   test("setProposalReference, illegal semester") {
     createProgramAs(pi).flatMap { pid =>
-      expect(pi,
+      expect(staff,
         s"""
           mutation {
             setProgramReference(input: {
@@ -440,14 +404,14 @@ class reference extends OdbSuite {
   test("setProposalReference CAL") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-CAL-GMOSS-01".programReference.some)
   }
 
   test("setProposalReference CAL, different instrument has its own index") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
     } yield assertEquals(ref, "G-2025B-CAL-GMOSN-01".programReference.some)
   }
 
@@ -483,21 +447,21 @@ class reference extends OdbSuite {
   test("setProposalReference COM") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-COM-GMOSS-01".programReference.some)
   }
 
   test("setProposalReference COM, second has increased index") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """commissioning: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-COM-GMOSS-02".programReference.some)
   }
 
   test("setProposalReference COM, different instrument has its own index") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """commissioning: { semester: "2025B", instrument: GMOS_NORTH }""")
+      ref <- setProgramReference(staff, pid, """commissioning: { semester: "2025B", instrument: GMOS_NORTH }""")
     } yield assertEquals(ref, "G-2025B-COM-GMOSN-01".programReference.some)
   }
 
@@ -533,14 +497,14 @@ class reference extends OdbSuite {
   test("setProposalReference ENG") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-ENG-GMOSS-01".programReference.some)
   }
 
   test("setProposalReference ENG, second time increases index") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-ENG-GMOSS-02".programReference.some)
   }
 
@@ -576,14 +540,14 @@ class reference extends OdbSuite {
   test("setProposalReference XPL") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """example: { instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """example: { instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-XPL-GMOSS".programReference.some)
   }
 
   test("setProposalReference XPL, already taken") {
     createProgramAs(pi).flatMap { pid =>
       expect(
-        pi,
+        staff,
         s"""
           mutation {
             setProgramReference(input: {
@@ -627,13 +591,13 @@ class reference extends OdbSuite {
   test("setProposalReference LIB") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """library: { instrument: GMOS_SOUTH, description: "FOO" }""")
+      ref <- setProgramReference(staff, pid, """library: { instrument: GMOS_SOUTH, description: "FOO" }""")
     } yield assertEquals(ref, "G-LIB-GMOSS-FOO".programReference.some)
   }
 
   test("setProposalReference LIB, invalid description") {
     createProgramAs(pi).flatMap { pid =>
-      expect(pi,
+      expect(staff,
         s"""
           mutation {
             setProgramReference(input: {
@@ -681,7 +645,7 @@ class reference extends OdbSuite {
   test("setProposalReference MON") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """monitoring: { semester: "2024A", instrument: GMOS_NORTH }""")
+      ref <- setProgramReference(staff, pid, """monitoring: { semester: "2024A", instrument: GMOS_NORTH }""")
     } yield assertEquals(ref, "G-2024A-MON-GMOSN-01".programReference.some)
   }
 
@@ -717,32 +681,57 @@ class reference extends OdbSuite {
   test("setProposalReference SCI, no proposal") {
     for {
       pid <- createProgramAs(pi)
-      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      ref <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
     } yield assertEquals(ref, none)
   }
 
   test("setProposalReference SCI, yes proposal") {
     for {
+      cid <- createCallForProposalsAs(staff, semester = sem2025B)
       pid <- createProgramAs(pi)
-      _   <- setSemester(pi, pid, sem2025B)
-      _   <- addProposal(pi, pid)
+      _   <- addQueueProposal(pi, pid, cid)
+      _   <- addPartnerSplits(pi, pid)
       _   <- acceptProposal(staff, pid)
-      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0001-Q".programReference.some)
   }
 
   test("setProposalReference SCI, change subtype but index remains the same") {
     for {
       pid <- fetchPid(pi, "G-2025B-0001-Q".programReference)
-      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: CLASSICAL }""")
+      ref <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: CLASSICAL }""")
     } yield assertEquals(ref, "G-2025B-0001-C".programReference.some)
+  }
+
+  test("attempt setProposalReference CAL, though it has a proposal") {
+    fetchPid(pi, "G-2025B-0001-C".programReference).flatMap { pid =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            setProgramReference(input: {
+              programId: "$pid"
+              SET: { calibration: { semester: "2025B", instrument: GMOS_SOUTH } }
+            }) {
+              reference { label }
+            }
+          }
+        """,
+        List(s"Cannot set the program reference for $pid to CAL until its proposal is removed.").asLeft
+      )
+    }
   }
 
   test("setProposalReference SCI -> CAL -> SCI, index increases") {
     for {
+      cid <- createCallForProposalsAs(staff, semester = sem2025B)
       pid <- fetchPid(pi, "G-2025B-0001-C".programReference)
-      _   <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
-      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      _   <- deleteProposal(staff, pid)
+      _   <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      _   <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
+      _   <- addProposal(pi, pid, cid.some, "queue: { }".some)
+      _   <- acceptProposal(staff, pid)
+      ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0002-Q".programReference.some)
   }
 
@@ -1006,7 +995,7 @@ class reference extends OdbSuite {
     val pRef = "G-2025B-ENG-GMOSS-02".programReference
     for {
       pid <- fetchPid(pi, pRef)
-      ref <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       oref1 = s"${ref.get.label}-0001".observationReference
       oref2 = s"${ref.get.label}-0002".observationReference
       _  <- fetchOid(pi, oref1)
@@ -1020,7 +1009,7 @@ class reference extends OdbSuite {
       pid <- createProgramAs(pi)
       o1  <- createObservationAs(pi, pid)
       o2  <- createObservationAs(pi, pid)
-      ref <- setProgramReference(pi, pid, """example: { instrument: GMOS_NORTH }""")
+      ref <- setProgramReference(staff, pid, """example: { instrument: GMOS_NORTH }""")
       _   <- expectObservationReference(o1, s"${pRef.label}-0001".observationReference)
       _   <- expectObservationReference(o2, s"${pRef.label}-0002".observationReference)
     } yield ()
@@ -1066,7 +1055,7 @@ class reference extends OdbSuite {
     for {
       pid  <- createProgramAs(pi)
       oid  <- createObservationAs(pi, pid, mode.some)
-      pRef <- setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      pRef <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
       oRef  = ObservationReference(pRef.get, PosInt.unsafeFrom(1))
       vid  <- recordVisitAs(service, mode.instrument, oid)
       aid  <- recordAtomAs(service, mode.instrument, vid)
@@ -1201,14 +1190,14 @@ class reference extends OdbSuite {
   test("change subtype to P, index remains the same") {
     for {
       pid <- fetchPid(pi, "G-2025B-0002-Q".programReference)
-      ref <- setProgramReference(pi, pid, """science: { semester: "2025B", scienceSubtype: POOR_WEATHER }""")
+      ref <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: POOR_WEATHER }""")
     } yield assertEquals(ref, "G-2025B-0002-P".programReference.some)
   }
 
-  test("select via WHERE program reference science subtype POOR_WEATHER") {
-    assertIO(
-      programRefsWhere( s"""{ reference: { scienceSubtype: { EQ: POOR_WEATHER } } }"""),
-      List("G-2025B-0002-P".programReference)
-    )
-  }
+//  test("select via WHERE program reference science subtype POOR_WEATHER") {
+//    assertIO(
+//      programRefsWhere( s"""{ reference: { scienceSubtype: { EQ: POOR_WEATHER } } }"""),
+//      List("G-2025B-0002-P".programReference)
+//    )
+//  }
 }

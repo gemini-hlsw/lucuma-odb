@@ -12,6 +12,7 @@ import lucuma.core.model.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.CallForProposalsType.DemoScience
 import lucuma.odb.data.TargetRole
 
 class createTarget extends OdbSuite {
@@ -241,8 +242,9 @@ class createTarget extends OdbSuite {
 
   test("[general] can create a target with a proposal reference") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) *>
-      setSemester(pi, pid, Semester.unsafeFromString("2025A")) *>
+      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+        addDemoScienceProposal(pi, pid, cid)
+      } *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""

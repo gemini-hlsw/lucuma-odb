@@ -13,11 +13,13 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
+import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class targetGroup extends OdbSuite {
 
-  val pi       = TestUsers.Standard.pi(1, 30)
-  val validUsers = List(pi)
+  val pi         = TestUsers.Standard.pi(nextId, nextId)
+  val staff      = TestUsers.Standard.staff(nextId, nextId)
+  val validUsers = List(pi, staff)
 
   test("targets should be correctly grouped") {
     List(pi).traverse { user =>
@@ -183,9 +185,9 @@ class targetGroup extends OdbSuite {
   test("should work with a proposal reference") {
     List(pi).traverse { user =>
       for {
+        cid  <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramAs(user)
-        _    <- addProposal(user, pid)
-        _    <- setSemester(user, pid, Semester.unsafeFromString("2025A"))
+        _    <- addDemoScienceProposal(user, pid, cid)
         _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(3)
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))

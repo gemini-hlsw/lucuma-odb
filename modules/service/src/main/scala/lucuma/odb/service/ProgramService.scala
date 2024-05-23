@@ -12,6 +12,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Guest
@@ -61,7 +62,7 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]]
+  def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -187,17 +188,28 @@ object ProgramService {
                 .failure
           }
 
-      override def setProgramReference(input: SetProgramReferenceInput): F[Result[(Program.Id, Option[ProgramReference])]] =
+      override def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]] = {
+        def validateProposal(pid: Program.Id): F[Result[Unit]] =
+          proposalService.hasProposal(pid).map { hasProposal =>
+            OdbError
+              .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${input.SET.programType.abbreviation} until its proposal is removed.".some)
+              .asFailure
+              .whenA(hasProposal && input.SET.programType != ProgramType.Science)
+          }
+
         programService.resolvePid(input.programId,input.proposalReference, input.programReference).flatMap: r =>
           r.flatTraverse: pid =>
-            setProgramReferenceImpl(pid, input.SET).map: oref =>
-              oref.map((pid, _))
+            (for {
+              _ <- ResultT(validateProposal(pid))
+              r <- ResultT(setProgramReferenceImpl(pid, input.SET).map(_.map((pid, _))))
+            } yield r).value
+      }
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, SETʹ.semester, user))
+          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user))
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -297,9 +309,6 @@ object ProgramService {
                 .toList
                 .map(_.success)
             }
-          }.recover {
-            case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
-              UpdateProgramsError.InvalidSemester(SET.semester).failure
           }
 
         (for {
@@ -423,8 +432,7 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.map(sql"c_name = $text_nonempty"),
-          SET.semester.map(sql"c_semester = $semester"),
+          SET.name.map(sql"c_name = $text_nonempty")
         ).flatten
       )
 
@@ -492,15 +500,15 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[(Option[NonEmptyString], Option[Semester], User), Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name, c_semester, c_pi_user_id, c_pi_user_type)
-        VALUES (${text_nonempty.opt}, ${semester.opt}, ${(user_id ~ user_type).opt})
+        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
+        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
         RETURNING c_program_id
       """.query(program_id)
          .contramap {
-            case (oNes, oSem, ServiceUser(_, _)) => (oNes, oSem, None)
-            case (oNes, oSem, nonServiceUser   ) => (oNes, oSem, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
+            case (oNes, ServiceUser(_, _)) => (oNes, None)
+            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
 
     /** Link a user to a program, without any access checking. */

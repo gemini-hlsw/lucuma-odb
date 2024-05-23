@@ -15,11 +15,13 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class constraintSetGroup extends OdbSuite {
 
-  val pi       = TestUsers.Standard.pi(1, 30)
-  val validUsers = List(pi)
+  val pi         = TestUsers.Standard.pi(nextId, nextId)
+  val staff      = TestUsers.Standard.staff(nextId, nextId)
+  val validUsers = List(pi, staff)
 
   def createObservation(user: User, pid: Program.Id, iq: ImageQuality, sb: SkyBackground): IO[Observation.Id] =
     query(
@@ -128,8 +130,9 @@ class constraintSetGroup extends OdbSuite {
           create2(ImageQuality.PointOne, SkyBackground.Bright),
           create2(ImageQuality.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
-          addProposal(user, pid) *>
-          setSemester(user, pid, Semester.unsafeFromString("2025A")) *>
+          createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+           addDemoScienceProposal(user, pid, cid)
+          } *>
           submitProposal(user, pid) *>
           expect(
             user = user,
