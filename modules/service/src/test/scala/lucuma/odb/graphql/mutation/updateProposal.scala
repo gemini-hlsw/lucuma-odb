@@ -285,6 +285,112 @@ class updateProposal extends OdbSuite {
     }
   }
 
+  test("✓ change type to PW") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTime: 50
+             toOActivation: STANDARD
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    poorWeather: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "POOR_WEATHER"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ change type to C") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid, callProps =
+        s"""
+          largeProgram: {
+             minPercentTime: 50
+             toOActivation: STANDARD
+             minPercentTotalTime: 25
+             totalTime: { hours: 10.0 }
+          }
+        """.some
+      ) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  title: "updated title"
+                  category: SMALL_BODIES
+                  type: {
+                    classical: { }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Classical {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "CLASSICAL",
+                  "minPercentTime": 100
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
   test("⨯ missing proposal") {
     createProgramAs(pi).flatMap { pid =>
       expect(

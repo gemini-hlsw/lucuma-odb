@@ -114,7 +114,7 @@ object ProposalService {
     def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
       subtype match {
         case ScienceSubtype.FastTurnaround =>
-          s"Submitted proposal $pid of type ${subtype.title} must specify the piAffiliate".invalidArg
+          s"Submitted proposal $pid of type ${subtype.title} must specify the piAffiliation.".invalidArg
         case _ =>
           s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
       }
