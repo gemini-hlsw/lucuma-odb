@@ -67,7 +67,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("⨯ missing partner splits") {
+  test("⨯ missing partner splits (queue)") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
@@ -87,6 +87,67 @@ class setProposalStatus extends OdbSuite {
           """,
           expected =
             List(s"Submitted proposal $pid of type Queue must specify partner time percentages which sum to 100%.").asLeft
+        )
+      }
+    }
+  }
+
+  test("⨯ missing piAffiliation (fast turnaround)") {
+    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "fastTurnaround: {}".some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            List(s"Submitted proposal $pid of type Fast Turnaround must specify the piAffiliation.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓  having piAffiliation (fast turnaround)") {
+    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "fastTurnaround: { piAffiliation: US }".some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "proposal": {
+                      "reference": { "label": "G-2025A-0002" }
+                    }
+                  }
+                }
+              }
+            """.asRight
+
         )
       }
     }
@@ -269,7 +330,7 @@ class setProposalStatus extends OdbSuite {
                 "program": {
                   "id" : $pid,
                   "proposalStatus": "SUBMITTED",
-                  "proposal": { "reference": { "label": "G-2025A-0002" } }
+                  "proposal": { "reference": { "label": "G-2025A-0003" } }
                  }
               }
             }
