@@ -575,16 +575,6 @@ type CategorizedTimeRange {
 }
 
 """
-Classical observing at Gemini
-"""
-input ClassicalInput {
-  """
-  The minPercentTime field is required when creating a new instance of classical, but optional when editing
-  """
-  minPercentTime: IntPercent
-}
-
-"""
 Describes an observation clone operation, making any edits in the `SET`
 parameter.  The observation status in the cloned observation defaults to NEW.
 Identify the observation to clone by specifying either its id or reference.  If
@@ -854,24 +844,15 @@ input DeclinationInput {
   dms: DmsString
 }
 
-"""
-Demo science
-"""
-input DemoScienceInput {
-  """
-  The minPercentTime field is required when creating a new instance of demoScience, but optional when editing
-  """
-  minPercentTime: IntPercent
+"Input for deleting a proposal."
+input DeleteProposalInput {
+  programId: ProgramId!
 }
 
-"""
-Director's time
-"""
-input DirectorsTimeInput {
-  """
-  The minPercentTime field is required when creating a new instance of directorsTime, but optional when editing
-  """
-  minPercentTime: IntPercent
+"The result of deleting a proposal."
+type DeleteProposalResult {
+  "`true` if a proposal was deleted, `false` otherwise."
+  result: Boolean!
 }
 
 """
@@ -1015,16 +996,6 @@ input EmissionLinesSurfaceInput {
   fluxDensityContinuum: FluxDensityContinuumSurfaceInput
 }
 
-"""
-Exchange observing at Keck/Subaru
-"""
-input ExchangeInput {
-  """
-  The minPercentTime field is required when creating a new instance of exchange, but optional when editing
-  """
-  minPercentTime: IntPercent
-}
-
 "Execution event types."
 enum ExecutionEventType {
   "Sequence-level event type."
@@ -1056,16 +1027,6 @@ input ExposureTimeModeInput {
   The fixedExposure field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   fixedExposure: FixedExposureModeInput
-}
-
-"""
-Fast turnaround observing at Gemini
-"""
-input FastTurnaroundInput {
-  """
-  The minPercentTime field is required when creating a new instance of fastTurnaround, but optional when editing
-  """
-  minPercentTime: IntPercent
 }
 
 """
@@ -2444,46 +2405,6 @@ input HourAngleRangeInput {
 }
 
 """
-Intensive program observing at Subaru
-"""
-input IntensiveInput {
-  """
-  The minPercentTime field is required when creating a new instance of intensive, but optional when editing
-  """
-  minPercentTime: IntPercent
-
-  """
-  The minPercentTotalTime field is required when creating a new instance of intensive, but optional when editing
-  """
-  minPercentTotalTime: IntPercent
-
-  """
-  The totalTime field is required when creating a new instance of intensive, but optional when editing
-  """
-  totalTime: TimeSpanInput
-}
-
-"""
-Large program observing at Gemini
-"""
-input LargeProgramInput {
-  """
-  The minPercentTime field is required when creating a new instance of largeProgram, but optional when editing
-  """
-  minPercentTime: IntPercent
-
-  """
-  The minPercentTotalTime field is required when creating a new instance of largeProgram, but optional when editing
-  """
-  minPercentTotalTime: IntPercent
-
-  """
-  The totalTime field is required when creating a new instance of largeProgram, but optional when editing
-  """
-  totalTime: TimeSpanInput
-}
-
-"""
 A line flux value with integrated units
 """
 input LineFluxIntegratedInput {
@@ -2745,6 +2666,9 @@ type Mutation {
     input: CloneTargetInput!
   ): CloneTargetResult!
 
+  """
+  Creates a Call for Proposals.  Requires staff access.
+  """
   createCallForProposals(
     input: CreateCallForProposalsInput!
   ): CreateCallForProposalsResult!
@@ -2794,6 +2718,13 @@ type Mutation {
     """
     input: CreateTargetInput!
   ): CreateTargetResult!
+
+  """
+  Deletes the given program's proposal, if any.
+  """
+  deleteProposal(
+    input: DeleteProposalInput!
+  ): DeleteProposalResult!
 
   """
   Link a user to a program. Any existing link will be replaced.
@@ -3155,16 +3086,6 @@ input PartnerSplitInput {
 }
 
 """
-Poor weather
-"""
-input PoorWeatherInput {
-  """
-  The minPercentTime field is required when creating a new instance of poorWeather, but optional when editing
-  """
-  minPercentTime: IntPercent
-}
-
-"""
 Create or edit position angle constraint.  If not specified, then the
 position angle required to reach the best guide star option will be used.
 
@@ -3215,13 +3136,6 @@ input ProgramPropertiesInput {
   name: NonEmptyString
 
   """
-  The semester associated with the program, if any. If this value is
-  subsequently edited it will result in a new reference, with (likely) a
-  different index. Cannot be unset.
-  """
-  semester: Semester
-
-  """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
   """
   existence: Existence
@@ -3270,73 +3184,421 @@ input ProperMotionInput {
 }
 
 """
-Proposal class. Choose exactly one class type
+Proposal properties that depend on the particular call for proposals associated
+with this proposal.
 """
-input ProposalClassInput {
+interface ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+}
+
+"""
+Proposal properties for Regular Semester (Classical) CallForProposals.
+"""
+type Classical implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
   """
-  Classical observing at Gemini
+  Minimum percentage of observing time required to consider this proposal
+  successful.
   """
+  minPercentTime: IntPercent!
+
+  "Describes how time for the program will be apportioned across partners."
+  partnerSplits: [PartnerSplit!]!
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
+
+}
+
+"""
+Proposal properties for Demo Science CallForProposals.
+"""
+type DemoScience implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+}
+
+"""
+Proposal properties for Director's Time CallForProposals.
+"""
+type DirectorsTime implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+}
+
+"""
+Proposal properties for Fast Turnaround CallForProposals.
+"""
+type FastTurnaround implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Partner associated with this FT proposal.  This is optional until submission,
+  by which time it must be defined.
+  """
+  piAffiliation: Partner
+
+  # TODO: Reviewer?
+}
+
+"""
+Proposal properties for Large Program CallForProposals.
+"""
+type LargeProgram implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time (first semester) required to consider this
+  proposal successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Minimum percentage of the total observing time (over all semesters) required
+  to consider this proposal successful.
+  """
+  minPercentTotalTime: IntPercent!
+
+  """
+  Total time requested (over multiple all semesters) for this proposal.
+  """
+  totalTime: TimeSpan!
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+
+}
+
+"""
+Proposal properties for Regular Semester (Poor Weather) CallForProposals.
+"""
+type PoorWeather implements ProposalType {
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+}
+
+"""
+Proposal properties for Regular Semester (Queue) CallForProposals.
+"""
+type Queue implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+  """
+  Describes how time for the program will be apportioned across partners.
+  """
+  partnerSplits: [PartnerSplit!]!
+
+  # TODO: Band 3 ?
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+
+}
+
+"""
+Proposal properties for System Verification CallForProposals.
+"""
+type SystemVerification implements ProposalType {
+
+  "The science type of this Call for Proposals."
+  scienceSubtype: ScienceSubtype!
+
+  """
+  Whether (and how) the observations in this proposal are available for Target
+  of Opportunity triggering.
+  """
+  toOActivation: ToOActivation!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
+}
+
+"""
+Properties associated with particular proposal types.  Exactly one of
+these should be set upon creation or editing.
+"""
+input ProposalTypeInput {
+
   classical: ClassicalInput
 
-  """
-  Demo science
-  """
   demoScience: DemoScienceInput
 
-  """
-  Director's time
-  """
   directorsTime: DirectorsTimeInput
 
-  """
-  Exchange observing at Keck/Subaru
-  """
-  exchange: ExchangeInput
-
-  """
-  Fast turnaround observing at Gemini
-  """
   fastTurnaround: FastTurnaroundInput
 
-  """
-  Poor weather
-  """
-  poorWeather: PoorWeatherInput
-
-  """
-  Queue observing at Gemini
-  """
-  queue: QueueInput
-
-  """
-  System verification
-  """
-  systemVerification: SystemVerificationInput
-
-  """
-  Large program observing at Gemini
-  """
   largeProgram: LargeProgramInput
 
+  poorWeather: PoorWeatherInput
+
+  queue: QueueInput
+
+  systemVerification: SystemVerificationInput
+
+}
+
+input ClassicalInput {
+
   """
-  Intensive program observing at Subaru
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
   """
-  intensive: IntensiveInput
+  minPercentTime: IntPercent
+
+  """
+  The partnerSplits field specifies how time is apportioned over partners. This
+  will default to empty but if specified, the partner percents must sum to 100.
+  By submission time, it must be specified.
+  """
+  partnerSplits: [PartnerSplitInput!]
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+  # TODO: Visitors?
+
+}
+
+input DemoScienceInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+}
+
+input DirectorsTimeInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+}
+
+input FastTurnaroundInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+  """
+  Partner associated with this FT proposal.  This is optional on creation but
+  must be specified upon submission.
+  """
+  piAffiliation: Partner
+
+  # TODO: Reviewer?
+
+}
+
+input LargeProgramInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required (first semester) to consider this
+  proposal a success. If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+  """
+  The minimum percentage of time required over the lifetime of the program to
+  consider this proposal a success.  If not set, 100% is assumed.
+  """
+  minPercentTotalTime: IntPercent
+
+  """
+  The total time requested over the lifetime of the program.  If not set, zero
+  hours are assumed.
+  """
+  totalTime: TimeSpanInput
+
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+
+}
+
+"""
+The GraphQL specification requires that types and inputs have fields, even when
+there is no useful data to include.  This enumeration provides a placeholder
+value for an ignored field to satisfy the specification.
+"""
+enum Ignore {
+  IGNORE
+}
+
+"""
+Input for a poor weather proposal.  There are no fields to further specify a
+poor weather proposal but GraphQL requires at least one field.  Therefore this
+input includes a single optional 'ignore' field which need not be set.
+"""
+input PoorWeatherInput {
+
+  """
+  This field is not intended to be used (and may be left unset), but is required
+  by the GraphQL specification.
+  """
+  ignore: Ignore
+
+}
+
+input QueueInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+  """
+  The partnerSplits field specifies how time is apportioned over partners. This
+  will default to empty but if specified, the partner percents must sum to 100.
+  By submission time, it must be specified.
+  """
+  partnerSplits: [PartnerSplitInput!]
+
+  # TODO: Band 3 ?
+  # TODO: AEON / Multi-facility
+  # TODO: JWST Synergy
+  # TODO: US Long Term
+
+}
+
+input SystemVerificationInput {
+
+  """
+  The toOActivation field is optional. If not specified when creating a
+  proposal, it defaults to `NONE'.
+  """
+  toOActivation: ToOActivation
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
 }
 
 """
 Program proposal
 """
 input ProposalPropertiesInput {
+
   """
   The title field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   title: NonEmptyString
-
-  """
-  The proposalClass field is required when creating a new instance of proposal, but optional when editing
-  """
-  proposalClass: ProposalClassInput
 
   """
   The category field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -3344,31 +3606,30 @@ input ProposalPropertiesInput {
   category: TacCategory
 
   """
-  The toOActivation field is optional. If not specified when creating a proposal, it defaults to `NONE'.
-  """
-  toOActivation: ToOActivation
-
-  """
   The abstract field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   abstract: NonEmptyString
 
   """
-  The partnerSplits field is required when creating a new instance of proposal, but optional when editing
-  When specified, must sum to 100%
+  Sets the associated Call for Proposals. This is optional upon creation, but
+  must be set for a successful submission.  Also, the Call for Proposals type
+  must agree with the proposal type (see 'type' below).  For example a Queue
+  proposal must be submitted to a Regular Semester Call and a Demo Science
+  proposal must be submitted to a Demo Science Call, etc.
   """
-  partnerSplits: [PartnerSplitInput!]
+  callId: CallForProposalsId
+
+  """
+  Specifies the properties that depend on the call type. If not set on creation,
+  a regular semester queue proposal is assumed.  The selected call properties
+  must match the call (see 'callId' above) or a submission attempt will fail
+  with an error. Call properties can be edited, but when switching the call
+  type itself, all properties required for that type must be included.
+  """
+  type: ProposalTypeInput
+
 }
 
-"""
-Queue observing at Gemini
-"""
-input QueueInput {
-  """
-  The minPercentTime field is required when creating a new instance of queue, but optional when editing
-  """
-  minPercentTime: IntPercent
-}
 
 """
 Radial velocity, choose one of the available units
@@ -4045,16 +4306,6 @@ input ObservationEditInput {
 
 input ProgramEditInput {
   programId: ProgramId
-}
-
-"""
-System verification
-"""
-input SystemVerificationInput {
-  """
-  The minPercentTime field is required when creating a new instance of systemVerification, but optional when editing
-  """
-  minPercentTime: IntPercent
 }
 
 """
@@ -5022,16 +5273,6 @@ enum ChargeClass {
 }
 
 """
-Classical observing at Gemini
-"""
-type Classical implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
-
-"""
 Cloud extinction
 """
 enum CloudExtinction {
@@ -5427,26 +5668,6 @@ type Declination {
 }
 
 """
-Demo science
-"""
-type DemoScience implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
-
-"""
-Director's time
-"""
-type DirectorsTime implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
-
-"""
 Target declination coordinate in format '[+/-]DD:MM:SS.sss'
 """
 scalar DmsString
@@ -5530,16 +5751,6 @@ enum EphemerisKeyType {
 Reference observation epoch in format '[JB]YYYY.YYY'
 """
 scalar EpochString
-
-"""
-Exchange observing at Keck/Subaru
-"""
-type Exchange implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
 
 type Execution {
 
@@ -5717,16 +5928,6 @@ type ExposureTimeMode {
   Fixed exposure time mode data, if applicable
   """
   fixedExposure: FixedExposureMode
-}
-
-"""
-Fast turnaround observing at Gemini
-"""
-type FastTurnaround implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
 }
 
 """
@@ -7318,26 +7519,6 @@ An 'Int` in the range 0 to 100
 scalar IntPercent
 
 """
-Intensive program observing at Subaru
-"""
-type Intensive implements ProposalClass {
-  """
-  Minimum percent of time requested for this semester that is required
-  """
-  minPercentTime: IntPercent!
-
-  """
-  Minimum percent of total program time that is required
-  """
-  minPercentTotalTime: IntPercent!
-
-  """
-  Estimated total program time
-  """
-  totalTime: TimeSpan!
-}
-
-"""
 Contains the result of calling the ITC for a particular observation.  Since
 the observation may contain multiple targets, there may be multiple results.
 The "result" field contains the selected, representative, result for all
@@ -7360,27 +7541,6 @@ type ItcResult {
   exposureTime:  TimeSpan!
   exposures:     NonNegInt!
   signalToNoise: SignalToNoise!
-}
-
-
-"""
-Large program observing at Gemini
-"""
-type LargeProgram implements ProposalClass {
-  """
-  Minimum percent of time requested for this semester that is required
-  """
-  minPercentTime: IntPercent!
-
-  """
-  Minimum percent of total program time that is required
-  """
-  minPercentTotalTime: IntPercent!
-
-  """
-  Estimated total program time
-  """
-  totalTime: TimeSpan!
 }
 
 type LineFluxIntegrated {
@@ -7883,16 +8043,6 @@ enum PlanetaryNebulaSpectrum {
 }
 
 """
-Poor Weather
-"""
-type PoorWeather implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
-
-"""
 Constraints (if any) on the observation's position angle.
 """
 type PosAngleConstraint {
@@ -8203,19 +8353,10 @@ Metadata for `enum ProposalAttachmentType`
 type ProposalAttachmentTypeMeta {
   tag:        ProposalAttachmentType!
   shortName:  String!
-  longName:       String!
+  longName:   String!
 }
 
 type Proposal {
-  """
-  Proposal title
-  """
-  title: NonEmptyString
-
-  """
-  Proposal class
-  """
-  proposalClass: ProposalClass!
 
   """
   The proposal reference, assuming the proposal has been submitted and
@@ -8224,14 +8365,20 @@ type Proposal {
   reference: ProposalReference
 
   """
+  The corresponding CallForProposals definition itself, if the call id has been
+  set.
+  """
+  call: CallForProposals
+
+  """
+  Proposal title
+  """
+  title: NonEmptyString
+
+  """
   Proposal TAC category
   """
   category: TacCategory
-
-  """
-  Target of Opportunity activation
-  """
-  toOActivation: ToOActivation!
 
   """
   Abstract
@@ -8239,74 +8386,10 @@ type Proposal {
   abstract: NonEmptyString
 
   """
-  Partner time allocations
+  Properties of this proposal that are dependent upon the Call for Proposals
+  type.
   """
-  partnerSplits: [PartnerSplit!]!
-}
-
-"""
-Proposal Class interface
-"""
-interface ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
-}
-
-"""
-Proposal class type
-"""
-enum ProposalClassEnum {
-  """
-  ProposalClassEnum Classical
-  """
-  CLASSICAL
-
-  """
-  ProposalClassEnum DemoScience
-  """
-  DEMO_SCIENCE
-
-  """
-  ProposalClassEnum DirectorsTime
-  """
-  DIRECTORS_TIME
-
-  """
-  ProposalClassEnum Exchange
-  """
-  EXCHANGE
-
-  """
-  ProposalClassEnum FastTurnaround
-  """
-  FAST_TURNAROUND
-
-  """
-  ProposalClassEnum Intensive
-  """
-  INTENSIVE
-
-  """
-  ProposalClassEnum LargeProgram
-  """
-  LARGE_PROGRAM
-
-  """
-  ProposalClassEnum PoorWeather
-  """
-  POOR_WEATHER
-
-  """
-  ProposalClassEnum Queue
-  """
-  QUEUE
-
-  """
-  ProposalClassEnum SystemVerification
-  """
-  SYSTEM_VERIFICATION
+  type: ProposalType!
 }
 
 type ProposalReference {
@@ -8743,16 +8826,6 @@ type Query {
     includeDeleted: Boolean! = false
   ): TargetSelectResult!
 
-}
-
-"""
-Queue observing at Gemini
-"""
-type Queue implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
 }
 
 type RadialVelocity {
@@ -9888,16 +9961,6 @@ type StepRecordSelectResult {
   "`true` when there were additional matches that were not returned."
   hasMore: Boolean!
 
-}
-
-"""
-System Verification
-"""
-type SystemVerification implements ProposalClass {
-  """
-  Minimum percent of requested observation time that is required
-  """
-  minPercentTime: IntPercent!
 }
 
 """
@@ -11068,37 +11131,8 @@ input WhereEqProgramType {
 }
 
 """
-Filters on equality (or not) of the property value and the supplied criteria.
-All supplied criteria must match, but usually only one is selected.  E.g.
-'EQ = "Foo"' will match when the property value is "FOO".
-
-"""
-input WhereEqProposalClassType {
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: ProposalClassEnum
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: ProposalClassEnum
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [ProposalClassEnum!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [ProposalClassEnum!]
-}
-
-"""
 Filters on equality of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'EQ: "SUBMITTED'
-
 """
 input WhereEqProposalStatus {
   """
@@ -12708,11 +12742,6 @@ input WhereProposal {
   reference: WhereProposalReference
 
 #  """
-#  Matches the proposal class.
-#  """
-#  class: WhereProposalClass
-#
-#  """
 #  Matches the proposal TAC category.
 #  """
 #  category: WhereOptionEqTacCategory
@@ -12731,21 +12760,6 @@ input WhereProposal {
 #  Matches proposal partners.
 #  """
 #  partners: WhereProposalPartners
-}
-
-"""
-Proposal class filter options.
-"""
-input WhereProposalClass {
-  """
-  Proposal class type match.
-  """
-  type: WhereEqProposalClassType
-
-  """
-  Minimum acceptable percentage match.
-  """
-  minPercent: WhereOrderInt
 }
 
 """

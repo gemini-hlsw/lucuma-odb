@@ -1,15 +1,12 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql
-
-package input
+package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import lucuma.core.enums.ToOActivation
-import lucuma.core.model.IntPercent
+import lucuma.core.model.CallForProposals
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
@@ -17,74 +14,49 @@ import lucuma.odb.graphql.binding.*
 object ProposalPropertiesInput {
 
   case class Create(
-    title: Nullable[NonEmptyString],
-    proposalClass: Either[ProposalClassInput.TypeA.Create, ProposalClassInput.TypeB.Create],
-    category: Nullable[Tag],
-    toOActivation: ToOActivation,
-    abstrakt: Nullable[NonEmptyString],
-    partnerSplits: Option[Map[Tag, IntPercent]],
+    title:     Option[NonEmptyString],
+    category:  Option[Tag],
+    abstractʹ: Option[NonEmptyString],
+    callId:    Option[CallForProposals.Id],
+    typeʹ:     ProposalTypeInput.Create
   )
 
   case class Edit(
-    title: Nullable[NonEmptyString],
-    proposalClass: Option[Either[ProposalClassInput.TypeA.Edit, ProposalClassInput.TypeB.Edit]],
-    category: Nullable[Tag],
-    toOActivation: Option[ToOActivation],
-    abstrakt: Nullable[NonEmptyString],
-    partnerSplits: Option[Map[Tag, IntPercent]],
-  ) {
-    def asCreate: Option[Create] = {
-      val proposalClassʹ = proposalClass.flatMap {
-        case Left(a) => a.asCreate.map(_.asLeft)
-        case Right(b) => b.asCreate.map(_.asRight)
-      }
-      (proposalClassʹ, toOActivation).mapN { (pc, too) =>
-        Create(title, pc, category, too, abstrakt, partnerSplits)
-      }
-    }
+    title:     Nullable[NonEmptyString],
+    category:  Nullable[Tag],
+    abstractʹ: Nullable[NonEmptyString],
+    callId:    Nullable[CallForProposals.Id],
+    typeʹ:     Option[ProposalTypeInput.Edit]
+  )
 
+  object Edit {
+    val Empty: Edit =
+      Edit(Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None)
   }
 
-  private def data[A](
-    proposalClass: Matcher[A]
-  ): Matcher[(
-      Nullable[NonEmptyString],
-      Option[A],
-      Nullable[Tag],
-      Option[ToOActivation],
-      Nullable[NonEmptyString],
-      Option[Map[Tag, IntPercent]],
-  )] =
+  val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
-        NonEmptyStringBinding.Nullable("title", rTitle),
-        proposalClass.Option("proposalClass", rProposalClass),
-        TagBinding.Nullable("category", rCategory),
-        ToOActivationBinding.Option("toOActivation", rToOActivation),
-        NonEmptyStringBinding.Nullable("abstract", rAbstract),
-        PartnerSplitsInput.Option("partnerSplits", rSplits),
+        NonEmptyStringBinding.Option("title", rTitle),
+        TagBinding.Option("category", rCategory),
+        NonEmptyStringBinding.Option("abstract", rAbstract),
+        CallForProposalsIdBinding.Option("callId", rCid),
+        ProposalTypeInput.Create.Binding.Option("type", rType)
       ) =>
-        (rTitle, rProposalClass, rCategory, rToOActivation, rAbstract, rSplits).parTupled
-    }
-
-  val CreateBinding: Matcher[Create] =
-    data(ProposalClassInput.CreateBinding).rmap {
-      case (title, Some(propClass), cat, Some(too), abs, splits) => Result(Create(title, propClass, cat, too, abs, splits))
-      case _ => Matcher.validationFailure("Both proposalClass and toOActivation are required on creation.")
+        val t = rType.map(_.getOrElse(ProposalTypeInput.Create.Default))
+        (rTitle, rCategory, rAbstract, rCid, t).parMapN(Create.apply)
     }
 
   val EditBinding: Matcher[Edit] =
-    data(ProposalClassInput.EditBinding).map(Edit.apply)
-
-  private val PartnerSplitsInput: Matcher[Map[Tag, IntPercent]] =
-    PartnerSplitInput.Binding.List.rmap { splits =>
-      val map = splits.map(a => (a.partner -> a.percent)).toMap
-      if splits.length != map.size
-      then Matcher.validationFailure("Each partner may only appear once.")
-      else
-        if splits.foldMap(_.percent.value) != 100
-        then Matcher.validationFailure("Percentages must sum to exactly 100.")
-        else Result(map)
+    ObjectFieldsBinding.rmap {
+      case List(
+        NonEmptyStringBinding.Nullable("title", rTitle),
+        TagBinding.Nullable("category", rCategory),
+        NonEmptyStringBinding.Nullable("abstract", rAbstract),
+        CallForProposalsIdBinding.Nullable("callId", rCid),
+        ProposalTypeInput.Edit.Binding.Option("type", rType)
+      ) =>
+        (rTitle, rCategory, rAbstract, rCid, rType).parMapN(Edit.apply)
     }
 
 }

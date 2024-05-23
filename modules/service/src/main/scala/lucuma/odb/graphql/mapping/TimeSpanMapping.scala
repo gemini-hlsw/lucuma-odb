@@ -12,7 +12,7 @@ import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
-import lucuma.odb.graphql.table.ProposalTable
+import lucuma.odb.graphql.table.ProposalView
 import lucuma.odb.graphql.table.StepRecordView
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
@@ -22,7 +22,7 @@ import lucuma.odb.graphql.table.VisitTable
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
                                with ProgramTable[F]
-                               with ProposalTable[F]
+                               with ProposalView[F]
                                with ObservationView[F]
                                with GroupView[F]
                                with StepRecordView[F]
@@ -38,8 +38,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
-      timeSpanMappingAtPath(IntensiveType / "totalTime", ProposalTable.TotalTime)(ProposalTable.ProgramId),
-      timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalTable.TotalTime)(ProposalTable.ProgramId),
+      timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),
       timeSpanMappingAtPath(StepRecordType / "estimate", StepRecordView.TimeEstimate)(StepRecordView.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),

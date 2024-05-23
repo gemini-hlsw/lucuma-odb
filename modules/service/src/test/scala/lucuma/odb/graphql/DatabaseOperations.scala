@@ -25,6 +25,7 @@ import lucuma.core.enums.StepStage
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.RightAscension
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
@@ -53,6 +54,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -78,12 +80,43 @@ import scala.collection.immutable.SortedMap
 
 trait DatabaseOperations { this: OdbSuite =>
 
+  def createCallForProposalsAs(
+     user:        User,
+     callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
+     semester:    Semester             = Semester.unsafeFromString("2025A"),
+     activeStart: Timestamp            = Timestamp.FromString.unsafeGet("2025-02-01 14:00:00"),
+     activeEnd:   Timestamp            = Timestamp.FromString.unsafeGet("2025-07-31 14:00:00")
+  ): IO[CallForProposals.Id] =
+    query(user, s"""
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        ${callType.tag.toScreamingSnakeCase}
+                semester:    "${semester.format}"
+                activeStart: "${activeStart.format}"
+                activeEnd:   "${activeEnd.format}"
+              }
+            }
+          ) {
+            callForProposals {
+              id
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("createCallForProposals", "callForProposals", "id")
+        .as[CallForProposals.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
   def createProgramAs(user: User, name: String = null): IO[Program.Id] =
     query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }").flatMap { js =>
       js.hcursor
-        .downField("createProgram")
-        .downField("program")
-        .downField("id")
+        .downFields("createProgram", "program", "id")
         .as[Program.Id]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
@@ -151,25 +184,6 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  // Temporary until there is a Call for Proposal mutation that also sets the semester. At that time,
-  // ability to set the semester via updatePrograms will be removed.
-  def setSemester(user: User, pid: Program.Id, semester: Semester): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updatePrograms(
-            input: {
-              WHERE: { id: { EQ: "$pid" } }
-              SET: { semester: "${semester.format}" }
-            }
-          ) {
-            programs { id }
-          }
-        }
-      """
-    ).void
-
   def setProgramReference(user: User, pid: Program.Id, set: String): IO[Option[ProgramReference]] =
     query(
       user,
@@ -192,9 +206,42 @@ trait DatabaseOperations { this: OdbSuite =>
        .liftTo[IO]
     }
 
-  // For proposal tests where it doesn't matter what the proposal is, just that
-  // there is one.
-  def addProposal(user: User, pid: Program.Id, title: String = "my proposal"): IO[Unit] =
+  def addQueueProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] = {
+    addProposal(
+      user,
+      pid,
+      cid.some,
+      s"""
+        queue: {
+          toOActivation: NONE
+          minPercentTime: 0
+        }
+      """.some,
+      "Queue Proposal"
+    )
+  }
+
+  def addDemoScienceProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
+    addProposal(
+      user,
+      pid,
+      cid.some,
+      s"""
+        demoScience: {
+          toOActivation: NONE
+          minPercentTime: 0
+        }
+      """.some,
+      "Demo Science Proposal"
+    )
+
+  def addProposal(
+    user: User,
+    pid: Program.Id,
+    callId: Option[CallForProposals.Id] = None,
+    callProps: Option[String] = None,
+    title: String = "my proposal"
+  ): IO[Unit] =
     expect(
       user = user,
       query = s"""
@@ -204,33 +251,66 @@ trait DatabaseOperations { this: OdbSuite =>
               programId: "$pid"
               SET: {
                 title: "$title"
-                proposalClass: {
-                  queue: {
-                    minPercentTime: 50
-                  }
-                }
                 category: COSMOLOGY
-                toOActivation: NONE
+                ${callId.fold("")(c => s"callId: \"$c\"")}
+                ${callProps.fold("") { c =>
+                  s"""
+                    type: {
+                      $c
+                    }
+                  """
+                }}
               }
             }
           ) {
             proposal {
-              toOActivation
+              title
             }
           }
         }
       """,
       expected =
-        Right(json"""
-          {
-            "createProposal": {
-              "proposal": {
-                "toOActivation" : "NONE"
-               }
+        Json.obj(
+          "createProposal" -> Json.obj(
+            "proposal" -> Json.obj(
+              "title" -> title.asJson
+            )
+          )
+        ).asRight
+    )
+
+  def addPartnerSplits(
+    user: User,
+    pid: Program.Id,
+    proposalType: String = "queue"
+  ): IO[Unit] =
+    query(user, s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              type: {
+                $proposalType: {
+                  partnerSplits: [
+                    {
+                      partner: US
+                      percent: 70
+                    },
+                    {
+                      partner: CA
+                      percent: 30
+                    }
+                  ]
+                }
+              }
             }
           }
-        """)
-    )
+        ) {
+          proposal { title }
+        }
+      }
+    """).void
 
   def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
     query(user,  s"""
@@ -265,11 +345,20 @@ trait DatabaseOperations { this: OdbSuite =>
   def acceptProposal(user: User, pid: Program.Id): IO[Option[ProgramReference]] =
     setProposalStatus(user, pid, "ACCEPTED").map(_._1)
 
-  def createProgramWithProposalAs(user: User, name: String = null): IO[Program.Id] =
-    for {
-      pid <- createProgramAs(user, name)
-      _   <- addProposal(user, pid)
-    } yield pid
+  def deleteProposal(user: User, pid: Program.Id): IO[Boolean] =
+    query(user, s"""
+      mutation {
+        deleteProposal(
+          input: {
+            programId: "$pid"
+          }
+        ) {
+          result
+        }
+      }
+    """).flatMap { js =>
+      js.hcursor.downFields("deleteProposal", "result").as[Boolean].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+    }
 
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)

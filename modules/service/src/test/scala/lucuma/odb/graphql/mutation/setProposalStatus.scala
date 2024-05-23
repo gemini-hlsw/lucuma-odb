@@ -5,14 +5,20 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.effect.IO
+import cats.syntax.either.*
+import cats.syntax.option.*
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ProgramType
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
+import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
-import lucuma.odb.service.ProposalService.UpdateProposalError
+import lucuma.odb.service.ProposalService.error
 
 class setProposalStatus extends OdbSuite {
   
@@ -24,8 +30,130 @@ class setProposalStatus extends OdbSuite {
   val guest    = TestUsers.guest(6)
 
   val validUsers = List(pi, pi2, ngo, staff, admin, guest)
-  
-  test("edit proposal status (attempt update proposalStatus with no proposal)") {
+
+  test("✓ valid submission") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "proposal": {
+                      "reference": { "label": "G-2025A-0001" }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ missing partner splits (queue)") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            List(s"Submitted proposal $pid of type Queue must specify partner time percentages which sum to 100%.").asLeft
+        )
+      }
+    }
+  }
+
+  test("⨯ missing piAffiliation (fast turnaround)") {
+    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "fastTurnaround: {}".some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            List(s"Submitted proposal $pid of type Fast Turnaround must specify the piAffiliation.").asLeft
+        )
+      }
+    }
+  }
+
+  test("✓  having piAffiliation (fast turnaround)") {
+    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "fastTurnaround: { piAffiliation: US }".some) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "proposal": {
+                      "reference": { "label": "G-2025A-0002" }
+                    }
+                  }
+                }
+              }
+            """.asRight
+
+        )
+      }
+    }
+  }
+
+  test("⨯ update proposalStatus with no proposal") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi,
@@ -45,12 +173,12 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NoProposalForStatusChange(pid).message))
+          Left(List(error.missingProposal(pid).message))
       )
     }
   }
 
-  test("edit proposal status (pi attempts update proposalStatus to unauthorized status)") {
+  test("⨯ pi update proposalStatus to unauthorized status") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -71,12 +199,12 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NotAuthorizedNewProposalStatus(pid, pi, Tag("accepted")).message))
+          Left(List(error.notAuthorizedNew(pid, pi, Tag("accepted")).message))
       )
     }
   }
 
-  test("edit proposal status (guests cannot submit proposals)") {
+  test("⨯ guest submit") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       // the non-guest requirement gets caught before it even gets to the service.
@@ -103,7 +231,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("no semester for proposal submission") {
+  test("⨯ no CfP for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) >>
       expect(
@@ -124,15 +252,14 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NoSemesterForSubmittedProposal(pid).message))
+          Left(List(error.missingCfP(pid).message))
       )
     }
   }
 
-  test("non-science program type for proposal submission") {
+  test("⨯ non-science program type for proposal submission") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setProgramReference(pi, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
+      setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
         query = s"""
@@ -151,15 +278,33 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.InvalidProgramType(pid, ProgramType.Calibration).message))
+          Left(List(error.invalidProgramType(pid, ProgramType.Calibration).message))
       )
     }
   }
 
-  test("edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setSemester(pi, pid, Semester.unsafeFromString("2024B")) >>
+  def setCallId(pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateProposal(
+            input: {
+              programId: "$pid",
+              SET: {
+                callId: "$cid"
+              }
+            }
+          ) {
+            proposal { title }
+          }
+        }
+      """
+    ).void
+
+  test("✓ edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
+
+    def submit(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -178,20 +323,21 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program": { 
+                "program": {
                   "id" : $pid,
                   "proposalStatus": "SUBMITTED",
-                  "proposal": { "reference": { "label": "G-2024B-0001" } }
+                  "proposal": { "reference": { "label": "G-2025A-0003" } }
                  }
               }
             }
-          """
-        )
-      ) >>
+          """.asRight
+      )
+
+    def recall(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -209,20 +355,20 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program" : { 
+                "program" : {
                   "id" : $pid,
                   "proposalStatus": "NOT_SUBMITTED"
                 }
               }
             }
-          """
-        )
-      ) >>
-      chronProgramUpdates(pid).map(_.drop(3)).assertEquals(
+          """.asRight
+      )
+
+    def expected(pid: Program.Id): List[Json] =
         List(
           json"""
           {
@@ -275,14 +421,22 @@ class setProposalStatus extends OdbSuite {
           }
           """
         )
-      )
-    }
+
+    for {
+      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      p <- createProgramAs(pi)
+      _ <- addProposal(pi, p)
+      _ <- setCallId(p, c)
+      _ <- addPartnerSplits(pi, p)
+      _ <- submit(p)
+      _ <- recall(p)
+      l <- chronProgramUpdates(p)
+    } yield assertEquals(l.drop(3), expected(p))
   }
 
-  test("edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid) >>
-      setSemester(pi, pid, Semester.unsafeFromString("2024B")) >>
+  test("⨯ edit proposal status (staff can set to ACCEPTED, and pi cannot change it again)") {
+
+    def accept(pid: Program.Id): IO[Unit] =
       expect(
         user = staff,
         query = s"""
@@ -300,19 +454,20 @@ class setProposalStatus extends OdbSuite {
             }
           }
         """,
-        expected = Right(
+        expected =
           json"""
             {
               "setProposalStatus" : {
-                "program": { 
+                "program": {
                   "id" : $pid,
                   "proposalStatus": "ACCEPTED"
                  }
               }
             }
-          """
-        )
-      ) >>
+          """.asRight
+      )
+
+    def recall(pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
         query = s"""
@@ -331,12 +486,21 @@ class setProposalStatus extends OdbSuite {
           }
         """,
         expected =
-          Left(List(UpdateProposalError.NotAuthorizedOldProposalStatus(pid, pi, Tag("accepted")).message))
+          List(error.notAuthorizedOld(pid, pi, Tag("accepted")).message).asLeft
       )
-    }
+
+    for {
+      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      p <- createProgramAs(pi)
+      _ <- addProposal(pi, p)
+      _ <- addPartnerSplits(pi, p)
+      _ <- setCallId(p, c)
+      _ <- accept(p)
+      _ <- recall(p)
+    } yield ()
   }
 
-  test("user cannot set status of another user's proposal") {
+  test("⨯ user cannot set status of another user's proposal") {
     createProgramAs(pi).flatMap { pid =>
       expect(
         user = pi2,
@@ -361,7 +525,7 @@ class setProposalStatus extends OdbSuite {
     }
   }
 
-  test("attempt to set proposal status in non-existent program") {
+  test("⨯ attempt to set proposal status in non-existent program") {
     val badPid = Program.Id.fromLong(Long.MaxValue).get
     expect(
       user = pi,

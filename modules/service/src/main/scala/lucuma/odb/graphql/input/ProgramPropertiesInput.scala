@@ -8,49 +8,44 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import lucuma.core.model.Semester
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
 
 object ProgramPropertiesInput {
 
   case class Create(
-    name:     Option[NonEmptyString],
-    semester: Option[Semester],
+    name: Option[NonEmptyString]
   )
 
   object Create {
     val Empty: Create =
-      Create(None, None)
+      Create(None)
   }
 
   case class Edit(
     name:           Option[NonEmptyString],
-    semester:       Option[Semester],
     existence:      Option[Existence]
   )
 
   object Edit {
     val Empty: Edit =
-      Edit(None, None, None)
+      Edit(None, None)
   }
 
   private val data: Matcher[(
     Option[NonEmptyString],
-    Option[Semester],
     Option[Existence]
   )] =
     ObjectFieldsBinding.rmap {
       case List(
         NonEmptyStringBinding.Option("name", rName),
-        SemesterBinding.Option("semester", rSemester),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rSemester, rExistence).parTupled
+        (rName, rExistence).parTupled
     }
 
   val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
-    data.map((n, s, _) => Create(n, s))
+    data.map((n, _) => Create(n))
 
   val EditBinding: Matcher[Edit] =
     data.map(Edit.apply)
