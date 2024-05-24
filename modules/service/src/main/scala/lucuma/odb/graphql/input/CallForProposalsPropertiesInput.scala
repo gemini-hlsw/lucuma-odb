@@ -28,6 +28,7 @@ object CallForProposalsPropertiesInput {
     semester:    Semester,
     raLimit:     Option[(RightAscension, RightAscension)],
     decLimit:    Option[(Declination, Declination)],
+    deadline:    Option[Timestamp],
     active:      TimestampInterval,
     partners:    List[CallForProposalsPartnerInput],
     instruments: List[Instrument],
@@ -35,6 +36,8 @@ object CallForProposalsPropertiesInput {
   )
 
   object Create {
+    private val RequiresDeadlineTypes: List[CallForProposalsType] =
+      List(CallForProposalsType.DirectorsTime, CallForProposalsType.PoorWeather)
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -45,6 +48,7 @@ object CallForProposalsPropertiesInput {
           RightAscensionInput.Binding.Option("raLimitEnd",   rRaEnd),
           DeclinationInput.Binding.Option("decLimitStart",   rDecStart),
           DeclinationInput.Binding.Option("decLimitEnd",     rDecEnd),
+          TimestampBinding.Option("submissionDeadline", rDeadline),
           TimestampBinding("activeStart", rActiveStart),
           TimestampBinding("activeEnd",   rActiveEnd),
           CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
@@ -61,6 +65,16 @@ object CallForProposalsPropertiesInput {
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
+          val rDeadlineʹ = (rType, rDeadline).tupled.flatMap {
+            case (t, Some(d)) if RequiresDeadlineTypes.contains(t) =>
+              d.some.success
+            case (t, None)    if RequiresDeadlineTypes.contains(t) =>
+              Matcher.validationFailure(s"submissionDeadline required for ${RequiresDeadlineTypes.map(_.title).mkString(", ")}")
+            case (_, Some(d))                                      =>
+              Matcher.validationFailure(s"submissionDeadline only applies to ${RequiresDeadlineTypes.map(_.title).mkString(", ")}")
+            case _                                                 =>
+              none.success
+          }
           val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase).map(_.toList.flatten)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
@@ -68,6 +82,7 @@ object CallForProposalsPropertiesInput {
             rSemester,
             rRaLimit,
             rDecLimit,
+            rDeadlineʹ,
             rActive,
             rPartnersʹ,
             rInstrumentsʹ,
@@ -83,6 +98,7 @@ object CallForProposalsPropertiesInput {
     semester:    Option[Semester],
     raLimit:     Nullable[(RightAscension, RightAscension)],
     decLimit:    Nullable[(Declination, Declination)],
+    deadline:    Option[Timestamp],
     active:      Option[Ior[Timestamp, Timestamp]],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
@@ -100,6 +116,7 @@ object CallForProposalsPropertiesInput {
           RightAscensionInput.Binding.Nullable("raLimitEnd",   rRaEnd),
           DeclinationInput.Binding.Nullable("decLimitStart",   rDecStart),
           DeclinationInput.Binding.Nullable("decLimitEnd",     rDecEnd),
+          TimestampBinding.Option("submissionDeadline", rDeadline),
           TimestampBinding.NonNullable("activeStart", rActiveStart),
           TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
           CallForProposalsPartnerInput.Binding.List.Nullable("partners", rPartners),
@@ -124,6 +141,7 @@ object CallForProposalsPropertiesInput {
             rSemester,
             rRaLimit,
             rDecLimit,
+            rDeadline,
             rActive,
             rPartnersʹ,
             rInstrumentsʹ,
