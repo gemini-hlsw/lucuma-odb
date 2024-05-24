@@ -60,6 +60,7 @@ class createCallForProposals extends OdbSuite {
               raLimitEnd { hms }
               decLimitStart { dms }
               decLimitEnd { dms }
+              submissionDeadline
               active {
                 start
                 end
@@ -85,6 +86,7 @@ class createCallForProposals extends OdbSuite {
               "raLimitEnd":    null,
               "decLimitStart": null,
               "decLimitEnd":   null,
+              "submissionDeadline": null,
               "active": {
                 "start": "2025-02-01 14:00:00",
                 "end": "2025-07-31 14:00:00",
@@ -400,6 +402,51 @@ class createCallForProposals extends OdbSuite {
         }
       """,
       expected = List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
+    )
+  }
+
+  test("failure - missing submissionDeadline") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        POOR_WEATHER
+                semester:    "2025A"
+                activeStart: "2025-02-31 14:00:00"
+                activeEnd:   "2025-07-31 14:00:00"
+                decLimitEnd: { dms: "12:00:00" }
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: submissionDeadline required for Director's Time, Poor Weather").asLeft
+    )
+  }
+
+  test("failure - superfluous submissionDeadline") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                submissionDeadline: "2025-02-01 14:00:00"
+                activeStart: "2025-02-31 14:00:00"
+                activeEnd:   "2025-07-31 14:00:00"
+                decLimitEnd: { dms: "12:00:00" }
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: submissionDeadline only applies to Director's Time, Poor Weather").asLeft
     )
   }
 

@@ -167,6 +167,7 @@ object CallForProposalsService {
           c_ra_end,
           c_dec_start,
           c_dec_end,
+          c_deadline,
           c_active,
           c_existence
         )
@@ -177,6 +178,7 @@ object CallForProposalsService {
           ${right_ascension.opt},
           ${declination.opt},
           ${declination.opt},
+          ${core_timestamp.opt},
           $timestamp_interval_tsrange,
           $existence
         RETURNING
@@ -188,6 +190,7 @@ object CallForProposalsService {
         input.raLimit.map(_._2),
         input.decLimit.map(_._1),
         input.decLimit.map(_._2),
+        input.deadline,
         input.active,
         input.existence
       )}

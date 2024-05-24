@@ -402,6 +402,12 @@ type CallForProposals {
   decLimitEnd: Declination
 
   """
+  Submission deadline.  Specify a particular partner to see its deadline, if
+  any, or no partner to see the latest deadline, if any.
+  """
+  submissionDeadline(partner: Partner): Timestamp
+
+  """
   The active period during which accepted observations for this call may be
   observed.
   """
@@ -464,6 +470,13 @@ input CallForProposalsPropertiesInput {
   specified.  Nullable on edit if decLimitStart is also set to 'null'.
   """
   decLimitEnd: DeclinationInput
+
+  """
+  Specifies a submission deadline to use for Director's Time or Poor Weather
+  calls.  Required on create for these call types, prohibited for other call
+  types.
+  """
+  submissionDeadline: Timestamp
 
   """
   Active period start time for this call.  Required on create.  Must be before

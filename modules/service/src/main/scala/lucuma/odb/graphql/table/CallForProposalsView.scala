@@ -35,6 +35,7 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
     val DecEndId   = col("c_dec_end_id",   cfp_id.embedded)
     val DecEnd     = col("c_dec_end",      declination.embedded)
 
+    val Deadline    = col("c_deadline",    core_timestamp.opt)
     val Active      = col("c_active",      timestamp_interval_tsrange)
     val Existence   = col("c_existence",   existence)
     val Instruments = col("c_instruments", _instrument)
