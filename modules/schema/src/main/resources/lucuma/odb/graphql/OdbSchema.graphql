@@ -402,16 +402,16 @@ type CallForProposals {
   decLimitEnd: Declination
 
   """
-  Submission deadline.  Specify a particular partner to see its deadline, if
-  any, or no partner to see the latest deadline, if any.
-  """
-  submissionDeadline(partner: Partner): Timestamp
-
-  """
   The active period during which accepted observations for this call may be
   observed.
   """
   active: TimestampInterval!
+
+  """
+  The submission deadline to use for any partners without an explicit partner
+  deadline.
+  """
+  submissionDeadlineDefault: Timestamp
 
   """
   Partners that may participate in this Call.
@@ -472,13 +472,6 @@ input CallForProposalsPropertiesInput {
   decLimitEnd: DeclinationInput
 
   """
-  Specifies a submission deadline to use for Director's Time or Poor Weather
-  calls.  Required on create for these call types, prohibited for other call
-  types.
-  """
-  submissionDeadline: Timestamp
-
-  """
   Active period start time for this call.  Required on create.  Must be before
   the activeEnd time.  Not nullable.
   """
@@ -491,9 +484,15 @@ input CallForProposalsPropertiesInput {
   activeEnd: Timestamp
 
   """
+  Specifies a submission deadline to use for any partners without an explicit
+  partner deadline.
+  """
+  submissionDeadlineDefault: Timestamp
+
+  """
   Partners that may participate in the call along with their respective
-  deadlines.  When editing, supply the entire list of all partners.  Nullable
-  on edit.
+  deadlines.  When editing, supply the entire list of all partners. Defaults to
+  all partners.
   """
   partners: [CallForProposalsPartnerInput!]
 
@@ -513,12 +512,30 @@ Groups a partner with its submission deadline.
 """
 type CallForProposalsPartner {
   partner:  Partner!
-  submissionDeadline: Timestamp!
+
+  """
+  Sets the submission deadline for this partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
 }
 
 input CallForProposalsPartnerInput {
   partner:  Partner!
-  submissionDeadline: Timestamp!
+
+  """
+  If this partner has an explicit submission deadline that overrides the
+  Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
+  Otherwise, the partner deadline is the default deadline for the call.
+  """
+  submissionDeadlineOverride: Timestamp
 }
 
 type CallsForProposalsSelectResult {

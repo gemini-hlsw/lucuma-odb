@@ -35,17 +35,18 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
     val DecEndId   = col("c_dec_end_id",   cfp_id.embedded)
     val DecEnd     = col("c_dec_end",      declination.embedded)
 
-    val Deadline    = col("c_deadline",    core_timestamp.opt)
-    val Active      = col("c_active",      timestamp_interval_tsrange)
-    val Existence   = col("c_existence",   existence)
-    val Instruments = col("c_instruments", _instrument)
-    val IsOpen      = col("c_is_open",     bool)
+    val DeadlineDefault = col("c_deadline_default", core_timestamp.opt)
+    val Active          = col("c_active",           timestamp_interval_tsrange)
+    val Existence       = col("c_existence",        existence)
+    val Instruments     = col("c_instruments",      _instrument)
+    val IsOpen          = col("c_is_open",          bool)
   }
 
-  object CallForProposalsPartnerTable extends TableDef("t_cfp_partner") {
-    val CfpId    = col("c_cfp_id",   cfp_id)
-    val Partner  = col("c_partner",  tag)
-    val Deadline = col("c_deadline", core_timestamp)
+  object CallForProposalsPartnerView extends TableDef("v_cfp_partner") {
+    val CfpId            = col("c_cfp_id",            cfp_id)
+    val Partner          = col("c_partner",           tag)
+    val DeadlineOverride = col("c_deadline_override", core_timestamp.opt)
+    val Deadline         = col("c_deadline",          core_timestamp.opt)
   }
 
   object CallForProposalsInstrumentTable extends TableDef("t_cfp_instrument") {
