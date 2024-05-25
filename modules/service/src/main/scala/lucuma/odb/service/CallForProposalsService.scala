@@ -67,15 +67,27 @@ object CallForProposalsService {
       override def createCallForProposals(
         input: CreateCallForProposalsInput
       )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]] = {
-        val partners    = input.SET.partners
+
+        def insertPartnersDefault(cids: List[CallForProposals.Id]): F[Unit] =
+          session
+           .prepareR(Statements.InsertDefaultPartners(cids))
+           .use(_.execute(cids))
+           .void
+
+        def insertPartners(cids: List[CallForProposals.Id]): F[Unit] =
+          input.SET.partners.fold(insertPartnersDefault(cids)) { partners =>
+            session
+              .prepareR(Statements.InsertPartners(cids, partners))
+              .use(_.execute(cids, partners))
+              .whenA(partners.nonEmpty)
+          }
+
         val instruments = input.SET.instruments
+
         (for {
           cid <- session.unique(Statements.InsertCallForProposals)(input.SET)
           cids = List(cid)
-          _   <- session
-                   .prepareR(Statements.InsertPartners(cids, partners))
-                   .use(_.execute(cids, partners))
-                   .whenA(partners.nonEmpty)
+          _   <- insertPartners(cids)
           _   <- session
                    .prepareR(Statements.InsertInstruments(cids, instruments))
                    .use(_.execute(cids, instruments))
@@ -167,7 +179,7 @@ object CallForProposalsService {
           c_ra_end,
           c_dec_start,
           c_dec_end,
-          c_deadline,
+          c_deadline_default,
           c_active,
           c_existence
         )
@@ -195,6 +207,20 @@ object CallForProposalsService {
         input.existence
       )}
 
+    def InsertDefaultPartners(
+      cids: List[CallForProposals.Id]
+    ): Command[cids.type] =
+      sql"""
+        INSERT INTO t_cfp_partner (
+          c_cfp_id,
+          c_partner
+        )
+        SELECT
+            cfps.id,
+            p.c_tag
+        FROM t_partner p CROSS JOIN (VALUES ${cfp_id.values.list(cids.length)}) AS cfps(id)
+      """.command.contramap(_ => cids)
+
     def InsertPartners(
       cids:     List[CallForProposals.Id],
       partners: List[CallForProposalsPartnerInput]
@@ -203,11 +229,11 @@ object CallForProposalsService {
         INSERT INTO t_cfp_partner (
           c_cfp_id,
           c_partner,
-          c_deadline
+          c_deadline_override
         ) VALUES ${(
           cfp_id  *:
           tag     *:
-          core_timestamp
+          core_timestamp.opt
         ).values.list(cids.length * partners.length)}
       """.command
          .contramap {
@@ -266,6 +292,7 @@ object CallForProposalsService {
       val ups: Option[NonEmptyList[AppliedFragment]] =
         NonEmptyList.fromList(upRaDec ++ List(
           upActive,
+          SET.deadline.foldPresent(sql"c_deadline_default = ${core_timestamp.opt}"),
           SET.existence.map(upExistence),
           SET.semester.map(upSemester),
           SET.cfpType.map(upType)
