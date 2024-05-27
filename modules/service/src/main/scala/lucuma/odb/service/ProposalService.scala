@@ -20,7 +20,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -71,19 +70,6 @@ private[service] trait ProposalService[F[_]] {
   def deleteProposal(
     input: DeleteProposalInput
   )(using Transaction[F], Services.StaffAccess): F[Result[Boolean]]
-
-  /**
-   * The Call for Proposals submission deadline for the given call and partner.
-   *
-   * @param cid identifies the call for proposals
-   * @param partner if None, the default submission deadline if any
-   *
-   * @return the deadline for this call and partner
-   */
-  def submissionDeadline(
-    cid:     CallForProposals.Id,
-    partner: Option[Tag]
-  )(using Transaction[F]): F[Option[Timestamp]]
 
   /**
    * Set the proposal status associated with the program specified in the `input`.
@@ -389,12 +375,6 @@ object ProposalService {
             case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure
           }
 
-      override def submissionDeadline(
-        cid:     CallForProposals.Id,
-        partner: Option[Tag]
-      )(using Transaction[F]): F[Option[Timestamp]] =
-        session.unique(Statements.SelectSubmissionDeadline)(cid, partner)
-
       override def setProposalStatus(
         input: SetProposalStatusInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
@@ -553,19 +533,6 @@ object ProposalService {
         WHERE c_program_id = $program_id
       """.apply(status, pid) |+|
       ProgramService.Statements.andWhereUserAccess(user, pid)
-
-    val SelectSubmissionDeadline: Query[(CallForProposals.Id, Option[Tag]), Option[Timestamp]] =
-      sql"""
-        SELECT
-          CASE
-            WHEN c.c_type = 'directors_time' OR c.c_type = 'poor_weather' THEN c.c_deadline
-            ELSE (SELECT p.c_deadline FROM t_cfp_partner p WHERE p.c_cfp_id = c.c_cfp_id AND p.c_partner = ${tag.opt})
-          END AS c_deadline
-        FROM
-          t_cfp c
-        WHERE
-          c.c_cfp_id = $cfp_id
-      """.query(core_timestamp.opt).contramap { case (t, p) => (p, t) }
 
   }
 }
