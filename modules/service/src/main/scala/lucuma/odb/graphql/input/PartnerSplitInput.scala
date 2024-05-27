@@ -7,11 +7,11 @@ package input
 
 import cats.syntax.all.*
 import lucuma.core.model.IntPercent
-import lucuma.odb.data.Tag
+import lucuma.core.model.Partner
 import lucuma.odb.graphql.binding.*
 
 case class PartnerSplitInput(
-  partner: Tag,
+  partner: Partner,
   percent: IntPercent,
 )
 
@@ -20,7 +20,7 @@ object PartnerSplitInput {
   val Binding: Matcher[PartnerSplitInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        TagBinding("partner", rPartner),
+        PartnerBinding("partner", rPartner),
         IntPercentBinding("percent", rPercent),
       ) =>
         (rPartner, rPercent).parMapN(apply)

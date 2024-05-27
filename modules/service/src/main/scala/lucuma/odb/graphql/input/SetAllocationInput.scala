@@ -7,14 +7,14 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
 case class SetAllocationInput(
   programId: Program.Id,
-  partner: Tag,
+  partner: Partner,
   duration: TimeSpan
 )
 
@@ -24,7 +24,7 @@ object SetAllocationInput {
     ObjectFieldsBinding.rmap {
       case List(
         ProgramIdBinding("programId", rProgramId),
-        TagBinding("partner", rPartner),
+        PartnerBinding("partner", rPartner),
         TimeSpanInput.Binding("duration", rDuration),
       ) =>
         (rProgramId, rPartner, rDuration).mapN(apply)

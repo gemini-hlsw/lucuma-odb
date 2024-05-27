@@ -154,12 +154,6 @@ object GraphQLRoutes {
   ): HttpRoutes[F] =
     exportConst(service, "enumMetadata", """
       query {
-        partnerMeta {
-          tag
-          shortName
-          longName
-          active
-        }
         filterTypeMeta {
           tag
           shortName

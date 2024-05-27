@@ -12,7 +12,7 @@ trait PartnerSplitTable[F[_]] extends BaseMapping[F] {
 
   object PartnerSplitTable extends TableDef("t_partner_split") {
     val ProgramId  = col("c_program_id", program_id)
-    val Partner    = col("c_partner", tag)
+    val Partner    = col("c_partner", partner)
     val Percent    = col("c_percent", int_percent)
   }
 

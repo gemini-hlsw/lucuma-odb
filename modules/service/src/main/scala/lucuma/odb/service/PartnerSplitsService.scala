@@ -7,8 +7,8 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import lucuma.core.model.IntPercent
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
-import lucuma.odb.data.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -18,9 +18,9 @@ import Services.Syntax.*
 
 private[service] trait PartnerSplitsService[F[_]] {
 
-    def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
+    def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
 
-    def updateSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
+    def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
 
 }
 
@@ -33,12 +33,12 @@ object PartnerSplitsService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): PartnerSplitsService[F] =
     new PartnerSplitsService[F] {
 
-      def insertSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
         NonEmptyList.fromList(splits.toList).traverse_ { lst =>
           session.prepareR(Statements.insertSplits(lst)).use(_.execute(pid, lst)).void
         }
 
-      def updateSplits(splits: Map[Tag, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
         for {
           _ <- deleteSplits(pid)
           _ <- insertSplits(splits, pid)
@@ -51,10 +51,10 @@ object PartnerSplitsService {
 
   private object Statements {
 
-    def insertSplits(splits: NonEmptyList[(Tag, IntPercent)]): Command[(Program.Id, splits.type)] =
+    def insertSplits(splits: NonEmptyList[(Partner, IntPercent)]): Command[(Program.Id, splits.type)] =
       sql"""
          INSERT INTO t_partner_split (c_program_id, c_partner, c_percent)
-         VALUES ${(program_id *: tag *: int_percent).values.list(splits.size)}
+         VALUES ${(program_id *: partner *: int_percent).values.list(splits.size)}
       """.command
          .contramap {
            case (pid, splits) => splits.toList.map { case (t, p) => (pid, t, p) }

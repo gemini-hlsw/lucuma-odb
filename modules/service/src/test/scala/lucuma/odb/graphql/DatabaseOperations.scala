@@ -35,6 +35,7 @@ import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -59,7 +60,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
@@ -506,7 +506,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def setAllocationAs(
     user: User,
     pid: Program.Id,
-    partner: Tag,
+    partner: Partner,
     duration: TimeSpan,
   ): IO[Unit] =
     expect(
@@ -515,7 +515,7 @@ trait DatabaseOperations { this: OdbSuite =>
         mutation {
           setAllocation(input: {
             programId: ${pid.asJson}
-            partner:   ${partner.value.toUpperCase}
+            partner:   ${partner.tag.toUpperCase}
             duration:  {
               hours: "${duration.toHours}"
             }

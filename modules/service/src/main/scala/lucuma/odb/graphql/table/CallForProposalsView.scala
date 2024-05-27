@@ -11,9 +11,9 @@ import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.declination
 import lucuma.odb.util.Codecs.existence
 import lucuma.odb.util.Codecs.instrument
+import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.right_ascension
 import lucuma.odb.util.Codecs.semester
-import lucuma.odb.util.Codecs.tag
 import lucuma.odb.util.Codecs.text_nonempty
 import lucuma.odb.util.Codecs.timestamp_interval_tsrange
 import skunk.codec.boolean.bool
@@ -44,7 +44,7 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
   object CallForProposalsPartnerView extends TableDef("v_cfp_partner") {
     val CfpId            = col("c_cfp_id",            cfp_id)
-    val Partner          = col("c_partner",           tag)
+    val Partner          = col("c_partner",           partner)
     val DeadlineOverride = col("c_deadline_override", core_timestamp.opt)
     val Deadline         = col("c_deadline",          core_timestamp.opt)
   }

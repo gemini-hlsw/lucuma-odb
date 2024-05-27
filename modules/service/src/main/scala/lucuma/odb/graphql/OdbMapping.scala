@@ -154,7 +154,6 @@ object OdbMapping {
           with ObservationSelectResultMapping[F]
           with OffsetMapping[F]
           with ParallaxMapping[F]
-          with PartnerMetaMapping[F]
           with PartnerSplitMapping[F]
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
@@ -317,7 +316,6 @@ object OdbMapping {
                 ObservationReferenceMapping,
                 ObservingModeMapping,
                 ParallaxMapping,
-                PartnerMetaMapping,
                 PartnerSplitMapping,
                 PoorWeatherMapping,
                 PosAngleConstraintMapping,
@@ -495,7 +493,6 @@ object OdbMapping {
       with LeafMappings[F]
       with ObsAttachmentTypeMetaMapping[F]
       with ObsAttachmentFileExtMapping[F]
-      with PartnerMetaMapping[F]
       with ProposalAttachmentTypeMetaMapping[F]
       with ProposalStatusMetaMapping[F]
       with QueryMapping[F]
@@ -516,7 +513,6 @@ object OdbMapping {
             FilterTypeMetaMapping,
             ObsAttachmentTypeMetaMapping,
             ObsAttachmentFileExtMapping,
-            PartnerMetaMapping,
             ProposalAttachmentTypeMetaMapping,
             ProposalStatusMetaMapping,
             QueryMapping,

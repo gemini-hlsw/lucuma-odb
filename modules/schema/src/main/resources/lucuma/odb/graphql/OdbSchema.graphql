@@ -3,7 +3,6 @@
 # These "empty" enums (they must have at least one element) will be replaced at runtime with
 # definitions based on database tables.
 
-enum Partner { DUMMY }
 enum ConditionsMeasurementSource { DUMMY }
 enum SeeingTrend { DUMMY }
 enum ConditionsExpectationType { DUMMY }
@@ -3098,13 +3097,16 @@ input ParallaxInput {
 }
 
 """
-Metadata describing `enum Partner`
+Gemini Partners
 """
-type PartnerMeta {
-  tag:        Partner!
-  shortName:  String!
-  longName:       String!
-  active:     Boolean!
+enum Partner {
+   "Argentina"            AR
+   "Brazil"               BR
+   "Canada"               CA
+   "Chile"                CL
+   "Korea"                KR
+   "University of Hawaii" UH
+   "United States"        US
 }
 
 """
@@ -8671,11 +8673,6 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
-
-  """
-  Metadata for `enum Partner`
-  """
-  partnerMeta: [PartnerMeta!]!
 
   """
   Returns the program with the given id or reference, if any. Identify the
