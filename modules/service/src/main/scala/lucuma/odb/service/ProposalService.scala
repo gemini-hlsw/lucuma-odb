@@ -554,10 +554,6 @@ object ProposalService {
       """.apply(status, pid) |+|
       ProgramService.Statements.andWhereUserAccess(user, pid)
 
-//    val SelectDefaultSubmissionDeadline: Query[Program.Id, Timestamp] =
-//      sql"""SELECT c_deadline FROM t_cfp WHERE c_cfp_id = $program_id"""
-//        .query(core_timestamp)
-
     val SelectSubmissionDeadline: Query[(CallForProposals.Id, Option[Tag]), Option[Timestamp]] =
       sql"""
         SELECT
@@ -570,20 +566,6 @@ object ProposalService {
         WHERE
           c.c_cfp_id = $cfp_id
       """.query(core_timestamp.opt).contramap { case (t, p) => (p, t) }
-
-//    val SelectSubmissionDeadlineForPartner: Query[(Program.Id, Tag), Timestamp] =
-//      sql"""
-//        SELECT
-//          CASE
-//            WHEN EXISTS(SELECT 1 FROM t_cfp_partner p WHERE p.c_cfp_id = c.c_cfp_id) THEN
-//              (SELECT p.c_deadline FROM t_cfp_partner p WHERE p.c_cfp_id = c.c_cfp_id AND p.c_partner = $tag)
-//            ELSE c.c_deadline
-//          END AS c_deadline
-//        FROM
-//          t_cfp c
-//        WHERE
-//          c.c_cfp_id = $program_id
-//      """.query(core_timestamp).contramap { case (t, p) => (p, t) }
 
   }
 }

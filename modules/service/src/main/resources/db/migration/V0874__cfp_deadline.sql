@@ -40,6 +40,7 @@ CREATE VIEW v_cfp_partner AS
 -- * repackages the instruments as an array value so Grackle can digest it
 -- * computes an "is open" boolean column to determine which CFPs are currently
 --   open
+-- * computes a title for the CfP based on the type, semester, instruments, etc.
 DROP VIEW v_cfp;
 CREATE VIEW v_cfp AS
   WITH
