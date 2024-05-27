@@ -65,8 +65,10 @@ class createCallForProposals extends OdbSuite {
                 end
                 duration { hours }
               }
+              submissionDeadlineDefault
               partners {
                 partner
+                submissionDeadline
               }
               instruments
               existence
@@ -90,7 +92,37 @@ class createCallForProposals extends OdbSuite {
                 "end": "2025-07-31 14:00:00",
                 "duration": { "hours": 4320.000000 }
               },
-              "partners":      [],
+              "submissionDeadlineDefault": null,
+              "partners": [
+                {
+                  "partner" : "AR",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "BR",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "CA",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "CL",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "KR",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "UH",
+                  "submissionDeadline": null
+                },
+                {
+                  "partner" : "US",
+                  "submissionDeadline": null
+                }
+              ],
               "instruments":   [],
               "existence":     "PRESENT"
             }
@@ -133,14 +165,18 @@ class createCallForProposals extends OdbSuite {
                 semester:    "2025A"
                 activeStart: "2026-02-01 14:00:00"
                 activeEnd:   "2026-07-31 14:00:00"
+                submissionDeadlineDefault: "2025-07-31 10:00:02"
                 partners:    [
                   {
                     partner: CA
-                    submissionDeadline: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31 10:00:00"
+                  },
+                  {
+                    partner: CL
                   },
                   {
                     partner: US
-                    submissionDeadline: "2025-07-31 10:00:01"
+                    submissionDeadlineOverride: "2025-07-31 10:00:01"
                   }
                 ]
               }
@@ -148,8 +184,10 @@ class createCallForProposals extends OdbSuite {
           ) {
              callForProposals {
                id
+               submissionDeadlineDefault
                partners {
                  partner
+                 submissionDeadlineOverride
                  submissionDeadline
                }
              }
@@ -161,16 +199,60 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id": "c-101",
+              "submissionDeadlineDefault": "2025-07-31 10:00:02",
               "partners": [
                 {
                   "partner": "CA",
+                  "submissionDeadlineOverride": "2025-07-31 10:00:00",
                   "submissionDeadline": "2025-07-31 10:00:00"
                 },
                 {
+                  "partner": "CL",
+                  "submissionDeadlineOverride": null,
+                  "submissionDeadline": "2025-07-31 10:00:02"
+                },
+                {
                   "partner": "US",
+                  "submissionDeadlineOverride": "2025-07-31 10:00:01",
                   "submissionDeadline": "2025-07-31 10:00:01"
                 }
               ]
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("success - with empty partners") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2026-02-01 14:00:00"
+                activeEnd:   "2026-07-31 14:00:00"
+                partners:    []
+              }
+            }
+          ) {
+             callForProposals {
+               id
+               partners { partner }
+             }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id": "c-102",
+              "partners": []
             }
           }
         }
@@ -193,11 +275,11 @@ class createCallForProposals extends OdbSuite {
                 partners:    [
                   {
                     partner: US
-                    submissionDeadline: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31 10:00:00"
                   },
                   {
                     partner: US
-                    submissionDeadline: "2025-07-31 10:00:01"
+                    submissionDeadlineOverride: "2025-07-31 10:00:01"
                   }
                 ]
               }
@@ -234,7 +316,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                instruments
              }
           }
@@ -245,7 +326,6 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id": "c-102",
               "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
             }
           }
@@ -271,7 +351,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                instruments
              }
           }
@@ -299,7 +378,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                raLimitStart { hms }
                raLimitEnd { hms }
              }
@@ -310,7 +388,6 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id": "c-103",
               "raLimitStart": { "hms": "12:00:00.000000" },
               "raLimitEnd":   { "hms": "18:00:00.000000" }
             }
@@ -360,7 +437,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                decLimitStart { dms }
                decLimitEnd { dms }
              }
@@ -371,7 +447,6 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id": "c-104",
               "decLimitStart": { "dms": "+45:00:00.000000" },
               "decLimitEnd":   { "dms": "-45:00:00.000000" }
             }

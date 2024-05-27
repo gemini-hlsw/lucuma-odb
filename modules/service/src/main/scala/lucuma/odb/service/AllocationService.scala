@@ -6,9 +6,9 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -33,10 +33,10 @@ object AllocationService {
 
   object Statements {
 
-    val SetAllocation: Fragment[(Program.Id, Tag, TimeSpan)] =
+    val SetAllocation: Fragment[(Program.Id, Partner, TimeSpan)] =
         sql"""
           INSERT INTO t_allocation (c_program_id, c_partner, c_duration)
-          VALUES ($program_id, $tag, $time_span)
+          VALUES ($program_id, $partner, $time_span)
           ON CONFLICT (c_program_id, c_partner) DO UPDATE
           SET c_duration = $time_span
         """.contramap { case (p, t, d) => (p, t, d, d) }

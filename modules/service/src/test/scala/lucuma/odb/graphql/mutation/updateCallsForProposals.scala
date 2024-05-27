@@ -34,14 +34,14 @@ class updateCallsForProposals extends OdbSuite {
                 activeStart:   "2025-02-01 14:00:00"
                 activeEnd:     "2025-07-31 14:00:00"
                 instruments:   [GMOS_NORTH]
+                submissionDeadlineDefault: "2025-07-31 10:00:01"
                 partners:      [
                   {
                     partner: CA
-                    submissionDeadline: "2025-07-31 10:00:00"
+                    submissionDeadlineOverride: "2025-07-31 10:00:00"
                   },
                   {
                     partner: US
-                    submissionDeadline: "2025-07-31 10:00:01"
                   }
                 ]
               }
@@ -714,11 +714,10 @@ class updateCallsForProposals extends OdbSuite {
                 partners: [
                   {
                     partner: BR
-                    submissionDeadline: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15 04:00:00"
                   },
                   {
                     partner: AR
-                    submissionDeadline: "2025-08-15 04:00:00"
                   }
                 ]
               },
@@ -743,7 +742,7 @@ class updateCallsForProposals extends OdbSuite {
                   "partners": [
                     {
                       "partner": "AR",
-                      "submissionDeadline": "2025-08-15 04:00:00"
+                      "submissionDeadline": "2025-07-31 10:00:01"
                     },
                     {
                       "partner": "BR",
@@ -805,11 +804,11 @@ class updateCallsForProposals extends OdbSuite {
                 partners: [
                   {
                     partner: BR
-                    submissionDeadline: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15 04:00:00"
                   },
                   {
                     partner: BR
-                    submissionDeadline: "2025-08-15 04:00:00"
+                    submissionDeadlineOverride: "2025-08-15 04:00:00"
                   }
                 ]
               },
@@ -824,6 +823,53 @@ class updateCallsForProposals extends OdbSuite {
           }
         """,
         List("Argument 'input.SET' is invalid: duplicate 'partners' specified: BR").asLeft
+      )
+    }
+  }
+
+  test("partners - remove default deadline") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                submissionDeadlineDefault: null
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                partners {
+                  partner
+                  submissionDeadline
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "partners": [
+                    {
+                      "partner": "CA",
+                      "submissionDeadline": "2025-07-31 10:00:00"
+                    },
+                    {
+                      "partner": "US",
+                      "submissionDeadline": null
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        """.asRight
       )
     }
   }

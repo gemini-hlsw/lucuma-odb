@@ -35,7 +35,7 @@ trait ProposalView[F[_]] extends BaseMapping[F] {
     }
     object FastTurnaround {
       val Id          = col("c_program_id_f", program_id.embedded)
-      val PiAffiliate = col("c_ft_partner", tag.opt)
+      val PiAffiliate = col("c_ft_partner", partner.opt)
     }
     object LargeProgram {
       val Id              = col("c_program_id_l", program_id.embedded)

@@ -10,7 +10,6 @@ import lucuma.core.model.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 
 class setAllocation extends OdbSuite {
 
@@ -27,7 +26,7 @@ class setAllocation extends OdbSuite {
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         interceptGraphQL(s"User ${user.id} is not authorized to perform this operation.") {
-          setAllocationAs(user, pid, Tag("CA"), 42.hourTimeSpan)
+          setAllocationAs(user, pid, Partner.Ca, 42.hourTimeSpan)
         }
       }
     }
@@ -36,7 +35,7 @@ class setAllocation extends OdbSuite {
   test("admin, staff, service can set (and update) allocation in any program") {
     createProgramAs(pi).flatMap { pid =>
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
-        setAllocationAs(user, pid, Tag("US"), TimeSpan.fromHours(hours).get)
+        setAllocationAs(user, pid, Partner.Us, TimeSpan.fromHours(hours).get)
       }
     }
   }

@@ -3,7 +3,6 @@
 # These "empty" enums (they must have at least one element) will be replaced at runtime with
 # definitions based on database tables.
 
-enum Partner { DUMMY }
 enum ConditionsMeasurementSource { DUMMY }
 enum SeeingTrend { DUMMY }
 enum ConditionsExpectationType { DUMMY }
@@ -408,6 +407,12 @@ type CallForProposals {
   active: TimestampInterval!
 
   """
+  The submission deadline to use for any partners without an explicit partner
+  deadline.
+  """
+  submissionDeadlineDefault: Timestamp
+
+  """
   Partners that may participate in this Call.
   """
   partners: [CallForProposalsPartner!]!
@@ -478,9 +483,15 @@ input CallForProposalsPropertiesInput {
   activeEnd: Timestamp
 
   """
+  Specifies a submission deadline to use for any partners without an explicit
+  partner deadline.
+  """
+  submissionDeadlineDefault: Timestamp
+
+  """
   Partners that may participate in the call along with their respective
-  deadlines.  When editing, supply the entire list of all partners.  Nullable
-  on edit.
+  deadlines.  When editing, supply the entire list of all partners. Defaults to
+  all partners.
   """
   partners: [CallForProposalsPartnerInput!]
 
@@ -500,12 +511,30 @@ Groups a partner with its submission deadline.
 """
 type CallForProposalsPartner {
   partner:  Partner!
-  submissionDeadline: Timestamp!
+
+  """
+  Sets the submission deadline for this partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
 }
 
 input CallForProposalsPartnerInput {
   partner:  Partner!
-  submissionDeadline: Timestamp!
+
+  """
+  If this partner has an explicit submission deadline that overrides the
+  Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
+  Otherwise, the partner deadline is the default deadline for the call.
+  """
+  submissionDeadlineOverride: Timestamp
 }
 
 type CallsForProposalsSelectResult {
@@ -3068,13 +3097,16 @@ input ParallaxInput {
 }
 
 """
-Metadata describing `enum Partner`
+Gemini Partners
 """
-type PartnerMeta {
-  tag:        Partner!
-  shortName:  String!
-  longName:       String!
-  active:     Boolean!
+enum Partner {
+   "Argentina"            AR
+   "Brazil"               BR
+   "Canada"               CA
+   "Chile"                CL
+   "Korea"                KR
+   "University of Hawaii" UH
+   "United States"        US
 }
 
 """
@@ -8641,11 +8673,6 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
-
-  """
-  Metadata for `enum Partner`
-  """
-  partnerMeta: [PartnerMeta!]!
 
   """
   Returns the program with the given id or reference, if any. Identify the

@@ -4,22 +4,30 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.effect.Resource
+import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
-import lucuma.odb.data.Tag
+import lucuma.core.model.Partner
+import lucuma.core.model.User
 import lucuma.odb.graphql.table.CallForProposalsView
+import lucuma.odb.service.Services
 
 trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
 
+  def user: User
+  def services: Resource[F, Services[F]]
+
   lazy val CallForProposalsPartnerMapping: TypeMapping =
     ObjectMapping(CallForProposalsPartnerType)(
-      SqlField("id",                 CallForProposalsPartnerTable.CfpId, hidden = true, key = true),
-      SqlField("partner",            CallForProposalsPartnerTable.Partner, key = true),
-      SqlField("submissionDeadline", CallForProposalsPartnerTable.Deadline)
+      SqlField("id",                         CallForProposalsPartnerView.CfpId, hidden = true, key = true),
+      SqlField("partner",                    CallForProposalsPartnerView.Partner, key = true),
+      SqlField("submissionDeadlineOverride", CallForProposalsPartnerView.DeadlineOverride),
+      SqlField("submissionDeadline",         CallForProposalsPartnerView.Deadline)
     )
 
   lazy val CallForProposalsMapping: TypeMapping =
@@ -32,8 +40,9 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       SqlObject("raLimitEnd"),
       SqlObject("decLimitStart"),
       SqlObject("decLimitEnd"),
+      SqlField("submissionDeadlineDefault", CallForProposalsView.DeadlineDefault),
       SqlObject("active"),
-      SqlObject("partners",   Join(CallForProposalsView.Id, CallForProposalsPartnerTable.CfpId)),
+      SqlObject("partners",   Join(CallForProposalsView.Id, CallForProposalsPartnerView.CfpId)),
       SqlField("instruments", CallForProposalsView.Instruments),
       SqlField("existence",   CallForProposalsView.Existence),
       SqlField("_isOpen",     CallForProposalsView.IsOpen, hidden = true)
@@ -45,7 +54,7 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
         OrderBy(
           OrderSelections(
             List(
-              OrderSelection[Tag](CallForProposalsPartnerType / "partner")
+              OrderSelection[Partner](CallForProposalsPartnerType / "partner")
             )
           ),
           child
