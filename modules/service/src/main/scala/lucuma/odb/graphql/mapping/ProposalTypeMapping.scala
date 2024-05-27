@@ -21,7 +21,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
-import lucuma.odb.data.Tag
+import lucuma.core.model.Partner
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
 
@@ -142,7 +142,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
         OrderSelections(
           List(
             OrderSelection[IntPercent](PartnerSplitType / "percent", ascending = false),
-            OrderSelection[Tag](PartnerSplitType / "partner")
+            OrderSelection[Partner](PartnerSplitType / "partner")
           )
         ),
         child

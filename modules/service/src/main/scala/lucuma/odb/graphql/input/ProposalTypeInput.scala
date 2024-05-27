@@ -17,10 +17,10 @@ import grackle.syntax.*
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
+import lucuma.core.model.Partner
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import monocle.Focus
 import monocle.Lens
@@ -49,7 +49,7 @@ object ProposalTypeInput {
   private lazy val ZeroPercent    = IntPercent.unsafeFrom(0)
   private lazy val HundredPercent = IntPercent.unsafeFrom(100)
 
-  private val PartnerSplitsInput: Matcher[Map[Tag, IntPercent]] =
+  private val PartnerSplitsInput: Matcher[Map[Partner, IntPercent]] =
     PartnerSplitInput.Binding.List.Option.rmap { splits =>
       val map = splits.getOrElse(List.empty).map(a => (a.partner -> a.percent)).toMap
 
@@ -65,11 +65,11 @@ object ProposalTypeInput {
 
   case class Create(
     scienceSubtype:  ScienceSubtype,
-    tooActivation:   ToOActivation        = ToOActivation.None,
-    minPercentTime:  IntPercent           = HundredPercent,
-    minPercentTotal: Option[IntPercent]   = none,
-    totalTime:       Option[TimeSpan]     = none,
-    partnerSplits:   Map[Tag, IntPercent] = Map.empty
+    tooActivation:   ToOActivation            = ToOActivation.None,
+    minPercentTime:  IntPercent               = HundredPercent,
+    minPercentTotal: Option[IntPercent]       = none,
+    totalTime:       Option[TimeSpan]         = none,
+    partnerSplits:   Map[Partner, IntPercent] = Map.empty
   ) {
 
     def asEdit: Edit =
@@ -104,7 +104,7 @@ object ProposalTypeInput {
     val minPercentTime: Lens[Create, IntPercent]          = Focus[Create](_.minPercentTime)
     val minPercentTotal: Lens[Create, Option[IntPercent]] = Focus[Create](_.minPercentTotal)
     val totalTime: Lens[Create, Option[TimeSpan]]         = Focus[Create](_.totalTime)
-    val partnerSplits: Lens[Create, Map[Tag, IntPercent]] = Focus[Create](_.partnerSplits)
+    val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -147,7 +147,7 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          TagBinding.Option("piAffiliation", rPartner)
+          PartnerBinding.Option("piAffiliation", rPartner)
         ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for {
@@ -220,11 +220,11 @@ object ProposalTypeInput {
 
   case class Edit(
     scienceSubtype:  ScienceSubtype,
-    tooActivation:   Option[ToOActivation]          = None,
-    minPercentTime:  Option[IntPercent]             = None,
-    minPercentTotal: Nullable[IntPercent]           = Nullable.Null,
-    totalTime:       Nullable[TimeSpan]             = Nullable.Null,
-    partnerSplits:   Nullable[Map[Tag, IntPercent]] = Nullable.Null
+    tooActivation:   Option[ToOActivation]              = None,
+    minPercentTime:  Option[IntPercent]                 = None,
+    minPercentTotal: Nullable[IntPercent]               = Nullable.Null,
+    totalTime:       Nullable[TimeSpan]                 = Nullable.Null,
+    partnerSplits:   Nullable[Map[Partner, IntPercent]] = Nullable.Null
   ) {
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update {
@@ -271,7 +271,7 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          TagBinding.Nullable("piAffiliation", rPartner)
+          PartnerBinding.Nullable("piAffiliation", rPartner)
         ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
           Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)))
         }

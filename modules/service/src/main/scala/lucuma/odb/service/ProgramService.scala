@@ -19,6 +19,7 @@ import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -464,10 +465,10 @@ object ProgramService {
 
     def existsAllocationForPartner(
       programId: Program.Id,
-      partner: Tag
+      partner: Partner
     ): AppliedFragment =
       sql"""
-        EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=$tag and c_duration > 'PT')
+        EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=${lucuma.odb.util.Codecs.partner} and c_duration > 'PT')
         """.apply(programId, partner)
 
     def existsUserAccess(
@@ -477,7 +478,7 @@ object ProgramService {
       user.role match {
         case GuestRole             => existsUserAsPi(programId, user.id).some
         case Pi(_)                 => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void")").some
-        case Ngo(_, partner)       => existsAllocationForPartner(programId, Tag(partner.tag)).some
+        case Ngo(_, partner)       => existsAllocationForPartner(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
              StandardRole.Staff(_) => none
@@ -534,7 +535,7 @@ object ProgramService {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
         case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, Tag(partner.tag)))
+        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, partner))
         case StandardRole.Pi(_)           => Some(up |+| void" WHERE " |+| existsUserAsPi(targetProgram, user.id))
         case StandardRole.Staff(_)        => Some(up)
       }
@@ -556,7 +557,7 @@ object ProgramService {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
         case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, Tag(partner.tag)))
+        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, partner))
         case StandardRole.Staff(_)        => Some(up)
         case StandardRole.Pi(_)           =>
           Some(

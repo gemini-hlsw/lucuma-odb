@@ -232,7 +232,7 @@ object CallForProposalsService {
           c_deadline_override
         ) VALUES ${(
           cfp_id  *:
-          tag     *:
+          partner *:
           core_timestamp.opt
         ).values.list(cids.length * partners.length)}
       """.command

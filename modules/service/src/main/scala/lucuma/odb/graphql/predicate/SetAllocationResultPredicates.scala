@@ -4,10 +4,10 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
-import lucuma.odb.data.Tag
 
 class SetAllocationResultPredicates(path: Path) {
   val programId = LeafPredicates[Program.Id](path / "programId")
-  val partner = LeafPredicates[Tag](path / "partner")
+  val partner = LeafPredicates[Partner](path / "partner")
 }

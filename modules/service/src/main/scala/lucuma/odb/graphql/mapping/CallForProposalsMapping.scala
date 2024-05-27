@@ -12,8 +12,8 @@ import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import lucuma.core.model.Partner
 import lucuma.core.model.User
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.service.Services
 
@@ -54,7 +54,7 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
         OrderBy(
           OrderSelections(
             List(
-              OrderSelection[Tag](CallForProposalsPartnerType / "partner")
+              OrderSelection[Partner](CallForProposalsPartnerType / "partner")
             )
           ),
           child

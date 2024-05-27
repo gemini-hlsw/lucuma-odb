@@ -60,7 +60,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("obsAttachmentTypeMeta"),
       SqlObject("observation"),
       SqlObject("observations"),
-      SqlObject("partnerMeta"),
       SqlObject("program"),
       SqlObject("programs"),
       SqlObject("proposalAttachmentTypeMeta"),
@@ -85,7 +84,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ObsAttachmentTypeMeta,
       Observation,
       Observations,
-      PartnerMeta,
       Program,
       Programs,
       ProposalAttachmentTypeMeta,
@@ -412,12 +410,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
-
-  private lazy val PartnerMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "partnerMeta", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Tag](PartnerMetaType / "tag"))), child)
-      }
 
   private def programPredicate(
     rPid:  Result[Option[model.Program.Id]],

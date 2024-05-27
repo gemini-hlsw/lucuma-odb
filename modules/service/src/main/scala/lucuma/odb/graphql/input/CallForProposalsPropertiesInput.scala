@@ -62,7 +62,7 @@ object CallForProposalsPropertiesInput {
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
-          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase)
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
             rType,
@@ -121,7 +121,7 @@ object CallForProposalsPropertiesInput {
             case (s, e)                                  =>
               Result(Ior.fromOptions(s, e))
           }
-          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase)
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase)
           (
             rType,
