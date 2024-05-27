@@ -1,13 +1,11 @@
+
 -- Remove from the partner table all things that are not actual Gemini partners.
 -- We were mixing partners with time accounting categories.
+DELETE FROM t_cfp_partner
+  WHERE c_partner IN ('cfh', 'keck', 'lp', 'subaru', 'gt');
+
 DELETE FROM t_partner
-  WHERE c_tag IN (
-    'cfh',
-    'keck',
-    'lp',
-    'subaru',
-    'gt'
-  );
+  WHERE c_tag IN ('cfh', 'keck', 'lp', 'subaru', 'gt');
 
 -- Add a nullable default submission deadline column to the Call for Proposals
 -- table.
