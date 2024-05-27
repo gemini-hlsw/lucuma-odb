@@ -5,23 +5,23 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import lucuma.core.model.Partner
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.TagBinding
+import lucuma.odb.graphql.binding.PartnerBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 
 case class CallForProposalsPartnerInput(
-  partner:  Tag,
-  deadline: Timestamp
+  partner:  Partner,
+  deadline: Option[Timestamp]
 )
 
 object CallForProposalsPartnerInput {
 
   val Binding = ObjectFieldsBinding.rmap {
     case List(
-      TagBinding("partner", rPartner),
-      TimestampBinding("submissionDeadline", rDeadline)
+      PartnerBinding("partner", rPartner),
+      TimestampBinding.Option("submissionDeadlineOverride", rDeadline)
     ) =>
       (rPartner, rDeadline).parMapN(apply)
   }

@@ -25,6 +25,7 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -133,7 +134,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[ObsStatus](ObsStatusType),
-      LeafMapping[Tag](PartnerType),
+      LeafMapping[Partner](PartnerType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),

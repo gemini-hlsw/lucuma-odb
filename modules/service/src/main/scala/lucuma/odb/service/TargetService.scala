@@ -30,7 +30,6 @@ import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.Tag
 import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
@@ -322,7 +321,7 @@ object TargetService {
           case StandardUser(id, role, _, _) =>
             role match {
               case Admin(_)        => void""
-              case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(pid, Tag(partner.tag))
+              case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(pid, partner)
               case Pi(_)           => void"WHERE " |+| existsUserAsPi(pid, id) |+| void" OR " |+| existsUserAsCoi(pid, id)
               case Staff(_)        => void""
             }

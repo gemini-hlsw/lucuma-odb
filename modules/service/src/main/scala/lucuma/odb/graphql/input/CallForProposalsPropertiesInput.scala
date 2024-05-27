@@ -29,24 +29,25 @@ object CallForProposalsPropertiesInput {
     raLimit:     Option[(RightAscension, RightAscension)],
     decLimit:    Option[(Declination, Declination)],
     active:      TimestampInterval,
-    partners:    List[CallForProposalsPartnerInput],
+    deadline:    Option[Timestamp],
+    partners:    Option[List[CallForProposalsPartnerInput]],
     instruments: List[Instrument],
     existence:   Existence
   )
 
   object Create {
-
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
-          RightAscensionInput.Binding.Option("raLimitStart", rRaStart),
-          RightAscensionInput.Binding.Option("raLimitEnd",   rRaEnd),
-          DeclinationInput.Binding.Option("decLimitStart",   rDecStart),
-          DeclinationInput.Binding.Option("decLimitEnd",     rDecEnd),
+          RightAscensionInput.Binding.Option("raLimitStart",   rRaStart),
+          RightAscensionInput.Binding.Option("raLimitEnd",     rRaEnd),
+          DeclinationInput.Binding.Option("decLimitStart",     rDecStart),
+          DeclinationInput.Binding.Option("decLimitEnd",       rDecEnd),
           TimestampBinding("activeStart", rActiveStart),
           TimestampBinding("activeEnd",   rActiveEnd),
+          TimestampBinding.Option("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
           InstrumentBinding.List.Option("instruments", rInstruments),
           ExistenceBinding.Option("existence", rExistence)
@@ -61,7 +62,7 @@ object CallForProposalsPropertiesInput {
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
-          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase).map(_.toList.flatten)
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
             rType,
@@ -69,6 +70,7 @@ object CallForProposalsPropertiesInput {
             rRaLimit,
             rDecLimit,
             rActive,
+            rDeadline,
             rPartnersʹ,
             rInstrumentsʹ,
             rExistence.map(_.getOrElse(Existence.Present))
@@ -84,6 +86,7 @@ object CallForProposalsPropertiesInput {
     raLimit:     Nullable[(RightAscension, RightAscension)],
     decLimit:    Nullable[(Declination, Declination)],
     active:      Option[Ior[Timestamp, Timestamp]],
+    deadline:    Nullable[Timestamp],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
     existence:   Option[Existence]
@@ -96,12 +99,13 @@ object CallForProposalsPropertiesInput {
         case List(
           CallForProposalsTypeBinding.NonNullable("type", rType),
           SemesterBinding.NonNullable("semester", rSemester),
-          RightAscensionInput.Binding.Nullable("raLimitStart", rRaStart),
-          RightAscensionInput.Binding.Nullable("raLimitEnd",   rRaEnd),
-          DeclinationInput.Binding.Nullable("decLimitStart",   rDecStart),
-          DeclinationInput.Binding.Nullable("decLimitEnd",     rDecEnd),
+          RightAscensionInput.Binding.Nullable("raLimitStart",   rRaStart),
+          RightAscensionInput.Binding.Nullable("raLimitEnd",     rRaEnd),
+          DeclinationInput.Binding.Nullable("decLimitStart",     rDecStart),
+          DeclinationInput.Binding.Nullable("decLimitEnd",       rDecEnd),
           TimestampBinding.NonNullable("activeStart", rActiveStart),
           TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
+          TimestampBinding.Nullable("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Nullable("partners", rPartners),
           InstrumentBinding.List.Nullable("instruments", rInstruments),
           ExistenceBinding.NonNullable("existence", rExistence)
@@ -117,7 +121,7 @@ object CallForProposalsPropertiesInput {
             case (s, e)                                  =>
               Result(Ior.fromOptions(s, e))
           }
-          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.value.toScreamingSnakeCase)
+          val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase)
           (
             rType,
@@ -125,6 +129,7 @@ object CallForProposalsPropertiesInput {
             rRaLimit,
             rDecLimit,
             rActive,
+            rDeadline,
             rPartnersʹ,
             rInstrumentsʹ,
             rExistence

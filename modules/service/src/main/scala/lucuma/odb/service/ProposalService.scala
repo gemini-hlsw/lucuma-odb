@@ -375,7 +375,7 @@ object ProposalService {
             case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure
           }
 
-      def setProposalStatus(
+      override def setProposalStatus(
         input: SetProposalStatusInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 

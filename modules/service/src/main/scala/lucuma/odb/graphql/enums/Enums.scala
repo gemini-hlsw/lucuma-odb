@@ -139,7 +139,6 @@ object Enums {
                ObsAttachmentTypeEnumType.fetch(s),
                ProposalAttachmentTypeEnumType.fetch(s),
                FilterTypeEnumType.fetch(s),
-               PartnerEnumType.fetch(s),
                ConditionsExpectationTypeEnumType.fetch(s),
                ConditionsMeasurementSourceEnumType.fetch(s),
                SeeingTrendEnumType.fetch(s),
