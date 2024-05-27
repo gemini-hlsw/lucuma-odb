@@ -266,11 +266,11 @@ class callsForProposals extends OdbSuite {
       partners:    [
         {
           partner: CA
-          submissionDeadline: "3000-01-01 00:00:00"
+          submissionDeadlineOverride: "3000-01-01 00:00:00"
         },
         {
           partner: US
-          submissionDeadline: "2000-01-01 00:00:00"
+          submissionDeadlineOverride: "2000-01-01 00:00:00"
         }
       ]
     """.stripMargin

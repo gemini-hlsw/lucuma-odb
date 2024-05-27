@@ -44,25 +44,10 @@ class partnerMeta extends OdbSuite {
                   "name": "CA"
                 },
                 {
-                  "name": "CFH"
-                },
-                {
                   "name": "CL"
                 },
                 {
-                  "name": "GT"
-                },
-                {
-                  "name": "KECK"
-                },
-                {
                   "name": "KR"
-                },
-                {
-                  "name": "LP"
-                },
-                {
-                  "name": "SUBARU"
                 },
                 {
                   "name": "UH"
@@ -116,45 +101,15 @@ class partnerMeta extends OdbSuite {
                     "active" : true
                   },
                   {
-                    "tag" : "CFH",
-                    "shortName" : "CFHT",
-                    "longName" : "Canada-France-Hawaii Telescope",
-                    "active" : true
-                  },
-                  {
                     "tag" : "CL",
                     "shortName" : "Chile",
                     "longName" : "Chile",
                     "active" : true
                   },
                   {
-                    "tag" : "GT",
-                    "shortName" : "Guaranteed Time",
-                    "longName" : "Guaranteed Time",
-                    "active" : true
-                  },
-                  {
-                    "tag" : "KECK",
-                    "shortName" : "Keck",
-                    "longName" : "Keck Observatory",
-                    "active" : true
-                  },
-                  {
                     "tag" : "KR",
                     "shortName" : "Korea",
                     "longName" : "Republic of Korea",
-                    "active" : true
-                  },
-                  {
-                    "tag" : "LP",
-                    "shortName" : "Long Programs",
-                    "longName" : "Long Programs",
-                    "active" : true
-                  },
-                  {
-                    "tag" : "SUBARU",
-                    "shortName" : "Subaru",
-                    "longName" : "Subaru Telescope",
                     "active" : true
                   },
                   {

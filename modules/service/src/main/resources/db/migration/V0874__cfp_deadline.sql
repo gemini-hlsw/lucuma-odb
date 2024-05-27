@@ -46,11 +46,14 @@ CREATE VIEW v_cfp AS
     cte_instrument AS (
       SELECT
         c.c_cfp_id,
-        array_remove(array_agg(i.c_instrument ORDER BY i.c_instrument), NULL) AS c_instruments
+        array_remove(array_agg(ci.c_instrument ORDER BY ci.c_instrument), NULL) AS c_instruments,
+        array_remove(array_agg(i.c_long_name ORDER BY i.c_long_name), NULL) AS c_instrument_names
       FROM
         t_cfp c
       LEFT JOIN
-        t_cfp_instrument i ON c.c_cfp_id = i.c_cfp_id
+        t_cfp_instrument ci ON c.c_cfp_id = ci.c_cfp_id
+      LEFT JOIN
+        t_instrument i ON i.c_tag = ci.c_instrument
       GROUP BY
         c.c_cfp_id
     ),
@@ -72,7 +75,8 @@ CREATE VIEW v_cfp AS
       CASE WHEN c.c_dec_start IS NOT NULL THEN c.c_cfp_id END AS c_dec_start_id,
       CASE WHEN c.c_dec_end   IS NOT NULL THEN c.c_cfp_id END AS c_dec_end_id,
       cte_instrument.c_instruments,
-      cte_partner.c_is_open
+      cte_partner.c_is_open,
+      format_cfp_title(c.c_type, c.c_semester, c.c_active, cte_instrument.c_instrument_names) AS c_title
     FROM
       t_cfp c
     LEFT JOIN
