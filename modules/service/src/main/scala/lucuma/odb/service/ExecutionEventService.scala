@@ -232,6 +232,7 @@ object ExecutionEventService {
         (for {
           e <- ResultT(insert)
           (eid, time, oid, vid, aid) = e
+          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
           _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(stepId, stepStage, time))
           _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, stepId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
