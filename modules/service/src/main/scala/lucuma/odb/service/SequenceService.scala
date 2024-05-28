@@ -654,11 +654,13 @@ object SequenceService {
 
     val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
       sql"""
-        UPDATE t_step_record
+        UPDATE t_step_record r
            SET c_execution_state = $step_execution_state,
                c_completed       = ${core_timestamp.opt}
-         WHERE c_step_id = $step_id
-           AND c_execution_state != 'abandoned'
+          FROM t_step_execution_state e
+         WHERE r.c_execution_state = e.c_tag
+           AND e.c_terminal = FALSE
+           AND r.c_step_id = $step_id
       """.command
 
     val AbandonOngoingStepsWithoutStepId: Command[(Observation.Id, Step.Id)] =
@@ -685,10 +687,12 @@ object SequenceService {
 
     val SetAtomExecutionState: Command[(AtomExecutionState, Atom.Id)] =
       sql"""
-        UPDATE t_atom_record
+        UPDATE t_atom_record r
            SET c_execution_state = $atom_execution_state
-         WHERE c_atom_id = $atom_id
-           AND c_execution_state != 'abandoned'
+          FROM t_atom_execution_state e
+         WHERE r.c_execution_state = e.c_tag
+           AND e.c_terminal = FALSE
+           AND r.c_atom_id = $atom_id
       """.command
 
     val AbandonOngoingAtomsWithoutAtomId: Command[(Observation.Id, Atom.Id)] =
