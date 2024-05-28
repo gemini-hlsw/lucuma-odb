@@ -27,5 +27,5 @@ enum StepExecutionState(val tag: String) derives Enumerated:
   /** A STOP event was received */
   case Stopped     extends StepExecutionState("stopped")
 
-  /** An ongoing step was abandonded without having received an END_STEP. */
-//  case Abandoned     extends StepExecutionState("stopped")
+  /** An ongoing step was abandonded. */
+  case Abandoned     extends StepExecutionState("stopped")
