@@ -9,12 +9,17 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.AtomStage
+import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.StepExecutionState
 
-class addSequenceEvent extends OdbSuite {
+class addSequenceEvent extends OdbSuite with ExecutionState {
 
   val service: User = TestUsers.service(nextId)
 
@@ -114,5 +119,33 @@ class addSequenceEvent extends OdbSuite {
 
   }
 
+  test("addSequenceEvent - abandon atoms and steps") {
+    val user = service
+    val mode = ObservingModeType.GmosNorthLongSlit
+
+    import StepExecutionState.*
+
+    for {
+      pid  <- createProgramAs(user)
+      oid  <- createObservationAs(user, pid, mode.some)
+      vid  <- recordVisitAs(user, mode.instrument, oid)
+      aid0 <- recordAtomAs(user, mode.instrument, vid)
+      sid0 <- recordStepAs(user, mode.instrument, aid0)
+      aid1 <- recordAtomAs(user, mode.instrument, vid)
+      sid1 <- recordStepAs(user, mode.instrument, aid1)
+      _    <- addAtomEventAs(user, aid0, AtomStage.StartAtom)
+      _    <- addStepEventAs(user, sid0, StepStage.StartStep)
+      _    <- addStepEventAs(user, sid0, StepStage.EndStep)
+      _    <- addAtomEventAs(user, aid0, AtomStage.EndAtom)
+      _    <- addAtomEventAs(user, aid0, AtomStage.StartAtom)
+      _    <- addStepEventAs(user, sid1, StepStage.StartStep)
+      _    <- addSequenceEventAs(user, vid, SequenceCommand.Abort)
+      resA <- atomExecutionState(user, oid)
+      resS <- stepExecutionState(user, oid)
+    } yield {
+      assertEquals(resA, List(AtomExecutionState.Completed, AtomExecutionState.Abandoned))
+      assertEquals(resS, List(StepExecutionState.Completed, StepExecutionState.Abandoned))
+    }
+  }
 
 }
