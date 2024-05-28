@@ -118,6 +118,7 @@ object ExecutionEventService {
           e <- ResultT(insert)
           (eid, time, oid, vid) = e
           _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(atomId, atomStage))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoing(oid, atomId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
       }

@@ -10,7 +10,7 @@ import lucuma.core.util.Enumerated
  *
  * @param tag database tag
  */
-enum StepExecutionState(val tag: String) derives Enumerated {
+enum StepExecutionState(val tag: String) derives Enumerated:
 
   /** No events have been produced for this step. */
   case NotStarted  extends StepExecutionState("not_started")
@@ -27,4 +27,5 @@ enum StepExecutionState(val tag: String) derives Enumerated {
   /** A STOP event was received */
   case Stopped     extends StepExecutionState("stopped")
 
-}
+  /** An ongoing step was abandonded without having received an END_STEP. */
+//  case Abandoned     extends StepExecutionState("stopped")

@@ -179,6 +179,9 @@ enum AtomExecutionState {
   "An event with an 'END_ATOM' 'AtomStage' was received."
   COMPLETED
 
+  "An ongoing atom was abandoned."
+  ABANDONED
+
 }
 
 """
@@ -4219,6 +4222,10 @@ enum StepExecutionState {
 
   "An event with a 'STOP' 'StepStage' was received."
   STOPPED
+
+  "An ongoing step was abandoned."
+  ABANDONED
+
 }
 
 """

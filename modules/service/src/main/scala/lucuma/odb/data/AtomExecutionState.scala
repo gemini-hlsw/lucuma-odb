@@ -10,7 +10,7 @@ import lucuma.core.util.Enumerated
  *
  * @param tag database tag
  */
-enum AtomExecutionState(val tag: String) derives Enumerated {
+enum AtomExecutionState(val tag: String) derives Enumerated:
 
   /** No events have been produced for this step. */
   case NotStarted  extends AtomExecutionState("not_started")
@@ -21,4 +21,5 @@ enum AtomExecutionState(val tag: String) derives Enumerated {
   /** The atom ended with END_ATOM. */
   case Completed   extends AtomExecutionState("completed")
 
-}
+  /** The atom execution was abandoned without having received an END_ATOM. */
+  case Abandoned  extends AtomExecutionState("abandoned")
