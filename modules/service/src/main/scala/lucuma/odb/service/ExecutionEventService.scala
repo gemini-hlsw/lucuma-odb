@@ -118,7 +118,7 @@ object ExecutionEventService {
           e <- ResultT(insert)
           (eid, time, oid, vid) = e
           _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(atomId, atomStage))
-          _ <- ResultT.liftF(services.sequenceService.abandonOngoing(oid, atomId))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingAtomsExcept(oid, atomId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
       }
@@ -233,6 +233,7 @@ object ExecutionEventService {
           e <- ResultT(insert)
           (eid, time, oid, vid, aid) = e
           _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(stepId, stepStage, time))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, stepId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
       }
