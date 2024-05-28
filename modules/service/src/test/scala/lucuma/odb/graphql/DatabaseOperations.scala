@@ -1088,7 +1088,7 @@ trait DatabaseOperations { this: OdbSuite =>
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
-          atomStage: ${stage.tag.toUpperCase}
+          atomStage: ${stage.tag.toScreamingSnakeCase}
         }) {
           event {
             id

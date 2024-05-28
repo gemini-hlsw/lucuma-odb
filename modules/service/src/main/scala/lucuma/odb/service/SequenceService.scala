@@ -72,7 +72,12 @@ trait SequenceService[F[_]] {
   def setAtomExecutionState(
     atomId: Atom.Id,
     stage:  AtomStage
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def abandonOngoing(
+    observationId: Observation.Id,
+    atomId:        Atom.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def setStepExecutionState(
     stepId: Step.Id,
@@ -291,13 +296,19 @@ object SequenceService {
       override def setAtomExecutionState(
         atomId: Atom.Id,
         stage:  AtomStage
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
         val state = stage match {
           case AtomStage.StartAtom => AtomExecutionState.Ongoing
           case AtomStage.EndAtom   => AtomExecutionState.Completed
         }
         session.execute(Statements.SetAtomExecutionState)(state, atomId).void
       }
+
+      override def abandonOngoing(
+        observationId: Observation.Id,
+        atomId:        Atom.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        session.execute(Statements.AbandonOngoing)(observationId, atomId).void
 
       override def setStepExecutionState(
         stepId: Step.Id,
@@ -635,6 +646,15 @@ object SequenceService {
         UPDATE t_atom_record
            SET c_execution_state = $atom_execution_state
          WHERE c_atom_id = $atom_id
+      """.command
+
+    val AbandonOngoing: Command[(Observation.Id, Atom.Id)] =
+      sql"""
+        UPDATE t_atom_record
+           SET c_execution_state = 'abandoned'
+         WHERE c_observation_id = $observation_id
+           AND c_atom_id != $atom_id
+           AND c_execution_state = 'ongoing';
       """.command
 
     val SelectLastVisit: Query[Observation.Id, Visit.Id] =
