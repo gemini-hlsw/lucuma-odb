@@ -14,10 +14,10 @@ import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.StepExecutionState
-import lucuma.core.syntax.string.*
 
 class addAtomEvent extends OdbSuite with ExecutionState {
 

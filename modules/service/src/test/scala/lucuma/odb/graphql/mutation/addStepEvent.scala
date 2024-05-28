@@ -179,7 +179,7 @@ class addStepEvent extends OdbSuite with ExecutionState {
       resA <- atomExecutionState(user, oid)
       resS <- stepExecutionState(user, oid)
     } yield {
-      assertEquals(resA, List(AtomExecutionState.Abandoned, AtomExecutionState.NotStarted))
+      assertEquals(resA, List(AtomExecutionState.Abandoned, AtomExecutionState.Ongoing))
       assertEquals(resS, List(StepExecutionState.Abandoned, StepExecutionState.Ongoing))
     }
   }
