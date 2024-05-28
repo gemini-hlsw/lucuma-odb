@@ -163,7 +163,8 @@ trait Codecs {
     )
 
   val atom_execution_state: Codec[AtomExecutionState] =
-    enumerated(Type("e_atom_execution_state"))
+    enumerated[AtomExecutionState](Type.varchar) //("e_step_execution_state"))
+    //enumerated(Type("e_atom_execution_state"))
 
   val atom_id: Codec[Atom.Id] =
     uid[Atom.Id]
@@ -446,7 +447,7 @@ trait Codecs {
     )(_.toBigDecimal)
 
   val step_execution_state: Codec[StepExecutionState] =
-    enumerated(Type("e_step_execution_state"))
+    enumerated[StepExecutionState](Type.varchar) //("e_step_execution_state"))
 
   val step_id: Codec[Step.Id] =
     uid[Step.Id]
