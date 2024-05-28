@@ -172,6 +172,16 @@ object ExecutionEventService {
         command: SequenceCommand
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
+        extension (s: SequenceCommand)
+          def isTerminal: Boolean =
+            s match {
+              case SequenceCommand.Abort    |
+                   SequenceCommand.Stop       => true
+              case SequenceCommand.Continue |
+                   SequenceCommand.Pause    |
+                   SequenceCommand.Start      => false
+            }
+
         def invalidVisit: OdbError.InvalidVisit =
           OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
 
@@ -186,6 +196,7 @@ object ExecutionEventService {
         (for {
           e <- ResultT(insert)
           (eid, time, oid) = e
+          _ <- ResultT.liftF(services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(command.isTerminal))
           _ <- ResultT.liftF(timeAccountingService.update(visitId))
         } yield SequenceEvent(eid, time, oid, visitId, command)).value
       }
