@@ -69,10 +69,60 @@ There is also a required environment variable that sets the maximum file upload 
 ## Testing Migrations
 
 If you're adding migration scripts you should ensure that they will run correctly on a populated
-database. You can do this by bringing the database up via `docker-compose up` and then overwriting
-the database with data from the dev environment with `./populate-db-from-dev.sh`. You can then run
-the app and see verify that it comes up and looks ok. Note that you will need Heroku and Postgres
-tools installed locally.
+database.  There is a `populate-db-from-dev.sh` script, but currently it will fail in the restore
+step due to `pg_dump` wiping out the search path.  To work around this, the full procedure is:
+
+
+1. Create the binary database dump.
+```
+heroku pg:backups:capture --app lucuma-postgres-odb-dev
+heroku pg:backups:download --app lucuma-postgres-odb-dev --output /tmp/lucuma-postgres-odb-dev.dump
+```
+
+2. Convert the dump to text SQL commands.
+```
+pg_restore --verbose --clean --no-acl --no-owner --if-exists --no-comments -f ~/dump.sql /tmp/lucuma-postgres-odb-dev.dump
+```
+
+3. Edit the `.sql` file commenting out the following line:
+```
+SELECT pg_catalog.set_config('search_path', '', false);
+```
+
+This permits functions to find types that haven't been prefixed with the schema name.
+
+4. Clean the database.
+```
+docker-compose down
+docker-compose up
+```
+
+5. Connect with psql (to postgres database) and drop and recreate the lucuma-odb database
+```
+psql -h localhost -U jimmy -d postgres
+```
+
+then
+
+```
+# drop database "lucuma-odb";
+# create database "lucuma-odb";
+^C
+```
+
+6. Use `psql` to restore the database.
+```
+psql -h localhost -U jimmy -d lucuma-odb -f ~/dump.sql 
+```
+At this point the database is running locally with the data as it exists in main and any new
+migrations are ready to run when the application starts.
+
+7. Start the application in `sbt`.  This will cause the new migration to run and any errors
+will be revealed. 
+```
+service/reStart
+```
+
 
 ## Mailgun
 
