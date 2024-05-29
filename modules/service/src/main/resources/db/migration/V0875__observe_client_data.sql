@@ -21,6 +21,7 @@ SELECT
   s.c_step_type,
   s.c_observe_class,
   s.c_created,
+  s.c_execution_state,
   s.c_time_estimate,
   s.c_generated_id,
   g.c_gcal_continuum,
