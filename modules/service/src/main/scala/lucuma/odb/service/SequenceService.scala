@@ -69,16 +69,31 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]]
 
+  def abandonAtomsAndStepsForObservation(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def setAtomExecutionState(
     atomId: Atom.Id,
     stage:  AtomStage
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def abandonOngoingAtomsExcept(
+    observationId: Observation.Id,
+    atomId:        Atom.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def setStepExecutionState(
     stepId: Step.Id,
     stage:  StepStage,
     time:   Timestamp
   )(using Transaction[F]): F[Unit]
+
+  def abandonOngoingStepsExcept(
+    observationId: Observation.Id,
+    atomId:        Atom.Id,
+    stepId:        Step.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertAtomRecord(
     visitId:      Visit.Id,
@@ -288,16 +303,33 @@ object SequenceService {
           .onlyOrError
           .map(_.build)
 
+      override def abandonAtomsAndStepsForObservation(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        for {
+          _ <- session.execute(Statements.AbandonAllNonTerminalAtomsForObservation)(observationId)
+          _ <- session.execute(Statements.AbandonAllNonTerminalStepsForObservation)(observationId)
+        } yield ()
+
       override def setAtomExecutionState(
         atomId: Atom.Id,
         stage:  AtomStage
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
         val state = stage match {
           case AtomStage.StartAtom => AtomExecutionState.Ongoing
           case AtomStage.EndAtom   => AtomExecutionState.Completed
         }
         session.execute(Statements.SetAtomExecutionState)(state, atomId).void
       }
+
+      override def abandonOngoingAtomsExcept(
+        observationId: Observation.Id,
+        atomId:        Atom.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        for {
+          _ <- session.execute(Statements.AbandonOngoingAtomsWithoutAtomId)(observationId, atomId)
+          _ <- session.execute(Statements.AbandonOngoingStepsWithoutAtomId)(observationId, atomId)
+        } yield ()
 
       override def setStepExecutionState(
         stepId: Step.Id,
@@ -313,6 +345,16 @@ object SequenceService {
         val completedTime = Option.when(stage === StepStage.EndStep)(time)
         session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
       }
+
+      override def abandonOngoingStepsExcept(
+        observationId: Observation.Id,
+        atomId:        Atom.Id,
+        stepId:        Step.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        for {
+          _ <- session.execute(Statements.AbandonOngoingAtomsWithoutAtomId)(observationId, atomId)
+          _ <- session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, stepId)
+        } yield ()
 
       def insertAtomRecordImpl(
         visitId:      Visit.Id,
@@ -497,7 +539,7 @@ object SequenceService {
         INNER JOIN
           t_atom_record a
         ON a.c_atom_id = s.c_atom_id
-        WHERE  a.c_observation_id = $observation_id AND s.c_completed IS NOT NULL
+        WHERE  a.c_observation_id = $observation_id AND s.c_execution_state = 'completed'
           AND NOT EXISTS (
             SELECT 1
             FROM   t_dataset d
@@ -624,17 +666,75 @@ object SequenceService {
 
     val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
       sql"""
-        UPDATE t_step_record
+        UPDATE t_step_record s
            SET c_execution_state = $step_execution_state,
                c_completed       = ${core_timestamp.opt}
-         WHERE c_step_id = $step_id
+          FROM t_step_execution_state e
+         WHERE s.c_execution_state = e.c_tag
+           AND e.c_terminal = FALSE
+           AND s.c_step_id = $step_id
+      """.command
+
+    val AbandonAllNonTerminalStepsForObservation: Command[Observation.Id] =
+      sql"""
+        UPDATE t_step_record s
+           SET c_execution_state = 'abandoned'
+          FROM t_atom_record a, t_step_execution_state e
+         WHERE s.c_atom_id = a.c_atom_id
+           AND s.c_execution_state = e.c_tag
+           AND a.c_observation_id = $observation_id
+           AND e.c_terminal = FALSE
+      """.command
+
+    val AbandonOngoingStepsWithoutStepId: Command[(Observation.Id, Step.Id)] =
+      sql"""
+        UPDATE t_step_record s
+           SET c_execution_state = 'abandoned'
+          FROM t_atom_record a
+         WHERE s.c_atom_id = a.c_atom_id
+           AND a.c_observation_id = $observation_id
+           AND s.c_step_id != $step_id
+           AND s.c_execution_state = 'ongoing';
+      """.command
+
+    val AbandonOngoingStepsWithoutAtomId: Command[(Observation.Id, Atom.Id)] =
+      sql"""
+        UPDATE t_step_record s
+           SET c_execution_state = 'abandoned'
+          FROM t_atom_record a
+         WHERE s.c_atom_id = a.c_atom_id
+           AND a.c_observation_id = $observation_id
+           AND a.c_atom_id != $atom_id
+           AND s.c_execution_state = 'ongoing';
       """.command
 
     val SetAtomExecutionState: Command[(AtomExecutionState, Atom.Id)] =
       sql"""
-        UPDATE t_atom_record
+        UPDATE t_atom_record a
            SET c_execution_state = $atom_execution_state
-         WHERE c_atom_id = $atom_id
+          FROM t_atom_execution_state e
+         WHERE a.c_execution_state = e.c_tag
+           AND e.c_terminal = FALSE
+           AND a.c_atom_id = $atom_id
+      """.command
+
+    val AbandonAllNonTerminalAtomsForObservation: Command[Observation.Id] =
+      sql"""
+        UPDATE t_atom_record a
+           SET c_execution_state = 'abandoned'
+          FROM t_atom_execution_state e
+         WHERE a.c_execution_state = e.c_tag
+           AND a.c_observation_id = $observation_id
+           AND e.c_terminal = FALSE
+      """.command
+
+    val AbandonOngoingAtomsWithoutAtomId: Command[(Observation.Id, Atom.Id)] =
+      sql"""
+        UPDATE t_atom_record
+           SET c_execution_state = 'abandoned'
+         WHERE c_observation_id = $observation_id
+           AND c_atom_id != $atom_id
+           AND c_execution_state = 'ongoing';
       """.command
 
     val SelectLastVisit: Query[Observation.Id, Visit.Id] =
