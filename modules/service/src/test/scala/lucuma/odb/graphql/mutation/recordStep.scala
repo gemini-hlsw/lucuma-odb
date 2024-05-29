@@ -16,8 +16,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.toScreamingSnakeCase
 import lucuma.odb.data.ObservingModeType
+import org.scalacheck.Arbitrary.arbitrary
 
 class recordStep extends OdbSuite {
 
@@ -860,4 +862,48 @@ class recordStep extends OdbSuite {
     } yield ()
 
   }
+
+  test("recordStep - generated id") {
+    import lucuma.core.util.arb.ArbUid.given
+    val gen = arbitrary[Step.Id].sample.get
+
+    val stepConfigSmartGcal: String =
+      """
+        stepConfig: {
+          smartGcal: {
+            smartGcalType: FLAT
+          }
+        }
+      """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      service,
+      aid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            atomId: ${aid.asJson},
+            ${dynamicConfig(Instrument.GmosNorth)},
+            $stepConfigSmartGcal,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase},
+            generatedId: ${gen.asJson}
+          }) {
+            stepRecord {
+              generatedId
+            }
+          }
+        }
+      """,
+      _ => json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "generatedId": ${gen.asJson}
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
 }

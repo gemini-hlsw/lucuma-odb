@@ -52,6 +52,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       EffectField("qaState",     qaStateHandler, List("id")),
       SqlObject("datasets"),
       SqlObject("events"),
+      SqlField("generatedId",    StepRecordView.GeneratedId),
       SqlObject("gmosNorth",     Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
       SqlObject("gmosSouth",     Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
     )

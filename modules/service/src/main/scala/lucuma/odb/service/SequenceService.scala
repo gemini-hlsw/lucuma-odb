@@ -99,7 +99,8 @@ trait SequenceService[F[_]] {
     visitId:      Visit.Id,
     instrument:   Instrument,
     stepCount:    NonNegShort,
-    sequenceType: SequenceType
+    sequenceType: SequenceType,
+    generatedId:  Option[Atom.Id]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
 
   def insertGmosNorthStepRecord(
@@ -107,6 +108,7 @@ trait SequenceService[F[_]] {
     instrument:     GmosNorth,
     step:           StepConfig,
     observeClass:   ObserveClass,
+    generatedId:    Option[Step.Id],
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
@@ -115,6 +117,7 @@ trait SequenceService[F[_]] {
     instrument:     GmosSouth,
     step:           StepConfig,
     observeClass:   ObserveClass,
+    generatedId:    Option[Step.Id],
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
@@ -360,22 +363,24 @@ object SequenceService {
         visitId:      Visit.Id,
         instrument:   Instrument,
         stepCount:    NonNegShort,
-        sequenceType: SequenceType
+        sequenceType: SequenceType,
+        generatedId:  Option[Atom.Id]
       )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
         val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
         (for {
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType))
+          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType, generatedId))
         } yield InsertAtomResponse.Success(aid)).merge
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
         instrument:   Instrument,
         stepCount:    NonNegShort,
-        sequenceType: SequenceType
+        sequenceType: SequenceType,
+        generatedId:  Option[Atom.Id]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
-        insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType).map:
+        insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType, generatedId).map:
           case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
           case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
@@ -397,6 +402,7 @@ object SequenceService {
         instrument:          Instrument,
         stepConfig:          StepConfig,
         observeClass:        ObserveClass,
+        generatedId:         Option[Step.Id],
         timeEstimate:        (S, EstimatorState[D]) => StepEstimate,
         estimatorState:      Observation.Id => F[Option[(S, EstimatorState[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
@@ -407,7 +413,7 @@ object SequenceService {
           sid <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           es  <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
           _   <- EitherT.right(session.execute(Statements.InsertStep)(
-                   sid, atomId, instrument, stepConfig.stepType, observeClass, timeEstimate.tupled(es).total
+                   sid, atomId, instrument, stepConfig.stepType, observeClass, generatedId, timeEstimate.tupled(es).total
                  )).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
@@ -420,6 +426,7 @@ object SequenceService {
         dynamicConfig:  GmosNorth,
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
+        generatedId:    Option[Step.Id],
         timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
@@ -427,6 +434,7 @@ object SequenceService {
           Instrument.GmosNorth,
           stepConfig,
           observeClass,
+          generatedId,
           timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
           selectGmosNorthEstimatorState,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
@@ -437,6 +445,7 @@ object SequenceService {
         dynamicConfig:  GmosSouth,
         stepConfig:     StepConfig,
         observeClass:   ObserveClass,
+        generatedId:    Option[Step.Id],
         timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
@@ -444,6 +453,7 @@ object SequenceService {
           Instrument.GmosSouth,
           stepConfig,
           observeClass,
+          generatedId,
           timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
           selectGmosSouthEstimatorState,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
@@ -465,7 +475,8 @@ object SequenceService {
       Visit.Id,
       Instrument,
       NonNegShort,
-      SequenceType
+      SequenceType,
+      Option[Atom.Id]
     )] =
       sql"""
         INSERT INTO t_atom_record (
@@ -474,14 +485,16 @@ object SequenceService {
           c_visit_id,
           c_instrument,
           c_step_count,
-          c_sequence_type
+          c_sequence_type,
+          c_generated_id
         ) SELECT
           $atom_id,
           $observation_id,
           $visit_id,
           $instrument,
           $int2_nonneg,
-          $sequence_type
+          $sequence_type,
+          ${atom_id.opt}
       """.command
 
     val InsertStep: Command[(
@@ -490,7 +503,8 @@ object SequenceService {
       Instrument,
       StepType,
       ObserveClass,
-      TimeSpan
+      Option[Step.Id],
+      TimeSpan,
     )] =
       sql"""
         INSERT INTO t_step_record (
@@ -500,6 +514,7 @@ object SequenceService {
           c_instrument,
           c_step_type,
           c_observe_class,
+          c_generated_id,
           c_time_estimate
         ) SELECT
           $step_id,
@@ -515,8 +530,9 @@ object SequenceService {
           $instrument,
           $step_type,
           $obs_class,
+          ${step_id.opt},
           $time_span
-      """.command.contramap { (s, a, i, t, c, d) => (s, a, a, i, t, c, d) }
+      """.command.contramap { (s, a, i, t, c, g, d) => (s, a, a, i, t, c, g, d) }
 
     /**
      * Selects completed step records for a particular observation, folding in
