@@ -10,6 +10,11 @@ import grackle.Result
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProgramService.LinkUserRequest
+import lucuma.odb.data.ProgramUserRole.Coi
+import lucuma.odb.data.ProgramUserRole.CoiRO
+import lucuma.odb.data.ProgramUserRole.Support
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 object LinkUserInput {
 
@@ -19,9 +24,14 @@ object LinkUserInput {
         ProgramIdBinding("programId", rProgramId),
         UserIdBinding("userId", rUserId),
         ProgramUserRoleBinding("role", rRole),
+        PartnerBinding.Option("partner", rPartner),
       ) =>
-        (rProgramId, rUserId, rRole).parTupled.map { (pid, uid, role) =>
-          ProgramService.LinkUserRequest(role, pid, uid) 
+        (rProgramId, rUserId, rRole, rPartner).parTupled.flatMap {
+          case (pid, uid, Coi, Some(partner)) => Result(LinkUserRequest.Coi(pid, partner, uid))
+          case (pid, uid, CoiRO, Some(partner)) => Result(LinkUserRequest.CoiRo(pid, partner, uid))
+          case (pid, uid, Support, None) => Result(LinkUserRequest.Support(pid, uid))
+          case (_, _, Coi | CoiRO, None) => OdbError.InvalidArgument("A partner must be specified for co-investigators.".some).asFailure
+          case (_, _, Support, Some(_)) => OdbError.InvalidArgument("A partner may not be specified for support users.".some).asFailure
         }
     }
 

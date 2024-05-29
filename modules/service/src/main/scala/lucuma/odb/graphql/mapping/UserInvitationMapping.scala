@@ -23,6 +23,7 @@ trait UserInvitationMapping[F[_]]
       SqlObject("program", Join(UserInvitationTable.ProgramId, ProgramTable.Id)),
       SqlField("recipientEmail", UserInvitationTable.RecipientEmail),
       SqlField("role", UserInvitationTable.Role),
+      SqlField("partner", UserInvitationTable.Partner),
       SqlObject("redeemer", Join(UserInvitationTable.RedeemerId, UserTable.UserId)),
       SqlObject("email", Join(UserInvitationTable.EmailId, EmailTable.EmailId))
     )
