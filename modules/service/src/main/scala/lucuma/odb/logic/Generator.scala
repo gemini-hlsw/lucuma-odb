@@ -107,8 +107,14 @@ sealed trait Generator[F[_]] {
 
 object Generator {
 
+  // The digest calculation needs to go through every step in the sequence.
+  // The ITC sometimes returns `Int.MaxValue`, which leads to timeouts.  This is
+  // a reasonable upper limit on the number of atoms in a sequence.
   val SequenceAtomLimit = 100_000
 
+  // This is a user-specifiable limit on how many `possibleFuture` steps should
+  // be returned by the sequence generation.  It doesn't limit the overall
+  // length of the sequence the way that the SequenceAtomLimit above does.
   type FutureLimit = Int Refined Interval.Closed[0, 100]
 
   object FutureLimit extends RefinedTypeOps[FutureLimit, Int] {

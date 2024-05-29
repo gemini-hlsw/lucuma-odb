@@ -163,6 +163,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
+  // Provides a hook to allow test cases to alter the dummy ITC results.
   def fakeItcResult: IntegrationTime =
     FakeItcResult
 
