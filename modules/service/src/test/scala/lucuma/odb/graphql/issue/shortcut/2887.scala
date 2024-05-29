@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 package issue.shortcut
 
 import cats.effect.IO
+import cats.effect.Ref
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -14,19 +16,24 @@ import lucuma.core.model.Target
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.logic.Generator.SequenceAtomLimit
 
 class ShortCut_2887 extends ExecutionTestSupport {
+
+  val atomCount: Ref[IO, Int] =
+    Ref.unsafe(0)
 
   override def fakeItcResult: IntegrationTime =
     IntegrationTime(
       596523.hourTimeSpan,
-      PosInt.unsafeFrom(2147483647),
+      PosInt.unsafeFrom(atomCount.get.unsafeRunSync()),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   test("forever sequence") {
     val setup: IO[Observation.Id] =
       for {
+        _ <- atomCount.set(SequenceAtomLimit + 1)
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
@@ -40,37 +47,38 @@ class ShortCut_2887 extends ExecutionTestSupport {
                observation(observationId: "$oid") {
                  execution {
                    digest {
-                     setup {
-                       full { seconds }
-                       reacquisition { seconds }
-                     }
-                     acquisition {
-                       observeClass
-                       timeEstimate {
-                         program { seconds }
-                         partner { seconds }
-                         nonCharged { seconds }
-                         total { seconds }
-                       }
-                       offsets {
-                         p { arcseconds }
-                         q { arcseconds }
-                       }
-                       atomCount
-                     }
                      science {
                        observeClass
-                       timeEstimate {
-                         program { seconds }
-                         partner { seconds }
-                         nonCharged { seconds }
-                         total { seconds }
-                       }
-                       offsets {
-                         p { arcseconds }
-                         q { arcseconds }
-                       }
-                       atomCount
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = List("The generated sequence is too long (more than 100000 atoms).").asLeft
+      )
+    }
+  }
+
+  test("on the edge of forever") {
+    val setup: IO[Observation.Id] =
+      for {
+        _ <- atomCount.set(SequenceAtomLimit)
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   digest {
+                     science {
+                       observeClass
                      }
                    }
                  }
@@ -83,85 +91,8 @@ class ShortCut_2887 extends ExecutionTestSupport {
               "observation": {
                 "execution": {
                   "digest": {
-                    "setup" : {
-                      "full" : {
-                        "seconds" : 960.000000
-                      },
-                      "reacquisition" : {
-                        "seconds" : 300.000000
-                      }
-                    },
-                    "acquisition" : {
-                      "observeClass" : "ACQUISITION",
-                      "timeEstimate" : {
-                        "program" : {
-                          "seconds" : 175.162500
-                        },
-                        "partner" : {
-                          "seconds" : 0.000000
-                        },
-                        "nonCharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "total" : {
-                          "seconds" : 175.162500
-                        }
-                      },
-                      "offsets" : [
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        },
-                        {
-                          "p" : {
-                            "arcseconds" : 10.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        }
-                      ],
-                      "atomCount": 1
-                    },
                     "science" : {
-                      "observeClass" : "SCIENCE",
-                      "timeEstimate" : {
-                        "program" : {
-                          "seconds" : 411.600000
-                        },
-                        "partner" : {
-                          "seconds" : 357.600000
-                        },
-                        "nonCharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "total" : {
-                          "seconds" : 769.200000
-                        }
-                      },
-                      "offsets" : [
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        },
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 15.000000
-                          }
-                        }
-                      ],
-                      "atomCount": 6
+                      "observeClass" : "SCIENCE"
                     }
                   }
                 }
