@@ -172,16 +172,6 @@ object ExecutionEventService {
         command: SequenceCommand
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
-        extension (s: SequenceCommand)
-          def isTerminal: Boolean =
-            s match {
-              case SequenceCommand.Abort    |
-                   SequenceCommand.Stop       => true
-              case SequenceCommand.Continue |
-                   SequenceCommand.Pause    |
-                   SequenceCommand.Start      => false
-            }
-
         def invalidVisit: OdbError.InvalidVisit =
           OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
 

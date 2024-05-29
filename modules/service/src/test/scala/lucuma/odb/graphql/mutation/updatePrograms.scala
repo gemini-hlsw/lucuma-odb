@@ -6,7 +6,7 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
@@ -14,7 +14,7 @@ import lucuma.odb.data.Existence
 class updatePrograms extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 101)
-  val ngo      = TestUsers.Standard.ngo(2, 102, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(2, 102, Partner.CA)
   val staff    = TestUsers.Standard.staff(3, 103)
   val admin    = TestUsers.Standard.admin(4, 104)
   val guest    = TestUsers.guest(5)

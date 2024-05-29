@@ -15,7 +15,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.EmailStatus
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
@@ -25,7 +24,6 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference

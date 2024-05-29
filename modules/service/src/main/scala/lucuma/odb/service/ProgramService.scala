@@ -12,6 +12,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
 import lucuma.core.model.Access.Admin
@@ -19,7 +20,6 @@ import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -255,22 +255,22 @@ object ProgramService {
           case Access.Guest   => Result.internalError("unlinkCoi: guest user seen; should be impossible").pure[F]
           case Access.Ngo     => OdbError.NotAuthorized(user.id).asFailureF // not allowed
           case Access.Staff   |
-               Access.Admin   |          
-               Access.Service => unlinkUnconditionally(input) 
+               Access.Admin   |
+               Access.Service => unlinkUnconditionally(input)
           case Access.Pi      =>
             session.prepareR(Statements.UnlinkCoiAsPi).use: pc =>
               pc.execute(user.id, input.programId, input.userId).map:
                 case Completion.Delete(1) => Result(true)
                 case Completion.Delete(0) => OdbError.NotAuthorized(user.id).asFailure
                 case other                => Result.internalError(s"unlinkCoi: unexpected completion: $other")
-        
+
       private def unlinkObserver(input: UnlinkUserInput)(using Transaction[F], Services.PiAccess): F[Result[Boolean]] =
         user.role.access match
           case Access.Guest   => Result.internalError("unlinkObserver: guest user seen; should be impossible").pure[F]
           case Access.Ngo     => OdbError.NotAuthorized(user.id).asFailureF // not allowed
           case Access.Staff   |
-               Access.Admin   |          
-               Access.Service => unlinkUnconditionally(input) 
+               Access.Admin   |
+               Access.Service => unlinkUnconditionally(input)
           case Access.Pi      =>
             session.prepareR(Statements.UnlinkObserverAsPiOrCoi).use: pc =>
               pc.execute(user.id, input.programId, input.userId).map:
@@ -290,7 +290,7 @@ object ProgramService {
             case Some(R.CoiRO)    => unlinkObserver(input)
             case Some(R.Support)  => requireStaffAccess(unlinkUnconditionally(input))
       }
-      
+
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
         F[Result[List[Program.Id]]] = {
 
@@ -371,7 +371,7 @@ object ProgramService {
         DELETE FROM t_program_user u
         USING t_program p
         WHERE p.c_program_id = u.c_program_id
-        AND   p.c_program_id = $program_id        
+        AND   p.c_program_id = $program_id
         AND   p.c_pi_user_id = $user_id
         AND   u.c_role = 'coi'
         AND   u.c_user_id = $user_id
@@ -384,7 +384,7 @@ object ProgramService {
         DELETE FROM t_program_user u
         USING t_program p
         WHERE p.c_program_id = u.c_program_id
-        AND   p.c_program_id = $program_id        
+        AND   p.c_program_id = $program_id
         AND   (p.c_pi_user_id = $user_id OR exists(SELECT * FROM t_program_user x WHERE x.c_role = 'coi' AND x.c_user_id = $user_id))
         AND   u.c_role = 'coi_ro'
         AND   u.c_user_id = $user_id

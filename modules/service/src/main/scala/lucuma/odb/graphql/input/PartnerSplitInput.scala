@@ -6,8 +6,8 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
-import lucuma.core.model.Partner
 import lucuma.odb.graphql.binding.*
 
 case class PartnerSplitInput(

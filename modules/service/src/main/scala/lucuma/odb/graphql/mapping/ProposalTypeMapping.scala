@@ -19,9 +19,9 @@ import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
-import lucuma.core.model.Partner
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
 

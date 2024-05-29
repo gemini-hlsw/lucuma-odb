@@ -12,7 +12,7 @@ import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.service.Services

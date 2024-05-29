@@ -5,7 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PartnerBinding
