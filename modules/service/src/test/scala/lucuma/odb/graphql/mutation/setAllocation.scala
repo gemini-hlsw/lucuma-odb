@@ -6,7 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -15,7 +15,7 @@ class setAllocation extends OdbSuite {
 
   val guest    = TestUsers.guest(nextId)
   val pi       = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff    = TestUsers.Standard.staff(nextId, nextId)
   val admin    = TestUsers.Standard.admin(nextId, nextId)
   val service  = TestUsers.service(nextId)
@@ -26,7 +26,7 @@ class setAllocation extends OdbSuite {
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         interceptGraphQL(s"User ${user.id} is not authorized to perform this operation.") {
-          setAllocationAs(user, pid, Partner.Ca, 42.hourTimeSpan)
+          setAllocationAs(user, pid, Partner.CA, 42.hourTimeSpan)
         }
       }
     }
@@ -35,7 +35,7 @@ class setAllocation extends OdbSuite {
   test("admin, staff, service can set (and update) allocation in any program") {
     createProgramAs(pi).flatMap { pid =>
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
-        setAllocationAs(user, pid, Partner.Us, TimeSpan.fromHours(hours).get)
+        setAllocationAs(user, pid, Partner.US, TimeSpan.fromHours(hours).get)
       }
     }
   }

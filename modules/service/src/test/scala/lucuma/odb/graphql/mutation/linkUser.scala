@@ -6,7 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -17,7 +17,7 @@ class linkUser extends OdbSuite {
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
   val pi3      = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff    = TestUsers.Standard.staff(nextId, nextId)
   val admin    = TestUsers.Standard.admin(nextId, nextId)
   val guest    = TestUsers.guest(nextId)
@@ -74,7 +74,7 @@ class linkUser extends OdbSuite {
   test("[coi] ngo user can add coi to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.Ca, 42.hourTimeSpan) >>
+      setAllocationAs(admin, pid, Partner.CA, 42.hourTimeSpan) >>
       linkCoiAs(ngo, pi2.id -> pid)
     }
   }
@@ -147,7 +147,7 @@ class linkUser extends OdbSuite {
   test("[observer] ngo user can add observer to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.Ca, 42.hourTimeSpan) >>
+      setAllocationAs(admin, pid, Partner.CA, 42.hourTimeSpan) >>
       linkObserverAs(ngo, pi2.id -> pid)
     }
   }
@@ -193,7 +193,7 @@ class linkUser extends OdbSuite {
   test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.Ca, 42.hourTimeSpan) >>
+      setAllocationAs(admin, pid, Partner.CA, 42.hourTimeSpan) >>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkSupportAs(ngo, pi2.id -> pid)
       }
