@@ -89,6 +89,7 @@ class createUserInvitation extends OdbSuite {
                 programId: "$pid"
                 recipientEmail: "$successRecipient"
                 role: ${pur.tag.toUpperCase}
+                partner: US
               }
             ) {
               invitation {
@@ -202,6 +203,7 @@ class createUserInvitation extends OdbSuite {
             programId: "p-ffff"
             recipientEmail: "$successRecipient"
             role: ${ProgramUserRole.Coi.tag.toUpperCase}
+            partner: US
           }
         ) {
           key
@@ -226,6 +228,7 @@ class createUserInvitation extends OdbSuite {
               programId: "$pid"
               recipientEmail: "$successRecipient"
               role: ${ProgramUserRole.Coi.tag.toUpperCase}
+              partner: US
             }
           ) {
             key
@@ -251,6 +254,7 @@ class createUserInvitation extends OdbSuite {
                 programId: "$pid"
                 recipientEmail: "$successRecipient"
                 role: ${ProgramUserRole.Coi.tag.toUpperCase}
+                partner: US
               }
             ) {
               key

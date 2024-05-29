@@ -90,7 +90,14 @@ trait ProgramService[F[_]] {
 
 object ProgramService {
 
-  case class LinkUserRequest(role: ProgramUserRole, programId: Program.Id, userId: User.Id)
+  sealed trait LinkUserRequest:
+    def programId: Program.Id
+    def userId: User.Id
+
+  object LinkUserRequest:
+    case class Coi(programId: Program.Id, partner: Partner, userId: User.Id) extends LinkUserRequest
+    case class CoiRo(programId: Program.Id, partner: Partner, userId: User.Id) extends LinkUserRequest
+    case class Support(programId: Program.Id, userId: User.Id) extends LinkUserRequest
 
   sealed trait LinkUserResponse extends Product with Serializable
   object LinkUserResponse {
@@ -216,9 +223,9 @@ object ProgramService {
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
-            case LinkUserRequest(ProgramUserRole.Coi, programId, userId) => Statements.linkCoi(programId, userId, user)
-            case LinkUserRequest(ProgramUserRole.CoiRO, programId, userId) => Statements.linkObserver(programId, userId, user)
-            case LinkUserRequest(ProgramUserRole.Support, programId, userId) => Statements.linkSupport(programId, userId, user)
+            case LinkUserRequest.Coi(programId, partner, userId) => Statements.linkCoi(programId, userId, Tag(partner.tag), user)
+            case LinkUserRequest.CoiRo(programId, partner, userId) => Statements.linkCoiReadOnly(programId, userId, Tag(partner.tag), user)
+            case LinkUserRequest.Support(programId, userId) => Statements.linkSupport(programId, userId, user)
           }
         af match {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
@@ -513,10 +520,10 @@ object ProgramService {
          }
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole)] =
+    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[Tag])] =
       sql"""
-         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role)
-         SELECT $program_id, $user_id, 'standard', $program_user_role
+         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner)
+         SELECT $program_id, $user_id, 'standard', $program_user_role, ${tag.opt}
         """
 
     /**
@@ -528,9 +535,10 @@ object ProgramService {
     def linkCoi(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
+      partner: Tag,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, Some(partner))
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -547,12 +555,13 @@ object ProgramService {
      * - Staff, Admin, and Service users can always do this.
      * - Standard user can only do this if they're the program's PI or Coi.
      */
-    def linkObserver(
+    def linkCoiReadOnly(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
+      partner: Tag,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, Some(partner))
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -578,7 +587,7 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, None)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

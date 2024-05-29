@@ -31,7 +31,7 @@ class linkUser extends OdbSuite {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
       interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-        linkCoiAs(guest, pi.id -> pid)
+        linkCoiAs(guest, pi.id -> pid, Partner.Us)
       }
     }
   }
@@ -39,16 +39,16 @@ class linkUser extends OdbSuite {
   test("[coi] pi user can link coi to program they own") {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid)
+      linkCoiAs(pi, pi2.id -> pid, Partner.Us)
     }
   }
 
   test("[coi] pi user can't link another coi to program where they are a coi") {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid) >>
+      linkCoiAs(pi, pi2.id -> pid, Partner.Us) >>
       interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkCoiAs(pi2, pi3.id -> pid)
+        linkCoiAs(pi2, pi3.id -> pid, Partner.Us)
       }
     }
   }
@@ -57,7 +57,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkCoiAs(pi2, pi3.id -> pid)
+        linkCoiAs(pi2, pi3.id -> pid, Partner.Us)
       }
     }
   }
@@ -66,7 +66,7 @@ class linkUser extends OdbSuite {
     List(service, admin, staff).traverse_ { user =>
       createUsers(user) >>
       createProgramAs(pi).flatMap { pid =>
-        linkCoiAs(user, pi2.id -> pid)
+        linkCoiAs(user, pi2.id -> pid, Partner.Us)
       }
     }
   }
@@ -74,8 +74,8 @@ class linkUser extends OdbSuite {
   test("[coi] ngo user can add coi to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.CA, 42.hourTimeSpan) >>
-      linkCoiAs(ngo, pi2.id -> pid)
+      setAllocationAs(admin, pid, Partner.Ca, 42.hourTimeSpan) >>
+      linkCoiAs(ngo, pi2.id -> pid, Partner.Us)
     }
   }
 
@@ -83,7 +83,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkCoiAs(ngo, pi2.id -> pid)
+        linkCoiAs(ngo, pi2.id -> pid, Partner.Us)
       }
     }
   }
@@ -94,7 +94,7 @@ class linkUser extends OdbSuite {
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap { pid =>
       interceptOdbError {
-        linkObserverAs(guest, pi.id -> pid)
+        linkObserverAs(guest, pi.id -> pid, Partner.Us)
       } {
         case OdbError.NotAuthorized(guest.id, _) =>
       }
@@ -104,7 +104,7 @@ class linkUser extends OdbSuite {
   test("[observer] pi user can link observer to program they own") {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      linkObserverAs(pi, pi2.id -> pid)
+      linkObserverAs(pi, pi2.id -> pid, Partner.Us)
     }
   }
 
@@ -112,7 +112,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkObserverAs(pi2, pi3.id -> pid)
+        linkObserverAs(pi2, pi3.id -> pid, Partner.Us)
       }
     }
   }
@@ -120,17 +120,17 @@ class linkUser extends OdbSuite {
   test("[observer] pi user can link an observer to a program where they are a coi") {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid) >>     // pi links pi2 as coi
-      linkObserverAs(pi2, pi3.id -> pid)  // pi2 links pi3 as observer
+      linkCoiAs(pi, pi2.id -> pid, Partner.Us) >>     // pi links pi2 as coi
+      linkObserverAs(pi2, pi3.id -> pid, Partner.Us)  // pi2 links pi3 as observer
     }
   }
 
   test("[observer] pi user can't link an observer to a program where they are an observer") {
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap { pid =>
-      linkObserverAs(pi, pi2.id -> pid) >>  // pi links pi2 as observer
+      linkObserverAs(pi, pi2.id -> pid, Partner.Us) >>  // pi links pi2 as observer
       interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkObserverAs(pi2, pi3.id -> pid)   // pi2 tries to link pi3 as observer
+        linkObserverAs(pi2, pi3.id -> pid, Partner.Us)   // pi2 tries to link pi3 as observer
       }
     }
   }
@@ -139,7 +139,7 @@ class linkUser extends OdbSuite {
     List(service, admin, staff).traverse_ { user =>
       createUsers(user) >>
       createProgramAs(pi).flatMap { pid =>
-        linkObserverAs(user, pi2.id -> pid)
+        linkObserverAs(user, pi2.id -> pid, Partner.Us)
       }
     }
   }
@@ -147,8 +147,8 @@ class linkUser extends OdbSuite {
   test("[observer] ngo user can add observer to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.CA, 42.hourTimeSpan) >>
-      linkObserverAs(ngo, pi2.id -> pid)
+      setAllocationAs(admin, pid, Partner.Ca, 42.hourTimeSpan) >>
+      linkObserverAs(ngo, pi2.id -> pid, Partner.Us)
     }
   }
 
@@ -156,7 +156,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkObserverAs(ngo, pi2.id -> pid)
+        linkObserverAs(ngo, pi2.id -> pid, Partner.Us)
       }
     }
   }
@@ -205,9 +205,9 @@ class linkUser extends OdbSuite {
   test("[general] can't re-link a user") {
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid) >>
+      linkCoiAs(pi, pi2.id -> pid, Partner.Us) >>
       interceptGraphQL(s"User ${pi2.id} is already linked to program ${pid}.") {
-        linkCoiAs(pi, pi2.id -> pid)
+        linkCoiAs(pi, pi2.id -> pid, Partner.Us)
       }
     }
   }
@@ -216,7 +216,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, guest) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${guest.id} does not exist or is of a nonstandard type.") {
-        linkCoiAs(pi, guest.id -> pid)
+        linkCoiAs(pi, guest.id -> pid, Partner.Us)
       }
     }
   }
@@ -225,7 +225,7 @@ class linkUser extends OdbSuite {
     createUsers(pi, service) >>
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${service.id} does not exist or is of a nonstandard type.") {
-        linkCoiAs(pi, service.id -> pid)
+        linkCoiAs(pi, service.id -> pid, Partner.Us)
       }
     }
   }
