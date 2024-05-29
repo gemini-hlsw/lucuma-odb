@@ -14,7 +14,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.odb.data.ObservingModeType
+import org.scalacheck.Arbitrary.arbitrary
 
 class recordAtom extends OdbSuite {
 
@@ -160,4 +162,37 @@ class recordAtom extends OdbSuite {
     )
   }
 
+  test("recordAtom - generated id") {
+    import lucuma.core.util.arb.ArbUid.given
+    val gen = arbitrary[Atom.Id].sample.get
+
+    recordAtomTest(
+      ObservingModeType.GmosNorthLongSlit,
+      service,
+      vid => s"""
+        mutation {
+          recordAtom(input: {
+            visitId: ${vid.asJson},
+            instrument: GMOS_NORTH,
+            sequenceType: ACQUISITION,
+            stepCount: 3,
+            generatedId: ${gen.asJson}
+          }) {
+            atomRecord {
+              generatedId
+            }
+          }
+        }
+      """,
+      vid => json"""
+        {
+          "recordAtom": {
+            "atomRecord": {
+              "generatedId": ${gen.asJson}
+            }
+          }
+        }
+      """.asRight
+    )
+  }
 }

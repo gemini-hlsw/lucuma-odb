@@ -8,13 +8,15 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.odb.graphql.binding.*
 
 case class RecordAtomInput(
   visitId:      Visit.Id,
   instrument:   Instrument,
   sequenceType: SequenceType,
-  stepCount:    NonNegShort
+  stepCount:    NonNegShort,
+  generatedId:  Option[Atom.Id]
 )
 
 object RecordAtomInput {
@@ -25,9 +27,11 @@ object RecordAtomInput {
         VisitIdBinding("visitId", rVisitId),
         InstrumentBinding("instrument", rInstrument),
         SequenceTypeBinding("sequenceType", rSequenceType),
-        NonNegShortBinding("stepCount", rStepCount)
-      ) => (rVisitId, rInstrument, rSequenceType, rStepCount).parMapN { (visitId, instrument, sequenceType, stepCount) =>
-        RecordAtomInput(visitId, instrument, sequenceType, stepCount)
+        NonNegShortBinding("stepCount", rStepCount),
+        AtomIdBinding.Option("generatedId", rGenerated)
+      ) => (rVisitId, rInstrument, rSequenceType, rStepCount, rGenerated).parMapN {
+        (visitId, instrument, sequenceType, stepCount, generated) =>
+          RecordAtomInput(visitId, instrument, sequenceType, stepCount, generated)
       }
     }
 

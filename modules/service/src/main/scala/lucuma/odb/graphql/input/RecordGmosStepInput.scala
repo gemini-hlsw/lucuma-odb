@@ -7,6 +7,7 @@ package input
 import cats.syntax.parallel.*
 import lucuma.core.enums.ObserveClass
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -16,7 +17,8 @@ case class RecordGmosStepInput[A](
   atomId:       Atom.Id,
   instrument:   A,
   step:         StepConfig,
-  observeClass: ObserveClass
+  observeClass: ObserveClass,
+  generatedId:  Option[Step.Id]
 )
 
 object RecordGmosStepInput {
@@ -30,9 +32,11 @@ object RecordGmosStepInput {
         AtomIdBinding("atomId", rAtomId),
         instrumentMatcher(`instrumentName`, rInstrument),
         StepConfigInput.Binding("stepConfig", rStepConfig),
-        ObserveClassBinding("observeClass", rObserveClass)
-      ) => (rAtomId, rInstrument, rStepConfig, rObserveClass).parMapN { (atomId, instrument, step, oclass) =>
-        RecordGmosStepInput(atomId, instrument, step, oclass)
+        ObserveClassBinding("observeClass", rObserveClass),
+        StepIdBinding.Option("generatedId", rGenerated)
+      ) => (rAtomId, rInstrument, rStepConfig, rObserveClass, rGenerated).parMapN {
+        (atomId, instrument, step, oclass, generated) =>
+        RecordGmosStepInput(atomId, instrument, step, oclass, generated)
       }
     }
 

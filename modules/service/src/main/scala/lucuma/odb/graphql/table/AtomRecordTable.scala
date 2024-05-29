@@ -24,6 +24,7 @@ trait AtomRecordTable[F[_]] extends BaseMapping[F] {
     val SequenceType: ColumnRef   = col("c_sequence_type",   sequence_type)
     val Created: ColumnRef        = col("c_created",         core_timestamp)
     val ExecutionState: ColumnRef = col("c_execution_state", atom_execution_state)
+    val GeneratedId: ColumnRef    = col("c_generated_id",    atom_id.opt)
   }
 
 }
