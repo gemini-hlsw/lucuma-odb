@@ -25,7 +25,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
 
   override def fakeItcResult: IntegrationTime =
     IntegrationTime(
-      596523.hourTimeSpan,
+      1.secTimeSpan,
       PosInt.unsafeFrom(atomCount.get.unsafeRunSync()),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
@@ -55,7 +55,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
                }
              }
            """,
-        expected = List("The generated sequence is too long (more than 100000 atoms).").asLeft
+        expected = List(s"The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
       )
     }
   }
