@@ -118,6 +118,7 @@ object ExecutionEventService {
           e <- ResultT(insert)
           (eid, time, oid, vid) = e
           _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(atomId, atomStage))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingAtomsExcept(oid, atomId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
       }
@@ -171,6 +172,16 @@ object ExecutionEventService {
         command: SequenceCommand
       )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
 
+        extension (s: SequenceCommand)
+          def isTerminal: Boolean =
+            s match {
+              case SequenceCommand.Abort    |
+                   SequenceCommand.Stop       => true
+              case SequenceCommand.Continue |
+                   SequenceCommand.Pause    |
+                   SequenceCommand.Start      => false
+            }
+
         def invalidVisit: OdbError.InvalidVisit =
           OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
 
@@ -185,6 +196,7 @@ object ExecutionEventService {
         (for {
           e <- ResultT(insert)
           (eid, time, oid) = e
+          _ <- ResultT.liftF(services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(command.isTerminal))
           _ <- ResultT.liftF(timeAccountingService.update(visitId))
         } yield SequenceEvent(eid, time, oid, visitId, command)).value
       }
@@ -231,7 +243,9 @@ object ExecutionEventService {
         (for {
           e <- ResultT(insert)
           (eid, time, oid, vid, aid) = e
+          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
           _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(stepId, stepStage, time))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, stepId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
       }
