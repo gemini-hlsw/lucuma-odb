@@ -163,13 +163,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
+  def fakeItcResult: IntegrationTime =
+    FakeItcResult
+
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(FakeItcResult)
+          Zipper.one(fakeItcResult)
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] = {
@@ -177,7 +180,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(FakeItcResult)
+          Zipper.one(fakeItcResult)
         ).pure[IO]
       }
 
