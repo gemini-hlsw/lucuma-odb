@@ -220,7 +220,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   protected def databaseConfig: Config.Database =
     Config.Database(
-      maxConnections = 3,
+      maxConnections = 10,
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),
       user     = container.username,
