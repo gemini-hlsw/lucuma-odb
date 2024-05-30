@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 
 val PartnerBinding: Matcher[Partner] =
   enumeratedBinding

@@ -10,9 +10,9 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.odb.data.CallForProposalsType
@@ -21,10 +21,10 @@ import lucuma.odb.data.Tag
 import lucuma.odb.service.ProposalService.error
 
 class setProposalStatus extends OdbSuite {
-  
+
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
-  val ngo      = TestUsers.Standard.ngo(3, 103, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(3, 103, Partner.CA)
   val staff    = TestUsers.Standard.staff(4, 104)
   val admin    = TestUsers.Standard.admin(5, 105)
   val guest    = TestUsers.guest(6)

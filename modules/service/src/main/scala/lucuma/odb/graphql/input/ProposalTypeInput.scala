@@ -14,10 +14,10 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
-import lucuma.core.model.Partner
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable

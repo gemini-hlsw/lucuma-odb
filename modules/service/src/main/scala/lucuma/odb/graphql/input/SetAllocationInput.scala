@@ -7,7 +7,7 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.*

@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 
 class SetAllocationResultPredicates(path: Path) {

@@ -8,7 +8,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -21,7 +21,7 @@ class createTarget extends OdbSuite {
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
   val pi3      = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff    = TestUsers.Standard.staff(nextId, nextId)
   val admin    = TestUsers.Standard.admin(nextId, nextId)
   val guest    = TestUsers.guest(nextId)
@@ -229,7 +229,7 @@ class createTarget extends OdbSuite {
               }
             }
           """
-          
+
           val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
           assertEquals(data, expected)
 

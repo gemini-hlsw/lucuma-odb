@@ -55,7 +55,8 @@ import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite
-import munit.internal.console.AnsiColors
+import munit.catseffect.IOFixture
+import munit.diff.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.Response
 import org.http4s.Uri
@@ -201,9 +202,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = _ => Resource.eval(IO.pure(Response.notFound[IO]))
 
   // tests that require successfully sending invitations can assign this to httpRequestHandler
-  protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] = 
+  protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
     req => {
-      val sio = UUIDGen[IO].randomUUID.map(uuid => 
+      val sio = UUIDGen[IO].randomUUID.map(uuid =>
         Json.obj(
           "id"      -> s"<$uuid>".asJson,
           "message" -> "Queued".asJson
@@ -211,7 +212,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       )
       Resource.eval(IO.pure(Response(body = Stream.eval(sio).through(utf8.encode))))
     }
-  
+
   private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
 
   protected def databaseConfig: Config.Database =
@@ -306,10 +307,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 
-  private lazy val serverFixture: Fixture[Server] =
+  private lazy val serverFixture: IOFixture[Server] =
     ResourceSuiteLocalFixture("server", server)
 
-  private lazy val sessionFixture: Fixture[Session[IO]] =
+  private lazy val sessionFixture: IOFixture[Session[IO]] =
     ResourceSuiteLocalFixture("session", session)
 
   override def munitFixtures = List(serverFixture, sessionFixture)
@@ -475,7 +476,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             es.traverse_ : e =>
               OdbError.fromGraphQLError(e) match
                 case Some(_) => IO.unit
-                case None => IO.println(s"🐙 Not an OdbError: $e")              
+                case None => IO.println(s"🐙 Not an OdbError: $e")
           case _ => IO.unit
       }
 

@@ -7,14 +7,14 @@ package mutation
 import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.InvitationStatus
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
 import lucuma.odb.data.ProgramUserRole
 
 class redeemUserInvitation extends OdbSuite {
 
-  val partner = Partner.Ca
+  val partner = Partner.CA
 
   val pi      = TestUsers.Standard.pi(1, 101)
   val pi2     = TestUsers.Standard.pi(2, 201)

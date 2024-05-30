@@ -17,7 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.InvitationStatus
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
@@ -28,7 +28,7 @@ import org.http4s.dsl.Http4sDsl
 
 class createUserInvitation extends OdbSuite {
 
-  val partner = Partner.Ca
+  val partner = Partner.CA
 
   val pi      = TestUsers.Standard.pi(1, 101)
   val pi2     = TestUsers.Standard.pi(2, 201)
@@ -57,7 +57,7 @@ class createUserInvitation extends OdbSuite {
           if (recip === badResponseRecipient)
             BadRequest("whatever")
           else {
-            val sio = UUIDGen[IO].randomUUID.map(uuid => 
+            val sio = UUIDGen[IO].randomUUID.map(uuid =>
               Json.obj(
                 "id"      -> s"<$uuid>".asJson,
                 "message" -> "Queued".asJson
@@ -257,7 +257,7 @@ class createUserInvitation extends OdbSuite {
             }
           }
           """,
-          expected = 
+          expected =
             val Id = user.id
             {
               case OdbError.NotAuthorized(Id, _) =>
