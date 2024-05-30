@@ -29,7 +29,7 @@ val paigesVersion              = "0.4.3"
 val postgresVersion            = "42.7.3"
 val skunkVersion               = "0.6.3"
 val pprintVersion              = "0.9.0"
-val testcontainersScalaVersion = "0.40.17"
+val testcontainersScalaVersion = "0.41.3"
 
 ThisBuild / tlBaseVersion      := "0.11"
 ThisBuild / scalaVersion       := "3.4.2"
