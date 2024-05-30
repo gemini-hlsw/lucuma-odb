@@ -5,6 +5,8 @@ package lucuma.odb.logic
 
 import cats.data.EitherT
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -105,6 +107,14 @@ sealed trait Generator[F[_]] {
 
 object Generator {
 
+  // The digest calculation needs to go through every step in the sequence.
+  // The ITC sometimes returns `Int.MaxValue`, which leads to timeouts.  This is
+  // a reasonable upper limit on the number of atoms in a sequence.
+  val SequenceAtomLimit = 1000
+
+  // This is a user-specifiable limit on how many `possibleFuture` steps should
+  // be returned by the sequence generation.  It doesn't limit the overall
+  // length of the sequence the way that the SequenceAtomLimit above does.
   type FutureLimit = Int Refined Interval.Closed[0, 100]
 
   object FutureLimit extends RefinedTypeOps[FutureLimit, Int] {
@@ -146,8 +156,10 @@ object Generator {
 
     case object SequenceTooLong extends Error {
       def format: String =
-        s"The generated sequence is too long (more than ${Int.MaxValue} atoms)"
+        s"The generated sequence is too long (more than $SequenceAtomLimit atoms)."
     }
+
+    val sequenceTooLong: Error = SequenceTooLong
 
     def missingSmartGcalDef(key: String): Error =
       MissingSmartGcalDef(key)
@@ -272,7 +284,10 @@ object Generator {
       private def calcDigestFromContext(
         ctx: Context
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
-        ctx.params match {
+        EitherT
+          .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
+          .unlessA(ctx.scienceIntegrationTime.exposures.value <= SequenceAtomLimit) *>
+        (ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
               p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
@@ -286,7 +301,7 @@ object Generator {
               m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
               r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), calculator.gmosSouth.estimateSetup)
             } yield r
-        }
+        })
 
       override def generate(
         pid: Program.Id,
@@ -396,15 +411,19 @@ object Generator {
         ): F[Either[Error, SequenceDigest]] =
           s.fold(SequenceDigest.Zero.asRight[Error]) { (eDigest, eAtom) =>
             eDigest.flatMap { digest =>
-              digest.incrementAtomCount.toRight(SequenceTooLong).flatMap { incDigest =>
-                eAtom.bimap(
-                  missingSmartGcalDef,
-                  _.steps.foldLeft(incDigest) { (d, s) =>
-                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.value._2))
-                    offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
-                  }
-                )
-              }
+              digest
+                .incrementAtomCount
+                .filter(_.atomCount.value <= SequenceAtomLimit)
+                .toRight(SequenceTooLong)
+                .flatMap { incDigest =>
+                  eAtom.bimap(
+                    missingSmartGcalDef,
+                    _.steps.foldLeft(incDigest) { (d, s) =>
+                      val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.value._2))
+                      offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
+                    }
+                  )
+                }
             }
           }.compile.onlyOrError
 

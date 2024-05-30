@@ -164,13 +164,17 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
+  // Provides a hook to allow test cases to alter the dummy ITC results.
+  def fakeItcResult: IntegrationTime =
+    FakeItcResult
+
   private def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(FakeItcResult)
+          Zipper.one(fakeItcResult)
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] = {
@@ -178,7 +182,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(FakeItcResult)
+          Zipper.one(fakeItcResult)
         ).pure[IO]
       }
 
@@ -337,7 +341,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val All: List[ClientOption] = List(Http, Ws)
 
-    val Default: ClientOption = Http
+    val Default: ClientOption = Ws
   }
 
   override def beforeAll(): Unit = {
