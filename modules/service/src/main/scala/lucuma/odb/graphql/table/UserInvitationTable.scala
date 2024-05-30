@@ -16,5 +16,6 @@ trait UserInvitationTable[F[_]] extends BaseMapping[F]:
     val ProgramId      = col("c_program_id", program_id)
     val RecipientEmail = col("c_recipient_email", email_address)
     val Role           = col("c_role", program_user_role)
+    val Partner        = col("c_partner", partner.opt)
     val RedeemerId     = col("c_redeemer_id", user_id)
     val EmailId        = col("c_email_id", email_id)

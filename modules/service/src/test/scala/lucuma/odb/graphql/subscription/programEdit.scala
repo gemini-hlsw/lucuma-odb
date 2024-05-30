@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.Partner
 import lucuma.core.model.UserInvitation
 
 import scala.concurrent.duration.*
@@ -365,7 +366,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            linkCoiAs(pi, pi2.id, pid)
+            linkCoiAs(pi, pi2.id, pid, Partner.BR)
           }
         ),
       expected =

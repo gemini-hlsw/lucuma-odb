@@ -556,6 +556,7 @@ trait DatabaseOperations { this: OdbSuite =>
     uid: User.Id,
     pid: Program.Id,
     role: ProgramUserRole,
+    partner: Option[Partner]
   ): IO[Unit] =
     expect(
       user = user,
@@ -565,9 +566,11 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: ${pid.asJson}
             userId: ${uid.asJson}
             role: ${role.tag.toUpperCase}
+            ${partner.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
           }) {
             user {
               role
+              partner
               userId
             }
           }
@@ -578,6 +581,7 @@ trait DatabaseOperations { this: OdbSuite =>
           "linkUser" : {
             "user": {
               "role" : $role,
+              "partner" : $partner,
               "userId" : $uid
             }
           }
@@ -585,20 +589,20 @@ trait DatabaseOperations { this: OdbSuite =>
       """.asRight
     )
 
-  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Coi)
+  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.Coi, Some(partner))
 
-  def linkCoiAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkCoiAs(user, arrow._1, arrow._2)
+  def linkCoiAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
+    linkCoiAs(user, arrow._1, arrow._2, partner)
 
-  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.CoiRO)
+  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
+    linkAs(user, uid, pid, ProgramUserRole.CoiRO, Some(partner))
 
-  def linkObserverAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkObserverAs(user, arrow._1, arrow._2)
+  def linkObserverAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
+    linkObserverAs(user, arrow._1, arrow._2, partner)
 
   def linkSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support)
+    linkAs(user, uid, pid, ProgramUserRole.Support, None)
 
   def linkSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
     linkSupportAs(user, arrow._1, arrow._2)
@@ -1291,6 +1295,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     role: ProgramUserRole = ProgramUserRole.Coi,
+    partner: Option[Partner] = Some(Partner.US),
     recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get
   ): IO[UserInvitation] =
     query(
@@ -1302,6 +1307,7 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             recipientEmail: "$recipientEmail"
             role: ${role.tag.toUpperCase}
+            ${partner.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
           }
         ) {
           key

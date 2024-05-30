@@ -2467,6 +2467,9 @@ input LinkUserInput {
   "The role this user will play in the program."
   role: ProgramUserRole!
 
+  "Partner (co-investigators only)"
+  partner: Partner
+
 }
 
 
@@ -2484,6 +2487,9 @@ input CreateUserInvitationInput {
 
   "The role this user will play in the program."
   role: ProgramUserRole!
+
+  "Partner (co-investigators only)"
+  partner: Partner
 
 }
 
@@ -2526,6 +2532,9 @@ type UserInvitation {
 
   "The role the redeemer will play in the program."
   role: ProgramUserRole!
+
+  "Redeemer's partner (co-investigators only)"
+  partner: Partner
 
   "The email sent for the invitation"
   email: Email
@@ -3201,6 +3210,7 @@ An assignment of a user to a program.
 """
 type ProgramUser {
   role:   ProgramUserRole!
+  partner: Partner
   userId: UserId!
   user:   User
 }
