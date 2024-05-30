@@ -3,10 +3,10 @@
 
 package lucuma.odb.graphql
 
+import lucuma.core.enums.Partner
 import lucuma.core.model.GuestUser
 import lucuma.core.model.OrcidId
 import lucuma.core.model.OrcidProfile
-import lucuma.core.model.Partner
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser

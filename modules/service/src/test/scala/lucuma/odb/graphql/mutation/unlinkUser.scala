@@ -6,7 +6,7 @@ package mutation
 
 import cats.effect.IO
 import io.circe.syntax.*
-import lucuma.core.model.Partner
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
@@ -19,7 +19,7 @@ class unlinkUser extends OdbSuite {
   val pi1      = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
   val pi3      = TestUsers.Standard.pi(nextId, nextId)
-  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val ngo      = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff    = TestUsers.Standard.staff(nextId, nextId)
   val admin    = TestUsers.Standard.admin(nextId, nextId)
   val guest    = TestUsers.guest(nextId)
@@ -138,13 +138,13 @@ class unlinkUser extends OdbSuite {
   // What can NGO user do?
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
-    test(s"Ngo (Ca) can't unlink $link (NotAuthorized).") {
+    test(s"Ngo (CA) can't unlink $link (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
           _   <- linkAs(admin, pi2.id, pid, link)
-          _   <- setAllocationAs(admin, pid, Partner.Ca, TimeSpan.Max) // so ngo can see the program
+          _   <- setAllocationAs(admin, pid, Partner.CA, TimeSpan.Max) // so ngo can see the program
           _   <- unlinkAs(ngo, pi2.id, pid)
         yield ()
       } {

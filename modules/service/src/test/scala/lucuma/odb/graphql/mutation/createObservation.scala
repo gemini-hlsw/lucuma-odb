@@ -28,12 +28,12 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
@@ -65,7 +65,7 @@ class createObservation extends OdbSuite {
   val pi: StandardUser     = TestUsers.Standard.pi(nextId, nextId)
   val pi2: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
   val pi3: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
-  val ngo: StandardUser    = TestUsers.Standard.ngo(nextId, nextId, Partner.Ca)
+  val ngo: StandardUser    = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff: StandardUser  = TestUsers.Standard.staff(nextId, nextId)
   val admin: StandardUser  = TestUsers.Standard.admin(nextId, nextId)
   val guest: GuestUser     = TestUsers.guest(nextId)

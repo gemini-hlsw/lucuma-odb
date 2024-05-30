@@ -17,6 +17,7 @@ import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.Partner
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
@@ -35,7 +36,6 @@ import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference

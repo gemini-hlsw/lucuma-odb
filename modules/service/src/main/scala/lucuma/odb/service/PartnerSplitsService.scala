@@ -6,8 +6,8 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
-import lucuma.core.model.Partner
 import lucuma.core.model.Program
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
