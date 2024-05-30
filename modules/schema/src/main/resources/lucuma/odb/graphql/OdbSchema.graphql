@@ -3210,6 +3210,7 @@ An assignment of a user to a program.
 """
 type ProgramUser {
   role:   ProgramUserRole!
+  partner: Partner
   userId: UserId!
   user:   User
 }

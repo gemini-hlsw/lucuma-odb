@@ -570,6 +570,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }) {
             user {
               role
+              partner
               userId
             }
           }
@@ -580,6 +581,7 @@ trait DatabaseOperations { this: OdbSuite =>
           "linkUser" : {
             "user": {
               "role" : $role,
+              "partner" : $partner,
               "userId" : $uid
             }
           }
