@@ -154,7 +154,7 @@ class redeemUserInvitation extends OdbSuite {
 
   test("redeeming an invitation works if you aready have that role, but it's a no-op in terms of linking") {
     createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, Some(Partner.Ca)) >>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, Some(Partner.CA)) >>
       createUserInvitationAs(pi, pid).flatMap { inv =>
         expect(
           user = pi2,

@@ -20,16 +20,16 @@ val lucumaItcVersion           = "0.21.11"
 val lucumaCoreVersion          = "0.98.0"
 val lucumaGraphQLRoutesVersion = "0.8.9"
 val lucumaSsoVersion           = "0.6.18"
-val munitVersion               = "1.0.0"
-val munitCatsEffectVersion     = "2.0.0"
-val munitDisciplineVersion     = "2.0.0"
+val munitVersion               = "0.7.29" // check test output if you attempt to update this
+val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
+val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.5"
 val paigesVersion              = "0.4.3"
 val postgresVersion            = "42.7.3"
 val skunkVersion               = "0.6.3"
 val pprintVersion              = "0.9.0"
-val testcontainersScalaVersion = "0.40.17"
+val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.11"
 ThisBuild / scalaVersion       := "3.4.2"
@@ -143,7 +143,7 @@ lazy val service = project
       "edu.gemini"     %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.typelevel"  %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"  %% "log4cats-slf4j"                     % log4catsVersion,
-      "org.typelevel"  %% "munit-cats-effect"                  % munitCatsEffectVersion     % Test,
+      "org.typelevel"  %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
       "org.typelevel"  %% "paiges-core"                        % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.5",
     ),

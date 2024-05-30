@@ -61,7 +61,7 @@ class unlinkUser extends OdbSuite {
     for
       _   <- createUsers(pi1, pi2, pi3)
       pid <- createProgramAs(pi1)
-      _   <- linkCoiAs(pi1, pi2.id -> pid, Partner.Us)
+      _   <- linkCoiAs(pi1, pi2.id -> pid, Partner.US)
       _   <- assertIO(unlinkAs(pi3, pi2.id, pid), false)
     yield ()
   }
@@ -74,7 +74,7 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
-          _   <- linkAs(admin, pi2.id, pid, role, Option.when(role != ProgramUserRole.Support)(Partner.Us))
+          _   <- linkAs(admin, pi2.id, pid, role, Option.when(role != ProgramUserRole.Support)(Partner.US))
           _   <- unlinkAs(guest, pi2.id, pid)
         yield ()
       } {
@@ -89,7 +89,7 @@ class unlinkUser extends OdbSuite {
       for
         _   <- createUsers(pi1, pi2, pi3)
         pid <- createProgramAs(pi1)
-        _   <- linkAs(pi1, pi2.id, pid, link, Some(Partner.Ca))
+        _   <- linkAs(pi1, pi2.id, pid, link, Some(Partner.CA))
         _   <- assertIO(unlinkAs(pi1, pi2.id, pid), true)
       yield ()
     }
@@ -100,7 +100,7 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.Us))
+          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
           _   <- unlinkAs(pi1, pi2.id, pid)
         yield ()
       } {
@@ -114,8 +114,8 @@ class unlinkUser extends OdbSuite {
     for
       _   <- createUsers(pi1, pi2, pi3)
       pid <- createProgramAs(pi1)
-      _   <- linkCoiAs(pi1, pi2.id -> pid, Partner.Ar)
-      _   <- linkObserverAs(pi1, pi3.id -> pid, Partner.Ca)
+      _   <- linkCoiAs(pi1, pi2.id -> pid, Partner.AR)
+      _   <- linkObserverAs(pi1, pi3.id -> pid, Partner.CA)
       _   <- unlinkAs(pi2, pi3.id, pid)
     yield ()
   }
@@ -126,8 +126,8 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.Us))
-          _   <- linkCoiAs(pi1, pi3.id -> pid, Partner.Us)
+          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
+          _   <- linkCoiAs(pi1, pi3.id -> pid, Partner.US)
           _   <- unlinkAs(pi3, pi2.id, pid)
         yield ()
       } {
@@ -143,8 +143,8 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.Us))
-          _   <- setAllocationAs(admin, pid, Partner.Ca, TimeSpan.Max) // so ngo can see the program
+          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
+          _   <- setAllocationAs(admin, pid, Partner.CA, TimeSpan.Max) // so ngo can see the program
           _   <- unlinkAs(ngo, pi2.id, pid)
         yield ()
       } {
@@ -160,7 +160,7 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(pi1, pi2, u)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.Us))
+          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
           _   <- assertIO(unlinkAs(u, pi2.id, pid), true)
         yield ()
       }
