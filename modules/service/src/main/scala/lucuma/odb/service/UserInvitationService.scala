@@ -10,6 +10,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
+import lucuma.core.enums.Partner
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
@@ -25,6 +26,7 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
@@ -37,8 +39,6 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.odb.data.Tag
-import lucuma.core.model.Partner
 
 trait UserInvitationService[F[_]]:
 

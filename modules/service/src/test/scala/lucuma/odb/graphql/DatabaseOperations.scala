@@ -1295,7 +1295,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     role: ProgramUserRole = ProgramUserRole.Coi,
-    partner: Option[Partner] = Some(Partner.Us),
+    partner: Option[Partner] = Some(Partner.US),
     recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get
   ): IO[UserInvitation] =
     query(

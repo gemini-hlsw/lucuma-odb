@@ -6,17 +6,17 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
-import lucuma.odb.data.{ ProgramUserRole => PUR }
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.ProgramUserRole as PUR
 import lucuma.odb.graphql.binding.EmailAddressBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
+import lucuma.odb.graphql.binding.PartnerBinding
 import lucuma.odb.graphql.binding.ProgramIdBinding
 import lucuma.odb.graphql.binding.ProgramUserRoleBinding
-import lucuma.core.model.Partner
-import lucuma.odb.graphql.binding.PartnerBinding
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 enum CreateUserInvitationInput:
   def programId: Program.Id
