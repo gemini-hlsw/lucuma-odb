@@ -10,6 +10,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
+import lucuma.core.enums.Partner
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
@@ -25,6 +26,7 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
@@ -84,16 +86,16 @@ object UserInvitationService:
           .use: pq =>
             pq.unique(emailId, invitationId).as(Result.unit)
 
-      def createPiInvitation(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type): F[Result[UserInvitation]] =
+      def createInvitationAsPi(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type, partner: Partner): F[Result[UserInvitation]] =
         session
-          .prepareR(Statements.createPiInvitation)
+          .prepareR(Statements.createInvitationAsPi)
           .use: pq =>
-            pq.option(user, pid, email, role)
+            pq.option(user, pid, email, role, partner)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI.")).asProblem))
 
-      def createSuperUserInvitation(input: CreateUserInvitationInput) =
+      def createInvitationAsSuperUser(input: CreateUserInvitationInput) =
         session
-          .prepareR(Statements.createSuperUserInvitation)
+          .prepareR(Statements.createInvitationAsSuperUser)
           .use: pq =>
             pq.option(user, input)
               .map(Result.fromOption(_, OdbError.InvalidProgram(input.programId, Some("Specified program does not exist.")).asProblem))
@@ -105,9 +107,9 @@ object UserInvitationService:
           case GuestRole             => OdbError.NotAuthorized(user.id, Some("Guest users cannot create invitations.")).asFailureF
 
           // Superusers can do anything
-          case ServiceRole(_)        => createSuperUserInvitation(input)
-          case StandardRole.Staff(_) => createSuperUserInvitation(input)
-          case StandardRole.Admin(_) => createSuperUserInvitation(input)
+          case ServiceRole(_)        => createInvitationAsSuperUser(input)
+          case StandardRole.Staff(_) => createInvitationAsSuperUser(input)
+          case StandardRole.Admin(_) => createInvitationAsSuperUser(input)
 
           // NGO user can't create invitations
           case StandardRole.Ngo(_, p) =>
@@ -116,8 +118,8 @@ object UserInvitationService:
           // Science users can only create CoI or Observer invitations, and only if they're the PI
           case StandardRole.Pi(_)     =>
             input match
-              case CreateUserInvitationInput(pid, e, ProgramUserRole.Coi)   => createPiInvitation(pid, e, ProgramUserRole.Coi)
-              case CreateUserInvitationInput(pid, e, ProgramUserRole.CoiRO) => createPiInvitation(pid, e, ProgramUserRole.CoiRO)
+              case CreateUserInvitationInput.Coi(pid, e, partner)   => createInvitationAsPi(pid, e, ProgramUserRole.Coi, partner)
+              case CreateUserInvitationInput.CoiRO(pid, e, partner) => createInvitationAsPi(pid, e, ProgramUserRole.CoiRO, partner)
               case _                                          => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
@@ -138,12 +140,12 @@ object UserInvitationService:
               .use(_.option(user, status, input.key))
               .flatMap:
                 case None => OdbError.InvitationError(input.key.id, Some("Invitation is invalid, or has already been accepted, declined, or revoked.")).asFailureF
-                case Some(r, pid) =>
+                case Some(r, pid, partner) =>
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>
                     session
                       .prepareR(ProgramService.Statements.LinkUser.command)
-                      .use(_.execute(pid, user.id, r))
+                      .use(_.execute(pid, user.id, r, partner))
                       .as(Result(input.key.id))
                       .recoverWith:
                         case SqlState.UniqueViolation(_) =>
@@ -164,38 +166,42 @@ object UserInvitationService:
 
   object Statements:
 
-    val createSuperUserInvitation: Query[(User, CreateUserInvitationInput), UserInvitation] =
+    val createInvitationAsSuperUser: Query[(User, CreateUserInvitationInput), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
           $email_address,
           $program_user_role,
+          ${tag.opt},
           null
         ) from t_program
         where c_program_id = $program_id
       """
         .query(user_invitation)
         .contramap {
-          case (u, CreateUserInvitationInput(pid, e, r)) => (u.id, pid, e, r, pid)
+          case (u, CreateUserInvitationInput.Coi(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.Coi, Tag(partner.tag).some, pid)
+          case (u, CreateUserInvitationInput.CoiRO(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.CoiRO, Tag(partner.tag).some, pid)
+          case (u, CreateUserInvitationInput.Support(pid, e)) => (u.id, pid, e, ProgramUserRole.Support, none, pid)
         }
 
-    val createPiInvitation: Query[(User, Program.Id, EmailAddress, ProgramUserRole), UserInvitation] =
+    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, Partner), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
           $email_address,
           $program_user_role,
+          $tag,
           null
         ) from t_program
         where c_program_id = $program_id
         and c_pi_user_id = $user_id
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r) => (u.id, pid, e, r, pid, u.id))
+        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, Tag(p.tag), pid, u.id))
 
-    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id)] =
+    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, Option[Tag])] =
       sql"""
         update t_invitation
         set c_status = $user_invitation_status, c_redeemer_id = $user_id
@@ -203,8 +209,8 @@ object UserInvitationService:
         and c_invitation_id = $user_invitation_id
         and c_key_hash = md5($varchar)
         and c_issuer_id <> $user_id -- can't redeem your own invitation
-        returning c_role, c_program_id
-      """.query(program_user_role *: program_id)
+        returning c_role, c_program_id, c_partner
+      """.query(program_user_role *: program_id *: tag.opt)
         .contramap((u, s, i) => (s, u.id, i.id, i.body, u.id))
 
     val revokeUserInvitation: Query[(UserInvitation.Id, User.Id), UserInvitation.Id] =

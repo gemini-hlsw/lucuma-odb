@@ -21,6 +21,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
       SqlField("userId", ProgramUserTable.UserId, key = true),
       SqlField("role", ProgramUserTable.Role),
+      SqlField("partner", ProgramUserTable.Partner),
       SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId))
     )
 

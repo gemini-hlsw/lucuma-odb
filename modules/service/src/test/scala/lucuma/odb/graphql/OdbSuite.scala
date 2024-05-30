@@ -55,8 +55,7 @@ import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
 import lucuma.refined.*
 import munit.CatsEffectSuite
-import munit.catseffect.IOFixture
-import munit.diff.console.AnsiColors
+import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
 import org.http4s.Response
 import org.http4s.Uri
@@ -311,10 +310,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 
-  private lazy val serverFixture: IOFixture[Server] =
+  private lazy val serverFixture: Fixture[Server] =
     ResourceSuiteLocalFixture("server", server)
 
-  private lazy val sessionFixture: IOFixture[Session[IO]] =
+  private lazy val sessionFixture: Fixture[Session[IO]] =
     ResourceSuiteLocalFixture("session", session)
 
   override def munitFixtures = List(serverFixture, sessionFixture)
