@@ -391,8 +391,8 @@ object Generator {
            .through(calc.estimateSequence[F](proto.static))
 
         proto.mapSequences(
-          pipe(SequenceType.Acquisition, comState.acq.atomMap),
-          pipe(SequenceType.Science,     comState.sci.atomMap)
+          pipe(SequenceType.Acquisition, comState.acq.combinedAtomMap),
+          pipe(SequenceType.Science,     comState.sci.combinedAtomMap)
         )
       }
 

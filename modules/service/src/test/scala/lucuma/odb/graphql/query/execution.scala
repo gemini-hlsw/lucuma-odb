@@ -2105,7 +2105,7 @@ class execution extends ExecutionTestSupport {
         }
       }
     }
-    assertIO(m.map(_.sci.atomMap), Completion.AtomMap.Empty)
+    assertIO(m.map(_.sci.combinedAtomMap), Completion.AtomMap.Empty)
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - FAIL") {
@@ -2124,7 +2124,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m.map(_.sci.atomMap), Completion.AtomMap.Empty)
+    assertIO(m.map(_.sci.combinedAtomMap), Completion.AtomMap.Empty)
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - NULL QA") {
@@ -2142,7 +2142,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
+    assertIO(m.map(_.sci.combinedAtomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
   }
 
   test("one gmos north dynamic step - SequenceService atom counts - Pass") {
@@ -2161,7 +2161,7 @@ class execution extends ExecutionTestSupport {
         }
       } yield m
 
-    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
+    assertIO(m.map(_.sci.combinedAtomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
   }
 
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
@@ -2225,7 +2225,7 @@ class execution extends ExecutionTestSupport {
       }
     }
 
-    assertIO(m.map(_.sci.atomMap), atomMap1((GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
+    assertIO(m.map(_.sci.combinedAtomMap), atomMap1((GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
   }
 
   test("clear execution digest") {

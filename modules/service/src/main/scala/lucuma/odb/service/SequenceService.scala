@@ -299,7 +299,7 @@ object SequenceService {
           .stream(Statements.SelectCompletionRows)(observationId, 1024)
           .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) =>
             stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
-              stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
+              stepMap.get(sid).fold(state.reset(vid))(state.nextStep(vid, seqType, aid, cnt, _))
             }
           }
           .compile
