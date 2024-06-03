@@ -6,6 +6,8 @@ package lucuma.odb.sequence.data
 import cats.Eq
 import cats.syntax.eq.*
 import cats.syntax.option.*
+import cats.syntax.semigroup.*
+import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.SequenceType
@@ -46,6 +48,9 @@ object Completion {
 
     def from[D](seq: (AtomMatch[D], PosInt)*): AtomMap[D] =
       Map.from(seq)
+
+    def combine[D](ms: Iterable[AtomMap[D]]): AtomMap[D] =
+      ms.fold(Empty[D])(_ |+| _)
 
     extension [D](m: AtomMap[D]) {
 
@@ -136,40 +141,49 @@ object Completion {
   // for that sequence.  When this number changes, future atom and step ids will
   // also change.  This is important for acquisition sequences where the same
   // steps are repeatedly executed.
-  case class SequenceMatch[D](idBase: Int, atomMap: AtomMap[D])
+  case class SequenceMatch[D](idBase: Int, visitMap: Map[Visit.Id, AtomMap[D]]) {
+    def combinedAtomMap: AtomMap[D] =
+      AtomMap.combine(visitMap.values)
+  }
 
   object SequenceMatch {
 
-    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, AtomMap.Empty)
+    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, Map.empty)
 
     trait Builder[D, T <: Builder[D, T]] {
       def idBase: Int
-      def atomMap: AtomMap.Builder[D]
-      def resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]
+      def visitMap: Map[Visit.Id, AtomMap.Builder[D]]
       def updated(idBase: Int, atomMap: AtomMap.Builder[D]): T
+      def reset(vid: Visit.Id): T
 
-      def reset: T = updated(idBase + 1, resetAtomMap(atomMap))
-      def build: SequenceMatch[D] = SequenceMatch(idBase, atomMap.build)
+      def build: SequenceMatch[D] =
+        SequenceMatch(idBase, visitMap.view.mapValues(_.build).toMap)
 
-      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): T =
-        updated(idBase, atomMap.next(aid, count, step))
+      def next(vid: Visit.Id, aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): T =
+        updated(idBase, visitMap.updatedWith(vid)(_.getOrElse(AtomMap.Builder.init[D]).next(aid, count, step)))
     }
 
-    case class Acquisition[D](idBase: Int, atomMap: AtomMap.Builder[D]) extends Builder[D, Acquisition[D]] {
+    case class Acquisition[D](idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]) extends Builder[D, Acquisition[D]] {
       // Acquisition sequence matching starts over from scratch when reset.
-      override val resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]            = _ => AtomMap.Builder.init[D]
-      override def updated(idBase: Int, atomMap: AtomMap.Builder[D]): Acquisition[D] = Acquisition(idBase, atomMap)
+      override def reset(vid: Visit.Id): Acquisition[D] =
+        updated(idBase + 1, Map(vid -> AtomMap.Builder.init[D]))
+
+      override def updated(idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Acquisition[D] =
+        Acquisition(idBase, visitMap)
     }
 
-    def acq[D]: Acquisition[D] = Acquisition(0, AtomMap.Builder.init[D])
+    def acq[D]: Acquisition[D] = Acquisition(0, Map.empty)
 
     case class Science[D](idBase: Int, atomMap: AtomMap.Builder[D]) extends Builder[D, Science[D]] {
       // Science sequence matching keeps any progress that has been made when reset.
-      override val resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]        = _.reset
-      override def updated(idBase: Int, atomMap: AtomMap.Builder[D]): Science[D] = Science(idBase, atomMap)
+      override val reset(vid: Visit.Id): Science[D] =
+        updated(idBase + 1, visitMap.updatedWith(vid)(_.fold(AtomMap.Builder.init[D].some)(_.reset.some)))
+
+      override def updated(idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Science[D] =
+        Science(idBase, visitMap)
     }
 
-    def sci[D]: Science[D]     = Science(0, AtomMap.Builder.init[D])
+    def sci[D]: Science[D] = Science(0, Map.empty)
   }
 
   // The overall completion state for the observation, which consists of the
@@ -200,13 +214,13 @@ object Completion {
       sci: SequenceMatch.Science[D]
     ) {
 
-      def reset: Builder[D] = Builder(ctx, acq.reset, sci.reset)
+      def reset(vid: Visit.Id): Builder[D] = Builder(ctx, acq.reset(vid), sci.reset(vid))
 
       // Handle a new visit apart from any completed steps.  This can result in
       // a context update which causes the sequence matchers to be reset.
       def nextVisit(vid: Visit.Id): Builder[D] =
         val ctxʹ = MatchContext.fromVisitId(vid)
-        if (ctxʹ === ctx) this else Builder(ctxʹ, acq.reset, sci.reset)
+        if (ctxʹ === ctx) this else Builder(ctxʹ, acq.reset(vid), sci.reset(vid))
 
       // Handle the next completed step, updating the appropriate AtomMap for
       // the sequence type.
@@ -221,15 +235,15 @@ object Completion {
 
         // If it is a new visit, or if we switch from sci to acq or vice versa
         // we reset the acquisition sequence to execute from the beginning.
-        val acqʹ = if (ctxʹ === ctx) acq else acq.reset
+        val acqʹ = if (ctxʹ === ctx) acq else acq.reset(vid)
 
         // If it is a new visit, we abandon any atom we were working on and
         // start over with a new ids.
-        val sciʹ = if (ctxʹ.vid === ctx.vid) sci else sci.reset
+        val sciʹ = if (ctxʹ.vid === ctx.vid) sci else sci.reset(vid)
 
         val (acqʹʹ, sciʹʹ) = seqType match {
-          case SequenceType.Acquisition => (acqʹ.next(aid, count, step), sciʹ)
-          case SequenceType.Science     => (acqʹ, sciʹ.next(aid, count, step))
+          case SequenceType.Acquisition => (acqʹ.next(vid, aid, count, step), sciʹ)
+          case SequenceType.Science     => (acqʹ, sciʹ.next(vid, aid, count, step))
         }
 
         Builder(ctxʹ, acqʹʹ, sciʹʹ)
