@@ -33,6 +33,10 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.gmos.StaticConfig.{ GmosNorth as GmosNorthStatic }
+import lucuma.core.model.sequence.gmos.DynamicConfig.{ GmosNorth as GmosNorthDynamic }
+import lucuma.core.model.sequence.gmos.StaticConfig.{ GmosSouth as GmosSouthStatic }
+import lucuma.core.model.sequence.gmos.DynamicConfig.{ GmosSouth as GmosSouthDynamic }
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
@@ -281,6 +285,33 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         calcDigestFromContext(ctx).flatTap(ctx.cache)
 
+      type ExpandedAndEstimatedProtoExecutionSequence[F[_], S, D] =
+        ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]]
+
+      type GmosNorthProtoExecutionConfig[F[_]] =
+        ExpandedAndEstimatedProtoExecutionSequence[F, GmosNorthStatic, GmosNorthDynamic]
+
+      type GmosSouthProtoExecutionConfig[F[_]] =
+        ExpandedAndEstimatedProtoExecutionSequence[F, GmosSouthStatic, GmosSouthDynamic]
+
+      private def gmosNorthLongSlit(
+        ctx:    Context,
+        config: gmos.longslit.Config.GmosNorth
+      ): EitherT[F, Error, (GmosNorthProtoExecutionConfig[F], Int)] =
+        for {
+          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
+          m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
+        } yield (expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), m.acq.idBase)
+
+      private def gmosSouthLongSlit(
+        ctx:    Context,
+        config: gmos.longslit.Config.GmosSouth
+      ): EitherT[F, Error, (GmosSouthProtoExecutionConfig[F], Int)] =
+        for {
+          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
+          m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
+        } yield (expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), m.acq.idBase)
+
       private def calcDigestFromContext(
         ctx: Context
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
@@ -289,18 +320,10 @@ object Generator {
           .unlessA(ctx.scienceIntegrationTime.exposures.value <= SequenceAtomLimit) *>
         (ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
-            for {
-              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
-              r <- executionDigest(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), calculator.gmosNorth.estimateSetup)
-            } yield r
+            gmosNorthLongSlit(ctx, config).flatMap { (p, _) => executionDigest(p, calculator.gmosNorth.estimateSetup) }
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
-            for {
-              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
-              r <- executionDigest(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), calculator.gmosSouth.estimateSetup)
-            } yield r
+            gmosSouthLongSlit(ctx, config).flatMap { (p, _) => executionDigest(p, calculator.gmosSouth.estimateSetup) }
         })
 
       override def generate(
@@ -320,19 +343,16 @@ object Generator {
         ctx.params match {
           case GeneratorParams.GmosNorthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
-              r <- executionConfig(expandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), ctx.namespace, m, lim)
+              (p, a) <- gmosNorthLongSlit(ctx, config)
+              r      <- executionConfig(p, ctx.namespace, a, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
           case GeneratorParams.GmosSouthLongSlit(_, config) =>
             for {
-              p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
-              m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
-              r <- executionConfig(expandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), ctx.namespace, m, lim)
+              (p, a) <- gmosSouthLongSlit(ctx, config)
+              r      <- executionConfig(p, ctx.namespace, a, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
-
 
       // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
       // or time estimate calculation.
@@ -441,7 +461,7 @@ object Generator {
       private def executionConfig[S, D](
         proto:       ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
         namespace:   UUID,
-        compState:   Completion.State[D],
+        acqBase:     Int,
         futureLimit: FutureLimit
       ): EitherT[F, Error, ExecutionConfig[S, D]] = {
 
@@ -478,8 +498,8 @@ object Generator {
         for {
           // For acquisitions, take only the first step of the infinite sequence.
           // We always assume we only need one more step.
-          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, compState.acq.idBase))
-          s <- EitherT(executionSequence(proto.science, SequenceType.Science, compState.sci.idBase))
+          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, acqBase))
+          s <- EitherT(executionSequence(proto.science, SequenceType.Science, 0))
         } yield ExecutionConfig(proto.static, a, s)
       }
     }
