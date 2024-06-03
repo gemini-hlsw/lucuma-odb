@@ -61,10 +61,11 @@ import skunk.Session
 trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User   = TestUsers.Standard.pi(1, 30)
+  val pi2: User  = TestUsers.Standard.pi(2, 32)
   val user: User = TestUsers.service(3)
 
   override val validUsers: List[User] =
-    List(pi, user)
+    List(pi, pi2, user)
 
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "Sequence Testing")

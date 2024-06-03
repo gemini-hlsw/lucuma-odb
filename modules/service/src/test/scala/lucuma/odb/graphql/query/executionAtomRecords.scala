@@ -19,16 +19,23 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.json.gmos.given
+import lucuma.odb.json.time.transport.given
+import lucuma.odb.json.wavelength.transport.given
+import munit.Assertions.*
 
-class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
+class executionAtomRecords extends OdbSuite
+                              with ExecutionQuerySetupOperations
+                              with ExecutionTestSupport {
+
+//  val pi      = TestUsers.Standard.pi(1, 30)
+//  val pi2     = TestUsers.Standard.pi(2, 32)
+  val service = user
 
   val mode    = ObservingModeType.GmosNorthLongSlit
 
-  val validUsers = List(pi, pi2, service).toList
+//  val validUsers = List(pi, pi2, service).toList
 
   def noEventSetup: IO[(Observation.Id, Atom.Id)] =
     for {
@@ -515,5 +522,59 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
       es     <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.Completed)
+  }
+
+  def generatedNextAtomId(user: User, oid: Observation.Id): IO[Atom.Id] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              config {
+                gmosNorth {
+                  science {
+                    nextAtom {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "execution", "config", "gmosNorth", "science", "nextAtom", "id")
+        .as[Atom.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  test("record atom does not change ids") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ga0 <- generatedNextAtomId(pi, oid)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      _   <- recordAtomAs(service, mode.instrument, vid)
+      ga1 <- generatedNextAtomId(pi, oid)
+    } yield assertEquals(ga0, ga1)
+  }
+
+  test("record atom does not change ids 2") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ga0 <- generatedNextAtomId(pi, oid)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid, stepCount = 2)
+      sid <- recordStepAs(service, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      _   <- addEndStepEvent(sid)
+      ga1 <- generatedNextAtomId(pi, oid)
+    } yield assertEquals(ga0, ga1)
   }
 }
