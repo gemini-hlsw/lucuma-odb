@@ -141,14 +141,14 @@ object Completion {
   // for that sequence.  When this number changes, future atom and step ids will
   // also change.  This is important for acquisition sequences where the same
   // steps are repeatedly executed.
-  case class SequenceMatch[D](idBase: Int, visitMap: Map[Visit.Id, AtomMap[D]]) {
+  case class SequenceMatch[D](idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap[D]]) {
     def combinedAtomMap: AtomMap[D] =
       AtomMap.combine(visitMap.values)
   }
 
   object SequenceMatch {
 
-    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, Map.empty)
+    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, None, Map.empty)
 
     trait Builder[D, T <: Builder[D, T]] {
       def idBase: Int

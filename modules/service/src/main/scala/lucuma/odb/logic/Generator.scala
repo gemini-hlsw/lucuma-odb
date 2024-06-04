@@ -381,8 +381,7 @@ object Generator {
         // Given a SequenceType produces a Pipe from a SimpleAtom to a smart-gcal
         // expanded, estimated, indexed atom with executed steps filtered out.
         def pipe(
-          sequenceType: SequenceType,
-          compMap:      Completion.AtomMap[D]
+          compMap: Completion.AtomMap[D]
         ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
             // Do smart-gcal expansion
           _.through(expander.expand)
@@ -402,17 +401,19 @@ object Generator {
                 }
               )
             }
+
+            // dump the state and keep only un-executed atoms
             .collect {
               case (_, Left(error))               => Left(error)
-              case (_, Right(atom, index, false)) => Right((atom, index)) // keep only un-executed atoms
+              case (_, Right(atom, index, false)) => Right((atom, index))
             }
 
             // Add step estimates
            .through(calc.estimateSequence[F](proto.static))
 
         proto.mapSequences(
-          pipe(SequenceType.Acquisition, comState.acq.combinedAtomMap),
-          pipe(SequenceType.Science,     comState.sci.combinedAtomMap)
+          pipe(comState.acq.combinedAtomMap),
+          pipe(comState.sci.combinedAtomMap)
         )
       }
 
