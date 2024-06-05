@@ -30,6 +30,14 @@ trait SmartGcalExpander[F[_], K, D] {
    */
   def expand: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]]
 
+  def expandStep(
+    step: ProtoStep[D]
+  ): F[Either[String, NonEmptyList[ProtoStep[D]]]]
+
+  def expandAtom(
+    atom: ProtoAtom[ProtoStep[D]]
+  ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
+
 }
 
 object SmartGcalExpander {
@@ -51,18 +59,18 @@ object SmartGcalExpander {
   ) extends SmartGcalExpander[F, K, D] {
 
     val expand: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
-      _.evalMapAccumulate(emptyCache[K, D])(expandAtom).map(_._2)
+      _.evalMapAccumulate(emptyCache[K, D])(expandAtomWithCache).map(_._2)
 
-    private def expandAtom(
+    private def expandAtomWithCache(
       cache: Cache[K, D],
       atom:  ProtoAtom[ProtoStep[D]]
     ): F[(Cache[K, D], Either[String, ProtoAtom[ProtoStep[D]]])] =
       atom
         .steps
-        .mapAccumulateM(cache)(expandStep)
+        .mapAccumulateM(cache)(expandStepWithCache)
         .map(_.map(_.flatSequence.map(steps => ProtoAtom(atom.description, steps))))
 
-    private def expandStep(
+    private def expandStepWithCache(
       cache: Cache[K, D],
       step:  ProtoStep[D]
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
@@ -91,6 +99,16 @@ object SmartGcalExpander {
         case ps@ProtoStep(_, _, _, _) =>
           (cache, NonEmptyList.one(ps).asRight).pure[F]
       }
+
+    def expandStep(
+      step: ProtoStep[D]
+    ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+      expandStepWithCache(emptyCache[K, D], step).map(_._2)
+
+    def expandAtom(
+      atom: ProtoAtom[ProtoStep[D]]
+    ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
+      expandAtomWithCache(emptyCache[K, D], atom).map(_._2)
 
   }
 
