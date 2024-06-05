@@ -8,9 +8,11 @@ import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -18,7 +20,9 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Pipe
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.GcalLampType.Arc
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -371,52 +375,148 @@ object Generator {
         )
 
       // Performs smart-gcal expansion and time estimate calculation.
+      private def expandAndEstimatePipe[S, K, D](
+        static:   S,
+        expander: SmartGcalExpander[F, K, D],
+        calc:     TimeEstimateCalculator[S, D],
+        compMap:  Completion.AtomMap[D]
+      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
+          // Do smart-gcal expansion
+        _.through(expander.expand)
+
+          // Number the atoms, because executed atoms will be filtered out but
+          // we need the correct index to always calculate the same Atom.Id.
+          .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
+
+          // Strip executed atoms
+          .mapAccumulate(compMap) { case (state, eAtom) =>
+            eAtom.fold(
+              error => (state, error.asLeft),
+              { case (atom, index) =>
+                // Add executed flag and return updated map.
+                val (stateʹ, executed) = state.matchAtom(atom)
+                (stateʹ, (atom, index, executed).asRight)
+              }
+            )
+          }
+
+          // dump the state and keep only un-executed atoms
+          .collect {
+            case (_, Left(error))               => Left(error)
+            case (_, Right(atom, index, false)) => Right((atom, index))
+          }
+
+          // Add step estimates
+         .through(calc.estimateSequence[F](static))
+/*
+      private def gmosLongslitExpandAndEstimatePipe[S, K, D](
+        static:   S,
+        expander: SmartGcalExpander[F, K, D],
+        calc:     TimeEstimateCalculator[S, D],
+        comp:     Completion.State[D]
+      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = {
+
+        // Go through the completed state and for any visit other than the
+        // current one, if there is a science step but no matching arc, remove
+        // it from the map.  Previous visit steps for which there was no
+        // maching arc don't count.
+
+        // Visit.ID -> Set[D] instrument configs that have a matching arc per
+        // visit.
+        val vm   = comp.sci.visitMap
+        val arcs = vm.view.mapValues { am =>
+          am.toList.collect {
+            case (List((d, StepConfig.Gcal(lamp, _, _, _))), _) if lamp.lampType === Arc => d
+          }.toSet
+        }.toMap
+
+        // Split the visit map into past visits vs current visit.
+        val (past, current) = comp.sci.lastVisit.fold((vm, none[Completion.AtomMap[D]])) { vid =>
+          (vm - vid,  vm.get(vid))
+        }
+
+        val pastʹ = Completion.AtomMap.from(
+          past.toList.flatMap { (vid, am) =>
+            am.toList.filterNot { case (atom, _) =>
+              val isScienceWithoutArc =
+                atom.toList.contains { (d: D, c: StepConfig) =>
+                  (c.stepType === StepType.Science) && arcs.get(vid).forall(ds => !ds.contains(d))
+                }
+              val isArc =
+                atom.toList match {
+                  case List((_, StepConfig.Gcal(lamp, _, _, _))) if lamp.lampType === Arc => true
+                  case _ => false
+                }
+              isScienceWithoutArc || isArc
+            }
+          }*
+        )
+
+        val compMap = Completion.AtomMap.combine(pastʹ :: current.toList)
+
+        case class State(
+          compMap: Completion.AtomMap[D],
+          index:   Int,
+          arcs:    Set[D]
+        )
+
+        val initialState = State(
+          Completion.AtomMap.combine(pastʹ :: current.toList)
+          1,
+          Set.empty[D]
+        )
+
+          // Do smart-gcal expansion
+        _.through(expander.expand)
+
+          // Number the atoms, because executed atoms will be filtered out but
+          // we need the correct index to always calculate the same Atom.Id.
+//          .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
+
+          // Strip executed atoms
+          .mapAccumulate(initialState) { case (state, eAtom) =>
+            eAtom.fold(
+              error  => (state, error.asLeft),
+              { atom =>
+                val (compMap, executed) = state.compMap.matchAtom(atom)
+                val index               = state.index + 1
+                val stateʹ              = State(compMap, index, state.arcs)
+
+                if (executed) {
+                  // skip this atom
+                  (stateʹ, Stream.empty[F, Either[String, (EstimatedAtom[D], Long)]])
+                } else {
+                  //
+                }
+              }
+            )
+          }
+          .map(_._2)
+          .flatten
+
+
+
+          // dump the state and keep only un-executed atoms
+          .collect {
+            case (_, Left(error))               => Left(error)
+            case (_, Right(atom, index, false)) => Right((atom, index))
+          }
+
+          // Add step estimates
+         .through(calc.estimateSequence[F](static))
+      }
+*/
+      // Performs smart-gcal expansion and time estimate calculation.
       private def expandAndEstimate[S, K, D](
         proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
         calc:     TimeEstimateCalculator[S, D],
         comState: Completion.State[D]
-      ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] = {
-
-        // Given a SequenceType produces a Pipe from a SimpleAtom to a smart-gcal
-        // expanded, estimated, indexed atom with executed steps filtered out.
-        def pipe(
-          compMap: Completion.AtomMap[D]
-        ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
-            // Do smart-gcal expansion
-          _.through(expander.expand)
-
-            // Number the atoms, because executed atoms will be filtered out but
-            // we need the correct index to always calculate the same Atom.Id.
-            .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
-
-            // Strip executed atoms
-            .mapAccumulate(compMap) { case (state, eAtom) =>
-              eAtom.fold(
-                error => (state, error.asLeft),
-                { case (atom, index) =>
-                  // Add executed flag and return updated map.
-                  val (stateʹ, executed) = state.matchAtom(atom)
-                  (stateʹ, (atom, index, executed).asRight)
-                }
-              )
-            }
-
-            // dump the state and keep only un-executed atoms
-            .collect {
-              case (_, Left(error))               => Left(error)
-              case (_, Right(atom, index, false)) => Right((atom, index))
-            }
-
-            // Add step estimates
-           .through(calc.estimateSequence[F](proto.static))
-
+      ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] =
         proto.mapSequences(
-          pipe(comState.acq.combinedAtomMap),
-          pipe(comState.sci.combinedAtomMap)
+          expandAndEstimatePipe(proto.static, expander, calc, comState.acq.combinedAtomMap),
+          expandAndEstimatePipe(proto.static, expander, calc, comState.sci.combinedAtomMap)
         )
-      }
-
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 

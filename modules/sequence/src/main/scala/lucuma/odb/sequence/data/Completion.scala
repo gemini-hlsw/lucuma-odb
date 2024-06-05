@@ -71,6 +71,9 @@ object Completion {
       def toMap: Map[AtomMatch[D], PosInt] =
         m
 
+      def toList: List[(AtomMatch[D], PosInt)] =
+        m.toList
+
       /**
        * Match the given `ProtoAtom[ProtoStep[D]]` against the completed atoms.
        * If there is at least one matching completed atom, `true` is returned
