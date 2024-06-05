@@ -340,7 +340,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     val All: List[ClientOption] = List(Http, Ws)
 
-    val Default: ClientOption = Ws
+    val Default: ClientOption = Http
   }
 
   override def beforeAll(): Unit = {

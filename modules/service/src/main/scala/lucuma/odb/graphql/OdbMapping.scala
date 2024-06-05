@@ -508,7 +508,7 @@ object OdbMapping {
 
       // Our combined type mappings
       override val typeMappings: TypeMappings =
-        TypeMappings.unsafe(
+        TypeMappings.unchecked(
           List(
             FilterTypeMetaMapping,
             ObsAttachmentTypeMetaMapping,
