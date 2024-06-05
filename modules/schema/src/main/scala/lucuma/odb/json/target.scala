@@ -149,6 +149,8 @@ object target {
         Json.obj(
           "name"          -> t.name.asJson,
           "sourceProfile" -> t.sourceProfile.asJson,
+          "sidereal"      -> Json.Null, // one of these will be replaced
+          "nonsidereal"   -> Json.Null, // one of these will be replaced
           siderealOrNonJsonInternal(t)
         )
       }

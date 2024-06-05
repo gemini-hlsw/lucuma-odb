@@ -77,26 +77,22 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val SequenceEventMapping: ObjectMapping =
     ObjectMapping(SequenceEventType)(
-      SqlField("id",      ExecutionEventTable.Id, key = true),
       SqlField("command", ExecutionEventTable.SequenceCommand)
     )
 
   lazy val SlewEventMapping: ObjectMapping =
     ObjectMapping(SlewEventType)(
-      SqlField("id",        ExecutionEventTable.Id, key = true),
       SqlField("slewStage", ExecutionEventTable.SlewStage)
     )
 
   lazy val AtomEventMapping: ObjectMapping =
     ObjectMapping(AtomEventType)(
-      SqlField("id",        ExecutionEventTable.Id, key = true),
       SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
       SqlField("atomStage", ExecutionEventTable.AtomStage)
     )
 
   lazy val StepEventMapping: ObjectMapping =
   ObjectMapping(StepEventType)(
-      SqlField("id",        ExecutionEventTable.Id, key = true),
       SqlObject("atom",     Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
       SqlObject("step",     Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlField("stepStage", ExecutionEventTable.StepStage)
@@ -104,7 +100,6 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val DatasetEventMapping: ObjectMapping =
     ObjectMapping(DatasetEventType)(
-      SqlField("id",           ExecutionEventTable.Id, key = true),
       SqlObject("atom",        Join(ExecutionEventTable.AtomId, AtomRecordTable.Id)),
       SqlObject("step",        Join(ExecutionEventTable.StepId, StepRecordView.Id)),
       SqlObject("dataset",     Join(ExecutionEventTable.DatasetId, DatasetTable.Id)),
