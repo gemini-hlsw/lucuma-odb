@@ -73,7 +73,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ClassicalMapping: ObjectMapping =
     ObjectMapping(ClassicalType)(
       SqlField("id", ProposalView.Classical.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlObject("partnerSplits",  Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
@@ -81,7 +80,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val DemoScienceMapping: ObjectMapping =
     ObjectMapping(DemoScienceType)(
       SqlField("id", ProposalView.DemoScience.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
@@ -89,7 +87,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val DirectorsTimeMapping: ObjectMapping =
     ObjectMapping(DirectorsTimeType)(
       SqlField("id", ProposalView.DirectorsTime.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
@@ -97,7 +94,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val FastTurnaroundMapping: ObjectMapping =
     ObjectMapping(FastTurnaroundType)(
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate)
@@ -106,7 +102,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val LargeProgramMapping: ObjectMapping =
     ObjectMapping(LargeProgramType)(
       SqlField("id", ProposalView.LargeProgram.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",      ProposalView.ScienceSubtype),
       SqlField("toOActivation",       ProposalView.TooActivation),
       SqlField("minPercentTime",      ProposalView.MinPercent),
       SqlField("minPercentTotalTime", ProposalView.LargeProgram.MinPercentTotal),
@@ -116,13 +111,11 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val PoorWeatherMapping: ObjectMapping =
     ObjectMapping(PoorWeatherType)(
       SqlField("id", ProposalView.PoorWeather.Id, key = true, hidden = true),
-      SqlField("scienceSubtype", ProposalView.ScienceSubtype),
     )
 
   lazy val QueueMapping: ObjectMapping =
     ObjectMapping(QueueType)(
       SqlField("id", ProposalView.Queue.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlObject("partnerSplits",  Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
@@ -131,7 +124,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val SystemVerificationMapping: ObjectMapping =
     ObjectMapping(SystemVerificationType)(
       SqlField("id", ProposalView.SystemVerification.Id, key = true, hidden = true),
-      SqlField("scienceSubtype",  ProposalView.ScienceSubtype),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
