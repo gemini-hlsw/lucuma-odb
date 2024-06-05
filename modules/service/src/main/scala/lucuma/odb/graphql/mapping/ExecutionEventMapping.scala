@@ -28,7 +28,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
 
   lazy val ExecutionEventMapping: ObjectMapping =
     SqlInterfaceMapping(ExecutionEventType, executionEventTypeDiscriminator)(
-      SqlField("id",           ExecutionEventTable.Id, key = true),
+      SqlField("id",           ExecutionEventTable.Id, key = true, hidden = true),
       SqlObject("visit",       Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
       SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
       SqlField("received",     ExecutionEventTable.Received),
