@@ -38,7 +38,6 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as StaticGmosSouth
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
-import io.circe.JsonObject
 
 // (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength])
 
@@ -210,15 +209,15 @@ trait SequenceCodec {
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig] =
     Encoder.instance { (a: InstrumentExecutionConfig) =>
-      val template = JsonObject(
+      Json.obj(
         "instrument" -> a.instrument.asJson,
-        "gmosNorth"  -> Json.Null,
-        "gmosSouth"  -> Json.Null,
+        "gmosNorth"  -> Json.Null, // one of these will be replaced
+        "gmosSouth"  -> Json.Null, // one of these will be replaced
+        a match {
+          case i@InstrumentExecutionConfig.GmosNorth(_) => "gmosNorth" -> i.asJson
+          case i@InstrumentExecutionConfig.GmosSouth(_) => "gmosSouth" -> i.asJson
+        }
       )
-      a match {
-        case i@InstrumentExecutionConfig.GmosNorth(_) => template.add("gmosNorth", i.asJson).asJson
-        case i@InstrumentExecutionConfig.GmosSouth(_) => template.add("gmosSouth", i.asJson).asJson
-      }
     }
 
 }
