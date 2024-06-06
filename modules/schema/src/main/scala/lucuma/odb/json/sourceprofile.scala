@@ -51,7 +51,6 @@ import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 
 import scala.collection.immutable.SortedMap
-import io.circe.JsonObject
 
 trait SourceProfileCodec {
 
@@ -186,31 +185,31 @@ trait SourceProfileCodec {
 
 
   given (using Encoder[Wavelength]): Encoder[UnnormalizedSED] =
-
-    val template = JsonObject(
-      "stellarLibrary" -> Json.Null,
-      "coolStar"       -> Json.Null,
-      "galaxy"         -> Json.Null,
-      "planet"         -> Json.Null,
-      "quasar"         -> Json.Null,
-      "hiiRegion"      -> Json.Null,
-      "planetaryNebula"-> Json.Null,
-      "powerLaw"       -> Json.Null,
-      "blackBodyTempK" -> Json.Null,
-      "fluxDensities"  -> Json.Null,
-    )
-
-    Encoder.instance {
-      case StellarLibrary(librarySpectrum)          => template.add("stellarLibrary" , librarySpectrum.asJson).asJson
-      case CoolStarModel(temperature)               => template.add("coolStar"       , temperature.asJson).asJson // todo: tag
-      case Galaxy(galaxySpectrum)                   => template.add("galaxy"         , galaxySpectrum.asJson).asJson
-      case Planet(planetSpectrum)                   => template.add("planet"         , planetSpectrum.asJson).asJson
-      case Quasar(quasarSpectrum)                   => template.add("quasar"         , quasarSpectrum.asJson).asJson
-      case HIIRegion(hiiRegionSpectrum)             => template.add("hiiRegion"      , hiiRegionSpectrum.asJson).asJson
-      case PlanetaryNebula(planetaryNebulaSpectrum) => template.add("planetaryNebula", planetaryNebulaSpectrum.asJson).asJson
-      case PowerLaw(index)                          => template.add("powerLaw"       , index.asJson).asJson
-      case BlackBody(temperature)                   => template.add("blackBodyTempK" , temperature.value.value.asJson).asJson
-      case UserDefined(fluxDensities)               => template.add("fluxDensities"  , fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson).asJson
+    Encoder.instance { a =>
+      Json.obj(
+        "stellarLibrary" -> Json.Null, // one of these will be replaced
+        "coolStar"       -> Json.Null, // one of these will be replaced
+        "galaxy"         -> Json.Null, // one of these will be replaced
+        "planet"         -> Json.Null, // one of these will be replaced
+        "quasar"         -> Json.Null, // one of these will be replaced
+        "hiiRegion"      -> Json.Null, // one of these will be replaced
+        "planetaryNebula"-> Json.Null, // one of these will be replaced
+        "powerLaw"       -> Json.Null, // one of these will be replaced
+        "blackBodyTempK" -> Json.Null, // one of these will be replaced
+        "fluxDensities"  -> Json.Null, // one of these will be replaced
+        a match {
+          case StellarLibrary(librarySpectrum)          => "stellarLibrary" -> librarySpectrum.asJson
+          case CoolStarModel(temperature)               => "coolStar"       -> temperature.asJson // todo: tag
+          case Galaxy(galaxySpectrum)                   => "galaxy"         -> galaxySpectrum.asJson
+          case Planet(planetSpectrum)                   => "planet"         -> planetSpectrum.asJson
+          case Quasar(quasarSpectrum)                   => "quasar"         -> quasarSpectrum.asJson
+          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"      -> hiiRegionSpectrum.asJson
+          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"-> planetaryNebulaSpectrum.asJson
+          case PowerLaw(index)                          => "powerLaw"       -> index.asJson
+          case BlackBody(temperature)                   => "blackBodyTempK" -> temperature.value.value.asJson
+          case UserDefined(fluxDensities)               => "fluxDensities"  -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+        }
+      )
     }
 
   def CodecBandBrightness[T](using Enumerated[Units Of Brightness[T]]): Codec[(Band, BrightnessMeasure[T])] =
@@ -353,15 +352,17 @@ trait SourceProfileCodec {
     }
 
   given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile] =
-    val template = JsonObject(
-      "point"    -> Json.Null,
-      "uniform"  -> Json.Null,
-      "gaussian" -> Json.Null,
-    )
-    Encoder.instance {
-      case SourceProfile.Point(sd)   => template.add("point"   , sd.asJson).asJson
-      case SourceProfile.Uniform(sd) => template.add("uniform" , sd.asJson).asJson
-      case g: SourceProfile.Gaussian => template.add("gaussian",  g.asJson).asJson
+    Encoder.instance { a =>
+      Json.obj(
+        "point"    -> Json.Null, // one of these will be replaced
+        "uniform"  -> Json.Null, // one of these will be replaced
+        "gaussian" -> Json.Null, // one of these will be replaced
+        a match {
+          case SourceProfile.Point(sd)   => "point"   -> sd.asJson
+          case SourceProfile.Uniform(sd) => "uniform" -> sd.asJson
+          case g: SourceProfile.Gaussian => "gaussian"->  g.asJson
+        }
+      )
     }
 
 }
