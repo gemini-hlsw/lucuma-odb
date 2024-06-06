@@ -114,6 +114,8 @@ object GuideService {
           "probe"         -> gt.probe.asJson,
           "name"          -> gt.target.name.asJson,
           "sourceProfile" -> gt.target.sourceProfile.asJson,
+          "sidereal"      -> Json.Null, // one of these will be replaced
+          "nonsidereal"   -> Json.Null, // one of these will be replaced
           target.query.siderealOrNonJson(gt.target)
         )
       }
