@@ -46,6 +46,7 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
       SqlObject("events"),
       SqlField("filename",     DatasetTable.File.Name),
       SqlField("qaState",      DatasetTable.QaState),
+      SqlField("comment",      DatasetTable.Comment),
 
       SqlField("start",        DatasetTable.Time.Start, hidden = true),
       SqlField("end",          DatasetTable.Time.End, hidden = true),

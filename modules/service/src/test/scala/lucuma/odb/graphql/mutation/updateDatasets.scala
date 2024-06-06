@@ -30,7 +30,8 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           mutation {
             updateDatasets(input: {
               SET: {
-                qaState: PASS
+                qaState: PASS,
+                comment: "very pass"
               },
               WHERE: {
                 qaState: {
@@ -40,6 +41,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
             }) {
               datasets {
                 qaState
+                comment
                 filename
               }
             }
@@ -53,7 +55,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
                 f"N18630101S00$i%02d.fits"
               }
               .toList
-              .map(f => Json.obj("qaState" -> "PASS".asJson, "filename" -> f.asJson))
+              .map(f => Json.obj("qaState" -> "PASS".asJson, "comment" -> "very pass".asJson, "filename" -> f.asJson))
             )
           )
         ).asRight
