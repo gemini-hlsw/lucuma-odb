@@ -35,7 +35,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       discriminator = proposalTypeDiscriminator,
       fieldMappings = List(
         SqlField("id", ProposalView.ProgramId, key = true, hidden = true),
-        SqlField("scienceSubtype", ProposalView.ScienceSubtype, discriminator = true, hidden = true),
+        SqlField("scienceSubtype", ProposalView.ScienceSubtype, discriminator = true),
       )
     )
 
