@@ -392,7 +392,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         requireServiceAccess:
           datasetService
-            .insertDataset(input.stepId, input.filename, input.qaState)
+            .insertDataset(input)
             .map(recordDatasetResponseToResult(child, Predicates.recordDatasetResult.dataset))
 
   private def addEvent[I: ClassTag: TypeName](

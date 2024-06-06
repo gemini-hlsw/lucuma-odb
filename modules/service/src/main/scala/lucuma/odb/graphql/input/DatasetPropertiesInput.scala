@@ -4,13 +4,15 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.DatasetQaState
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class DatasetPropertiesInput(
-  qaState: Nullable[DatasetQaState]
+  qaState: Nullable[DatasetQaState],
+  comment: Nullable[NonEmptyString]
 )
 
 object DatasetPropertiesInput {
@@ -18,8 +20,11 @@ object DatasetPropertiesInput {
   val Binding: Matcher[DatasetPropertiesInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        DatasetQaStateBinding.Nullable("qaState", rQaState)
-      ) => rQaState.map(apply)
+        DatasetQaStateBinding.Nullable("qaState", rQaState),
+        NonEmptyStringBinding.Nullable("comment", rComment)
+      ) => (rQaState, rComment).mapN { (qa, comment) =>
+        DatasetPropertiesInput(qa, comment)
+      }
     }
 
 }

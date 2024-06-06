@@ -867,7 +867,8 @@ type Dark implements StepConfig {
 Editable dataset properties
 """
 input DatasetPropertiesInput {
-  qaState: DatasetQaState
+  qaState: DatasetQaState,
+  comment: NonEmptyString
 }
 
 """
@@ -3714,6 +3715,8 @@ input RecordDatasetInput {
   "Dataset QA State."
   qaState: DatasetQaState
 
+  "Dataset comment."
+  comment: NonEmptyString
 }
 
 "The result of recording a new dataset."
@@ -5583,6 +5586,9 @@ type Dataset {
 
   "Dataset QA state, if any has been set."
   qaState: DatasetQaState
+
+  "Dataset comment, if any has been set."
+  comment: NonEmptyString
 
   "Dataset time interval, if the dataset collection has started."
   interval: TimestampInterval
