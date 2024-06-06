@@ -75,18 +75,14 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
 
   lazy val TimeChargeDaylightDiscountMapping: ObjectMapping =
     ObjectMapping(TimeChargeDaylightDiscountType)(
-      // SqlField("id",   TimeChargeDiscountTable.Id, key = true, hidden = true),
       SqlField("site", TimeChargeDiscountTable.Daylight.Site)
     )
 
   lazy val TimeChargeNoDataDiscountMapping: ObjectMapping =
-    ObjectMapping(TimeChargeNoDataDiscountType)(
-      // SqlField("id", TimeChargeDiscountTable.Id, key = true, hidden = true)
-    )
+    ObjectMapping(TimeChargeNoDataDiscountType)()
 
   lazy val TimeChargeQaDiscountMapping: ObjectMapping =
     ObjectMapping(TimeChargeQaDiscountType)(
-      // SqlField("id",        TimeChargeDiscountTable.Id, key = true, hidden = true),
       SqlObject("datasets", Join(TimeChargeDiscountTable.Id, TimeChargeDiscountDatasetTable.DiscountId), Join(TimeChargeDiscountDatasetTable.DatasetId, DatasetTable.Id))
     )
 
