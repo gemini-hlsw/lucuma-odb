@@ -14,6 +14,9 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
+import monocle.Focus
+import monocle.Lens
+import scala.collection.immutable.ListMap
 
 /**
  * Internal structures required for completion state tracking in an observation.
@@ -136,6 +139,89 @@ object Completion {
           else completed.increment(inProgressSteps.reverse)              // finish in progress atom
 
     }
+
+  }
+
+  // Given an atom to match:
+  // - if it matches a past visit
+  //     if there is an arc in that same visit
+  //       skip the step
+  //     else
+  //       update the state and start over
+  //   else
+  //     if it mtaches the current visit
+   //      skip the step
+  //       if we haven't yet generated an arc
+  //         generate the arc
+  //       end
+  //     else
+  //       generate the atom and its arc
+  //
+
+/*
+    val matchCurrent: State[VisitMatch[D], GeneratorState] =
+      VisitMatch.matchCurrent(a).flatMap { ovid =>
+        ovid.fold(/*generate atom */) { vid =>
+          // check state .  if we haven't
+        }
+      }
+
+    val update: State[VisitMatch[D], GeneratorState] =
+      VisitMatch.matchPast(a).flatMap { vid =>
+        vid.fold(matchCurrent) {
+      }
+*/
+
+
+  case class VisitMatch[D](
+    current: Option[(Visit.Id, AtomMap[D])],
+    past:    ListMap[Visit.Id, AtomMap[D]]
+  ) {
+
+    import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
+
+    def matchCurrentVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) =
+      current.fold((this, none)) { case (vid, am) =>
+        val (amʹ, matches) = am.matchAtom(a)
+        (VisitMatch((vid, amʹ).some, past), Option.when(matches)(vid))
+      }
+
+    def matchPastVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) =
+      past.foldLeft(none[(VisitMatch[D], Option[Visit.Id])]) { case (m, (vid, am)) =>
+        m orElse {
+          val (amʹ, matches) = am.matchAtom(a)
+          Option.when(matches)((VisitMatch(current, past.updated(vid, amʹ)), vid.some))
+        }
+      }.getOrElse((this, none))
+
+    def matchAnyVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) = {
+      val (vm, vid) = matchPastVisit(a)
+      if (vid.isDefined) (vm, vid) else matchCurrentVisit(a)
+    }
+
+    def visitHas(v: Visit.Id, a: ProtoAtom[ProtoStep[D]]): Boolean = {
+      val k = AtomMatch.fromProtoAtom(a)
+      current.filter(_._1 === v).fold(past.get(v).exists(_.contains(k))) { case (_, am) =>
+        am.contains(k)
+      }
+    }
+
+  }
+
+  object VisitMatch {
+
+    import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
+
+    def current[D]: Lens[VisitMatch[D], Option[(Visit.Id, AtomMap[D])]] =
+      Focus[VisitMatch[D]](_.current)
+
+    def matchCurrent[D](a: ProtoAtom[ProtoStep[D]]): cats.data.State[VisitMatch[D], Option[Visit.Id]] =
+      cats.data.State { vm =>
+        vm.current.fold((vm, none)) { case (vid, am) =>
+          val (amʹ, matches) = am.matchAtom(a)
+          (current.replace((vid, amʹ).some)(vm), Option.when(matches)(vid))
+        }
+      }
 
   }
 
