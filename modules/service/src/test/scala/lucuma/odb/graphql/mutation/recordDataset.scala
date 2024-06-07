@@ -68,6 +68,7 @@ class recordDataset extends OdbSuite {
               }
               filename
               qaState
+              comment
               interval { start }
             }
           }
@@ -86,6 +87,7 @@ class recordDataset extends OdbSuite {
               },
               "filename": "N18630101S0001.fits",
               "qaState": null,
+              "comment": null,
               "interval": null
             }
           }
@@ -115,6 +117,7 @@ class recordDataset extends OdbSuite {
               }
               filename
               qaState
+              comment
               interval { start }
             }
           }
@@ -133,6 +136,56 @@ class recordDataset extends OdbSuite {
               },
               "filename": "N18630101S0002.fits",
               "qaState": "USABLE",
+              "comment": null,
+              "interval": null
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordDataset - init comment") {
+    recordDatasetTest(
+      ObservingModeType.GmosNorthLongSlit,
+      service,
+      sid => s"""
+        mutation {
+          recordDataset(input: {
+            stepId: ${sid.asJson},
+            filename: "N18630101S0003.fits",
+            comment: "such data"
+          }) {
+            dataset {
+              step {
+                id
+              }
+              index
+              observation {
+                id
+              }
+              filename
+              qaState
+              comment
+              interval { start }
+            }
+          }
+        }
+      """,
+      (oid, sid) => json"""
+        {
+          "recordDataset": {
+            "dataset": {
+              "step": {
+                "id": $sid
+              },
+              "index": 1,
+              "observation": {
+                "id": $oid
+              },
+              "filename": "N18630101S0003.fits",
+              "qaState": null,
+              "comment": "such data",
               "interval": null
             }
           }

@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
@@ -12,7 +13,8 @@ import lucuma.odb.graphql.binding.*
 case class RecordDatasetInput(
   stepId:   Step.Id,
   filename: Dataset.Filename,
-  qaState:  Option[DatasetQaState]
+  qaState:  Option[DatasetQaState],
+  comment:  Option[NonEmptyString]
 )
 
 object RecordDatasetInput {
@@ -22,10 +24,11 @@ object RecordDatasetInput {
       case List(
         StepIdBinding("stepId", rStepId),
         DatasetFilenameBinding("filename", rFilename),
-        DatasetQaStateBinding.Option("qaState", rQaState)
+        DatasetQaStateBinding.Option("qaState", rQaState),
+        NonEmptyStringBinding.Option("comment", rComment)
       ) =>
-        (rStepId, rFilename, rQaState).parMapN { (sid, filename, qaState) =>
-          RecordDatasetInput(sid, filename, qaState)
+        (rStepId, rFilename, rQaState, rComment).parMapN { (sid, filename, qaState, comment) =>
+          RecordDatasetInput(sid, filename, qaState, comment)
         }
     }
 
