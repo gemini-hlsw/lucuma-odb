@@ -2042,9 +2042,7 @@ class execution extends ExecutionTestSupport {
       }
     }
 
-    import Completion.*
-
-    assertIO(m, State(SequenceMatch(0, AtomMap.Empty), SequenceMatch(0, AtomMap.Empty)))
+    assertIO(m, Completion.Matcher.Empty)
   }
 
   private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {
