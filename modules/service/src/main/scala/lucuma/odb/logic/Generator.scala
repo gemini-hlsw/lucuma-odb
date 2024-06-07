@@ -8,11 +8,9 @@ import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -20,9 +18,9 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Pipe
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GcalLampType.Arc
+//import lucuma.core.enums.GcalLampType.Arc
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepType
+//import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -379,7 +377,7 @@ object Generator {
         static:   S,
         expander: SmartGcalExpander[F, K, D],
         calc:     TimeEstimateCalculator[S, D],
-        compMap:  Completion.AtomMap[D]
+        comp:     Completion.SequenceMatch[D]
       ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
           // Do smart-gcal expansion
         _.through(expander.expand)
@@ -389,13 +387,13 @@ object Generator {
           .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
 
           // Strip executed atoms
-          .mapAccumulate(compMap) { case (state, eAtom) =>
+          .mapAccumulate(comp) { case (state, eAtom) =>
             eAtom.fold(
               error => (state, error.asLeft),
               { case (atom, index) =>
                 // Add executed flag and return updated map.
-                val (stateʹ, executed) = state.matchAtom(atom)
-                (stateʹ, (atom, index, executed).asRight)
+                val (stateʹ, executed) = Completion.SequenceMatch.matchAny(atom).run(state).value
+                (stateʹ, (atom, index, executed.isDefined).asRight)
               }
             )
           }
@@ -511,11 +509,11 @@ object Generator {
         proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
         expander: SmartGcalExpander[F, K, D],
         calc:     TimeEstimateCalculator[S, D],
-        comState: Completion.State[D]
+        comState: Completion.Matcher[D]
       ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] =
         proto.mapSequences(
-          expandAndEstimatePipe(proto.static, expander, calc, comState.acq.combinedAtomMap),
-          expandAndEstimatePipe(proto.static, expander, calc, comState.sci.combinedAtomMap)
+          expandAndEstimatePipe(proto.static, expander, calc, comState.acq),
+          expandAndEstimatePipe(proto.static, expander, calc, comState.sci)
         )
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)

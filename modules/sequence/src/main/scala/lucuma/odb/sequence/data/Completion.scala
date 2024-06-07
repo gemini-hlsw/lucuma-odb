@@ -4,7 +4,9 @@
 package lucuma.odb.sequence.data
 
 import cats.Eq
+import cats.data.State
 import cats.syntax.eq.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import eu.timepit.refined.cats.given
@@ -16,7 +18,6 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import monocle.Focus
 import monocle.Lens
-import scala.collection.immutable.ListMap
 
 /**
  * Internal structures required for completion state tracking in an observation.
@@ -172,116 +173,122 @@ object Completion {
       }
 */
 
-
-  case class VisitMatch[D](
-    current: Option[(Visit.Id, AtomMap[D])],
-    past:    ListMap[Visit.Id, AtomMap[D]]
-  ) {
-
-    import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
-
-    def matchCurrentVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) =
-      current.fold((this, none)) { case (vid, am) =>
-        val (amʹ, matches) = am.matchAtom(a)
-        (VisitMatch((vid, amʹ).some, past), Option.when(matches)(vid))
-      }
-
-    def matchPastVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) =
-      past.foldLeft(none[(VisitMatch[D], Option[Visit.Id])]) { case (m, (vid, am)) =>
-        m orElse {
-          val (amʹ, matches) = am.matchAtom(a)
-          Option.when(matches)((VisitMatch(current, past.updated(vid, amʹ)), vid.some))
-        }
-      }.getOrElse((this, none))
-
-    def matchAnyVisit(a: ProtoAtom[ProtoStep[D]]): (VisitMatch[D], Option[Visit.Id]) = {
-      val (vm, vid) = matchPastVisit(a)
-      if (vid.isDefined) (vm, vid) else matchCurrentVisit(a)
-    }
-
-    def visitHas(v: Visit.Id, a: ProtoAtom[ProtoStep[D]]): Boolean = {
-      val k = AtomMatch.fromProtoAtom(a)
-      current.filter(_._1 === v).fold(past.get(v).exists(_.contains(k))) { case (_, am) =>
-        am.contains(k)
-      }
-    }
-
-  }
-
-  object VisitMatch {
-
-    import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
-
-    def current[D]: Lens[VisitMatch[D], Option[(Visit.Id, AtomMap[D])]] =
-      Focus[VisitMatch[D]](_.current)
-
-    def matchCurrent[D](a: ProtoAtom[ProtoStep[D]]): cats.data.State[VisitMatch[D], Option[Visit.Id]] =
-      cats.data.State { vm =>
-        vm.current.fold((vm, none)) { case (vid, am) =>
-          val (amʹ, matches) = am.matchAtom(a)
-          (current.replace((vid, amʹ).some)(vm), Option.when(matches)(vid))
-        }
-      }
-
-  }
-
   // SequenceMatch is a completed atom map for a sequence along with an id base.
   // The id base is folded into the atom and step UUIDs that will be generated
   // for that sequence.  When this number changes, future atom and step ids will
-  // also change.  This is important for acquisition sequences where the same
-  // steps are repeatedly executed.
-  case class SequenceMatch[D](idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap[D]]) {
+  // also change.
+  case class SequenceMatch[D](
+    idBase:  Int,
+    current: Option[(Visit.Id, AtomMap[D])],
+    past:    Map[Visit.Id, AtomMap[D]]
+  ) {
     def combinedAtomMap: AtomMap[D] =
-      AtomMap.combine(visitMap.values)
+      AtomMap.combine(past.values ++ current.map(_._2))
   }
 
   object SequenceMatch {
 
-    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, None, Map.empty)
+    def Empty[D]: SequenceMatch[D] = SequenceMatch(0, none, Map.empty)
+
+    def idBase[D]: Lens[SequenceMatch[D], Int] =
+      Focus[SequenceMatch[D]](_.idBase)
+
+    def current[D]: Lens[SequenceMatch[D], Option[(Visit.Id, AtomMap[D])]] =
+      Focus[SequenceMatch[D]](_.current)
+
+    def past[D]: Lens[SequenceMatch[D], Map[Visit.Id, AtomMap[D]]] =
+      Focus[SequenceMatch[D]](_.past)
+
+
+    import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
+
+    def matchCurrent[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
+      State { sm =>
+        sm.current.fold((sm, none)) { case (vid, am) =>
+          val (amʹ, matches) = am.matchAtom(a)
+          (current.replace((vid, amʹ).some)(sm), Option.when(matches)(vid))
+        }
+      }
+
+    def matchPast[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
+      State { sm =>
+        sm.past.foldLeft(none[(SequenceMatch[D], Option[Visit.Id])]) { case (m, (vid, am)) =>
+          m orElse {
+            val (amʹ, matches) = am.matchAtom(a)
+            Option.when(matches)((past.replace(sm.past.updated(vid, amʹ))(sm), vid.some))
+          }
+        }.getOrElse((sm, none))
+      }
+
+    def matchAny[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
+      for {
+        m  <- matchPast(a)
+        mʹ <- if (m.isDefined) State.pure(m) else matchCurrent(a)
+      } yield mʹ
+
+    def atomMap[D](v: Visit.Id): State[SequenceMatch[D], Option[AtomMap[D]]] =
+      State.inspect { sm =>
+        current.get(sm).map(_._2) orElse past.get(sm).get(v)
+      }
+
+    def contains[D](v: Visit.Id, a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Boolean] =
+      atomMap(v).map(_.exists(_.contains(AtomMatch.fromProtoAtom(a))))
 
     trait Builder[D, T <: Builder[D, T]] {
       def idBase: Int
+      def lastVisit: Option[Visit.Id]
       def visitMap: Map[Visit.Id, AtomMap.Builder[D]]
-      def updated(idBase: Int, atomMap: AtomMap.Builder[D]): T
+      def updated(idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap.Builder[D]]): T
       def reset(vid: Visit.Id): T
 
-      def build: SequenceMatch[D] =
-        SequenceMatch(idBase, visitMap.view.mapValues(_.build).toMap)
+      def build: SequenceMatch =
+        SequenceMatch(
+          idBase,
+          lastVisit.flatMap(vid => visitMap.get(vid).map(_.build).tupleLeft(vid)),
+          lastVisit.fold(visitMap)(visitMap.removed).view.mapValues(_.build).toMap
+        )
 
       def next(vid: Visit.Id, aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): T =
-        updated(idBase, visitMap.updatedWith(vid)(_.getOrElse(AtomMap.Builder.init[D]).next(aid, count, step)))
+        updated(idBase, vid.some, visitMap.updatedWith(vid)(_.getOrElse(AtomMap.Builder.init[D]).next(aid, count, step)))
     }
 
-    case class Acquisition[D](idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]) extends Builder[D, Acquisition[D]] {
-      // Acquisition sequence matching starts over from scratch when reset.
-      override def reset(vid: Visit.Id): Acquisition[D] =
-        updated(idBase + 1, Map(vid -> AtomMap.Builder.init[D]))
+    // Acquisition sequence matching starts over from scratch when reset.
+    case class Acquisition[D](
+      idBase:    Int,
+      lastVisit: Option[Visit.Id],
+      visitMap:  Map[Visit.Id, AtomMap.Builder[D]]
+    ) extends Builder[D, Acquisition[D]]:
+      def reset(vid: Visit.Id): Acquisition[D] =
+         Acquisition(idBase + 1, vid.some, Map(vid -> AtomMap.Builder.init[D]))
 
-      override def updated(idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Acquisition[D] =
-        Acquisition(idBase, visitMap)
-    }
+      def updated(idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Acquisition[D] =
+        Acquisition(idBase, lastVisit, visitMap)
 
-    def acq[D]: Acquisition[D] = Acquisition(0, Map.empty)
 
-    case class Science[D](idBase: Int, atomMap: AtomMap.Builder[D]) extends Builder[D, Science[D]] {
-      // Science sequence matching keeps any progress that has been made when reset.
-      override val reset(vid: Visit.Id): Science[D] =
-        updated(idBase + 1, visitMap.updatedWith(vid)(_.fold(AtomMap.Builder.init[D].some)(_.reset.some)))
+    // Science sequence matching keeps any progress that has been made when reset.
+    case class Science[D](
+      idBase:    Int,
+      lastVisit: Option[Visit.Id],
+      visitMap:  Map[Visit.Id, AtomMap.Builder[D]]
+    ) extends Builder[D, Science[D]]:
 
-      override def updated(idBase: Int, visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Science[D] =
-        Science(idBase, visitMap)
-    }
+      def reset(vid: Visit.Id): Science[D] =
+        Science(idBase + 1, vid.some, visitMap.updatedWith(vid)(_.fold(AtomMap.Builder.init[D].some)(_.reset.some)))
 
-    def sci[D]: Science[D] = Science(0, Map.empty)
+      def updated(idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap.Builder[D]]): Science[D] =
+        Science(idBase, lastVisit, visitMap)
+
+    def acq[D]: Acquisition[D] = Acquisition(0, none, Map.empty)
+    def sci[D]: Science[D]     = Science(0, none, Map.empty)
   }
 
   // The overall completion state for the observation, which consists of the
   // completion state for the acquisition and science sequences.
-  case class State[D](acq: SequenceMatch[D], sci: SequenceMatch[D])
+  case class Matcher[D](acq: SequenceMatch[D], sci: SequenceMatch[D])
 
-  object State {
+  object Matcher {
 
-    def Empty[D]: State[D] = State(SequenceMatch.Empty, SequenceMatch.Empty)
+    def Empty[D]: Matcher[D] = Matcher(SequenceMatch.Empty, SequenceMatch.Empty)
 
     // MatchContext is the combination of the visit and sequence type.  When
     // either changes, we need to reset the sequence matchers.
@@ -338,7 +345,7 @@ object Completion {
         Builder(ctxʹ, acqʹʹ, sciʹʹ)
       }
 
-      def build: State[D] = State(acq.build, sci.build)
+      def build: Matcher[D] = Matcher(acq.build, sci.build)
     }
 
     object Builder:
