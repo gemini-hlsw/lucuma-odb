@@ -24,6 +24,7 @@ object WhereDataset {
     val WhereOrderIndexBinding     = WhereOrder.binding[PosInt](path / "index", PosIntBinding)
     val WhereFilenameBinding       = WhereString.binding(path / "filename")
     val QaStateBinding             = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
+    val CommentBinding             = WhereOptionString.binding(path / "comment")
 
     lazy val WhereDatasetBinding = binding(path)
 
@@ -39,9 +40,10 @@ object WhereDataset {
         WhereEqStepIdBinding.Option("stepId", rStepId),
         WhereOrderIndexBinding.Option("index", rIndex),
         WhereFilenameBinding.Option("filename", rFile),
-        QaStateBinding.Option("qaState", rQa)
+        QaStateBinding.Option("qaState", rQa),
+        CommentBinding.Option("comment", rComment)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rObs, rStepId, rIndex, rFile, rQa).parMapN { (AND, OR, NOT, id, ref, obs, sid, index, file, qa) =>
+        (rAND, rOR, rNOT, rId, rRef, rObs, rStepId, rIndex, rFile, rQa, rComment).parMapN { (AND, OR, NOT, id, ref, obs, sid, index, file, qa, comment) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -52,7 +54,8 @@ object WhereDataset {
             sid,
             index,
             file,
-            qa
+            qa,
+            comment
           ).flatten)
         }
     }
