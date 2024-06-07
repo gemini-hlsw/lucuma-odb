@@ -12,6 +12,7 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observation_reference
 import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.step_id
+import lucuma.odb.util.Codecs.text_nonempty
 import lucuma.odb.util.Codecs.varchar_nonempty
 import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.temporal.date
@@ -37,6 +38,7 @@ trait DatasetTable[F[_]] extends BaseMapping[F] {
     }
 
     val QaState: ColumnRef     = col("c_qa_state", dataset_qa_state.opt)
+    val Comment: ColumnRef     = col("c_comment",  text_nonempty.opt)
 
     object Time {
       val Start: ColumnRef     = col("c_start_time", core_timestamp.opt)

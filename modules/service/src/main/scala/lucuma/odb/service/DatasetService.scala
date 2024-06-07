@@ -3,8 +3,10 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicativeError.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import grackle.Result
@@ -17,10 +19,10 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.DatasetPropertiesInput
+import lucuma.odb.graphql.input.RecordDatasetInput
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -40,9 +42,7 @@ sealed trait DatasetService[F[_]] {
   ): F[Result[Dataset.Id]]
 
   def insertDataset(
-    stepId:   Step.Id,
-    filename: Dataset.Filename,
-    qaState:  Option[DatasetQaState]
+    input: RecordDatasetInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]]
 
   def updateDatasets(
@@ -87,20 +87,18 @@ object DatasetService {
         resolver.resolve(did, ref)
 
       override def insertDataset(
-        stepId:   Step.Id,
-        filename: Dataset.Filename,
-        qaState:  Option[DatasetQaState]
+        input: RecordDatasetInput
       )(using Transaction[F], Services.ServiceAccess): F[Result[Dataset.Id]] = {
 
         def stepNotFound: Result[Dataset.Id] =
-          OdbError.InvalidStep(stepId, Some(s"Step id '$stepId' not found")).asFailure
+          OdbError.InvalidStep(input.stepId, Some(s"Step id '${input.stepId}' not found")).asFailure
 
         val insert: F[Result[Dataset.Id]] =
           session
-            .unique(Statements.InsertDataset)(stepId, filename, qaState)
+            .unique(Statements.InsertDataset)(input)
             .map(_.success)
             .recover {
-              case SqlState.UniqueViolation(_)     => OdbError.InvalidFilename(filename, Some(s"The filename '${filename.format}' is already assigned")).asFailure
+              case SqlState.UniqueViolation(_)     => OdbError.InvalidFilename(input.filename, Some(s"The filename '${input.filename.format}' is already assigned")).asFailure
               case SqlState.ForeignKeyViolation(_) => stepNotFound
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
             }
@@ -158,37 +156,44 @@ object DatasetService {
          WHERE c_dataset_reference = $dataset_reference
       """.query(dataset_id)
 
-    val InsertDataset: Query[(Step.Id, Dataset.Filename, Option[DatasetQaState]), Dataset.Id] =
+    val InsertDataset: Query[RecordDatasetInput, Dataset.Id] =
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
           c_file_site,
           c_file_date,
           c_file_index,
-          c_qa_state
+          c_qa_state,
+          c_comment
         )
         SELECT
           $step_id,
           $dataset_filename,
-          ${dataset_qa_state.opt}
+          ${dataset_qa_state.opt},
+          ${text_nonempty.opt}
         RETURNING
           c_dataset_id
-      """.query(dataset_id)
+      """.query(dataset_id).contramap { input => (
+        input.stepId,
+        input.filename,
+        input.qaState,
+        input.comment
+      )}
 
     def UpdateDatasets(
       SET:   DatasetPropertiesInput,
       which: AppliedFragment
     ): Option[AppliedFragment] = {
       val upQaState = sql"c_qa_state = ${dataset_qa_state.opt}"
+      val upComment = sql"c_comment = ${text_nonempty.opt}"
 
-      val update = SET.qaState match {
-        case Nullable.Absent      => None
-        case Nullable.Null        => Some(upQaState(None))
-        case Nullable.NonNull(qa) => Some(upQaState(Some(qa)))
-      }
+      val updates = NonEmptyList.fromList(List(
+        SET.qaState.foldPresent(upQaState),
+        SET.comment.foldPresent(upComment)
+      ).flatten)
 
-      update.map { up =>
-        void"UPDATE t_dataset SET " |+| up |+|
+      updates.map { ups =>
+        void"UPDATE t_dataset SET " |+| ups.intercalate(void", ") |+|
           void" WHERE c_dataset_id IN (" |+| which |+| void")" |+|
           void" RETURNING c_dataset_id"
       }
