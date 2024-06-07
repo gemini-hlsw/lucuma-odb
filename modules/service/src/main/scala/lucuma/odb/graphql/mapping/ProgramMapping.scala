@@ -60,7 +60,7 @@ trait ProgramMapping[F[_]]
   lazy val ProgramMapping: ObjectMapping =
     ObjectMapping(ProgramType)(
       SqlField("id", ProgramTable.Id, key = true),
-      SqlField("existence", ProgramTable.Existence, hidden = true),
+      SqlField("existence", ProgramTable.Existence),
       SqlField("name", ProgramTable.Name),
 
       SqlField("type", ProgramTable.ProgramType),
