@@ -154,7 +154,7 @@ class recordDataset extends OdbSuite {
           recordDataset(input: {
             stepId: ${sid.asJson},
             filename: "N18630101S0003.fits",
-            comment: "such datat"
+            comment: "such data"
           }) {
             dataset {
               step {

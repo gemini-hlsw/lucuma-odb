@@ -64,6 +64,58 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
     }
   }
 
+  test("updateDatasets - where comment") {
+    recordDatasets(mode, pi, service, 6, 2, 3).flatMap {
+      case (_, _) =>
+        val init = query(staff, s"""
+          mutation {
+            updateDatasets(input: {
+              SET: {
+                comment: "such pass"
+              },
+              WHERE: {
+                comment: { IS_NULL: true }
+              }
+            }) {
+              datasets { comment }
+            }
+          }
+        """)
+
+        val q = s"""
+          mutation {
+            updateDatasets(input: {
+              SET: {
+                comment: "such very pass"
+              },
+              WHERE: {
+                comment: { LIKE: "such %" }
+              }
+            }) {
+              datasets {
+                comment
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "updateDatasets" -> Json.obj(
+            "datasets"     -> Json.fromValues(
+              (7 to 12).map { i =>
+                f"N18630101S00$i%02d.fits"
+              }
+              .toList
+              .map(f => Json.obj("comment" -> "such very pass".asJson))
+            )
+          )
+        ).asRight
+
+        init *> expect(staff, q, e)
+    }
+  }
+
+
   test("updateDatasets - unset") {
       val q = s"""
         mutation {
@@ -101,7 +153,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
   }
 
   test("updateDatasets - subset select") {
-    recordDatasets(mode, pi, service, 6, 2, 3).flatMap {
+    recordDatasets(mode, pi, service, 17, 2, 3).flatMap {
       case (_, _) =>
         val q = s"""
           mutation {
@@ -111,7 +163,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
               },
               WHERE: {
                 filename: {
-                  LIKE: "N18630101S001_.fits"
+                  LIKE: "N18630101S002_.fits"
                 }
               }
             }) {
@@ -127,9 +179,10 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
           "updateDatasets" -> Json.obj(
             "datasets"     -> Json.fromValues(
               List(
-                "N18630101S0010.fits",
-                "N18630101S0011.fits",
-                "N18630101S0012.fits"
+                "N18630101S0020.fits",
+                "N18630101S0021.fits",
+                "N18630101S0022.fits",
+                "N18630101S0023.fits"
               ).map(f => Json.obj("qaState" -> "FAIL".asJson, "filename" -> f.asJson))
             )
           )

@@ -11062,6 +11062,9 @@ input WhereDataset {
 
   "Matches the dataset QA state."
   qaState: WhereOptionEqQaState
+
+  "Matches the dataset comment."
+  comment: WhereOptionString
 }
 
 input WhereDatasetReference {
