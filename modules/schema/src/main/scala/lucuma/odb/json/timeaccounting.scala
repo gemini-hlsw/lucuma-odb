@@ -144,7 +144,9 @@ trait TimeAccountingCodec {
   given (using Encoder[TimeSpan]): Encoder[StepEstimate] =
     Encoder.instance { (a: StepEstimate) =>
       Json.fromFields(
-        "total" -> a.total.asJson ::
+        "total"        -> a.total.asJson ::
+        "configChange" -> Json.Null      :: // may be replaced below
+        "detector"     -> Json.Null      :: // may be replaced below
         a.configChange.toList.map { z => "configChange" -> EncoderAllConfigChangeEstimates.apply(z) } ++
         a.detector.toList.map { z => "detector" -> EncoderAllDetectorEstimates.apply(z) }
       )

@@ -185,17 +185,31 @@ trait SourceProfileCodec {
 
 
   given (using Encoder[Wavelength]): Encoder[UnnormalizedSED] =
-    Encoder.instance {
-      case StellarLibrary(librarySpectrum)          => Json.obj("stellarLibrary"  -> librarySpectrum.asJson)
-      case CoolStarModel(temperature)               => Json.obj("coolStar"        -> temperature.asJson) // todo: tag
-      case Galaxy(galaxySpectrum)                   => Json.obj("galaxy"          -> galaxySpectrum.asJson)
-      case Planet(planetSpectrum)                   => Json.obj("planet"          -> planetSpectrum.asJson)
-      case Quasar(quasarSpectrum)                   => Json.obj("quasar"          -> quasarSpectrum.asJson)
-      case HIIRegion(hiiRegionSpectrum)             => Json.obj("hiiRegion"       -> hiiRegionSpectrum.asJson)
-      case PlanetaryNebula(planetaryNebulaSpectrum) => Json.obj("planetaryNebula" -> planetaryNebulaSpectrum.asJson)
-      case PowerLaw(index)                          => Json.obj("powerLaw"        -> index.asJson)
-      case BlackBody(temperature)                   => Json.obj("blackBodyTempK"  -> temperature.value.value.asJson)
-      case UserDefined(fluxDensities)               => Json.obj("fluxDensities"   -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson)
+    Encoder.instance { a =>
+      Json.obj(
+        "stellarLibrary" -> Json.Null, // one of these will be replaced
+        "coolStar"       -> Json.Null, // one of these will be replaced
+        "galaxy"         -> Json.Null, // one of these will be replaced
+        "planet"         -> Json.Null, // one of these will be replaced
+        "quasar"         -> Json.Null, // one of these will be replaced
+        "hiiRegion"      -> Json.Null, // one of these will be replaced
+        "planetaryNebula"-> Json.Null, // one of these will be replaced
+        "powerLaw"       -> Json.Null, // one of these will be replaced
+        "blackBodyTempK" -> Json.Null, // one of these will be replaced
+        "fluxDensities"  -> Json.Null, // one of these will be replaced
+        a match {
+          case StellarLibrary(librarySpectrum)          => "stellarLibrary" -> librarySpectrum.asJson
+          case CoolStarModel(temperature)               => "coolStar"       -> temperature.asJson // todo: tag
+          case Galaxy(galaxySpectrum)                   => "galaxy"         -> galaxySpectrum.asJson
+          case Planet(planetSpectrum)                   => "planet"         -> planetSpectrum.asJson
+          case Quasar(quasarSpectrum)                   => "quasar"         -> quasarSpectrum.asJson
+          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"      -> hiiRegionSpectrum.asJson
+          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"-> planetaryNebulaSpectrum.asJson
+          case PowerLaw(index)                          => "powerLaw"       -> index.asJson
+          case BlackBody(temperature)                   => "blackBodyTempK" -> temperature.value.value.asJson
+          case UserDefined(fluxDensities)               => "fluxDensities"  -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+        }
+      )
     }
 
   def CodecBandBrightness[T](using Enumerated[Units Of Brightness[T]]): Codec[(Band, BrightnessMeasure[T])] =
@@ -305,6 +319,8 @@ trait SourceProfileCodec {
   given [T](using Encoder[Wavelength], Enumerated[Units Of Brightness[T]], Enumerated[Units Of LineFlux[T]], Enumerated[Units Of FluxDensityContinuum[T]]): Encoder[SpectralDefinition[T]] =
     Encoder.instance { (sd: SpectralDefinition[T]) =>
       Json.obj(
+        "bandNormalized" -> Json.Null, // one of these will be replaced
+        "emissionLines"  -> Json.Null, // one of these will be replaced
         sd match {
           case bn: BandNormalized[T] => "bandNormalized" -> bn.asJson
           case el: EmissionLines[T]  => "emissionLines"  -> el.asJson
@@ -336,10 +352,17 @@ trait SourceProfileCodec {
     }
 
   given (using Encoder[Angle], Encoder[Wavelength]): Encoder[SourceProfile] =
-    Encoder.instance {
-      case SourceProfile.Point(sd)   => Json.obj("point"    -> sd.asJson)
-      case SourceProfile.Uniform(sd) => Json.obj("uniform"  -> sd.asJson)
-      case g: SourceProfile.Gaussian => Json.obj("gaussian" ->  g.asJson)
+    Encoder.instance { a =>
+      Json.obj(
+        "point"    -> Json.Null, // one of these will be replaced
+        "uniform"  -> Json.Null, // one of these will be replaced
+        "gaussian" -> Json.Null, // one of these will be replaced
+        a match {
+          case SourceProfile.Point(sd)   => "point"   -> sd.asJson
+          case SourceProfile.Uniform(sd) => "uniform" -> sd.asJson
+          case g: SourceProfile.Gaussian => "gaussian"->  g.asJson
+        }
+      )
     }
 
 }

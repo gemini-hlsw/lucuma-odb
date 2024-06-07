@@ -211,6 +211,8 @@ trait SequenceCodec {
     Encoder.instance { (a: InstrumentExecutionConfig) =>
       Json.obj(
         "instrument" -> a.instrument.asJson,
+        "gmosNorth"  -> Json.Null, // one of these will be replaced
+        "gmosSouth"  -> Json.Null, // one of these will be replaced
         a match {
           case i@InstrumentExecutionConfig.GmosNorth(_) => "gmosNorth" -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_) => "gmosSouth" -> i.asJson
