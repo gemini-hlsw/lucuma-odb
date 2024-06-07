@@ -16,8 +16,8 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("synthetic_id", table.Fpu.CustomMask.SyntheticId, key = true, hidden = true),
-      SqlField("filename",     table.Fpu.CustomMask.Filename,  hidden = true),
-      SqlField("slitWidth",    table.Fpu.CustomMask.SlitWidth, hidden = true)
+      SqlField("filename",     table.Fpu.CustomMask.Filename),
+      SqlField("slitWidth",    table.Fpu.CustomMask.SlitWidth)
     )
 
   lazy val GmosCustomMaskMapping: List[TypeMapping] =

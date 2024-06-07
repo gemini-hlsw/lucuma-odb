@@ -48,7 +48,7 @@ trait ObservationMapping[F[_]]
     ObjectMapping(ObservationType)(
       SqlField("id", ObservationView.Id, key = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
-      SqlField("existence", ObservationView.Existence, hidden = true),
+      SqlField("existence", ObservationView.Existence),
       SqlObject("reference", Join(ObservationView.Id, ObservationReferenceView.Id)),
       SqlField("index", ObservationView.ObservationIndex),
       SqlField("title", ObservationView.Title),
