@@ -4,6 +4,7 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
+import cats.data.State
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
@@ -378,7 +379,11 @@ object Generator {
         expander: SmartGcalExpander[F, K, D],
         calc:     TimeEstimateCalculator[S, D],
         comp:     Completion.SequenceMatch[D]
-      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
+      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = {
+
+        type MatchState[A] = State[Completion.SequenceMatch[D], A]
+        import Completion.SequenceMatch.matchAny
+
           // Do smart-gcal expansion
         _.through(expander.expand)
 
@@ -386,16 +391,14 @@ object Generator {
           // we need the correct index to always calculate the same Atom.Id.
           .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
 
-          // Strip executed atoms
+          // Mark the atoms with true (excuted) or false (not executed)
           .mapAccumulate(comp) { case (state, eAtom) =>
-            eAtom.fold(
-              error => (state, error.asLeft),
-              { case (atom, index) =>
-                // Add executed flag and return updated map.
-                val (stateʹ, executed) = Completion.SequenceMatch.matchAny(atom).run(state).value
-                (stateʹ, (atom, index, executed.isDefined).asRight)
-              }
-            )
+            val nextAtom = for {
+              (atom, index) <- EitherT.fromEither[MatchState](eAtom)
+              visit         <- EitherT.liftF(matchAny(atom))
+            } yield (atom, index, visit.isDefined)
+
+            nextAtom.value.run(state).value
           }
 
           // dump the state and keep only un-executed atoms
@@ -406,6 +409,7 @@ object Generator {
 
           // Add step estimates
          .through(calc.estimateSequence[F](static))
+      }
 /*
       private def gmosLongslitExpandAndEstimatePipe[S, K, D](
         static:   S,
