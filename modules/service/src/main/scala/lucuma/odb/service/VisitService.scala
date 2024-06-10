@@ -115,15 +115,17 @@ object VisitService {
     val InsertVisit: Query[(Observation.Id, Instrument), Visit.Id] =
       sql"""
         INSERT INTO t_visit (
+          c_visit_id,
           c_observation_id,
           c_instrument
         )
         SELECT
+          next_visit_id($observation_id),
           $observation_id,
           $instrument
         RETURNING
           c_visit_id
-      """.query(visit_id)
+      """.query(visit_id).contramap { (obs, ins) => (obs, obs, ins) }
 
   }
 }
