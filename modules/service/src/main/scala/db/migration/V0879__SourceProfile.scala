@@ -3,18 +3,18 @@
 
 package db.migration
 
+import cats.effect.IO
+import io.circe.syntax.*
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.Target
+import lucuma.core.util.Gid
+import lucuma.odb.json.angle.query.given
+import lucuma.odb.json.sourceprofile.given
+import lucuma.odb.json.wavelength.query.given
+import org.flywaydb.core.api.migration.BaseJavaMigration
 import org.flywaydb.core.api.migration.Context
 import org.postgresql.core.BaseConnection
-import cats.effect.IO
-import lucuma.core.model.SourceProfile
-import lucuma.core.util.Gid
-import lucuma.core.model.Target
-import lucuma.odb.json.sourceprofile.given
-import lucuma.odb.json.angle.query.given
-import lucuma.odb.json.wavelength.query.given
-import io.circe.syntax.*
 import org.postgresql.util.PGobject
-import org.flywaydb.core.api.migration.BaseJavaMigration
 
 class V0879__SourceProfile extends BaseIOMigration:
   def ioMigrate(ctx: Context, baseConnection: BaseConnection): IO[Unit] =
