@@ -142,20 +142,34 @@ object Completion {
 
     def Empty[D]: SequenceMatch[D] = SequenceMatch(0, AtomMap.Empty)
 
-    case class Builder[D](idBase: Int, atomMap: AtomMap.Builder[D], resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]):
-      def reset = Builder(idBase + 1, resetAtomMap(atomMap), resetAtomMap)
-      def build = SequenceMatch(idBase, atomMap.build)
+    trait Builder[D, T <: Builder[D, T]] {
+      def idBase: Int
+      def atomMap: AtomMap.Builder[D]
+      def resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]
+      def updated(idBase: Int, atomMap: AtomMap.Builder[D]): T
 
-      // Handle the next acquisition step.
-      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): Builder[D] =
-        Builder(idBase, atomMap.next(aid, count, step), resetAtomMap)
+      def reset: T = updated(idBase + 1, resetAtomMap(atomMap))
+      def build: SequenceMatch[D] = SequenceMatch(idBase, atomMap.build)
 
-    object Builder:
+      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): T =
+        updated(idBase, atomMap.next(aid, count, step))
+    }
+
+    case class Acquisition[D](idBase: Int, atomMap: AtomMap.Builder[D]) extends Builder[D, Acquisition[D]] {
       // Acquisition sequence matching starts over from scratch when reset.
-      def acq[D]: Builder[D] = Builder(0, AtomMap.Builder.init[D], _ => AtomMap.Builder.init[D])
+      override val resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]            = _ => AtomMap.Builder.init[D]
+      override def updated(idBase: Int, atomMap: AtomMap.Builder[D]): Acquisition[D] = Acquisition(idBase, atomMap)
+    }
 
+    def acq[D]: Acquisition[D] = Acquisition(0, AtomMap.Builder.init[D])
+
+    case class Science[D](idBase: Int, atomMap: AtomMap.Builder[D]) extends Builder[D, Science[D]] {
       // Science sequence matching keeps any progress that has been made when reset.
-      def sci[D]: Builder[D] = Builder(0, AtomMap.Builder.init[D], _.reset)
+      override val resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]        = _.reset
+      override def updated(idBase: Int, atomMap: AtomMap.Builder[D]): Science[D] = Science(idBase, atomMap)
+    }
+
+    def sci[D]: Science[D]     = Science(0, AtomMap.Builder.init[D])
   }
 
   // The overall completion state for the observation, which consists of the
@@ -182,8 +196,8 @@ object Completion {
     // reset is needed) and with the acquisition and science matchers.
     case class Builder[D](
       ctx: MatchContext,
-      acq: SequenceMatch.Builder[D],
-      sci: SequenceMatch.Builder[D]
+      acq: SequenceMatch.Acquisition[D],
+      sci: SequenceMatch.Science[D]
     ) {
 
       def reset: Builder[D] = Builder(ctx, acq.reset, sci.reset)
@@ -226,7 +240,7 @@ object Completion {
 
     object Builder:
       def init[D]: Builder[D] =
-        Builder(MatchContext.init, SequenceMatch.Builder.acq, SequenceMatch.Builder.sci)
+        Builder(MatchContext.init, SequenceMatch.acq, SequenceMatch.sci)
 
   }
 }
