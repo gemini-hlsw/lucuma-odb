@@ -159,16 +159,16 @@ object Completion {
     // Science sequence matching keeps any progress that has been made when
     // reset.  Science sequences don't need to generate distinct ids since the
     // steps are not repeated so there is no "id base".
-    case class Science[D](atomMap: AtomMap.Builder[D]):
-      def reset = Science(atomMap.reset)
-      def build = SequenceMatch(0, atomMap.build)
+    case class Science[D](idBase: Int, atomMap: AtomMap.Builder[D]):
+      def reset = Science(idBase + 1, atomMap.reset)
+      def build = SequenceMatch(idBase, atomMap.build)
 
       // Handle the next science step.
       def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): Science[D] =
-        Science(atomMap.next(aid, count, step))
+        Science(idBase, atomMap.next(aid, count, step))
 
     object Science:
-      def init[D] = Science(AtomMap.Builder.init[D])
+      def init[D] = Science(0, AtomMap.Builder.init[D])
 
   }
 
@@ -219,14 +219,20 @@ object Completion {
       ): Builder[D] = {
         val ctxʹ = MatchContext(vid.some, seqType)
 
-        val (acqʹ, sciʹ) = (seqType, ctxʹ === ctx) match {
-          case (SequenceType.Acquisition, true ) => (acq.next(aid, count, step), sci)
-          case (SequenceType.Science,     true ) => (acq, sci.next(aid, count, step))
-          case (SequenceType.Acquisition, false) => (acq.reset.next(aid, count, step), sci.reset)
-          case (SequenceType.Science,     false) => (acq.reset, sci.reset.next(aid, count, step))
+        // If it is a new visit, or if we switch from sci to acq or vice versa
+        // we reset the acquisition sequence to execute from the beginning.
+        val acqʹ = if (ctxʹ === ctx) acq else acq.reset
+
+        // If it is a new visit, we abandon any atom we were working on and
+        // start over with a new ids.
+        val sciʹ = if (ctxʹ.vid === ctx.vid) sci else sci.reset
+
+        val (acqʹʹ, sciʹʹ) = seqType match {
+          case SequenceType.Acquisition => (acqʹ.next(aid, count, step), sciʹ)
+          case SequenceType.Science     => (acqʹ, sciʹ.next(aid, count, step))
         }
 
-        Builder(ctxʹ, acqʹ, sciʹ)
+        Builder(ctxʹ, acqʹʹ, sciʹʹ)
       }
 
       def build: State[D] = State(acq.build, sci.build)
