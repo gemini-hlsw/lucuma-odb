@@ -143,36 +143,6 @@ object Completion {
 
   }
 
-  // Given an atom to match:
-  // - if it matches a past visit
-  //     if there is an arc in that same visit
-  //       skip the step
-  //     else
-  //       update the state and start over
-  //   else
-  //     if it mtaches the current visit
-   //      skip the step
-  //       if we haven't yet generated an arc
-  //         generate the arc
-  //       end
-  //     else
-  //       generate the atom and its arc
-  //
-
-/*
-    val matchCurrent: State[VisitMatch[D], GeneratorState] =
-      VisitMatch.matchCurrent(a).flatMap { ovid =>
-        ovid.fold(/*generate atom */) { vid =>
-          // check state .  if we haven't
-        }
-      }
-
-    val update: State[VisitMatch[D], GeneratorState] =
-      VisitMatch.matchPast(a).flatMap { vid =>
-        vid.fold(matchCurrent) {
-      }
-*/
-
   // SequenceMatch is a completed atom map for a sequence along with an id base.
   // The id base is folded into the atom and step UUIDs that will be generated
   // for that sequence.  When this number changes, future atom and step ids will
@@ -228,10 +198,10 @@ object Completion {
 
     def atomMap[D](v: Visit.Id): State[SequenceMatch[D], Option[AtomMap[D]]] =
       State.inspect { sm =>
-        current.get(sm).map(_._2) orElse past.get(sm).get(v)
+        current.get(sm).filter(_._1 === v).map(_._2) orElse past.get(sm).get(v)
       }
 
-    def contains[D](v: Visit.Id, a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Boolean] =
+    def contains[D](a: ProtoAtom[ProtoStep[D]])(v: Visit.Id): State[SequenceMatch[D], Boolean] =
       atomMap(v).map(_.exists(_.contains(AtomMatch.fromProtoAtom(a))))
 
     trait Builder[D, T <: Builder[D, T]] {
@@ -241,7 +211,7 @@ object Completion {
       def updated(idBase: Int, lastVisit: Option[Visit.Id], visitMap: Map[Visit.Id, AtomMap.Builder[D]]): T
       def reset(vid: Visit.Id): T
 
-      def build: SequenceMatch =
+      def build: SequenceMatch[D] =
         SequenceMatch(
           idBase,
           lastVisit.flatMap(vid => visitMap.get(vid).map(_.build).tupleLeft(vid)),
@@ -249,7 +219,7 @@ object Completion {
         )
 
       def next(vid: Visit.Id, aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): T =
-        updated(idBase, vid.some, visitMap.updatedWith(vid)(_.getOrElse(AtomMap.Builder.init[D]).next(aid, count, step)))
+        updated(idBase, vid.some, visitMap.updatedWith(vid)(_.getOrElse(AtomMap.Builder.init[D]).next(aid, count, step).some))
     }
 
     // Acquisition sequence matching starts over from scratch when reset.
