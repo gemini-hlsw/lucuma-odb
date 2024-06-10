@@ -32,16 +32,16 @@ psql -h $PG_HOST -U $PG_USER -d postgres -c "drop database \"$PG_DATABASE\"" > /
 psql -h $PG_HOST -U $PG_USER -d postgres -c "create database \"$PG_DATABASE\"" > /dev/null
 
 echo "🍏 Capturing a Heroku backup."
-# heroku pg:backups:capture --app $HEROKU_APP
+heroku pg:backups:capture --app $HEROKU_APP
 
 echo "🍏 Downloading Heroku backup."
-# heroku pg:backups:download --app $HEROKU_APP --output /tmp/$HEROKU_APP.dump
+heroku pg:backups:download --app $HEROKU_APP --output /tmp/$HEROKU_APP.dump
 
 echo "🍏 Translating binary dump to SQL."
-# pg_restore --verbose --clean --if-exists --no-acl --no-owner -f /tmp/$HEROKU_APP.temp /tmp/$HEROKU_APP.dump > /dev/null 2>&1
+pg_restore --verbose --clean --if-exists --no-acl --no-owner -f /tmp/$HEROKU_APP.temp /tmp/$HEROKU_APP.dump > /dev/null 2>&1
 
 echo "🍏 Removing pg_catalog.set_config (temporary, hopefully)."
-# grep -v pg_catalog.set_config /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
+grep -v pg_catalog.set_config /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
 
 echo "🍏 Restoring dump to local database."
 psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > /dev/null 2>&1
