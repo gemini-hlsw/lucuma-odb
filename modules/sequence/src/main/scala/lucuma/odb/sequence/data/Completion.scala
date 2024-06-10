@@ -142,34 +142,20 @@ object Completion {
 
     def Empty[D]: SequenceMatch[D] = SequenceMatch(0, AtomMap.Empty)
 
-    // Acquisition sequence matching starts over from scratch when reset.
-    // We also need a new "id base" so that the generated ids are distinct
-    // from any previous acquisition sequences.
-    case class Acquisition[D](idBase: Int, atomMap: AtomMap.Builder[D]):
-      def reset = Acquisition(idBase + 1, AtomMap.Builder.init[D])
+    case class Builder[D](idBase: Int, atomMap: AtomMap.Builder[D], resetAtomMap: AtomMap.Builder[D] => AtomMap.Builder[D]):
+      def reset = Builder(idBase + 1, resetAtomMap(atomMap), resetAtomMap)
       def build = SequenceMatch(idBase, atomMap.build)
 
       // Handle the next acquisition step.
-      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): Acquisition[D] =
-        Acquisition(idBase, atomMap.next(aid, count, step))
+      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): Builder[D] =
+        Builder(idBase, atomMap.next(aid, count, step), resetAtomMap)
 
-    object Acquisition:
-      def init[D] = Acquisition(0, AtomMap.Builder.init[D])
+    object Builder:
+      // Acquisition sequence matching starts over from scratch when reset.
+      def acq[D]: Builder[D] = Builder(0, AtomMap.Builder.init[D], _ => AtomMap.Builder.init[D])
 
-    // Science sequence matching keeps any progress that has been made when
-    // reset.  Science sequences don't need to generate distinct ids since the
-    // steps are not repeated so there is no "id base".
-    case class Science[D](atomMap: AtomMap.Builder[D]):
-      def reset = Science(atomMap.reset)
-      def build = SequenceMatch(0, atomMap.build)
-
-      // Handle the next science step.
-      def next(aid: Atom.Id, count: NonNegShort, step: StepMatch[D]): Science[D] =
-        Science(atomMap.next(aid, count, step))
-
-    object Science:
-      def init[D] = Science(AtomMap.Builder.init[D])
-
+      // Science sequence matching keeps any progress that has been made when reset.
+      def sci[D]: Builder[D] = Builder(0, AtomMap.Builder.init[D], _.reset)
   }
 
   // The overall completion state for the observation, which consists of the
@@ -196,8 +182,8 @@ object Completion {
     // reset is needed) and with the acquisition and science matchers.
     case class Builder[D](
       ctx: MatchContext,
-      acq: SequenceMatch.Acquisition[D],
-      sci: SequenceMatch.Science[D]
+      acq: SequenceMatch.Builder[D],
+      sci: SequenceMatch.Builder[D]
     ) {
 
       def reset: Builder[D] = Builder(ctx, acq.reset, sci.reset)
@@ -219,14 +205,20 @@ object Completion {
       ): Builder[D] = {
         val ctxʹ = MatchContext(vid.some, seqType)
 
-        val (acqʹ, sciʹ) = (seqType, ctxʹ === ctx) match {
-          case (SequenceType.Acquisition, true ) => (acq.next(aid, count, step), sci)
-          case (SequenceType.Science,     true ) => (acq, sci.next(aid, count, step))
-          case (SequenceType.Acquisition, false) => (acq.reset.next(aid, count, step), sci.reset)
-          case (SequenceType.Science,     false) => (acq.reset, sci.reset.next(aid, count, step))
+        // If it is a new visit, or if we switch from sci to acq or vice versa
+        // we reset the acquisition sequence to execute from the beginning.
+        val acqʹ = if (ctxʹ === ctx) acq else acq.reset
+
+        // If it is a new visit, we abandon any atom we were working on and
+        // start over with a new ids.
+        val sciʹ = if (ctxʹ.vid === ctx.vid) sci else sci.reset
+
+        val (acqʹʹ, sciʹʹ) = seqType match {
+          case SequenceType.Acquisition => (acqʹ.next(aid, count, step), sciʹ)
+          case SequenceType.Science     => (acqʹ, sciʹ.next(aid, count, step))
         }
 
-        Builder(ctxʹ, acqʹ, sciʹ)
+        Builder(ctxʹ, acqʹʹ, sciʹʹ)
       }
 
       def build: State[D] = State(acq.build, sci.build)
@@ -234,11 +226,7 @@ object Completion {
 
     object Builder:
       def init[D]: Builder[D] =
-        Builder(
-          MatchContext.init,
-          SequenceMatch.Acquisition.init,
-          SequenceMatch.Science.init
-        )
+        Builder(MatchContext.init, SequenceMatch.Builder.acq, SequenceMatch.Builder.sci)
 
   }
 }

@@ -8,6 +8,7 @@ import cats.data.EitherT
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -296,15 +297,22 @@ object SequenceService {
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
-          .stream(Statements.SelectCompletionRows)(observationId, 1024)
-          .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) =>
-            stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
-              stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
+          .option(Statements.SelectOngoingOrNextVisitId)(observationId)
+          .flatMap { vid =>
+            vid.fold(Completion.State.Empty[D].pure[F]) { v =>
+              session
+                .stream(Statements.SelectCompletionRows)(observationId, 1024)
+                .append(Stream.emit((v, none[((Atom.Id, NonNegShort, SequenceType, Step.Id))])))
+                .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) =>
+                  stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
+                    stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
+                  }
+                }
+                .compile
+                .onlyOrError
+                .map(_.build)
             }
           }
-          .compile
-          .onlyOrError
-          .map(_.build)
 
       override def abandonAtomsAndStepsForObservation(
         observationId: Observation.Id
@@ -588,6 +596,21 @@ object SequenceService {
           } {
             case (v, a, c, t, s, _) => (v, (a, c, t, s).tupled)
           }
+
+    def SelectOngoingOrNextVisitId: Query[Observation.Id, Visit.Id] =
+      sql"""
+        SELECT
+          COALESCE (
+            (SELECT e.c_visit_id
+              FROM t_execution_event e
+             WHERE e.c_observation_id = $observation_id
+             ORDER BY e.c_received DESC
+             LIMIT 1),
+             o.c_next_visit_id
+          ) AS c_visit_id
+          FROM t_observation o
+         WHERE o.c_observation_id = $observation_id
+      """.query(visit_id).contramap(o => (o, o))
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
