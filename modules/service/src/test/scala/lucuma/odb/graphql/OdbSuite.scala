@@ -393,6 +393,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .assertEquals(errors)
     }, success => {
       op.map(_.spaces2)
+        .flatTap(s => IO.println(s))
         .assertEquals(success.spaces2) // by comparing strings we get more useful errors
     })
   }

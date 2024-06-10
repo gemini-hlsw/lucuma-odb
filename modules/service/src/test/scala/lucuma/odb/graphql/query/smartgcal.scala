@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptySet
 import cats.data.State
 import cats.effect.IO
 import cats.syntax.option.*
@@ -11,6 +12,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -60,7 +62,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
       val services = Services.forUser(pi /* doesn't matter*/, e)(s)
       services.transactionally {
 
-        val smartGcalValue =
+        val flat =
           SmartGcalValue(
             Gcal(
               Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
@@ -75,8 +77,22 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             )
           )
 
+        val arc =
+          SmartGcalValue(
+            Gcal(
+              Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
+              GcalFilter.None,
+              GcalDiffuser.Visible,
+              GcalShutter.Closed
+            ),
+            GcalBaselineType.Day,
+            PosInt.unsafeFrom(1),
+            LegacyInstrumentConfig(
+              TimeSpan.unsafeFromMicroseconds(1_000_000L)
+            )
+          )
 
-        val tableRowN: TableRow.North =
+        def northRow(s: SmartGcalValue[LegacyInstrumentConfig]): TableRow.North =
           TableRow(
             PosLong.unsafeFrom(1),
             TableKey(
@@ -91,10 +107,16 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               GmosYBinning.Two,
               GmosAmpGain.Low
             ),
-            smartGcalValue
+            s
           )
 
-        val tableRowS: TableRow.South =
+        val tableRowArcN: TableRow.North =
+          northRow(arc)
+
+        val tableRowFlatN: TableRow.North =
+          northRow(flat)
+
+        def southRow(s: SmartGcalValue[LegacyInstrumentConfig]): TableRow.South =
           TableRow(
             PosLong.unsafeFrom(1),
             TableKey(
@@ -109,11 +131,18 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               GmosYBinning.Two,
               GmosAmpGain.Low
             ),
-            smartGcalValue
+            s
           )
+
+        val tableRowArcS: TableRow.South =
+          southRow(arc)
+
+        val tableRowFlatS: TableRow.South =
+          southRow(flat)
 
         def defineN(
           id:         Int,
+          row:        TableRow.North,
           stepOrder:  Int              = 1,
           disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
           low:        Int              = Wavelength.Min.pm.value.value,
@@ -121,10 +150,11 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int              = 1,
           count:      Int              = 1
         ): IO[Unit] =
-          define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowN, services.smartGcalService.insertGmosNorth)
+          define(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
 
         def defineS(
           id:         Int,
+          row:        TableRow.South,
           stepOrder:  Int              = 1,
           disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
           low:        Int              = Wavelength.Min.pm.value.value,
@@ -132,7 +162,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int              = 1,
           count:      Int              = 1
         ): IO[Unit] =
-          define(id, stepOrder, disperser, low, high, expTimeSec, count)(tableRowS, services.smartGcalService.insertGmosSouth)
+          define(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)
 
         def define[G, L, U](
           id:         Int,
@@ -168,20 +198,24 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
         for {
           // simple lookup
-          _ <- defineN(1, high = 500_000, expTimeSec = 1)
-          _ <- defineN(2, low  = 500_000, high = 600_000, expTimeSec = 2)
-          _ <- defineN(3, low  = 600_000, expTimeSec = 3)
+          _ <- defineN(1, tableRowFlatN, high = 500_000, expTimeSec = 1)
+          _ <- defineN(2, tableRowFlatN, low  = 500_000, high = 600_000, expTimeSec = 2)
+          _ <- defineN(3, tableRowFlatN, low  = 600_000, expTimeSec = 3)
+          _ <- defineN(4, tableRowArcN,  expTimeSec = 1)
 
-          _ <- defineS(1, high = 500_000, expTimeSec = 1)
-          _ <- defineS(2, low  = 500_000, high = 600_000, expTimeSec = 2)
-          _ <- defineS(3, low  = 600_000, expTimeSec = 3)
+          _ <- defineS(1, tableRowFlatS, high = 500_000, expTimeSec = 1)
+          _ <- defineS(2, tableRowFlatS, low  = 500_000, high = 600_000, expTimeSec = 2)
+          _ <- defineS(3, tableRowFlatS, low  = 600_000, expTimeSec = 3)
+          _ <- defineS(4, tableRowArcS,  expTimeSec = 1)
 
           // multi steps
-          _ <- defineN(4, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-          _ <- defineN(5, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
+          _ <- defineN(5, tableRowFlatN, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
+          _ <- defineN(6, tableRowFlatN, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
+          _ <- defineN(7, tableRowArcN, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 1)
 
           // step count
-          _ <- defineN(6, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
+          _ <- defineN(8, tableRowFlatN, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
+          _ <- defineN(9, tableRowArcN, disperser = GmosNorthGrating.B600_G5307, expTimeSec = 1)
 
         } yield ()
       }
@@ -281,6 +315,36 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                           ]
                         },
                         "possibleFuture": [
+                          {
+                            "steps" : [
+                              {
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 1.000000
+                                  }
+                                },
+                                "stepConfig": {
+                                  "stepType": "GCAL",
+                                  "filter": "NONE"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "steps": [
+                              {
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 1.000000
+                                  }
+                                },
+                                "stepConfig": {
+                                  "stepType": "GCAL",
+                                  "filter": "NONE"
+                                }
+                              }
+                            ]
+                          },
                           {
                             "steps" : [
                               {

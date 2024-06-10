@@ -7,51 +7,21 @@ package query
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.numeric.PosLong
 import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.GcalBaselineType
-import lucuma.core.enums.GcalContinuum
-import lucuma.core.enums.GcalDiffuser
-import lucuma.core.enums.GcalFilter
-import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosGratingOrder
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Angle
-import lucuma.core.math.BoundedInterval
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.StepConfig.Gcal
-import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.GuideService.AvailabilityPeriod
-import lucuma.odb.service.Services
-import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
-import lucuma.odb.smartgcal.data.Gmos.TableKey
-import lucuma.odb.smartgcal.data.Gmos.TableRow
-import lucuma.odb.smartgcal.data.SmartGcalValue
-import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
-import natchez.Trace.Implicits.noop
 import org.http4s.Request
 import org.http4s.Response
-import skunk.Session
 
-class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
-
-  val pi         = TestUsers.Standard.pi(1, 30)
-  val validUsers = List(pi)
+class guideAvailability extends ExecutionTestSupport {
 
   val oct15_2023 = "2023-10-15T00:00:00Z"
   val oct25_2023 = "2023-10-25T00:00:00Z"
@@ -67,45 +37,6 @@ class guideAvailability extends OdbSuite with ObservingModeSetupOperations {
 
   val earlyAngles = List(160, 170, 180, 190, 200, 250, 260, 270, 280, 290, 300, 310)
   val laterAngles = earlyAngles.filter(_ =!= 250)
-
-  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
-        )
-      )
-    
-    Enums.load(s).flatMap{ e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e )(s)
-      services.transactionally {
-        services.smartGcalService.insertGmosNorth(1, tableRow)
-      }
-    }
-  }
 
   // increased the proper motion of the second candidate so we could get multiple availabilities.
   val gaiaResponseString = 

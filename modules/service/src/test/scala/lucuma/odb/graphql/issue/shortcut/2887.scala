@@ -33,7 +33,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
   test("forever sequence") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit + 1)
+        _ <- atomCount.set(SequenceAtomLimit - 1) // 2 more for the arcs puts it over
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
@@ -63,7 +63,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
   test("on the edge of forever") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit)
+        _ <- atomCount.set(SequenceAtomLimit - 2)
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))

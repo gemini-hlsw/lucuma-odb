@@ -34,6 +34,16 @@ import lucuma.odb.sequence.data.Completion
 
 class execution extends ExecutionTestSupport {
 
+  // Additional cost of an arc (no sci fold move because we are already doing a flat)
+  //  5.0 seconds for the Gcal configuration change (shutter, filter, diffuser)
+  //  1.0 second for the arc exposure
+  // 10.0 seconds for the write cost
+  // 41.1 seconds readout (hamamatsu, 1x2, 12 amp, Low, Slow)
+  // ----
+  // 57.1 seconds per arc
+
+  // 114.2 additional seconds for the two arcs produced by the sequence
+
   test("digest") {
     val setup: IO[Observation.Id] =
       for {
@@ -144,13 +154,13 @@ class execution extends ExecutionTestSupport {
                           "seconds" : 411.600000
                         },
                         "partner" : {
-                          "seconds" : 357.600000
+                          "seconds" : 471.800000
                         },
                         "nonCharged" : {
                           "seconds" : 0.000000
                         },
                         "total" : {
-                          "seconds" : 769.200000
+                          "seconds" : 883.400000
                         }
                       },
                       "offsets" : [
@@ -171,7 +181,7 @@ class execution extends ExecutionTestSupport {
                           }
                         }
                       ],
-                      "atomCount": 6
+                      "atomCount": 8
                     }
                   }
                 }
@@ -742,7 +752,7 @@ class execution extends ExecutionTestSupport {
                         },
                         "possibleFuture": [
                           {
-                            "observeClass": "SCIENCE",
+                            "observeClass": "PARTNER_CAL",
                             "steps" : [
                               {
                                 "instrumentConfig" : {
@@ -750,18 +760,7 @@ class execution extends ExecutionTestSupport {
                                     "grating" : "R831_G5302",
                                     "order" : "ONE",
                                     "wavelength" : {
-                                      "nanometers" : 505.000
-                                    }
-                                  }
-                                }
-                              },
-                              {
-                                "instrumentConfig" : {
-                                  "gratingConfig" : {
-                                    "grating" : "R831_G5302",
-                                    "order" : "ONE",
-                                    "wavelength" : {
-                                      "nanometers" : 505.000
+                                      "nanometers" : 500.000
                                     }
                                   }
                                 }
@@ -937,6 +936,26 @@ class execution extends ExecutionTestSupport {
                           ]
                         },
                         "possibleFuture": [
+                          {
+                            "description" : "Arc: q -15.0″, λ 500.0 nm",
+                            "steps" : [
+                              {
+                                "stepConfig" : {
+                                  "stepType" : "GCAL"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "description" : "Arc: q 15.0″, λ 505.0 nm",
+                            "steps" : [
+                              {
+                                "stepConfig" : {
+                                  "stepType" : "GCAL"
+                                }
+                              }
+                            ]
+                          },
                           {
                             "description": "q 15.0″, λ 505.0 nm",
                             "steps": [
@@ -1146,6 +1165,34 @@ class execution extends ExecutionTestSupport {
                         },
                         "possibleFuture": [
                           {
+                            "description" : "Arc: q 0.0″, λ 495.0 nm",
+                            "steps" : [
+                              {
+                                "instrumentConfig" : {
+                                  "gratingConfig" : {
+                                    "wavelength" : {
+                                      "nanometers" : 495.000
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "description" : "Arc: q 15.0″, λ 500.0 nm",
+                            "steps" : [
+                              {
+                                "instrumentConfig" : {
+                                  "gratingConfig" : {
+                                    "wavelength" : {
+                                      "nanometers" : 500.000
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
                             "description": "q 15.0″, λ 500.0 nm",
                             "steps": [
                               {
@@ -1185,6 +1232,20 @@ class execution extends ExecutionTestSupport {
                                   "gratingConfig": {
                                     "wavelength": {
                                       "nanometers": 505.000
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "description" : "Arc: q 15.0″, λ 505.0 nm",
+                            "steps" : [
+                              {
+                                "instrumentConfig" : {
+                                  "gratingConfig" : {
+                                    "wavelength" : {
+                                      "nanometers" : 505.000
                                     }
                                   }
                                 }
@@ -1861,13 +1922,13 @@ class execution extends ExecutionTestSupport {
                           "seconds" : 411.600000
                         },
                         "partner" : {
-                          "seconds" : 357.600000
+                          "seconds" : 471.800000
                         },
                         "nonCharged": {
                           "seconds": 0.000000
                         },
                         "total" : {
-                          "seconds" : 769.200000
+                          "seconds" : 883.400000
                         }
                       }
                     }
@@ -1899,7 +1960,29 @@ class execution extends ExecutionTestSupport {
                               {
                                 "estimate" : {
                                   "total" : {
+                                    "seconds" : 57.100000
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "steps" : [
+                              {
+                                "estimate" : {
+                                  "total" : {
                                     "seconds" : 52.100000
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "steps" : [
+                              {
+                                "estimate" : {
+                                  "total" : {
+                                    "seconds" : 57.100000
                                   }
                                 }
                               },
@@ -2267,13 +2350,13 @@ class execution extends ExecutionTestSupport {
         t      <- createTargetWithProfileAs(pi, p)
         o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 7)
         a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
         s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
         s1     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
         _      <- addEndStepEvent(s1)
-        after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 6)
       } yield (before, after)
 
     // The tail of `before` should equal `after` since the first atom has been executed.
@@ -2293,13 +2376,11 @@ class execution extends ExecutionTestSupport {
         t      <- createTargetWithProfileAs(pi, p)
         o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        before <- genGmosNorthSequence(o, SequenceType.Science, 5)
-        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
+        before <- genGmosNorthSequence(o, SequenceType.Science, 7)
+        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 1)
+        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthArc0, Arc)
         _      <- addEndStepEvent(s0)
-        s1     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
-        _      <- addEndStepEvent(s1)
-        after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
+        after  <- genGmosNorthSequence(o, SequenceType.Science, 6)
       } yield (before, after)
 
     // `after` should be the same as `before` with atom at index 1 removed, since
