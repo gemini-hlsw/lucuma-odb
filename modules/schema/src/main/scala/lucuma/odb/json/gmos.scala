@@ -208,10 +208,12 @@ trait GmosCodec {
     Encoder.instance[GmosFpuMask[A]] {
       case GmosFpuMask.Builtin(v)       =>
         Json.obj(
-          "builtin"    -> v.asJson
+          "builtin"    -> v.asJson,
+          "customMask" -> Json.Null
         )
       case c @ GmosFpuMask.Custom(_, _) =>
         Json.obj(
+          "builtin"    -> Json.Null,
           "customMask" -> c.asJson
         )
     }
