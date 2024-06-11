@@ -85,7 +85,8 @@ trait DatabaseOperations { this: OdbSuite =>
      callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
      semester:    Semester             = Semester.unsafeFromString("2025A"),
      activeStart: Timestamp            = Timestamp.FromString.unsafeGet("2025-02-01 14:00:00"),
-     activeEnd:   Timestamp            = Timestamp.FromString.unsafeGet("2025-07-31 14:00:00")
+     activeEnd:   Timestamp            = Timestamp.FromString.unsafeGet("2025-07-31 14:00:00"),
+     other:       Option[String]       = None
   ): IO[CallForProposals.Id] =
     query(user, s"""
         mutation {
@@ -96,6 +97,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 semester:    "${semester.format}"
                 activeStart: "${activeStart.format}"
                 activeEnd:   "${activeEnd.format}"
+                ${other.getOrElse("")}
               }
             }
           ) {
