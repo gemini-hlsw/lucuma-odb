@@ -426,6 +426,7 @@ class execution extends ExecutionTestSupport {
                                filter
                                fpu {
                                  builtin
+                                 customMask { slitWidth }
                                }
                              }
                              stepConfig {
@@ -519,7 +520,8 @@ class execution extends ExecutionTestSupport {
                                 "gratingConfig": null,
                                 "filter": "G_PRIME",
                                 "fpu": {
-                                  "builtin": "LONG_SLIT_0_50"
+                                  "builtin": "LONG_SLIT_0_50",
+                                  "customMask": null
                                 }
                               },
                               "stepConfig": {
@@ -551,7 +553,8 @@ class execution extends ExecutionTestSupport {
                                 "gratingConfig": null,
                                 "filter": "G_PRIME",
                                 "fpu": {
-                                  "builtin": "LONG_SLIT_0_50"
+                                  "builtin": "LONG_SLIT_0_50",
+                                  "customMask": null
                                 }
                               },
                               "stepConfig": {
