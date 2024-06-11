@@ -20,6 +20,7 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ObservationValidation
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
@@ -68,6 +69,7 @@ trait ObservationMapping[F[_]]
       SqlField("instrument", ObservationView.Instrument),
       SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
       EffectField("itc", itcQueryHandler, List("id", "programId")),
+      EffectField("validations", validationsQueryHandler, List("id", "programId")),
       SqlObject("execution"),
       SqlField("groupId", ObservationView.GroupId),
       SqlField("groupIndex", ObservationView.GroupIndex),
@@ -112,6 +114,20 @@ trait ObservationMapping[F[_]]
              case Left(e)  => OdbError.ItcError(Some(e.format)).asFailure
              case Right(s) => s.success
            }
+        }
+
+    effectHandler(readEnv, calculate)
+  }
+
+  def validationsQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Unit] = _ => ().success
+
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ObservationValidation]]] =
+      (pid, oid, _) =>
+        services.useTransactionally {
+          observationService
+           .observationValidations(pid, oid)
+           .map(_.success)
         }
 
     effectHandler(readEnv, calculate)
