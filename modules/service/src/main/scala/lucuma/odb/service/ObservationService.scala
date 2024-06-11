@@ -465,7 +465,7 @@ object ObservationService {
       extension (tsi: TimestampInterval)
         def centerUnsafe: Timestamp =
           if (tsi.isEmpty) tsi.start
-          else tsi.start.plusMicrosOption(tsi.boundedTimeSpan.toMicroseconds).get
+          else tsi.start.plusMicrosOption(tsi.boundedTimeSpan.toMicroseconds / 2).get
 
       extension (ge: GeneratorParamsService.Error)
         def toObsValidation: ObservationValidation = ge match
