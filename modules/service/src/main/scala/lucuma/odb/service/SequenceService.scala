@@ -583,9 +583,9 @@ object SequenceService {
           NULL :: int2            AS c_step_count,
           NULL :: e_sequence_type AS c_sequence_type,
           NULL :: d_step_id       AS c_step_id,
-          c_created               AS c_timestamp
+          c_received              AS c_timestamp
         FROM
-          t_visit
+          t_execution_event
         WHERE
           c_observation_id = $observation_id
 

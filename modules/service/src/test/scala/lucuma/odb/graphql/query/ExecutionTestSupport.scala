@@ -61,13 +61,14 @@ import skunk.Session
 trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User   = TestUsers.Standard.pi(1, 30)
-  val user: User = TestUsers.service(3)
+  val pi2: User  = TestUsers.Standard.pi(2, 32)
+  val service: User = TestUsers.service(3)
 
   override val validUsers: List[User] =
-    List(pi, user)
+    List(pi, pi2, service)
 
   val createProgram: IO[Program.Id] =
-    createProgramAs(user, "Sequence Testing")
+    createProgramAs(service, "Sequence Testing")
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val tableRow1: TableRow.North =
@@ -206,7 +207,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-    query(user, q).void
+    query(service, q).void
   }
 
   def addDatasetEvent(did: Dataset.Id, stage: DatasetStage): IO[Unit] = {
@@ -223,7 +224,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-    query(user, q).void
+    query(service, q).void
   }
 
   def setQaState(did: Dataset.Id, qa: DatasetQaState): IO[Unit] = {
@@ -244,7 +245,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         }
     """
 
-    query(user, q).void
+    query(service, q).void
   }
 
   val Seconds01 = TimeSpan.unsafeFromMicroseconds( 1_000_000L)
@@ -399,7 +400,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   def genGmosNorthSequence(oid: Observation.Id, seqType: SequenceType, futureLimit: Int): IO[List[Atom.Id]] =
     query(
-      user = user,
+      user = service,
       query = s"""
         query {
           observation(observationId: "$oid") {

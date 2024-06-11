@@ -20,13 +20,13 @@ class executionAcq extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(service, p)
+        o <- createGmosNorthLongSlitObservationAs(service, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = service,
         query =
           s"""
              query {
@@ -80,17 +80,17 @@ class executionAcq extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o  <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v  <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t  <- createTargetWithProfileAs(service, p)
+        o  <- createGmosNorthLongSlitObservationAs(service, p, List(t))
+        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
 
         // Record the first atom with 3 steps
-        a  <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
-        s0 <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
+        a  <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
+        s0 <- recordStepAs(service, a, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
+        s1 <- recordStepAs(service, a, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        s2 <- recordStepAs(service, a, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Now the last acquisition step should be generated as the nextAtom
@@ -98,7 +98,7 @@ class executionAcq extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = service,
         query =
           s"""
              query {
@@ -150,22 +150,22 @@ class executionAcq extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o  <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v  <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t  <- createTargetWithProfileAs(service, p)
+        o  <- createGmosNorthLongSlitObservationAs(service, p, List(t))
+        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
 
         // First atom with 3 steps.
-        a0 <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
-        s0 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
+        a0 <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
+        s0 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
+        s1 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        s2 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Second atom with just the last acq step
-        a1 <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 1)
-        s3 <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        a1 <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 1)
+        s3 <- recordStepAs(service, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Now we should expect to generate (again) the last acq step
@@ -173,7 +173,7 @@ class executionAcq extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = service,
         query =
           s"""
              query {
@@ -225,25 +225,25 @@ class executionAcq extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o  <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v  <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t  <- createTargetWithProfileAs(service, p)
+        o  <- createGmosNorthLongSlitObservationAs(service, p, List(t))
+        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
 
         // Acquisition Sequence
-        a0 <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
-        s0 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
+        a0 <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 3)
+        s0 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
+        s1 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        s2 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
-        a1 <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 1)
-        s3 <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        a1 <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Acquisition, stepCount = 1)
+        s3 <- recordStepAs(service, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Do a science step
-        a2 <- recordAtomAs(user, Instrument.GmosNorth, v, SequenceType.Science, stepCount = 1)
-        s4 <- recordStepAs(user, a2, Instrument.GmosNorth, GmosNorthScience0, ScienceP10Q00, ObserveClass.Science)
+        a2 <- recordAtomAs(service, Instrument.GmosNorth, v, SequenceType.Science, stepCount = 1)
+        s4 <- recordStepAs(service, a2, Instrument.GmosNorth, GmosNorthScience0, ScienceP10Q00, ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         // Now when we ask for acquisition, we should expect to take it from the top.
@@ -251,7 +251,7 @@ class executionAcq extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = service,
         query =
           s"""
              query {
@@ -305,31 +305,31 @@ class executionAcq extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o  <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v0 <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t  <- createTargetWithProfileAs(service, p)
+        o  <- createGmosNorthLongSlitObservationAs(service, p, List(t))
+        v0 <- recordVisitAs(service, Instrument.GmosNorth, o)
 
         // Acquisition Sequence
-        a0 <- recordAtomAs(user, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 3)
-        s0 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
+        a0 <- recordAtomAs(service, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 3)
+        s0 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq0, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
+        s1 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq1, ScienceP10Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        s2 <- recordStepAs(service, a0, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
-        a1 <- recordAtomAs(user, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 1)
-        s3 <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
+        a1 <- recordAtomAs(service, Instrument.GmosNorth, v0, SequenceType.Acquisition, stepCount = 1)
+        s3 <- recordStepAs(service, a1, Instrument.GmosNorth, GmosNorthAcq2, ScienceP00Q00, ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Record a new visit, but don't execute anything
-        _  <- recordVisitAs(user, Instrument.GmosNorth, o)
+        _  <- recordVisitAs(service, Instrument.GmosNorth, o)
 
         // Now when we ask for acquisition, we should expect to take it from the top.
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = service,
         query =
           s"""
              query {

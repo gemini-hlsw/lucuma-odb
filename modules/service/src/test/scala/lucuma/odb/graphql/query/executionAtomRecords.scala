@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -11,6 +12,8 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SequenceType.Acquisition
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
@@ -19,16 +22,15 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.json.gmos.given
+import lucuma.odb.json.time.transport.given
+import lucuma.odb.json.wavelength.transport.given
+import munit.Assertions.*
 
-class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
-
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
+class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
+                                            with ExecutionTestSupport {
 
   val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service).toList
 
   def noEventSetup: IO[(Observation.Id, Atom.Id)] =
     for {
@@ -516,4 +518,47 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield es
     assertIO(res, AtomExecutionState.Completed)
   }
+
+  def generatedNextAtomId(user: User, oid: Observation.Id, sequenceType: SequenceType): IO[Atom.Id] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              config {
+                gmosNorth {
+                  ${sequenceType.tag} {
+                    nextAtom {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "execution", "config", "gmosNorth", sequenceType.tag, "nextAtom", "id")
+        .as[Atom.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  test("ids: acquisition ids don't change") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid, sequenceType = Acquisition, stepCount = 2)
+      sid <- recordStepAs(service, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      _   <- addEndStepEvent(sid)
+      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
+    } yield assertEquals(ga0, ga1)
+  }
+
 }
