@@ -89,7 +89,7 @@ trait AsterismService[F[_]] {
   def getAsterism(
     programId: Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[List[(Target.Id, Target)]]
+  ): F[List[(Target.Id, Target)]]
 }
 
 object AsterismService {
@@ -185,7 +185,7 @@ object AsterismService {
       override def getAsterism(
         programId: Program.Id,
         observationId: Observation.Id
-      )(using NoTransaction[F]): F[List[(Target.Id, Target)]] =
+      ): F[List[(Target.Id, Target)]] =
         val af = Statements.getAsterism(user, programId, observationId)
         session.prepareR(af.fragment.query(Decoders.targetDecoder)).use { ps =>
           ps.stream(af.argument, chunkSize = 1024).compile.toList
