@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -11,6 +12,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SequenceType.Acquisition
+import lucuma.core.enums.SequenceType.Science
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
@@ -19,27 +23,26 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.json.gmos.given
+import lucuma.odb.json.time.transport.given
+import lucuma.odb.json.wavelength.transport.given
+import munit.Assertions.*
 
-class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
-
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
+class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
+                                            with ExecutionTestSupport {
 
   val mode    = ObservingModeType.GmosNorthLongSlit
-
-  val validUsers = List(pi, pi2, service).toList
 
   def noEventSetup: IO[(Observation.Id, Atom.Id)] =
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
     } yield (oid, aid)
 
   test("observation -> execution -> atomRecords") {
-    recordAll(pi, service, mode, offset = 0, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0, visitCount = 2, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -75,7 +78,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> atomRecords -> interval") {
-    recordAll(pi, service, mode, offset = 50, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 50, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -130,7 +133,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> atomRecords -> steps") {
-    recordAll(pi, service, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -174,7 +177,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> atomRecords -> steps -> interval") {
-    recordAll(pi, service, mode, offset = 150, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 150, visitCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -241,7 +244,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> atomRecords -> steps -> datasets") {
-    recordAll(pi, service, mode, offset = 200, atomCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 200, atomCount = 2, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -297,7 +300,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> atomRecords -> steps -> events") {
-    recordAll(pi, service, mode, offset = 300).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 300).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -357,7 +360,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     offset:       Int,
     matchesQuery: String
   ): IO[Unit] =
-    recordAll(pi, service, mode, offset = offset).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = offset).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -457,9 +460,9 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, mode.some)
-      vid <- recordVisitAs(service, mode.instrument, oid)
-      aid <- recordAtomAs(service, mode.instrument, vid)
-      sid <- recordStepAs(service, mode.instrument, aid)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
+      sid <- recordStepAs(serviceUser, mode.instrument, aid)
       _   <- expect(pi, query(oid), expected)
     } yield ()
   }
@@ -501,7 +504,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   test("execution state - ongoing") {
     val res = for {
       (o, a) <- noEventSetup
-      _      <- addAtomEventAs(service, a, AtomStage.StartAtom)
+      _      <- addAtomEventAs(serviceUser, a, AtomStage.StartAtom)
       es     <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.Ongoing)
@@ -510,10 +513,102 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations {
   test("execution state - completed") {
     val res = for {
       (o, a) <- noEventSetup
-      _      <- addAtomEventAs(service, a, AtomStage.StartAtom)
-      _      <- addAtomEventAs(service, a, AtomStage.EndAtom)
+      _      <- addAtomEventAs(serviceUser, a, AtomStage.StartAtom)
+      _      <- addAtomEventAs(serviceUser, a, AtomStage.EndAtom)
       es     <- executionState(o)
     } yield es
     assertIO(res, AtomExecutionState.Completed)
+  }
+
+  def generatedNextAtomId(user: User, oid: Observation.Id, sequenceType: SequenceType): IO[Atom.Id] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              config {
+                gmosNorth {
+                  ${sequenceType.tag} {
+                    nextAtom {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downFields("observation", "execution", "config", "gmosNorth", sequenceType.tag, "nextAtom", "id")
+        .as[Atom.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  test("steps do not change inside of a visit") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition, stepCount = 2)
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      _   <- addEndStepEvent(sid)
+      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
+    } yield assertEquals(ga0, ga1)
+  }
+
+  test("acquisition steps change over visits") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
+    } yield assertNotEquals(ga0, ga1)
+  }
+
+  test("science steps change over visits") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ga0 <- generatedNextAtomId(pi, oid, Science)
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ga1 <- generatedNextAtomId(pi, oid, Science)
+    } yield assertNotEquals(ga0, ga1)
+  }
+
+  test("steps change after switch to science") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Science, stepCount = 2)
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      _   <- addEndStepEvent(sid)
+      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
+    } yield assertNotEquals(ga0, ga1)
+  }
+
+  test("science steps do not change after switch to acquisition") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      ga0 <- generatedNextAtomId(pi, oid, Science)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition, stepCount = 2)
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      _   <- addEndStepEvent(sid)
+      ga1 <- generatedNextAtomId(pi, oid, Science)
+    } yield assertEquals(ga0, ga1)
   }
 }

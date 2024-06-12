@@ -38,12 +38,12 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -189,13 +189,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Program.Id, Observation.Id)] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createObservationWithNoModeAs(user, p, t)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithNoModeAs(pi, p, t)
       } yield (p, o)
 
     setup.flatMap { (pid, oid) =>
       expectIor(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -243,14 +243,14 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        o1 <- createObservationWithNoModeAs(user, p, t)
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o1 <- createObservationWithNoModeAs(pi, p, t)
       } yield (p, o0, o1)
 
     setup.flatMap { (pid, oid0, oid1) =>
       expectIor(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -310,14 +310,14 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
       for {
         p  <- createProgram
-        t  <- createTargetWithProfileAs(user, p)
-        o0 <- createObservationWithNoModeAs(user, p, t)
-        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createObservationWithNoModeAs(pi, p, t)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield (p, o0, o1)
 
     setup.flatMap { (pid, oid0, oid1) =>
       expectIor(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -376,13 +376,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -611,13 +611,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Observation.Id, Target.Id)] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createObservation(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(pi, p, List(t))
       } yield (o, t)
 
     setup.flatMap { case (oid, tid) =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -646,13 +646,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createObservationWithNoModeAs(user, p, t)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithNoModeAs(pi, p, t)
       } yield o
 
     setup.flatMap { oid =>
       expectIor(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -689,13 +689,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -786,13 +786,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Program.Id, Observation.Id)] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield (p, o)
 
     setup.flatMap { case (_, oid) =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -821,8 +821,8 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createObservationWithModeAs(user, p, List(t),
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t),
           """
             gmosNorthLongSlit: {
               grating: R831_G5302,
@@ -843,7 +843,7 @@ class execution extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -1056,8 +1056,8 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createObservationWithModeAs(user, p, List(t),
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t),
           """
             gmosNorthLongSlit: {
               grating: R831_G5302,
@@ -1077,7 +1077,7 @@ class execution extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -1279,13 +1279,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = pi,
+        user  = pi2,
         query =
           s"""
              query {
@@ -1314,13 +1314,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[(Program.Id, Observation.Id)] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield (p, o)
 
     setup.flatMap { case (_, oid) =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -1368,13 +1368,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              fragment configChangeEstimateFields on ConfigChangeEstimate {
@@ -1769,13 +1769,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              fragment categorizedTimeFields on CategorizedTime {
@@ -2001,13 +2001,13 @@ class execution extends ExecutionTestSupport {
   private val SetupZeroStepsGmosNorth: IO[Observation.Id] =
     for {
       p <- createProgram
-      t <- createTargetWithProfileAs(user, p)
-      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
     } yield o
 
   test("zero gmos north dynamic steps - GmosSequenceService") {
     SetupZeroStepsGmosNorth.flatMap { oid =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
@@ -2021,7 +2021,7 @@ class execution extends ExecutionTestSupport {
 
   test("zero gmos north dynamic steps - SequenceService steps") {
     SetupZeroStepsGmosNorth.flatMap { oid =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2033,7 +2033,7 @@ class execution extends ExecutionTestSupport {
 
   test("zero gmos north dynamic steps - SequenceService atom counts") {
     val m = SetupZeroStepsGmosNorth.flatMap { oid =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2042,7 +2042,9 @@ class execution extends ExecutionTestSupport {
       }
     }
 
-    assertIO(m, Completion.State.Empty)
+    import Completion.*
+
+    assertIO(m, State(SequenceMatch(0, AtomMap.Empty), SequenceMatch(0, AtomMap.Empty)))
   }
 
   private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {
@@ -2050,12 +2052,12 @@ class execution extends ExecutionTestSupport {
 
     for {
       p <- createProgram
-      t <- createTargetWithProfileAs(user, p)
-      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-      v <- recordVisitAs(user, Instrument.GmosNorth, o)
-      a <- recordAtomAs(user, Instrument.GmosNorth, v)
-      s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
-      d <- recordDatasetAs(user, s, f"N18630101S$count%04d.fits")
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
+      s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+      d <- recordDatasetAs(serviceUser, s, f"N18630101S$count%04d.fits")
       _ <- addDatasetEvent(d, DatasetStage.StartExpose)
       _ <- addDatasetEvent(d, DatasetStage.EndExpose)
       _ <- addDatasetEvent(d, DatasetStage.StartReadout)
@@ -2067,7 +2069,7 @@ class execution extends ExecutionTestSupport {
 
   test("one gmos north dynamic step - GmosSequenceService") {
     setupOneStepGmosNorth(1).flatMap { case (o, s, _) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
@@ -2081,7 +2083,7 @@ class execution extends ExecutionTestSupport {
 
   test("one gmos north dynamic step - SequenceService steps") {
     setupOneStepGmosNorth(2).flatMap { case (o, s, _) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2095,7 +2097,7 @@ class execution extends ExecutionTestSupport {
 
   test("one gmos north dynamic step - SequenceService atom counts - incomplete dataset") {
     val m = setupOneStepGmosNorth(3).flatMap { case (o, _, _) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2113,7 +2115,7 @@ class execution extends ExecutionTestSupport {
         (o, s, d) = osd
         _   <- addDatasetEvent(d, DatasetStage.EndWrite)
         _   <- setQaState(d, DatasetQaState.Fail)
-        m   <- withServices(user) { services =>
+        m   <- withServices(pi) { services =>
           services.session.transaction.use { xa =>
             services
               .sequenceService
@@ -2131,7 +2133,7 @@ class execution extends ExecutionTestSupport {
         osd <- setupOneStepGmosNorth(5)
         (o, s, d) = osd
         _   <- addDatasetEvent(d, DatasetStage.EndWrite)
-        m   <- withServices(user) { services =>
+        m   <- withServices(pi) { services =>
           services.session.transaction.use { xa =>
             services
               .sequenceService
@@ -2150,7 +2152,7 @@ class execution extends ExecutionTestSupport {
         (o, s, d) = osd
         _   <- addDatasetEvent(d, DatasetStage.EndWrite)
         _   <- setQaState(d, DatasetQaState.Pass)
-        m   <- withServices(user) { services =>
+        m   <- withServices(pi) { services =>
           services.session.transaction.use { xa =>
             services
               .sequenceService
@@ -2167,15 +2169,15 @@ class execution extends ExecutionTestSupport {
 
     for {
       p <- createProgram
-      t <- createTargetWithProfileAs(user, p)
-      o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-      v <- recordVisitAs(user, Instrument.GmosNorth, o)
-      a <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
 
-      sSci  <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+      sSci  <- recordStepAs(serviceUser, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
       _     <- addEndStepEvent(sSci)
 
-      sFlat <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthFlat0,    Flat)
+      sFlat <- recordStepAs(serviceUser, a, Instrument.GmosNorth, GmosNorthFlat0,    Flat)
       _     <- addEndStepEvent(sFlat)
 
     } yield (o, sSci, sFlat)
@@ -2183,7 +2185,7 @@ class execution extends ExecutionTestSupport {
 
   test("two gmos north dynamic steps - GmosSequenceService") {
     SetupTwoStepsGmosNorth.flatMap { case (o, sSci, sFlat) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .gmosSequenceService
@@ -2200,7 +2202,7 @@ class execution extends ExecutionTestSupport {
 
   test("two gmos north dynamic steps - SequenceService steps") {
     SetupTwoStepsGmosNorth.flatMap { case (o, sSci, sFlat) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2214,7 +2216,7 @@ class execution extends ExecutionTestSupport {
 
   test("two gmos north dynamic steps - SequenceService atom counts") {
     val m = SetupTwoStepsGmosNorth.flatMap { case (o, _, _) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services
             .sequenceService
@@ -2233,16 +2235,16 @@ class execution extends ExecutionTestSupport {
 
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v <- recordVisitAs(user, Instrument.GmosNorth, o)
-        a <- recordAtomAs(user, Instrument.GmosNorth, v)
-        s <- recordStepAs(user, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
+        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
       } yield (p, o, s)
     }
 
     val isEmpty = setup.flatMap { case (p, o, s) =>
-      withServices(user) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           for {
             _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
@@ -2264,14 +2266,14 @@ class execution extends ExecutionTestSupport {
     val beforeAndAfter =
       for {
         p      <- createProgram
-        t      <- createTargetWithProfileAs(user, p)
-        o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t      <- createTargetWithProfileAs(pi, p)
+        o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         before <- genGmosNorthSequence(o, SequenceType.Science, 5)
-        a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
+        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
-        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
+        s1     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
         _      <- addEndStepEvent(s1)
         after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
       } yield (before, after)
@@ -2290,14 +2292,14 @@ class execution extends ExecutionTestSupport {
     val beforeAndAfter =
       for {
         p      <- createProgram
-        t      <- createTargetWithProfileAs(user, p)
-        o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t      <- createTargetWithProfileAs(pi, p)
+        o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         before <- genGmosNorthSequence(o, SequenceType.Science, 5)
-        a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
+        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
+        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
         _      <- addEndStepEvent(s0)
-        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
+        s1     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
         _      <- addEndStepEvent(s1)
         after  <- genGmosNorthSequence(o, SequenceType.Science, 4)
       } yield (before, after)
@@ -2319,15 +2321,15 @@ class execution extends ExecutionTestSupport {
     val beforeAndAfter =
       for {
         p      <- createProgram
-        t      <- createTargetWithProfileAs(user, p)
-        o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t      <- createTargetWithProfileAs(pi, p)
+        o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         before <- genGmosNorthSequence(o, SequenceType.Science, 5)
-        a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
+        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
-        a1     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s1     <- recordStepAs(user, a1, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
+        a1     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
+        s1     <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, GmosNorthScience5, ScienceP00Q15)
         _      <- addEndStepEvent(s1)
         after  <- genGmosNorthSequence(o, SequenceType.Science, 5)
       } yield (before, after)
@@ -2344,16 +2346,16 @@ class execution extends ExecutionTestSupport {
     val beforeAndAfter =
       for {
         p      <- createProgram
-        t      <- createTargetWithProfileAs(user, p)
-        o      <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        v      <- recordVisitAs(user, Instrument.GmosNorth, o)
+        t      <- createTargetWithProfileAs(pi, p)
+        o      <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v      <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         before <- genGmosNorthSequence(o, SequenceType.Science, 5)
-        a0     <- recordAtomAs(user, Instrument.GmosNorth, v, stepCount = 2)
-        s0     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
+        a0     <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, stepCount = 2)
+        s0     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthScience0, ScienceP00Q00)
         _      <- addEndStepEvent(s0)
-        s1     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
+        s1     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat5, Flat)
         _      <- addEndStepEvent(s1)
-        s2     <- recordStepAs(user, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
+        s2     <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, GmosNorthFlat0, Flat)
         _      <- addEndStepEvent(s2)
         after  <- genGmosNorthSequence(o, SequenceType.Science, 5)
       } yield (before, after)
@@ -2366,9 +2368,9 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t0 <- createTargetWithGaussianAs(user, p, Angle.fromMicroarcseconds(647_200L))  // X-binning of 4
-        t1 <- createTargetWithProfileAs(user, p)  // X-binning of 1
-        o  <- createObservationWithModeAs(user, p, List(t0, t1),
+        t0 <- createTargetWithGaussianAs(pi, p, Angle.fromMicroarcseconds(647_200L))  // X-binning of 4
+        t1 <- createTargetWithProfileAs(pi, p)  // X-binning of 1
+        o  <- createObservationWithModeAs(pi, p, List(t0, t1),
                // use a 5" slit so that won't be a factor
                """
                  gmosNorthLongSlit: {
@@ -2386,7 +2388,7 @@ class execution extends ExecutionTestSupport {
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -2457,13 +2459,13 @@ class execution extends ExecutionTestSupport {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
