@@ -16,11 +16,11 @@ import cats.syntax.option.*
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Semester
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*

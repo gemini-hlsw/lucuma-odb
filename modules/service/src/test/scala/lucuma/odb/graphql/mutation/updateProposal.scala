@@ -8,8 +8,8 @@ package mutation
 import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.Program
-import lucuma.odb.data.CallForProposalsType
 
 class updateProposal extends OdbSuite {
   
