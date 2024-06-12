@@ -6,6 +6,8 @@ package lucuma.odb.data
 import cats.Order.*
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
+import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.model.ObservationValidation
 import lucuma.core.util.NewType
 
 import scala.collection.immutable.SortedMap

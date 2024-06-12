@@ -4,8 +4,8 @@
 package lucuma.odb.syntax
 
 import cats.syntax.eq.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ScienceSubtype
-import lucuma.odb.data.CallForProposalsType
 
 trait ToScienceSubtypeOps {
 

@@ -10,12 +10,12 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
 import lucuma.odb.service.ProposalService.error

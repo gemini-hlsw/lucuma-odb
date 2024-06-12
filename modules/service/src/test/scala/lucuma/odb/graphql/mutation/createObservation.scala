@@ -12,6 +12,7 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosAmpGain
@@ -44,7 +45,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.CallForProposalsType.DemoScience
 import lucuma.odb.data.PosAngleConstraintMode
 
 import java.time.LocalDateTime

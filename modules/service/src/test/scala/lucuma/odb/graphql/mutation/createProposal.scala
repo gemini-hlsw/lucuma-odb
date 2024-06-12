@@ -7,9 +7,9 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.OdbError
 
 class createProposal extends OdbSuite with DatabaseOperations  {

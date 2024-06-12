@@ -9,14 +9,14 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
-import lucuma.odb.data.CallForProposalsType
-import lucuma.odb.data.ObservationValidation
 import lucuma.odb.service.ObservationService
 
 class observationValidations extends OdbSuite with ObservingModeSetupOperations {

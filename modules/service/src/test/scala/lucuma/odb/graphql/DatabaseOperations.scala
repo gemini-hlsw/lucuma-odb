@@ -12,6 +12,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EmailStatus
@@ -55,7 +56,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
