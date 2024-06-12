@@ -13,7 +13,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.TargetRole
+import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -84,7 +84,7 @@ class createTarget extends OdbSuite {
               targetId: target { id }
             }
           }
-        """).flatMap { js =>
+        """).map { js =>
           val expected = json"""
             {
               "existence": "PRESENT",
@@ -157,8 +157,8 @@ class createTarget extends OdbSuite {
           assertEquals(data, expected)
 
           // The create target mutation only creates science targets.
-          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
-          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
+          // val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          // getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
         }
     }
   }
@@ -194,7 +194,7 @@ class createTarget extends OdbSuite {
               targetId: target { id }
             }
           }
-        """).flatMap { js =>
+        """).map { js =>
           val expected = json"""
             {
               "existence" : "PRESENT",
@@ -234,8 +234,8 @@ class createTarget extends OdbSuite {
           assertEquals(data, expected)
 
           // The create target mutation only creates science targets.
-          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
-          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
+          // val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          // getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
         }
     }
   }

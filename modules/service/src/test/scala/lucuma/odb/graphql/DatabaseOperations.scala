@@ -60,7 +60,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
@@ -1204,11 +1203,11 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user = user, query = q).void
   }
 
-  def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {
-    val query = sql"select c_role from t_target where c_target_id = $target_id".query(target_role)
-    FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(query).use(_.unique(tid)))
-  }
+  // def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {
+  //   val query = sql"select c_role from t_target where c_target_id = $target_id".query(target_role)
+  //   FMain.databasePoolResource[IO](databaseConfig).flatten
+  //     .use(_.prepareR(query).use(_.unique(tid)))
+  // }
 
   def createGuideTargetIn(
     pid:  Program.Id,
@@ -1230,7 +1229,6 @@ trait DatabaseOperations { this: OdbSuite =>
         c_sid_dec,
         c_sid_epoch,
         c_source_profile,
-        c_role
       )
       select
         $program_id,
@@ -1240,7 +1238,6 @@ trait DatabaseOperations { this: OdbSuite =>
         ${declination},
         ${epoch},
         $jsonCodec,
-        $target_role
       returning c_target_id
     """.apply(
       pid,
@@ -1248,8 +1245,7 @@ trait DatabaseOperations { this: OdbSuite =>
       RightAscension.Zero,
       Declination.Zero,
       Epoch.J2000,
-      sourceProfile.asJson,
-      TargetRole.Guide
+      sourceProfile.asJson
     )
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
