@@ -43,7 +43,6 @@ import org.http4s.implicits.*
 import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
@@ -119,8 +118,7 @@ object Main extends CommandIOApp(
       name    = "serve",
       header  = "Run the ODB service.",
     )((ResetDatabase.opt, SkipMigration.opt).tupled.map { case (reset, skipMigration) =>
-      implicit val log: SelfAwareStructuredLogger[IO] =
-        Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
+      given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("lucuma-odb")
 
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
@@ -151,11 +149,11 @@ object FMain extends MainParams {
         s"""|
             |$Header
             |
-            |CommitHash.: ${config.commitHash.format}
-            |CORS domain: ${config.domain}
-            |ITC Root   : ${config.itc.root}
-            |Port       : ${config.port}
-            |PID        : ${ProcessHandle.current.pid}
+            |CommitHash. : ${config.commitHash.format}
+            |CORS domains: ${config.domain.mkString(", ")}
+            |ITC Root    : ${config.itc.root}
+            |Port        : ${config.port}
+            |PID         : ${ProcessHandle.current.pid}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -224,7 +222,7 @@ object FMain extends MainParams {
     itcClientResource:   Resource[F, ItcClient[F]],
     commitHash:          CommitHash,
     ssoClientResource:   Resource[F, SsoClient[F, User]],
-    domain:              String,
+    domain:              List[String],
     s3OpsResource:       Resource[F, S3AsyncClientOp[F]],
     s3PresignerResource: Resource[F, S3Presigner],
     httpClientResource:  Resource[F, Client[F]]
