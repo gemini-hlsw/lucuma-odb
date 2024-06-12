@@ -136,7 +136,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.missingData(ObservationService.MissingDataMsg(none, "target"))
+          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "target"))
         ).asRight
       )
     }
@@ -154,7 +154,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.missingData(ObservationService.MissingDataMsg(none, "observing mode"))
+          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode"))
         ).asRight
       )
     }
@@ -172,7 +172,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.missingData(
+          ObservationValidation.configuration(
             ObservationService.MissingDataMsg(tid.some, "brightness measure"),
             ObservationService.MissingDataMsg(tid.some, "radial velocity")
           )
@@ -211,7 +211,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.missingData(
+          ObservationValidation.configuration(
             ObservationService.MissingDataMsg(tid.some, "brightness measure"),
             ObservationService.MissingDataMsg(tid.some, "radial velocity")
           ),
