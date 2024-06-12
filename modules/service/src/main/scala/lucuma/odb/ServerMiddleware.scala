@@ -15,6 +15,7 @@ import lucuma.sso.client.SsoClient
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware
 import org.http4s.HttpRoutes
+import org.http4s.Uri.Scheme
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
@@ -48,10 +49,10 @@ object ServerMiddleware {
     )
 
   /** A middleware that adds CORS headers. The origin must match the cookie domain. */
-  def cors[F[_]: Monad](domain: String): Middleware[F] =
+  def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(_.host.value.endsWith(domain))
+      .withAllowOriginHost(u => u.scheme === Scheme.https && domain.exists(u.host.value.endsWith))
       .withMaxAge(1.day)
       .apply
 
@@ -100,7 +101,7 @@ object ServerMiddleware {
 
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Trace: Logger](
-    domain: String,
+    domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =

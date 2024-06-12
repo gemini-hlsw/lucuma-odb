@@ -45,7 +45,7 @@ case class Config(
   database:   Config.Database,  // Database config
   aws:        Config.Aws,       // AWS config
   email:      Config.Email,     // Mailgun config
-  domain:     String,           // Domain, for CORS headers
+  domain:     List[String],     // Domains, for CORS headers
   commitHash: CommitHash        // From Heroku Dyno Metadata
 ) {
 
@@ -220,7 +220,7 @@ object Config {
     apiKey:            NonEmptyString,
     domain:            NonEmptyString,
     webhookSigningKey: NonEmptyString,
-    invitationFrom:    EmailAddress, 
+    invitationFrom:    EmailAddress,
     exploreUrl:        Uri
   ) {
     // add to environment?
@@ -272,7 +272,7 @@ object Config {
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCirrus,
-    envOrProp("ODB_DOMAIN"),
+    envOrProp("ODB_DOMAIN").map(_.split(",").map(_.trim).toList).as[List[String]],
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)
 
