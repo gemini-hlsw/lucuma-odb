@@ -10168,6 +10168,33 @@ enum TacCategory {
 }
 
 """
+Calibration role
+Observations/Programs/Targets can have a calibration role
+"""
+enum CalibrationRole {
+
+  """
+  CalibrationRole Twilight
+  """
+  TWILIGHT
+
+  """
+  CalibrationRole Photometric
+  """
+  PHOTOMETRIC
+
+  """
+  CalibrationRole SpectroPhotometric
+  """
+  SPECTROPHOTOMETRIC
+
+  """
+  CalibrationRole Telluric
+  """
+  TELLURIC
+}
+
+"""
 Target description
 """
 type Target {
@@ -10195,6 +10222,11 @@ type Target {
   Target name.
   """
   name: NonEmptyString!
+
+  """
+  calibration role
+  """
+  calibratioRole: CalibrationRole
 
   """
   source profile

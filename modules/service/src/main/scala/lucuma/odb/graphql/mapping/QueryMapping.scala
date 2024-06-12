@@ -23,7 +23,6 @@ import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
-import lucuma.odb.data.TargetRole
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereDataset
@@ -256,7 +255,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           }
         }
     }
-  
+
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
@@ -501,8 +500,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
             Filter(
               and(List(
                 Predicates.target.id.eql(pid),
-                Predicates.target.program.isVisibleTo(user),
-                Predicates.target.hasRole(TargetRole.Science)
+                Predicates.target.program.isVisibleTo(user)
               )),
               child
             )
@@ -566,7 +564,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                     OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
                     Predicates.target.existence.includeDeleted(includeDeleted),
                     Predicates.target.program.isVisibleTo(user),
-                    Predicates.target.hasRole(TargetRole.Science),
                     WHERE.getOrElse(True)
                   )
                 )),

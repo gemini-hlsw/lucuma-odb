@@ -4,17 +4,14 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import grackle.Predicate
-import grackle.Predicate.*
 import lucuma.core.model.Target
-import lucuma.odb.data.TargetRole
 
 class TargetPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")
   lazy val id = LeafPredicates[Target.Id](path / "id")
   lazy val program = ProgramPredicates(path / "program")
 
-  def hasRole(role: TargetRole): Predicate =
-    Eql(path / "role", Const[TargetRole](role))
+  // def hasRole(role: TargetRole): Predicate =
+  //   Eql(path / "role", Const[TargetRole](role))
 }
 
