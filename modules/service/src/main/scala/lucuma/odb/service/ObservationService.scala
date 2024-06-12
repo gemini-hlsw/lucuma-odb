@@ -30,19 +30,26 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.Group
+import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
+import lucuma.odb.data.ObservationValidation
+import lucuma.odb.data.ObservationValidationCode
+import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -59,6 +66,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
+import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -100,6 +108,10 @@ sealed trait ObservationService[F[_]] {
     input: CloneObservationInput
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
+  def observationValidations(
+    pid: Program.Id,
+    oid: Observation.Id
+  )(using Transaction[F]): F[List[ObservationValidation]]
 }
 
 object ObservationService {
@@ -149,6 +161,13 @@ object ObservationService {
       .find { dc => ex.message.contains(dc.constraint) }
       .map(_.message)
       .getOrElse(GenericConstraintViolationMessage(ex.message))
+
+  // observation validation messages
+  val AsterismOutOfRangeMsg = "Asterism out of Call for Proposals limits."
+  val ExplicitBaseOutOfRangeMsg = "Explicit base out of Call for Proposals limits."
+  def InvalidInstrumentMsg(instr: Instrument) = s"Instrument $instr not part of Call for Proposals."
+  def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
+    otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
 
   case class CloneIds(
     originalId: Observation.Id,
@@ -428,6 +447,118 @@ object ObservationService {
           _             <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), input.asterism))
         yield CloneIds(origOid, newOid)).value
         
+      // ***********************
+      // All about the validations
+      // ***********************
+      def cfpError(msg: String): ObservationValidation =
+        ObservationValidation.callForProposals(msg)
+
+      extension (ra: RightAscension)
+        def isInInterval(raStart: RightAscension, raEnd: RightAscension): Boolean =
+          if (raStart > raEnd) raStart <= ra || ra <= raEnd
+          else raStart <= ra && ra <= raEnd
+
+      extension (dec: Declination)
+        def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
+          decStart <= dec && dec <= decEnd
+
+      extension (tsi: TimestampInterval)
+        def centerUnsafe: Timestamp =
+          if (tsi.isEmpty) tsi.start
+          else tsi.start.plusMicrosOption(tsi.boundedTimeSpan.toMicroseconds / 2).get
+
+      extension (ge: GeneratorParamsService.Error)
+        def toObsValidation: ObservationValidation = ge match
+          case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(MissingDataMsg(otid, paramName))
+          case _                                           => ObservationValidation.configuration(ge.format)
+
+      override def observationValidations(
+        pid: Program.Id,
+        oid: Observation.Id
+      )(using Transaction[F]): F[List[ObservationValidation]] = {
+        val generatorValidations: F[ObservationValidationMap] =
+          generatorParamsService.selectOne(pid, oid).map {
+            case Right(_) => ObservationValidationMap.empty
+            case Left(errors) => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList)
+          }
+ 
+        val optCfpId: F[Option[CallForProposals.Id]] = 
+          session.option(Statements.ProgramCfpId)(pid)
+
+        def validateAsterismRaDec(
+          raStart: RightAscension,
+          raEnd: RightAscension,
+          decStart: Declination,
+          decEnd: Declination,
+          active: TimestampInterval
+        ): F[Option[ObservationValidation]] = 
+          asterismService.getAsterism(pid,oid)
+            .map { l =>
+              val targets = l.map(_._2)
+              // The lack of a target will get reported in the generator errors
+              (for {
+                asterism <- NonEmptyList.fromList(targets)
+                tracking  = ObjectTracking.fromAsterism(asterism)
+                coordsAt <- tracking.at(active.centerUnsafe.toInstant)
+                coords    = coordsAt.value
+              } yield {
+                if (coords.ra.isInInterval(raStart, raEnd) && coords.dec.isInInterval(decStart, decEnd)) none
+                else cfpError(AsterismOutOfRangeMsg).some
+              }).flatten
+            }
+        
+        def validateRaDec(
+          cid: CallForProposals.Id,
+          explicitBase: Option[(RightAscension, Declination)]
+        ): F[Option[ObservationValidation]] =
+          session.unique(Statements.CfpInformation)(cid)
+            .flatMap( (ora1, ora2, odec1, odec2, active) =>
+              // if the proposal doesn't have Ra/Dec limits, there can't be an error
+              (ora1, ora2, odec1, odec2).tupled
+                .fold(none.pure) { (raStart, raEnd, decStart, decEnd) =>
+                  // if the observation has explicit base declared, use that
+                  explicitBase.fold(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, active)){ (ra, dec) =>
+                    if (ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd)) none.pure
+                    else cfpError(ExplicitBaseOutOfRangeMsg).some.pure
+                  }
+              }
+            )
+
+        def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
+          // If there is no instrument in the observation, that will get caught with the generatorValidations
+          optInstr.fold(none.pure){ instr =>
+            session.stream(Statements.CfpInstruments)(cid, chunkSize = 1024)
+              .compile
+              .toList
+              .map(l => 
+                if(l.isEmpty || l.contains(instr)) none 
+                else cfpError(InvalidInstrumentMsg(instr)).some
+              )
+          }
+        }
+
+        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] = 
+          session.unique(Statements.ObservationValidationInfo)(oid)
+
+        val cfpValidations: F[ObservationValidationMap] = {
+          optCfpId.flatMap(
+            _.fold(ObservationValidationMap.empty.pure){ cid => 
+              for {
+                (oinstr, ora, odec) <- obsInfo
+                valInstr            <- validateInstrument(cid, oinstr)
+                explicitBase     = (ora, odec).tupled
+                valRaDec            <- validateRaDec(cid, explicitBase)
+              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec).flatten)
+             }
+          )
+        }
+
+
+        for {
+          genVals <- generatorValidations
+          cfpVals <- cfpValidations
+        } yield (genVals |+| cfpVals).toList
+      }
     }
 
   object Statements {
@@ -916,6 +1047,44 @@ object ObservationService {
         FROM t_observation
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
+
+    val ProgramCfpId: Query[Program.Id, CallForProposals.Id] =
+      sql"""
+        SELECT c_cfp_id
+        FROM t_proposal
+        WHERE c_program_id = $program_id
+      """.query(cfp_id)
+
+    val ObservationValidationInfo: 
+      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
+      sql"""
+        SELECT
+          c_instrument,
+          c_explicit_ra,
+          c_explicit_dec
+        FROM t_observation
+        WHERE c_observation_id = $observation_id
+      """.query(instrument.opt *: right_ascension.opt *: declination.opt)
+
+    val CfpInformation:
+      Query[CallForProposals.Id, (Option[RightAscension], Option[RightAscension], Option[Declination], Option[Declination], TimestampInterval)] =
+      sql"""
+        SELECT
+          c_ra_start,
+          c_ra_end,
+          c_dec_start,
+          c_dec_end,
+          c_active
+        FROM t_cfp
+        WHERE c_cfp_id = $cfp_id
+      """.query(right_ascension.opt *: right_ascension.opt *: declination.opt *: declination.opt *: timestamp_interval_tsrange)
+
+    val CfpInstruments: Query[CallForProposals.Id, Instrument] =
+      sql"""
+        SELECT c_instrument
+        FROM t_cfp_instrument
+        WHERE c_cfp_id = $cfp_id
+      """.query(instrument)
   }
 
 }

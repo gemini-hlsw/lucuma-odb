@@ -1,0 +1,418 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+
+package query
+
+import cats.effect.IO
+import cats.syntax.all.*
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.core.enums.Instrument
+import lucuma.core.model.CallForProposals
+import lucuma.core.model.Observation
+import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.core.syntax.string.*
+import lucuma.odb.data.CallForProposalsType
+import lucuma.odb.data.ObservationValidation
+import lucuma.odb.service.ObservationService
+
+class observationValidations extends OdbSuite with ObservingModeSetupOperations {
+  val pi    = TestUsers.Standard.pi(1, 30)
+  val staff = TestUsers.Standard.staff(3, 103)
+  
+  override def validUsers: List[User] = List(pi, staff)
+
+  // ra and dec values in degrees
+  val RaStart = 90
+  val RaCenter = 180
+  val RaEnd = 270
+  val RaStartWrap =  RaEnd
+  val RaCenterWrap = 1
+  val RaEndWrap = RaStart
+  val DecStart = 0
+  val DecCenter = 25
+  val DecEnd = 45
+  val Limits = (RaStart, RaEnd, DecStart, DecEnd)
+  val WrappedLimits = (RaStartWrap, RaEndWrap, DecStart, DecEnd)
+
+  def validationQuery(oid: Observation.Id) = 
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          validations {
+            code
+            messages
+          }
+        }
+      }
+    """
+
+  def queryResult(obsVals: ObservationValidation*): Json = {
+    Json.obj(
+      "observation" ->
+        Json.obj("validations" -> obsVals.asJson)
+    )
+  }
+
+  // only use this if you have instruments, limits or both. Otherwise use createCallForProposalsAs(...)
+  def createCfp(
+    instruments: List[Instrument] = List.empty,
+    limits: Option[(Int, Int, Int, Int)] = none
+  ): IO[CallForProposals.Id] =
+    val inStr = 
+      if (instruments.isEmpty) ""
+      else s"instruments: [${instruments.map(_.tag.toScreamingSnakeCase).mkString(",")}]\n"
+    val limitStr = limits.fold("") { (raStart, raEnd, decStart, decEnd) =>
+      s"""
+        raLimitStart: { degrees: $raStart }
+        raLimitEnd: { degrees: $raEnd }
+        decLimitStart: { degrees: $decStart }
+        decLimitEnd: { degrees: $decEnd }
+      """
+    }
+    createCallForProposalsAs(staff, other = (inStr + limitStr).some)
+
+  def setTargetCoords(tid: Target.Id, raHours: Int, decHours: Int): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              sidereal: {
+                ra: { degrees: $raHours }
+                dec: { degrees: $decHours }
+              }
+            }
+            WHERE: {
+              id: { EQ: "$tid" }
+            }
+          }) {
+            targets {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  def setObservationExplicitBase(oid: Observation.Id, raHours: Int, decHours: Int): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              targetEnvironment: {
+                explicitBase: {
+                  ra: { degrees: $raHours }
+                  dec: { degrees: $decHours }
+                }
+              }
+            },
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("no target") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        oid <- createObservationAs(pi, pid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "target"))
+        ).asRight
+      )
+    }
+  }
+
+  test("no observing mode") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        tid <- createTargetAs(pi, pid)
+        oid <- createObservationAs(pi, pid, tid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode"))
+        ).asRight
+      )
+    }
+  }
+
+  test("missing target info") {
+    val setup: IO[(Target.Id, Observation.Id)] =
+      for {
+        pid <- createProgramAs(pi)
+        tid <- createTargetAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield (tid, oid)
+    setup.flatMap { (tid, oid) =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.MissingDataMsg(tid.some, "brightness measure"),
+            ObservationService.MissingDataMsg(tid.some, "radial velocity")
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("no validations") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
+      )
+    }
+  }
+  
+  test("missing target info, invalid instrument") {
+    val setup: IO[(Target.Id, Observation.Id)] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosSouth))
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield (tid, oid)
+    setup.flatMap { (tid, oid) =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.MissingDataMsg(tid.some, "brightness measure"),
+            ObservationService.MissingDataMsg(tid.some, "radial velocity")
+          ),
+          ObservationValidation.callForProposals(
+            ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("valid instrument") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth))
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
+      )
+    }
+  }
+
+  test("invalid instrument") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosSouth))
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.callForProposals(
+            ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("explicit base within limits") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
+        setObservationExplicitBase(oid, ra, dec) >>
+          expect(
+            pi,
+            validationQuery(oid),
+            expected = queryResult().asRight
+          )
+      }
+    }
+  }
+
+  test("explicit base within limits, CfP with wrapped RA limits") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = WrappedLimits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      List((RaStartWrap, DecStart), (RaEndWrap, DecEnd), (RaStartWrap, DecEnd), (RaCenterWrap, DecCenter)).traverse { (ra, dec) =>
+        setObservationExplicitBase(oid, ra, dec) >>
+          expect(
+            pi,
+            validationQuery(oid),
+            expected = queryResult().asRight
+          )
+      }
+    }
+  }
+
+  test("explicit base outside limits") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      List((RaStart - 1, DecStart), (RaEnd, DecEnd + 1), (RaCenterWrap, DecCenter)).traverse { (ra, dec) =>
+        setObservationExplicitBase(oid, ra, dec) >>
+          expect(
+            pi,
+            validationQuery(oid),
+            expected = queryResult(
+              ObservationValidation.callForProposals(ObservationService.ExplicitBaseOutOfRangeMsg)
+            ).asRight
+          )
+      }
+    }
+  }
+
+  test("explicit base outside limits, CfP with wrapped RA limits") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = WrappedLimits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      List((RaStartWrap, DecStart - 1), (RaEndWrap + 1, DecEnd), (RaStartWrap - 1, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
+        setObservationExplicitBase(oid, ra, dec) >>
+          expect(
+            pi,
+            validationQuery(oid),
+            expected = queryResult(
+              ObservationValidation.callForProposals(ObservationService.ExplicitBaseOutOfRangeMsg)
+            ).asRight
+          )
+      }
+    }
+  }
+
+  test("asterism within limits, valid instrument") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        _   <- setTargetCoords(tid, RaCenter, DecCenter)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
+      )
+    }
+  }
+
+  test("asterism outside limits, valid instrument") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        _   <- setTargetCoords(tid, RaStart - 20, DecCenter)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.callForProposals(ObservationService.AsterismOutOfRangeMsg)
+        ).asRight
+      )
+    }
+  }
+
+  test("asterism outside limits, invalid instrument") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        _   <- setTargetCoords(tid, RaStart - 20, DecCenter)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.callForProposals(
+            ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
+            ObservationService.AsterismOutOfRangeMsg
+          )
+        ).asRight
+      )
+    }
+  }
+
+}

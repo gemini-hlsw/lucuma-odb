@@ -7930,6 +7930,11 @@ type Observation {
   itc: Itc!
 
   """
+  A list of observation validation problems
+  """
+  validations: [ObservationValidation!]!
+
+  """
   Enclosing group, if any.
   """
   groupId: GroupId
@@ -7995,6 +8000,36 @@ observation index. For example, G-2024B-1234-Q-0001 where G-2024B-1234-Q is
 the program reference label and the observation index is 1.
 """
 scalar ObservationReferenceLabel
+
+"""
+An observation validation problem
+"""
+type ObservationValidation {
+  """
+  The type of validation problem
+  """
+  code: ObservationValidationCode!
+
+  """
+  Particular errors for this validation type
+  """
+  messages: [String!]!
+}
+
+"""
+Types of observation validations
+"""
+enum ObservationValidationCode {
+  """
+  The observation is not configured correctly and cannot be executed
+  """
+  CONFIGURATION_ERROR,
+
+  """
+  The observation does not meet the requirements of the Call for Proposals
+  """
+  CFP_ERROR
+}
 
 """
 Each step in a sequence is tagged with an observe class which identifies its
