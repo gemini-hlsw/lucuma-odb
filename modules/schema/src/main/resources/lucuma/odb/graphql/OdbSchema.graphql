@@ -8021,24 +8021,14 @@ Types of observation validations
 """
 enum ObservationValidationCode {
   """
-  The observation or targets are missing required information
+  The observation is not configured correctly and cannot be executed
   """
-  MISSING_DATA,
-
-  """
-  The data in the observation or targets is inconsistent.
-  """
-  CONFLICTING_DATA,
+  CONFIGURATION_ERROR,
 
   """
   The observation does not meet the requirements of the Call for Proposals
   """
   CFP_ERROR
-
-  """
-  The observation is missing or is not accessible
-  """
-  MISSING_OBSERVATION
 }
 
 """

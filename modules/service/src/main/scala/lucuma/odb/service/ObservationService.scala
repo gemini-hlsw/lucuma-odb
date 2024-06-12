@@ -469,9 +469,8 @@ object ObservationService {
 
       extension (ge: GeneratorParamsService.Error)
         def toObsValidation: ObservationValidation = ge match
-          case GenParamsError.MissingObservation(_, _)     => ObservationValidation.missingObservation(ge.format)
-          case GenParamsError.MissingData(otid, paramName) => ObservationValidation.missingData(MissingDataMsg(otid, paramName))
-          case GenParamsError.ConflictingData              => ObservationValidation.conflictingData(ge.format)
+          case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(MissingDataMsg(otid, paramName))
+          case _                                           => ObservationValidation.configuration(ge.format)
 
       override def observationValidations(
         pid: Program.Id,
@@ -483,11 +482,8 @@ object ObservationService {
             case Left(errors) => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList)
           }
  
-        val optCfpId: F[Option[CallForProposals.Id]] = {
-          val af = Statements.getProgramCfpId(pid)
-          session.prepareR(af.fragment.query(cfp_id.opt))
-            .use(_.option(af.argument).map(_.flatten))
-        }
+        val optCfpId: F[Option[CallForProposals.Id]] = 
+          session.option(Statements.ProgramCfpId)(pid)
 
         def validateAsterismRaDec(
           raStart: RightAscension,
@@ -514,10 +510,8 @@ object ObservationService {
         def validateRaDec(
           cid: CallForProposals.Id,
           explicitBase: Option[(RightAscension, Declination)]
-        ): F[Option[ObservationValidation]] = {
-          val af = Statements.getCfpInformation(cid)
-          session.prepareR(af.fragment.query(right_ascension.opt *: right_ascension.opt *: declination.opt *: declination.opt *: timestamp_interval_tsrange))
-            .use(_.unique(af.argument))
+        ): F[Option[ObservationValidation]] =
+          session.unique(Statements.CfpInformation)(cid)
             .flatMap( (ora1, ora2, odec1, odec2, active) =>
               // if the proposal doesn't have Ra/Dec limits, there can't be an error
               (ora1, ora2, odec1, odec2).tupled
@@ -529,14 +523,13 @@ object ObservationService {
                   }
               }
             )
-        }
 
         def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
           // If there is no instrument in the observation, that will get caught with the generatorValidations
           optInstr.fold(none.pure){ instr =>
-            val af = Statements.getCfpInstruments(cid)
-            session.prepareR(af.fragment.query(instrument))
-              .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+            session.stream(Statements.CfpInstruments)(cid, chunkSize = 1024)
+              .compile
+              .toList
               .map(l => 
                 if(l.isEmpty || l.contains(instr)) none 
                 else cfpError(InvalidInstrumentMsg(instr)).some
@@ -544,11 +537,8 @@ object ObservationService {
           }
         }
 
-        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] = {
-          val af = Statements.getObservationValidationInfo(oid)
-          session.prepareR(af.fragment.query(instrument.opt *: right_ascension.opt *: declination.opt))
-            .use(_.unique(af.argument))
-        }
+        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] = 
+          session.unique(Statements.ObservationValidationInfo)(oid)
 
         val cfpValidations: F[ObservationValidationMap] = {
           optCfpId.flatMap(
@@ -1058,14 +1048,15 @@ object ObservationService {
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
 
-    def getProgramCfpId(pid: Program.Id): AppliedFragment =
+    val ProgramCfpId: Query[Program.Id, CallForProposals.Id] =
       sql"""
         SELECT c_cfp_id
         FROM t_proposal
         WHERE c_program_id = $program_id
-      """.apply(pid)
+      """.query(cfp_id)
 
-    def getObservationValidationInfo(oid: Observation.Id): AppliedFragment =
+    val ObservationValidationInfo: 
+      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
       sql"""
         SELECT
           c_instrument,
@@ -1073,9 +1064,10 @@ object ObservationService {
           c_explicit_dec
         FROM t_observation
         WHERE c_observation_id = $observation_id
-      """.apply(oid)
+      """.query(instrument.opt *: right_ascension.opt *: declination.opt)
 
-    def getCfpInformation(cid: CallForProposals.Id): AppliedFragment =
+    val CfpInformation:
+      Query[CallForProposals.Id, (Option[RightAscension], Option[RightAscension], Option[Declination], Option[Declination], TimestampInterval)] =
       sql"""
         SELECT
           c_ra_start,
@@ -1085,14 +1077,14 @@ object ObservationService {
           c_active
         FROM t_cfp
         WHERE c_cfp_id = $cfp_id
-      """.apply(cid)
+      """.query(right_ascension.opt *: right_ascension.opt *: declination.opt *: declination.opt *: timestamp_interval_tsrange)
 
-    def getCfpInstruments(cid: CallForProposals.Id): AppliedFragment =
+    val CfpInstruments: Query[CallForProposals.Id, Instrument] =
       sql"""
         SELECT c_instrument
         FROM t_cfp_instrument
         WHERE c_cfp_id = $cfp_id
-      """.apply(cid)
+      """.query(instrument)
   }
 
 }

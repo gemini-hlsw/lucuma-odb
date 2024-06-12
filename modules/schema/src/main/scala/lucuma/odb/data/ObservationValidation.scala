@@ -14,11 +14,8 @@ enum ObservationValidationCode(
   val name: String,
   val description: String
 ) derives Enumerated:
-  case MissingData extends ObservationValidationCode("missing_data", "Missing Data", "Some required data is missing")
-  case ConflictingData extends ObservationValidationCode("conflicting_data", "Conflicting Data", "Conflicting data")
-  case CallForProposalsError extends ObservationValidationCode("cfp_error", "CfP Error", "Not valid for the selected Call for Proposals")
-  // we should never get this one, unless we change how the validation method is called.
-  case MissingObservation extends ObservationValidationCode("missing_observation", "Missing Observation", "The observation is missing or not accessible")
+  case ConfigurationError extends ObservationValidationCode("configuration_error", "Configuration Error", "The observation is not configured correctly and cannot be executed")
+  case CallForProposalsError extends ObservationValidationCode("cfp_error", "Call for Proposals Error", "Not valid for the selected Call for Proposals")
 
 case class ObservationValidation(
   code: ObservationValidationCode,
@@ -28,11 +25,7 @@ case class ObservationValidation(
 object ObservationValidation:
   def fromMsgs(code: ObservationValidationCode, msg: String, moreMsgs: String*): ObservationValidation =
     ObservationValidation(code, NonEmptyChain.of(msg, moreMsgs*))
-  def missingData(msg: String, moreMsgs: String*): ObservationValidation =
-    fromMsgs(ObservationValidationCode.MissingData, msg, moreMsgs*)
-  def conflictingData(msg: String, moreMsgs: String*): ObservationValidation =
-    fromMsgs(ObservationValidationCode.ConflictingData, msg, moreMsgs*)
+  def configuration(msg: String, moreMsgs: String*): ObservationValidation =
+    fromMsgs(ObservationValidationCode.ConfigurationError, msg, moreMsgs*)
   def callForProposals(msg: String, moreMsgs: String*): ObservationValidation =
     fromMsgs(ObservationValidationCode.CallForProposalsError, msg, moreMsgs*)
-  def missingObservation(msg: String, moreMsgs: String*): ObservationValidation =
-    fromMsgs(ObservationValidationCode.MissingObservation, msg, moreMsgs*)
