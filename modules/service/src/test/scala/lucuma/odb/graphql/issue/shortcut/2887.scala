@@ -35,12 +35,12 @@ class ShortCut_2887 extends ExecutionTestSupport {
       for {
         _ <- atomCount.set(SequenceAtomLimit + 1)
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
       } yield o
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
@@ -65,12 +65,12 @@ class ShortCut_2887 extends ExecutionTestSupport {
       for {
         _ <- atomCount.set(SequenceAtomLimit)
         p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       expect(
-        user  = user,
+        user  = pi,
         query =
           s"""
              query {
