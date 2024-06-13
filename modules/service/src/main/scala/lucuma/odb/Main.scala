@@ -137,9 +137,6 @@ object FMain extends MainParams {
 
   import MainArgs.*
 
-  // TODO: put this in the config
-  val MaxConnections = 10
-
   // Time GraphQL service instances are cached
   val GraphQLServiceTTL = 30.minutes
 
@@ -170,7 +167,7 @@ object FMain extends MainParams {
       password = Some(config.password),
       database = config.database,
       ssl      = SSL.Trusted.withFallback(true),
-      max      = MaxConnections,
+      max      = config.maxConnections,
       strategy = Strategy.SearchPath,
       // debug    = true,
     )
