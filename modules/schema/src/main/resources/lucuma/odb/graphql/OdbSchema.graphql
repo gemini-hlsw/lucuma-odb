@@ -2497,14 +2497,14 @@ input CreateUserInvitationInput {
 enum UserInvitationStatus {
 
   "This invitation has not been used."
-  PENDING, 
-  
+  PENDING,
+
   "This invitation was redeemed."
   REDEEMED,
-  
+
   "This invitation was declined."
   DECLINED,
-  
+
   "This invitation was revoked, and can no longer be redeemed."
   REVOKED
 
@@ -4279,50 +4279,50 @@ enum StepType {
 
 type Subscription {
   """
-  
+
   Subscribes to an event that is generated whenever a(n) observation is
   created or updated.  If a(n) observation id is provided, the event is only
   generated for edits to that particular observation.  If a program id is
   provided then the event must correspond to a(n) observation referenced by
   that program.
-  
+
   """
   observationEdit(
     input: ObservationEditInput
   ): ObservationEdit!
 
   """
-  
+
   Subscribes to an event that is generated whenever a program is created
   or edited. A particular program id may be provided to limit events to
   that program.
-  
+
   """
   programEdit(
     input: ProgramEditInput
   ): ProgramEdit!
 
   """
-  
+
   Subscribes to an event that is generated whenever a(n) target is
   created or updated.  If a(n) target id is provided, the event is only
   generated for edits to that particular target.  If a program id is
   provided then the event must correspond to a(n) target referenced by
   that program.
-  
+
   """
   targetEdit(
     input: TargetEditInput
   ): TargetEdit!
 
   """
-  
+
   Subscribes to an event that is generated whenever a group is
   created or updated.  If a group id is provided, the event is only
   generated for edits to that particular group.  If a program id is
   provided then the event must correspond to a group referenced by
   that program.
-  
+
   """
   groupEdit(
     input: GroupEditInput
@@ -7275,7 +7275,7 @@ type GuideAvailabilityPeriod {
 
   "Then end time of the availability period."
   end:   Timestamp!
-  
+
   "The position angles available during this period."
   posAngles: [Angle!]!
 }
@@ -10226,7 +10226,7 @@ type Target {
   """
   calibration role
   """
-  calibratioRole: CalibrationRole
+  calibrationRole: CalibrationRole
 
   """
   source profile
@@ -10283,7 +10283,7 @@ type TargetEnvironment {
   guideAvailability(
     "The starting time of the time range of interest."
     start: Timestamp!
-    
+
     "The ending time of the time range of interest."
     end:   Timestamp!
   ): [GuideAvailabilityPeriod!]!
@@ -10899,7 +10899,7 @@ input WhereAngle {
   NOT: WhereAngle
 
   microarcseconds: WhereOrderLong
-  
+
   microseconds: WhereOrderBigDecimal
 
   milliarcseconds: WhereOrderBigDecimal
@@ -11108,7 +11108,7 @@ input WhereDataset {
 
   "A nested dataset filter that must not match in order for the NOT itself to match."
   NOT: WhereDataset
-  
+
   "Matches indicated dataset(s)."
   id: WhereOrderDatasetId
 

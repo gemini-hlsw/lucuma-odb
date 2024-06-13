@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -37,7 +38,7 @@ class cloneTarget extends OdbSuite {
               }
             }
           """
-        ).map { json =>
+        ).flatMap { json =>
 
           // The data fields (i.e., everything but ID) should be the same
           assertEquals(
@@ -53,9 +54,9 @@ class cloneTarget extends OdbSuite {
           assertNotEquals(origId, newId)
 
           // The target roles should match
-          // (getTargetRoleFromDb(origId), getTargetRoleFromDb(newId)).parMapN((oldRole, newRole) =>
-          //   assertEquals(oldRole, newRole)
-          // )
+          (getCalibrationRoleFromDb(origId), getCalibrationRoleFromDb(newId)).parMapN((oldCalib, newCalib) =>
+            assertEquals(oldCalib, newCalib)
+          )
         }
       }
     }
@@ -170,9 +171,9 @@ class cloneTarget extends OdbSuite {
     }
   }
 
-  test("clone a guide target") {
+  test("clone a calibration target") {
     createProgramAs(pi).flatMap { pid =>
-      createGuideTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -180,13 +181,23 @@ class cloneTarget extends OdbSuite {
               cloneTarget(input: {
                 targetId: "$tid"
               }) {
-                newTarget {
+                originalTarget {
                   id
                 }
               }
             }
           """,
-          expected = Left(List(s"No such target: $tid"))
+          expected = Right(
+            json"""{
+                "cloneTarget" : {
+                  "originalTarget" :
+                    {
+                      "id" : $tid
+                    }
+                }
+              }
+            """
+          )
         )
       }
     }

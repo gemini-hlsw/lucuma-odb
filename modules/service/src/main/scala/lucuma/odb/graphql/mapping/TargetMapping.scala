@@ -19,7 +19,7 @@ trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
       SqlField("name", TargetView.Name),
       SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
       SqlJson("sourceProfile", TargetView.SourceProfile),
-      // SqlField("role", TargetView.Role, hidden = true),
+      SqlField("calibrationRole", TargetView.CalibrationRole),
       SqlObject("sidereal"),
       SqlObject("nonsidereal")
     )

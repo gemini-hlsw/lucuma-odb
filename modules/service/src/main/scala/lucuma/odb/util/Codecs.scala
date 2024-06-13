@@ -47,7 +47,6 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.CalibrationRole
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
