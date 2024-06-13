@@ -8,11 +8,11 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.CallForProposalsType.DemoScience
 import lucuma.odb.data.TargetRole
 
 class createTarget extends OdbSuite {

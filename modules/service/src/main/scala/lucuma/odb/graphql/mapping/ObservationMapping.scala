@@ -18,9 +18,9 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ObservationValidation
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding

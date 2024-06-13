@@ -10,6 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation

@@ -7,8 +7,8 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.graphql.binding.*
 
 object WhereCallForProposals {

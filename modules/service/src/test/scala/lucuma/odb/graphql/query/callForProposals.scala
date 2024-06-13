@@ -9,9 +9,9 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.syntax.string.*
-import lucuma.odb.data.CallForProposalsType
 
 class callForProposals extends OdbSuite {
 

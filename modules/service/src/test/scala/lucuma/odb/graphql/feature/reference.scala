@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -20,7 +21,6 @@ import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.ObservingModeType
 
 
