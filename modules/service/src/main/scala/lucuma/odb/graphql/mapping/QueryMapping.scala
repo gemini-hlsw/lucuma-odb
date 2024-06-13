@@ -500,7 +500,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
             Filter(
               and(List(
                 Predicates.target.id.eql(pid),
-                Predicates.target.program.isVisibleTo(user)
+                Predicates.target.program.isVisibleTo(user),
+                Predicates.target.noCalibrationRole
               )),
               child
             )

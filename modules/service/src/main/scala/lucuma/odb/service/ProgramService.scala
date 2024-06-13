@@ -467,7 +467,7 @@ object ProgramService {
       userId: User.Id,
     ): AppliedFragment =
       sql"""
-        EXISTS (select c_role from t_program_user where  c_program_id = $program_id and c_user_id = $user_id and c_role = 'coi')
+        EXISTS (select c_role from t_program_user where c_program_id = $program_id and c_user_id = $user_id and c_role = 'coi')
       """.apply(programId, userId)
 
     def existsAllocationForPartner(

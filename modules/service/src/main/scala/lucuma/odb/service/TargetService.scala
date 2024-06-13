@@ -219,8 +219,7 @@ object TargetService {
       pid:           Program.Id,
       name:          NonEmptyString,
       si:            SiderealInput.Create,
-      sourceProfile: Json,
-      // role:          TargetRole
+      sourceProfile: Json
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -237,7 +236,7 @@ object TargetService {
           c_sid_catalog_name,
           c_sid_catalog_id,
           c_sid_catalog_object_type,
-          c_source_profile,
+          c_source_profile
         )
         select
           $program_id,
@@ -253,7 +252,7 @@ object TargetService {
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
-          $json,
+          $json
       """.apply(
         pid,
         name,
@@ -275,8 +274,7 @@ object TargetService {
       pid:           Program.Id,
       name:          NonEmptyString,
       ek:            EphemerisKey,
-      sourceProfile: Json,
-      // role:          TargetRole
+      sourceProfile: Json
     ): AppliedFragment = {
       sql"""
         insert into t_target (
@@ -286,7 +284,7 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile,
+          c_source_profile
         )
         select
           $program_id,
@@ -295,7 +293,7 @@ object TargetService {
           ${text_nonempty},
           ${ephemeris_key_type},
           ${text_nonempty},
-          $json,
+          $json
       """.apply(
         pid,
         name,
@@ -438,6 +436,7 @@ object TargetService {
           c_nsid_key_type,
           c_nsid_key,
           c_source_profile,
+          c_calibration_role
         )
         SELECT
           c_program_id,
@@ -457,6 +456,7 @@ object TargetService {
           c_nsid_key_type,
           c_nsid_key,
           c_source_profile,
+          c_calibration_role
         FROM t_target
         WHERE c_target_id = $target_id
       """.apply(tid) |+|

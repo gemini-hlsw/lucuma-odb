@@ -56,6 +56,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -1203,13 +1204,13 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user = user, query = q).void
   }
 
-  // def getTargetRoleFromDb(tid: Target.Id): IO[TargetRole] = {
-  //   val query = sql"select c_role from t_target where c_target_id = $target_id".query(target_role)
-  //   FMain.databasePoolResource[IO](databaseConfig).flatten
-  //     .use(_.prepareR(query).use(_.unique(tid)))
-  // }
+  def getCalibrationRoleFromDb(tid: Target.Id): IO[Option[CalibrationRole]] = {
+    val query = sql"select c_calibration_role from t_target where c_target_id = $target_id".query(calibration_role.opt)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.unique(tid)))
+  }
 
-  def createGuideTargetIn(
+  def createCalibrationTargetIn(
     pid:  Program.Id,
     name: NonEmptyString = "Unnamed Guide".refined,
     sourceProfile: SourceProfile =
@@ -1218,7 +1219,8 @@ trait DatabaseOperations { this: OdbSuite =>
           StellarLibrary(StellarLibrarySpectrum.B5III).some,
           SortedMap.empty
         )
-      )
+      ),
+    calibrationRole: CalibrationRole = CalibrationRole.Telluric
   ): IO[Target.Id] = {
     val af = sql"""
       insert into t_target (
@@ -1229,6 +1231,7 @@ trait DatabaseOperations { this: OdbSuite =>
         c_sid_dec,
         c_sid_epoch,
         c_source_profile,
+        c_calibration_role
       )
       select
         $program_id,
@@ -1238,6 +1241,7 @@ trait DatabaseOperations { this: OdbSuite =>
         ${declination},
         ${epoch},
         $jsonCodec,
+        $calibration_role
       returning c_target_id
     """.apply(
       pid,
@@ -1245,7 +1249,8 @@ trait DatabaseOperations { this: OdbSuite =>
       RightAscension.Zero,
       Declination.Zero,
       Epoch.J2000,
-      sourceProfile.asJson
+      sourceProfile.asJson,
+      calibrationRole
     )
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
