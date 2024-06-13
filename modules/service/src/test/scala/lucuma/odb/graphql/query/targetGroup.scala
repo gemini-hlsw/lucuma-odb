@@ -9,11 +9,11 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
-import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class targetGroup extends OdbSuite {
 

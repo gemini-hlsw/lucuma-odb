@@ -20,6 +20,7 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
@@ -37,6 +38,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
@@ -47,8 +49,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
-import lucuma.odb.data.ObservationValidation
-import lucuma.odb.data.ObservationValidationCode
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError

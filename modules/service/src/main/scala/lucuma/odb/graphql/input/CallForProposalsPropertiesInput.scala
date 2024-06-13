@@ -9,6 +9,7 @@ import cats.data.Ior
 import cats.syntax.all.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -16,7 +17,6 @@ import lucuma.core.model.Semester
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.CallForProposalsType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*

@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.CallForProposalsType
+import lucuma.core.enums.CallForProposalsType
 
 val CallForProposalsTypeBinding: Matcher[CallForProposalsType] =
   enumeratedBinding

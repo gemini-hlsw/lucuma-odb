@@ -8,8 +8,8 @@ import cats.effect.IO
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.model.Semester
-import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class createGroup extends OdbSuite {
 

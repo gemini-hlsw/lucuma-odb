@@ -9,13 +9,13 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.CallForProposalsType.DemoScience
 
 class constraintSetGroup extends OdbSuite {
 
