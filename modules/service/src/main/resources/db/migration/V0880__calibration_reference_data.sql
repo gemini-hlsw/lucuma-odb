@@ -9,7 +9,7 @@ alter table t_target
 add column c_calibration_role e_calibration_role null;
 
 -- Drop constraints/trigger that are no longer needed because c_role is dropped
-alter table t_asterism_target 
+alter table t_asterism_target
 drop constraint asterism_target_is_science;
 
 drop trigger t_target_role_immutable_trigger on t_target;
@@ -28,3 +28,5 @@ create view v_target as
   case when c_sid_parallax     is not null then c_target_id end as c_sid_parallax_id,
   case when c_sid_rv           is not null then c_target_id end as c_sid_rv_id
   from t_target;
+
+drop type e_target_role;
