@@ -478,7 +478,7 @@ object OdbMapping {
 
         }
 
-  /** 
+  /**
    * A minimal read-only mapping that only knows how to return enum metadata. Other queries will
    * fail with errors.
    */
@@ -521,7 +521,7 @@ object OdbMapping {
 
       override val selectElaborator: SelectElaborator =
         SelectElaborator(QueryElaborator)
-    
+
     }
-        
+
 }
