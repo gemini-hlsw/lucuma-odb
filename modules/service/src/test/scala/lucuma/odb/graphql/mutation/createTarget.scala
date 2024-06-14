@@ -13,7 +13,6 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.TargetRole
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -158,7 +157,7 @@ class createTarget extends OdbSuite {
 
           // The create target mutation only creates science targets.
           val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
-          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
+          getCalibrationRoleFromDb(id).map(role => assert(role.isEmpty))
         }
     }
   }
@@ -235,7 +234,7 @@ class createTarget extends OdbSuite {
 
           // The create target mutation only creates science targets.
           val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
-          getTargetRoleFromDb(id).map(role => assertEquals(role, TargetRole.Science))
+          getCalibrationRoleFromDb(id).map(role => assert(role.isEmpty))
         }
     }
   }

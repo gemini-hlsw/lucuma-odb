@@ -11,12 +11,12 @@ import skunk.codec.all.*
 trait TargetView[F[_]] extends BaseMapping[F] {
 
   object TargetView extends TableDef("v_target") {
-    val ProgramId     = col("c_program_id", program_id)
-    val TargetId      = col("c_target_id", target_id)
-    val Name          = col("c_name", text_nonempty)
-    val Existence     = col("c_existence", existence)
-    val SourceProfile = col("c_source_profile", jsonb)
-    val Role          = col("c_role", target_role)
+    val ProgramId       = col("c_program_id", program_id)
+    val TargetId        = col("c_target_id", target_id)
+    val Name            = col("c_name", text_nonempty)
+    val Existence       = col("c_existence", existence)
+    val SourceProfile   = col("c_source_profile", jsonb)
+    val CalibrationRole = col("c_calibration_role", calibration_role.opt)
     object Sidereal {
       val SyntheticId    = col("c_sidereal_id", target_id.embedded)
       val Ra             = col("c_sid_ra", right_ascension.embedded)
@@ -43,10 +43,10 @@ trait TargetView[F[_]] extends BaseMapping[F] {
       }
     }
     object Nonsidereal {
-      val SyntheticId    = col("c_nonsidereal_id", target_id.embedded)
-      val Des     = col("c_nsid_des", varchar.embedded)
-      val KeyType = col("c_nsid_key_type", ephemeris_key_type.embedded)
-      val Key     = col("c_nsid_key", varchar.embedded)
+      val SyntheticId = col("c_nonsidereal_id", target_id.embedded)
+      val Des         = col("c_nsid_des", varchar.embedded)
+      val KeyType     = col("c_nsid_key_type", ephemeris_key_type.embedded)
+      val Key         = col("c_nsid_key", varchar.embedded)
     }
   }
 

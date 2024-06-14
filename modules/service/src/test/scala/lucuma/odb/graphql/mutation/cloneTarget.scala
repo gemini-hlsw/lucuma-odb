@@ -54,8 +54,8 @@ class cloneTarget extends OdbSuite {
           assertNotEquals(origId, newId)
 
           // The target roles should match
-          (getTargetRoleFromDb(origId), getTargetRoleFromDb(newId)).parMapN((oldRole, newRole) => 
-            assertEquals(oldRole, newRole)
+          (getCalibrationRoleFromDb(origId), getCalibrationRoleFromDb(newId)).parMapN((oldCalib, newCalib) =>
+            assertEquals(oldCalib, newCalib)
           )
         }
       }
@@ -119,7 +119,7 @@ class cloneTarget extends OdbSuite {
       """,
       expected = Left(List("No such target: t-ffff"))
     )
-  }                
+  }
 
   test("clone with bogus update") {
     createProgramAs(pi).flatMap { pid =>
@@ -171,9 +171,9 @@ class cloneTarget extends OdbSuite {
     }
   }
 
-  test("clone a guide target") {
+  test("clone a calibration target") {
     createProgramAs(pi).flatMap { pid =>
-      createGuideTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
         expect(
           user = pi,
           query = s"""
@@ -181,13 +181,23 @@ class cloneTarget extends OdbSuite {
               cloneTarget(input: {
                 targetId: "$tid"
               }) {
-                newTarget {
+                originalTarget {
                   id
                 }
               }
             }
           """,
-          expected = Left(List(s"No such target: $tid"))
+          expected = Right(
+            json"""{
+                "cloneTarget" : {
+                  "originalTarget" :
+                    {
+                      "id" : $tid
+                    }
+                }
+              }
+            """
+          )
         )
       }
     }
@@ -197,19 +207,19 @@ class cloneTarget extends OdbSuite {
 
     def cloneTarget(tid: Target.Id, oids: List[Observation.Id]): IO[Target.Id] =
       query(pi, s"""
-        mutation { 
-          cloneTarget(input: { 
+        mutation {
+          cloneTarget(input: {
             targetId: "$tid"
             REPLACE_IN: ${oids.asJson}
-          }) { 
+          }) {
             newTarget { id }
-          } 
+          }
         }
       """).map(_.hcursor.downFields("cloneTarget", "newTarget", "id").require[Target.Id])
 
     def asterism(oid: Observation.Id): IO[List[Target.Id]] =
       query(pi, s"""
-        query { 
+        query {
           observation(observationId: "$oid") {
             targetEnvironment {
               asterism {

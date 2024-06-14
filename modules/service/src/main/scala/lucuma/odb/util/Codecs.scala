@@ -46,6 +46,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -57,7 +58,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
-import lucuma.odb.data.TargetRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
@@ -463,8 +463,8 @@ trait Codecs {
   val target_id: Codec[Target.Id] =
     gid[Target.Id]
 
-  val target_role: Codec[TargetRole] =
-    enumerated(Type("e_target_role"))
+  val calibration_role: Codec[CalibrationRole] =
+    enumerated(Type("e_calibration_role"))
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)

@@ -120,9 +120,9 @@ class updateTargets extends OdbSuite {
     }
   }
 
-  test("update guide target (not updated)") {
+  test("update calibration targets is allowed directly with the id") {
     createProgramAs(pi).flatMap { pid =>
-      createGuideTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
        expect(
         user = pi,
         query = s"""
@@ -146,8 +146,10 @@ class updateTargets extends OdbSuite {
           json"""
             {
               "updateTargets" : {
-                "targets" : [
-                ]
+                "targets" : [ { 
+                  "id" : $tid, 
+                  "name" : "New Guía" 
+                } ]
               }
             }
           """

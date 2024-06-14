@@ -28,7 +28,6 @@ import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.TargetRole
 import lucuma.odb.json.all.query.given
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -319,8 +318,7 @@ object AsterismService {
           and a.c_program_id = $program_id
           and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
-          and t.c_role = $target_role
-      """.apply(pid, oid, TargetRole.Science) |+| andWhereUserAccess(user, pid)
+      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
   }
 
   object Decoders {

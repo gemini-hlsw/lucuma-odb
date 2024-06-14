@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -67,6 +68,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
       LeafMapping[AtomStage](AtomStageType),
+      LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
       LeafMapping[CatalogName](CatalogNameType),

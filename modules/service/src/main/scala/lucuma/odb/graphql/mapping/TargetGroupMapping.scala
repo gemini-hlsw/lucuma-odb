@@ -34,14 +34,14 @@ trait TargetGroupMapping[F[_]]
 
   lazy val TargetGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (
-      TargetGroupType, 
-      "observations", 
+      TargetGroupType,
+      "observations",
       List(
         BooleanBinding("includeDeleted", rIncludeDeleted),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
       )
-    ) => 
+    ) =>
       Elab.transformChild { child =>
         (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
