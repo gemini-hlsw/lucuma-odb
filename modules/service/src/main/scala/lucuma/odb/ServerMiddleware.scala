@@ -52,7 +52,7 @@ object ServerMiddleware {
   def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => u.scheme === Scheme.https && domain.exists(u.host.value.endsWith))
+      .withAllowOriginHost(u => domain.exists(u.host.value.endsWith))
       .withMaxAge(1.day)
       .apply
 
