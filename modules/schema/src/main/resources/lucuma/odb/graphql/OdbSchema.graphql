@@ -3937,6 +3937,7 @@ input ProgramReferencePropertiesInput {
   library:       ProgramReferencePropertiesLibraryInput
   monitoring:    ProgramReferencePropertiesMonitoringInput
   science:       ProgramReferencePropertiesScienceInput
+  system:        ProgramReferencePropertiesSystemInput
 }
 
 type SetProgramReferenceResult {
@@ -3997,6 +3998,13 @@ Inputs required when updating or switching to a science program.
 input ProgramReferencePropertiesScienceInput {
   semester:       Semester!
   scienceSubtype: ScienceSubtype!
+}
+
+"""
+Inputs required when updating or switching to a system program.
+"""
+input ProgramReferencePropertiesSystemInput {
+  description: NonEmptyString!
 }
 
 """
@@ -8370,6 +8378,11 @@ type ScienceProgramReference implements ProgramReference {
   semesterIndex:  PosInt!
 }
 
+type SystemProgramReference implements ProgramReference {
+  label:         ProgramReferenceLabel!
+  type:          ProgramType!
+}
+
 """
 Program reference, formatted according to the type.  For example, a Science
 Program has format G-YYYY[AB]-NNNN+-[CDLFSV]. For example, G-2024B-1234-Q
@@ -8398,6 +8411,7 @@ enum ProgramType {
   EXAMPLE
   LIBRARY
   SCIENCE
+  SYSTEM
 }
 
 

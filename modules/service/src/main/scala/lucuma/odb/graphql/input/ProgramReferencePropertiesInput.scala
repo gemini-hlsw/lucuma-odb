@@ -22,7 +22,8 @@ case class ProgramReferencePropertiesInput(
          ProgramReferencePropertiesExampleInput       |
          ProgramReferencePropertiesLibraryInput       |
          ProgramReferencePropertiesMonitoringInput    |
-         ProgramReferencePropertiesScienceInput
+         ProgramReferencePropertiesScienceInput       |
+         ProgramReferencePropertiesSystemInput
 ) {
 
   def programType: ProgramType =
@@ -34,11 +35,13 @@ case class ProgramReferencePropertiesInput(
       case ProgramReferencePropertiesLibraryInput(_, _)       => ProgramType.Library
       case ProgramReferencePropertiesMonitoringInput(_, _)    => ProgramType.Monitoring
       case ProgramReferencePropertiesScienceInput(_, _)       => ProgramType.Science
+      case ProgramReferencePropertiesSystemInput(_)           => ProgramType.System
     }
 
   def description: Option[ProgramReference.Description] =
     input match {
       case ProgramReferencePropertiesLibraryInput(_, d) => d.some
+      case ProgramReferencePropertiesSystemInput(d)     => d.some
       case _                                            => none
     }
 
@@ -82,17 +85,19 @@ object ProgramReferencePropertiesInput {
         ProgramReferencePropertiesExampleInput.Binding.Option("example", rXpl),
         ProgramReferencePropertiesLibraryInput.Binding.Option("library", rLib),
         ProgramReferencePropertiesMonitoringInput.Binding.Option("monitoring", rMon),
-        ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci)
-      ) => (rCal, rCom, rEng, rXpl, rLib, rMon, rSci).parTupled.flatMap {
-         case (Some(cal), None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
-         case (None, Some(com), None, None, None, None, None) => ProgramReferencePropertiesInput(com).success
-         case (None, None, Some(eng), None, None, None, None) => ProgramReferencePropertiesInput(eng).success
-         case (None, None, None, Some(xpl), None, None, None) => ProgramReferencePropertiesInput(xpl).success
-         case (None, None, None, None, Some(lib), None, None) => ProgramReferencePropertiesInput(lib).success
-         case (None, None, None, None, None, Some(mon), None) => ProgramReferencePropertiesInput(mon).success
-         case (None, None, None, None, None, None, Some(sci)) => ProgramReferencePropertiesInput(sci).success
+        ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci),
+        ProgramReferencePropertiesSystemInput.Binding.Option("system", rSys)
+      ) => (rCal, rCom, rEng, rXpl, rLib, rMon, rSci, rSys).parTupled.flatMap {
+         case (Some(cal), None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
+         case (None, Some(com), None, None, None, None, None, None) => ProgramReferencePropertiesInput(com).success
+         case (None, None, Some(eng), None, None, None, None, None) => ProgramReferencePropertiesInput(eng).success
+         case (None, None, None, Some(xpl), None, None, None, None) => ProgramReferencePropertiesInput(xpl).success
+         case (None, None, None, None, Some(lib), None, None, None) => ProgramReferencePropertiesInput(lib).success
+         case (None, None, None, None, None, Some(mon), None, None) => ProgramReferencePropertiesInput(mon).success
+         case (None, None, None, None, None, None, Some(sci), None) => ProgramReferencePropertiesInput(sci).success
+         case (None, None, None, None, None, None, None, Some(sys)) => ProgramReferencePropertiesInput(sys).success
          case _                                               =>
-           Result.failure("Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring' or 'science' expected.")
+           Result.failure("Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring', 'science' or 'system' expected.")
       }
     }
 

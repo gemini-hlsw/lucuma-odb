@@ -43,7 +43,9 @@ trait ProgramReferenceMapping[F[_]]
       import lucuma.core.enums.{ProgramType => PT}
 
       override def discriminate(c: Cursor): Result[Type] =
-        c.fieldAs[PT]("type").flatMap {
+        val m = c.fieldAs[PT]("type")
+        println(s"m: $m")
+        m.flatMap {
           case PT.Calibration   => Result(CalibrationProgramReferenceType)
           case PT.Commissioning => Result(CommissioningProgramReferenceType)
           case PT.Engineering   => Result(EngineeringProgramReferenceType)
@@ -51,12 +53,14 @@ trait ProgramReferenceMapping[F[_]]
           case PT.Library       => Result(LibraryProgramReferenceType)
           case PT.Monitoring    => Result(MonitoringProgramReferenceType)
           case PT.Science       => Result(ScienceProgramReferenceType)
+          case PT.System        => Result(SystemProgramReferenceType)
         }
 
       private def mkPredicate(tpe: PT): Option[Predicate] =
         Eql(ProgramReferenceType / "type", Const(tpe)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
+        println(s"m: $tpe")
         tpe match {
           case CalibrationProgramReferenceType   => mkPredicate(PT.Calibration)
           case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)
@@ -65,6 +69,7 @@ trait ProgramReferenceMapping[F[_]]
           case LibraryProgramReferenceType       => mkPredicate(PT.Library)
           case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
           case ScienceProgramReferenceType       => mkPredicate(PT.Science)
+          case SystemProgramReferenceType        => mkPredicate(PT.System)
           case _                                 => none
         }
     }
@@ -90,6 +95,11 @@ trait ProgramReferenceMapping[F[_]]
     ObjectMapping(ExampleProgramReferenceType)(
       SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
       SqlField("instrument",    ProgramReferenceView.Instrument)
+    )
+
+  lazy val SystemProgramReferenceMapping: ObjectMapping =
+    ObjectMapping(SystemProgramReferenceType)(
+      SqlField("id", ProgramReferenceView.Id, key = true, hidden = true)
     )
 
   lazy val LibraryProgramReferenceMapping: ObjectMapping =

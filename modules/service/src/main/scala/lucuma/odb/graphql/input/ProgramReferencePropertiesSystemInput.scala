@@ -4,26 +4,22 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
-import lucuma.core.enums.Instrument
-import lucuma.core.model.ProgramReference
-import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.DescriptionBinding
+import lucuma.core.model.ProgramReference
 
-case class ProgramReferencePropertiesLibraryInput(
-  instrument: Instrument,
+case class ProgramReferencePropertiesSystemInput(
   description: ProgramReference.Description
 )
 
-object ProgramReferencePropertiesLibraryInput {
+object ProgramReferencePropertiesSystemInput {
 
-  val Binding: Matcher[ProgramReferencePropertiesLibraryInput] =
+  val Binding: Matcher[ProgramReferencePropertiesSystemInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        InstrumentBinding("instrument", rInstrument),
         DescriptionBinding("description", rDescription)
-      ) => (rInstrument, rDescription).parMapN(apply)
+      ) => rDescription.map(apply)
     }
 
 }

@@ -17,7 +17,7 @@
   <logger name="org.testcontainers" level="WARN" />
   <logger name="org.http4s.server.service-errors" level="OFF" />
   <logger name="lucuma-odb-test-attachments" level="OFF" />
-  <logger name="lucuma.odb.Main" level="INFO"/>
+  <logger name="lucuma.odb.Main" level="WARN"/>
 
   <root level="WARN">
     <appender-ref ref="STDOUT" />
