@@ -10,9 +10,11 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
+import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -27,6 +29,14 @@ class createTarget extends OdbSuite {
   val service  = TestUsers.service(nextId)
 
   lazy val validUsers = List(pi, pi2, pi3, ngo, staff, admin, guest, service)
+
+  // Unsafe convenience for testing.
+  extension (s: String) {
+    def programReference: ProgramReference =
+      ProgramReference.fromString.unsafeGet(s)
+  }
+
+  val specPhoto  = "SYS-SPECTROPHOTOMETRIC".programReference
 
   test("[general] create a sidereal target") {
     createProgramAs(pi).flatMap { pid =>
@@ -279,6 +289,81 @@ class createTarget extends OdbSuite {
       }
     }
   }
+
+  test("[calibration target] generate a calibration target by putting it in a program with a calibration role") {
+    fetchPid(staff, specPhoto).flatMap { pid =>
+      query(staff,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Crunchy Target"
+                  sidereal: {
+                    ra: {
+                      degrees: "12.345"
+                    }
+                    dec: {
+                      degrees: "45.678"
+                    }
+                    epoch: "J2000.000"
+                    properMotion: {
+                      ra: {
+                        milliarcsecondsPerYear: "12.345"
+                      }
+                      dec: {
+                        milliarcsecondsPerYear: "-7.0"
+                      }
+                    }
+                    radialVelocity: {
+                      centimetersPerSecond: "78"
+                    }
+                    parallax: {
+                      microarcseconds: "123456"
+                    }
+                    catalogInfo: {
+                      name: SIMBAD
+                      id: "arbitrary"
+                      objectType: "also arbitrary"
+                    }
+                  }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target {
+                calibrationRole
+              }
+              targetId: target { id }
+            }
+          }
+        """).flatMap { js =>
+          val expected = json"""
+            {
+              "calibrationRole": "SPECTROPHOTOMETRIC"
+            }
+          """
+
+          val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
+          assertEquals(data, expected)
+
+          // The create target mutation only creates science targets.
+          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          getCalibrationRoleFromDb(id).map(role => assertEquals(role, CalibrationRole.SpectroPhotometric.some))
+        }
+    }
+  }
+
 }
 
 
