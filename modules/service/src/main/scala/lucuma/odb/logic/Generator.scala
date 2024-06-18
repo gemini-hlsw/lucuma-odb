@@ -41,10 +41,10 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
-import lucuma.core.model.sequence.gmos.StaticConfig.{ GmosNorth as GmosNorthStatic }
-import lucuma.core.model.sequence.gmos.DynamicConfig.{ GmosNorth as GmosNorthDynamic }
-import lucuma.core.model.sequence.gmos.StaticConfig.{ GmosSouth as GmosSouthStatic }
-import lucuma.core.model.sequence.gmos.DynamicConfig.{ GmosSouth as GmosSouthDynamic }
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
+import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
+import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
