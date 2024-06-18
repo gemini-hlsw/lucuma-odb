@@ -483,7 +483,7 @@ object ObservationService {
           }
  
         val optCfpId: F[Option[CallForProposals.Id]] = 
-          session.option(Statements.ProgramCfpId)(pid)
+          session.option(Statements.ProgramCfpId)(pid).map(_.flatten)
 
         def validateAsterismRaDec(
           raStart: RightAscension,
@@ -1048,12 +1048,12 @@ object ObservationService {
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
 
-    val ProgramCfpId: Query[Program.Id, CallForProposals.Id] =
+    val ProgramCfpId: Query[Program.Id, Option[CallForProposals.Id]] =
       sql"""
         SELECT c_cfp_id
         FROM t_proposal
         WHERE c_program_id = $program_id
-      """.query(cfp_id)
+      """.query(cfp_id.opt)
 
     val ObservationValidationInfo: 
       Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
