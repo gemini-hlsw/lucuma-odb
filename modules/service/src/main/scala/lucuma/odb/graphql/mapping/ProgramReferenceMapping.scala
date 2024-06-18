@@ -43,9 +43,7 @@ trait ProgramReferenceMapping[F[_]]
       import lucuma.core.enums.{ProgramType => PT}
 
       override def discriminate(c: Cursor): Result[Type] =
-        val m = c.fieldAs[PT]("type")
-        println(s"m: $m")
-        m.flatMap {
+        c.fieldAs[PT]("type").flatMap {
           case PT.Calibration   => Result(CalibrationProgramReferenceType)
           case PT.Commissioning => Result(CommissioningProgramReferenceType)
           case PT.Engineering   => Result(EngineeringProgramReferenceType)
@@ -60,7 +58,6 @@ trait ProgramReferenceMapping[F[_]]
         Eql(ProgramReferenceType / "type", Const(tpe)).some
 
       override def narrowPredicate(tpe: Type): Option[Predicate] =
-        println(s"m: $tpe")
         tpe match {
           case CalibrationProgramReferenceType   => mkPredicate(PT.Calibration)
           case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)

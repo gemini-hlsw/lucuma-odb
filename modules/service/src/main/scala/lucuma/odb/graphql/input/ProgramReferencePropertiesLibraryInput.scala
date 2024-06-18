@@ -6,10 +6,10 @@ package lucuma.odb.graphql.input
 import cats.syntax.parallel.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.ProgramReference
+import lucuma.odb.graphql.binding.DescriptionBinding
 import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.DescriptionBinding
 
 case class ProgramReferencePropertiesLibraryInput(
   instrument: Instrument,
