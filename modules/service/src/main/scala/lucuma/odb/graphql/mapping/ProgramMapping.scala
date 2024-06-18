@@ -15,6 +15,7 @@ import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.enums.Partner
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -49,7 +50,8 @@ trait ProgramMapping[F[_]]
      with ResultMapping[F]
      with GroupElementView[F]
      with UserInvitationTable[F]
-     with KeyValueEffectHandler[F] {
+     with KeyValueEffectHandler[F]
+     with AllocationTable[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -79,6 +81,7 @@ trait ProgramMapping[F[_]]
       EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
+      SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
     )
     
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -149,6 +152,12 @@ trait ProgramMapping[F[_]]
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
       }
+
+    case (ProgramType, "allocations", Nil) =>
+      Elab.transformChild { child =>
+        OrderBy(OrderSelections(List(OrderSelection[Partner](AllocationType / "partner"))), child)
+      }
+
   }
 
   private lazy val timeEstimateHandler: EffectHandler[F] =
