@@ -8296,6 +8296,11 @@ type Program {
   """
   userInvitations: [UserInvitation!]!
 
+  """
+  All partner time allocations.
+  """
+  allocations: [Allocation!]!
+
 }
 
 """
