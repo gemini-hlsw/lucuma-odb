@@ -197,6 +197,41 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
     }
   }
   
+  test("no validations with CfP") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCallForProposalsAs(staff)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
+      )
+    }
+  }
+  
+  test("no validations with no CfP") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
+      )
+    }
+  }
+  
   test("missing target info, invalid instrument") {
     val setup: IO[(Target.Id, Observation.Id)] =
       for {
