@@ -15,6 +15,7 @@ import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.enums.Partner
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -35,7 +36,6 @@ import lucuma.odb.service.Services
 import Services.Syntax.*
 import binding.*
 import table.*
-import lucuma.core.enums.Partner
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
