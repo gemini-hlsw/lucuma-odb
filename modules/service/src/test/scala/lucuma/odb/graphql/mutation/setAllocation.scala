@@ -10,6 +10,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import io.circe.literal.*
 
 class setAllocation extends OdbSuite {
 
@@ -37,6 +38,50 @@ class setAllocation extends OdbSuite {
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
         setAllocationAs(user, pid, Partner.US, TimeSpan.fromHours(hours).get)
       }
+    }
+  }
+
+  test("should be able to read allocations back") {
+    createProgramAs(pi).flatMap { pid =>
+      setAllocationAs(staff, pid, Partner.US, TimeSpan.fromHours(1.23).get) >>
+      setAllocationAs(staff, pid, Partner.CA, TimeSpan.fromHours(4.56).get) >>
+      expect(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              allocations {
+                partner
+                duration {
+                  hours
+                }              
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "program" : {
+                "allocations" : [
+                  {
+                    "partner" : "CA",
+                    "duration" : {
+                      "hours" : 4.560000
+                    }
+                  },
+                  {
+                    "partner" : "US",
+                    "duration" : {
+                      "hours" : 1.230000
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
     }
   }
 
