@@ -6,11 +6,11 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.literal.*
 import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import io.circe.literal.*
 
 class setAllocation extends OdbSuite {
 
