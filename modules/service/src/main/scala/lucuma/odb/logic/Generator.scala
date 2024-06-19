@@ -48,6 +48,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.defaultExpandAndFilter
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.CalLocation
 import lucuma.odb.sequence.data.Completion
@@ -386,37 +387,9 @@ object Generator {
         expander: SmartGcalExpander[F, D],
         calc:     TimeEstimateCalculator[S, D],
         comp:     Completion.SequenceMatch[D]
-      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = {
-
-        type MatchState[A] = State[Completion.SequenceMatch[D], A]
-        import Completion.SequenceMatch.matchAny
-
-          // Do smart-gcal expansion
-        _.through(expander.expandSequence)
-
-          // Number the atoms, because executed atoms will be filtered out but
-          // we need the correct index to always calculate the same Atom.Id.
-          .zipWithIndex.map { case (e, index) => e.tupleRight(index) }
-
-          // Mark the atoms with true (excuted) or false (not executed)
-          .mapAccumulate(comp) { case (state, eAtom) =>
-            val nextAtom = for {
-              (atom, index) <- EitherT.fromEither[MatchState](eAtom)
-              visit         <- EitherT.liftF(matchAny(atom))
-            } yield (atom, index, visit.isDefined)
-
-            nextAtom.value.run(state).value
-          }
-
-          // dump the state and keep only un-executed atoms
-          .collect {
-            case (_, Left(error))               => Left(error)
-            case (_, Right(atom, index, false)) => Right((atom, index))
-          }
-
-          // Add step estimates
-         .through(calc.estimateSequence[F](static))
-      }
+      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
+        _.through(defaultExpandAndFilter(expander, comp))
+         .through(calc.estimateSequence[F](static)) // Add step estimates
 
       private def gmosLongslitScienceExpandAndEstimatePipe[S, D](
         static:   S,
