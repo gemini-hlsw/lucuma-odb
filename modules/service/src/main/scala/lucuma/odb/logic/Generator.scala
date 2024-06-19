@@ -374,10 +374,9 @@ object Generator {
         generator:      gmos.longslit.Generator[S, D, G, L, U]
       ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, SimpleAtom[D]]] =
         EitherT.fromEither[F](
-          generator.generate(acquisitionItc, scienceItc, config) match {
-            case Left(msg)    => InvalidData(oid, msg).asLeft
-            case Right(proto) => ProtoExecutionConfig(proto.static, proto.acquisition, proto.science.take(scienceItc.exposures.value)).asRight
-          }
+          generator
+            .generate(acquisitionItc, scienceItc, config)
+            .leftMap(s => InvalidData(oid, s))
         )
 
       // Performs smart-gcal expansion and time estimate calculation.
