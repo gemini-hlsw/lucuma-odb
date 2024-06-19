@@ -48,6 +48,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.CalLocation
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
@@ -191,7 +192,7 @@ object Generator {
 
       import Error.*
 
-      private val exp = SmartGcalExpander.fromService(smartGcalService)
+      private val exp = SmartGcalImplementation.fromService(smartGcalService)
 
       private case class Context(
         pid:    Program.Id,
@@ -380,9 +381,9 @@ object Generator {
         )
 
       // Performs smart-gcal expansion and time estimate calculation.
-      private def simpleExpandAndEstimatePipe[S, K, D](
+      private def simpleExpandAndEstimatePipe[S, D](
         static:   S,
-        expander: SmartGcalExpander[F, K, D],
+        expander: SmartGcalExpander[F, D],
         calc:     TimeEstimateCalculator[S, D],
         comp:     Completion.SequenceMatch[D]
       ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = {
@@ -391,7 +392,7 @@ object Generator {
         import Completion.SequenceMatch.matchAny
 
           // Do smart-gcal expansion
-        _.through(expander.expand)
+        _.through(expander.expandSequence)
 
           // Number the atoms, because executed atoms will be filtered out but
           // we need the correct index to always calculate the same Atom.Id.
@@ -417,9 +418,9 @@ object Generator {
          .through(calc.estimateSequence[F](static))
       }
 
-      private def gmosLongslitScienceExpandAndEstimatePipe[S, K, D](
+      private def gmosLongslitScienceExpandAndEstimatePipe[S, D](
         static:   S,
-        expander: SmartGcalExpander[F, K, D],
+        expander: SmartGcalExpander[F, D],
         calc:     TimeEstimateCalculator[S, D],
         comp:     Completion.SequenceMatch[D]
       ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = { (s: Stream[F, SimpleAtom[D]]) =>
@@ -481,7 +482,7 @@ object Generator {
           .map(_._2)
 
           // Do smart-gcal expansion
-        s.through(expander.expand)
+        s.through(expander.expandSequence)
 
           // Add corresponding arcs
          .through(zipWithArc)
@@ -533,9 +534,9 @@ object Generator {
       }
 
       // Performs smart-gcal expansion and time estimate calculation.
-      private def gmosLongslitExpandAndEstimate[S, K, D](
+      private def gmosLongslitExpandAndEstimate[S, D](
         proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
-        expander: SmartGcalExpander[F, K, D],
+        expander: SmartGcalExpander[F, D],
         calc:     TimeEstimateCalculator[S, D],
         comState: Completion.Matcher[D]
       ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] =
