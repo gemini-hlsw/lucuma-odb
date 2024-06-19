@@ -62,6 +62,7 @@ sealed abstract class Generator[S, D, G, F, U](
           Stream(ProtoAtom.of("Acquisition - Initial", acq.ccd2, acq.p10, acq.slit)) ++
             Stream(ProtoAtom.of("Acquisition - Slit", acq.slit)).repeat,
           sci.map(a => ProtoAtom(a.description.some, a.steps))
+             .take(scienceItc.exposures.value)
         )
       ).toRight("ITC prescribes 0 exposures.")
 
