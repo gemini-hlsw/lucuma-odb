@@ -52,7 +52,7 @@ class GitHub_249 extends OdbSuite {
         oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
         oid4 <- createObservationAs(user, pid)
         _    <- deleteTarget(user, tids(0))
-        _  <- expect(
+        _    <- expect(
           user = user,
           query =
             s"""
@@ -80,11 +80,14 @@ class GitHub_249 extends OdbSuite {
                       "observations" : {
                         "matches" : [
                           {
-                            "id" : $oid4
+                            "id" : $oid0
                           }
                         ]
                       },
                       "asterism" : [
+                        {
+                          "id" : ${tids(3)}
+                        }
                       ]
                     },
                     {
@@ -97,11 +100,22 @@ class GitHub_249 extends OdbSuite {
                       },
                       "asterism" : [
                         {
-                          "id" : ${tids(1)}
+                          "id" : ${tids(2)}
                         },
                         {
-                          "id" : ${tids(2)}
+                          "id" : ${tids(1)}
                         }
+                      ]
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid4
+                          }
+                        ]
+                      },
+                      "asterism" : [
                       ]
                     },
                     {
@@ -118,20 +132,6 @@ class GitHub_249 extends OdbSuite {
                       "asterism" : [
                         {
                           "id" : ${tids(1)}
-                        }
-                      ]
-                    },
-                    {
-                      "observations" : {
-                        "matches" : [
-                          {
-                            "id" : $oid0
-                          }
-                        ]
-                      },
-                      "asterism" : [
-                        {
-                          "id" : ${tids(3)}
                         }
                       ]
                     }
