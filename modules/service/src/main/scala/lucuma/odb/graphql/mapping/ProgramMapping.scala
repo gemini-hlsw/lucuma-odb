@@ -82,8 +82,9 @@ trait ProgramMapping[F[_]]
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
+      SqlField("calibrationRole", ProgramTable.CalibrationRole),
     )
-    
+
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
 
     case (ProgramType, "observations", List(

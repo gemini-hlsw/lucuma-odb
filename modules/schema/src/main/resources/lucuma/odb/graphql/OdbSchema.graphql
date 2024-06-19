@@ -8309,6 +8309,10 @@ type Program {
   """
   allocations: [Allocation!]!
 
+  """
+  Calibration role of the program
+  """
+  calibrationRole: CalibrationRole
 }
 
 """

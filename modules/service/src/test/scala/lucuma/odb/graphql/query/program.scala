@@ -20,8 +20,9 @@ class program extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val guest    = TestUsers.guest(2)
   val service  = TestUsers.service(3)
+  val staff    = TestUsers.Standard.staff(4, 104)
 
-  val validUsers = List(pi, guest, service)
+  val validUsers = List(pi, guest, service, staff)
 
   override val httpRequestHandler = invitationEmailRequestHandler
 
@@ -318,4 +319,53 @@ class program extends OdbSuite {
     }
   }
 
+  test("program without calibration role") {
+    createProgramAs(pi, "program without calibration role").flatMap { pid =>
+      expect(
+        user = staff,
+        query =
+          s"""
+            query {
+              program(programId: "$pid") {
+                calibrationRole
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "program": {
+                  "calibrationRole": null
+                }
+              }
+            """
+          )
+
+      )
+    }
+  }
+
+  test("program with calibration role") {
+    expect(
+      user = staff,
+      query =
+        s"""
+          query {
+            program(programId: "p-10") {
+              calibrationRole
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "calibrationRole": "SPECTROPHOTOMETRIC"
+              }
+            }
+          """
+        )
+
+    )
+  }
 }
