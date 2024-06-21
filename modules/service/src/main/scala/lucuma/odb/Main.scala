@@ -205,6 +205,7 @@ object FMain extends MainParams {
       config.itcClient,
       config.commitHash,
       config.ssoClient,
+      config.corsOverHttps,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
       S3FileService.s3PresignerResource(config.aws),
@@ -219,6 +220,7 @@ object FMain extends MainParams {
     itcClientResource:   Resource[F, ItcClient[F]],
     commitHash:          CommitHash,
     ssoClientResource:   Resource[F, SsoClient[F, User]],
+    corsOverHttps:       Boolean,
     domain:              List[String],
     s3OpsResource:       Resource[F, S3AsyncClientOp[F]],
     s3PresignerResource: Resource[F, S3Presigner],
@@ -230,7 +232,7 @@ object FMain extends MainParams {
       ssoClient         <- ssoClientResource
       httpClient        <- httpClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
-      middleware        <- Resource.eval(ServerMiddleware(domain, ssoClient, userSvc))
+      middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculator.fromSession(_, enums)))
       graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)

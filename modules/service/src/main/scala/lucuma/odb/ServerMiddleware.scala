@@ -49,10 +49,10 @@ object ServerMiddleware {
     )
 
   /** A middleware that adds CORS headers. The origin must match the cookie domain. */
-  def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
+  def cors[F[_]: Monad](corsOverHttps: Boolean, domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => u.scheme === Scheme.https && domain.exists(u.host.value.endsWith))
+      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(u.host.value.endsWith))
       .withMaxAge(1.day)
       .apply
 
@@ -101,13 +101,14 @@ object ServerMiddleware {
 
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Trace: Logger](
+    corsOverHttps: Boolean,
     domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =
     userCache(client, userService).map { userCache =>
       List[Middleware[F]](
-        cors(domain),
+        cors(corsOverHttps, domain),
         logging,
         natchez,
         traceUser(client),

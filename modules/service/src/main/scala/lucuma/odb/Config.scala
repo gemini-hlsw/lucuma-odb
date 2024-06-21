@@ -37,16 +37,17 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
-  port:       Port,             // Our port, nothing fancy.
-  itc:        Config.Itc,       // ITC config
-  sso:        Config.Sso,       // SSO config
-  serviceJwt: String,           // Only service users can exchange API keys, so we need a service user JWT.
-  honeycomb:  Config.Honeycomb, // Honeycomb config
-  database:   Config.Database,  // Database config
-  aws:        Config.Aws,       // AWS config
-  email:      Config.Email,     // Mailgun config
-  domain:     List[String],     // Domains, for CORS headers
-  commitHash: CommitHash        // From Heroku Dyno Metadata
+  port:          Port,             // Our port, nothing fancy.
+  itc:           Config.Itc,       // ITC config
+  sso:           Config.Sso,       // SSO config
+  serviceJwt:    String,           // Only service users can exchange API keys, so we need a service user JWT.
+  honeycomb:     Config.Honeycomb, // Honeycomb config
+  database:      Config.Database,  // Database config
+  aws:           Config.Aws,       // AWS config
+  email:         Config.Email,     // Mailgun config
+  corsOverHttps: Boolean,          // Whether to require CORS over HTTPS
+  domain:        List[String],     // Domains, for CORS headers
+  commitHash:    CommitHash        // From Heroku Dyno Metadata
 ) {
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -171,7 +172,7 @@ object Config {
       envOrProp("ODB_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
-    
+
   }
 
   case class Aws(
@@ -279,6 +280,7 @@ object Config {
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCirrus,
+    envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").map(_.split(",").map(_.trim).toList).as[List[String]],
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
   ).parMapN(Config.apply)
