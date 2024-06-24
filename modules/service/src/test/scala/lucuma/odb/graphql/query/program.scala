@@ -351,21 +351,27 @@ class program extends OdbSuite {
       query =
         s"""
           query {
-            program(programId: "p-10") {
-              calibrationRole
-            }
-          }
-        """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "calibrationRole": "SPECTROPHOTOMETRIC"
+            programs(WHERE: {type: {EQ: SYSTEM}}) {
+                matches {
+                  calibrationRole
+                }
               }
             }
-          """
-        )
+          """,
+          expected = Right(
+            json"""
+              {
+                "programs": {
+                  "matches": [
+                    {
+                      "calibrationRole": "SPECTROPHOTOMETRIC"
+                    }
+                  ]
+                }
+              }
+            """
+          )
 
-    )
+      )
+    }
   }
-}
