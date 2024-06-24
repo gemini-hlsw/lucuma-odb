@@ -211,3 +211,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- Forbid changing calibration role
+CREATE OR REPLACE FUNCTION forbid_calibration_role_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.c_calibration_role IS DISTINCT FROM OLD.c_calibration_role THEN
+    RAISE EXCEPTION 'Modification of calibration role is not allowed';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER forbid_calibration_role_change_trigger
+BEFORE UPDATE ON t_program
+FOR EACH ROW
+EXECUTE FUNCTION forbid_calibration_role_change();
