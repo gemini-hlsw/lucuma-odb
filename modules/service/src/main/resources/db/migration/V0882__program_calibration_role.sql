@@ -3,7 +3,6 @@
 alter table t_program
 add column c_calibration_role e_calibration_role null;
 
-ALTER TYPE e_program_type ADD VALUE 'system';
 INSERT INTO t_program_type VALUES ('system', 'SYS', 'System', false);
 
 -- Create a trigger function
