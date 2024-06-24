@@ -76,7 +76,7 @@ ALTER TABLE t_program
       END
   );
 
--- Update the update_program_type function to handle COM and MON
+-- Update the update_program_type function to handle SYS
 CREATE OR REPLACE FUNCTION update_program_type()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -113,6 +113,9 @@ BEGIN
 
       WHEN NEW.c_program_type = 'system' THEN
         BEGIN
+          IF NEW.c_library_desc IS NULL THEN
+            RAISE EXCEPTION 'System programs must define a description';
+          END IF;
           NEW.c_semester        := NULL;
           NEW.c_semester_index  := NULL;
           NEW.c_science_subtype := NULL;
