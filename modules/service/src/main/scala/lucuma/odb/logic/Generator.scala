@@ -5,31 +5,23 @@ package lucuma.odb.logic
 
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.data.State
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
-import fs2.Pipe
-import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
@@ -48,10 +40,6 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.sequence.defaultExpandAndFilter
-import lucuma.odb.sequence.SmartGcalExpander
-import lucuma.odb.sequence.data.CalLocation
-import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.IdBase
 import lucuma.odb.sequence.data.ProtoAtom
@@ -181,7 +169,6 @@ object Generator {
       MissingSmartGcalDef(key)
   }
 
-  private type SimpleAtom[D]    = ProtoAtom[ProtoStep[D]]
   private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
 
   def instantiate[F[_]: Concurrent](
@@ -311,18 +298,20 @@ object Generator {
         config: gmos.longslit.Config.GmosNorth
       ): EitherT[F, Error, (GmosNorthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
         for {
-          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.PureGenerator.GmosNorth)
-          m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
-        } yield (gmosLongslitExpandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
+          m  <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
+          gen = gmos.longslit.Generator.gmosNorth(exp.gmosNorth).forConfig(config)
+          p <-  EitherT.fromEither(gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m).leftMap(msg => InvalidData(ctx.oid, msg)))
+        } yield (p.mapBothSequences(calculator.gmosNorth.estimateSequence[F](p.static)), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
 
       private def gmosSouthLongSlit(
         ctx:    Context,
         config: gmos.longslit.Config.GmosSouth
       ): EitherT[F, Error, (GmosSouthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
         for {
-          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.PureGenerator.GmosSouth)
-          m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
-        } yield (gmosLongslitExpandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
+          m  <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
+          gen = gmos.longslit.Generator.gmosSouth(exp.gmosSouth).forConfig(config)
+          p <-  EitherT.fromEither(gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m).leftMap(msg => InvalidData(ctx.oid, msg)))
+        } yield (p.mapBothSequences(calculator.gmosSouth.estimateSequence[F](p.static)), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
 
       private def calcDigestFromContext(
         ctx: Context
@@ -365,158 +354,6 @@ object Generator {
               r         <- executionConfig(p, ctx.namespace, a, s, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }
-
-      // Generates the initial GMOS LongSlit sequences, without smart-gcal expansion
-      // or time estimate calculation.
-      private def gmosLongSlit[S, D, G, L, U](
-        oid:            Observation.Id,
-        acquisitionItc: IntegrationTime,
-        scienceItc:     IntegrationTime,
-        config:         gmos.longslit.Config[G, L, U],
-        generator:      gmos.longslit.PureGenerator[S, D, G, L, U]
-      ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, SimpleAtom[D]]] =
-        EitherT.fromEither[F](
-          generator
-            .generate(acquisitionItc, scienceItc, config)
-            .leftMap(s => InvalidData(oid, s))
-        )
-
-      // Performs smart-gcal expansion and time estimate calculation.
-      private def simpleExpandAndEstimatePipe[S, D](
-        static:   S,
-        expander: SmartGcalExpander[F, D],
-        calc:     TimeEstimateCalculator[S, D],
-        comp:     Completion.SequenceMatch[D]
-      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] =
-        _.through(defaultExpandAndFilter(expander, comp))
-         .through(calc.estimateSequence[F](static)) // Add step estimates
-
-      private def gmosLongslitScienceExpandAndEstimatePipe[S, D](
-        static:   S,
-        expander: SmartGcalExpander[F, D],
-        calc:     TimeEstimateCalculator[S, D],
-        comp:     Completion.SequenceMatch[D]
-      ): Pipe[F, SimpleAtom[D], Either[String, (EstimatedAtom[D], Long)]] = { (s: Stream[F, SimpleAtom[D]]) =>
-
-        def smartArc(description: String, d: D): ProtoAtom[ProtoStep[D]] =
-          ProtoAtom.one(description, ProtoStep.smartArc(d))
-
-        val matchedArcs: Set[D] = comp.current.toList.flatMap(_._2.toList.flatMap(_._1)).collect {
-          case (d, StepConfig.Gcal(lamp,_,_,_)) if lamp.lampType === GcalLampType.Arc => d
-        }.toSet
-
-        case class Accumulator(
-          comp:          Completion.SequenceMatch[D],
-          index:         Long,
-          generatedArcs: Set[D]
-        ) {
-          def shouldGenerateArc(d: D): Boolean =
-            !(matchedArcs(d) || generatedArcs(d))
-        }
-
-        val init = Accumulator(comp, 1L, Set.empty)
-
-        type MatchState[A] = State[Completion.SequenceMatch[D], A]
-        import Completion.SequenceMatch.matchCurrent
-        import Completion.SequenceMatch.matchPast
-        import Completion.SequenceMatch.contains
-
-        case class Arc[D](atom: ProtoAtom[ProtoStep[D]], location: CalLocation)
-
-        val zipWithArc: Pipe[
-          F,
-          Either[String, ProtoAtom[ProtoStep[D]]],
-          Either[String, (ProtoAtom[ProtoStep[D]], Arc[D])]
-        ] =
-          _.evalMapAccumulate(Map.empty[D, ProtoAtom[ProtoStep[D]]]) { (cache, eAtom) =>
-            eAtom.flatTraverse { atom =>
-              val arcTitle = atom.description.fold("Arc")(s => s"Arc: $s")
-
-              val scienceConfig: Either[String, (D, CalLocation)] =
-                atom
-                  .steps
-                  .zipWithIndex
-                  .find(_._1.stepConfig.stepType === StepType.Science)
-                  .map((s, l) => (s.value, if (l === 0) CalLocation.After else CalLocation.Before))
-                  .toRight("Atom contains no science step!")
-
-              scienceConfig.flatTraverse { (d, loc) =>
-                cache
-                  .get(d)
-                  .fold(expander.expandAtom(smartArc(arcTitle, d)))(_.asRight.pure)
-                  .map(_.map { arc => (cache.updated(d, arc), atom, Arc(arc, loc)) })
-              }
-            }
-            .map {
-              case Left(error)             => (cache, error.asLeft)
-              case Right(cache, atom, arc) => (cache, (atom, arc).asRight)
-            }
-          }
-          .map(_._2)
-
-          // Do smart-gcal expansion
-        s.through(expander.expandSequence)
-
-          // Add corresponding arcs
-         .through(zipWithArc)
-
-          // Strip executed atoms
-         .mapAccumulate(init) {
-           case (acc, Left(error))        =>
-             (acc, error.asLeft)
-
-           case (acc, Right((atom, arc))) =>
-             val arcConfig = arc.atom.steps.head.value
-
-             val pastMatch: MatchState[(Int, Option[D], List[(ProtoAtom[ProtoStep[D]], Long)])] =
-               (0, none[D], List.empty[(ProtoAtom[ProtoStep[D]], Long)]).pure[MatchState]
-
-             val currentMatch: MatchState[(Int, Option[D], List[(ProtoAtom[ProtoStep[D]], Long)])] =
-               matchCurrent(atom).map { vid =>
-                 val genAtom = Option.unless(vid.isDefined)(atom)
-                 val genArc  = Option.when(acc.shouldGenerateArc(arcConfig))(arc.atom)
-                 val atoms = arc.location match {
-                   case CalLocation.Before => genArc.tupleRight(acc.index + 1).toList ++ genAtom.tupleRight(acc.index + 2).toList
-                   case CalLocation.After  => genAtom.tupleRight(acc.index + 1).toList ++ genArc.tupleRight(acc.index + 2).toList
-                 }
-                 (
-                   1 + (if (acc.generatedArcs(arcConfig)) 0 else 1),
-                   arcConfig.some,
-                   atoms//.zipWithIndex.map(_.map(_ + acc.index))
-                 )
-               }
-
-             val update = for {
-               vid  <- matchPast(atom)
-               skip <- vid.fold(false.pure[MatchState])(contains(arc.atom)) // same visit must contain the arc
-               m    <- if (skip) pastMatch else currentMatch
-             } yield m
-
-             val (compʹ, (inc, genArc, steps)) = update.run(acc.comp).value
-             val accʹ = Accumulator(compʹ, acc.index + inc, acc.generatedArcs ++ genArc)
-
-             (accʹ, steps.asRight)
-         }
-         .flatMap {
-           case (_, Left(error))  => Stream.emit(Left(error))
-           case (_, Right(steps)) => Stream.emits(steps.map(_.asRight))
-         }
-
-         // Add step estimates
-         .through(calc.estimateSequence[F](static))
-      }
-
-      // Performs smart-gcal expansion and time estimate calculation.
-      private def gmosLongslitExpandAndEstimate[S, D](
-        proto:    ProtoExecutionConfig[Pure, S, SimpleAtom[D]],
-        expander: SmartGcalExpander[F, D],
-        calc:     TimeEstimateCalculator[S, D],
-        comState: Completion.Matcher[D]
-      ): ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]] =
-        proto.mapSequences(
-          simpleExpandAndEstimatePipe(proto.static, expander, calc, comState.acq),
-          gmosLongslitScienceExpandAndEstimatePipe(proto.static, expander, calc, comState.sci)
-        )
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
