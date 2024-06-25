@@ -46,13 +46,13 @@ import java.io.DataOutputStream
  * Configuration for the GMOS Long Slit science mode.  Using these parameters, a
  * GMOS long slit sequence may be generated.
  * @tparam G grating type
- * @tparam F filter type
+ * @tparam L filter type
  * @tparam U FPU type
  */
-sealed trait Config[G: Enumerated, F: Enumerated, U: Enumerated] extends Product with Serializable {
+sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable {
   def grating: G
 
-  def filter: Option[F]
+  def filter: Option[L]
 
   def fpu: U
 

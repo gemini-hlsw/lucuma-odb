@@ -311,7 +311,7 @@ object Generator {
         config: gmos.longslit.Config.GmosNorth
       ): EitherT[F, Error, (GmosNorthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
         for {
-          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosNorth)
+          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.PureGenerator.GmosNorth)
           m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
         } yield (gmosLongslitExpandAndEstimate(p, exp.gmosNorth, calculator.gmosNorth, m), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
 
@@ -320,7 +320,7 @@ object Generator {
         config: gmos.longslit.Config.GmosSouth
       ): EitherT[F, Error, (GmosSouthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
         for {
-          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.Generator.GmosSouth)
+          p <- gmosLongSlit(ctx.oid, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, config, gmos.longslit.PureGenerator.GmosSouth)
           m <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
         } yield (gmosLongslitExpandAndEstimate(p, exp.gmosSouth, calculator.gmosSouth, m), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
 
@@ -373,7 +373,7 @@ object Generator {
         acquisitionItc: IntegrationTime,
         scienceItc:     IntegrationTime,
         config:         gmos.longslit.Config[G, L, U],
-        generator:      gmos.longslit.Generator[S, D, G, L, U]
+        generator:      gmos.longslit.PureGenerator[S, D, G, L, U]
       ): EitherT[F, Error, ProtoExecutionConfig[Pure, S, SimpleAtom[D]]] =
         EitherT.fromEither[F](
           generator
