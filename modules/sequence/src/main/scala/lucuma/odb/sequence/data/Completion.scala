@@ -144,9 +144,11 @@ object Completion {
   }
 
   // SequenceMatch is a completed atom map for a sequence along with an id base.
-  // The id base is folded into the atom and step UUIDs that will be generated
-  // for that sequence.  When this number changes, future atom and step ids will
-  // also change.
+  // The completed atom map is split between the current visit (if any) and past
+  // visits (if any).  This is important for steps that must be regenerated per
+  // visit.  The id base is folded into the atom and step UUIDs that will be
+  // generated for that sequence.  When this number changes, future atom and
+  // step ids will also change.
   case class SequenceMatch[D](
     idBase:  Int,
     current: Option[(Visit.Id, AtomMap[D])],
@@ -172,6 +174,11 @@ object Completion {
 
     import lucuma.odb.sequence.data.Completion.AtomMap.matchAtom
 
+    /**
+     * Tries to find a matching atom in the current visit, removing an instance
+     * of it from the atom map if successful and returning the current visit id.
+     * If there is no match, the state is not modified and none is returned.
+     */
     def matchCurrent[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
       State { sm =>
         sm.current.fold((sm, none)) { case (vid, am) =>
@@ -180,6 +187,11 @@ object Completion {
         }
       }
 
+    /**
+     * Attempts to find a matching atom in past visits, removing an instance of
+     * it from the atom map if successful and returning the corresponding visit
+     * id.  If there is no match, the state is not modified and none is returned.
+     */
     def matchPast[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
       State { sm =>
         sm.past.foldLeft(none[(SequenceMatch[D], Option[Visit.Id])]) { case (m, (vid, am)) =>
@@ -190,17 +202,32 @@ object Completion {
         }.getOrElse((sm, none))
       }
 
+    /**
+     * Attempts to find a matching atom in past and then (if not successful)
+     * current visits.  If found, an instance is discounted from the
+     * corresponding atom map and the visit id is returned as the value of the
+     * state computation.  Otherwise, the state is unmodified and none is
+     * returned.
+     */
     def matchAny[D](a: ProtoAtom[ProtoStep[D]]): State[SequenceMatch[D], Option[Visit.Id]] =
       for {
         m  <- matchPast(a)
         mʹ <- if (m.isDefined) State.pure(m) else matchCurrent(a)
       } yield mʹ
 
+    /**
+     * Inspects the state to obtains the atom map tied to the given visit id, if
+     * any.
+     */
     def atomMap[D](v: Visit.Id): State[SequenceMatch[D], Option[AtomMap[D]]] =
       State.inspect { sm =>
         current.get(sm).filter(_._1 === v).map(_._2) orElse past.get(sm).get(v)
       }
 
+    /**
+     * Inspects the current state to determine whether a matching atom is
+     * found in the given visit.
+     */
     def contains[D](a: ProtoAtom[ProtoStep[D]])(v: Visit.Id): State[SequenceMatch[D], Boolean] =
       atomMap(v).map(_.exists(_.contains(AtomMatch.fromProtoAtom(a))))
 
