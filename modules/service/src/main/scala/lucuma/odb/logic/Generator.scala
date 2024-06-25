@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.IdBase
 import lucuma.odb.sequence.data.ProtoAtom
@@ -51,8 +52,10 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
+import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import skunk.Transaction
 
 import java.security.MessageDigest
 import java.util.UUID
@@ -284,34 +287,56 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         calcDigestFromContext(ctx).flatTap(ctx.cache)
 
-      type ExpandedAndEstimatedProtoExecutionSequence[F[_], S, D] =
+      type ExpandedAndEstimatedProtoExecutionConfig[F[_], S, D] =
         ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]]
 
-      type GmosNorthProtoExecutionConfig[F[_]] =
-        ExpandedAndEstimatedProtoExecutionSequence[F, GmosNorthStatic, GmosNorthDynamic]
+      type GmosNorth[F[_]] =
+        ExpandedAndEstimatedProtoExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]
 
-      type GmosSouthProtoExecutionConfig[F[_]] =
-        ExpandedAndEstimatedProtoExecutionSequence[F, GmosSouthStatic, GmosSouthDynamic]
+      type GmosSouth[F[_]] =
+        ExpandedAndEstimatedProtoExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]
+
+      private def protoExecutionConfig[S, D](
+        gen:  lucuma.odb.sequence.Generator[F, S, D],
+        ctx:  Context,
+        calc: TimeEstimateCalculator[S, D]
+      )(
+        comp: Transaction[F] ?=> SequenceService[F] => F[Completion.Matcher[D]]
+      ): EitherT[F, Error, (ExpandedAndEstimatedProtoExecutionConfig[F, S, D], IdBase.Acq, IdBase.Sci)] =
+        EitherT.liftF(services.transactionally { comp(sequenceService) }).flatMap { m =>
+          EitherT.fromEither(
+            gen
+              .generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
+              .bimap(
+                msg   => InvalidData(ctx.oid, msg),
+                proto => (
+                  proto.mapBothSequences(calc.estimateSequence(proto.static)),
+                  IdBase.Acq(m.acq.idBase),
+                  IdBase.Sci(m.sci.idBase)
+                )
+              )
+          )
+        }
 
       private def gmosNorthLongSlit(
         ctx:    Context,
         config: gmos.longslit.Config.GmosNorth
-      ): EitherT[F, Error, (GmosNorthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
-        for {
-          m  <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosNorthCompletionState(ctx.oid) })
-          gen = gmos.longslit.Generator.gmosNorth(exp.gmosNorth).forConfig(config)
-          p <-  EitherT.fromEither(gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m).leftMap(msg => InvalidData(ctx.oid, msg)))
-        } yield (p.mapBothSequences(calculator.gmosNorth.estimateSequence[F](p.static)), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
+      ): EitherT[F, Error, (GmosNorth[F], IdBase.Acq, IdBase.Sci)] =
+        protoExecutionConfig(
+          gmos.longslit.LongSlit.gmosNorth(exp.gmosNorth).forConfig(config),
+          ctx,
+          calculator.gmosNorth
+        )(_.selectGmosNorthCompletionState(ctx.oid))
 
       private def gmosSouthLongSlit(
         ctx:    Context,
         config: gmos.longslit.Config.GmosSouth
-      ): EitherT[F, Error, (GmosSouthProtoExecutionConfig[F], IdBase.Acq, IdBase.Sci)] =
-        for {
-          m  <- EitherT.liftF(services.transactionally { services.sequenceService.selectGmosSouthCompletionState(ctx.oid) })
-          gen = gmos.longslit.Generator.gmosSouth(exp.gmosSouth).forConfig(config)
-          p <-  EitherT.fromEither(gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m).leftMap(msg => InvalidData(ctx.oid, msg)))
-        } yield (p.mapBothSequences(calculator.gmosSouth.estimateSequence[F](p.static)), IdBase.Acq(m.acq.idBase), IdBase.Sci(m.sci.idBase))
+      ): EitherT[F, Error, (GmosSouth[F], IdBase.Acq, IdBase.Sci)] =
+        protoExecutionConfig(
+          gmos.longslit.LongSlit.gmosSouth(exp.gmosSouth).forConfig(config),
+          ctx,
+          calculator.gmosSouth
+        )(_.selectGmosSouthCompletionState(ctx.oid))
 
       private def calcDigestFromContext(
         ctx: Context

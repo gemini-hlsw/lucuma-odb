@@ -25,7 +25,10 @@ import lucuma.odb.sequence.data.SciExposureTime
 
 
 /**
- * Generator for GMOS Long Slit.
+ * Core sequence generator for GMOS Long Slit.  It creates the acquisition
+ * sequence and the science sequence (which at this point is a stream of
+ * atoms containing a science step and a corresponding flat).  Neither sequence
+ * is filtered for execution and smart arcs are not yet added.
  *
  * @tparam S static configuration type
  * @tparam D dynamic configuration type
@@ -33,7 +36,7 @@ import lucuma.odb.sequence.data.SciExposureTime
  * @tparam L filter enumeration
  * @tparam U FPU enumeration
  */
-sealed abstract class PureGenerator[S, D, G, L, U](
+sealed abstract class CoreGenerator[S, D, G, L, U](
   static:      S,
   acqFilters:  NonEmptyList[L],
   acqSequence: Acquisition[D, G, L, U],
@@ -71,9 +74,9 @@ sealed abstract class PureGenerator[S, D, G, L, U](
 }
 
 
-object PureGenerator {
+object CoreGenerator {
 
-  object GmosNorth extends PureGenerator(
+  object GmosNorth extends CoreGenerator(
     StaticConfig.GmosNorth(
       FollowXy,
       HamamatsuNorth,
@@ -85,7 +88,7 @@ object PureGenerator {
     Science.GmosNorth
   )
 
-  object GmosSouth extends PureGenerator(
+  object GmosSouth extends CoreGenerator(
     StaticConfig.GmosSouth(
       FollowXyz,
       HamamatsuSouth,

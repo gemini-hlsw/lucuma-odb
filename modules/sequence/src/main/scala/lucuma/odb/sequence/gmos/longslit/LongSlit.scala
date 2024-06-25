@@ -9,8 +9,8 @@ import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
-import cats.syntax.option.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import fs2.Pipe
 import fs2.Stream
@@ -26,20 +26,13 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 
-trait Generator[F[_], S, D] {
-
-  def generate(
-    acquisitionItc: IntegrationTime,
-    scienceItc:     IntegrationTime,
-    completion:     Completion.Matcher[D]
-  ): Either[String, ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[D]], Long)]]]
-
-}
-
-object Generator {
+/**
+ * GMOS Long Slit generators.
+ */
+object LongSlit {
 
   private def instantiate[F[_]: Concurrent, S, D, G, L, U](
-    pureGen:  PureGenerator[S, D, G, L, U],
+    pureGen:  CoreGenerator[S, D, G, L, U],
     expander: SmartGcalExpander[F, D],
     config:   Config[G, L, U]
   ): Generator[F, S, D] =
@@ -91,11 +84,16 @@ object Generator {
       }
       .map(_._2)
 
+    // Processes the stream of science atoms from the pure generator, expanding
+    // smart flats, adding expanded arcs where necessary, combining with the
+    // atom index, and filtering out executed atoms.
     def scienceSequence(
       comp: Completion.SequenceMatch[D]
     ): Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, (ProtoAtom[ProtoStep[D]], Long)]] =
       (s: Stream[F, ProtoAtom[ProtoStep[D]]]) => {
 
+        // A set of instrument configs for which a matching arc was found in the
+        // current visit.
         val matchedArcs: Set[D] = comp.current.toList.flatMap(_._2.toList.flatMap(_._1)).collect {
           case (d, StepConfig.Gcal(lamp,_,_,_)) if lamp.lampType === GcalLampType.Arc => d
         }.toSet
@@ -103,7 +101,7 @@ object Generator {
         case class Accumulator(
           comp:          Completion.SequenceMatch[D],
           index:         Long,
-          generatedArcs: Set[D]
+          generatedArcs: Set[D] // inst configs for arcs that we've already generated
         ) {
           def shouldGenerateArc(d: D): Boolean =
             !(matchedArcs(d) || generatedArcs(d))
@@ -162,7 +160,12 @@ object Generator {
       ): Either[String, ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[D]], Long)]]] =
         pureGen
           .generate(acquisitionItc, scienceItc, config)
-          .map(p => p.mapSequences(defaultExpandAndFilter(expander, completion.acq), scienceSequence(completion.sci)))
+          .map { p =>
+            p.mapSequences(
+              defaultExpandAndFilter(expander, completion.acq), // acquisition
+              scienceSequence(completion.sci)                   // science
+            )
+          }
 
     }
 
@@ -170,14 +173,14 @@ object Generator {
     expander: SmartGcalExpander[F, DynamicConfig.GmosNorth]
   ) {
     def forConfig(c: Config.GmosNorth): Generator[F, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
-      instantiate(PureGenerator.GmosNorth, expander, c)
+      instantiate(CoreGenerator.GmosNorth, expander, c)
   }
 
   case class GmosSouthGenerator[F[_]: Concurrent](
     expander: SmartGcalExpander[F, DynamicConfig.GmosSouth]
   ) {
     def forConfig(c: Config.GmosSouth): Generator[F, StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
-      instantiate(PureGenerator.GmosSouth, expander, c)
+      instantiate(CoreGenerator.GmosSouth, expander, c)
   }
 
   def gmosNorth[F[_]: Concurrent](

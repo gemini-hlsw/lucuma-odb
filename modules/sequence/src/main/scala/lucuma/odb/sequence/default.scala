@@ -10,6 +10,7 @@ import fs2.Pipe
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+
 import Completion.SequenceMatch.matchAny
 
 /**
