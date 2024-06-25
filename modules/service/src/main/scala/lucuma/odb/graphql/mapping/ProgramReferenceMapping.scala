@@ -51,6 +51,7 @@ trait ProgramReferenceMapping[F[_]]
           case PT.Library       => Result(LibraryProgramReferenceType)
           case PT.Monitoring    => Result(MonitoringProgramReferenceType)
           case PT.Science       => Result(ScienceProgramReferenceType)
+          case PT.System        => Result(SystemProgramReferenceType)
         }
 
       private def mkPredicate(tpe: PT): Option[Predicate] =
@@ -65,6 +66,7 @@ trait ProgramReferenceMapping[F[_]]
           case LibraryProgramReferenceType       => mkPredicate(PT.Library)
           case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
           case ScienceProgramReferenceType       => mkPredicate(PT.Science)
+          case SystemProgramReferenceType        => mkPredicate(PT.System)
           case _                                 => none
         }
     }
@@ -90,6 +92,11 @@ trait ProgramReferenceMapping[F[_]]
     ObjectMapping(ExampleProgramReferenceType)(
       SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
       SqlField("instrument",    ProgramReferenceView.Instrument)
+    )
+
+  lazy val SystemProgramReferenceMapping: ObjectMapping =
+    ObjectMapping(SystemProgramReferenceType)(
+      SqlField("id", ProgramReferenceView.Id, key = true, hidden = true)
     )
 
   lazy val LibraryProgramReferenceMapping: ObjectMapping =
