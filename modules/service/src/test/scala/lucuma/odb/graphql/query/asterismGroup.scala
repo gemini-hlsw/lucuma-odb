@@ -31,7 +31,7 @@ class asterismGroup extends OdbSuite {
         oid2 <- createObservationAs(user, pid, tids(0), tids(1))
         oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
         oid4 <- createObservationAs(user, pid)
-        _  <- expect(
+        _    <- expect(
           user = user,
           query =
             s"""
@@ -55,17 +55,6 @@ class asterismGroup extends OdbSuite {
               {
                 "asterismGroup" : {
                   "matches" : [
-                    {
-                      "observations" : {
-                        "matches" : [
-                          {
-                            "id" : $oid4
-                          }
-                        ]
-                      },
-                      "asterism" : [
-                      ]
-                    },
                     {
                       "observations" : {
                         "matches" : [
@@ -104,6 +93,17 @@ class asterismGroup extends OdbSuite {
                       "observations" : {
                         "matches" : [
                           {
+                            "id" : $oid4
+                          }
+                        ]
+                      },
+                      "asterism" : [
+                      ]
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
                             "id" : $oid3
                           }
                         ]
@@ -113,10 +113,10 @@ class asterismGroup extends OdbSuite {
                           "id" : ${tids(0)}
                         },
                         {
-                          "id" : ${tids(1)}
+                          "id" : ${tids(2)}
                         },
                         {
-                          "id" : ${tids(2)}
+                          "id" : ${tids(1)}
                         }
                       ]
                     }

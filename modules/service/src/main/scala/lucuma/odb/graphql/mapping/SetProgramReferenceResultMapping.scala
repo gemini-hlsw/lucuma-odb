@@ -16,5 +16,5 @@ trait SetProgramReferenceResultMapping[F[_]] extends BaseMapping[F]
       SqlField("programId", ProgramTable.Id, key = true, hidden = true),
       SqlObject("reference", Join(ProgramTable.Id, ProgramReferenceView.Id))
     )
-    
+
 }

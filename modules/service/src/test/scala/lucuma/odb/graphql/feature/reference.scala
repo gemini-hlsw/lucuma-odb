@@ -67,7 +67,7 @@ class reference extends OdbSuite {
   val sem2025B   = "2025B".semester
   val ref2025B1  = "G-2025B-0001".proposalReference
   val ref2025B2  = "G-2025B-0002".proposalReference
-  
+
   val sem2010A   = "2010A".semester
   val ref2010A1  = "G-2010A-0001".proposalReference
 
@@ -376,7 +376,7 @@ class reference extends OdbSuite {
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring' or 'science' expected.").asLeft
+        List("Argument 'input.SET' is invalid: Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring', 'science' or 'system' expected.").asLeft
       )
     }
   }
@@ -494,14 +494,21 @@ class reference extends OdbSuite {
     )
   }
 
-  test("setProposalReference ENG") {
+  test("setProgramReference SYS") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """system: { description: "SPECPHOTO" }""")
+    } yield assertEquals(ref, "SYS-SPECPHOTO".programReference.some)
+  }
+
+  test("setProgramReference ENG") {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-ENG-GMOSS-01".programReference.some)
   }
 
-  test("setProposalReference ENG, second time increases index") {
+  test("setProgramReference ENG, second time increases index") {
     for {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -785,6 +792,15 @@ class reference extends OdbSuite {
         "G-2025B-COM-GMOSS-02",
         "G-2025B-ENG-GMOSS-02",
         "G-2025B-0002-Q"
+      ).map(_.programReference)
+    )
+  }
+
+  test("select via WHERE program reference semester, only SYS") {
+    assertIO(
+      programRefsWhere( s"""{ type: { EQ: SYSTEM } }"""),
+      List(
+        "SYS-SPECPHOTO"
       ).map(_.programReference)
     )
   }

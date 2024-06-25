@@ -366,6 +366,7 @@ object OdbMapping {
                 StepRecordMapping,
                 StepRecordSelectResultMapping,
                 SubscriptionMapping,
+                SystemProgramReferenceMapping,
                 SystemVerificationMapping,
                 TargetEditMapping,
                 TargetEnvironmentMapping,
