@@ -6,7 +6,7 @@ add column c_calibration_role e_calibration_role null;
 INSERT INTO t_program_type VALUES ('system', 'SYS', 'System', false);
 
 -- Create a trigger function
--- If a program has a calibration role, set the program type to 'SYS'
+-- If a program has a calibration role, set the program type to 'system'
 CREATE OR REPLACE FUNCTION calibration_type_program_type()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -19,7 +19,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create a trigger on your_table
+-- Create a trigger on t_program on insert or update
 CREATE TRIGGER calibration_role_sets_type
 BEFORE INSERT OR UPDATE ON t_program
 FOR EACH ROW
