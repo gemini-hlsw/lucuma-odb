@@ -67,6 +67,18 @@ BEGIN
           NEW.c_instrument   := NULL;
           NEW.c_library_desc := NULL;
         END;
+
+      WHEN NEW.c_program_type = 'system' THEN
+        BEGIN
+          IF NEW.c_library_desc IS NULL THEN
+            RAISE EXCEPTION 'System programs must define a description';
+          END IF;
+          NEW.c_instrument      := NULL;
+          NEW.c_semester        := NULL;
+          NEW.c_semester_index  := NULL;
+          NEW.c_science_subtype := NULL;
+        END;
+
     END CASE;
 
     RETURN NEW;
