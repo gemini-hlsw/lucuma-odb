@@ -6,6 +6,8 @@ package issue.github
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
@@ -22,8 +24,9 @@ class GitHub_1237 extends OdbSuite {
   val sem25A   = Semester.unsafeFromString("2025A")
   val ref24B01 = ProposalReference.fromString.unsafeGet("G-2024B-0001")
   val ref24B02 = ProposalReference.fromString.unsafeGet("G-2024B-0002")
+  val ref24B03 = ProposalReference.fromString.unsafeGet("G-2024B-0003")
 
-  private def switchCfp(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[ProposalReference] =
+  private def switchCfp(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Option[ProposalReference]] =
     query(
       user,
       s"""
@@ -43,10 +46,33 @@ class GitHub_1237 extends OdbSuite {
     ).flatMap { js =>
       js.hcursor
         .downFields("updateProposal", "proposal", "reference", "label")
-        .as[ProposalReference]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
+        .focus
+        .traverse { js =>
+          js.hcursor.as[ProposalReference].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+        }
     }
+
+  test("switch proposal semester after submit") {
+    for {
+      cid24B <- createCallForProposalsAs(staff, semester = sem24B)
+      cid25A <- createCallForProposalsAs(staff, semester = sem25A)
+
+      pid1 <- createProgramAs(pi)
+      _    <- addQueueProposal(pi, pid1, cid24B)
+      _    <- addPartnerSplits(pi, pid1)
+      ref1 <- submitProposal(pi, pid1)
+
+      pid2 <- createProgramAs(pi)
+      _    <- addQueueProposal(pi, pid2, cid25A)
+      _    <- addPartnerSplits(pi, pid2)
+      _    <- submitProposal(pi, pid2)
+      ref2 <- switchCfp(staff, pid2, cid24B) // switches the semester to 2024B (updates index to 0002)
+
+    } yield {
+      assertEquals(ref1, ref24B01)
+      assertEquals(ref2, ref24B02.some)
+    }
+  }
 
   test("switch proposal semester after unsubmit") {
     for {
@@ -63,11 +89,11 @@ class GitHub_1237 extends OdbSuite {
       _    <- addPartnerSplits(pi, pid2)
       _    <- submitProposal(pi, pid2)
       _    <- unsubmitProposal(pi, pid2)  // keeps the index 0001 of 2025A that was previously assigned
-      ref2 <- switchCfp(pi, pid2, cid24B) // switches the semester to 2024B (keeping already used index 0001)
+      ref2 <- switchCfp(pi, pid2, cid24B) // switches the semester to 2024B and deletes the index
 
     } yield {
-      assertEquals(ref1, ref24B01)
-      assertEquals(ref2, ref24B02)
+      assertEquals(ref1, ref24B03)
+      assertEquals(ref2, none[ProposalReference])
     }
   }
 }
