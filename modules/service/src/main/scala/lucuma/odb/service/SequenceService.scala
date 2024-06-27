@@ -55,7 +55,7 @@ trait SequenceService[F[_]] {
 
   def selectGmosNorthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Completion.State[GmosNorth]]
+  )(using Transaction[F]): F[Completion.Matcher[GmosNorth]]
 
   def selectGmosNorthSteps(
     observationId: Observation.Id
@@ -63,7 +63,7 @@ trait SequenceService[F[_]] {
 
   def selectGmosSouthCompletionState(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Completion.State[GmosSouth]]
+  )(using Transaction[F]): F[Completion.Matcher[GmosSouth]]
 
   def selectGmosSouthSteps(
     observationId: Observation.Id
@@ -159,7 +159,7 @@ object SequenceService {
 
       override def selectGmosNorthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Completion.State[GmosNorth]] =
+      )(using Transaction[F]): F[Completion.Matcher[GmosNorth]] =
         selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
@@ -167,7 +167,7 @@ object SequenceService {
 
       override def selectGmosSouthCompletionState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Completion.State[GmosSouth]] =
+      )(using Transaction[F]): F[Completion.Matcher[GmosSouth]] =
         selectCompletionState(
           observationId,
           gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
@@ -176,7 +176,7 @@ object SequenceService {
       private def selectCompletionState[D](
         observationId:  Observation.Id,
         dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[Completion.State[D]] =
+      )(using Transaction[F]): F[Completion.Matcher[D]] =
         stepRecordMap(observationId, dynamicConfigs)
           .flatMap(completionState(observationId))
 
@@ -291,15 +291,15 @@ object SequenceService {
         observationId: Observation.Id
       )(
         stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[Completion.State[D]] =
+      )(using Transaction[F]): F[Completion.Matcher[D]] =
 
         // Fold over the stream of completed steps in completion order.  If an
         // atom is broken up by anything else it shouldn't count as complete.
         session
           .stream(Statements.SelectCompletionRows)(observationId, 1024)
-          .fold(Completion.State.Builder.init[D]) { case (state, (vid, stepData)) =>
+          .fold(Completion.Matcher.Builder.init[D]) { case (state, (vid, stepData)) =>
             stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
-              stepMap.get(sid).fold(state.reset)(state.nextStep(vid, seqType, aid, cnt, _))
+              stepMap.get(sid).fold(state.reset(vid))(state.nextStep(vid, seqType, aid, cnt, _))
             }
           }
           .compile

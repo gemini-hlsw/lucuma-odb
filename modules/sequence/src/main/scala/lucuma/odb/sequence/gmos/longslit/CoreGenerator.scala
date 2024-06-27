@@ -25,25 +25,28 @@ import lucuma.odb.sequence.data.SciExposureTime
 
 
 /**
- * Generator for GMOS Long Slit.
+ * Core sequence generator for GMOS Long Slit.  It creates the acquisition
+ * sequence and the science sequence (which at this point is a stream of
+ * atoms containing a science step and a corresponding flat).  Neither sequence
+ * is filtered for execution and smart arcs are not yet added.
  *
  * @tparam S static configuration type
  * @tparam D dynamic configuration type
  * @tparam G grating enumeration
- * @tparam F filter enumeration
+ * @tparam L filter enumeration
  * @tparam U FPU enumeration
  */
-sealed abstract class Generator[S, D, G, F, U](
+sealed abstract class CoreGenerator[S, D, G, L, U](
   static:      S,
-  acqFilters:  NonEmptyList[F],
-  acqSequence: Acquisition[D, G, F, U],
-  sciSequence: Science[D, G, F, U]
+  acqFilters:  NonEmptyList[L],
+  acqSequence: Acquisition[D, G, L, U],
+  sciSequence: Science[D, G, L, U]
 ) {
 
   def generate(
     acquisitionItc: IntegrationTime,
     scienceItc:     IntegrationTime,
-    config:         Config[G, F, U]
+    config:         Config[G, L, U]
   ): Either[String, ProtoExecutionConfig[Pure, S, ProtoAtom[ProtoStep[D]]]] = {
 
     val acq = acqSequence.compute(
@@ -62,6 +65,7 @@ sealed abstract class Generator[S, D, G, F, U](
           Stream(ProtoAtom.of("Acquisition - Initial", acq.ccd2, acq.p10, acq.slit)) ++
             Stream(ProtoAtom.of("Acquisition - Slit", acq.slit)).repeat,
           sci.map(a => ProtoAtom(a.description.some, a.steps))
+             .take(scienceItc.exposures.value)
         )
       ).toRight("ITC prescribes 0 exposures.")
 
@@ -70,9 +74,9 @@ sealed abstract class Generator[S, D, G, F, U](
 }
 
 
-object Generator {
+object CoreGenerator {
 
-  object GmosNorth extends Generator(
+  object GmosNorth extends CoreGenerator(
     StaticConfig.GmosNorth(
       FollowXy,
       HamamatsuNorth,
@@ -84,7 +88,7 @@ object Generator {
     Science.GmosNorth
   )
 
-  object GmosSouth extends Generator(
+  object GmosSouth extends CoreGenerator(
     StaticConfig.GmosSouth(
       FollowXyz,
       HamamatsuSouth,
