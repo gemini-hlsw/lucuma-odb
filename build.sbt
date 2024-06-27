@@ -198,6 +198,6 @@ lazy val calibrations = project
       "org.typelevel"  %% "paiges-core"                        % paigesVersion,
       "com.github.vertical-blank" % "sql-formatter" % "2.0.5",
     ),
-    reStartArgs       += "one-off"
+    reStart / envVars += "PORT" -> "8082"
   )
 
