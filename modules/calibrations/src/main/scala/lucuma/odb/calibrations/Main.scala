@@ -29,6 +29,13 @@ import lucuma.odb.graphql.topic.ProgramTopic
 import cats.effect.std.Supervisor
 import fs2.concurrent.Topic
 import lucuma.odb.graphql.topic.ObservationTopic
+import lucuma.core.model.User
+import org.http4s.headers.Authorization
+import org.typelevel.ci.CIString
+import lucuma.odb.service.Services
+import lucuma.core.model.Role
+import lucuma.core.model.Access
+import cats.effect.std.UUIDGen
 
 sealed trait MainParams {
   val ServiceName: String =
@@ -59,6 +66,8 @@ object CalibrationsMain extends CommandIOApp(
 
   lazy val serve: IO[ExitCode] = {
     given Logger[IO] = Slf4jLogger.getLoggerFromName[IO]("calibrations-service")
+
+    import natchez.Trace.Implicits.noop
 
     CMain.runF[IO]
   }
@@ -110,12 +119,10 @@ object CMain extends MainParams {
       }
     }
 
-  def singleSession[F[_]: Async: Console: Network](
+  def singleSession[F[_]: Async: Trace: Console: Network](
     config:   Config.Database,
     database: Option[String] = None
   ): Resource[F, Session[F]] = {
-
-    import natchez.Trace.Implicits.noop
 
     Session.single[F](
       host     = config.host,
@@ -131,6 +138,9 @@ object CMain extends MainParams {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
+  def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
+    c.ssoClient.use: sso =>
+      sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
   // This derivation is required to avoid a deprecation warning in the call to wsLiftR below.
   // given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
 
@@ -141,33 +151,47 @@ object CMain extends MainParams {
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield top
 
-  def calibrationService[F[_]: Concurrent: Logger](obsTopic: Topic[F, ObservationTopic.Element], session: Session[F]): Resource[F, Unit] =
+  def calibrationService[F[_]: Concurrent: Logger: Services](obsTopic: Topic[F, ObservationTopic.Element]): Resource[F, Unit] =
     for {
       _ <- Resource.eval(Logger[F].info("--------- Starting calibration service"))
-      cs <- Resource.pure(CalibrationsService.instantiate[F](session))
+      cs <- Resource.pure(CalibrationsService.instantiate[F])
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               Logger[F].info(s"STATE $elem") *> cs.recalculateCalibrations(elem.programId)
             }.compile.drain.start.void)
     } yield ()
 
+  def services[F[_]: Concurrent: UUIDGen: Trace: Logger](user: Option[User], enums: Enums)(pool: Session[F]): F[Services[F]] =
+    user match {
+      case Some(u) if u.role.access === Access.Service =>
+        Services.forUser(u, enums)(pool).pure[F]
+      case Some(u) =>
+        Logger[F].error(s"User $u is not allowed to execute this service") *>
+          MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
+      case None    =>
+        Logger[F].error("Failed to get service user") *>
+          MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
+    }
+
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Console: Network]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Logger: Trace: Console: Network]: Resource[F, ExitCode] =
     for {
-      c     <- Resource.eval(Config.fromCiris.load[F])
-      _     <- Resource.eval(banner[F](c))
-      s     <- singleSession(c.database)
-      ep    <- entryPointResource(c)
-      pool  <- databasePoolResource[F](c.database)
-      enums <- Resource.eval(pool.use(Enums.load))
-      obsT  <- topics(pool)
-      _     <- calibrationService[F](obsT, s)
+      c                 <- Resource.eval(Config.fromCiris.load[F])
+      _                 <- Resource.eval(banner[F](c))
+      s                 <- singleSession(c.database)
+      ep                <- entryPointResource(c)
+      pool              <- databasePoolResource[F](c.database)
+      enums             <- Resource.eval(pool.use(Enums.load))
+      obsT              <- topics(pool)
+      user              <- Resource.eval(serviceUser[F](c))
+      given Services[F] <- pool.evalMap(services(user, enums)(_))
+      _                 <- calibrationService(obsT)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Logger: Console: Network]: F[ExitCode] =
+  def runF[F[_]:   Async: Logger: Trace: Network: Console]: F[ExitCode] =
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }
