@@ -35,7 +35,7 @@ import scala.util.NotGiven
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
 
-/** 
+/**
  * A collection of services, all bound to a single `Session` and `User`, together with a canonical
  * operation for interacting with the database in a transactional way.
  */
@@ -50,23 +50,23 @@ trait Services[F[_]]:
   /** The dynamic enums loaded from the DB. */
   val enums: Enums
 
-  /** 
+  /**
    * Define an interaction with the database that will execute a block `fa` within a transaction,
    * with `user` (see above) set in a transaction-local variable `lucuma.user` in the database,
-   * available in PostgreSQL as `current_setting('lucuma.user', true)` 
-   * 
+   * available in PostgreSQL as `current_setting('lucuma.user', true)`
+   *
    * Within the passed block `fa` the current `Transaction` is implicit, as well as this `Services`
    * instance. The purpose is as follows:
    *
-   *   - When `Services` is `given` and `Services.Syntax.*` is imported, all members here are 
+   *   - When `Services` is `given` and `Services.Syntax.*` is imported, all members here are
    *     available unprefixed; i.e., you can just say `groupService.doWhatever(...)` or `user`
    *     or `session` and the reference will be taken from the implicit `Services` in scope.
    *   - When `Transaction` is `given` and `Services.Syntax.*` is imported, the current transaction
-   *     is available as `transaction`. This is rarely necessary, but it allows service code to use 
+   *     is available as `transaction`. This is rarely necessary, but it allows service code to use
    *     savepoints and rollback to handle errors when necessary.
    *   - Most service methods have a `using Transaction[F]` clause, to prevent them from being
    *     called without an active transaction. This adds a bit of safety.
-   * 
+   *
    * See also `Services.Syntax.useTransactionally`, which is more commonly used; it does the same
    * thing but works on `Resource[F, Service[F]]`. In this form you never actually see the
    * `Services` instance; it's always implicit.
@@ -75,9 +75,12 @@ trait Services[F[_]]:
 
   /** The `AllocationService`. */
   def allocationService: AllocationService[F]
-  
+
   /** The `AsterismService`. */
   def asterismService: AsterismService[F]
+
+  /** The `CalibrationsService`. */
+  def calibrationsService: CalibrationsService[F]
 
   /** The `CallForProposalsService`. */
   def callForProposalsService: CallForProposalsService[F]
@@ -93,16 +96,16 @@ trait Services[F[_]]:
 
   /** The `ExecutionEventService`. */
   def executionEventService: ExecutionEventService[F]
-  
+
   /** The `GeneratorParamsService`. */
   def generatorParamsService: GeneratorParamsService[F]
-  
+
   /** The `GmosLongSlitService`. */
   def gmosLongSlitService: GmosLongSlitService[F]
 
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
-  
+
   /** The `GroupService`. */
   def groupService: GroupService[F]
 
@@ -111,28 +114,28 @@ trait Services[F[_]]:
 
   /** Construct an `ObsAttachmentFileService`, given an `S3FileService`.  */
   def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
-  
+
   /** The `ObsAttachmentMetadataService`. */
   def obsAttachmentMetadataService: ObsAttachmentMetadataService[F]
-  
+
   /** The `ObservationService`. */
   def observationService: ObservationService[F]
-  
+
   /** The `ObservingModeServices`. */
   def observingModeServices: ObservingModeServices[F]
-  
+
   /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
-  
+
   /** The `ProgramService`. */
   def programService: ProgramService[F]
-  
+
   /** Construct a `ProposalAttachmentFileService`, given an `S3FileService`. */
   def proposalAttachmentFileService(s3: S3FileService[F]): ProposalAttachmentFileService[F]
-  
+
   /** The `ProposalService`. */
   def proposalService: ProposalService[F]
-  
+
   /** The `SmartGcalService`. */
   def smartGcalService: SmartGcalService[F]
 
@@ -162,7 +165,7 @@ trait Services[F[_]]:
 
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode): GuideService[F]
-  
+
   /** The `UserInvitationService` */
   def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]): UserInvitationService[F]
 
@@ -212,6 +215,7 @@ object Services:
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val callForProposalsService = CallForProposalsService.instantiate
+      lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
       lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
@@ -258,6 +262,7 @@ object Services:
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
+    def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
@@ -288,7 +293,7 @@ object Services:
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculator.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
     def userInvitationService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService(emailConfig, httpClient)
     def emailService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]) = summon[Services[F]].emailService(emailConfig, httpClient)
-    
+
     def requirePiAccess[F[_], A](fa: Services.PiAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Pi then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF
@@ -311,7 +316,7 @@ object Services:
     // This is because you need a stable identifier in order to do anything like
     //   `Enumerated[enumVal.ProposalStatus]`
     // Alternatively, you could assign a variable to the implicit Services in the service instantiation
-    // method, like 
+    // method, like
     //   `(using theSvcs: Services[F])`
     // and then use
     //   `Enumerated[theSvcs.enums.ProposalStatus]`
@@ -324,7 +329,7 @@ object Services:
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =
           s.use(_.transactionally(fa))
-      
+
       def useNonTransactionally(fa: (NoTransaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =

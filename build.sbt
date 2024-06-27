@@ -151,3 +151,13 @@ lazy val service = project
     reStartArgs       += "serve"
   )
 
+lazy val calibrations = project
+  .in(file("modules/calibrations"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .settings(
+    name := "calibrations-service",
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082"
+  )
+
