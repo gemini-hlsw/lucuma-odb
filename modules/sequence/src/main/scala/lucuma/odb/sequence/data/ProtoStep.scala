@@ -10,6 +10,7 @@ import cats.Traverse
 import cats.syntax.functor.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import monocle.Focus
 import monocle.Lens
@@ -22,6 +23,12 @@ case class ProtoStep[A](
 )
 
 object ProtoStep {
+
+  def smartGcal[A](a: A, t: SmartGcalType): ProtoStep[A] =
+    ProtoStep(a, StepConfig.SmartGcal(t), ObserveClass.PartnerCal)
+
+  def smartArc[A](a: A): ProtoStep[A]  = smartGcal(a, SmartGcalType.Arc)
+  def smartFlat[A](a: A): ProtoStep[A] = smartGcal(a, SmartGcalType.Flat)
 
   /** @group Optics */
   def value[A]: Lens[ProtoStep[A], A] =

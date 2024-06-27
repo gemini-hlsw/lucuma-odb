@@ -7,94 +7,21 @@ package query
 import cats.effect.IO
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
-import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.GcalBaselineType
-import lucuma.core.enums.GcalContinuum
-import lucuma.core.enums.GcalDiffuser
-import lucuma.core.enums.GcalFilter
-import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosGratingOrder
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObsActiveStatus.Inactive
 import lucuma.core.enums.ObsStatus.Approved
 import lucuma.core.enums.ObsStatus.New
-import lucuma.core.math.BoundedInterval
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.model.sequence.StepConfig.Gcal
-import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.service.Services
-import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
-import lucuma.odb.smartgcal.data.Gmos.TableKey
-import lucuma.odb.smartgcal.data.Gmos.TableRow
-import lucuma.odb.smartgcal.data.SmartGcalValue
-import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
-import natchez.Trace.Implicits.noop
-import skunk.Session
 
-class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
+class programPlannedTime extends ExecutionTestSupport {
 
-  val pi: User   = TestUsers.Standard.pi(1, 30)
-  val user: User = TestUsers.service(3)
-
-  override val validUsers: List[User] =
-    List(pi, user)
-
-  val createProgram: IO[Program.Id] =
-    createProgramAs(user, "Program Planned Time Testing")
-
-  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
-        ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
-        )
-      )
-
-    Enums.load(s).flatMap { e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e)(s)
-      services.transactionally {
-        services.smartGcalService.insertGmosNorth(1, tableRow)
-      }
-    }
-  }
+  val user: User = serviceUser
 
   // 1736.262500
   def createLongerGmosNorthLongSlitObservationAs(
@@ -133,8 +60,8 @@ class programPlannedTime extends OdbSuite with ObservingModeSetupOperations {
       """
     )
 
-  val ShortTime = BigDecimal("1729.200000")
-  val LongTime  = BigDecimal("1736.262500")
+  val ShortTime = BigDecimal("1843.400000")
+  val LongTime  = BigDecimal("1850.462500")
 
   test("program level: single complete observation") {
     val setup: IO[Program.Id] =

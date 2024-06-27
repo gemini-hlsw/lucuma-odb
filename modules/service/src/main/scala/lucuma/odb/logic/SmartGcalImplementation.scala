@@ -15,24 +15,13 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Gmos
 
-trait SmartGcalExpander[F[_], K, D] {
-
-  /**
-   * Expands the given sequence, attempting to replace smart gcal steps with
-   * normal gcal steps.  For each atom in the Stream, if successful, the
-   * expanded atom without smart gcal steps is emitted in a `Right`.  When
-   * unsuccessful, the missing mapping is formatted and wrapped with a `Left`.
-   */
-  def expand: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]]
-
-}
-
-object SmartGcalExpander {
+object SmartGcalImplementation {
 
   type Cache[K, D] = Map[(K, SmartGcalType), Either[String, NonEmptyList[(D => D, Gcal)]]]
 
@@ -48,21 +37,21 @@ object SmartGcalExpander {
     toKey:     D => K,
     formatKey: K => String,
     select:    (K, SmartGcalType) => F[List[(D => D, Gcal)]]
-  ) extends SmartGcalExpander[F, K, D] {
+  ) extends SmartGcalExpander[F, D] {
 
-    val expand: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
-      _.evalMapAccumulate(emptyCache[K, D])(expandAtom).map(_._2)
+    override val expandSequence: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
+      _.evalMapAccumulate(emptyCache[K, D])(expandAtomWithCache).map(_._2)
 
-    private def expandAtom(
+    private def expandAtomWithCache(
       cache: Cache[K, D],
       atom:  ProtoAtom[ProtoStep[D]]
     ): F[(Cache[K, D], Either[String, ProtoAtom[ProtoStep[D]]])] =
       atom
         .steps
-        .mapAccumulateM(cache)(expandStep)
+        .mapAccumulateM(cache)(expandStepWithCache)
         .map(_.map(_.flatSequence.map(steps => ProtoAtom(atom.description, steps))))
 
-    private def expandStep(
+    private def expandStepWithCache(
       cache: Cache[K, D],
       step:  ProtoStep[D]
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
@@ -92,18 +81,28 @@ object SmartGcalExpander {
           (cache, NonEmptyList.one(ps).asRight).pure[F]
       }
 
+    override def expandStep(
+      step: ProtoStep[D]
+    ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+      expandStepWithCache(emptyCache[K, D], step).map(_._2)
+
+    override def expandAtom(
+      atom: ProtoAtom[ProtoStep[D]]
+    ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
+      expandAtomWithCache(emptyCache[K, D], atom).map(_._2)
+
   }
 
   class ForInstrument[F[_]: Concurrent](service: SmartGcalService[F]) {
 
-    val gmosNorth: SmartGcalExpander[F, Gmos.SearchKey.North, GmosNorth] =
+    val gmosNorth: SmartGcalExpander[F, GmosNorth] =
       new Expander[F, Gmos.SearchKey.North, GmosNorth](
         Gmos.SearchKey.North.fromDynamicConfig,
         _.format,
         service.selectGmosNorth
       )
 
-    val gmosSouth: SmartGcalExpander[F, Gmos.SearchKey.South, GmosSouth] =
+    val gmosSouth: SmartGcalExpander[F, GmosSouth] =
       new Expander[F, Gmos.SearchKey.South, GmosSouth](
         Gmos.SearchKey.South.fromDynamicConfig,
         _.format,

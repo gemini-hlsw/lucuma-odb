@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptySet
 import cats.effect.IO
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -12,6 +14,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
@@ -71,70 +74,95 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(pi, "Sequence Testing")
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRow1: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_0_50.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
+    val key_0_50: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+      TableKey(
+        GratingConfigKey(
+          GmosNorthGrating.R831_G5302,
+          GmosGratingOrder.One,
+          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+        ).some,
+        GmosNorthFilter.RPrime.some,
+        GmosNorthFpu.LongSlit_0_50.some,
+        GmosXBinning.One,
+        GmosYBinning.Two,
+        GmosAmpGain.Low
+      )
+
+    // NB: 2x4, no filter
+    val key_1_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+      TableKey(
+        GratingConfigKey(
+          GmosNorthGrating.R831_G5302,
+          GmosGratingOrder.One,
+          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+        ).some,
+        none,
+        GmosNorthFpu.LongSlit_1_00.some,
+        GmosXBinning.Two,
+        GmosYBinning.Four,
+        GmosAmpGain.Low
+      )
+
+    val key_5_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+      TableKey(
+        GratingConfigKey(
+          GmosNorthGrating.R831_G5302,
+          GmosGratingOrder.One,
+          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+        ).some,
+        GmosNorthFilter.RPrime.some,
+        GmosNorthFpu.LongSlit_5_00.some,
+        GmosXBinning.One,
+        GmosYBinning.Two,
+        GmosAmpGain.Low
+      )
+
+    val flat =
+      SmartGcalValue(
+        Gcal(
+          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+          GcalFilter.Gmos,
+          GcalDiffuser.Ir,
+          GcalShutter.Open
         ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
+        GcalBaselineType.Night,
+        PosInt.unsafeFrom(1),
+        LegacyInstrumentConfig(
+          TimeSpan.unsafeFromMicroseconds(1_000_000L)
         )
       )
-    val tableRow2: TableRow.North =
-      TableRow(
-        PosLong.unsafeFrom(1),
-        TableKey(
-          GratingConfigKey(
-            GmosNorthGrating.R831_G5302,
-            GmosGratingOrder.One,
-            BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-          ).some,
-          GmosNorthFilter.RPrime.some,
-          GmosNorthFpu.LongSlit_5_00.some,
-          GmosXBinning.One,
-          GmosYBinning.Two,
-          GmosAmpGain.Low
+
+    val arc =
+      SmartGcalValue(
+        Gcal(
+          Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
+          GcalFilter.None,
+          GcalDiffuser.Visible,
+          GcalShutter.Closed
         ),
-        SmartGcalValue(
-          Gcal(
-            Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-            GcalFilter.Gmos,
-            GcalDiffuser.Ir,
-            GcalShutter.Open
-          ),
-          GcalBaselineType.Night,
-          PosInt.unsafeFrom(1),
-          LegacyInstrumentConfig(
-            TimeSpan.unsafeFromMicroseconds(1_000_000L)
-          )
+        GcalBaselineType.Day,
+        PosInt.unsafeFrom(1),
+        LegacyInstrumentConfig(
+          TimeSpan.unsafeFromMicroseconds(1_000_000L)
         )
+      )
+
+    val tableRows: List[TableRow.North] =
+      List(
+        TableRow(PosLong.unsafeFrom(1), key_0_50, flat),
+        TableRow(PosLong.unsafeFrom(1), key_0_50, arc),
+        TableRow(PosLong.unsafeFrom(1), key_1_00, flat),
+        TableRow(PosLong.unsafeFrom(1), key_1_00, arc),
+        TableRow(PosLong.unsafeFrom(1), key_5_00, flat),
+        TableRow(PosLong.unsafeFrom(1), key_5_00, arc)
       )
 
     Enums.load(s).flatMap { e =>
       val services = Services.forUser(pi /* doesn't matter*/, e)(s)
       services.transactionally {
-        services.smartGcalService.insertGmosNorth(1, tableRow1) *>
-        services.smartGcalService.insertGmosNorth(2, tableRow2)
+        tableRows.zipWithIndex.traverse_ { (r, i) =>
+          services.smartGcalService.insertGmosNorth(i, r)
+        }
       }
     }
   }
@@ -367,7 +395,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       ))
     )
 
+  val GmosNorthArc0  = GmosNorthScience0.copy(exposure = Seconds01)
   val GmosNorthFlat0 = GmosNorthScience0.copy(exposure = Seconds01)
+  val GmosNorthArc5  = GmosNorthScience5.copy(exposure = Seconds01)
   val GmosNorthFlat5 = GmosNorthScience5.copy(exposure = Seconds01)
 
   val P00Q00 = Offset.Zero
@@ -378,6 +408,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val ScienceP10Q00 = StepConfig.Science(P10Q00, StepGuideState.Enabled)
   val ScienceP00Q15 = StepConfig.Science(P00Q15, StepGuideState.Enabled)
   val Flat          = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
+  val Arc           = StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
 
   def stepConfigScienceJson(o: Offset): Json =
     json"""
