@@ -6,49 +6,29 @@ package lucuma.odb.calibrations
 import cats.*
 import cats.data.Kleisli
 import cats.effect.*
+import cats.effect.syntax.all.*
 import cats.effect.std.Console
 import cats.implicits.*
-import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
-import grackle.skunk.SkunkMonitor
-import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
-import lucuma.core.model.User
-import lucuma.graphql.routes.GraphQLService
-import lucuma.itc.client.ItcClient
-import lucuma.odb.graphql.EmailWebhookRoutes
-import lucuma.odb.graphql.GraphQLRoutes
-import lucuma.odb.graphql.ObsAttachmentRoutes
-import lucuma.odb.graphql.OdbMapping
-import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.EmailWebhookService
-import lucuma.odb.service.ItcService
-import lucuma.odb.service.S3FileService
-import lucuma.odb.service.UserService
-import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
-import natchez.http4s.implicits.*
-import org.flywaydb.core.Flyway
-import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
-import org.http4s.blaze.server.BlazeServerBuilder
-import org.http4s.client.Client
-import org.http4s.implicits.*
 import org.http4s.server.*
-import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
-import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
 import lucuma.odb.Config
+import lucuma.odb.graphql.topic.ProgramTopic
+import cats.effect.std.Supervisor
+import fs2.concurrent.Topic
+import lucuma.odb.graphql.topic.ObservationTopic
 
 sealed trait MainParams {
   val ServiceName: String =
@@ -87,9 +67,6 @@ object CalibrationsMain extends CommandIOApp(
 
 object CMain extends MainParams {
 
-  // Time GraphQL service instances are cached
-  val GraphQLServiceTTL = 30.minutes
-
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
     val banner =
@@ -97,8 +74,6 @@ object CMain extends MainParams {
             |$Header
             |
             |CommitHash. : ${config.commitHash.format}
-            |CORS domains: ${config.domain.mkString(", ")}
-            |ITC Root    : ${config.itc.root}
             |Port        : ${config.port}
             |PID         : ${ProcessHandle.current.pid}
             |
@@ -107,9 +82,10 @@ object CMain extends MainParams {
   }
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Trace: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Network: Console](
     config: Config.Database
-  ): Resource[F, Resource[F, Session[F]]] =
+  ): Resource[F, Resource[F, Session[F]]] = {
+    import natchez.Trace.Implicits.noop
     Session.pooled(
       host     = config.host,
       port     = config.port,
@@ -121,18 +97,8 @@ object CMain extends MainParams {
       strategy = Strategy.SearchPath,
       // debug    = true,
     )
+  }
 
-
-  /** A resource that yields a running HTTP server. */
-  def serverResource[F[_]: Async](
-    port: Port,
-    app:  WebSocketBuilder2[F] => HttpApp[F]
-  ): Resource[F, Server] =
-    BlazeServerBuilder
-      .apply[F]
-      .bindHttp(port.value, "0.0.0.0")
-      .withHttpWebSocketApp(app)
-      .resource
 
   /** A resource that yields a Natchez tracing entry point. */
   def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
@@ -142,73 +108,6 @@ object CMain extends MainParams {
         cb.setDataset(config.honeycomb.dataset)
         cb.build()
       }
-    }
-
-  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  // def routesResource[F[_]: Async: Trace: Logger: Network: Console](
-  //   config: Config
-  // ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-  //   routesResource(
-  //     config.database,
-  //     config.aws,
-  //     config.email,
-  //     config.itcClient,
-  //     config.commitHash,
-  //     config.ssoClient,
-  //     config.corsOverHttps,
-  //     config.domain,
-  //     S3FileService.s3AsyncClientOpsResource(config.aws),
-  //     S3FileService.s3PresignerResource(config.aws),
-  //     config.httpClientResource
-  //   )
-
-  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  // def routesResource[F[_]: Async: Trace: Logger: Network: Console](
-  //   databaseConfig:      Config.Database,
-  //   awsConfig:           Config.Aws,
-  //   emailConfig:         Config.Email,
-  //   itcClientResource:   Resource[F, ItcClient[F]],
-  //   commitHash:          CommitHash,
-  //   ssoClientResource:   Resource[F, SsoClient[F, User]],
-  //   corsOverHttps:       Boolean,
-  //   domain:              List[String],
-  //   s3OpsResource:       Resource[F, S3AsyncClientOp[F]],
-  //   s3PresignerResource: Resource[F, S3Presigner],
-  //   httpClientResource:  Resource[F, Client[F]]
-  // ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-  //   for {
-  //     pool              <- databasePoolResource[F](databaseConfig)
-  //     itcClient         <- itcClientResource
-  //     ssoClient         <- ssoClientResource
-  //     httpClient        <- httpClientResource
-  //     userSvc           <- pool.map(UserService.fromSession(_))
-  //     middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
-  //     enums             <- Resource.eval(pool.use(Enums.load))
-  //     ptc               <- Resource.eval(pool.use(TimeEstimateCalculator.fromSession(_, enums)))
-  //     graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
-  //     s3ClientOps       <- s3OpsResource
-  //     s3Presigner       <- s3PresignerResource
-  //     s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
-  //     metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
-  //     webhookService    <- pool.map(EmailWebhookService.fromSession(_))
-  //   } yield { wsb =>
-  //     val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
-  //     val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
-  //     val metadataRoutes = GraphQLRoutes.enumMetadata(metadataService)
-  //     val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-  //     middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes <+> metadataRoutes <+> emailWebhookRoutes)
-  //   }
-
-  /** A startup action that runs database migrations using Flyway. */
-  def migrateDatabase[F[_]: Sync](config: Config.Database): F[MigrateResult] =
-    Sync[F].delay {
-      Flyway
-        .configure()
-        .loggers("slf4j")
-        .dataSource(config.jdbcUrl, config.user, config.password)
-        .baselineOnMigrate(true)
-        .load()
-        .migrate()
     }
 
   def singleSession[F[_]: Async: Console: Network](
@@ -229,27 +128,27 @@ object CMain extends MainParams {
     )
   }
 
-  def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
-
-    import skunk.*
-    import skunk.implicits.*
-
-    val drop   = sql"""DROP DATABASE "#${config.database}"""".command
-    val create = sql"""CREATE DATABASE "#${config.database}"""".command
-
-    singleSession(config, "postgres".some).use { s =>
-      for {
-        _ <- s.execute(drop).void
-        _ <- s.execute(create).void
-      } yield()
-    }
-  }
-
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
   // This derivation is required to avoid a deprecation warning in the call to wsLiftR below.
-  given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
+  // given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
+
+  def topics[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]): Resource[F, Topic[F, ObservationTopic.Element]] =
+    for {
+      sup <- Supervisor[F]
+      ses <- pool
+      top <- Resource.eval(ObservationTopic(ses, 1024, sup))
+    } yield top
+
+  def calibrationService[F[_]: Concurrent: Logger](obsTopic: Topic[F, ObservationTopic.Element], session: Session[F]): Resource[F, Unit] =
+    for {
+      _ <- Resource.eval(Logger[F].info("--------- Starting calibration service"))
+      cs <- Resource.pure(CalibrationsService.instantiate[F](session))
+      _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
+              Logger[F].info(s"STATE $elem") *> cs.recalculateCalibrations(elem.programId)
+            }.compile.drain.start.void)
+    } yield ()
 
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
@@ -257,12 +156,14 @@ object CMain extends MainParams {
    */
   def server[F[_]: Async: Logger: Console: Network]: Resource[F, ExitCode] =
     for {
-      c  <- Resource.eval(Config.fromCiris.load[F])
-      _  <- Resource.eval(banner[F](c))
-      // ep <- entryPointResource(c)
-      // ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
-      // _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
-      // _  <- serverResource(c.port, ap)
+      c     <- Resource.eval(Config.fromCiris.load[F])
+      _     <- Resource.eval(banner[F](c))
+      s     <- singleSession(c.database)
+      ep    <- entryPointResource(c)
+      pool  <- databasePoolResource[F](c.database)
+      enums <- Resource.eval(pool.use(Enums.load))
+      obsT  <- topics(pool)
+      _     <- calibrationService[F](obsT, s)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
