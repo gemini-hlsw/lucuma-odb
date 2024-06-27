@@ -79,6 +79,9 @@ trait Services[F[_]]:
   /** The `AsterismService`. */
   def asterismService: AsterismService[F]
 
+  /** The `CalibrationsService`. */
+  def calibrationsService: CalibrationsService[F]
+
   /** The `CallForProposalsService`. */
   def callForProposalsService: CallForProposalsService[F]
 
@@ -212,6 +215,7 @@ object Services:
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val callForProposalsService = CallForProposalsService.instantiate
+      lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
       lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
@@ -258,6 +262,7 @@ object Services:
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
+    def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService

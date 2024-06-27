@@ -1,44 +1,42 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.calibrations
+package lucuma.odb.service
 
-import cats.effect.Concurrent
+import cats.FlatMap
+import cats.syntax.all.*
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFpu
+import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Program
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import skunk.Query
-import lucuma.core.model.Program
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosSouthFpu
 import org.typelevel.log4cats.Logger
-import cats.FlatMap
-
-import cats.syntax.all.*
-import skunk.Session
+import skunk.Query
 import skunk.syntax.all.*
-import lucuma.odb.service.GroupService
-import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id
-  ): F[Unit]
+  )(using L: Logger[F]): F[Unit]
 
 }
 
 object CalibrationsService {
-  def instantiate[F[_]: FlatMap: Logger](using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: FlatMap](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
-      def recalculateCalibrations(pid: Program.Id): F[Unit] =
-        session.execute(Statements.SelectGmosNorthLongSlitConfigurations)(pid).flatMap{ r =>
-          Logger[F].info(s"Recalculating calibrations for program $pid with ${r} configurations.")
-        }
+      def recalculateCalibrations(pid: Program.Id)(using L: Logger[F]): F[Unit] =
+        for {
+          gnls   <- session.execute(Statements.SelectGmosNorthLongSlitConfigurations)(pid)
+          gsls   <- session.execute(Statements.SelectGmosSouthLongSlitConfigurations)(pid)
+          groups <- groupService.selectGroups(pid)
+          _      <- Logger[F].info(groups.toString)
+        } yield ()
     }
 
   object Statements {
@@ -77,7 +75,7 @@ object CalibrationsService {
            c_central_wavelength,
            c_xbin,
            c_ybin
-         FROM t_gmos_south_slit
+         FROM t_gmos_south_long_slit
          INNER JOIN t_observation
          ON t_gmos_south_long_slit.c_observation_id = t_observation.c_observation_id
          WHERE c_program_id=$program_id

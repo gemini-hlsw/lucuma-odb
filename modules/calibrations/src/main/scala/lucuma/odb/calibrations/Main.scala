@@ -4,38 +4,35 @@
 package lucuma.odb.calibrations
 
 import cats.*
-import cats.data.Kleisli
 import cats.effect.*
-import cats.effect.syntax.all.*
 import cats.effect.std.Console
+import cats.effect.std.Supervisor
+import cats.effect.std.UUIDGen
+import cats.effect.syntax.all.*
 import cats.implicits.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.concurrent.Topic
 import fs2.io.net.Network
+import lucuma.core.model.Access
+import lucuma.core.model.User
+import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
-import org.http4s.*
-import org.http4s.server.*
+import org.http4s.Credentials
+import org.http4s.headers.Authorization
+import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
-import lucuma.odb.Config
-import lucuma.odb.graphql.topic.ProgramTopic
-import cats.effect.std.Supervisor
-import fs2.concurrent.Topic
-import lucuma.odb.graphql.topic.ObservationTopic
-import lucuma.core.model.User
-import org.http4s.headers.Authorization
-import org.typelevel.ci.CIString
-import lucuma.odb.service.Services
-import lucuma.core.model.Role
-import lucuma.core.model.Access
-import cats.effect.std.UUIDGen
 
 sealed trait MainParams {
   val ServiceName: String =
@@ -83,7 +80,6 @@ object CMain extends MainParams {
             |$Header
             |
             |CommitHash. : ${config.commitHash.format}
-            |Port        : ${config.port}
             |PID         : ${ProcessHandle.current.pid}
             |
             |""".stripMargin
@@ -119,48 +115,32 @@ object CMain extends MainParams {
       }
     }
 
-  def singleSession[F[_]: Async: Trace: Console: Network](
-    config:   Config.Database,
-    database: Option[String] = None
-  ): Resource[F, Session[F]] = {
-
-    Session.single[F](
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      database = database.getOrElse(config.database),
-      password = config.password.some,
-      ssl      = SSL.Trusted.withFallback(true),
-      strategy = Strategy.SearchPath
-    )
-  }
-
-  implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
-    Logger[F].mapK(Kleisli.liftK)
-
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
-  // This derivation is required to avoid a deprecation warning in the call to wsLiftR below.
-  // given [F[_]: Async, A]: Network[Kleisli[F, A, _]] = Network.forAsync
 
-  def topics[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]): Resource[F, Topic[F, ObservationTopic.Element]] =
+  def topics[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]):
+   Resource[F, Topic[F, ObservationTopic.Element]] =
     for {
       sup <- Supervisor[F]
       ses <- pool
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield top
 
-  def calibrationService[F[_]: Concurrent: Logger: Services](obsTopic: Topic[F, ObservationTopic.Element]): Resource[F, Unit] =
+  def runCalibrationsDaemon[F[_]: Concurrent: Logger: Services](
+    obsTopic: Topic[F, ObservationTopic.Element]
+  ): Resource[F, Unit] =
     for {
-      _ <- Resource.eval(Logger[F].info("--------- Starting calibration service"))
-      cs <- Resource.pure(CalibrationsService.instantiate[F])
+      _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
-              Logger[F].info(s"STATE $elem") *> cs.recalculateCalibrations(elem.programId)
+              calibrationsService.recalculateCalibrations(elem.programId)
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Concurrent: UUIDGen: Trace: Logger](user: Option[User], enums: Enums)(pool: Session[F]): F[Services[F]] =
+  def services[F[_]: Concurrent: UUIDGen: Trace: Logger](
+    user: Option[User],
+    enums: Enums
+  )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
         Services.forUser(u, enums)(pool).pure[F]
@@ -180,14 +160,13 @@ object CMain extends MainParams {
     for {
       c                 <- Resource.eval(Config.fromCiris.load[F])
       _                 <- Resource.eval(banner[F](c))
-      s                 <- singleSession(c.database)
       ep                <- entryPointResource(c)
       pool              <- databasePoolResource[F](c.database)
       enums             <- Resource.eval(pool.use(Enums.load))
       obsT              <- topics(pool)
       user              <- Resource.eval(serviceUser[F](c))
-      given Services[F] <- pool.evalMap(services(user, enums)(_))
-      _                 <- calibrationService(obsT)
+      given Services[F] <- pool.evalMap(services(user, enums))
+      _                 <- runCalibrationsDaemon(obsT)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
