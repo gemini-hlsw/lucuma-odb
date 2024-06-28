@@ -441,13 +441,13 @@ input CallForProposalsPropertiesInput {
 
   """
   Active period start time for this call.  Required on create.  Must be before
-  the activeEnd time.  Not nullable.
+  the activeEnd time.  Not nullable.  Limited to dates before 2100.
   """
   activeStart: Timestamp
 
   """
   Active period end time for this call.  Required on create.  Must be after
-  the activeStart time.  Not nullable.
+  the activeStart time.  Not nullable.  Limited to dates before 2100.
   """
   activeEnd: Timestamp
 

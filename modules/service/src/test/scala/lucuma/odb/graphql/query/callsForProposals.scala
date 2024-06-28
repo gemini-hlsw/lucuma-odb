@@ -262,7 +262,7 @@ class callsForProposals extends OdbSuite {
       type:        DEMO_SCIENCE
       semester:    "2025B"
       activeStart: "2025-02-02 14:00:00"
-      activeEnd:   "9999-07-30 14:00:00"
+      activeEnd:   "2099-07-30 14:00:00"
       partners:    [
         {
           partner: CA
