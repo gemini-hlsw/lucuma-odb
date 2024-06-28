@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.apply.*
-import cats.syntax.eq.*
 import cats.syntax.parallel.*
 
 import lucuma.core.enums.Site
@@ -28,7 +27,7 @@ object CoordinateLimitsInput {
   // hour after the LST at evening twilight on the first night of the semester
   // and half an hour before the LST at morning twilight on the last night of
   // the semester.
-  private val Buffer: Duration = Duration.ofMinutes(30L)
+  private val Buffer = Duration.ofMinutes(30L)
 
   def defaultRaLimits(site: Site, time: TimestampInterval): (RightAscension, RightAscension) = {
 
@@ -60,9 +59,14 @@ object CoordinateLimitsInput {
     (toRa(lstStart), toRa(lstEnd))
   }
 
-  def defaultDecLimits(site: Site): (Declination, Declination) = {
-    (Declination.Zero, Declination.Zero)
-  }
+  private val NorthLowerLimit = Declination.fromStringSignedDMS.unsafeGet("-37:00:00.000000")
+  private val SouthUpperLimit = Declination.fromStringSignedDMS.unsafeGet("+28:00:00.000000")
+
+  def defaultDecLimits(site: Site): (Declination, Declination) =
+    site match {
+      case Site.GN => (NorthLowerLimit, Declination.Max)
+      case Site.GS => (Declination.Min, SouthUpperLimit)
+    }
 
   case class Create(
     raStart:  RightAscension,
