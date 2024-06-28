@@ -23,6 +23,15 @@ import lucuma.odb.graphql.binding.*
 
 object CallForProposalsPropertiesInput {
 
+  // We default RA and Dec from the LST of the active period start/end.  Our
+  // code for computing the LST only works until 2100 apparently.
+  private def validateTime(name: String, rTime: Result[Timestamp]): Result[Timestamp] =
+    rTime.flatMap { time =>
+      val year = time.toLocalDateTime.getYear  // year in UTC timezone
+      if (year < 2100) time.success
+      else Matcher.validationFailure(s"'$name' time must be before the year 2100 UTC")
+    }
+
   case class Create(
     cfpType:     CallForProposalsType,
     semester:    Semester,
@@ -53,9 +62,11 @@ object CallForProposalsPropertiesInput {
           ExistenceBinding.Option("existence", rExistence)
         ) => {
           // Check that active start comes before end.
-          val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
+          val rValidStart = validateTime("activeStart", rActiveStart)
+          val rValidEnd   = validateTime("activeEnd", rActiveEnd)
+          val rActive = (rValidStart, rValidEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
-              Option.when(start <= end)(TimestampInterval.between(start, end)),
+              Option.when(start < end)(TimestampInterval.between(start, end)),
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }

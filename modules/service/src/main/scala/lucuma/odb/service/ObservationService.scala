@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.NonEmptyList
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.api.Refined.value
@@ -22,6 +23,7 @@ import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.WaterVapor
@@ -67,6 +69,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -509,20 +512,20 @@ object ObservationService {
         
         def validateRaDec(
           cid: CallForProposals.Id,
+          inst: Option[Instrument],
           explicitBase: Option[(RightAscension, Declination)]
         ): F[Option[ObservationValidation]] =
-          session.unique(Statements.CfpInformation)(cid)
-            .flatMap( (ora1, ora2, odec1, odec2, active) =>
-              // if the proposal doesn't have Ra/Dec limits, there can't be an error
-              (ora1, ora2, odec1, odec2).tupled
-                .fold(none.pure) { (raStart, raEnd, decStart, decEnd) =>
-                  // if the observation has explicit base declared, use that
-                  explicitBase.fold(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, active)){ (ra, dec) =>
-                    if (ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd)) none.pure
-                    else cfpError(ExplicitBaseOutOfRangeMsg).some.pure
-                  }
-              }
-            )
+          (for {
+            site <- OptionT.fromOption(inst.map(_.site.toList).collect {
+              case List(Site.GN) => Site.GN
+              case List(Site.GS) => Site.GS
+            })
+            (raStart, raEnd, decStart, decEnd, active) <- OptionT.liftF(session.unique(Statements.cfpInformation(site))(cid))
+            // if the observation has explicit base declared, use that
+            validation <- explicitBase.fold(OptionT(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, active))) { (ra, dec) =>
+              OptionT.fromOption(Option.unless(ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd))(cfpError(ExplicitBaseOutOfRangeMsg)))
+            }
+          } yield validation).value
 
         def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
           // If there is no instrument in the observation, that will get caught with the generatorValidations
@@ -547,7 +550,7 @@ object ObservationService {
                 (oinstr, ora, odec) <- obsInfo
                 valInstr            <- validateInstrument(cid, oinstr)
                 explicitBase     = (ora, odec).tupled
-                valRaDec            <- validateRaDec(cid, explicitBase)
+                valRaDec            <- validateRaDec(cid, oinstr, explicitBase)
               } yield ObservationValidationMap.fromList(List(valInstr, valRaDec).flatten)
              }
           )
@@ -1066,18 +1069,23 @@ object ObservationService {
         WHERE c_observation_id = $observation_id
       """.query(instrument.opt *: right_ascension.opt *: declination.opt)
 
-    val CfpInformation:
-      Query[CallForProposals.Id, (Option[RightAscension], Option[RightAscension], Option[Declination], Option[Declination], TimestampInterval)] =
+    def cfpInformation(
+      site: Site
+    ): Query[CallForProposals.Id, (RightAscension, RightAscension, Declination, Declination, TimestampInterval)] =
+      val ns = site match {
+        case Site.GN => "north"
+        case Site.GS => "south"
+      }
       sql"""
         SELECT
-          c_ra_start,
-          c_ra_end,
-          c_dec_start,
-          c_dec_end,
+          c_#${ns}_ra_start,
+          c_#${ns}_ra_end,
+          c_#${ns}_dec_start,
+          c_#${ns}_dec_end,
           c_active
         FROM t_cfp
         WHERE c_cfp_id = $cfp_id
-      """.query(right_ascension.opt *: right_ascension.opt *: declination.opt *: declination.opt *: timestamp_interval_tsrange)
+      """.query(right_ascension *: right_ascension *: declination *: declination *: timestamp_interval_tsrange)
 
     val CfpInstruments: Query[CallForProposals.Id, Instrument] =
       sql"""

@@ -35,6 +35,48 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("failure - start too far in the future for LST calc") {
+    expect(
+      user = pi,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2100-02-31 14:00:00"
+                activeEnd:   "2025-07-31 14:00:00"
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: 'activeStart' time must be before the year 2100 UTC").asLeft
+    )
+  }
+
+  test("failure - end too far in the future for LST calc") {
+    expect(
+      user = pi,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2025A"
+                activeStart: "2025-02-31 14:00:00"
+                activeEnd:   "2100-07-31 14:00:00"
+              }
+            }
+          ) { callForProposals { id } }
+        }
+      """,
+      expected = List("Argument 'input.SET' is invalid: 'activeEnd' time must be before the year 2100 UTC").asLeft
+    )
+  }
+
   test("success - simple with defaults") {
 
     // existence defaults to PRESENT
