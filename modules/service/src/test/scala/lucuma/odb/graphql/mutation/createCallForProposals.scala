@@ -97,14 +97,14 @@ class createCallForProposals extends OdbSuite {
                 "north": {
                   "raStart": { "hms": "16:30:00.000000" },
                   "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "+00:00:00.000000" },
-                  "decEnd": { "dms": "+00:00:00.000000" }
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
                 },
                 "south": {
                   "raStart": { "hms": "15:30:00.000000" },
                   "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "+00:00:00.000000" },
-                  "decEnd": { "dms": "+00:00:00.000000" }
+                  "decStart": { "dms": "-90:00:00.000000" },
+                  "decEnd": { "dms": "+28:00:00.000000" }
                 }
               },
               "active": {
@@ -428,14 +428,14 @@ class createCallForProposals extends OdbSuite {
                 "north": {
                   "raStart": { "hms": "17:00:00.000000" },
                   "raEnd": { "hms": "13:00:00.000000" },
-                  "decStart": { "dms": "+00:00:00.000000" },
-                  "decEnd": { "dms": "+00:00:00.000000" }
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
                 },
                 "south": {
                   "raStart": { "hms": "15:30:00.000000" },
                   "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "+00:00:00.000000" },
-                  "decEnd": { "dms": "+00:00:00.000000" }
+                  "decStart": { "dms": "-90:00:00.000000" },
+                  "decEnd": { "dms": "+28:00:00.000000" }
                 }
               }
             }
@@ -493,8 +493,8 @@ class createCallForProposals extends OdbSuite {
                 "north": {
                   "raStart": { "hms": "16:30:00.000000" },
                   "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "+00:00:00.000000" },
-                  "decEnd": { "dms": "+00:00:00.000000" }
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
                 },
                 "south": {
                   "raStart": { "hms": "15:30:00.000000" },
