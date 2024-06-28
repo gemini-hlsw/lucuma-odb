@@ -18,7 +18,8 @@ import lucuma.odb.data.OdbError
 class updateGroups extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
-  override lazy val validUsers: List[User] = List(pi)
+  val service  = TestUsers.service(6)
+  override lazy val validUsers: List[User] = List(pi, service)
 
   test("simple bulk update") {
     for {
@@ -105,7 +106,7 @@ class updateGroups extends OdbSuite {
         mutation {
           updateGroups(input: {
             SET: {
-              parentGroup: ${gid.asJson}              
+              parentGroup: ${gid.asJson}
               ${index.map(_.value.asJson).foldMap(j => s"parentGroupIndex: $j")}
             },
             WHERE: {
@@ -135,7 +136,7 @@ class updateGroups extends OdbSuite {
     } yield {
       assertEquals(es.toSet, gidElementSet(o2, o1, o3))
       assertEquals(es.drop(1).toSet, gidElementSet(o2, o1))
-    }  
+    }
   }
 
   test("move groups into a group (at beginning)") {
@@ -181,7 +182,7 @@ class updateGroups extends OdbSuite {
     } yield {
       assertEquals(es.take(2), List(Left(gid), Left(o1)))
       assertEquals(es.drop(2).toSet, gidElementSet(o2, o3))
-    }  
+    }
   }
 
   test("move groups out of a group (at beginning of program)") {
@@ -196,9 +197,9 @@ class updateGroups extends OdbSuite {
     } yield {
       assertEquals(es.take(2).toSet, gidElementSet(o2, o3))
       assertEquals(es.drop(2), List(Left(gid), Left(o1)))
-    }  
+    }
   }
-  
+
   test("move groups out of a group (in the middle of program)") {
     for {
       pid <- createProgramAs(pi)
@@ -212,7 +213,7 @@ class updateGroups extends OdbSuite {
       assertEquals(es(0), Left(gid))
       assertEquals(es.drop(1).take(2).toSet, gidElementSet(o2, o3))
       assertEquals(es(3), Left(o1))
-    }  
+    }
   }
 
   test("move groups between groups") {
@@ -229,7 +230,7 @@ class updateGroups extends OdbSuite {
     } yield {
       assertEquals(e1, List(Left(o1)))
       assertEquals(e2.toSet, gidElementSet(o2, o3))
-    }  
+    }
   }
 
   test("Hugo's example, with groups") {
@@ -323,7 +324,7 @@ class updateGroups extends OdbSuite {
       _   <- assertIO(groupElementsAs(pi, pid, None), List(Left(g2)))
     yield ()
   }
-  
+
   test("update existence - deleted group should be visible at top level, if you ask") {
     for
       pid <- createProgramAs(pi)
@@ -343,7 +344,7 @@ class updateGroups extends OdbSuite {
       _   <- assertIO(groupElementsAs(pi, pid, Some(g1)), Nil)
     yield ()
   }
-  
+
   test("update existence - deleted group should be visible at nested level, if you ask") {
     for
       pid <- createProgramAs(pi)
@@ -363,4 +364,93 @@ class updateGroups extends OdbSuite {
     yield ()
   }
 
+  def updateGroupName(user: User, gid: Group.Id, name: String): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              name: $name
+            },
+            WHERE: {
+              id: { IN: [${gid.asJson}] }
+            }
+          }) {
+            groups {
+              id
+              name
+            }
+          }
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateGroups": {
+            "groups": [
+              {
+                "id": $gid,
+                "name": $name
+              }
+            ]
+          }
+        }
+      """)
+    )
+
+  def updateGroupNameNoOp(user: User, gid: Group.Id, name: String): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              name: $name
+            },
+            WHERE: {
+              id: { IN: [${gid.asJson}] }
+            }
+          }) {
+            groups {
+              id
+              name
+            }
+          }
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateGroups": {
+            "groups": [
+            ]
+          }
+        }
+      """)
+    )
+
+  test("update name") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      _   <- updateGroupName(pi, g1, "NewName")
+    yield ()
+  }
+
+  test("update system group's name is a no op") {
+    for
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      _   <- updateGroupSystem(g1, true)
+      _   <- updateGroupNameNoOp(pi, g1, "NewName")
+    yield ()
+  }
+
+  test("update system group's name is allowed for system") {
+    for
+      pid <- createProgramAs(service)
+      g1  <- createGroupAs(service, pid)
+      _   <- updateGroupSystem(g1, true)
+      _   <- updateGroupName(service, g1, "NewName")
+    yield ()
+  }
 }

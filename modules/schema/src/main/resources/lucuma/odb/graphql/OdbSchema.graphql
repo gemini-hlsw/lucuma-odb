@@ -7211,6 +7211,7 @@ type Group {
 
   existence: Existence!
 
+  system: Boolean!
 }
 
 scalar GroupId
