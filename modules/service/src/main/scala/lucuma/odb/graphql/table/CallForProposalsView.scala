@@ -26,14 +26,23 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
     val Type     = col("c_type",       cfp_type)
     val Semester = col("c_semester",   semester)
 
-    val RaStartId  = col("c_ra_start_id",  cfp_id.embedded)
-    val RaStart    = col("c_ra_start",     right_ascension.embedded)
-    val RaEndId    = col("c_ra_end_id",    cfp_id.embedded)
-    val RaEnd      = col("c_ra_end",       right_ascension.embedded)
-    val DecStartId = col("c_dec_start_id", cfp_id.embedded)
-    val DecStart   = col("c_dec_start",    declination.embedded)
-    val DecEndId   = col("c_dec_end_id",   cfp_id.embedded)
-    val DecEnd     = col("c_dec_end",      declination.embedded)
+    object coordinateLimits {
+
+      object north {
+        val RaStart  = col("c_north_ra_start",     right_ascension)
+        val RaEnd    = col("c_north_ra_end",       right_ascension)
+        val DecStart = col("c_north_dec_start",    declination)
+        val DecEnd   = col("c_north_dec_end",      declination)
+      }
+
+      object south {
+        val RaStart  = col("c_south_ra_start",     right_ascension)
+        val RaEnd    = col("c_south_ra_end",       right_ascension)
+        val DecStart = col("c_south_dec_start",    declination)
+        val DecEnd   = col("c_south_dec_end",      declination)
+      }
+
+    }
 
     val DeadlineDefault = col("c_deadline_default", core_timestamp.opt)
     val Active          = col("c_active",           timestamp_interval_tsrange)

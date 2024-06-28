@@ -383,28 +383,9 @@ type CallForProposals {
   semester: Semester!
 
   """
-  When specified specified, the start limit defines the beginning (inclusive) of
-  an RA range in which observations will be accepted.
+  Coordinate limits for targets that may be observed in this Call for Proposals.
   """
-  raLimitStart: RightAscension
-
-  """
-  When specified specified, the end limit defines the end (inclusive) of an RA
-  range in which observations will be accepted.
-  """
-  raLimitEnd: RightAscension
-
-  """
-  When specified specified, the start limit defines the beginning (inclusive) of
-  a declination range in which observations will be accepted.
-  """
-  decLimitStart: Declination
-
-  """
-  When specified specified, the end limit defines the end (inclusive) of
-  a declination range in which observations will be accepted.
-  """
-  decLimitEnd: Declination
+  coordinateLimits: SiteCoordinateLimits!
 
   """
   The active period during which accepted observations for this call may be
@@ -453,28 +434,10 @@ input CallForProposalsPropertiesInput {
   semester: Semester
 
   """
-  Optional RA limit start RA. Required only if raLimitEnd is specified. Nullable
-  on edit if raLimitEnd is also set to 'null'.
+  Coordinate limits.  If not specified, they will default according to the
+  active period of the call.
   """
-  raLimitStart: RightAscensionInput
-
-  """
-  Optional RA limit end RA. Required only if raLimitStart is specified. Nullable
-  on edit if raLimitStart is also set to 'null'.
-  """
-  raLimitEnd: RightAscensionInput
-
-  """
-  Optional declination limit start declination. Required only if decLimitEnd is
-  specified.  Nullable on edit if decLimitEnd is also set to 'null'.
-  """
-  decLimitStart: DeclinationInput
-
-  """
-  Optional declination limit end declination. Required only if decLimitStart is
-  specified.  Nullable on edit if decLimitStart is also set to 'null'.
-  """
-  decLimitEnd: DeclinationInput
+  coordinateLimits: SiteCoordinateLimitsInput
 
   """
   Active period start time for this call.  Required on create.  Must be before
@@ -510,6 +473,38 @@ input CallForProposalsPropertiesInput {
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
+}
+
+input SiteCoordinateLimitsInput {
+
+  north: CoordinateLimitsInput
+
+  south: CoordinateLimitsInput
+
+}
+
+input CoordinateLimitsInput {
+
+  """
+  Optional RA limit start RA.
+  """
+  raStart: RightAscensionInput
+
+  """
+  Optional RA limit end RA.
+  """
+  raEnd: RightAscensionInput
+
+  """
+  Optional declination limit start declination.
+  """
+  decStart: DeclinationInput
+
+  """
+  Optional declination limit end declination.
+  """
+  decEnd: DeclinationInput
+
 }
 
 """
@@ -758,6 +753,37 @@ input ConditionsExpectationInput {
 
 type AddConditionsEntryResult {
   conditionsEntry: ConditionsEntry!
+}
+
+"""
+RA/Dec limits.
+"""
+type CoordinateLimits {
+
+  """
+  The start limit defines the beginning (inclusive) of an RA range in which
+  observations will be accepted.
+  """
+  raStart: RightAscension!
+
+  """
+  The end limit defines the end (inclusive) of an RA range in which observations
+  will be accepted.
+  """
+  raEnd: RightAscension!
+
+  """
+  The start limit defines the beginning (inclusive) of a declination range in
+  which observations will be accepted.
+  """
+  decStart: Declination!
+
+  """
+  The end limit defines the end (inclusive) of a declination range in which
+  observations will be accepted.
+  """
+  decEnd: Declination!
+
 }
 
 """
@@ -9311,6 +9337,23 @@ enum Site {
 
   "Gemini South"
   GS
+
+}
+
+"""
+Coordinate limits per site.
+"""
+type SiteCoordinateLimits {
+
+  """
+  Gemini North coordinate limits.
+  """
+  north: CoordinateLimits!
+
+  """
+  Gemini South coordinate limits.
+  """
+  south: CoordinateLimits!
 
 }
 

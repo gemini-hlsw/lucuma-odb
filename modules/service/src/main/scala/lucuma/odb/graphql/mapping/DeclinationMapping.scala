@@ -34,8 +34,10 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
 
   lazy val DeclinationMapping: List[TypeMapping] =
     List(
-      declinationMappingAtPath(CallForProposalsType / "decLimitStart", CallForProposalsView.DecStartId, CallForProposalsView.DecStart),
-      declinationMappingAtPath(CallForProposalsType / "decLimitEnd", CallForProposalsView.DecEndId, CallForProposalsView.DecEnd),
+      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "decStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.DecStart),
+      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
+      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecStart),
+      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
     )

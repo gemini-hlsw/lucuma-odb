@@ -110,6 +110,7 @@ object OdbMapping {
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
+          with CoordinateLimitsMapping[F]
           with CoordinatesMapping[F]
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
@@ -185,6 +186,7 @@ object OdbMapping {
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
+          with SiteCoordinateLimitsMapping[F]
           with SpectroscopyConfigOptionMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
@@ -402,6 +404,7 @@ object OdbMapping {
                 AngleMappings,
                 AtomRecordSelectResultMappings,
                 CategorizedTimeMappings,
+                CoordinateLimitsMappings,
                 DatasetSelectResultMappings,
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
@@ -419,6 +422,7 @@ object OdbMapping {
                 OffsetPMappings,
                 OffsetQMappings,
                 RightAscensionMappings,
+                SiteCoordinateLimitsMappings,
                 TimeSpanMappings,
                 TimestampIntervalMappings,
                 WavelengthMappings
