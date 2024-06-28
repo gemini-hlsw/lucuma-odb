@@ -795,7 +795,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       } .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
         case SqlState.RaiseException(ex) =>
           OdbError.InconsistentGroupError(Some(ex.message)).asFailure
-          
+
     }
 
 }

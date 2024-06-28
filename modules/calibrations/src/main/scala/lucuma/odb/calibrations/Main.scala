@@ -127,13 +127,13 @@ object CMain extends MainParams {
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield top
 
-  def runCalibrationsDaemon[F[_]: Concurrent: Logger: Services](
-    obsTopic: Topic[F, ObservationTopic.Element]
+  def runCalibrationsDaemon[F[_]: Concurrent: Logger](
+    obsTopic: Topic[F, ObservationTopic.Element],  services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
-              calibrationsService.recalculateCalibrations(elem.programId)
+              services.useTransactionally(calibrationsService.recalculateCalibrations(elem.programId))
             }.compile.drain.start.void)
     } yield ()
 
@@ -158,15 +158,14 @@ object CMain extends MainParams {
    */
   def server[F[_]: Async: Logger: Trace: Console: Network]: Resource[F, ExitCode] =
     for {
-      c                 <- Resource.eval(Config.fromCiris.load[F])
-      _                 <- Resource.eval(banner[F](c))
-      ep                <- entryPointResource(c)
-      pool              <- databasePoolResource[F](c.database)
-      enums             <- Resource.eval(pool.use(Enums.load))
-      obsT              <- topics(pool)
-      user              <- Resource.eval(serviceUser[F](c))
-      given Services[F] <- pool.evalMap(services(user, enums))
-      _                 <- runCalibrationsDaemon(obsT)
+      c     <- Resource.eval(Config.fromCiris.load[F])
+      _     <- Resource.eval(banner[F](c))
+      ep    <- entryPointResource(c)
+      pool  <- databasePoolResource[F](c.database)
+      enums <- Resource.eval(pool.use(Enums.load))
+      obsT  <- topics(pool)
+      user  <- Resource.eval(serviceUser[F](c))
+      _     <- runCalibrationsDaemon(obsT, pool.evalMap(services(user, enums)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

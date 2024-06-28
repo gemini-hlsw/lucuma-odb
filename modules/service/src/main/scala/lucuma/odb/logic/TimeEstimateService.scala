@@ -157,9 +157,9 @@ object TimeEstimateService {
         m:    Map[Observation.Id, ObservationData]
       ): F[Option[CategorizedTimeRange]] =
         root match {
-          case GroupTree.Leaf(oid)                               => leafRange(pid, oid, m)
-          case GroupTree.Branch(_, min, _, children, _, _, _, _) => parentRange(pid, min, children, m)
-          case GroupTree.Root(_, children)                       => parentRange(pid, None, children, m)
+          case GroupTree.Leaf(oid)                                  => leafRange(pid, oid, m)
+          case GroupTree.Branch(_, min, _, children, _, _, _, _, _) => parentRange(pid, min, children, m)
+          case GroupTree.Root(_, children)                          => parentRange(pid, None, children, m)
         }
 
       private def load(pid: Program.Id): F[(GroupTree, Map[Observation.Id, ObservationData])] =
