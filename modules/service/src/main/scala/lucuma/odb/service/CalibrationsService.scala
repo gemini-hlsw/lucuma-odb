@@ -3,8 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.FlatMap
+import cats.Monad
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFpu
@@ -12,30 +13,72 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Group
 import lucuma.core.model.Program
+import lucuma.odb.data.Existence
+import lucuma.odb.data.GroupTree
+import lucuma.odb.graphql.input.CreateGroupInput
+import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import org.typelevel.log4cats.Logger
+import lucuma.refined.*
 import skunk.Query
+import skunk.Transaction
 import skunk.syntax.all.*
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id
-  )(using L: Logger[F]): F[Unit]
+  )(using Transaction[F]): F[Unit]
 
 }
 
 object CalibrationsService {
-  def instantiate[F[_]: FlatMap](using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: Monad](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
-      def recalculateCalibrations(pid: Program.Id)(using L: Logger[F]): F[Unit] =
+      private val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
+
+      private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
+        if (size > 0) {
+          groupService.selectGroups(pid).flatMap {
+            case GroupTree.Root(_, c) =>
+              val existing = c.collectFirst {
+                case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true) => gid
+              }
+              // Create a system group for calibrations if it does not exist
+              existing match {
+                case Some(gid) => gid.some.pure[F]
+                case None      =>
+                  groupService.createGroup(
+                      input = CreateGroupInput(
+                        programId = pid.some,
+                        proposalReference = none,
+                        programReference = none,
+                        SET = GroupPropertiesInput.Create(
+                          name = CalibrationsGroupName.some,
+                          description = CalibrationsGroupName.some,
+                          minimumRequired = none,
+                          ordered = false,
+                          minimumInterval = none,
+                          maximumInterval = none,
+                          parentGroupId = none,
+                          parentGroupIndex = none,
+                          existence = Existence.Present
+                        )
+                      ),
+                    system = true
+                  ).map(_.toOption)
+              }
+            case _ => none.pure[F]
+          }
+        } else none.pure[F]
+
+      def recalculateCalibrations(pid: Program.Id)(using Transaction[F]): F[Unit] =
         for {
-          gnls   <- session.execute(Statements.SelectGmosNorthLongSlitConfigurations)(pid)
-          gsls   <- session.execute(Statements.SelectGmosSouthLongSlitConfigurations)(pid)
-          groups <- groupService.selectGroups(pid)
-          _      <- Logger[F].info(groups.toString)
+          gnls <- session.execute(Statements.SelectGmosNorthLongSlitConfigurations)(pid)
+          gsls <- session.execute(Statements.SelectGmosSouthLongSlitConfigurations)(pid)
+          _    <-  calibrationsGroup(pid, gnls.size + gsls.size)
         } yield ()
     }
 

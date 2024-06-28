@@ -52,4 +52,16 @@ class group extends OdbSuite {
              )
     } yield ()
   }
+
+  test("groups have a system property") {
+    for {
+      pid <- createProgramAs(pi0)
+      gid <- createGroupAs(pi0, pid)
+      _   <- expect(pi0,  // not visible to pi1
+               s"""query { group(groupId: "$gid") { id system } }""",
+               json"""{ "group": {"id": $gid, "system": false } }""".asRight
+             )
+    } yield ()
+  }
+
 }
