@@ -28,13 +28,13 @@ object SiteCoordinateLimitsInput {
           (time: TimestampInterval) =>
             val n = north.getOrElse(CoordinateLimitsInput.Create.default)
             val s = south.getOrElse(CoordinateLimitsInput.Create.default)
-            Create(n(Site.GN.place, time), s(Site.GS.place, time))
+            Create(n(Site.GN, time), s(Site.GS, time))
         }
       }
 
     def default(time: TimestampInterval): Create =
-      val north = CoordinateLimitsInput.Create.default(Site.GN.place, time)
-      val south = CoordinateLimitsInput.Create.default(Site.GS.place, time)
+      val north = CoordinateLimitsInput.Create.default(Site.GN, time)
+      val south = CoordinateLimitsInput.Create.default(Site.GS, time)
       Create(north, south)
 
   case class Edit(
