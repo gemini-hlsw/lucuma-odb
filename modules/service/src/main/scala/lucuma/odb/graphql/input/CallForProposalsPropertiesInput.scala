@@ -26,8 +26,10 @@ object CallForProposalsPropertiesInput {
   case class Create(
     cfpType:     CallForProposalsType,
     semester:    Semester,
-    raLimit:     Option[(RightAscension, RightAscension)],
-    decLimit:    Option[(Declination, Declination)],
+    gnRaLimit:   (RightAscension, RightAscension),
+    gnDecLimit:  (Declination, Declination),
+    gsRaLimit:   (RightAscension, RightAscension),
+    gsDecLimit:  (Declination, Declination),
     active:      TimestampInterval,
     deadline:    Option[Timestamp],
     partners:    Option[List[CallForProposalsPartnerInput]],
@@ -36,15 +38,13 @@ object CallForProposalsPropertiesInput {
   )
 
   object Create {
+
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
-          RightAscensionInput.Binding.Option("raLimitStart",   rRaStart),
-          RightAscensionInput.Binding.Option("raLimitEnd",     rRaEnd),
-          DeclinationInput.Binding.Option("decLimitStart",     rDecStart),
-          DeclinationInput.Binding.Option("decLimitEnd",       rDecEnd),
+          SiteCoordinateLimitsInput.Create.Binding.Option("coordinateLimits", rLimits),
           TimestampBinding("activeStart", rActiveStart),
           TimestampBinding("activeEnd",   rActiveEnd),
           TimestampBinding.Option("submissionDeadlineDefault", rDeadline),
@@ -52,9 +52,6 @@ object CallForProposalsPropertiesInput {
           InstrumentBinding.List.Option("instruments", rInstruments),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
-          // Check that both (or neither) limits are supplied.
-          val rRaLimit  = bothOrNeither(rRaStart,  rRaEnd,  "raLimitStart",  "raLimitEnd")
-          val rDecLimit = bothOrNeither(rDecStart, rDecEnd, "decLimitStart", "decLimitEnd")
           // Check that active start comes before end.
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
@@ -62,19 +59,34 @@ object CallForProposalsPropertiesInput {
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
+
           val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
             rType,
             rSemester,
-            rRaLimit,
-            rDecLimit,
+            rLimits,
             rActive,
             rDeadline,
             rPartnersʹ,
             rInstrumentsʹ,
             rExistence.map(_.getOrElse(Existence.Present))
-          ).parMapN(Create.apply)
+          ).parMapN { (cfpType, semester, limits, active, deadline, partners, instruments, exist) =>
+            val coords = limits.fold(SiteCoordinateLimitsInput.Create.default(active))(f => f(active))
+            Create(
+              cfpType,
+              semester,
+              (coords.north.raStart, coords.north.raEnd),
+              (coords.north.decStart, coords.north.decEnd),
+              (coords.south.raStart, coords.south.raEnd),
+              (coords.south.decStart, coords.south.decEnd),
+              active,
+              deadline,
+              partners,
+              instruments,
+              exist
+            )
+          }
         }
       }
 
@@ -83,8 +95,10 @@ object CallForProposalsPropertiesInput {
   case class Edit(
     cfpType:     Option[CallForProposalsType],
     semester:    Option[Semester],
-    raLimit:     Nullable[(RightAscension, RightAscension)],
-    decLimit:    Nullable[(Declination, Declination)],
+    gnRaLimit:   (Option[RightAscension], Option[RightAscension]),
+    gnDecLimit:  (Option[Declination], Option[Declination]),
+    gsRaLimit:   (Option[RightAscension], Option[RightAscension]),
+    gsDecLimit:  (Option[Declination], Option[Declination]),
     active:      Option[Ior[Timestamp, Timestamp]],
     deadline:    Nullable[Timestamp],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
@@ -99,10 +113,7 @@ object CallForProposalsPropertiesInput {
         case List(
           CallForProposalsTypeBinding.NonNullable("type", rType),
           SemesterBinding.NonNullable("semester", rSemester),
-          RightAscensionInput.Binding.Nullable("raLimitStart",   rRaStart),
-          RightAscensionInput.Binding.Nullable("raLimitEnd",     rRaEnd),
-          DeclinationInput.Binding.Nullable("decLimitStart",     rDecStart),
-          DeclinationInput.Binding.Nullable("decLimitEnd",       rDecEnd),
+          SiteCoordinateLimitsInput.Edit.Binding.Option("coordinateLimits", rLimits),
           TimestampBinding.NonNullable("activeStart", rActiveStart),
           TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
           TimestampBinding.Nullable("submissionDeadlineDefault", rDeadline),
@@ -110,9 +121,8 @@ object CallForProposalsPropertiesInput {
           InstrumentBinding.List.Nullable("instruments", rInstruments),
           ExistenceBinding.NonNullable("existence", rExistence)
         ) => {
-          // Check that both (or neither) limits are supplied.
-          val rRaLimit  = bothOrNeitherNullable(rRaStart,  rRaEnd,  "raLimitStart",  "raLimitEnd")
-          val rDecLimit = bothOrNeitherNullable(rDecStart, rDecEnd, "decLimitStart", "decLimitEnd")
+          val rLimNorth = rLimits.map(_.flatMap(_.north))
+          val rLimSouth = rLimits.map(_.flatMap(_.south))
 
           // If both start and end are specified, they should be in order.
           val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap {
@@ -126,8 +136,10 @@ object CallForProposalsPropertiesInput {
           (
             rType,
             rSemester,
-            rRaLimit,
-            rDecLimit,
+            rLimNorth.map(lim => (lim.flatMap(_.raStart), lim.flatMap(_.raEnd))),
+            rLimNorth.map(lim => (lim.flatMap(_.decStart), lim.flatMap(_.decEnd))),
+            rLimSouth.map(lim => (lim.flatMap(_.raStart), lim.flatMap(_.raEnd))),
+            rLimSouth.map(lim => (lim.flatMap(_.decStart), lim.flatMap(_.decEnd))),
             rActive,
             rDeadline,
             rPartnersʹ,
@@ -138,31 +150,6 @@ object CallForProposalsPropertiesInput {
       }
 
   }
-
-  private def bothOrNeither[A](
-    ra: Result[Option[A]],
-    rb: Result[Option[A]],
-    na: String,
-    nb: String
-  ): Result[Option[(A, A)]] =
-    (ra, rb).parFlatMapN {
-      case (Some(a), Some(b)) => Some((a, b)).success
-      case (None, None)       => None.success
-      case _                  => Result.failure(s"Supply both $na and $nb or neither")
-    }
-
-  private def bothOrNeitherNullable[A](
-    ra: Result[Nullable[A]],
-    rb: Result[Nullable[A]],
-    na: String,
-    nb: String
-  ): Result[Nullable[(A, A)]] =
-    (ra, rb).parFlatMapN {
-      case (Nullable.Null,       Nullable.Null      ) => Nullable.Null.success
-      case (Nullable.Absent,     Nullable.Absent    ) => Nullable.Absent.success
-      case (Nullable.NonNull(a), Nullable.NonNull(b)) => Nullable.NonNull((a, b)).success
-      case _                                          => Result.failure(s"Supply both $na and $nb or neither")
-    }
 
   private def dedup[F[_]: Traverse, A, B](
     name: String,

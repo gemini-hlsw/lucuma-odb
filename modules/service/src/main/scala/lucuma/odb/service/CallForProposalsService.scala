@@ -175,10 +175,14 @@ object CallForProposalsService {
         INSERT INTO t_cfp (
           c_type,
           c_semester,
-          c_ra_start,
-          c_ra_end,
-          c_dec_start,
-          c_dec_end,
+          c_north_ra_start,
+          c_north_ra_end,
+          c_north_dec_start,
+          c_north_dec_end,
+          c_south_ra_start,
+          c_south_ra_end,
+          c_south_dec_start,
+          c_south_dec_end,
           c_deadline_default,
           c_active,
           c_existence
@@ -186,10 +190,14 @@ object CallForProposalsService {
         SELECT
           $cfp_type,
           $semester,
-          ${right_ascension.opt},
-          ${right_ascension.opt},
-          ${declination.opt},
-          ${declination.opt},
+          ${right_ascension},
+          ${right_ascension},
+          ${declination},
+          ${declination},
+          ${right_ascension},
+          ${right_ascension},
+          ${declination},
+          ${declination},
           ${core_timestamp.opt},
           $timestamp_interval_tsrange,
           $existence
@@ -198,10 +206,14 @@ object CallForProposalsService {
       """.query(cfp_id).contramap { input => (
         input.cfpType,
         input.semester,
-        input.raLimit.map(_._1),
-        input.raLimit.map(_._2),
-        input.decLimit.map(_._1),
-        input.decLimit.map(_._2),
+        input.gnRaLimit._1,
+        input.gnRaLimit._2,
+        input.gnDecLimit._1,
+        input.gnDecLimit._2,
+        input.gsRaLimit._1,
+        input.gsRaLimit._2,
+        input.gsDecLimit._1,
+        input.gsDecLimit._2,
         input.deadline,
         input.active,
         input.existence
@@ -272,26 +284,36 @@ object CallForProposalsService {
       SET:   CallForProposalsPropertiesInput.Edit,
       which: AppliedFragment
     ): AppliedFragment = {
-      val upRaDec = List(
-        SET.raLimit.map(_._1).foldPresent(sql"c_ra_start   = ${right_ascension.opt}"),
-        SET.raLimit.map(_._2).foldPresent(sql"c_ra_end     = ${right_ascension.opt}"),
-        SET.decLimit.map(_._1).foldPresent(sql"c_dec_start = ${declination.opt}"),
-        SET.decLimit.map(_._2).foldPresent(sql"c_dec_end   = ${declination.opt}")
-      ).flatMap(_.toList)
-
       val upActive = SET.active.map(_.fold(
         sql"c_active = tsrange($core_timestamp, upper(c_active))",
         sql"c_active = tsrange(lower(c_active), $core_timestamp)",
         (s, e) => sql"c_active = $timestamp_interval_tsrange"(TimestampInterval.between(s, e))
       ))
 
+      val gnRaStart   = sql"c_north_ra_start  = $right_ascension"
+      val gnRaEnd     = sql"c_north_ra_end    = $right_ascension"
+      val gnDecStart  = sql"c_north_dec_start = $declination"
+      val gnDecEnd    = sql"c_north_dec_end   = $declination"
+      val gsRaStart   = sql"c_south_ra_start  = $right_ascension"
+      val gsRaEnd     = sql"c_south_ra_end    = $right_ascension"
+      val gsDecStart  = sql"c_south_dec_start = $declination"
+      val gsDecEnd    = sql"c_south_dec_end   = $declination"
+
       val upExistence = sql"c_existence = $existence"
       val upSemester  = sql"c_semester  = $semester"
       val upType      = sql"c_type      = $cfp_type"
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
-        NonEmptyList.fromList(upRaDec ++ List(
+        NonEmptyList.fromList(List(
           upActive,
+          SET.gnRaLimit._1.map(gnRaStart),
+          SET.gnRaLimit._2.map(gnRaEnd),
+          SET.gnDecLimit._1.map(gnDecStart),
+          SET.gnDecLimit._2.map(gnDecEnd),
+          SET.gsRaLimit._1.map(gsRaStart),
+          SET.gsRaLimit._2.map(gsRaEnd),
+          SET.gsDecLimit._1.map(gsDecStart),
+          SET.gsDecLimit._2.map(gsDecEnd),
           SET.deadline.foldPresent(sql"c_deadline_default = ${core_timestamp.opt}"),
           SET.existence.map(upExistence),
           SET.semester.map(upSemester),

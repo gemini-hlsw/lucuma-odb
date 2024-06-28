@@ -36,8 +36,10 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
 
   lazy val RightAscensionMappings: List[TypeMapping] =
     List(
-      rightAscensionMappingAtPath(CallForProposalsType / "raLimitStart", CallForProposalsView.RaStartId, CallForProposalsView.RaStart),
-      rightAscensionMappingAtPath(CallForProposalsType / "raLimitEnd", CallForProposalsView.RaEndId, CallForProposalsView.RaEnd),
+      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "raStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.RaStart),
+      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
+      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaStart),
+      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
     )
