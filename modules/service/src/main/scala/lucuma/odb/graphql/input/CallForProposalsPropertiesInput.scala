@@ -16,20 +16,23 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model.Semester
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
-import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
+import org.typelevel.cats.time.*
+
+import java.time.LocalDate
 
 object CallForProposalsPropertiesInput {
 
   // We default RA and Dec from the LST of the active period start/end.  Our
   // code for computing the LST only works until 2100 apparently.
-  private def validateTime(name: String, rTime: Result[Timestamp]): Result[Timestamp] =
-    rTime.flatMap { time =>
-      val year = time.toLocalDateTime.getYear  // year in UTC timezone
-      if (year < 2100) time.success
-      else Matcher.validationFailure(s"'$name' time must be before the year 2100 UTC")
+  private def validateYear(name: String, rDate: Result[LocalDate]): Result[LocalDate] =
+    rDate.flatMap { date =>
+      val year = date.getYear  // year in UTC timezone
+      if ((year > 1900) && (year < 2100)) date.success
+      else Matcher.validationFailure(s"'$name' date must be between 1900 and 2100 UTC (exclusive)")
     }
 
   case class Create(
@@ -39,7 +42,7 @@ object CallForProposalsPropertiesInput {
     gnDecLimit:  (Declination, Declination),
     gsRaLimit:   (RightAscension, RightAscension),
     gsDecLimit:  (Declination, Declination),
-    active:      TimestampInterval,
+    active:      DateInterval,
     deadline:    Option[Timestamp],
     partners:    Option[List[CallForProposalsPartnerInput]],
     instruments: List[Instrument],
@@ -54,19 +57,19 @@ object CallForProposalsPropertiesInput {
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
           SiteCoordinateLimitsInput.Create.Binding.Option("coordinateLimits", rLimits),
-          TimestampBinding("activeStart", rActiveStart),
-          TimestampBinding("activeEnd",   rActiveEnd),
+          DateBinding("activeStart", rActiveStart),
+          DateBinding("activeEnd",   rActiveEnd),
           TimestampBinding.Option("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
           InstrumentBinding.List.Option("instruments", rInstruments),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
           // Check that active start comes before end.
-          val rValidStart = validateTime("activeStart", rActiveStart)
-          val rValidEnd   = validateTime("activeEnd", rActiveEnd)
+          val rValidStart = validateYear("activeStart", rActiveStart)
+          val rValidEnd   = validateYear("activeEnd", rActiveEnd)
           val rActive = (rValidStart, rValidEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
-              Option.when(start < end)(TimestampInterval.between(start, end)),
+              Option.when(start < end)(DateInterval.between(start, end)),
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
@@ -110,7 +113,7 @@ object CallForProposalsPropertiesInput {
     gnDecLimit:  (Option[Declination], Option[Declination]),
     gsRaLimit:   (Option[RightAscension], Option[RightAscension]),
     gsDecLimit:  (Option[Declination], Option[Declination]),
-    active:      Option[Ior[Timestamp, Timestamp]],
+    active:      Option[Ior[LocalDate, LocalDate]],
     deadline:    Nullable[Timestamp],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
@@ -125,8 +128,8 @@ object CallForProposalsPropertiesInput {
           CallForProposalsTypeBinding.NonNullable("type", rType),
           SemesterBinding.NonNullable("semester", rSemester),
           SiteCoordinateLimitsInput.Edit.Binding.Option("coordinateLimits", rLimits),
-          TimestampBinding.NonNullable("activeStart", rActiveStart),
-          TimestampBinding.NonNullable("activeEnd",   rActiveEnd),
+          DateBinding.NonNullable("activeStart", rActiveStart),
+          DateBinding.NonNullable("activeEnd",   rActiveEnd),
           TimestampBinding.Nullable("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Nullable("partners", rPartners),
           InstrumentBinding.List.Nullable("instruments", rInstruments),

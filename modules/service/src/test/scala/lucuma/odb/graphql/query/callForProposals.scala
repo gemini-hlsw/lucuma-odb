@@ -29,8 +29,8 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2025-02-01 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
+                activeStart: "2025-02-01"
+                activeEnd:   "2025-07-31"
               }
             }
           ) {
@@ -100,8 +100,8 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        ${cfpType.tag.toScreamingSnakeCase}
                 semester:    "2025A"
-                activeStart: "2025-02-01 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
+                activeStart: "2025-02-01"
+                activeEnd:   "2025-07-31"
               }
             }
           ) {
@@ -149,8 +149,8 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        FAST_TURNAROUND
                 semester:    "2025A"
-                activeStart: "2025-08-01 14:00:00"
-                activeEnd:   "2025-08-31 14:00:00"
+                activeStart: "2025-08-01"
+                activeEnd:   "2025-08-31"
               }
             }
           ) {
@@ -185,8 +185,8 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        SYSTEM_VERIFICATION
                 semester:    "2025A"
-                activeStart: "2025-08-01 14:00:00"
-                activeEnd:   "2025-08-31 14:00:00"
+                activeStart: "2025-08-01"
+                activeEnd:   "2025-08-31"
                 instruments: [GMOS_NORTH]
               }
             }
@@ -219,8 +219,8 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        SYSTEM_VERIFICATION
                 semester:    "2025A"
-                activeStart: "2025-08-01 14:00:00"
-                activeEnd:   "2025-08-31 14:00:00"
+                activeStart: "2025-08-01"
+                activeEnd:   "2025-08-31"
                 instruments: [GMOS_SOUTH, GMOS_NORTH]
               }
             }

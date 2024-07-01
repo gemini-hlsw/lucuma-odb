@@ -13,11 +13,11 @@ import lucuma.core.math.HourAngle
 import lucuma.core.math.RightAscension
 import lucuma.core.math.skycalc.ImprovedSkyCalc
 import lucuma.core.model.ObservingNight
-import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.DateInterval
 import lucuma.odb.graphql.binding.*
 
 import java.time.Duration
-import java.time.Instant
+import java.time.LocalDate
 import java.time.ZonedDateTime
 
 object CoordinateLimitsInput {
@@ -28,35 +28,37 @@ object CoordinateLimitsInput {
   // the semester.
   private val Buffer = Duration.ofMinutes(30L)
 
-  def defaultRaLimits(site: Site, time: TimestampInterval): (RightAscension, RightAscension) = {
+  private def toRa(z: ZonedDateTime): RightAscension =
+    val h = z.getHour
+    val m = z.getMinute
+    val s = z.getSecond
+    val n = z.getNano
 
-    def nightAt(instant: Instant): ObservingNight =
-      ObservingNight.fromSiteAndInstant(site, instant)
+    // Round to nearest half-hour and convert to RA
+    RightAscension.fromHourAngle.get(HourAngle.fromDoubleHours(
+      Math.round((h + m / 60.0 + (s + n/1000000000.0) / 3600.0) * 2.0) / 2.0
+    ))
 
-    // Twilight on the evening of the first night
-    val start    = nightAt(time.start.toInstant).twilightBoundedUnsafe(Nautical).start
+  def defaultRaLimits(site: Site, dateInterval: DateInterval): (RightAscension, RightAscension) =
 
-    // Twilight in the morning of the last night
-    val end      = nightAt(time.end.toInstant).previous.twilightBoundedUnsafe(Nautical).end
+    if (dateInterval.isEmpty) (RightAscension.Zero, RightAscension.Zero)
+    else {
+      def nightAt(date: LocalDate): ObservingNight =
+        ObservingNight.fromSiteAndLocalDate(site, date)
 
-    // LST at start and end
-    val sc       = ImprovedSkyCalc(site.place)
-    val lstStart = sc.getLst(start.plus(Buffer))
-    val lstEnd   = sc.getLst(end.minus(Buffer))
+      // Twilight on the evening of the first night
+      val start    = nightAt(dateInterval.start).twilightBoundedUnsafe(Nautical).start
 
-    def toRa(z: ZonedDateTime): RightAscension =
-      val h = z.getHour
-      val m = z.getMinute
-      val s = z.getSecond
-      val n = z.getNano
+      // Twilight in the morning of the last night
+      val end      = nightAt(dateInterval.end).previous.twilightBoundedUnsafe(Nautical).end
 
-      // Round to nearest half-hour and convert to RA
-      RightAscension.fromHourAngle.get(HourAngle.fromDoubleHours(
-        Math.round((h + m / 60.0 + (s + n/1000000000.0) / 3600.0) * 2.0) / 2.0
-      ))
+      // LST at start and end
+      val sc       = ImprovedSkyCalc(site.place)
+      val lstStart = sc.getLst(start.plus(Buffer))
+      val lstEnd   = sc.getLst(end.minus(Buffer))
 
-    (toRa(lstStart), toRa(lstEnd))
-  }
+      (toRa(lstStart), toRa(lstEnd))
+    }
 
   private val NorthLowerLimit = Declination.fromStringSignedDMS.unsafeGet("-37:00:00.000000")
   private val SouthUpperLimit = Declination.fromStringSignedDMS.unsafeGet("+28:00:00.000000")
@@ -75,7 +77,7 @@ object CoordinateLimitsInput {
   )
 
   object Create:
-    val Binding: Matcher[(Site, TimestampInterval) => Create] =
+    val Binding: Matcher[(Site, DateInterval) => Create] =
       ObjectFieldsBinding.rmap {
         case List(
           RightAscensionInput.Binding.Option("raStart", rRaStart),
@@ -89,8 +91,8 @@ object CoordinateLimitsInput {
             rDecStart,
             rDecEnd
           ).parMapN { (raStart, raEnd, decStart, decEnd) =>
-            (site: Site, time: TimestampInterval) => {
-              val defaultRa  = (raStart, raEnd).tupled.getOrElse(defaultRaLimits(site, time))
+            (site: Site, date: DateInterval) => {
+              val defaultRa  = (raStart, raEnd).tupled.getOrElse(defaultRaLimits(site, date))
               val defaultDec = (decStart, decEnd).tupled.getOrElse(defaultDecLimits(site))
 
               Create(
@@ -103,8 +105,8 @@ object CoordinateLimitsInput {
           }
       }
 
-    def default(site: Site, time: TimestampInterval): Create =
-      val ra  = defaultRaLimits(site, time)
+    def default(site: Site, date: DateInterval): Create =
+      val ra  = defaultRaLimits(site, date)
       val dec = defaultDecLimits(site)
       Create(ra._1, ra._2, dec._1, dec._2)
 
