@@ -8021,6 +8021,7 @@ type Itc {
   The ITC result for the acquisition part of the sequence
   """
   acquisition: ItcResultSet!
+
 }
 
 """
