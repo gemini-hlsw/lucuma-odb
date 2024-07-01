@@ -8004,6 +8004,11 @@ type Observation {
   """
   groupIndex: NonNegShort!
 
+  """
+  The Calibration role of this observation
+  """
+  calibrationRole: CalibrationRole!
+
 }
 
 type Itc {
