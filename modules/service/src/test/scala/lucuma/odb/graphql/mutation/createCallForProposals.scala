@@ -24,8 +24,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2025-02-31 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
+                activeStart: "2025-02-28"
+                activeEnd:   "2025-07-31"
               }
             }
           ) { callForProposals { id } }
@@ -45,14 +45,14 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2100-02-31 14:00:00"
-                activeEnd:   "2025-07-31 14:00:00"
+                activeStart: "2100-02-28"
+                activeEnd:   "2025-07-31"
               }
             }
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: 'activeStart' time must be before the year 2100 UTC").asLeft
+      expected = List("Argument 'input.SET' is invalid: 'activeStart' date must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
   }
 
@@ -66,14 +66,14 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2025-02-31 14:00:00"
-                activeEnd:   "2100-07-31 14:00:00"
+                activeStart: "2025-02-28"
+                activeEnd:   "2100-07-31"
               }
             }
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: 'activeEnd' time must be before the year 2100 UTC").asLeft
+      expected = List("Argument 'input.SET' is invalid: 'activeEnd' date must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
   }
 
@@ -89,8 +89,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2024B"
-                activeStart: "2024-07-31 14:00:00"
-                activeEnd:   "2025-02-01 14:00:00"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
               }
             }
           ) {
@@ -115,7 +115,6 @@ class createCallForProposals extends OdbSuite {
               active {
                 start
                 end
-                duration { hours }
               }
               submissionDeadlineDefault
               partners {
@@ -150,9 +149,8 @@ class createCallForProposals extends OdbSuite {
                 }
               },
               "active": {
-                "start": "2024-07-31 14:00:00",
-                "end": "2025-02-01 14:00:00",
-                "duration": { "hours": 4440.000000 }
+                "start": "2024-07-31",
+                "end": "2025-02-01"
               },
               "submissionDeadlineDefault": null,
               "partners": [
@@ -204,8 +202,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2025-07-31 14:00:00"
-                activeEnd:   "2025-02-31 14:00:00"
+                activeStart: "2025-07-31"
+                activeEnd:   "2025-02-28"
               }
             }
           ) { callForProposals { id } }
@@ -225,8 +223,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2026-02-01 14:00:00"
-                activeEnd:   "2026-07-31 14:00:00"
+                activeStart: "2026-02-01"
+                activeEnd:   "2026-07-31"
                 submissionDeadlineDefault: "2025-07-31 10:00:02"
                 partners:    [
                   {
@@ -296,8 +294,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2026-02-01 14:00:00"
-                activeEnd:   "2026-07-31 14:00:00"
+                activeStart: "2026-02-01"
+                activeEnd:   "2026-07-31"
                 partners:    []
               }
             }
@@ -332,8 +330,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2026-02-01 14:00:00"
-                activeEnd:   "2026-07-31 14:00:00"
+                activeStart: "2026-02-01"
+                activeEnd:   "2026-07-31"
                 partners:    [
                   {
                     partner: US
@@ -371,8 +369,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2026-02-01 14:00:00"
-                activeEnd:   "2026-07-31 14:00:00"
+                activeStart: "2026-02-01"
+                activeEnd:   "2026-07-31"
                 instruments: [GMOS_SOUTH, GMOS_NORTH]
               }
             }
@@ -406,8 +404,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:        REGULAR_SEMESTER
                 semester:    "2025A"
-                activeStart: "2026-02-01 14:00:00"
-                activeEnd:   "2026-07-31 14:00:00"
+                activeStart: "2026-02-01"
+                activeEnd:   "2026-07-31"
                 instruments: [GMOS_SOUTH, GMOS_SOUTH]
               }
             }
@@ -432,8 +430,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:         REGULAR_SEMESTER
                 semester:    "2024B"
-                activeStart: "2024-07-31 14:00:00"
-                activeEnd:   "2025-02-01 14:00:00"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
                 coordinateLimits: {
                   north: {
                     raStart: { hms: "17:00:00" }
@@ -497,8 +495,8 @@ class createCallForProposals extends OdbSuite {
               SET: {
                 type:         REGULAR_SEMESTER
                 semester:    "2024B"
-                activeStart: "2024-07-31 14:00:00"
-                activeEnd:   "2025-02-01 14:00:00"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
                 coordinateLimits: {
                   south: {
                     decStart: { dms: "45:00:00" }

@@ -391,7 +391,7 @@ type CallForProposals {
   The active period during which accepted observations for this call may be
   observed.
   """
-  active: TimestampInterval!
+  active: DateInterval!
 
   """
   The submission deadline to use for any partners without an explicit partner
@@ -435,21 +435,25 @@ input CallForProposalsPropertiesInput {
 
   """
   Coordinate limits.  If not specified, they will default according to the
-  active period of the call.
+  coordinates that are safely visible during the active period of the call.
   """
   coordinateLimits: SiteCoordinateLimitsInput
 
   """
-  Active period start time for this call.  Required on create.  Must be before
-  the activeEnd time.  Not nullable.  Limited to dates before 2100.
+  Active period start date (inclusive) for this call.  Required on create.  The
+  active period for this call will start on the night of the provided `Date`
+  value. Must be before the `activeEnd` date.  Not nullable.  Limited to dates
+  between 1900 and 2100 (exclusive).
   """
-  activeStart: Timestamp
+  activeStart: Date
 
   """
-  Active period end time for this call.  Required on create.  Must be after
-  the activeStart time.  Not nullable.  Limited to dates before 2100.
+  Active period end date (exclusive) for this call.  Required on create.  The
+  active period for this call will end on the morning of the provided `Date`
+  value.  Must be after the `activeStart` date.  Not nullable.  Limited to dates
+  between 1900 and 2100 (exclusive).
   """
-  activeEnd: Timestamp
+  activeEnd: Date
 
   """
   Specifies a submission deadline to use for any partners without an explicit
@@ -898,6 +902,24 @@ Editable dataset properties
 input DatasetPropertiesInput {
   qaState: DatasetQaState,
   comment: NonEmptyString
+}
+
+"""
+Date in ISO-8601 representation in format YYYY-MM-DD (e.g., '2024-07-31').
+"""
+scalar Date
+
+"""
+Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive).
+"""
+type DateInterval {
+
+  "Start date of the interval (inclusive)."
+  start: Date!
+
+  "End date of the interval (exclusive)."
+  end: Date!
+
 }
 
 """
@@ -11028,10 +11050,10 @@ input WhereCallForProposals {
   semester: WhereOrderSemester
 
   "Matches the active period start."
-  activeStart: WhereOrderTimestamp
+  activeStart: WhereOrderDate
 
   "Matches the active period end."
-  activeEnd: WhereOrderTimestamp
+  activeEnd: WhereOrderDate
 
   "Matches whether the call is still open for some partner."
   isOpen: WhereBoolean
@@ -12056,6 +12078,53 @@ input WhereOrderDatasetStage {
 }
 
 """
+Filters on equality or order comparisons of the Date property.  All supplied
+criteria must match, but usually only one is selected.  Dates are specified
+in ISO 8601 format (e.g., YYYY-MM-DD).
+"""
+input WhereOrderDate {
+  """
+  Matches if the date is exactly the supplied value.
+  """
+  EQ: Date
+
+  """
+  Matches if the date is not the supplied value.
+  """
+  NEQ: Date
+
+  """
+  Matches if the date value is any of the supplied options.
+  """
+  IN: [Date!]
+
+  """
+  Matches if the date value is none of the supplied values.
+  """
+  NIN: [Date!]
+
+  """
+  Matches if the date is ordered after (>) the supplied value.
+  """
+  GT: Date
+
+  """
+  Matches if the date is ordered before (<) the supplied value.
+  """
+  LT: Date
+
+  """
+  Matches if the date is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Date
+
+  """
+  Matches if the date is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Date
+}
+
+"""
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
@@ -12107,7 +12176,6 @@ input WhereOrderExecutionEventId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderTimestamp {
   """

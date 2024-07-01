@@ -52,6 +52,8 @@ import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
+import java.time.LocalDate
+
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   private given io.circe.Encoder[Epoch] =
@@ -81,6 +83,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](DatasetFilenameType),
       LeafMapping[Dataset.Id](DatasetIdType),
       LeafMapping[DatasetStage](DatasetStageType),
+      LeafMapping[LocalDate](DateType),
       LeafMapping[EditType](EditTypeType),
       LeafMapping[EmailAddress](EmailAddressType),
       LeafMapping[EmailStatus](EmailStatusType),

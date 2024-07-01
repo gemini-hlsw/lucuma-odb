@@ -27,8 +27,8 @@ class updateCallsForProposals extends OdbSuite {
               SET: {
                 type:          REGULAR_SEMESTER
                 semester:      "2025A"
-                activeStart:   "2025-02-01 14:00:00"
-                activeEnd:     "2025-07-31 14:00:00"
+                activeStart:   "2025-02-01"
+                activeEnd:     "2025-07-31"
                 coordinateLimits: {
                   north: {
                     raStart: { hms: "12:00:00" }
@@ -283,8 +283,8 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2024-12-31 14:00:00"
-                activeEnd:   "2026-01-01 14:00:00"
+                activeStart: "2024-12-31"
+                activeEnd:   "2026-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -305,8 +305,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2024-12-31 14:00:00",
-                    "end":   "2026-01-01 14:00:00"
+                    "start": "2024-12-31",
+                    "end":   "2026-01-01"
                   }
                 }
               ]
@@ -326,7 +326,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2024-12-31 14:00:00"
+                activeStart: "2024-12-31"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -347,8 +347,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2024-12-31 14:00:00",
-                    "end":   "2025-07-31 14:00:00"
+                    "start": "2024-12-31",
+                    "end":   "2025-07-31"
                   }
                 }
               ]
@@ -368,7 +368,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeEnd: "2025-06-01 14:00:00"
+                activeEnd: "2025-06-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -389,8 +389,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2025-02-01 14:00:00",
-                    "end":   "2025-06-01 14:00:00"
+                    "start": "2025-02-01",
+                    "end":   "2025-06-01"
                   }
                 }
               ]
@@ -410,8 +410,8 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2025-12-31 14:00:00"
-                activeEnd:   "2025-01-01 14:00:00"
+                activeStart: "2025-12-31"
+                activeEnd:   "2025-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -439,7 +439,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2026-01-01 14:00:00"
+                activeStart: "2026-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -467,7 +467,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeEnd: "2020-01-01 14:00:00"
+                activeEnd: "2020-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }

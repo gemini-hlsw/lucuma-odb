@@ -41,12 +41,13 @@ import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
-import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
@@ -77,6 +78,8 @@ import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
+
+import java.time.Duration
 
 import Services.Syntax.*
 
@@ -465,11 +468,6 @@ object ObservationService {
         def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
           decStart <= dec && dec <= decEnd
 
-      extension (tsi: TimestampInterval)
-        def centerUnsafe: Timestamp =
-          if (tsi.isEmpty) tsi.start
-          else tsi.start.plusMicrosOption(tsi.boundedTimeSpan.toMicroseconds / 2).get
-
       extension (ge: GeneratorParamsService.Error)
         def toObsValidation: ObservationValidation = ge match
           case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(MissingDataMsg(otid, paramName))
@@ -493,16 +491,22 @@ object ObservationService {
           raEnd: RightAscension,
           decStart: Declination,
           decEnd: Declination,
-          active: TimestampInterval
+          site: Site,
+          active: DateInterval
         ): F[Option[ObservationValidation]] = 
           asterismService.getAsterism(pid,oid)
             .map { l =>
               val targets = l.map(_._2)
               // The lack of a target will get reported in the generator errors
+              val start    = ObservingNight.fromSiteAndLocalDate(site, active.start).start
+              val end      = ObservingNight.fromSiteAndLocalDate(site, active.end).end
+              val duration = Duration.between(start, end)
+              val center   = start.plus(duration.dividedBy(2L))
+
               (for {
                 asterism <- NonEmptyList.fromList(targets)
                 tracking  = ObjectTracking.fromAsterism(asterism)
-                coordsAt <- tracking.at(active.centerUnsafe.toInstant)
+                coordsAt <- tracking.at(center)
                 coords    = coordsAt.value
               } yield {
                 if (coords.ra.isInInterval(raStart, raEnd) && coords.dec.isInInterval(decStart, decEnd)) none
@@ -522,7 +526,7 @@ object ObservationService {
             })
             (raStart, raEnd, decStart, decEnd, active) <- OptionT.liftF(session.unique(Statements.cfpInformation(site))(cid))
             // if the observation has explicit base declared, use that
-            validation <- explicitBase.fold(OptionT(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, active))) { (ra, dec) =>
+            validation <- explicitBase.fold(OptionT(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, site, active))) { (ra, dec) =>
               OptionT.fromOption(Option.unless(ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd))(cfpError(ExplicitBaseOutOfRangeMsg)))
             }
           } yield validation).value
@@ -1071,7 +1075,7 @@ object ObservationService {
 
     def cfpInformation(
       site: Site
-    ): Query[CallForProposals.Id, (RightAscension, RightAscension, Declination, Declination, TimestampInterval)] =
+    ): Query[CallForProposals.Id, (RightAscension, RightAscension, Declination, Declination, DateInterval)] =
       val ns = site match {
         case Site.GN => "north"
         case Site.GS => "south"
@@ -1082,10 +1086,11 @@ object ObservationService {
           c_#${ns}_ra_end,
           c_#${ns}_dec_start,
           c_#${ns}_dec_end,
-          c_active
+          c_active_start,
+          c_active_end
         FROM t_cfp
         WHERE c_cfp_id = $cfp_id
-      """.query(right_ascension *: right_ascension *: declination *: declination *: timestamp_interval_tsrange)
+      """.query(right_ascension *: right_ascension *: declination *: declination *: date_interval)
 
     val CfpInstruments: Query[CallForProposals.Id, Instrument] =
       sql"""

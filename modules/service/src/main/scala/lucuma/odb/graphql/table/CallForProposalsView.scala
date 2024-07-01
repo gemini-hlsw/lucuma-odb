@@ -15,8 +15,8 @@ import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.right_ascension
 import lucuma.odb.util.Codecs.semester
 import lucuma.odb.util.Codecs.text_nonempty
-import lucuma.odb.util.Codecs.timestamp_interval_tsrange
 import skunk.codec.boolean.bool
+import skunk.codec.temporal.date
 
 trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
@@ -45,7 +45,8 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
     }
 
     val DeadlineDefault = col("c_deadline_default", core_timestamp.opt)
-    val Active          = col("c_active",           timestamp_interval_tsrange)
+    val ActiveStart     = col("c_active_start",     date)
+    val ActiveEnd       = col("c_active_end",       date)
     val Existence       = col("c_existence",        existence)
     val Instruments     = col("c_instruments",      _instrument)
     val IsOpen          = col("c_is_open",          bool)

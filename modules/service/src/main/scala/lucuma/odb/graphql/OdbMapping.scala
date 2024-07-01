@@ -122,6 +122,7 @@ object OdbMapping {
           with DatasetMapping[F]
           with DatasetReferenceMapping[F]
           with DatasetSelectResultMapping[F]
+          with DateIntervalMapping[F]
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with EmailMapping[F]
@@ -203,7 +204,6 @@ object OdbMapping {
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
-          with TimestampIntervalMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateCallsForProposalsResultMapping[F]
@@ -406,6 +406,7 @@ object OdbMapping {
                 CategorizedTimeMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,
+                DateIntervalMappings,
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
                 GmosCcdModeMappings,
@@ -424,7 +425,6 @@ object OdbMapping {
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
                 TimeSpanMappings,
-                TimestampIntervalMappings,
                 WavelengthMappings
               ).flatten
 
