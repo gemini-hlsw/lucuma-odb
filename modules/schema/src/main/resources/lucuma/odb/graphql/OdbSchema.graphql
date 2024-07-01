@@ -8007,7 +8007,7 @@ type Observation {
   """
   The Calibration role of this observation
   """
-  calibrationRole: CalibrationRole!
+  calibrationRole: CalibrationRole
 
 }
 

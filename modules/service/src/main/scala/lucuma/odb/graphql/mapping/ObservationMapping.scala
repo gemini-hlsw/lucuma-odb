@@ -77,7 +77,7 @@ trait ObservationMapping[F[_]]
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    
+
     case (ObservationType, "timingWindows", Nil) =>
       Elab.transformChild { child =>
         FilterOrderByOffsetLimit(
