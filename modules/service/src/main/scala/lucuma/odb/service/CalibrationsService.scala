@@ -35,9 +35,10 @@ trait CalibrationsService[F[_]] {
 }
 
 object CalibrationsService {
+  val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
+
   def instantiate[F[_]: Monad](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
-      private val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
         if (size > 0) {
