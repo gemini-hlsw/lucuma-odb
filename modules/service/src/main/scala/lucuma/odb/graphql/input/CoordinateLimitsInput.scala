@@ -6,7 +6,6 @@ package input
 
 import cats.syntax.apply.*
 import cats.syntax.parallel.*
-
 import lucuma.core.enums.Site
 import lucuma.core.enums.TwilightType.Nautical
 import lucuma.core.math.Declination

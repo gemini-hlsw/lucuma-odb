@@ -475,6 +475,9 @@ input CallForProposalsPropertiesInput {
   existence: Existence
 }
 
+"""
+Coordinate limits input per site.
+"""
 input SiteCoordinateLimitsInput {
 
   north: CoordinateLimitsInput
