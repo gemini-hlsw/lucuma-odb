@@ -41,7 +41,7 @@ ALTER TABLE t_cfp
 ALTER TABLE t_cfp
   ADD COLUMN c_active_start date,
   ADD COLUMN c_active_end   date,
-  ADD CONSTRAINT active_dates_check CHECK (c_active_start <= c_active_end);
+  ADD CONSTRAINT active_dates_check CHECK (c_active_start < c_active_end);
 
 UPDATE t_cfp
    SET c_active_start = lower(c_active)::date,
