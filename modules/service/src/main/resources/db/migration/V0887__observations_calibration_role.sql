@@ -16,3 +16,4 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN c_spec_wavelength_coverage IS NOT NULL THEN c_observation_id END AS c_spec_wavelength_coverage_id,
   CASE WHEN c_spec_focal_plane_angle   IS NOT NULL THEN c_observation_id END AS c_spec_focal_plane_angle_id
   FROM t_observation o;
+

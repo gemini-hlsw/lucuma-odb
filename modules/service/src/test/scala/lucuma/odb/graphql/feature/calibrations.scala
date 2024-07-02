@@ -87,22 +87,23 @@ class calibrations extends OdbSuite {
       cg   <- cgid.map(queryGroup)
                 .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
     } yield {
-      assert(gr.size == 1)
+      assertEquals(gr.size, 1)
       assert(cg._2)
       assertEquals(cg._3, CalibrationsService.CalibrationsGroupName)
     }
   }
 
+
   test("add calibrations for each LongSlit mode") {
     for {
-      pid <- createProgramAs(pi)
+      pid  <- createProgramAs(pi)
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
-      _   <- withServices(service) { services =>
-               services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid)(using xa)
-               }
-             }
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid)(using xa)
+                }
+              }
       gr1  <- groupElementsAs(pi, pid, None)
       oids = gr1.collect {
                 case Right(oid) => oid
@@ -113,9 +114,35 @@ class calibrations extends OdbSuite {
         case CalibObs(_, Some(_)) => true
         case _ => false
       }
-      assert(cCount == 2)
-      assert(oids.size == 4)
+      assertEquals(cCount, 2)
+      assertEquals(oids.size, 4)
     }
+  }
+
+  test("add calibrations is idempotent") {
+        for {
+          pid  <- createProgramAs(pi)
+          oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
+          oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
+          _    <- withServices(service) { services =>
+                    services.session.transaction.use { xa =>
+                      services.calibrationsService.recalculateCalibrations(pid)(using xa) *>
+                        services.calibrationsService.recalculateCalibrations(pid)(using xa)
+                    }
+                  }
+          gr1  <- groupElementsAs(pi, pid, None)
+          oids = gr1.collect {
+                    case Right(oid) => oid
+                  }
+          ob   <- queryCalibrationObservations(pid)
+        } yield {
+          val cCount = ob.count {
+            case CalibObs(_, Some(_)) => true
+            case _                    => false
+          }
+          assertEquals(cCount, 2)
+          assertEquals(oids.size, 4)
+        }
   }
 
 }
