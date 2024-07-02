@@ -11,5 +11,5 @@ class GroupPredicates(path: Path) {
   lazy val parentId  = LeafPredicates[Group.Id](path / "parentId")
   lazy val program   = ProgramPredicates(path / "program")
   lazy val existence = ExistencePredicates(path / "existence")
-  lazy val system    = ExistencePredicates(path / "system")
+  lazy val system    = LeafPredicates[Boolean](path / "system")
 }
