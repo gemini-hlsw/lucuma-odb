@@ -47,6 +47,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.CalibrationRole
+import lucuma.odb.data.DateInterval
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -206,6 +207,11 @@ trait Codecs {
 
   val dataset_stage: Codec[DatasetStage] =
     enumerated(Type("e_dataset_stage"))
+
+  val date_interval: Codec[DateInterval] =
+    (date *: date).imap { case (min, max) =>
+      DateInterval.between(min, max)
+    } { interval => (interval.start, interval.end) }
 
   val declination: Codec[Declination] =
     angle_µas.eimap(

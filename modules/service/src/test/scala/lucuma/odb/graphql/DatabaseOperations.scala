@@ -76,6 +76,8 @@ import skunk.*
 import skunk.circe.codec.json.json as jsonCodec
 import skunk.syntax.all.*
 
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import scala.collection.immutable.SortedMap
 
 trait DatabaseOperations { this: OdbSuite =>
@@ -84,8 +86,8 @@ trait DatabaseOperations { this: OdbSuite =>
      user:        User,
      callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
      semester:    Semester             = Semester.unsafeFromString("2025A"),
-     activeStart: Timestamp            = Timestamp.FromString.unsafeGet("2025-02-01 14:00:00"),
-     activeEnd:   Timestamp            = Timestamp.FromString.unsafeGet("2025-07-31 14:00:00"),
+     activeStart: LocalDate            = LocalDate.parse("2025-02-01"),
+     activeEnd:   LocalDate            = LocalDate.parse("2025-07-31"),
      other:       Option[String]       = None
   ): IO[CallForProposals.Id] =
     query(user, s"""
@@ -95,8 +97,8 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 type:        ${callType.tag.toScreamingSnakeCase}
                 semester:    "${semester.format}"
-                activeStart: "${activeStart.format}"
-                activeEnd:   "${activeEnd.format}"
+                activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+                activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
                 ${other.getOrElse("")}
               }
             }

@@ -383,34 +383,15 @@ type CallForProposals {
   semester: Semester!
 
   """
-  When specified specified, the start limit defines the beginning (inclusive) of
-  an RA range in which observations will be accepted.
+  Coordinate limits for targets that may be observed in this Call for Proposals.
   """
-  raLimitStart: RightAscension
-
-  """
-  When specified specified, the end limit defines the end (inclusive) of an RA
-  range in which observations will be accepted.
-  """
-  raLimitEnd: RightAscension
-
-  """
-  When specified specified, the start limit defines the beginning (inclusive) of
-  a declination range in which observations will be accepted.
-  """
-  decLimitStart: Declination
-
-  """
-  When specified specified, the end limit defines the end (inclusive) of
-  a declination range in which observations will be accepted.
-  """
-  decLimitEnd: Declination
+  coordinateLimits: SiteCoordinateLimits!
 
   """
   The active period during which accepted observations for this call may be
   observed.
   """
-  active: TimestampInterval!
+  active: DateInterval!
 
   """
   The submission deadline to use for any partners without an explicit partner
@@ -453,40 +434,26 @@ input CallForProposalsPropertiesInput {
   semester: Semester
 
   """
-  Optional RA limit start RA. Required only if raLimitEnd is specified. Nullable
-  on edit if raLimitEnd is also set to 'null'.
+  Coordinate limits.  If not specified, they will default according to the
+  coordinates that are safely visible during the active period of the call.
   """
-  raLimitStart: RightAscensionInput
+  coordinateLimits: SiteCoordinateLimitsInput
 
   """
-  Optional RA limit end RA. Required only if raLimitStart is specified. Nullable
-  on edit if raLimitStart is also set to 'null'.
+  Active period start date (inclusive) for this call.  Required on create.  The
+  active period for this call will start on the night of the provided `Date`
+  value. Must be before the `activeEnd` date.  Not nullable.  Limited to dates
+  between 1900 and 2100 (exclusive).
   """
-  raLimitEnd: RightAscensionInput
+  activeStart: Date
 
   """
-  Optional declination limit start declination. Required only if decLimitEnd is
-  specified.  Nullable on edit if decLimitEnd is also set to 'null'.
+  Active period end date (exclusive) for this call.  Required on create.  The
+  active period for this call will end on the morning of the provided `Date`
+  value.  Must be after the `activeStart` date.  Not nullable.  Limited to dates
+  between 1900 and 2100 (exclusive).
   """
-  decLimitStart: DeclinationInput
-
-  """
-  Optional declination limit end declination. Required only if decLimitStart is
-  specified.  Nullable on edit if decLimitStart is also set to 'null'.
-  """
-  decLimitEnd: DeclinationInput
-
-  """
-  Active period start time for this call.  Required on create.  Must be before
-  the activeEnd time.  Not nullable.
-  """
-  activeStart: Timestamp
-
-  """
-  Active period end time for this call.  Required on create.  Must be after
-  the activeStart time.  Not nullable.
-  """
-  activeEnd: Timestamp
+  activeEnd: Date
 
   """
   Specifies a submission deadline to use for any partners without an explicit
@@ -510,6 +477,41 @@ input CallForProposalsPropertiesInput {
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
+}
+
+"""
+Coordinate limits input per site.
+"""
+input SiteCoordinateLimitsInput {
+
+  north: CoordinateLimitsInput
+
+  south: CoordinateLimitsInput
+
+}
+
+input CoordinateLimitsInput {
+
+  """
+  Optional RA limit start RA.
+  """
+  raStart: RightAscensionInput
+
+  """
+  Optional RA limit end RA.
+  """
+  raEnd: RightAscensionInput
+
+  """
+  Optional declination limit start declination.
+  """
+  decStart: DeclinationInput
+
+  """
+  Optional declination limit end declination.
+  """
+  decEnd: DeclinationInput
+
 }
 
 """
@@ -761,6 +763,37 @@ type AddConditionsEntryResult {
 }
 
 """
+RA/Dec limits.
+"""
+type CoordinateLimits {
+
+  """
+  The start limit defines the beginning (inclusive) of an RA range in which
+  observations will be accepted.
+  """
+  raStart: RightAscension!
+
+  """
+  The end limit defines the end (inclusive) of an RA range in which observations
+  will be accepted.
+  """
+  raEnd: RightAscension!
+
+  """
+  The start limit defines the beginning (inclusive) of a declination range in
+  which observations will be accepted.
+  """
+  decStart: Declination!
+
+  """
+  The end limit defines the end (inclusive) of a declination range in which
+  observations will be accepted.
+  """
+  decEnd: Declination!
+
+}
+
+"""
 Absolute coordinates relative base epoch
 """
 input CoordinatesInput {
@@ -869,6 +902,24 @@ Editable dataset properties
 input DatasetPropertiesInput {
   qaState: DatasetQaState,
   comment: NonEmptyString
+}
+
+"""
+Date in ISO-8601 representation in format YYYY-MM-DD (e.g., '2024-07-31').
+"""
+scalar Date
+
+"""
+Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive).
+"""
+type DateInterval {
+
+  "Start date of the interval (inclusive)."
+  start: Date!
+
+  "End date of the interval (exclusive)."
+  end: Date!
+
 }
 
 """
@@ -9315,6 +9366,23 @@ enum Site {
 }
 
 """
+Coordinate limits per site.
+"""
+type SiteCoordinateLimits {
+
+  """
+  Gemini North coordinate limits.
+  """
+  north: CoordinateLimits!
+
+  """
+  Gemini South coordinate limits.
+  """
+  south: CoordinateLimits!
+
+}
+
+"""
 Sky background
 """
 enum SkyBackground {
@@ -10982,10 +11050,10 @@ input WhereCallForProposals {
   semester: WhereOrderSemester
 
   "Matches the active period start."
-  activeStart: WhereOrderTimestamp
+  activeStart: WhereOrderDate
 
   "Matches the active period end."
-  activeEnd: WhereOrderTimestamp
+  activeEnd: WhereOrderDate
 
   "Matches whether the call is still open for some partner."
   isOpen: WhereBoolean
@@ -12010,6 +12078,53 @@ input WhereOrderDatasetStage {
 }
 
 """
+Filters on equality or order comparisons of the Date property.  All supplied
+criteria must match, but usually only one is selected.  Dates are specified
+in ISO 8601 format (e.g., YYYY-MM-DD).
+"""
+input WhereOrderDate {
+  """
+  Matches if the date is exactly the supplied value.
+  """
+  EQ: Date
+
+  """
+  Matches if the date is not the supplied value.
+  """
+  NEQ: Date
+
+  """
+  Matches if the date value is any of the supplied options.
+  """
+  IN: [Date!]
+
+  """
+  Matches if the date value is none of the supplied values.
+  """
+  NIN: [Date!]
+
+  """
+  Matches if the date is ordered after (>) the supplied value.
+  """
+  GT: Date
+
+  """
+  Matches if the date is ordered before (<) the supplied value.
+  """
+  LT: Date
+
+  """
+  Matches if the date is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Date
+
+  """
+  Matches if the date is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Date
+}
+
+"""
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
@@ -12061,7 +12176,6 @@ input WhereOrderExecutionEventId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderTimestamp {
   """

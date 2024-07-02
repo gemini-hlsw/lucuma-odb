@@ -27,12 +27,22 @@ class updateCallsForProposals extends OdbSuite {
               SET: {
                 type:          REGULAR_SEMESTER
                 semester:      "2025A"
-                raLimitStart:  { hms: "12:00:00" }
-                raLimitEnd:    { hms: "18:00:00" }
-                decLimitStart: { dms: "45:00:00" }
-                decLimitEnd:   { dms: "-45:00:00" }
-                activeStart:   "2025-02-01 14:00:00"
-                activeEnd:     "2025-07-31 14:00:00"
+                activeStart:   "2025-02-01"
+                activeEnd:     "2025-07-31"
+                coordinateLimits: {
+                  north: {
+                    raStart: { hms: "12:00:00" }
+                    raEnd: { hms: "18:00:00" }
+                    decStart: { dms: "45:00:00" }
+                    decEnd: { dms: "-45:00:00" }
+                  }
+                  south: {
+                    raStart: { hms: "12:00:01" }
+                    raEnd: { hms: "18:00:01" }
+                    decStart: { dms: "45:00:01" }
+                    decEnd: { dms: "-45:00:01" }
+                  }
+                }
                 instruments:   [GMOS_NORTH]
                 submissionDeadlineDefault: "2025-07-31 10:00:01"
                 partners:      [
@@ -131,7 +141,7 @@ class updateCallsForProposals extends OdbSuite {
     }
   }
 
-  test("RA limits - both") {
+  test("RA limits") {
     createCall.flatMap { id =>
       expect(
         staff,
@@ -139,16 +149,32 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                raLimitStart: { hms: "00:00:00" }
-                raLimitEnd:   { hms: "06:00:00" }
+                coordinateLimits: {
+                  north: {
+                    raStart: { hms: "00:00:00" }
+                    raEnd:   { hms: "06:00:00" }
+                  }
+                }
               }
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                raLimitStart { hms }
-                raLimitEnd { hms }
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                }
               }
             }
           }
@@ -158,8 +184,20 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "raLimitStart": { "hms": "00:00:00.000000" },
-                  "raLimitEnd":   { "hms": "06:00:00.000000" }
+                  "coordinateLimits": {
+                    "north": {
+                      "raStart": { "hms": "00:00:00.000000" },
+                      "raEnd": { "hms": "06:00:00.000000" },
+                      "decStart": { "dms": "+45:00:00.000000" },
+                      "decEnd": { "dms": "-45:00:00.000000" }
+                    },
+                    "south": {
+                      "raStart": { "hms": "12:00:01.000000" },
+                      "raEnd": { "hms": "18:00:01.000000" },
+                      "decStart": { "dms": "+45:00:01.000000" },
+                      "decEnd": { "dms": "-45:00:01.000000" }
+                    }
+                  }
                 }
               ]
             }
@@ -170,7 +208,7 @@ class updateCallsForProposals extends OdbSuite {
 
   }
 
-  test("RA limits - delete") {
+  test("Dec limits") {
     createCall.flatMap { id =>
       expect(
         staff,
@@ -178,16 +216,32 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                raLimitStart: null
-                raLimitEnd:   null
+                coordinateLimits: {
+                  south: {
+                    decStart: { dms: "+10:00:00" }
+                    decEnd:   { dms: "-50:00:00" }
+                  }
+                }
               }
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                raLimitStart { hms }
-                raLimitEnd { hms }
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                }
               }
             }
           }
@@ -197,8 +251,20 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "raLimitStart": null,
-                  "raLimitEnd":   null
+                  "coordinateLimits": {
+                    "north": {
+                      "raStart": { "hms": "12:00:00.000000" },
+                      "raEnd": { "hms": "18:00:00.000000" },
+                      "decStart": { "dms": "+45:00:00.000000" },
+                      "decEnd": { "dms": "-45:00:00.000000" }
+                    },
+                    "south": {
+                      "raStart": { "hms": "12:00:01.000000" },
+                      "raEnd": { "hms": "18:00:01.000000" },
+                      "decStart": { "dms": "+10:00:00.000000" },
+                      "decEnd": { "dms": "-50:00:00.000000" }
+                    }
+                  }
                 }
               ]
             }
@@ -207,190 +273,6 @@ class updateCallsForProposals extends OdbSuite {
       )
     }
 
-  }
-
-  test("RA limits - start only") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                raLimitStart: { hms: "00:00:00" }
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                raLimitStart { hms }
-                raLimitEnd { hms }
-              }
-            }
-          }
-        """,
-        List("Argument 'input.SET' is invalid: Supply both raLimitStart and raLimitEnd or neither").asLeft
-      )
-    }
-  }
-
-  test("RA limits - end only") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                raLimitStart: null
-                raLimitEnd:   { hms: "00:00:00" }
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                raLimitStart { hms }
-                raLimitEnd { hms }
-              }
-            }
-          }
-        """,
-        List("Argument 'input.SET' is invalid: Supply both raLimitStart and raLimitEnd or neither").asLeft
-      )
-    }
-  }
-
-  test("Dec limits - both") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                decLimitStart: { dms: "00:00:00" }
-                decLimitEnd:   { dms: "00:00:01" }
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                decLimitStart { dms }
-                decLimitEnd { dms }
-              }
-            }
-          }
-        """,
-        json"""
-          {
-            "updateCallsForProposals": {
-              "callsForProposals": [
-                {
-                  "decLimitStart": { "dms": "+00:00:00.000000" },
-                  "decLimitEnd":   { "dms": "+00:00:01.000000" }
-                }
-              ]
-            }
-          }
-        """.asRight
-      )
-    }
-
-  }
-
-  test("Dec limits - delete") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                decLimitStart:  null
-                decLimitEnd:    null
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                decLimitStart { dms }
-                decLimitEnd { dms }
-              }
-            }
-          }
-        """,
-        json"""
-          {
-            "updateCallsForProposals": {
-              "callsForProposals": [
-                {
-                  "decLimitStart": null,
-                  "decLimitEnd":   null
-                }
-              ]
-            }
-          }
-        """.asRight
-      )
-    }
-
-  }
-
-  test("Dec limits - start only") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                decLimitStart: { dms: "00:00:00" }
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                decLimitStart { dms }
-                decLimitEnd { dms }
-              }
-            }
-          }
-        """,
-        List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
-      )
-    }
-  }
-
-  test("Dec limits - end only") {
-    createCall.flatMap { id =>
-      expect(
-        staff,
-        s"""
-          mutation {
-            updateCallsForProposals(input: {
-              SET: {
-                decLimitStart: null
-                decLimitEnd:   { dms: "00:00:00" }
-              }
-              WHERE: {
-                id: { EQ: "$id" }
-              }
-            }) {
-              callsForProposals {
-                decLimitStart { dms }
-                decLimitEnd { dms }
-              }
-            }
-          }
-        """,
-        List("Argument 'input.SET' is invalid: Supply both decLimitStart and decLimitEnd or neither").asLeft
-      )
-    }
   }
 
   test("active - start and end") {
@@ -401,8 +283,8 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2024-12-31 14:00:00"
-                activeEnd:   "2026-01-01 14:00:00"
+                activeStart: "2024-12-31"
+                activeEnd:   "2026-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -423,8 +305,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2024-12-31 14:00:00",
-                    "end":   "2026-01-01 14:00:00"
+                    "start": "2024-12-31",
+                    "end":   "2026-01-01"
                   }
                 }
               ]
@@ -444,7 +326,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2024-12-31 14:00:00"
+                activeStart: "2024-12-31"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -465,8 +347,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2024-12-31 14:00:00",
-                    "end":   "2025-07-31 14:00:00"
+                    "start": "2024-12-31",
+                    "end":   "2025-07-31"
                   }
                 }
               ]
@@ -486,7 +368,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeEnd: "2025-06-01 14:00:00"
+                activeEnd: "2025-06-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -507,8 +389,8 @@ class updateCallsForProposals extends OdbSuite {
               "callsForProposals": [
                 {
                   "active": {
-                    "start": "2025-02-01 14:00:00",
-                    "end":   "2025-06-01 14:00:00"
+                    "start": "2025-02-01",
+                    "end":   "2025-06-01"
                   }
                 }
               ]
@@ -528,8 +410,8 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2025-12-31 14:00:00"
-                activeEnd:   "2025-01-01 14:00:00"
+                activeStart: "2025-12-31"
+                activeEnd:   "2025-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -557,7 +439,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeStart: "2026-01-01 14:00:00"
+                activeStart: "2026-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -585,7 +467,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                activeEnd: "2020-01-01 14:00:00"
+                activeEnd: "2020-01-01"
               },
               WHERE: {
                 id: { EQ: "$id" }
