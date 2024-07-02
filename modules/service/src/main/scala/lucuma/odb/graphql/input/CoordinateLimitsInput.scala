@@ -17,8 +17,10 @@ import lucuma.odb.data.DateInterval
 import lucuma.odb.graphql.binding.*
 
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
-import java.time.ZonedDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset.UTC
 
 object CoordinateLimitsInput {
 
@@ -28,11 +30,11 @@ object CoordinateLimitsInput {
   // the semester.
   private val Buffer = Duration.ofMinutes(30L)
 
-  private def toRa(z: ZonedDateTime): RightAscension =
-    val h = z.getHour
-    val m = z.getMinute
-    val s = z.getSecond
-    val n = z.getNano
+  private def toRa(t: LocalTime): RightAscension =
+    val h = t.getHour
+    val m = t.getMinute
+    val s = t.getSecond
+    val n = t.getNano
 
     // Round to nearest half-hour and convert to RA
     RightAscension.fromHourAngle.get(HourAngle.fromDoubleHours(
@@ -54,8 +56,9 @@ object CoordinateLimitsInput {
 
       // LST at start and end
       val sc       = ImprovedSkyCalc(site.place)
-      val lstStart = sc.getLst(start.plus(Buffer))
-      val lstEnd   = sc.getLst(end.minus(Buffer))
+      def lstAt(instant: Instant): LocalTime = sc.getLst(instant).withZoneSameInstant(UTC).toLocalTime
+      val lstStart = lstAt(start.plus(Buffer))
+      val lstEnd   = lstAt(end.minus(Buffer))
 
       (toRa(lstStart), toRa(lstEnd))
     }
