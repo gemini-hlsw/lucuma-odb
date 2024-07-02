@@ -24,7 +24,7 @@ sealed trait GroupTree extends Product with Serializable {
         case Nil => None
         case GroupTree.Leaf(_) :: tail => go(tail)
         case GroupTree.Root(_, c) :: tail => go(c ::: tail)
-        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _)) :: tail =>
+        case (b @ GroupTree.Branch(g, _, _, c, _, _, _, _, _)) :: tail =>
           if (g === groupId) b.some else go(c ::: tail)
       }
     go(List(this))
@@ -73,7 +73,8 @@ object GroupTree {
     name:        Option[NonEmptyString],
     description: Option[NonEmptyString],
     minInterval: Option[TimeSpan],
-    maxInterval: Option[TimeSpan]
+    maxInterval: Option[TimeSpan],
+    system:      Boolean
   ) extends Parent with Child
 
   /**

@@ -8,6 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
+import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.Existence
@@ -23,7 +24,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait GroupService[F[_]] {
-  def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Result[Group.Id]]
+  def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(programId: Program.Id): F[GroupTree]
   def selectPid(groupId: Group.Id): F[Option[Program.Id]]
@@ -36,16 +37,16 @@ object GroupService {
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
 
-      private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create)(using Transaction[F]): F[Group.Id] =
+      private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create, system: Boolean)(using Transaction[F]): F[Group.Id] =
         for {
           _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
           i <- openHole(pid, SET.parentGroupId, SET.parentGroupIndex)
-          g <- session.prepareR(Statements.InsertGroup).use(_.unique((pid, SET), i))
+          g <- session.prepareR(Statements.InsertGroup).use(_.unique(((pid, SET), i), system))
         } yield g
 
-      override def createGroup(input: CreateGroupInput)(using Transaction[F]): F[Result[Group.Id]] =
+      override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
         programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
-          r.traverse(createGroupImpl(_, input.SET))
+          r.traverse(createGroupImpl(_, input.SET, system))
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
@@ -53,18 +54,22 @@ object GroupService {
       def moveGroups(
         groupId: Nullable[Group.Id],
         groupIndex: Option[NonNegShort],
-        which: AppliedFragment
+        which: AppliedFragment,
+        accessPredicate: AppliedFragment
       ): F[List[Group.Id]] =
         (groupId, groupIndex) match
           case (Nullable.Absent, None) => Nil.pure[F] // do nothing if neither is specified
           case (gid, index) =>
-            val af = Statements.moveGroups(gid.toOption, index, which)
+            val af = Statements.moveGroups(gid.toOption, index, which, accessPredicate)
             session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
+        val accessPredicate = user.role.access match
+            case Access.Service => void""
+            case _              => void" AND c_system = FALSE" // Non service can't update system groups
         session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
-        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which).flatMap { ids =>
-          Statements.updateGroups(SET, which).traverse { af =>
+        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, accessPredicate).flatMap { ids =>
+          Statements.updateGroups(SET, which, accessPredicate).traverse { af =>
             session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
           } .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
         }
@@ -78,8 +83,8 @@ object GroupService {
 
           def mapChildren(children: List[GroupTree.Child]): List[GroupTree.Child] =
             children.map {
-              case l@GroupTree.Leaf(_)                        => l
-              case b@GroupTree.Branch(_, _, _, _, _, _, _, _) => mapBranch(b)
+              case l@GroupTree.Leaf(_)                           => l
+              case b@GroupTree.Branch(_, _, _, _, _, _, _, _, _) => mapBranch(b)
             }
 
           def mapBranch(p: GroupTree.Branch): GroupTree.Branch =
@@ -102,7 +107,7 @@ object GroupService {
 
   object Statements {
 
-    val InsertGroup: Query[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort, Group.Id] =
+    val InsertGroup: Query[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort ~ Boolean, Group.Id] =
       sql"""
       insert into t_group (
         c_program_id,
@@ -114,7 +119,8 @@ object GroupService {
         c_ordered,
         c_min_interval,
         c_max_interval,
-        c_existence
+        c_existence,
+        c_system
       ) values (
         $program_id,
         ${group_id.opt},
@@ -125,10 +131,11 @@ object GroupService {
         $bool,
         ${time_span.opt},
         ${time_span.opt},
-        $existence
+        $existence,
+        $bool
       ) returning c_group_id
       """.query(group_id)
-         .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort] { case ((pid, c), index) => (
+         .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort ~ Boolean] { case (((pid, c), index), system) => (
           pid,
           c.parentGroupId,
           index,
@@ -138,13 +145,14 @@ object GroupService {
           c.ordered,
           c.minimumInterval,
           c.maximumInterval,
-          c.existence
+          c.existence,
+          system
         )}
 
     val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
       sql"select group_open_hole($program_id, ${group_id.opt}, ${int2_nonneg.opt})".query(int2_nonneg)
 
-    def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment): Option[AppliedFragment] = {
+    def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment, accessPredicate: AppliedFragment): Option[AppliedFragment] = {
 
       val fieldUpdates: List[AppliedFragment] =
         List(
@@ -161,7 +169,7 @@ object GroupService {
         void" c_group_id IN (" |+| which |+| void")";
 
       val coda: AppliedFragment =
-        void" WHERE" |+| idPredicate |+| void" RETURNING c_group_id"
+        void" WHERE" |+| idPredicate |+| accessPredicate |+| void" RETURNING c_group_id"
 
       NonEmptyList.fromList(fieldUpdates).map { updates =>
         updates.foldSmash(
@@ -173,17 +181,17 @@ object GroupService {
 
     }
 
-    def moveGroups(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
+    def moveGroups(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment, access: AppliedFragment): AppliedFragment =
       sql"""
         SELECT c_group_id, group_move_group(c_group_id, ${group_id.opt}, ${int2_nonneg.opt})
         FROM t_group
         WHERE c_group_id IN (
-      """.apply(gid, index) |+| which |+| void")"
+      """.apply(gid, index) |+| which |+| access |+| void")"
 
     val branch: Decoder[GroupTree.Branch] =
-      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt).map {
-        case (gid, name, description, minRequired, ordered, minInterval, maxInterval) =>
-          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval)
+      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt *: bool).map {
+        case (gid, name, description, minRequired, ordered, minInterval, maxInterval, system) =>
+          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system)
       }
 
     val SelectGroups: Query[Program.Id, (Option[Group.Id], NonNegShort, GroupTree.Branch)] =
@@ -197,7 +205,8 @@ object GroupService {
           c_min_required,
           c_ordered,
           c_min_interval,
-          c_max_interval
+          c_max_interval,
+          c_system
         FROM
           t_group
         WHERE
