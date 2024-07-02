@@ -10,6 +10,7 @@ import grackle.Predicate.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.odb.graphql.binding.*
+import org.typelevel.cats.time.given
 
 object WhereCallForProposals {
 
@@ -17,8 +18,8 @@ object WhereCallForProposals {
     val WhereIdBinding       = WhereOrder.binding(path / "id",               CallForProposalsIdBinding)
     val WhereTypeBinding     = WhereEq.binding(   path / "type",             CallForProposalsTypeBinding)
     val WhereSemesterBinding = WhereOrder.binding(path / "semester",         SemesterBinding)
-    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start", TimestampBinding)
-    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",   TimestampBinding)
+    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start", DateBinding)
+    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",   DateBinding)
     val WhereIsOpenBinding   = WhereBoolean.binding(path / "_isOpen",        BooleanBinding)
 
     lazy val WhereCfpBinding = binding(path)

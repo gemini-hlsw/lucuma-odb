@@ -110,6 +110,7 @@ object OdbMapping {
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
+          with CoordinateLimitsMapping[F]
           with CoordinatesMapping[F]
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
@@ -121,6 +122,7 @@ object OdbMapping {
           with DatasetMapping[F]
           with DatasetReferenceMapping[F]
           with DatasetSelectResultMapping[F]
+          with DateIntervalMapping[F]
           with DeclinationMapping[F]
           with ElevationRangeMapping[F]
           with EmailMapping[F]
@@ -185,6 +187,7 @@ object OdbMapping {
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
+          with SiteCoordinateLimitsMapping[F]
           with SpectroscopyConfigOptionMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
           with StepConfigMapping[F]
@@ -201,7 +204,6 @@ object OdbMapping {
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
-          with TimestampIntervalMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateCallsForProposalsResultMapping[F]
@@ -402,7 +404,9 @@ object OdbMapping {
                 AngleMappings,
                 AtomRecordSelectResultMappings,
                 CategorizedTimeMappings,
+                CoordinateLimitsMappings,
                 DatasetSelectResultMappings,
+                DateIntervalMappings,
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
                 GmosCcdModeMappings,
@@ -419,8 +423,8 @@ object OdbMapping {
                 OffsetPMappings,
                 OffsetQMappings,
                 RightAscensionMappings,
+                SiteCoordinateLimitsMappings,
                 TimeSpanMappings,
-                TimestampIntervalMappings,
                 WavelengthMappings
               ).flatten
 

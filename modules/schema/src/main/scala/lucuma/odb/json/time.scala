@@ -14,10 +14,23 @@ import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.DateInterval
+import org.typelevel.cats.time.given
+
+import java.time.LocalDate
 
 object time {
 
   trait TimeDecoders {
+
+    given Decoder[DateInterval] =
+      Decoder.instance { c =>
+        for {
+          s <- c.downField("start").as[LocalDate]
+          e <- c.downField("end").as[LocalDate]
+          _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
+        } yield DateInterval.between(s, e)
+      }
 
     given Decoder[TimeSpan] =
       Decoder.instance { c =>
@@ -55,7 +68,17 @@ object time {
 
   object decoder extends TimeDecoders
 
-  trait QueryCodec extends TimeDecoders {
+  trait CommonEncoders {
+    given Encoder[DateInterval] =
+      Encoder { (a: DateInterval) =>
+        Json.obj(
+          "start" -> a.start.asJson,
+          "end"   -> a.end.asJson
+        )
+      }
+  }
+
+  trait QueryCodec extends TimeDecoders with CommonEncoders {
     given Encoder_TimeSpan: Encoder[TimeSpan] =
       Encoder { (ts: TimeSpan) =>
         Json.obj(
@@ -80,7 +103,7 @@ object time {
 
   object query extends QueryCodec
 
-  trait TransportCodec extends TimeDecoders {
+  trait TransportCodec extends TimeDecoders with CommonEncoders {
     given Encoder_TimeSpan: Encoder[TimeSpan] =
       Encoder.instance { (ts: TimeSpan) =>
         Json.obj(

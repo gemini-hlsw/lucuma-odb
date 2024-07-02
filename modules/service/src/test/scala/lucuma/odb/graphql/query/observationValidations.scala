@@ -67,10 +67,20 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
       else s"instruments: [${instruments.map(_.tag.toScreamingSnakeCase).mkString(",")}]\n"
     val limitStr = limits.fold("") { (raStart, raEnd, decStart, decEnd) =>
       s"""
-        raLimitStart: { degrees: $raStart }
-        raLimitEnd: { degrees: $raEnd }
-        decLimitStart: { degrees: $decStart }
-        decLimitEnd: { degrees: $decEnd }
+        coordinateLimits: {
+          north: {
+            raStart: { degrees: $raStart }
+            raEnd: { degrees: $raEnd }
+            decStart: { degrees: $decStart }
+            decEnd: { degrees: $decEnd }
+          }
+          south: {
+            raStart: { degrees: $raStart }
+            raEnd: { degrees: $raEnd }
+            decStart: { degrees: $decStart }
+            decEnd: { degrees: $decEnd }
+          }
+        }
       """
     }
     createCallForProposalsAs(staff, other = (inStr + limitStr).some)

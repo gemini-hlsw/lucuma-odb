@@ -71,8 +71,8 @@ class callsForProposals extends OdbSuite {
     createCall(s"""
       type:        REGULAR_SEMESTER
       semester:    "2025A"
-      activeStart: "2025-02-01 14:00:00"
-      activeEnd:   "2025-07-31 14:00:00"
+      activeStart: "2025-02-01"
+      activeEnd:   "2025-07-31"
     """.stripMargin
     ).flatMap { id =>
       expect(pi,
@@ -104,8 +104,8 @@ class callsForProposals extends OdbSuite {
     createCall(s"""
       type:        FAST_TURNAROUND
       semester:    "2025A"
-      activeStart: "2025-02-01 14:00:00"
-      activeEnd:   "2025-07-31 14:00:00"
+      activeStart: "2025-02-01"
+      activeEnd:   "2025-07-31"
     """.stripMargin
     ).flatMap { id =>
       expect(pi,
@@ -137,8 +137,8 @@ class callsForProposals extends OdbSuite {
     createCall(s"""
       type:        REGULAR_SEMESTER
       semester:    "2024B"
-      activeStart: "2025-02-01 14:00:00"
-      activeEnd:   "2025-07-31 14:00:00"
+      activeStart: "2025-02-01"
+      activeEnd:   "2025-07-31"
     """.stripMargin
     ).flatMap { id =>
       expect(pi,
@@ -170,16 +170,16 @@ class callsForProposals extends OdbSuite {
     createCall(s"""
       type:        REGULAR_SEMESTER
       semester:    "2025B"
-      activeStart: "2025-02-02 14:00:00"
-      activeEnd:   "2025-07-30 14:00:00"
+      activeStart: "2025-02-02"
+      activeEnd:   "2025-07-30"
     """.stripMargin
     ).flatMap { id =>
       expect(pi,
         s"""
           query {
             callsForProposals(WHERE: {
-              activeStart: { GT: "2025-02-01 14:00:00" }
-              activeEnd:   { LT: "2025-07-31 14:00:00" }
+              activeStart: { GT: "2025-02-01" }
+              activeEnd:   { LT: "2025-07-31" }
             }) {
               matches {
                 id
@@ -261,8 +261,8 @@ class callsForProposals extends OdbSuite {
     createCall(s"""
       type:        DEMO_SCIENCE
       semester:    "2025B"
-      activeStart: "2025-02-02 14:00:00"
-      activeEnd:   "9999-07-30 14:00:00"
+      activeStart: "2025-02-02"
+      activeEnd:   "2099-07-30"
       partners:    [
         {
           partner: CA

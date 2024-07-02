@@ -10,24 +10,50 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.arb.ArbTimeSpan
 import lucuma.core.util.arb.ArbTimestampInterval
+import lucuma.odb.data.DateInterval
 import munit.DisciplineSuite
+import org.scalacheck.Arbitrary
+import org.scalacheck.Cogen
+import org.scalacheck.Gen
 
-abstract class TimeSuite(using Encoder[TimeSpan], Encoder[TimestampInterval]) extends DisciplineSuite with ArbitraryInstances {
+import java.time.LocalDate
+
+abstract class TimeSuite(using Encoder[DateInterval], Encoder[TimeSpan], Encoder[TimestampInterval]) extends DisciplineSuite with ArbitraryInstances {
 
   import ArbTimeSpan.given
   import ArbTimestampInterval.given
   import time.decoder.given
 
+  val MinDate: LocalDate = LocalDate.of(1901,  1,  1)
+  val MaxDate: LocalDate = LocalDate.of(2099, 12, 31)
+
+  given Arbitrary[DateInterval] =
+    Arbitrary {
+      for {
+        a <- Gen.choose(MinDate, MaxDate)
+        b <- Gen.choose(MinDate, MaxDate)
+      } yield DateInterval.between(a, b)
+    }
+
+  given Cogen[DateInterval] =
+    Cogen[(LocalDate, LocalDate)].contramap(a => (
+      a.start,
+      a.end
+    ))
+
+  checkAll("DateInterval", CodecTests[DateInterval].codec)
   checkAll("TimeSpanCodec", CodecTests[TimeSpan].codec)
   checkAll("TimestampInterval", CodecTests[TimestampInterval].codec)
 }
 
 class TimeQuerySuite extends TimeSuite(using
+  time.query.given_Encoder_DateInterval,
   time.query.Encoder_TimeSpan,
   time.query.Encoder_TimestampInterval
 )
 
 class TimeTransportSuite extends TimeSuite(using
+  time.transport.given_Encoder_DateInterval,
   time.transport.Encoder_TimeSpan,
   time.transport.Encoder_TimestampInterval
 )
