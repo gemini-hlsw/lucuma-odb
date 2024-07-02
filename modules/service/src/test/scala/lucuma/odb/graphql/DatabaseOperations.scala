@@ -74,6 +74,7 @@ import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import skunk.*
 import skunk.circe.codec.json.json as jsonCodec
+import skunk.codec.boolean.*
 import skunk.syntax.all.*
 
 import java.time.LocalDate
@@ -1409,4 +1410,9 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(status, id).void))
   }
 
+  def updateGroupSystem(id: Group.Id, system: Boolean): IO[Unit] = {
+    val command = sql"update t_group set c_system = $bool where c_group_id = $group_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(system, id).void))
+  }
 }
