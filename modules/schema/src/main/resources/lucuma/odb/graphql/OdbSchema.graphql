@@ -118,8 +118,9 @@ input AirMassRangeInput {
 Time allocation
 """
 type Allocation {
-  partner: Partner!
-  duration: TimeSpan!
+  partner:     Partner!
+  scienceBand: ScienceBand!
+  duration:    TimeSpan!
 }
 
 """
@@ -3941,9 +3942,10 @@ input ScienceRequirementsInput {
 }
 
 input SetAllocationInput {
-  programId: ProgramId!
-  partner: Partner!
-  duration: TimeSpanInput!
+  programId:   ProgramId!
+  partner:     Partner!
+  scienceBand: ScienceBand!
+  duration:    TimeSpanInput!
 }
 
 type SetAllocationResult {
@@ -9124,6 +9126,19 @@ enum ScienceMode {
   ScienceMode Spectroscopy
   """
   SPECTROSCOPY
+}
+
+"""
+Science observation priorities.
+"""
+enum ScienceBand {
+  BAND1
+
+  BAND2
+
+  BAND3
+
+  BAND4
 }
 
 """

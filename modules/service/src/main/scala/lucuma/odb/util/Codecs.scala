@@ -57,6 +57,7 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -409,6 +410,9 @@ trait Codecs {
       a => RightAscension.fromAngleExact.getOption(a).toRight(s"Invalid right ascension: $a"))(
       RightAscension.fromAngleExact.reverseGet
     )
+
+  val science_band: Codec[ScienceBand] =
+    enumerated(Type("e_science_band"))
 
   val science_mode: Codec[ScienceMode] =
     enumerated[ScienceMode](Type.varchar)

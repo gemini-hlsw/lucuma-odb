@@ -13,8 +13,9 @@ trait AllocationMapping[F[_]] extends AllocationTable[F]  {
 
   lazy val AllocationMapping =
     ObjectMapping(AllocationType)(
-      SqlField("programId", AllocationTable.ProgramId, key = true, hidden = true),
-      SqlField("partner", AllocationTable.Partner, key = true),
+      SqlField("programId",   AllocationTable.ProgramId,   key = true, hidden = true),
+      SqlField("partner",     AllocationTable.Partner,     key = true),
+      SqlField("scienceBand", AllocationTable.ScienceBand, key = true),
       SqlObject("duration"),
     )
 
