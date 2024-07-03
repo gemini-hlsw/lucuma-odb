@@ -442,8 +442,8 @@ input CallForProposalsPropertiesInput {
 
   """
   Active period start date (inclusive) for this call.  The date is considered to
-  be the local date at each observation site.  Observations may begin at 12º
-  evening twilight on the indicated date at the site of the observation.
+  be the local date at each observation site.  Observations may begin the
+  evening of the indicated date at the site of the observation.".
 
   The start date is required on create and must be before the `activeEnd` date.
   Not nullable.  Limited to dates between 1900 and 2100 (exclusive).
@@ -452,8 +452,8 @@ input CallForProposalsPropertiesInput {
 
   """
   Active period end date (exclusive) for this call.  The date is considered to
-  be the local date at each observation site.  Observations may end at 12º
-  morning twilight on the indicated date at the site of the observation.
+  be the local date at each observation site.  Observations may end the
+  morning of the indicated date at the site of the observation.
 
   The end date is required on create and must be after the `activeStart` date.
   Not nullable.  Limited to dates between 1900 and 2100 (exclusive).
