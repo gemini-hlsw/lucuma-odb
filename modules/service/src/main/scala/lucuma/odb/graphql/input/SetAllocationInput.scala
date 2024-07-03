@@ -10,11 +10,13 @@ import grackle.Result
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
 case class SetAllocationInput(
   programId: Program.Id,
   partner: Partner,
+  scienceBand: ScienceBand,
   duration: TimeSpan
 )
 
@@ -25,9 +27,10 @@ object SetAllocationInput {
       case List(
         ProgramIdBinding("programId", rProgramId),
         PartnerBinding("partner", rPartner),
+        ScienceBandBinding("scienceBand", rBand),
         TimeSpanInput.Binding("duration", rDuration),
       ) =>
-        (rProgramId, rPartner, rDuration).mapN(apply)
+        (rProgramId, rPartner, rBand, rDuration).mapN(apply)
     }
 
 }

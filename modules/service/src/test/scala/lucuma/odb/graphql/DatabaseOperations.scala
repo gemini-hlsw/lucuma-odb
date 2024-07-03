@@ -61,6 +61,7 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
@@ -511,6 +512,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     partner: Partner,
+    scienceBand: ScienceBand,
     duration: TimeSpan,
   ): IO[Unit] =
     expect(
@@ -519,13 +521,15 @@ trait DatabaseOperations { this: OdbSuite =>
         mutation {
           setAllocation(input: {
             programId: ${pid.asJson}
-            partner:   ${partner.tag.toUpperCase}
+            partner:   ${partner.tag.toScreamingSnakeCase}
+            scienceBand: ${scienceBand.tag.toScreamingSnakeCase}
             duration:  {
               hours: "${duration.toHours}"
             }
           }) {
             allocation {
               partner
+              scienceBand
               duration {
                 microseconds
                 milliseconds
@@ -542,6 +546,7 @@ trait DatabaseOperations { this: OdbSuite =>
           "setAllocation" : {
             "allocation" : {
               "partner":  ${partner.asJson},
+              "scienceBand": ${scienceBand.asJson},
               "duration": {
                 "microseconds": ${duration.toMicroseconds},
                 "milliseconds": ${duration.toMilliseconds},

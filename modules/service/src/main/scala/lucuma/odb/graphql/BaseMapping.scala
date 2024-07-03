@@ -230,6 +230,7 @@ trait BaseMapping[F[_]]
   lazy val RedeemUserInvitationResultType          = schema.ref("RedeemUserInvitationResult")
   lazy val RevokeUserInvitationResultType          = schema.ref("RevokeUserInvitationResult")
   lazy val RightAscensionType                      = schema.ref("RightAscension")
+  lazy val ScienceBandType                         = schema.ref("ScienceBand")
   lazy val ScienceModeType                         = schema.ref("ScienceMode")
   lazy val ScienceProgramReferenceType             = schema.ref("ScienceProgramReference")
   lazy val ScienceRequirementsType                 = schema.ref("ScienceRequirements")
