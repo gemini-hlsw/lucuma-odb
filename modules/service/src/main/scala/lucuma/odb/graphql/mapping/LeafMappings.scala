@@ -48,6 +48,7 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
@@ -148,6 +149,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ProposalReference](ProposalReferenceLabelType),
       LeafMapping[Tag](ProposalStatusType),
+      LeafMapping[ScienceBand](ScienceBandType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[ScienceSubtype](ScienceSubtypeType),
       LeafMapping[Tag](SeeingTrendType),
