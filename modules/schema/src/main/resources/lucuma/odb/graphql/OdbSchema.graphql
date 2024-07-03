@@ -441,18 +441,22 @@ input CallForProposalsPropertiesInput {
   coordinateLimits: SiteCoordinateLimitsInput
 
   """
-  Active period start date (inclusive) for this call.  Required on create.  The
-  active period for this call will start on the night of the provided `Date`
-  value. Must be before the `activeEnd` date.  Not nullable.  Limited to dates
-  between 1900 and 2100 (exclusive).
+  Active period start date (inclusive) for this call.  The date is considered to
+  be the local date at each observation site.  Observations may begin at 12º
+  evening twilight on the indicated date at the site of the observation.
+
+  The start date is required on create and must be before the `activeEnd` date.
+  Not nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeStart: Date
 
   """
-  Active period end date (exclusive) for this call.  Required on create.  The
-  active period for this call will end on the morning of the provided `Date`
-  value.  Must be after the `activeStart` date.  Not nullable.  Limited to dates
-  between 1900 and 2100 (exclusive).
+  Active period end date (exclusive) for this call.  The date is considered to
+  be the local date at each observation site.  Observations may end at 12º
+  morning twilight on the indicated date at the site of the observation.
+
+  The end date is required on create and must be after the `activeStart` date.
+  Not nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeEnd: Date
 
@@ -912,13 +916,14 @@ scalar Date
 
 """
 Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive).
+Dates are interpreted as local dates.
 """
 type DateInterval {
 
-  "Start date of the interval (inclusive)."
+  "Start date, local to the observation site, of the interval (inclusive)."
   start: Date!
 
-  "End date of the interval (exclusive)."
+  "End date, local to the observation site, of the interval (exclusive)."
   end: Date!
 
 }
