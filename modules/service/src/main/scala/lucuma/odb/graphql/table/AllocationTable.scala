@@ -11,9 +11,10 @@ import lucuma.odb.util.Codecs.*
 trait AllocationTable[F[_]] extends BaseMapping[F] {
 
   object AllocationTable extends TableDef("t_allocation") {
-    val ProgramId = col("c_program_id", program_id)
-    val Partner = col("c_partner", partner)
-    val Duration = col("c_duration", time_span)
+    val ProgramId   = col("c_program_id",   program_id)
+    val Partner     = col("c_partner",      partner)
+    val ScienceBand = col("c_science_band", science_band)
+    val Duration    = col("c_duration",     time_span)
   }
 
 }

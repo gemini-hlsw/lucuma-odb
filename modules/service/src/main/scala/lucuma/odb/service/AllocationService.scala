@@ -9,6 +9,7 @@ import grackle.Result
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.SetAllocationInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -27,19 +28,19 @@ object AllocationService {
 
       def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
         session.prepareR(Statements.SetAllocation.command).use: ps =>
-          ps.execute(input.programId, input.partner, input.duration).as(Result.unit)
+          ps.execute(input.programId, input.partner, input.scienceBand, input.duration).as(Result.unit)
 
     }
 
   object Statements {
 
-    val SetAllocation: Fragment[(Program.Id, Partner, TimeSpan)] =
+    val SetAllocation: Fragment[(Program.Id, Partner, ScienceBand, TimeSpan)] =
         sql"""
-          INSERT INTO t_allocation (c_program_id, c_partner, c_duration)
-          VALUES ($program_id, $partner, $time_span)
-          ON CONFLICT (c_program_id, c_partner) DO UPDATE
+          INSERT INTO t_allocation (c_program_id, c_partner, c_science_band, c_duration)
+          VALUES ($program_id, $partner, $science_band, $time_span)
+          ON CONFLICT (c_program_id, c_partner, c_science_band) DO UPDATE
           SET c_duration = $time_span
-        """.contramap { case (p, t, d) => (p, t, d, d) }
+        """.contramap { case (p, t, s, d) => (p, t, s, d, d) }
 
   }
 
