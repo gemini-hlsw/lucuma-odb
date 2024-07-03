@@ -24,7 +24,7 @@ class calibrations extends OdbSuite {
 
   val validUsers = List(pi, service)
 
-  case class CalibObs(id: Observation.Id, calibrationRole: Option[CalibrationRole]) derives Decoder
+  case class CalibObs(id: Observation.Id, groupId: Option[Group.Id], calibrationRole: Option[CalibrationRole]) derives Decoder
 
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
     query(
@@ -43,7 +43,7 @@ class calibrations extends OdbSuite {
   private def queryCalibrationObservations(pid: Program.Id): IO[List[CalibObs]] =
     query(
       service,
-      s"""query { observations(WHERE: {program: {id: {EQ: "$pid"}}}) { matches {id calibrationRole} } }"""
+      s"""query { observations(WHERE: {program: {id: {EQ: "$pid"}}}) { matches {id groupId calibrationRole} } }"""
     ).flatMap { c =>
       (for {
         id    <- c.hcursor.downField("observations").downField("matches").as[List[CalibObs]]
@@ -86,6 +86,7 @@ class calibrations extends OdbSuite {
               }.headOption
       cg   <- cgid.map(queryGroup)
                 .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
+      ob   <- queryCalibrationObservations(pid)
     } yield {
       assertEquals(gr.size, 1)
       assert(cg._2)
@@ -105,17 +106,21 @@ class calibrations extends OdbSuite {
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
-      oids = gr1.collect {
-                case Right(oid) => oid
-              }
       ob   <- queryCalibrationObservations(pid)
     } yield {
+      val oids = gr1.collect { case Right(oid) => oid }
+      val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, Some(_)) => true
-        case _ => false
+        case CalibObs(_, _, Some(_)) => true
+        case _                       => false
       }
+      // calibs belong to the calib group
+      val obsGids = ob.collect {
+        case CalibObs(_, Some(gid), _) => gid
+      }
+      assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
-      assertEquals(oids.size, 4)
+      assertEquals(oids.size, 2)
     }
   }
 
@@ -131,17 +136,15 @@ class calibrations extends OdbSuite {
                     }
                   }
           gr1  <- groupElementsAs(pi, pid, None)
-          oids = gr1.collect {
-                    case Right(oid) => oid
-                  }
           ob   <- queryCalibrationObservations(pid)
         } yield {
+          val oids = gr1.collect { case Right(oid) => oid }
           val cCount = ob.count {
-            case CalibObs(_, Some(_)) => true
-            case _                    => false
+            case CalibObs(_, _, Some(_)) => true
+            case _                       => false
           }
           assertEquals(cCount, 2)
-          assertEquals(oids.size, 4)
+          assertEquals(oids.size, 2)
         }
   }
 

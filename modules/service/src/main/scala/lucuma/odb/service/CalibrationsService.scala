@@ -94,7 +94,7 @@ object CalibrationsService {
           }
         } else none.pure[F]
 
-      private def calibrationObservations(pid: Program.Id,  gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Result[List[Observation.Id]]] = {
+      private def calibrationObservations(pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Result[List[Observation.Id]]] = {
         def gmosNorthLSObservations(gnls: List[GmosNConfigs]) = gnls.traverse { case (g, f, w, xb, yb) =>
           val conf =
             GmosLongSlitInput.Create.North(
@@ -119,6 +119,7 @@ object CalibrationsService {
               proposalReference = none,
               programReference = none,
               SET = ObservationPropertiesInput.Create.Default.copy(
+                      group = gid.some,
                       posAngleConstraint = PosAngleConstraintInput(
                         mode = PosAngleConstraintMode.AverageParallactic.some, none
                       ).some,
@@ -158,6 +159,7 @@ object CalibrationsService {
               proposalReference = none,
               programReference = none,
               SET = ObservationPropertiesInput.Create.Default.copy(
+                      group = gid.some,
                       posAngleConstraint = PosAngleConstraintInput(
                         mode = PosAngleConstraintMode.AverageParallactic.some, none
                       ).some,
@@ -177,13 +179,13 @@ object CalibrationsService {
         (for {
           currGmosNLS <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(true))(pid)
           currGmosSLS <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(true))(pid)
-          o1 <- gmosNorthLSObservations(gnls.diff(currGmosNLS))
-          o2 <- gmosSouthLSObservations(gsls.diff(currGmosSLS))
+          o1          <- gmosNorthLSObservations(gnls.diff(currGmosNLS))
+          o2          <- gmosSouthLSObservations(gsls.diff(currGmosSLS))
         } yield (o1 ::: o2)).map(_.sequence)
       }
 
       // Set tthe calibration role of the observations in bulk
-      private def setObservationCalibRole(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] = {
+      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] = {
         val update = void"UPDATE t_observation " |+|
           sql"SET c_calibration_role = $calibration_role "(calibrationRole) |+|
           void"WHERE c_observation_id IN (" |+|
@@ -194,12 +196,14 @@ object CalibrationsService {
       private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Unit] = {
         for {
           cg  <- calibrationsGroup(pid, gnls.size + gsls.size)
-          _   <- calibrationObservations(pid, gnls, gsls).flatMap {
-                   case Result.Success(ids) if ids.nonEmpty =>
-                     setObservationCalibRole(ids, CalibrationRole.SpectroPhotometric).void
-                   case _                                   =>
-                     Applicative[F].unit
-                 }
+          _   <- cg.map(g =>
+                   calibrationObservations(pid, g, gnls, gsls).flatMap {
+                     case Result.Success(ids) if ids.nonEmpty =>
+                       setCalibRoleAndGroup(ids, CalibrationRole.SpectroPhotometric).void
+                     case _                                   =>
+                       Applicative[F].unit
+                   }
+                 ).getOrElse(Applicative[F].unit)
         } yield ()
       }
 
@@ -214,7 +218,7 @@ object CalibrationsService {
   object Statements {
 
     def selectGmosNorthLongSlitConfigurations(includeCalibs: Boolean): Query[Program.Id, GmosNConfigs] = {
-      val noCalibs = sql"t_observation.c_calibration_role is null"
+      val noCalibs = sql"t_observation.c_calibration_role is     null"
       val calibs   = sql"t_observation.c_calibration_role is not null"
       val selector = if (includeCalibs) calibs else noCalibs
 
@@ -239,7 +243,7 @@ object CalibrationsService {
     }
 
     def selectGmosSouthLongSlitConfigurations(includeCalibs: Boolean): Query[Program.Id, GmosSConfigs] = {
-      val noCalibs = sql"c_calibration_role is null"
+      val noCalibs = sql"c_calibration_role is     null"
       val calibs   = sql"c_calibration_role is not null"
       val selector = if (includeCalibs) calibs else noCalibs
 
