@@ -10,10 +10,13 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.ScienceMode
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -21,10 +24,17 @@ import lucuma.core.model.Program
 import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.Nullable
+import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
+import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ObservingModeInput
+import lucuma.odb.graphql.input.PosAngleConstraintInput
+import lucuma.odb.graphql.input.ScienceRequirementsInput
+import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
@@ -34,8 +44,6 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
-import lucuma.odb.graphql.input.ObservingModeInput
-import lucuma.odb.graphql.input.GmosLongSlitInput
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
@@ -99,10 +107,11 @@ object CalibrationsService {
                 explicitYBin = yb,
                 explicitAmpReadMode = none,
                 explicitAmpGain = none,
-                explicitRoi = none,
+                explicitRoi = GmosRoi.CentralSpectrum.some,
                 explicitλDithers = none,
-                explicitSpatialOffsets = none)
+                explicitSpatialOffsets = none
               )
+            )
 
           observationService.createObservation(
             CreateObservationInput(
@@ -110,7 +119,17 @@ object CalibrationsService {
               proposalReference = none,
               programReference = none,
               SET = ObservationPropertiesInput.Create.Default.copy(
-                      observingMode = ObservingModeInput.Create(conf.some, none).some
+                      posAngleConstraint = PosAngleConstraintInput(
+                        mode = PosAngleConstraintMode.AverageParallactic.some, none
+                      ).some,
+                      observingMode = ObservingModeInput.Create(conf.some, none).some,
+                      scienceRequirements =
+                        ScienceRequirementsInput(
+                          mode = ScienceMode.Spectroscopy.some,
+                          spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
+                            signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0))
+                        ).some
+                      ).some
                     ).some
             )
           )
@@ -127,10 +146,11 @@ object CalibrationsService {
                 explicitYBin = yb,
                 explicitAmpReadMode = none,
                 explicitAmpGain = none,
-                explicitRoi = none,
+                explicitRoi = GmosRoi.CentralSpectrum.some,
                 explicitλDithers = none,
-                explicitSpatialOffsets = none)
+                explicitSpatialOffsets = none
               )
+            )
 
           observationService.createObservation(
             CreateObservationInput(
@@ -138,7 +158,17 @@ object CalibrationsService {
               proposalReference = none,
               programReference = none,
               SET = ObservationPropertiesInput.Create.Default.copy(
-                      observingMode = ObservingModeInput.Create(none, conf.some).some
+                      posAngleConstraint = PosAngleConstraintInput(
+                        mode = PosAngleConstraintMode.AverageParallactic.some, none
+                      ).some,
+                      observingMode = ObservingModeInput.Create(none, conf.some).some,
+                      scienceRequirements =
+                        ScienceRequirementsInput(
+                          mode = ScienceMode.Spectroscopy.some,
+                          spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
+                            signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0))
+                        ).some
+                      ).some
                     ).some
             )
           )
