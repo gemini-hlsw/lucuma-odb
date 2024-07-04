@@ -3107,7 +3107,7 @@ input ObservationPropertiesInput {
   """
   Set the notes for  thhe observer
   """
-  observerNotes: String
+  observerNotes: NonEmptyString
 }
 
 type Offset {
@@ -8018,7 +8018,7 @@ type Observation {
   """
   Notes for the observer
   """
-  observerNotes: String
+  observerNotes: NonEmptyString
 
 }
 

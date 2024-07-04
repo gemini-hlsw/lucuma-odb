@@ -76,7 +76,6 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
-import skunk.codec.text.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -627,7 +626,7 @@ object ObservationService {
       scienceRequirements: Option[ScienceRequirementsInput],
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
-      observerNotes:       Option[String]
+      observerNotes:       Option[NonEmptyString]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -710,7 +709,7 @@ object ObservationService {
       Option[SpectroscopyCapabilities] ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
-      Option[String]
+      Option[NonEmptyString]
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -779,7 +778,7 @@ object ObservationService {
           ${spectroscopy_capabilities.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
-          ${text.opt}
+          ${text_nonempty.opt}
       """
 
     def selectObservingModes(
@@ -897,28 +896,16 @@ object ObservationService {
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
       val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
-      val upObserverNotes     = sql"c_observer_notes = ${text.opt}"
+      val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           SET.existence.map(upExistence),
-          SET.subtitle match {
-            case Nullable.Null  => Some(upSubtitle(None))
-            case Absent         => None
-            case NonNull(value) => Some(upSubtitle(Some(value)))
-          },
+          SET.subtitle.foldPresent(upSubtitle),
           SET.status.map(upStatus),
           SET.activeStatus.map(upActive),
-          SET.observerNotes match {
-            case Nullable.Null  => Some(upObserverNotes(None))
-            case Absent         => None
-            case NonNull(value) => Some(upObserverNotes(Some(value)))
-          },
-          SET.visualizationTime match {
-            case Nullable.Null  => Some(upVisualizationTime(None))
-            case Absent         => None
-            case NonNull(value) => Some(upVisualizationTime(Some(value)))
-          }
+          SET.observerNotes.foldPresent(upObserverNotes),
+          SET.visualizationTime.foldPresent(upVisualizationTime),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =

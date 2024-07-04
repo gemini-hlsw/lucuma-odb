@@ -49,7 +49,7 @@ object ObservationPropertiesInput {
     existence:           Option[Existence],
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
-    observerNotes:       Option[String],
+    observerNotes:       Option[NonEmptyString],
   ) extends AsterismInput
 
   object Create {
@@ -90,7 +90,7 @@ object ObservationPropertiesInput {
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
-          StringBinding.Option("observerNotes", rObserverNotes),
+          NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -127,7 +127,7 @@ object ObservationPropertiesInput {
     existence:           Option[Existence],
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
-    observerNotes:       Nullable[String],
+    observerNotes:       Nullable[NonEmptyString],
   ) extends AsterismInput
 
   object Edit {
@@ -149,7 +149,7 @@ object ObservationPropertiesInput {
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
-          StringBinding.Nullable("observerNotes", rObserverNotes),
+          NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
         ) =>
           (rSubtitle,
             rObsStatus,
