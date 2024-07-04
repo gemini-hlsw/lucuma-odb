@@ -1,8 +1,8 @@
 val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.7"
-val cirisVersion               = "3.5.0"
-val clueVersion                = "0.35.2"
+val circeVersion               = "0.14.9"
+val cirisVersion               = "3.6.0"
+val clueVersion                = "0.37.0"
 val declineVersion             = "2.4.1"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
@@ -16,18 +16,18 @@ val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.6"
 val log4catsVersion            = "2.7.0"
 val lucumaCatalogVersion       = "0.47.2"
-val lucumaItcVersion           = "0.21.13"
+val lucumaItcVersion           = "0.21.14"
 val lucumaCoreVersion          = "0.100.0"
-val lucumaGraphQLRoutesVersion = "0.8.10"
+val lucumaGraphQLRoutesVersion = "0.8.11"
 val lucumaSsoVersion           = "0.6.20"
 val munitVersion               = "0.7.29" // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
 val natchezHttp4sVersion       = "0.5.0"
 val natchezVersion             = "0.3.5"
-val paigesVersion              = "0.4.3"
+val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.3"
-val skunkVersion               = "0.6.3"
+val skunkVersion               = "0.6.4"
 val pprintVersion              = "0.9.0"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
@@ -135,7 +135,7 @@ lazy val service = project
       "com.dimafeng"   %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"       %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.715"                 % Test,
+      "com.amazonaws"  %  "aws-java-sdk-core"                  % "1.12.756"                 % Test,
       "edu.gemini"     %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"  %% "munit"                              % munitVersion               % Test,
       "org.scalameta"  %% "munit-scalacheck"                   % munitVersion               % Test,
