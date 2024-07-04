@@ -69,7 +69,7 @@ object CallForProposalsPropertiesInput {
           val rValidEnd   = validateYear("activeEnd", rActiveEnd)
           val rActive = (rValidStart, rValidEnd).parTupled.flatMap { (start, end) =>
             Result.fromOption(
-              Option.when(start < end)(DateInterval.between(start, end)),
+              Option.when(start <= end)(DateInterval.between(start, end.plusDays(1L))),
               Matcher.validationProblem("activeStart must come before activeEnd")
             )
           }
@@ -143,7 +143,7 @@ object CallForProposalsPropertiesInput {
             case (Some(start), Some(end)) if start > end =>
               Matcher.validationFailure("activeStart must come before activeEnd")
             case (s, e)                                  =>
-              Result(Ior.fromOptions(s, e))
+              Result(Ior.fromOptions(s, e.map(_.plusDays(1L))))
           }
           val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase)

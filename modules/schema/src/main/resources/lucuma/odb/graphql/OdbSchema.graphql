@@ -390,7 +390,7 @@ type CallForProposals {
 
   """
   The active period during which accepted observations for this call may be
-  observed.
+  observed (inclusive start and end dates).
   """
   active: DateInterval!
 
@@ -444,15 +444,15 @@ input CallForProposalsPropertiesInput {
   Active period start date (inclusive) for this call.  Required on create.  The
   active period for this call will start on the night of the provided `Date`
   value. Must be before the `activeEnd` date.  Not nullable.  Limited to dates
-  between 1900 and 2100 (exclusive).
+  between the years 1900 and 2100 (exclusive).
   """
   activeStart: Date
 
   """
-  Active period end date (exclusive) for this call.  Required on create.  The
+  Active period end date (inclusive) for this call.  Required on create.  The
   active period for this call will end on the morning of the provided `Date`
-  value.  Must be after the `activeStart` date.  Not nullable.  Limited to dates
-  between 1900 and 2100 (exclusive).
+  value.  Must be equal to or after the `activeStart` date.  Not nullable.
+  Limited to dates between the years 1900 and 2100 (exclusive).
   """
   activeEnd: Date
 
@@ -911,14 +911,14 @@ Date in ISO-8601 representation in format YYYY-MM-DD (e.g., '2024-07-31').
 scalar Date
 
 """
-Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive).
+Date interval marked by a start 'Date' and an end 'Date'.
 """
 type DateInterval {
 
-  "Start date of the interval (inclusive)."
+  "Start date of the interval."
   start: Date!
 
-  "End date of the interval (exclusive)."
+  "End date of the interval."
   end: Date!
 
 }

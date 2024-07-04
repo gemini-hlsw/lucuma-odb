@@ -90,7 +90,7 @@ class createCallForProposals extends OdbSuite {
                 type:        REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
+                activeEnd:   "2025-01-31"
               }
             }
           ) {
@@ -150,7 +150,7 @@ class createCallForProposals extends OdbSuite {
               },
               "active": {
                 "start": "2024-07-31",
-                "end": "2025-02-01"
+                "end": "2025-01-31"
               },
               "submissionDeadlineDefault": null,
               "partners": [
@@ -495,7 +495,7 @@ class createCallForProposals extends OdbSuite {
                 type:         REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
+                activeEnd:   "2025-01-31"
                 coordinateLimits: {
                   north: {
                     raStart: { hms: "17:00:00" }
@@ -560,7 +560,7 @@ class createCallForProposals extends OdbSuite {
                 type:         REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
+                activeEnd:   "2025-01-31"
                 coordinateLimits: {
                   south: {
                     decStart: { dms: "45:00:00" }
