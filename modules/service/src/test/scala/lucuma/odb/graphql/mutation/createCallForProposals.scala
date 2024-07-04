@@ -192,6 +192,75 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("success - another ra/dec example") {
+
+    // existence defaults to PRESENT
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2024B"
+                activeStart: "2024-08-01"
+                activeEnd:   "2024-10-31"
+              }
+            }
+          ) {
+            callForProposals {
+              coordinateLimits {
+                north {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+                south {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+              active {
+                start
+                end
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "coordinateLimits": {
+                "north": {
+                  "raStart": { "hms": "16:30:00.000000" },
+                  "raEnd": { "hms": "07:30:00.000000" },
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
+                },
+                "south": {
+                  "raStart": { "hms": "15:30:00.000000" },
+                  "raEnd": { "hms": "06:30:00.000000" },
+                  "decStart": { "dms": "-90:00:00.000000" },
+                  "decEnd": { "dms": "+28:00:00.000000" }
+                }
+              },
+              "active": {
+                "start": "2024-08-01",
+                "end": "2024-10-31"
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
   test("failure - end before start") {
     expect(
       user = staff,
@@ -243,7 +312,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                submissionDeadlineDefault
                partners {
                  partner
@@ -258,7 +326,6 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id": "c-101",
               "submissionDeadlineDefault": "2025-07-31 10:00:02",
               "partners": [
                 {
@@ -301,7 +368,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                partners { partner }
              }
           }
@@ -311,7 +377,6 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id": "c-102",
               "partners": []
             }
           }
@@ -346,7 +411,6 @@ class createCallForProposals extends OdbSuite {
             }
           ) {
              callForProposals {
-               id
                partners {
                  partner
                  submissionDeadline
