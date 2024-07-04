@@ -8,8 +8,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 
 class ObservationPredicates(path: Path) {
-  lazy val existence      = ExistencePredicates(path / "existence")
-  lazy val id             = LeafPredicates[Observation.Id](path / "id")
-  lazy val program        = new ProgramPredicates(path / "program")
-  lazy val referenceLabel = LeafPredicates[ObservationReference](path / "reference" / "label")
+  lazy val existence       = ExistencePredicates(path / "existence")
+  lazy val id              = LeafPredicates[Observation.Id](path / "id")
+  lazy val program         = new ProgramPredicates(path / "program")
+  lazy val referenceLabel  = LeafPredicates[ObservationReference](path / "reference" / "label")
+  lazy val calibrationRole = LeafPredicates(path / "calibrationRole")
 }
