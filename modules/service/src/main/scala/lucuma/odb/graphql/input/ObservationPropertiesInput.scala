@@ -31,7 +31,7 @@ object ObservationPropertiesInput {
         t match
           case TargetEnvironmentInput.Create(_, asterism) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
           case TargetEnvironmentInput.Edit(_, asterism)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
-        
+
   }
 
   final case class Create(
@@ -49,6 +49,7 @@ object ObservationPropertiesInput {
     existence:           Option[Existence],
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
+    observerNotes:       Option[String],
   ) extends AsterismInput
 
   object Create {
@@ -69,6 +70,7 @@ object ObservationPropertiesInput {
         existence           = Existence.Present.some,
         group               = None,
         groupIndex          = None,
+        observerNotes       = None,
       )
 
     val Binding: Matcher[Create] =
@@ -88,6 +90,7 @@ object ObservationPropertiesInput {
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
+          StringBinding.Option("observerNotes", rObserverNotes),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -103,6 +106,7 @@ object ObservationPropertiesInput {
             rExistence,
             rGroupId,
             rGroupIndex,
+            rObserverNotes,
           ).parMapN(Create.apply)
       }
 
@@ -123,6 +127,7 @@ object ObservationPropertiesInput {
     existence:           Option[Existence],
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
+    observerNotes:       Nullable[String],
   ) extends AsterismInput
 
   object Edit {
@@ -144,6 +149,7 @@ object ObservationPropertiesInput {
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
+          StringBinding.Nullable("observerNotes", rObserverNotes),
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -159,6 +165,7 @@ object ObservationPropertiesInput {
             rExistence,
             rGroupId,
             rGroupIndex,
+            rObserverNotes,
           ).parMapN(apply)
       }
   }

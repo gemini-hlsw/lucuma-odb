@@ -3104,6 +3104,10 @@ input ObservationPropertiesInput {
   """
   groupIndex: NonNegShort
 
+  """
+  Set the notes for  thhe observer
+  """
+  observerNotes: String
 }
 
 type Offset {
@@ -8010,6 +8014,11 @@ type Observation {
   The Calibration role of this observation
   """
   calibrationRole: CalibrationRole
+
+  """
+  Notes for the observer
+  """
+  observerNotes: String
 
 }
 
