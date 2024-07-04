@@ -184,14 +184,9 @@ object CalibrationsService {
         } yield (o1 ::: o2)).map(_.sequence)
       }
 
-      // Set tthe calibration role of the observations in bulk
-      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] = {
-        val update = void"UPDATE t_observation " |+|
-          sql"SET c_calibration_role = $calibration_role "(calibrationRole) |+|
-          void"WHERE c_observation_id IN (" |+|
-            oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-        session.executeCommand(update).void
-      }
+      // Set the calibration role of the observations in bulk
+      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
+        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
       private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Unit] = {
         for {
@@ -217,10 +212,10 @@ object CalibrationsService {
 
   object Statements {
 
-    def selectGmosNorthLongSlitConfigurations(includeCalibs: Boolean): Query[Program.Id, GmosNConfigs] = {
+    def selectGmosNorthLongSlitConfigurations(calibsOnly: Boolean): Query[Program.Id, GmosNConfigs] = {
       val noCalibs = sql"t_observation.c_calibration_role is     null"
       val calibs   = sql"t_observation.c_calibration_role is not null"
-      val selector = if (includeCalibs) calibs else noCalibs
+      val selector = if (calibsOnly) calibs else noCalibs
 
       sql"""
          SELECT DISTINCT ON (
@@ -242,10 +237,10 @@ object CalibrationsService {
       """.query(gmos_north_grating *: gmos_north_fpu *: wavelength_pm *: gmos_x_binning.opt *: gmos_y_binning.opt)
     }
 
-    def selectGmosSouthLongSlitConfigurations(includeCalibs: Boolean): Query[Program.Id, GmosSConfigs] = {
+    def selectGmosSouthLongSlitConfigurations(calibsOnly: Boolean): Query[Program.Id, GmosSConfigs] = {
       val noCalibs = sql"c_calibration_role is     null"
       val calibs   = sql"c_calibration_role is not null"
-      val selector = if (includeCalibs) calibs else noCalibs
+      val selector = if (calibsOnly) calibs else noCalibs
 
       sql"""
          SELECT DISTINCT ON (
@@ -266,6 +261,12 @@ object CalibrationsService {
          WHERE c_program_id=$program_id and $selector
       """.query(gmos_south_grating *: gmos_south_fpu *: wavelength_pm *: gmos_x_binning.opt *: gmos_y_binning.opt)
     }
+
+    def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
+      void"UPDATE t_observation " |+|
+        sql"SET c_calibration_role = $calibration_role "(role) |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
   }
 
 }
