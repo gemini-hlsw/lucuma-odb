@@ -8006,6 +8006,11 @@ type Observation {
   """
   groupIndex: NonNegShort!
 
+  """
+  The Calibration role of this observation
+  """
+  calibrationRole: CalibrationRole
+
 }
 
 type Itc {
@@ -8018,6 +8023,7 @@ type Itc {
   The ITC result for the acquisition part of the sequence
   """
   acquisition: ItcResultSet!
+
 }
 
 """

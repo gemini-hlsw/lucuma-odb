@@ -25,6 +25,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
       val GroupId: ColumnRef           = col("c_group_id",           group_id.opt)
       val GroupIndex: ColumnRef        = col("c_group_index",        int2_nonneg)
+      val CalibrationRole: ColumnRef   = col("c_calibration_role",   calibration_role.opt)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)
@@ -85,7 +86,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
             val SyntheticId: ColumnRef = col("c_spec_wavelength_coverage_id", observation_id.embedded)
             val Value: ColumnRef       = col("c_spec_wavelength_coverage",    wavelength_pm.embedded)
           }
-          
+
           object FocalPlaneAngle {
             val SyntheticId: ColumnRef = col("c_spec_focal_plane_angle_id", observation_id.embedded)
             val Value: ColumnRef       = col("c_spec_focal_plane_angle",    angle_µas.embedded)
@@ -97,7 +98,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capabilities.opt)
         }
       }
-      
+
       object ObservingMode {
         val SyntheticId: ColumnRef = col("c_observing_mode_id", observation_id.embedded)
         val ObservingModeType: ColumnRef = col("c_observing_mode_type", observing_mode_type.embedded)
