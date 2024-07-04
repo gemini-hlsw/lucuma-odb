@@ -76,6 +76,7 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
+import skunk.codec.text.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -251,7 +252,7 @@ object ObservationService {
             asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
           }.map(_.getOrElse(Result.unit))
 
-        val go = 
+        val go =
           for
             pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
             oid <- ResultT(create(pid))
@@ -260,7 +261,7 @@ object ObservationService {
 
         go.value.flatTap: r =>
           transaction.rollback.unlessA(r.hasValue)
-      
+
       }
 
       override def selectObservations(
@@ -452,7 +453,7 @@ object ObservationService {
           (pid, newOid) <- ResultT(cloneObservationImpl(origOid, input.SET))
           _             <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), input.asterism))
         yield CloneIds(origOid, newOid)).value
-        
+
       // ***********************
       // All about the validations
       // ***********************
@@ -482,8 +483,8 @@ object ObservationService {
             case Right(_) => ObservationValidationMap.empty
             case Left(errors) => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList)
           }
- 
-        val optCfpId: F[Option[CallForProposals.Id]] = 
+
+        val optCfpId: F[Option[CallForProposals.Id]] =
           session.option(Statements.ProgramCfpId)(pid).map(_.flatten)
 
         def validateAsterismRaDec(
@@ -493,7 +494,7 @@ object ObservationService {
           decEnd: Declination,
           site: Site,
           active: DateInterval
-        ): F[Option[ObservationValidation]] = 
+        ): F[Option[ObservationValidation]] =
           asterismService.getAsterism(pid,oid)
             .map { l =>
               val targets = l.map(_._2)
@@ -513,7 +514,7 @@ object ObservationService {
                 else cfpError(AsterismOutOfRangeMsg).some
               }).flatten
             }
-        
+
         def validateRaDec(
           cid: CallForProposals.Id,
           inst: Option[Instrument],
@@ -537,19 +538,19 @@ object ObservationService {
             session.stream(Statements.CfpInstruments)(cid, chunkSize = 1024)
               .compile
               .toList
-              .map(l => 
-                if(l.isEmpty || l.contains(instr)) none 
+              .map(l =>
+                if(l.isEmpty || l.contains(instr)) none
                 else cfpError(InvalidInstrumentMsg(instr)).some
               )
           }
         }
 
-        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] = 
+        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] =
           session.unique(Statements.ObservationValidationInfo)(oid)
 
         val cfpValidations: F[ObservationValidationMap] = {
           optCfpId.flatMap(
-            _.fold(ObservationValidationMap.empty.pure){ cid => 
+            _.fold(ObservationValidationMap.empty.pure){ cid =>
               for {
                 (oinstr, ora, odec) <- obsInfo
                 valInstr            <- validateInstrument(cid, oinstr)
@@ -605,7 +606,8 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument)
+          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          SET.observerNotes
         )
 
     def insertObservationAs(
@@ -624,7 +626,8 @@ object ObservationService {
       constraintSet:       ConstraintSet,
       scienceRequirements: Option[ScienceRequirementsInput],
       modeType:            Option[ObservingModeType],
-      instrument:          Option[Instrument]
+      instrument:          Option[Instrument],
+      observerNotes:       Option[String]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -662,7 +665,8 @@ object ObservationService {
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
            spectroscopy.flatMap(_.capability.toOption)                              ,
            modeType                                                                 ,
-           instrument
+           instrument                                                               ,
+           observerNotes
         )
       }
 
@@ -705,7 +709,8 @@ object ObservationService {
       Option[Angle]                    ,
       Option[SpectroscopyCapabilities] ,
       Option[ObservingModeType]        ,
-      Option[Instrument]
+      Option[Instrument]               ,
+      Option[String]
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -739,7 +744,8 @@ object ObservationService {
           c_spec_focal_plane_angle,
           c_spec_capability,
           c_observing_mode_type,
-          c_instrument
+          c_instrument,
+          c_observer_notes
         )
         SELECT
           $program_id,
@@ -772,7 +778,8 @@ object ObservationService {
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
           ${observing_mode_type.opt},
-          ${instrument.opt}
+          ${instrument.opt},
+          ${text.opt}
       """
 
     def selectObservingModes(
@@ -890,6 +897,7 @@ object ObservationService {
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
       val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
+      val upObserverNotes     = sql"c_observer_notes = ${text.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -901,6 +909,11 @@ object ObservationService {
           },
           SET.status.map(upStatus),
           SET.activeStatus.map(upActive),
+          SET.observerNotes match {
+            case Nullable.Null  => Some(upObserverNotes(None))
+            case Absent         => None
+            case NonNull(value) => Some(upObserverNotes(Some(value)))
+          },
           SET.visualizationTime match {
             case Nullable.Null  => Some(upVisualizationTime(None))
             case Absent         => None
@@ -1062,7 +1075,7 @@ object ObservationService {
         WHERE c_program_id = $program_id
       """.query(cfp_id.opt)
 
-    val ObservationValidationInfo: 
+    val ObservationValidationInfo:
       Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
       sql"""
         SELECT

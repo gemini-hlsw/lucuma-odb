@@ -32,6 +32,8 @@ class observations extends OdbSuite {
                 hasMore
                 matches {
                   id
+                  calibrationRole
+                  observerNotes
                 }
               }
             }
@@ -42,12 +44,16 @@ class observations extends OdbSuite {
                 "hasMore" -> Json.False,
                 "matches" -> Json.fromValues(
                     oids.map { id =>
-                      Json.obj("id" -> id.asJson)
+                      Json.obj(
+                        "id"              -> id.asJson,
+                        "calibrationRole" -> Json.Null,
+                        "observerNotes"   -> Json.Null
+                      )
                     }
                 )
               )
             )
-          )              
+          )
         )
       }
     }
@@ -79,7 +85,7 @@ class observations extends OdbSuite {
                 )
               )
             )
-          )              
+          )
         )
       }
     }
@@ -115,7 +121,7 @@ class observations extends OdbSuite {
               }
             """
           )
-        )              
+        )
       }
     }
   }
@@ -186,7 +192,7 @@ class observations extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       (createObservationWithDefinedSpecRequirements(pi, pid), createObservationWithNullSpecRequirements(pi, pid))
         .tupled
-        .flatMap { (oid1, oid2) => 
+        .flatMap { (oid1, oid2) =>
           expect(
             user = pi,
             query = s"""
