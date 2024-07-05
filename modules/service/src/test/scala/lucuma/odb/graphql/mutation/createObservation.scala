@@ -1379,6 +1379,35 @@ class createObservation extends OdbSuite {
     }
   }
 
+  test("[general] observation notes can be set") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson},
+              SET:{
+                observerNotes: "This is a note"
+              }
+            }) {
+              observation {
+                observerNotes
+              }
+            }
+          }
+          """).flatMap { js =>
+        val notes = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("observerNotes")
+          .as[String]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(notes, "This is a note")
+      }
+    }
+  }
+
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid)

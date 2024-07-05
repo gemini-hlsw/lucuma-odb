@@ -1784,6 +1784,31 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 
+  test("update observer notes") {
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        observerNotes: "My new note"
+      """,
+      query = """
+        observations {
+          observerNotes
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observerNotes": "My new note"
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
