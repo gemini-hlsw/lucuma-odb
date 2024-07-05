@@ -168,7 +168,7 @@ class callForProposals extends OdbSuite {
        .liftTo[IO]
     }
 
-    assertIO(title, "2025 August Fast Turnaround")
+    assertIO(title, "2025 June Fast Turnaround")
   }
 
   test("system verification - no instruments") {
