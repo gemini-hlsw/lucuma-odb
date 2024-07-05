@@ -14,7 +14,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
     object ObservationView extends TableDef("v_observation") {
       val ProgramId: ColumnRef         = col("c_program_id",         program_id)
       val Id: ColumnRef                = col("c_observation_id",     observation_id)
-      val ObservationIndex: ColumnRef  = col("c_observation_index",     int4_pos)
+      val ObservationIndex: ColumnRef  = col("c_observation_index",  int4_pos)
       val Existence: ColumnRef         = col("c_existence",          existence)
       val Title: ColumnRef             = col("c_title",              text_nonempty)
       val Subtitle: ColumnRef          = col("c_subtitle",           text_nonempty.opt)
@@ -26,6 +26,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val GroupId: ColumnRef           = col("c_group_id",           group_id.opt)
       val GroupIndex: ColumnRef        = col("c_group_index",        int2_nonneg)
       val CalibrationRole: ColumnRef   = col("c_calibration_role",   calibration_role.opt)
+      val ObserverNotes: ColumnRef     = col("c_observer_notes",     text_nonempty.opt)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)
