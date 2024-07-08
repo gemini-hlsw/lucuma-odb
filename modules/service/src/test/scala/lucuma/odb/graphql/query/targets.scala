@@ -7,8 +7,10 @@ package query
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
 
 class targets extends OdbSuite {
 
@@ -173,4 +175,47 @@ class targets extends OdbSuite {
     }
   }
 
+  test("target selection with calibration role") {
+    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("TELLURIC")).flatMap { pid =>
+      createCalibrationTargetIn(pid, calibrationRole = CalibrationRole.Telluric)
+        .replicateA(5)
+        .flatMap { tids =>
+          expect(
+            user = service,
+            query = s"""
+              query {
+                targets(
+                  WHERE: {
+                    calibrationRole: {
+                      EQ: TELLURIC
+                    }
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
+                  }
+                ) {
+                  matches {
+                    id
+                    calibrationRole
+                  }
+                }
+              }
+            """,
+            expected =
+              Right(Json.obj(
+                "targets" -> Json.obj(
+                  "matches" -> Json.fromValues {
+                      tids.map { id =>
+                        Json.obj(
+                          "id" -> id.asJson,
+                          "calibrationRole" -> Json.fromString("TELLURIC")
+                      )
+                    }
+                  }
+                )
+              ))
+          )
+        }
+    }
+  }
 }

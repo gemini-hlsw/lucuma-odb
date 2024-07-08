@@ -39,6 +39,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.SourceProfile
@@ -76,6 +77,7 @@ import natchez.Trace.Implicits.noop
 import skunk.*
 import skunk.circe.codec.json.json as jsonCodec
 import skunk.codec.boolean.*
+import skunk.codec.text.*
 import skunk.syntax.all.*
 
 import java.time.LocalDate
@@ -1221,14 +1223,14 @@ trait DatabaseOperations { this: OdbSuite =>
   def createCalibrationTargetIn(
     pid:  Program.Id,
     name: NonEmptyString = "Unnamed Guide".refined,
+    calibrationRole: CalibrationRole,
     sourceProfile: SourceProfile =
       SourceProfile.Point(
         BandNormalized(
           StellarLibrary(StellarLibrarySpectrum.B5III).some,
           SortedMap.empty
         )
-      ),
-    calibrationRole: CalibrationRole = CalibrationRole.Telluric
+      )
   ): IO[Target.Id] = {
     val af = sql"""
       insert into t_target (
@@ -1262,6 +1264,24 @@ trait DatabaseOperations { this: OdbSuite =>
     )
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
+  }
+
+  def createCalibrationProgram(
+    calibrationRole: CalibrationRole,
+    description: Description
+  ): IO[Program.Id] = {
+    val af = sql"""
+      insert into t_program (
+        c_calibration_role,
+        c_library_desc
+      )
+      select
+        $calibration_role,
+        $text
+      returning c_program_id
+    """.apply(calibrationRole, description.value)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(af.fragment.query(program_id)).use(_.unique(af.argument)))
   }
 
   def moveObservationAs(user: User, oid: Observation.Id, gid: Option[Group.Id]): IO[Unit] =

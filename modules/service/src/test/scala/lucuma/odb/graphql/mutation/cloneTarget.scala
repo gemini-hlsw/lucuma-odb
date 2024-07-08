@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
+import lucuma.odb.data.CalibrationRole
 import lucuma.refined.*
 
 class cloneTarget extends OdbSuite {
@@ -173,7 +174,7 @@ class cloneTarget extends OdbSuite {
 
   test("clone a calibration target") {
     createProgramAs(pi).flatMap { pid =>
-      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+      createCalibrationTargetIn(pid, "Estrella Guía".refined, CalibrationRole.Telluric).flatMap { tid =>
         expect(
           user = pi,
           query = s"""
