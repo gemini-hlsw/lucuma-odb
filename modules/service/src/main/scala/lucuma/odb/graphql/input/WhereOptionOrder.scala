@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.input
 
 import cats.Order
+import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
@@ -29,14 +30,14 @@ object WhereOptionOrder {
           (isNull, EQ, NEQ, IN, NIN, GT, LT, GTE, LTE) =>
             and(List(
               isNull.map(IsNull(path, _)),
-              EQ.map(a => Eql(path, Const(a))),
-              NEQ.map(a => NEql(path, Const(a))),
-              IN.map(as => In(path, as)),
-              NIN.map(as => Not(In(path, as))),
-              GT.map(a => Gt(path, Const(a))),
-              GTE.map(a => GtEql(path, Const(a))),
-              LT.map(a => Lt(path, Const(a))),
-              LTE.map(a => LtEql(path, Const(a)))
+              EQ.map(a => Eql(path, Const(a.some))),
+              NEQ.map(a => NEql(path, Const(a.some))),
+              IN.map(as => In(path, as.map(_.some))),
+              NIN.map(as => Not(In(path, as.map(_.some)))),
+              GT.map(a => Gt(path, Const(a.some))),
+              GTE.map(a => GtEql(path, Const(a.some))),
+              LT.map(a => Lt(path, Const(a.some))),
+              LTE.map(a => LtEql(path, Const(a.some)))
             ).flatten)
         }
     }
