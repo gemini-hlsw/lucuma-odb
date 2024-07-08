@@ -24,7 +24,7 @@ object WhereObservation {
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
     val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
-    val ScienceBandBinding = WhereOptionOrder.binding(path / "_scienceBand", enumeratedBinding[ScienceBand])
+    val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {

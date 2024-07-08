@@ -56,9 +56,7 @@ trait ObservationMapping[F[_]]
       SqlField("subtitle", ObservationView.Subtitle),
       SqlField("status", ObservationView.Status),
       SqlField("activeStatus", ObservationView.ActiveStatus),
-      SqlField("scienceBand", ObservationView.ScienceBandOpt),
-      // We need a non-option binding for WhereObservation matching.
-      SqlField("_scienceBand", ObservationView.ScienceBand, hidden = true),
+      SqlField("scienceBand", ObservationView.ScienceBand),
       SqlField("visualizationTime", ObservationView.VisualizationTime),
       SqlObject("posAngleConstraint"),
       SqlObject("targetEnvironment"),

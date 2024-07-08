@@ -141,11 +141,13 @@ class observations extends OdbSuite {
       b2   <- observationsWhere(pi2, """scienceBand: { EQ: BAND2 }""")
       b3   <- observationsWhere(pi2, """scienceBand: { EQ: BAND3 }""")
       bn   <- observationsWhere(pi2, s"""program: { id: { EQ: "$pid" } }, scienceBand: { IS_NULL: true }""")
+      bs   <- observationsWhere(pi2, "scienceBand: { IS_NULL: false }")
     } yield {
       assertEquals(b1, List(oid1, oid2))
       assertEquals(b2, List(oid3))
       assertEquals(b3, Nil)
       assertEquals(bn, List(oid4))
+      assertEquals(bs, List(oid1, oid2, oid3))
     }
   }
 
