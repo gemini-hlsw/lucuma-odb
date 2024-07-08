@@ -5,14 +5,17 @@ package lucuma.odb.graphql
 package mutation
 
 import io.circe.literal.*
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
 import lucuma.refined.*
 
 class updateTargets extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val staff = TestUsers.Standard.staff(3, 103)
 
-  override lazy val validUsers: List[User] = List(pi)
+  override lazy val validUsers: List[User] = List(pi, staff)
 
   test("no updates") {
     createProgramAs(pi).flatMap { pid =>
@@ -121,10 +124,10 @@ class updateTargets extends OdbSuite {
   }
 
   test("update calibration targets is allowed directly with the id") {
-    createProgramAs(pi).flatMap { pid =>
-      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
+    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("TELLURIC")).flatMap { pid =>
+      createCalibrationTargetIn(pid, "Estrella Guía".refined, CalibrationRole.Telluric).flatMap { tid =>
        expect(
-        user = pi,
+        user = staff,
         query = s"""
           mutation {
             updateTargets(input: {
@@ -138,6 +141,7 @@ class updateTargets extends OdbSuite {
               targets {
                 id
                 name
+                calibrationRole
               }
             }
           }
@@ -146,9 +150,10 @@ class updateTargets extends OdbSuite {
           json"""
             {
               "updateTargets" : {
-                "targets" : [ { 
-                  "id" : $tid, 
-                  "name" : "New Guía" 
+                "targets" : [ {
+                  "id" : $tid,
+                  "name" : "New Guía",
+                  "calibrationRole": "TELLURIC"
                 } ]
               }
             }
