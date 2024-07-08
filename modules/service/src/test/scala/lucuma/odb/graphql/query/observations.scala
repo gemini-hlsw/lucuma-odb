@@ -12,6 +12,7 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.ScienceBand
 
 class observations extends OdbSuite {
 
@@ -123,6 +124,30 @@ class observations extends OdbSuite {
           )
         )
       }
+    }
+  }
+
+  test("select science bands") {
+    for {
+      pid  <- createProgramAs(pi2)
+      oid1 <- createObservationAs(pi2, pid)
+      _    <- setScienceBandAs(pi2, oid1, ScienceBand.Band1.some)
+      oid2 <- createObservationAs(pi2, pid)
+      _    <- setScienceBandAs(pi2, oid2, ScienceBand.Band1.some)
+      oid3 <- createObservationAs(pi2, pid)
+      _    <- setScienceBandAs(pi2, oid3, ScienceBand.Band2.some)
+      oid4 <- createObservationAs(pi2, pid)
+      b1   <- observationsWhere(pi2, """scienceBand: { EQ: BAND1 }""")
+      b2   <- observationsWhere(pi2, """scienceBand: { EQ: BAND2 }""")
+      b3   <- observationsWhere(pi2, """scienceBand: { EQ: BAND3 }""")
+      bn   <- observationsWhere(pi2, s"""program: { id: { EQ: "$pid" } }, scienceBand: { IS_NULL: true }""")
+      bs   <- observationsWhere(pi2, "scienceBand: { IS_NULL: false }")
+    } yield {
+      assertEquals(b1, List(oid1, oid2))
+      assertEquals(b2, List(oid3))
+      assertEquals(b3, Nil)
+      assertEquals(bn, List(oid4))
+      assertEquals(bs, List(oid1, oid2, oid3))
     }
   }
 

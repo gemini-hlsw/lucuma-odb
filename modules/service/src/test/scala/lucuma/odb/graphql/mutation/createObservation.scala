@@ -46,6 +46,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.ScienceBand
 
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
@@ -363,6 +364,62 @@ class createObservation extends OdbSuite {
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
         assertIO(get, ObsStatus.ForReview)
+      }
+    }
+  }
+
+  test("[general] created observation may have no science band") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: { }
+            }) {
+              observation {
+                scienceBand
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("scienceBand")
+          .as[Option[ScienceBand]]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, none[ScienceBand])
+      }
+    }
+  }
+
+  test("[general] created observation should have specified science band") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceBand: BAND2
+              }
+            }) {
+              observation {
+                scienceBand
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("scienceBand")
+          .as[Option[ScienceBand]]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, ScienceBand.Band2.some)
       }
     }
   }

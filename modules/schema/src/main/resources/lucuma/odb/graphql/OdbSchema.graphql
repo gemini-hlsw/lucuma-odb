@@ -3055,6 +3055,12 @@ input ObservationPropertiesInput {
   activeStatus: ObsActiveStatus
 
   """
+  The science band to assign to this observation.  Set to `null` to remove the
+  science band.
+  """
+  scienceBand: ScienceBand
+
+  """
   Reference time used for time-dependent calculations such as average parallactic angle
   """
   visualizationTime: Timestamp
@@ -7937,6 +7943,12 @@ type Observation {
   activeStatus: ObsActiveStatus!
 
   """
+  Observations are associated with a science band once time has been allocated
+  to a program.
+  """
+  scienceBand: ScienceBand
+
+  """
   Reference time used by default for visualization and time-dependent calculations (e.g., average parallactic angle)
   """
   visualizationTime: Timestamp
@@ -11626,6 +11638,12 @@ input WhereObservation {
   Matches the observation active status.
   """
   activeStatus: WhereOrderObsActiveStatus
+
+  """
+  Matches the observation science band.
+  """
+  scienceBand: WhereOptionOrderScienceBand
+
 }
 
 input WhereObservationReference {
@@ -12645,6 +12663,59 @@ input WhereProposalReference {
   "Matches the index in the proposal reference."
   semesterIndex: WhereOrderPosInt
 
+}
+
+"""
+Filters on equality or order comparisons of science bands.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderScienceBand {
+
+  """
+  When `true`, matches if the science band is not defined. When `false` matches
+  if the science band is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the science band is exactly the supplied value.
+  """
+  EQ: ScienceBand
+
+  """
+  Matches if the science band is not the supplied value.
+  """
+  NEQ: ScienceBand
+
+  """
+  Matches if the science band is any of the supplied options.
+  """
+  IN: [ScienceBand!]
+
+  """
+  Matches if the science band is none of the supplied values.
+  """
+  NIN: [ScienceBand!]
+
+  """
+  Matches if the science band is ordered after (>) the supplied value.
+  """
+  GT: ScienceBand
+
+  """
+  Matches if the science band is ordered before (<) the supplied value.
+  """
+  LT: ScienceBand
+
+  """
+  Matches if the science band is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ScienceBand
+
+  """
+  Matches if the science band is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ScienceBand
 }
 
 """

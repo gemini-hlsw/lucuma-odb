@@ -15,6 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.service.ObservationService
 
 class updateObservations extends OdbSuite
@@ -1807,6 +1808,25 @@ class updateObservations extends OdbSuite
         }
       """.asRight
     )
+  }
+
+  test("update scienceBand") {
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      b1  <- observationsWhere(pi, "scienceBand: { EQ: BAND2 }")
+    } yield assertEquals(b1, List(oid))
+  }
+
+  test("null scienceBand") {
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _   <- setScienceBandAs(pi, oid, none[ScienceBand])
+      bn  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, scienceBand: { IS_NULL: true }""")
+    } yield assertEquals(bn, List(oid))
   }
 
 }
