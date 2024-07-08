@@ -369,6 +369,49 @@ trait DatabaseOperations { this: OdbSuite =>
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)
 
+  def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
+    query(
+      user,
+      s"""
+         query {
+          observations(WHERE: { $where }) {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    ).flatMap { json =>
+      json.hcursor.downFields("observations", "matches").values.toList.flatten.traverse { json =>
+        json.hcursor.downField("id").as[Observation.Id]
+      }
+      .leftMap(f => new RuntimeException(f.message))
+      .liftTo[IO]
+    }
+
+  def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateObservations(
+            input: {
+              SET: {
+                scienceBand: ${band.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+              }
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }
+          ) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
   private def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
       case ObservingModeType.GmosNorthLongSlit |
