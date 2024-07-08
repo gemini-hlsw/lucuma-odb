@@ -12,6 +12,7 @@ import grackle.Predicate.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
 object WhereObservation {
@@ -23,6 +24,8 @@ object WhereObservation {
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
     val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
+    val ScienceBandBinding = WhereOptionOrder.binding(path / "_scienceBand", enumeratedBinding[ScienceBand])
+
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -34,10 +37,11 @@ object WhereObservation {
         WhereProgramBinding.Option("program", rProgram),
         SubtitleBinding.Option("subtitle", rSubtitle),
         StatusBinding.Option("status", rStatus),
-        ActiveStatusBinding.Option("activeStatus", rActiveStatus)
+        ActiveStatusBinding.Option("activeStatus", rActiveStatus),
+        ScienceBandBinding.Option("scienceBand", rScienceBand)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rStatus, rActiveStatus).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, status, activeStatus) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rStatus, rActiveStatus, rScienceBand).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, status, activeStatus, scienceBand) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -47,7 +51,8 @@ object WhereObservation {
               program,
               subtitle,
               status,
-              activeStatus
+              activeStatus,
+              scienceBand
             ).flatten)
         }
     }
