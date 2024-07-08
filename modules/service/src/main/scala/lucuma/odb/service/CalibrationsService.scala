@@ -10,9 +10,11 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
@@ -51,10 +53,11 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
+import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.GmosCodecs.*
 import lucuma.refined.*
 import skunk.AppliedFragment
 import skunk.Query
@@ -72,8 +75,8 @@ trait CalibrationsService[F[_]] {
 }
 
 object CalibrationsService {
-  type GmosNConfigs = (GmosNorthGrating, GmosNorthFpu, Wavelength, Option[GmosXBinning], Option[GmosYBinning])
-  type GmosSConfigs = (GmosSouthGrating, GmosSouthFpu, Wavelength, Option[GmosXBinning], Option[GmosYBinning])
+  type GmosNConfigs = (GmosNorthGrating, Option[GmosNorthFilter], GmosNorthFpu, Wavelength, GmosXBinning, GmosYBinning)
+  type GmosSConfigs = (GmosSouthGrating, Option[GmosSouthFilter], GmosSouthFpu, Wavelength, GmosXBinning, GmosYBinning)
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
   extension[F[_], A](r: F[Result[A]])
@@ -123,7 +126,46 @@ object CalibrationsService {
           }
         } else none.pure[F]
 
-      private def createCalibrationObservation(pid: Program.Id, gid: Group.Id, tid: Target.Id, create: ObservingModeInput.Create)(using Transaction[F]): F[Observation.Id] =
+      private def uniqueConfiguration(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[GmosNConfigs], List[GmosSConfigs])] = {
+        val all: F[List[Config.GmosNorth | Config.GmosSouth]] = services.generatorParamsService.selectAll(pid, selection = selection)
+          .map(_.values.toList.collect {
+            case Right(GeneratorParams.GmosNorthLongSlit(_, mode)) => mode
+            case Right(GeneratorParams.GmosSouthLongSlit(_, mode)) => mode
+          })
+
+        val gnLSDiff = all
+          .map(_.collect {
+              case mode: Config.GmosNorth => mode
+            }.distinctBy(m =>
+               (m.grating,
+                m.filter,
+                m.fpu,
+                m.centralWavelength,
+                m.xBin,
+                m.yBin
+            ))).map { _.map {
+              case c @ Config.GmosNorth(g, of, f, w, _, _, _, _, _, _, _, _, _) => ((g, of, f, w, c.xBin, c.yBin))
+            }}
+
+        val gsLSDiff = all
+          .map(_.collect {
+              case mode: Config.GmosSouth => mode
+            }.distinctBy(m =>
+               (m.grating,
+                m.filter,
+                m.fpu,
+                m.centralWavelength,
+                m.xBin,
+                m.yBin
+            ))).map { _.map {
+              case c @ Config.GmosSouth(g, of, f, w, _, _, _, _, _, _, _, _, _) => ((g, of, f, w, c.xBin, c.yBin))
+            }}
+
+        (gnLSDiff, gsLSDiff).tupled
+      }
+
+      private def createCalibrationObservation(pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, create: ObservingModeInput.Create)(using Transaction[F]): F[Observation.Id] =
+
           observationService.createObservation(
             CreateObservationInput(
               programId = pid.some,
@@ -143,7 +185,8 @@ object CalibrationsService {
                         ScienceRequirementsInput(
                           mode = ScienceMode.Spectroscopy.some,
                           spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                            signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0))
+                            signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0)),
+                            signalToNoiseAt = Nullable.NonNull(cw),
                         ).some
                       ).some
                     ).some
@@ -151,77 +194,69 @@ object CalibrationsService {
           ).orError
 
       private def calibrationObservations(pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[List[Observation.Id]] = {
-        def gmosNorthLSObservations(gnls: List[GmosNConfigs], tid: Target.Id): F[List[Observation.Id]] =
-          gnls.traverse { case (g, f, w, xb, yb) =>
+
+        def gmosNorthLSObservations(gnls: List[GmosNConfigs], tid: Target.Id) =
+          gnls.traverse { case (g, of, f, w, xb, yb) =>
             val conf =
               GmosLongSlitInput.Create.North(
                 grating = g,
-                filter = none,
+                filter = of,
                 fpu = f,
                 common = GmosLongSlitInput.Create.Common(
                   centralWavelength = w,
-                  explicitXBin = xb,
-                  explicitYBin = yb,
+                  explicitXBin = xb.some,
+                  explicitYBin = yb.some,
                   explicitAmpReadMode = none,
                   explicitAmpGain = none,
                   explicitRoi = GmosRoi.CentralSpectrum.some,
                   explicitλDithers = none,
                   explicitSpatialOffsets = none
-                )
-              )
+                ))
 
-            createCalibrationObservation(pid, gid, tid, ObservingModeInput.Create(conf.some, none))
+            createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(conf.some, none))
           }
 
-        def gmosSouthLSObservations(gsls: List[GmosSConfigs], tid: Target.Id): F[List[Observation.Id]] =
-          gsls.traverse { case (g, f, w, xb, yb) =>
+        def gmosSouthLSObservations(gsls: List[GmosSConfigs], tid: Target.Id) =
+          gsls.traverse { case (g, of, f, w, xb, yb) =>
             val conf =
               GmosLongSlitInput.Create.South(
                 grating = g,
-                filter = none,
+                filter = of,
                 fpu = f,
                 common = GmosLongSlitInput.Create.Common(
                   centralWavelength = w,
-                  explicitXBin = xb,
-                  explicitYBin = yb,
+                  explicitXBin = xb.some,
+                  explicitYBin = yb.some,
                   explicitAmpReadMode = none,
                   explicitAmpGain = none,
                   explicitRoi = GmosRoi.CentralSpectrum.some,
                   explicitλDithers = none,
                   explicitSpatialOffsets = none
-                )
-              )
-            createCalibrationObservation(pid, gid, tid, ObservingModeInput.Create(none, conf.some))
+                ))
+
+            createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
           }
 
         val gno: Option[F[List[Observation.Id]]] = gnTgt.map(tgtid =>
-          (session.execute(Statements.selectGmosNorthLongSlitConfigurations(true))(pid))
-            .flatMap { current =>
-              val pendingConfigs = gnls.diff(current)
-              // We don't want to create a target if there are no pending configurations
-              if (pendingConfigs.nonEmpty) {
-                (for {
-                  ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                  o       <- ct.traverse(gmosNorthLSObservations(pendingConfigs, _))
-                } yield o).orError
-              } else {
-                List.empty[Observation.Id].pure[F]
-              }
+            // We don't want to create a target if there are no pending configurations
+            if (gnls.nonEmpty) {
+              (for {
+                ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                o       <- ct.traverse(gmosNorthLSObservations(gnls, _))
+              } yield o).orError
+            } else {
+              List.empty[Observation.Id].pure[F]
             })
 
         val gso: Option[F[List[Observation.Id]]] = gsTgt.map(tgtid =>
-          (session.execute(Statements.selectGmosSouthLongSlitConfigurations(true))(pid))
-            .flatMap { current =>
-              val pendingConfigs = gsls.diff(current)
-              // We don't want to create a target if there are no pending configurations
-              if (pendingConfigs.nonEmpty) {
-                (for {
-                  ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                  o       <- ct.traverse(gmosSouthLSObservations(pendingConfigs, _))
-                } yield o).orError
-              } else {
-                List.empty[Observation.Id].pure[F]
-              }
+            // We don't want to create a target if there are no pending configurations
+            if (gsls.nonEmpty) {
+              (for {
+                ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                o       <- ct.traverse(gmosSouthLSObservations(gsls, _))
+              } yield o).orError
+            } else {
+              List.empty[Observation.Id].pure[F]
             })
 
         (gno, gso).mapN((_, _).mapN(_ ::: _)).getOrElse(Nil.pure[F])
@@ -280,64 +315,16 @@ object CalibrationsService {
             .map(spectroPhotometricTargets(referenceInstant))
           gsTgt = bestTarget(gscoords, tgts)
           gnTgt = bestTarget(gncoords, tgts)
-          gnls <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(false))(pid)
-          gsls <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(false))(pid)
-          _    <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
+          (scienceGmosNLS, scienceGmosSLS) <- uniqueConfiguration(pid, ObservationSelection.Science)
+          (calibGmosNLS, calibGmosSLS)     <- uniqueConfiguration(pid, ObservationSelection.Calibration)
+          gnls = scienceGmosNLS.diff(calibGmosNLS)
+          gsls = scienceGmosSLS.diff(calibGmosSLS)
+          _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
         } yield ()
       }
     }
 
   object Statements {
-
-    def selectGmosNorthLongSlitConfigurations(calibsOnly: Boolean): Query[Program.Id, GmosNConfigs] = {
-      val noCalibs = sql"t_observation.c_calibration_role is     null"
-      val calibs   = sql"t_observation.c_calibration_role is not null"
-      val selector = if (calibsOnly) calibs else noCalibs
-
-      sql"""
-         SELECT DISTINCT ON (
-             c_grating,
-             c_fpu,
-             c_central_wavelength,
-             c_xbin,
-             c_ybin
-           )
-           c_grating,
-           c_fpu,
-           c_central_wavelength,
-           c_xbin,
-           c_ybin
-         FROM t_gmos_north_long_slit
-         INNER JOIN t_observation
-         ON t_gmos_north_long_slit.c_observation_id = t_observation.c_observation_id
-         WHERE t_observation.c_program_id=$program_id and $selector
-      """.query(gmos_north_grating *: gmos_north_fpu *: wavelength_pm *: gmos_x_binning.opt *: gmos_y_binning.opt)
-    }
-
-    def selectGmosSouthLongSlitConfigurations(calibsOnly: Boolean): Query[Program.Id, GmosSConfigs] = {
-      val noCalibs = sql"c_calibration_role is     null"
-      val calibs   = sql"c_calibration_role is not null"
-      val selector = if (calibsOnly) calibs else noCalibs
-
-      sql"""
-         SELECT DISTINCT ON (
-             c_grating,
-             c_fpu,
-             c_central_wavelength,
-             c_xbin,
-             c_ybin
-           )
-           c_grating,
-           c_fpu,
-           c_central_wavelength,
-           c_xbin,
-           c_ybin
-         FROM t_gmos_south_long_slit
-         INNER JOIN t_observation
-         ON t_gmos_south_long_slit.c_observation_id = t_observation.c_observation_id
-         WHERE c_program_id=$program_id and $selector
-      """.query(gmos_south_grating *: gmos_south_fpu *: wavelength_pm *: gmos_x_binning.opt *: gmos_y_binning.opt)
-    }
 
     def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
       void"UPDATE t_observation " |+|

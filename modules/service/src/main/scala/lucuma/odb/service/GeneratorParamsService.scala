@@ -47,6 +47,11 @@ import skunk.implicits.*
 import GeneratorParamsService.Error
 import Services.Syntax.*
 
+enum ObservationSelection:
+  case All
+  case Science
+  case Calibration
+
 trait GeneratorParamsService[F[_]] {
 
   def selectOne(
@@ -61,7 +66,8 @@ trait GeneratorParamsService[F[_]] {
 
   def selectAll(
     programId: Program.Id,
-    minStatus: ObsStatus = ObsStatus.New
+    minStatus: ObsStatus = ObsStatus.New,
+    selection: ObservationSelection = ObservationSelection.All
   )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]]
 
 }
@@ -134,9 +140,10 @@ object GeneratorParamsService {
 
       override def selectAll(
         pid:       Program.Id,
-        minStatus: ObsStatus
+        minStatus: ObsStatus,
+        selection: ObservationSelection
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
-        doSelect(selectAllParams(pid, minStatus))
+        doSelect(selectAllParams(pid, minStatus, selection))
 
       private def doSelect(
         params: F[List[Params]]
@@ -162,9 +169,10 @@ object GeneratorParamsService {
 
       private def selectAllParams(
         pid:       Program.Id,
-        minStatus: ObsStatus
+        minStatus: ObsStatus,
+        selection: ObservationSelection
       ): F[List[Params]] =
-        executeSelect(Statements.selectAllParams(user, pid, minStatus))
+        executeSelect(Statements.selectAllParams(user, pid, minStatus, selection))
 
       private def executeSelect(af: AppliedFragment): F[List[Params]] =
         session
@@ -344,8 +352,14 @@ object GeneratorParamsService {
     def selectAllParams(
       user:      User,
       programId: Program.Id,
-      minStatus: ObsStatus
-    ): AppliedFragment =
+      minStatus: ObsStatus,
+      selection: ObservationSelection
+    ): AppliedFragment = {
+      val selector = selection match
+        case ObservationSelection.All         => void""
+        case ObservationSelection.Science     => void" AND ob.c_calibration_role is null "
+        case ObservationSelection.Calibration => void" AND ob.c_calibration_role is not null "
+
       sql"""
         SELECT
           #${ParamColumns("gp")}
@@ -357,6 +371,8 @@ object GeneratorParamsService {
         void""" AND ob.c_existence = 'present' """                 |+|
         sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
         void""" AND ob.c_active_status = 'active' """              |+|
+        selector                                                   |+|
         existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
+    }
   }
 }
