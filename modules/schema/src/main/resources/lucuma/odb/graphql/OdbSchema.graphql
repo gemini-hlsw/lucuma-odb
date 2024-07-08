@@ -3055,6 +3055,12 @@ input ObservationPropertiesInput {
   activeStatus: ObsActiveStatus
 
   """
+  The science band to assign to this observation.  Set to `null` to remove the
+  science band.
+  """
+  scienceBand: ScienceBand
+
+  """
   Reference time used for time-dependent calculations such as average parallactic angle
   """
   visualizationTime: Timestamp
@@ -7935,6 +7941,12 @@ type Observation {
   Observation operational status
   """
   activeStatus: ObsActiveStatus!
+
+  """
+  Observations are associated with a science band once time has been allocated
+  to a program.
+  """
+  scienceBand: ScienceBand
 
   """
   Reference time used by default for visualization and time-dependent calculations (e.g., average parallactic angle)

@@ -57,6 +57,7 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -586,9 +587,7 @@ object ObservationService {
       SET:       ObservationPropertiesInput.Create,
       groupIndex: NonNegShort,
     ): Result[AppliedFragment] =
-      for {
-        cs <- SET.constraintSet.traverse(_.create)
-      } yield
+      SET.constraintSet.traverse(_.create).map { cs =>
         insertObservationAs(
           user,
           programId,
@@ -598,6 +597,7 @@ object ObservationService {
           SET.existence.getOrElse(Existence.Default),
           SET.status.getOrElse(ObsStatus.New),
           SET.activeStatus.getOrElse(ObsActiveStatus.Active),
+          SET.scienceBand,
           SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
@@ -608,6 +608,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes
         )
+      }
 
     def insertObservationAs(
       user:                User,
@@ -618,6 +619,7 @@ object ObservationService {
       existence:           Existence,
       status:              ObsStatus,
       activeState:         ObsActiveStatus,
+      scienceBand:         Option[ScienceBand],
       visualizationTime:   Option[Timestamp],
       posAngleConsMode:    PosAngleConstraintMode,
       posAngle:            Angle,
@@ -641,6 +643,7 @@ object ObservationService {
            existence   ,
            status      ,
            activeState ,
+           scienceBand ,
            visualizationTime             ,
            posAngleConsMode              ,
            posAngle                      ,
@@ -685,6 +688,7 @@ object ObservationService {
       Existence                        ,
       ObsStatus                        ,
       ObsActiveStatus                  ,
+      Option[ScienceBand]              ,
       Option[Timestamp]                ,
       PosAngleConstraintMode           ,
       Angle                            ,
@@ -720,6 +724,7 @@ object ObservationService {
           c_existence,
           c_status,
           c_active_status,
+          c_science_band,
           c_visualization_time,
           c_pac_mode,
           c_pac_angle,
@@ -754,6 +759,7 @@ object ObservationService {
           $existence,
           $obs_status,
           $obs_active_status,
+          ${science_band.opt},
           ${core_timestamp.opt},
           $pac_mode,
           $angle_µas,
@@ -895,6 +901,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
+      val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
 
@@ -904,6 +911,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.status.map(upStatus),
           SET.activeStatus.map(upActive),
+          SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.visualizationTime.foldPresent(upVisualizationTime),
         ).flatten
@@ -978,6 +986,7 @@ object ObservationService {
           c_instrument,
           c_status,
           c_active_status,
+          c_science_band,
           c_visualization_time,
           c_pts_pi,
           c_pts_uncharged,
@@ -1014,6 +1023,7 @@ object ObservationService {
           c_instrument,
           'new',
           'active',
+          c_science_band,
           c_visualization_time,
           c_pts_pi,
           c_pts_uncharged,
