@@ -22,11 +22,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
-import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.StepStage
-import lucuma.core.math.Declination
-import lucuma.core.math.Epoch
-import lucuma.core.math.RightAscension
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
@@ -42,10 +38,7 @@ import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition.*
 import lucuma.core.model.Target
-import lucuma.core.model.UnnormalizedSED.*
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
@@ -64,25 +57,20 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
-import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
-import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.stepconfig.given
-import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.service.EmailService
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import skunk.*
-import skunk.circe.codec.json.json as jsonCodec
 import skunk.codec.boolean.*
 import skunk.codec.text.*
 import skunk.syntax.all.*
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import scala.collection.immutable.SortedMap
 
 trait DatabaseOperations { this: OdbSuite =>
 
@@ -1218,52 +1206,6 @@ trait DatabaseOperations { this: OdbSuite =>
     val query = sql"select c_calibration_role from t_target where c_target_id = $target_id".query(calibration_role.opt)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(tid)))
-  }
-
-  def createCalibrationTargetIn(
-    pid:  Program.Id,
-    name: NonEmptyString = "Unnamed Guide".refined,
-    calibrationRole: CalibrationRole,
-    sourceProfile: SourceProfile =
-      SourceProfile.Point(
-        BandNormalized(
-          StellarLibrary(StellarLibrarySpectrum.B5III).some,
-          SortedMap.empty
-        )
-      )
-  ): IO[Target.Id] = {
-    val af = sql"""
-      insert into t_target (
-        c_program_id,
-        c_name,
-        c_type,
-        c_sid_ra,
-        c_sid_dec,
-        c_sid_epoch,
-        c_source_profile,
-        c_calibration_role
-      )
-      select
-        $program_id,
-        $text_nonempty,
-        'sidereal',
-        ${right_ascension},
-        ${declination},
-        ${epoch},
-        $jsonCodec,
-        $calibration_role
-      returning c_target_id
-    """.apply(
-      pid,
-      name,
-      RightAscension.Zero,
-      Declination.Zero,
-      Epoch.J2000,
-      sourceProfile.asJson,
-      calibrationRole
-    )
-    FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(af.fragment.query(target_id)).use(_.unique(af.argument)))
   }
 
   def createCalibrationProgram(
