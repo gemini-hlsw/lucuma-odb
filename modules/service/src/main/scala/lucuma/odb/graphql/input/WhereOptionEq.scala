@@ -28,8 +28,8 @@ object WhereOptionEq {
               isNull.map(IsNull(path, _)),
               EQ.map(a => Eql(path, Const(a.some))),
               NEQ.map(a => NEql(path, Const(a.some))),
-              IN.map(as => In(path, as)),
-              NIN.map(as => Not(In(path, as)))
+              IN.map(as => In(path, as.map(_.some))),
+              NIN.map(as => Not(In(path, as.map(_.some))))
             ).flatten)
         }
     }
