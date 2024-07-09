@@ -42,7 +42,6 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -68,7 +67,7 @@ import lucuma.odb.graphql.input.RecordGmosStepInput
 import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
-import lucuma.odb.graphql.input.SetAllocationInput
+import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
@@ -127,7 +126,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RecordGmosSouthVisit,
       RedeemUserInvitation,
       RevokeUserInvitation,
-      SetAllocation,
+      SetAllocations,
       SetProgramReference,
       SetProposalStatus,
       UnlinkUser,
@@ -252,14 +251,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child
     )
 
-  def proposalAttachmentResultSubquery(pid: Program.Id, aTypes: List[Tag], limit: Option[NonNegInt], child: Query) =
-    mutationResultSubquery(
-      predicate = And(Predicates.proposalAttachment.program.id.eql(pid), Predicates.proposalAttachment.attachmentType.in(aTypes)),
-      order = OrderSelection[Tag](ProposalAttachmentType / "attachmentType"),
-      limit = limit,
-      collectionField = "proposalAttachments",
-      child
-    )
+//  def allocationsResultSubquery(pid: Program.Id, child: Query) =
+//    mutationResultSubquery(
+//      predicate = Predicates.setAllocationsResult.programId.eql(pid)
+//      order     = OrderSelection[Partner](AllocationType / "partner"),
+//      limit     = None,
+//      collectionField = "attachments",
+//      child
+//    )
 
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
@@ -520,15 +519,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           rId.map: id =>
             Unique(Filter(Predicates.userInvitation.id.eql(id), child))
 
-  private lazy val SetAllocation =
-    MutationField("setAllocation", SetAllocationInput.Binding): (input, child) =>
+  private lazy val SetAllocations =
+    MutationField("setAllocations", SetAllocationsInput.Binding): (input, child) =>
       services.useTransactionally:
         requireStaffAccess:
-          allocationService.setAllocation(input).nestAs:
-            Unique(Filter(And(
-              Predicates.setAllocationResult.programId.eql(input.programId),
-              Predicates.setAllocationResult.partner.eql(input.partner)
-            ), child))
+          allocationService.setAllocations(input).nestAs:
+            Unique(Filter(Predicates.setAllocationsResult.programId.eql(input.programId), child))
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

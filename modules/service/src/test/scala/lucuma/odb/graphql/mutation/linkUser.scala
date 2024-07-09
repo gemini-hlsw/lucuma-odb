@@ -75,7 +75,7 @@ class linkUser extends OdbSuite {
   test("[coi] ngo user can add coi to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+      setOneAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
       linkCoiAs(ngo, pi2.id -> pid, Partner.US)
     }
   }
@@ -148,7 +148,7 @@ class linkUser extends OdbSuite {
   test("[observer] ngo user can add observer to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+      setOneAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
       linkObserverAs(ngo, pi2.id -> pid, Partner.US)
     }
   }
@@ -194,7 +194,7 @@ class linkUser extends OdbSuite {
   test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+      setOneAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
       interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
         linkSupportAs(ngo, pi2.id -> pid)
       }

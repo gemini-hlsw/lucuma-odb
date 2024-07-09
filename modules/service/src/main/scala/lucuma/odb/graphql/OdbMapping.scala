@@ -183,7 +183,7 @@ object OdbMapping {
           with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
-          with SetAllocationResultMapping[F]
+          with SetAllocationsResultMapping[F]
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
@@ -353,7 +353,7 @@ object OdbMapping {
                 SpectroscopyConfigOptionGmosNorthMapping,
                 SpectroscopyConfigOptionGmosSouthMapping,
                 SpectroscopyScienceRequirementsMapping,
-                SetAllocationResultMapping,
+                SetAllocationsResultMapping,
                 SetProgramReferenceResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,
@@ -445,6 +445,7 @@ object OdbMapping {
                 MutationElaborator,
                 ObservationElaborator,
                 ProgramElaborator,
+//                SetAllocationsResultElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,

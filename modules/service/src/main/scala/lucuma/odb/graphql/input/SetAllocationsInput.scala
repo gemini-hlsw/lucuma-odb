@@ -1,0 +1,35 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+
+package input
+
+import cats.syntax.all.*
+import grackle.Result
+import lucuma.core.model.Program
+import lucuma.odb.graphql.binding.*
+
+case class SetAllocationsInput(
+  programId:   Program.Id,
+  allocations: List[AllocationInput]
+)
+
+object SetAllocationsInput {
+
+  val Binding: Matcher[SetAllocationsInput] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        ProgramIdBinding("programId", rProgramId),
+        AllocationInput.Binding.List("allocations", rAllocations)
+      ) =>
+        val rValidAllocations = rAllocations.flatMap { allocations =>
+          Matcher
+            .validationFailure("Each partner + band combination may only appear once.")
+            .unlessA(allocations.map(a => (a.partner, a.scienceBand)).toSet.size === allocations.size)
+            .as(allocations)
+        }
+        (rProgramId, rValidAllocations).mapN(apply)
+    }
+
+}

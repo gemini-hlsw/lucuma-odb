@@ -62,6 +62,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.offset.transport.given
@@ -552,57 +553,68 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def setAllocationAs(
+  def readAllocations(
+    topLevelField: String,
+    json:          Json
+  ): IO[Set[(Partner, ScienceBand, BigDecimal)]] =
+    json.hcursor.downFields(topLevelField, "allocations").values.toList.flatten.traverse { obj =>
+      val c = obj.hcursor
+      (for {
+        p <- c.downField("partner").as[Partner]
+        b <- c.downField("scienceBand").as[ScienceBand]
+        d <- c.downFields("duration", "hours").as[BigDecimal]
+      } yield (p, b, d))
+       .leftMap(f => new RuntimeException(f.getMessage))
+       .liftTo[IO]
+    }.map(_.toSet)
+
+  def setAllocationsAs(
+    user:        User,
+    pid:         Program.Id,
+    allocations: List[AllocationInput]
+  ): IO[Unit] = {
+    val q = query(
+      user = user,
+      query = s"""
+        mutation {
+          setAllocations(input: {
+            programId:   ${pid.asJson}
+            allocations: ${allocations.map { a =>
+              s"""
+                {
+                  partner: ${a.partner.tag.toScreamingSnakeCase}
+                  scienceBand: ${a.scienceBand.tag.toScreamingSnakeCase}
+                  duration: {
+                    hours: "${a.duration.toHours}"
+                  }
+                }
+              """
+            }.mkString("[\n", ",\n", "]")}
+          }) {
+            allocations {
+              partner
+              scienceBand
+              duration { hours }
+            }
+          }
+        }
+      """
+    )
+
+    assertIO(
+      q.flatMap(readAllocations("setAllocations", _)),
+      allocations.map(a => (a.partner, a.scienceBand, a.duration.toHours)).toSet
+    )
+  }
+
+  def setOneAllocationAs(
     user: User,
     pid: Program.Id,
     partner: Partner,
     scienceBand: ScienceBand,
     duration: TimeSpan,
   ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          setAllocation(input: {
-            programId: ${pid.asJson}
-            partner:   ${partner.tag.toScreamingSnakeCase}
-            scienceBand: ${scienceBand.tag.toScreamingSnakeCase}
-            duration:  {
-              hours: "${duration.toHours}"
-            }
-          }) {
-            allocation {
-              partner
-              scienceBand
-              duration {
-                microseconds
-                milliseconds
-                seconds
-                minutes
-                hours
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "setAllocation" : {
-            "allocation" : {
-              "partner":  ${partner.asJson},
-              "scienceBand": ${scienceBand.asJson},
-              "duration": {
-                "microseconds": ${duration.toMicroseconds},
-                "milliseconds": ${duration.toMilliseconds},
-                "seconds": ${duration.toSeconds},
-                "minutes": ${duration.toMinutes},
-                "hours": ${duration.toHours}
-              }
-            }
-          }
-        }
-      """.asRight
-    )
+    setAllocationsAs(user, pid, List(AllocationInput(partner, scienceBand, duration)))
 
   def linkAs(
     user: User,
