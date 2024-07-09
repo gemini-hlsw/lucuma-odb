@@ -6,10 +6,14 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class createProgram extends OdbSuite {
 
@@ -161,6 +165,51 @@ class createProgram extends OdbSuite {
         """
       ),
     )
+  }
+
+  test("service user can create a calibration program") {
+    val name = "Photometric calibration targeets"
+    for {
+      pid <- withServices(service) { s =>
+              s.session.transaction.use { xa =>
+                s.programService
+                  .insertCalibrationProgram(
+                    ProgramPropertiesInput.Create(
+                      NonEmptyString.from(name).toOption
+                    ).some,
+                    CalibrationRole.Photometric,
+                    Description.unsafeFrom("PHOTO"))(using xa)
+              }
+            }
+      _ <- expect(
+            user = staff,
+            query =
+              s"""
+                query {
+                  program(programId: "$pid") {
+                    id
+                    name
+                    calibrationRole
+                    pi {
+                      id
+                    }
+                  }
+                }
+              """,
+            expected = Right(
+              json"""
+                {
+                  "program": {
+                    "id": $pid,
+                    "name": $name,
+                    "calibrationRole": "PHOTOMETRIC",
+                    "pi": null
+                  }
+                }
+              """
+            )
+          )
+    } yield ()
   }
 
   test("chronicle auditing") {

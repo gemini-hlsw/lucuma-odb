@@ -35,7 +35,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
-import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
@@ -66,7 +65,6 @@ import lucuma.refined.*
 import natchez.Trace.Implicits.noop
 import skunk.*
 import skunk.codec.boolean.*
-import skunk.codec.text.*
 import skunk.syntax.all.*
 
 import java.time.LocalDate
@@ -1206,24 +1204,6 @@ trait DatabaseOperations { this: OdbSuite =>
     val query = sql"select c_calibration_role from t_target where c_target_id = $target_id".query(calibration_role.opt)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(tid)))
-  }
-
-  def createCalibrationProgram(
-    calibrationRole: CalibrationRole,
-    description: Description
-  ): IO[Program.Id] = {
-    val af = sql"""
-      insert into t_program (
-        c_calibration_role,
-        c_library_desc
-      )
-      select
-        $calibration_role,
-        $text
-      returning c_program_id
-    """.apply(calibrationRole, description.value)
-    FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(af.fragment.query(program_id)).use(_.unique(af.argument)))
   }
 
   def moveObservationAs(user: User, oid: Observation.Id, gid: Option[Group.Id]): IO[Unit] =
