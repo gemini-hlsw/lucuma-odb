@@ -2,35 +2,31 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
-
 package input
 
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.Partner
-import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
-case class SetAllocationInput(
-  programId: Program.Id,
-  partner: Partner,
+case class AllocationInput(
+  partner:     Partner,
   scienceBand: ScienceBand,
-  duration: TimeSpan
+  duration:    TimeSpan
 )
 
-object SetAllocationInput {
+object AllocationInput {
 
-  val Binding: Matcher[SetAllocationInput] =
+  val Binding: Matcher[AllocationInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rProgramId),
         PartnerBinding("partner", rPartner),
         ScienceBandBinding("scienceBand", rBand),
         TimeSpanInput.Binding("duration", rDuration),
-      ) =>
-        (rProgramId, rPartner, rBand, rDuration).mapN(apply)
+      ) => (rPartner, rBand, rDuration).mapN(apply)
     }
 
 }
+
