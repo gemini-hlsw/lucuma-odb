@@ -10,16 +10,17 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.odb.data.CalibrationRole
-import lucuma.refined.*
 
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
 
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
+  val service = TestUsers.service(nextId)
 
-  lazy val validUsers = List(pi, pi2)
+  lazy val validUsers = List(pi, pi2, service)
 
   test("simple clone") {
     createProgramAs(pi).flatMap { pid =>
@@ -173,10 +174,10 @@ class cloneTarget extends OdbSuite {
   }
 
   test("clone a calibration target") {
-    createProgramAs(pi).flatMap { pid =>
-      createCalibrationTargetIn(pid, "Estrella Guía".refined, CalibrationRole.Telluric).flatMap { tid =>
+    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("PHOTO")).flatMap { pid =>
+      createTargetAs(service, pid).flatMap { tid =>
         expect(
-          user = pi,
+          user = service,
           query = s"""
             mutation {
               cloneTarget(input: {

@@ -8,7 +8,6 @@ import io.circe.literal.*
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
 import lucuma.odb.data.CalibrationRole
-import lucuma.refined.*
 
 class updateTargets extends OdbSuite {
 
@@ -124,8 +123,8 @@ class updateTargets extends OdbSuite {
   }
 
   test("update calibration targets is allowed directly with the id") {
-    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("TELLURIC")).flatMap { pid =>
-      createCalibrationTargetIn(pid, "Estrella Guía".refined, CalibrationRole.Telluric).flatMap { tid =>
+    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("PHOTO")).flatMap { pid =>
+      createTargetAs(staff, pid).flatMap { tid =>
        expect(
         user = staff,
         query = s"""
