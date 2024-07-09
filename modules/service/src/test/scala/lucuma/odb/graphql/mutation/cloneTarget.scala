@@ -13,6 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.odb.data.CalibrationRole
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -174,35 +175,43 @@ class cloneTarget extends OdbSuite {
   }
 
   test("clone a calibration target") {
-    createCalibrationProgram(CalibrationRole.Telluric, Description.unsafeFrom("PHOTO")).flatMap { pid =>
-      createTargetAs(service, pid).flatMap { tid =>
-        expect(
-          user = service,
-          query = s"""
-            mutation {
-              cloneTarget(input: {
-                targetId: "$tid"
-              }) {
-                originalTarget {
-                  id
-                }
+    for {
+      pid <- withServices(service) { s =>
+              s.session.transaction.use { xa =>
+                s.programService
+                  .insertCalibrationProgram(
+                    ProgramPropertiesInput.Create(none).some,
+                    CalibrationRole.Photometric,
+                    Description.unsafeFrom("PHOTO"))(using xa)
               }
             }
-          """,
-          expected = Right(
-            json"""{
-                "cloneTarget" : {
-                  "originalTarget" :
-                    {
-                      "id" : $tid
+      tid <- createTargetAs(service, pid)
+      _   <- expect(
+              user = service,
+              query = s"""
+                mutation {
+                  cloneTarget(input: {
+                    targetId: "$tid"
+                  }) {
+                    originalTarget {
+                      id
                     }
+                  }
                 }
-              }
-            """
-          )
-        )
-      }
-    }
+              """,
+              expected = Right(
+                json"""{
+                    "cloneTarget" : {
+                      "originalTarget" :
+                        {
+                          "id" : $tid
+                        }
+                    }
+                  }
+                """
+              )
+            )
+    } yield ()
   }
 
   test("clone and replace in an observation") {
