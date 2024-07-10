@@ -445,7 +445,6 @@ object OdbMapping {
                 MutationElaborator,
                 ObservationElaborator,
                 ProgramElaborator,
-//                SetAllocationsResultElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
