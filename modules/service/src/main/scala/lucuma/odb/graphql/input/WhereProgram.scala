@@ -11,17 +11,19 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.binding.*
 
 object WhereProgram {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereOrderProgramId            = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
-    val WhereNameBinding               = WhereOptionString.binding(path / "name")
-    val WhereTypeBinding               = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
-    val WhereProgramReferenceBinding  = WhereProgramReference.binding(path / "reference")
-    val WhereEqProposalStatus         = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
-    val WhereProposalBinding          = WhereProposal.binding(path / "proposal")
+    val WhereOrderProgramId          = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
+    val WhereNameBinding             = WhereOptionString.binding(path / "name")
+    val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
+    val WhereProgramReferenceBinding = WhereProgramReference.binding(path / "reference")
+    val WhereEqProposalStatus        = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
+    val WhereProposalBinding         = WhereProposal.binding(path / "proposal")
+    val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
 
     lazy val WhereProgramBinding = binding(path)
 
@@ -35,10 +37,11 @@ object WhereProgram {
         WhereTypeBinding.Option("type", rType),
         WhereProgramReferenceBinding.Option("reference", rRef),
         WhereEqProposalStatus.Option("proposalStatus", rPs),
-        WhereProposalBinding.Option("proposal", rPro)
+        WhereProposalBinding.Option("proposal", rPro),
+        WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPs, rPro).parMapN {
-            (AND, OR, NOT, id, name, ptype, ref, ps, pro) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPs, rPro, rCalibRole).parMapN {
+            (AND, OR, NOT, id, name, ptype, ref, ps, pro, calib) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -48,7 +51,8 @@ object WhereProgram {
                 ptype,
                 ref,
                 ps,
-                pro
+                pro,
+                calib
               ).flatten)
         }
     }
