@@ -49,6 +49,7 @@ import lucuma.core.model.Target
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
+import lucuma.core.math.HourAngle
 import lucuma.core.math.Angle
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.Parallax
@@ -56,6 +57,9 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import java.time.Instant
+import lucuma.core.math.skycalc.ImprovedSkyCalc
+import lucuma.core.enums.Site
+import lucuma.core.math.Offset
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
@@ -107,7 +111,7 @@ object CalibrationsService {
           }
         } else none.pure[F]
 
-      private def calibrationObservations(pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Result[List[Observation.Id]]] = {
+      private def calibrationObservations(pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[Result[List[Observation.Id]]] = {
         def gmosNorthLSObservations(gnls: List[GmosNConfigs]) = gnls.traverse { case (g, f, w, xb, yb) =>
           val conf =
             GmosLongSlitInput.Create.North(
@@ -201,11 +205,12 @@ object CalibrationsService {
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
-      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs])(using Transaction[F]): F[Unit] = {
+      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[Unit] = {
+
         for {
           cg  <- calibrationsGroup(pid, gnls.size + gsls.size)
           _   <- cg.map(g =>
-                   calibrationObservations(pid, g, gnls, gsls).flatMap {
+                   calibrationObservations(pid, g, gnls, gsls, gnTgt, gsTgt).flatMap {
                      case Result.Success(ids) if ids.nonEmpty =>
                        setCalibRoleAndGroup(ids, CalibrationRole.SpectroPhotometric).void
                      case _                                   =>
@@ -215,7 +220,7 @@ object CalibrationsService {
         } yield ()
       }
 
-      private def spectroPhotometricTargets(rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]): List[(Target.Id, SiderealTracking)] =
+      private def spectroPhotometricTargets(when: Instant)(rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]): List[(Target.Id, Coordinates)] =
         rows.map { case (tid, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
           (tid,
             SiderealTracking(
@@ -226,17 +231,38 @@ object CalibrationsService {
               },
               rv,
               parallax
-            )
+            ).at(when)
           )
+        }.collect {
+          case (tid, Some(st)) => (tid, st)
         }
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[Unit] =
+      private def bestTarget(ref: Coordinates, tgts: List[(Target.Id, Coordinates)]): Option[Target.Id] =
+        tgts.minimumByOption(_._2.angularDistance(ref))(Angle.SignedAngleOrder).map(_._1)
+
+      private def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
+        val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+        val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
+        val ra = RightAscension(HourAngle.fromHMS(h - 1, m, s, 0, n / 1000))
+        val dec = site.place.latitude
+        Coordinates(ra, dec)
+      }
+
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[Unit] = {
+        val gncoords = idealLocation(Site.GN, referenceInstant)
+        val gscoords = idealLocation(Site.GS, referenceInstant)
+        println(gncoords)
+        println(gscoords)
         for {
           tgts <- session.execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-          gnls <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(false))(pid)
+            .map(spectroPhotometricTargets(referenceInstant))
+          gsTgt = bestTarget(gscoords, tgts)
+          gnTgt = bestTarget(gncoords, tgts)
+          gnls <- {println(gsTgt);println(gnTgt);session.execute(Statements.selectGmosNorthLongSlitConfigurations(false))(pid)}
           gsls <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(false))(pid)
-          _    <- {pprint.pprintln(spectroPhotometricTargets(tgts).map(_.fmap(_.at(referenceInstant))));generateCalibrations(pid, gnls, gsls).whenA(gnls.nonEmpty || gsls.nonEmpty)}
+          _    <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
         } yield ()
+      }
     }
 
   object Statements {

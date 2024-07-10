@@ -24,6 +24,7 @@ import lucuma.core.math.Angle
 import java.time.format.DateTimeFormatter
 import java.time.ZoneOffset
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class calibrations extends OdbSuite {
 
@@ -32,7 +33,7 @@ class calibrations extends OdbSuite {
 
   val validUsers = List(pi, service)
 
-  val when = LocalDate.of(2024, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant
+  val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Decoder
