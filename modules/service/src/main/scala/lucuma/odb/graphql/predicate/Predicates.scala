@@ -42,7 +42,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val proposalAttachment            = ProposalAttachmentPredicates(Path.from(ProposalAttachmentType))
     val recordDatasetResult           = RecordDatasetResultPredicates(Path.from(RecordDatasetResultType))
     val sequenceEvent                 = ExecutionEventPredicates(Path.from(SequenceEventType))
-    val setAllocationResult           = SetAllocationResultPredicates(Path.from(SetAllocationResultType))
+    val setAllocationsResult          = SetAllocationsResultPredicates(Path.from(SetAllocationsResultType))
     val setProgramReferenceResult     = SetProgramReferenceResult(Path.from(SetProgramReferenceResultType))
     val setProposalStatusResult       = SetProposalStatusResultPredicates(Path.from(SetProposalStatusResultType))
     val slewEvent                     = ExecutionEventPredicates(Path.from(SlewEventType))

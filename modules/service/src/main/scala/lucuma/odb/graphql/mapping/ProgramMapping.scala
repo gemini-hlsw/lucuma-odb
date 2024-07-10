@@ -24,6 +24,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
@@ -156,7 +157,10 @@ trait ProgramMapping[F[_]]
 
     case (ProgramType, "allocations", Nil) =>
       Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Partner](AllocationType / "partner"))), child)
+        OrderBy(OrderSelections(List(
+          OrderSelection[ScienceBand](AllocationType / "scienceBand"),
+          OrderSelection[Partner](AllocationType / "partner")
+        )), child)
       }
 
   }

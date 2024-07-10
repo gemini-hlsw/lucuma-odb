@@ -115,12 +115,21 @@ input AirMassRangeInput {
 }
 
 """
-Time allocation
+An individual time allocation.
 """
 type Allocation {
   partner:     Partner!
   scienceBand: ScienceBand!
   duration:    TimeSpan!
+}
+
+"""
+An individual time allocation input.
+"""
+input AllocationInput {
+  partner:     Partner!
+  scienceBand: ScienceBand!
+  duration:    TimeSpanInput!
 }
 
 """
@@ -2882,8 +2891,10 @@ type Mutation {
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
 
-  "Set the allocation for a program from the specified partner."
-  setAllocation(input: SetAllocationInput!): SetAllocationResult!
+  """
+  Set the allocations for a program.
+  """
+  setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
 
   "Set the program reference."
   setProgramReference(input: SetProgramReferenceInput!): SetProgramReferenceResult!
@@ -3956,15 +3967,17 @@ input ScienceRequirementsInput {
   spectroscopy: SpectroscopyScienceRequirementsInput
 }
 
-input SetAllocationInput {
+"""
+Describes the program allocations.  Each partner and band combination should
+appear at most once in the 'allocations' array.
+"""
+input SetAllocationsInput {
   programId:   ProgramId!
-  partner:     Partner!
-  scienceBand: ScienceBand!
-  duration:    TimeSpanInput!
+  allocations: [AllocationInput!]!
 }
 
-type SetAllocationResult {
-  allocation: Allocation!
+type SetAllocationsResult {
+  allocations: [Allocation!]!
 }
 
 type SetupTime {
