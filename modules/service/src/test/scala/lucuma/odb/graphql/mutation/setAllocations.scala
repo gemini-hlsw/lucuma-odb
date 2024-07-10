@@ -12,8 +12,9 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 
-class setAllocation extends OdbSuite {
+class setAllocations extends OdbSuite {
 
   val guest    = TestUsers.guest(nextId)
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -28,7 +29,7 @@ class setAllocation extends OdbSuite {
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         interceptGraphQL(s"User ${user.id} is not authorized to perform this operation.") {
-          setAllocationAs(user, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan)
+          setOneAllocationAs(user, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan)
         }
       }
     }
@@ -37,15 +38,18 @@ class setAllocation extends OdbSuite {
   test("admin, staff, service can set (and update) allocation in any program") {
     createProgramAs(pi).flatMap { pid =>
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
-        setAllocationAs(user, pid, Partner.US, ScienceBand.Band1, TimeSpan.fromHours(hours).get)
+        setOneAllocationAs(user, pid, Partner.US, ScienceBand.Band1, TimeSpan.fromHours(hours).get)
       }
     }
   }
 
   test("should be able to read allocations back") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
+      AllocationInput(Partner.CA, ScienceBand.Band3, TimeSpan.fromHours(4.56).get)
+    )
     createProgramAs(pi).flatMap { pid =>
-      setAllocationAs(staff, pid, Partner.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get) >>
-      setAllocationAs(staff, pid, Partner.CA, ScienceBand.Band3, TimeSpan.fromHours(4.56).get) >>
+      setAllocationsAs(staff, pid, allocations) *>
       expect(
         user = pi,
         query = s"""
@@ -67,17 +71,17 @@ class setAllocation extends OdbSuite {
               "program" : {
                 "allocations" : [
                   {
-                    "partner" : "CA",
-                    "scienceBand": "BAND3",
-                    "duration" : {
-                      "hours" : 4.560000
-                    }
-                  },
-                  {
                     "partner" : "US",
                     "scienceBand": "BAND2",
                     "duration" : {
                       "hours" : 1.230000
+                    }
+                  },
+                  {
+                    "partner" : "CA",
+                    "scienceBand": "BAND3",
+                    "duration" : {
+                      "hours" : 4.560000
                     }
                   }
                 ]
@@ -85,6 +89,36 @@ class setAllocation extends OdbSuite {
             }
           """
         )
+      )
+    }
+  }
+
+  test("should refuse duplicate entries") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = staff,
+        query = s"""
+          mutation {
+            setAllocations(input: {
+              programId:   "$pid"
+              allocations: [
+                {
+                  partner: US
+                  scienceBand: BAND2
+                  duration: { hours: "1.23" }
+                },
+                {
+                  partner: US
+                  scienceBand: BAND2
+                  duration: { hours: "4.56" }
+                }
+              ]
+            }) {
+              allocations { partner }
+            }
+          }
+        """,
+        expected = List("Argument 'input' is invalid: Each partner + band combination may only appear once.").asLeft
       )
     }
   }

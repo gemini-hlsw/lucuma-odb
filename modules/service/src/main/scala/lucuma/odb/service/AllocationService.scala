@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
@@ -10,7 +11,8 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ScienceBand
-import lucuma.odb.graphql.input.SetAllocationInput
+import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -18,7 +20,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
-  def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
+  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
 }
 
 object AllocationService {
@@ -26,21 +28,33 @@ object AllocationService {
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
 
-      def setAllocation(input: SetAllocationInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
-        session.prepareR(Statements.SetAllocation.command).use: ps =>
-          ps.execute(input.programId, input.partner, input.scienceBand, input.duration).as(Result.unit)
+      def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.DeleteAllocations)(pid).void
+
+      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
+        deleteAllocations(input.programId) *>
+        NonEmptyList.fromList(input.allocations).traverse_ { lst =>
+          session.execute(Statements.setAllocations(lst))((input.programId, lst))
+        }.as(Result.unit)
 
     }
 
   object Statements {
 
-    val SetAllocation: Fragment[(Program.Id, Partner, ScienceBand, TimeSpan)] =
-        sql"""
-          INSERT INTO t_allocation (c_program_id, c_partner, c_science_band, c_duration)
-          VALUES ($program_id, $partner, $science_band, $time_span)
-          ON CONFLICT (c_program_id, c_partner, c_science_band) DO UPDATE
-          SET c_duration = $time_span
-        """.contramap { case (p, t, s, d) => (p, t, s, d, d) }
+    def setAllocations(allocations: NonEmptyList[AllocationInput]): Command[(Program.Id, allocations.type)] =
+      sql"""
+        INSERT INTO t_allocation (c_program_id, c_partner, c_science_band, c_duration)
+        VALUES ${(program_id *: partner *: science_band *: time_span).values.list(allocations.size)}
+      """.command
+         .contramap {
+           (pid, allocs) => allocs.toList.map { a => (pid, a.partner, a.scienceBand, a.duration) }
+         }
+
+    val DeleteAllocations: Command[Program.Id] =
+      sql"""
+        DELETE FROM t_allocation
+        WHERE t_allocation.c_program_id = $program_id
+      """.command
 
   }
 
