@@ -21,9 +21,9 @@ import lucuma.core.model.ProgramReference.Description
 import io.circe.Json
 import lucuma.core.model.Target
 import lucuma.core.math.Angle
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.ZoneOffset
+import java.time.LocalDate
 
 class calibrations extends OdbSuite {
 
@@ -32,7 +32,7 @@ class calibrations extends OdbSuite {
 
   val validUsers = List(pi, service)
 
-  val referenceDate = LocalDate.of(2024, 1, 1)
+  val when = LocalDate.of(2024, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant
 
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Decoder
@@ -152,7 +152,7 @@ class calibrations extends OdbSuite {
       oid <- createObservationAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa)
+                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -171,7 +171,7 @@ class calibrations extends OdbSuite {
       gr  <- groupElementsAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa)
+                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -196,7 +196,7 @@ class calibrations extends OdbSuite {
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa)
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -225,8 +225,8 @@ class calibrations extends OdbSuite {
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa) *>
-                    services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa)
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
+                    services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -341,7 +341,7 @@ class calibrations extends OdbSuite {
               }
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, referenceDate)(using xa)
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryCalibrationObservations(pid)
