@@ -4,15 +4,20 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
-import lucuma.refined.*
+import lucuma.odb.data.CalibrationRole
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class updateTargets extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val staff = TestUsers.Standard.staff(3, 103)
+  val service  = TestUsers.service(4)
 
-  override lazy val validUsers: List[User] = List(pi)
+  override lazy val validUsers: List[User] = List(pi, staff, service)
 
   test("no updates") {
     createProgramAs(pi).flatMap { pid =>
@@ -121,42 +126,52 @@ class updateTargets extends OdbSuite {
   }
 
   test("update calibration targets is allowed directly with the id") {
-    createProgramAs(pi).flatMap { pid =>
-      createCalibrationTargetIn(pid, "Estrella Guía".refined).flatMap { tid =>
-       expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateTargets(input: {
-              SET: {
-                name: "New Guía"
+    for {
+      pid  <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create(None).some,
+                      CalibrationRole.Photometric,
+                      Description.unsafeFrom("PHOTO"))(using xa)
+                }
               }
-              WHERE: {
-                id: { EQ: "$tid"}
-              }
-            }) {
-              targets {
-                id
-                name
-              }
-            }
-          }
-        """,
-        expected = Right(
-          json"""
-            {
-              "updateTargets" : {
-                "targets" : [ { 
-                  "id" : $tid, 
-                  "name" : "New Guía" 
-                } ]
-              }
-            }
-          """
-        )
-       )
-      }
-    }
+      tid  <- createTargetAs(staff, pid)
+      _    <- expect(
+                user = staff,
+                query = s"""
+                  mutation {
+                    updateTargets(input: {
+                      SET: {
+                        name: "New Guía"
+                      }
+                      WHERE: {
+                        id: { EQ: "$tid"}
+                      }
+                    }) {
+                      targets {
+                        id
+                        name
+                        calibrationRole
+                      }
+                    }
+                  }
+                """,
+                expected = Right(
+                  json"""
+                    {
+                      "updateTargets" : {
+                        "targets" : [ {
+                          "id" : $tid,
+                          "name" : "New Guía",
+                          "calibrationRole": "PHOTOMETRIC"
+                        } ]
+                      }
+                    }
+                  """
+                )
+              )
+    } yield ()
   }
 
   test("update tracking (sidereal -> sidereal)") {
