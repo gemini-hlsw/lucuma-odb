@@ -251,15 +251,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child
     )
 
-//  def allocationsResultSubquery(pid: Program.Id, child: Query) =
-//    mutationResultSubquery(
-//      predicate = Predicates.setAllocationsResult.programId.eql(pid)
-//      order     = OrderSelection[Partner](AllocationType / "partner"),
-//      limit     = None,
-//      collectionField = "attachments",
-//      child
-//    )
-
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
     def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
