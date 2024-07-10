@@ -4,10 +4,15 @@
 package lucuma.odb.graphql
 package query
 
+import cats.syntax.all.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class programs extends OdbSuite {
 
@@ -77,4 +82,50 @@ class programs extends OdbSuite {
     }
   }
 
+  test("calibration program selection") {
+    for {
+      pid  <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create(None).some,
+                      CalibrationRole.Telluric,
+                      Description.unsafeFrom("TELLURIC2"))(using xa)
+                }
+              }
+      _    <- expect(
+            user = service,
+            query = s"""
+              query {
+                programs(
+                  WHERE: {
+                    calibrationRole: {
+                      IN: [TELLURIC]
+                    }
+                  }
+                ) {
+                  matches {
+                    id
+                    calibrationRole
+                  }
+                }
+              }
+            """,
+            expected =
+              Right(json"""
+                {
+                  "programs": {
+                    "matches": [
+                      {
+                        "id": ${pid.asJson},
+                        "calibrationRole": "TELLURIC"
+                      }
+                    ]
+                  }
+                }
+                """
+              )
+            )
+    } yield ()
+  }
 }
