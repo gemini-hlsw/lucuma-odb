@@ -44,12 +44,23 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
-import java.time.LocalDate
+import skunk.codec.numeric.int8
+import lucuma.core.model.Target
+import lucuma.core.math.RightAscension
+import lucuma.core.math.Declination
+import lucuma.core.math.Epoch
+import lucuma.core.math.Angle
+import lucuma.core.math.RadialVelocity
+import lucuma.core.math.Parallax
+import lucuma.core.model.SiderealTracking
+import lucuma.core.math.Coordinates
+import lucuma.core.math.ProperMotion
+import java.time.Instant
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id,
-    referenceDate: LocalDate
+    referenceInstant: Instant
   )(using Transaction[F]): F[Unit]
 }
 
@@ -204,11 +215,27 @@ object CalibrationsService {
         } yield ()
       }
 
-      def recalculateCalibrations(pid: Program.Id, referenceDate: LocalDate)(using Transaction[F]): F[Unit] =
+      private def spectroPhotometricTargets(rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]): List[(Target.Id, SiderealTracking)] =
+        rows.map { case (tid, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
+          (tid,
+            SiderealTracking(
+              Coordinates(ra, dec),
+              epoch,
+              (pmra, pmdec).mapN{ case (r, d) =>
+                ProperMotion(ProperMotion.μasyRA(r), ProperMotion.μasyDec(d))
+              },
+              rv,
+              parallax
+            )
+          )
+        }
+
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[Unit] =
         for {
+          tgts <- session.execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
           gnls <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(false))(pid)
           gsls <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(false))(pid)
-          _    <- generateCalibrations(pid, gnls, gsls).whenA(gnls.nonEmpty || gsls.nonEmpty)
+          _    <- {pprint.pprintln(spectroPhotometricTargets(tgts).map(_.fmap(_.at(referenceInstant))));generateCalibrations(pid, gnls, gsls).whenA(gnls.nonEmpty || gsls.nonEmpty)}
         } yield ()
     }
 
@@ -269,6 +296,23 @@ object CalibrationsService {
         sql"SET c_calibration_role = $calibration_role "(role) |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
+    def selectCalibrationTargets: Query[CalibrationRole, (Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
+      sql"""SELECT
+              c_target_id,
+              c_sid_ra,
+              c_sid_dec,
+              c_sid_epoch,
+              c_sid_pm_ra,
+              c_sid_pm_dec,
+              c_sid_rv,
+              c_sid_parallax
+            FROM t_target
+            INNER JOIN t_program
+            ON t_target.c_program_id=t_program.c_program_id
+            WHERE t_program.c_calibration_role=$calibration_role
+              AND t_program.c_existence='present'
+          """.query(target_id *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
   }
 
 }
