@@ -11781,6 +11781,38 @@ input WhereEqInstrument {
   NIN: [Instrument!]
 }
 
+"""
+Filters on equality (or not) of the property value and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.  E.g.
+'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
+`NEQ` etc. implies `IS_NULL` is `false`.
+"""
+input WhereOptionEqCalibrationRole {
+  """
+  When `true`, matches if the QaState is not defined. When `false` matches if the QaState is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: CalibrationRole
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: CalibrationRole
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [CalibrationRole!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [CalibrationRole!]
+}
 
 """
 Filters on equality (or not) of the property value and the supplied criteria.
@@ -13289,6 +13321,11 @@ input WhereTarget {
   Matches the target name.
   """
   name: WhereString
+
+  """
+  Matches the calibration role.
+  """
+  calibrationRole: WhereOptionEqCalibrationRole
 }
 
 input WhereWavelength {

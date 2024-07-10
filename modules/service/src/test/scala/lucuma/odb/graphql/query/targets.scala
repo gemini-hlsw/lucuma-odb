@@ -7,16 +7,20 @@ package query
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.CalibrationRole
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class targets extends OdbSuite {
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
   val service = TestUsers.service(3)
+  val staff   = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, service).toList
+  val validUsers = List(pi, pi2, staff, service).toList
 
   test("simple target selection") {
     createProgramAs(pi).flatMap { pid =>
@@ -173,4 +177,155 @@ class targets extends OdbSuite {
     }
   }
 
+  test("target selection with calibration role") {
+    for {
+      pid <- withServices(service) { s =>
+              s.session.transaction.use { xa =>
+                s.programService
+                  .insertCalibrationProgram(
+                    ProgramPropertiesInput.Create(None).some,
+                    CalibrationRole.Telluric,
+                    Description.unsafeFrom("TELLURIC1"))(using xa)
+              }
+            }
+      tids <- createTargetAs(service, pid).replicateA(5)
+      _ <- expect(
+            user = service,
+            query = s"""
+              query {
+                targets(
+                  WHERE: {
+                    calibrationRole: {
+                      EQ: TELLURIC
+                    }
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
+                  }
+                ) {
+                  matches {
+                    id
+                    calibrationRole
+                  }
+                }
+              }
+            """,
+            expected =
+              Right(Json.obj(
+                "targets" -> Json.obj(
+                  "matches" -> Json.fromValues {
+                      tids.map { id =>
+                        Json.obj(
+                          "id" -> id.asJson,
+                          "calibrationRole" -> Json.fromString("TELLURIC")
+                      )
+                    }
+                  }
+                )
+              ))
+          )
+    } yield ()
+  }
+
+  test("target selection with mulitple calibration roles") {
+    for {
+      pid <- withServices(service) { s =>
+              s.session.transaction.use { xa =>
+                s.programService
+                  .insertCalibrationProgram(
+                    ProgramPropertiesInput.Create(None).some,
+                    CalibrationRole.Photometric,
+                    Description.unsafeFrom("PHOTO"))(using xa)
+              }
+            }
+      tids <- createTargetAs(service, pid).replicateA(5)
+      _    <-
+          expect(
+            user = service,
+            query = s"""
+              query {
+                targets(
+                  WHERE: {
+                    calibrationRole: {
+                      IN: [PHOTOMETRIC, TELLURIC]
+                    }
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
+                  }
+                ) {
+                  matches {
+                    id
+                    calibrationRole
+                  }
+                }
+              }
+            """,
+            expected =
+              Right(Json.obj(
+                "targets" -> Json.obj(
+                  "matches" -> Json.fromValues {
+                      tids.map { id =>
+                        Json.obj(
+                          "id" -> id.asJson,
+                          "calibrationRole" -> Json.fromString("PHOTOMETRIC")
+                      )
+                    }
+                  }
+                )
+              ))
+          )
+    } yield ()
+  }
+
+  test("target selection without a specific calibration role") {
+    for {
+      pid  <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create(None).some,
+                      CalibrationRole.Telluric,
+                      Description.unsafeFrom("TELLURIC2"))(using xa)
+                }
+              }
+      tids <- createTargetAs(service, pid).replicateA(5)
+      _    <- expect(
+            user = service,
+            query = s"""
+              query {
+                targets(
+                  WHERE: {
+                    calibrationRole: {
+                      NIN: [PHOTOMETRIC]
+                    }
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
+                  }
+                ) {
+                  matches {
+                    id
+                    calibrationRole
+                  }
+                }
+              }
+            """,
+            expected =
+              Right(Json.obj(
+                "targets" -> Json.obj(
+                  "matches" -> Json.fromValues {
+                      // Only Photometric targets
+                      tids.map { id =>
+                        Json.obj(
+                          "id" -> id.asJson,
+                          "calibrationRole" -> Json.fromString("TELLURIC")
+                      )
+                    }
+                  }
+                )
+              ))
+          )
+    } yield ()
+  }
 }

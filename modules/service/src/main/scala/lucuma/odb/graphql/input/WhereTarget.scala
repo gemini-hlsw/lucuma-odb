@@ -10,14 +10,17 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.model.Target
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.binding.*
 
 object WhereTarget {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereOrderTargetIdBinding = WhereOrder.binding[Target.Id](path / "id", TargetIdBinding)
-    val WhereProgramBinding = WhereProgram.binding(path / "program")
-    val WhereNameBinding = WhereString.binding(path / "name")
+    val WhereOrderTargetIdBinding   = WhereOrder.binding[Target.Id](path / "id", TargetIdBinding)
+    val WhereProgramBinding         = WhereProgram.binding(path / "program")
+    val WhereNameBinding            = WhereString.binding(path / "name")
+    val WhereCalibrationRoleBinding = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
+
     lazy val WhereTargetBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -27,8 +30,9 @@ object WhereTarget {
         WhereOrderTargetIdBinding.Option("id", rId),
         WhereProgramBinding.Option("program", rProgram),
         WhereNameBinding.Option("name", rName),
+        WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
       ) =>
-        (rAND, rOR, rNOT, rId, rProgram, rName).parMapN { (AND, OR, NOT, id, program, name) =>
+        (rAND, rOR, rNOT, rId, rProgram, rName, rCalibRole).parMapN { (AND, OR, NOT, id, program, name, calib) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -36,6 +40,7 @@ object WhereTarget {
             id,
             program,
             name,
+            calib
           ).flatten)
         }
     }

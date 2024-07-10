@@ -22,6 +22,7 @@ import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceRole
@@ -70,6 +71,11 @@ trait ProgramService[F[_]] {
    * case the PI is left empty.
    */
   def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id]
+
+  /**
+   * Insert a new calibration program, PI is left empty.
+   */
+  def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id]
 
   /**
    * Perform the requested program <-> user link, yielding the linked ids if successful, or None
@@ -242,6 +248,13 @@ object ProgramService {
             }
         }
       }
+
+      def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id] =
+        Trace[F].span("insertCalibrationProgram") {
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
+
+          session.prepareR(Statements.InsertCalibrationProgram).use(_.unique(SETʹ.name, calibrationRole, description.value))
+        }
 
       def linkUser(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]] =
         linkUserImpl(req).map:
@@ -518,6 +531,14 @@ object ProgramService {
             case (oNes, ServiceUser(_, _)) => (oNes, None)
             case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
          }
+
+    /** Insert a calibration program, without a user for a staff program */
+    val InsertCalibrationProgram: Query[(Option[NonEmptyString], CalibrationRole, String), Program.Id] =
+      sql"""
+        INSERT INTO t_program (c_name, c_calibration_role, c_library_desc)
+        VALUES (${text_nonempty.opt}, $calibration_role, $text)
+        RETURNING c_program_id
+      """.query(program_id)
 
     /** Link a user to a program, without any access checking. */
     val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[Tag])] =
