@@ -8,23 +8,24 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
+import io.circe.Json
 import io.circe.refined.*
+import lucuma.core.math.Angle
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference.Description
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.service.CalibrationsService
 import lucuma.odb.graphql.input.ProgramPropertiesInput
-import lucuma.core.model.ProgramReference.Description
-import io.circe.Json
-import lucuma.core.model.Target
-import lucuma.core.math.Angle
-import java.time.format.DateTimeFormatter
-import java.time.ZoneOffset
+import lucuma.odb.service.CalibrationsService
+
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 class calibrations extends OdbSuite {
 
@@ -336,8 +337,12 @@ class calibrations extends OdbSuite {
                    updateTargetProperties(tid, ra, dec, rv)
                  )
               }
+      // PI program
       pid  <- createProgramAs(pi)
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some).flatTap { oid =>
+      _    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some).flatTap { oid =>
+                updateVizTime(oid, LocalDate.of(2024, 1, 1))
+              }
+      _    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some).flatTap { oid =>
                 updateVizTime(oid, LocalDate.of(2024, 1, 1))
               }
       _    <- withServices(service) { services =>
@@ -347,8 +352,11 @@ class calibrations extends OdbSuite {
               }
       ob   <- queryCalibrationObservations(pid)
     } yield {
-      println(ob)
-      true
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), Some(_)) => true
+        case _                                => false
+      }
+      assertEquals(cCount, 2)
     }
   }
 }
