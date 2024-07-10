@@ -13098,6 +13098,11 @@ input WhereProgram {
   Matches the proposal.
   """
   proposal: WhereProposal
+
+  """
+  Matches the calibration role.
+  """
+  calibrationRole: WhereOptionEqCalibrationRole
 }
 
 input WhereProgramReference {
