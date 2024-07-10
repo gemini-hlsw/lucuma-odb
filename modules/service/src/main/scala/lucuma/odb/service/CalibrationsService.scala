@@ -44,10 +44,12 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
+import java.time.LocalDate
 
 trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
-    pid: Program.Id
+    pid: Program.Id,
+    referenceDate: LocalDate
   )(using Transaction[F]): F[Unit]
 }
 
@@ -202,7 +204,7 @@ object CalibrationsService {
         } yield ()
       }
 
-      def recalculateCalibrations(pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def recalculateCalibrations(pid: Program.Id, referenceDate: LocalDate)(using Transaction[F]): F[Unit] =
         for {
           gnls <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(false))(pid)
           gsls <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(false))(pid)
