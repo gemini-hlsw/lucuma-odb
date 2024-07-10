@@ -111,6 +111,11 @@ sealed trait ObservationService[F[_]] {
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
+  def setScienceBand(
+    pid:  Program.Id,
+    band: ScienceBand
+  )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]]
+
   def cloneObservation(
     input: CloneObservationInput
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
@@ -378,6 +383,14 @@ object ObservationService {
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
+        }
+
+      override def setScienceBand(
+        pid:  Program.Id,
+        band: ScienceBand
+      )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]] =
+        Trace[F].span("setScienceBand") {
+          session.execute(Statements.SetScienceBand)(pid, band)
         }
 
       private def cloneObservationImpl(
@@ -1057,6 +1070,15 @@ object ObservationService {
       void"""
         RETURNING c_observation_id
       """
+
+    val SetScienceBand: Query[(Program.Id, ScienceBand), Observation.Id] =
+      sql"""
+        UPDATE t_observation
+        SET c_science_band = $science_band
+        WHERE c_program_id = $program_id
+        RETURNING c_observation_id
+      """.query(observation_id)
+         .contramap { (s, p) => (p, s) }
 
     def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
       sql"""

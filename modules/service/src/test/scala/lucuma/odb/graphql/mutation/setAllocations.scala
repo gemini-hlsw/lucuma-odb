@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.Partner
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -123,4 +124,51 @@ class setAllocations extends OdbSuite {
     }
   }
 
+  def getBand(user: User, oid: Observation.Id): IO[Option[ScienceBand]] =
+    query(
+      user = user,
+      query = s"""
+        query {
+          observation(
+            observationId: "$oid"
+          ) {
+            scienceBand
+          }
+        }
+      """
+    ).flatMap { json =>
+      json.hcursor
+          .downFields("observation", "scienceBand")
+          .as[Option[ScienceBand]]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+    }
+
+  test("single band allocation sets observation band") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
+      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+    )
+    val band = for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- setAllocationsAs(staff, pid, allocations)
+      b   <- getBand(pi, oid)
+    } yield b
+    assertIO(band, ScienceBand.Band2.some)
+  }
+
+  test("multiple band allocation does not set observation band") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
+      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+    )
+    val band = for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- setAllocationsAs(staff, pid, allocations)
+      b   <- getBand(pi, oid)
+    } yield b
+    assertIO(band, none[ScienceBand])
+  }
 }

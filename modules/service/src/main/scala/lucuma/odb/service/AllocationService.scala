@@ -35,7 +35,11 @@ object AllocationService {
         deleteAllocations(input.programId) *>
         NonEmptyList.fromList(input.allocations).traverse_ { lst =>
           session.execute(Statements.setAllocations(lst))((input.programId, lst))
-        }.as(Result.unit)
+        }                                  *>
+        observationService
+          .setScienceBand(input.programId, input.bands.head)
+          .whenA(input.bands.sizeIs == 1)
+          .as(Result.unit)
 
     }
 
