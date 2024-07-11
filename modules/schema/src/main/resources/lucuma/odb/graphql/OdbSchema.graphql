@@ -8110,7 +8110,13 @@ enum ObservationValidationCode {
   """
   The observation does not meet the requirements of the Call for Proposals
   """
-  CFP_ERROR
+  CFP_ERROR,
+
+  """
+  The observation does not have valid ITC results.
+  """
+  ITC_ERROR
+
 }
 
 """
