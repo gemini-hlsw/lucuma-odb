@@ -492,16 +492,15 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
   private lazy val Target: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "target", List(
-      TargetIdBinding("targetId", rPid),
+      TargetIdBinding("targetId", rTid),
     )) =>
       Elab.transformChild { child =>
-        rPid.map { pid =>
+        rTid.map { tid =>
           Unique(
             Filter(
               and(List(
-                Predicates.target.id.eql(pid),
+                Predicates.target.id.eql(tid),
                 Predicates.target.program.isVisibleTo(user),
-                Predicates.target.noCalibrationRole
               )),
               child
             )

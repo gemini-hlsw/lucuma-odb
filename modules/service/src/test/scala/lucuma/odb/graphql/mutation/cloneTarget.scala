@@ -214,6 +214,47 @@ class cloneTarget extends OdbSuite {
     } yield ()
   }
 
+  test("clone a calibration target into a regular program") {
+    for {
+      pid  <- withServices(service) { s => // calibration prograam
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create(none).some,
+                      CalibrationRole.Telluric,
+                      Description.unsafeFrom("TELLURIC"))(using xa)
+                }
+              }
+      tid  <- createTargetAs(service, pid) // calibration target
+      pid2 <- createProgramAs(pi) // regular program
+      tidR <- withServices(service) { s => // clone the target into the regular program
+                s.session.transaction.use { xa =>
+                  s.targetService.cloneTargetInto(tid, pid2)(using xa)
+                }
+              }
+      (_, tid2) = tidR.toOption.get
+      _    <- expect(
+                user = pi, // I can read it as pi, on the target progra
+                query = s"""
+                  query {
+                    target(targetId: "$tid2") {
+                      id
+                      calibrationRole
+                    }
+                  }
+                """,
+                expected = Right(json"""
+                  {
+                    "target": {
+                      "id": $tid2,
+                      "calibrationRole": null
+                    }
+                  }
+                """)
+              )
+    } yield ()
+  }
+
   test("clone and replace in an observation") {
 
     def cloneTarget(tid: Target.Id, oids: List[Observation.Id]): IO[Target.Id] =

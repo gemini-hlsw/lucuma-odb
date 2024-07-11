@@ -56,6 +56,7 @@ trait TargetService[F[_]] {
   def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
+  def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
 }
 
 object TargetService {
@@ -79,6 +80,7 @@ object TargetService {
   enum CloneTargetResponse:
     case Success(oldTargetId: Target.Id, newTargetId: Target.Id)
     case NoSuchTarget(targetId: Target.Id)
+    case NoSuchProgram(programId: Program.Id)
     case UpdateFailed(problem: UpdateTargetsError)
 
   def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
@@ -164,6 +166,10 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
+      private def clone(targetId: Target.Id, pid: Program.Id): F[Option[Target.Id]] =
+        val stmt = Statements.cloneTarget(pid, targetId, user)
+        session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
+
       def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
         import CloneTargetResponse.*
 
@@ -171,10 +177,6 @@ object TargetService {
           session.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
             ps.option(input.targetId)
           }
-
-        def clone(pid: Program.Id): F[Option[Target.Id]] =
-          val stmt = Statements.cloneTarget(pid, input.targetId, user)
-          session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
 
         def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
           input.SET.traverse(updateTargetsʹ(_, sql"SELECT $target_id".apply(tid)))
@@ -190,7 +192,7 @@ object TargetService {
         pid.flatMap {
           case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
           case Some(pid) =>
-            clone(pid).flatMap {
+            clone(input.targetId, pid).flatMap {
               case None => NoSuchTarget(input.targetId).pure[F] // not authorized
               case Some(tid) =>
                 update(tid).flatMap {
@@ -201,14 +203,42 @@ object TargetService {
         }
 
       def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
-        cloneTargetImpl(input).map:
-          case CloneTargetResponse.Success(oldTargetId, newTargetId) => Result((oldTargetId, newTargetId))
-          case CloneTargetResponse.NoSuchTarget(targetId) => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
-          case CloneTargetResponse.UpdateFailed(problem)  =>
-            problem match
-              case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
-              case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
+        cloneTargetImpl(input).map(cloneResultTranslation)
 
+      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
+        import CloneTargetResponse.*
+
+        // Ensure the destination program exists
+        val pid: F[Option[Program.Id]] =
+          session.prepareR(sql"select c_program_id from t_program where c_program_id = $program_id".query(program_id)).use { ps =>
+            ps.option(programId)
+          }
+
+        pid.flatMap {
+          case None => NoSuchProgram(programId).pure[F]
+          case Some(pid) =>
+            clone(targetId, pid).flatMap {
+              case None => NoSuchTarget(targetId).pure[F] // not authorized
+              case Some(tid) =>
+                val s = Statements.moveToProgram(tid, programId)
+                session.prepareR(s.fragment.command).use(_.execute(s.argument)).map { _ =>
+                  Success(targetId, tid)
+                }
+            }
+        }
+      }
+
+      private def cloneResultTranslation: PartialFunction[CloneTargetResponse, Result[(Target.Id, Target.Id)]] =
+        case CloneTargetResponse.Success(oldTargetId, newTargetId) => Result((oldTargetId, newTargetId))
+        case CloneTargetResponse.NoSuchProgram(programId)          => OdbError.InvalidProgram(programId, Some(s"No such program: $programId")).asFailure
+        case CloneTargetResponse.NoSuchTarget(targetId)            => OdbError.InvalidTarget(targetId, Some(s"No such target: $targetId")).asFailure
+        case CloneTargetResponse.UpdateFailed(problem)             =>
+          problem match
+            case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+            case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
+
+      def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+        cloneTargetIntoImpl(targetId, programId).map(cloneResultTranslation)
     }
 
   object Statements {
@@ -415,6 +445,14 @@ object TargetService {
       updates(SET).fold(which)(update)
     }
 
+    def moveToProgram(
+      targetId:  Target.Id,
+      programId: Program.Id
+    ): AppliedFragment =  {
+        sql"""UPDATE t_target
+                SET c_program_id=$program_id
+                WHERE c_target_id=$target_id""".apply(programId, targetId)
+    }
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
     def cloneTarget(pid: Program.Id, tid: Target.Id, user: User): AppliedFragment =
       sql"""
