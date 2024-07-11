@@ -188,8 +188,8 @@ object ItcService {
   ) extends TargetResult
 
   case class AsterismResult private (
-    acquisitionResult: Zipper[TargetResult],
-    scienceResult: Zipper[TargetResult]
+    acquisitionResult: Zipper[TargetImagingResult],
+    scienceResult: Zipper[TargetSpectroscopyResult]
   ) {
     assert(acquisitionResult.focus.targetId === scienceResult.focus.targetId)
   }
@@ -207,8 +207,8 @@ object ItcService {
           val selectedTarget = t.targetId
 
           // Focus each zipper on the selected science target
-          val a = Zipper.fromNel[TargetResult](acquisition).findFocus(_.targetId === selectedTarget)
-          val s = Zipper.fromNel[TargetResult](science).findFocus(_.targetId === selectedTarget)
+          val a = Zipper.fromNel[TargetImagingResult](acquisition).findFocus(_.targetId === selectedTarget)
+          val s = Zipper.fromNel[TargetSpectroscopyResult](science).findFocus(_.targetId === selectedTarget)
           (a, s).mapN(AsterismResult(_, _))
         }
       } else None
@@ -217,8 +217,8 @@ object ItcService {
     given Encoder[AsterismResult] =
       Encoder.instance { rs =>
         Json.obj(
-          "science" -> rs.scienceResult.asJson,
-          "acquisition" -> rs.acquisitionResult.asJson
+          "science" -> rs.scienceResult.widen[TargetResult].asJson,
+          "acquisition" -> rs.acquisitionResult.widen[TargetResult].asJson
         )
       }
 
@@ -422,8 +422,8 @@ object ItcService {
         resultSet: AsterismResult
       )(using Transaction[F]): F[Unit] = {
 
-        def insertOrUpdateSingleTarget(acquisition: TargetResult)(science: TargetResult): F[Unit] = {
-          val h = hash((acquisition, science))
+        def insertOrUpdateSingleTarget(acquisition: TargetImagingResult)(science: TargetSpectroscopyResult): F[Unit] = {
+          val h = hash(acquisition.input, science.input)            
           session.execute(Statements.InsertOrUpdateItcResult)(
             pid,
             oid,
