@@ -215,15 +215,11 @@ object TargetService {
           }
 
         pid.flatMap {
-          case None => NoSuchProgram(programId).pure[F]
+          case None      => NoSuchProgram(programId).pure[F]
           case Some(pid) =>
             clone(targetId, pid).flatMap {
-              case None => NoSuchTarget(targetId).pure[F] // not authorized
-              case Some(tid) =>
-                val s = Statements.moveToProgram(tid, programId)
-                session.prepareR(s.fragment.command).use(_.execute(s.argument)).map { _ =>
-                  Success(targetId, tid)
-                }
+              case None      => NoSuchTarget(targetId).pure[F] // not authorized
+              case Some(tid) => Success(targetId, tid).pure[F]
             }
         }
       }
@@ -445,14 +441,6 @@ object TargetService {
       updates(SET).fold(which)(update)
     }
 
-    def moveToProgram(
-      targetId:  Target.Id,
-      programId: Program.Id
-    ): AppliedFragment =  {
-        sql"""UPDATE t_target
-                SET c_program_id=$program_id
-                WHERE c_target_id=$target_id""".apply(programId, targetId)
-    }
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
     def cloneTarget(pid: Program.Id, tid: Target.Id, user: User): AppliedFragment =
       sql"""
@@ -477,7 +465,7 @@ object TargetService {
           c_calibration_role
         )
         SELECT
-          c_program_id,
+          $program_id,
           c_name,
           c_type,
           c_sid_ra,
@@ -497,7 +485,7 @@ object TargetService {
           c_calibration_role
         FROM t_target
         WHERE c_target_id = $target_id
-      """.apply(tid) |+|
+      """.apply(pid, tid) |+|
       ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_target_id
