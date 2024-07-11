@@ -8,12 +8,18 @@ package input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Program
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
 case class SetAllocationsInput(
   programId:   Program.Id,
   allocations: List[AllocationInput]
-)
+) {
+
+  def bands: Set[ScienceBand] =
+    allocations.map(_.scienceBand).toSet
+
+}
 
 object SetAllocationsInput {
 

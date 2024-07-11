@@ -6,6 +6,6 @@ package lucuma.odb.graphql.predicate
 import grackle.Path
 import lucuma.core.model.Program
 
-class SetAllocationsResultPredicates(path: Path) {
-  val programId = LeafPredicates[Program.Id](path / "programId")
+class AllocationPredicates(path: Path) {
+  lazy val id = LeafPredicates[Program.Id](path / "programId")
 }
