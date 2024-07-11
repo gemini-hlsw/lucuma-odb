@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
@@ -20,7 +19,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
-  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
+  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Unit]
 }
 
 object AllocationService {
@@ -31,7 +30,7 @@ object AllocationService {
       def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
         session.execute(Statements.DeleteAllocations)(pid).void
 
-      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
+      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Unit] =
         deleteAllocations(input.programId) *>
         NonEmptyList.fromList(input.allocations).traverse_ { lst =>
           session.execute(Statements.setAllocations(lst))((input.programId, lst))
@@ -39,7 +38,6 @@ object AllocationService {
         observationService
           .setScienceBand(input.programId, input.bands.head)
           .whenA(input.bands.sizeIs == 1)
-          .as(Result.unit)
 
     }
 
