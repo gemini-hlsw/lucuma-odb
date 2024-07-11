@@ -158,6 +158,16 @@ class setAllocations extends OdbSuite {
     assertIO(band, ScienceBand.Band2.some)
   }
 
+  test("empty allocation does not set observation band") {
+    val band = for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- setAllocationsAs(staff, pid, List.empty)
+      b   <- getBand(pi, oid)
+    } yield b
+    assertIO(band, none[ScienceBand])
+  }
+
   test("multiple band allocation does not set observation band") {
     val allocations = List(
       AllocationInput(Partner.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),

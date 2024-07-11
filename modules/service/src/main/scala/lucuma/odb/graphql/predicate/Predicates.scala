@@ -15,6 +15,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
   object Predicates {
     val addConditionsEntyResult       = AddConditionsEntryResultPredicates(Path.from(AddConditionsEntryResultType))
     val addTimeChargeCorrectionResult = AddTimeChargeCorrectionResultPredicates(Path.from(AddTimeChargeCorrectionResultType))
+    val allocation                    = AllocationPredicates(Path.from(AllocationType))
     val asterismGroup                 = AsterismGroupPredicates(Path.from(AsterismGroupType))
     val atomEvent                     = ExecutionEventPredicates(Path.from(AtomEventType))
     val atomRecord                    = AtomRecordPredicates(Path.from(AtomRecordType))
@@ -42,7 +43,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val proposalAttachment            = ProposalAttachmentPredicates(Path.from(ProposalAttachmentType))
     val recordDatasetResult           = RecordDatasetResultPredicates(Path.from(RecordDatasetResultType))
     val sequenceEvent                 = ExecutionEventPredicates(Path.from(SequenceEventType))
-    val setAllocationsResult          = SetAllocationsResultPredicates(Path.from(SetAllocationsResultType))
+//    val setAllocationsResult          = SetAllocationsResultPredicates(Path.from(SetAllocationsResultType))
     val setProgramReferenceResult     = SetProgramReferenceResult(Path.from(SetProgramReferenceResultType))
     val setProposalStatusResult       = SetProposalStatusResultPredicates(Path.from(SetProposalStatusResultType))
     val slewEvent                     = ExecutionEventPredicates(Path.from(SlewEventType))

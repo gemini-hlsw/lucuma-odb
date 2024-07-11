@@ -27,6 +27,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
@@ -42,6 +43,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
@@ -232,6 +234,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       collectionField = "obsAttachments",
       child
     )
+
+  def allocationResultSubquery(pid: Program.Id, child: Query) =
+    ResultMapping.mutationResult(child, ResultMapping.MaxLimit, "allocations") { q =>
+      FilterOrderByOffsetLimit(
+        pred   = Predicates.allocation.id.eql(pid).some,
+        oss    = List(OrderSelection[ScienceBand](AllocationType / "scienceBand"), OrderSelection[Partner](AllocationType / "partner")).some,
+        offset = None,
+        limit  = None,
+        child  = q
+      )
+    }
 
   def observationResultSubquery(oids: List[Observation.Id], limit: Option[NonNegInt], child: Query) =
     mutationResultSubquery(
@@ -514,8 +527,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("setAllocations", SetAllocationsInput.Binding): (input, child) =>
       services.useTransactionally:
         requireStaffAccess:
-          allocationService.setAllocations(input).nestAs:
-            Unique(Filter(Predicates.setAllocationsResult.programId.eql(input.programId), child))
+          allocationService.setAllocations(input).as(
+            allocationResultSubquery(input.programId, child)
+          )
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
