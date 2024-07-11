@@ -47,6 +47,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
@@ -70,6 +71,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -117,7 +119,8 @@ sealed trait ObservationService[F[_]] {
 
   def observationValidations(
     pid: Program.Id,
-    oid: Observation.Id
+    oid: Observation.Id,
+    itcClient: ItcClient[F],
   )(using Transaction[F]): F[List[ObservationValidation]]
 }
 
@@ -476,12 +479,14 @@ object ObservationService {
 
       override def observationValidations(
         pid: Program.Id,
-        oid: Observation.Id
+        oid: Observation.Id,
+        itcClient: ItcClient[F]
       )(using Transaction[F]): F[List[ObservationValidation]] = {
-        val generatorValidations: F[ObservationValidationMap] =
+        
+        val generatorValidations: F[(ObservationValidationMap, Option[GeneratorParams])] =
           generatorParamsService.selectOne(pid, oid).map {
-            case Right(_) => ObservationValidationMap.empty
-            case Left(errors) => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList)
+            case Right(ps) => (ObservationValidationMap.empty, ps.some)
+            case Left(errors) => (ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList), none)
           }
 
         val optCfpId: F[Option[CallForProposals.Id]] =
@@ -561,11 +566,17 @@ object ObservationService {
           )
         }
 
+        def itcValidations(params: GeneratorParams): F[ObservationValidationMap] =
+          itcService(itcClient).selectOne(pid, oid, params).map:
+            // N.B. there will soon be more cases here
+            case Some(_) => ObservationValidationMap.empty
+            case None => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
 
         for {
-          genVals <- generatorValidations
-          cfpVals <- cfpValidations
-        } yield (genVals |+| cfpVals).toList
+          (genVals, op) <- generatorValidations
+          cfpVals       <- cfpValidations
+          itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
+        } yield (genVals |+| itcVals |+| cfpVals).toList
       }
     }
 
