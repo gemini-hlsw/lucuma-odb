@@ -50,6 +50,25 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
       }
     """
 
+  def itcQuery(oid: Observation.Id) = 
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          itc {
+            science {
+              selected {
+                targetId
+              }
+            }
+          }
+        }
+      }
+    """
+
+  // Load up the cache with an ITC result
+  def computeItcResult(oid: Observation.Id): IO[Unit] =
+    query(pi, itcQuery(oid)).void
+
   def queryResult(obsVals: ObservationValidation*): Json = {
     Json.obj(
       "observation" ->
@@ -191,12 +210,32 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
     }
   }
 
+
+  test("otherwise ok, but no itc results in cache") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.itc("ITC results are not present.")
+        ).asRight
+      )
+    }
+  }
+
   test("no validations") {
     val setup: IO[Observation.Id] =
       for {
         pid <- createProgramAs(pi)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -215,6 +254,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -232,6 +272,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -276,6 +317,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -316,6 +358,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
@@ -337,6 +380,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       List((RaStartWrap, DecStart), (RaEndWrap, DecEnd), (RaStartWrap, DecEnd), (RaCenterWrap, DecCenter)).traverse { (ra, dec) =>
@@ -405,6 +449,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         tid <- createTargetWithProfileAs(pi, pid)
         _   <- setTargetCoords(tid, RaCenter, DecCenter)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       expect(

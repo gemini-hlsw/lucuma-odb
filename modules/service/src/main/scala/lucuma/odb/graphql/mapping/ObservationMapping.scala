@@ -129,7 +129,7 @@ trait ObservationMapping[F[_]]
       (pid, oid, _) =>
         services.useTransactionally {
           observationService
-           .observationValidations(pid, oid)
+           .observationValidations(pid, oid, itcClient)
            .map(_.success)
         }
 
