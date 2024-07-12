@@ -9,18 +9,22 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 
 class observations extends OdbSuite {
 
-  val pi      = TestUsers.Standard.pi(1, 30)
-  val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
+  val pi      = TestUsers.Standard.pi(nextId, nextId)
+  val pi2     = TestUsers.Standard.pi(nextId, nextId)
+  val service = TestUsers.service(nextId)
+  val staff   = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, service).toList
+  val validUsers = List(pi, pi2, service, staff).toList
 
   test("simple observation selection") {
     createProgramAs(pi).flatMap { pid =>
@@ -128,8 +132,14 @@ class observations extends OdbSuite {
   }
 
   test("select science bands") {
+    val allocs = List(
+      AllocationInput(Partner.CA, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(Partner.CL, ScienceBand.Band2, 10.minTimeSpan)
+    )
+
     for {
       pid  <- createProgramAs(pi2)
+      _    <- setAllocationsAs(staff, pid, allocs)
       oid1 <- createObservationAs(pi2, pid)
       _    <- setScienceBandAs(pi2, oid1, ScienceBand.Band1.some)
       oid2 <- createObservationAs(pi2, pid)
