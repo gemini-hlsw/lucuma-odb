@@ -247,7 +247,7 @@ class cloneTarget extends OdbSuite {
                   {
                     "target": {
                       "id": $tid2,
-                      "calibrationRole": null
+                      "calibrationRole": "TELLURIC"
                     }
                   }
                 """)
