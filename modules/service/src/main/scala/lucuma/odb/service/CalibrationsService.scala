@@ -195,17 +195,35 @@ object CalibrationsService {
           }
 
         val gno: Option[F[List[Observation.Id]]] = gnTgt.map(tgtid =>
-          (for {
-            current <- session.execute(Statements.selectGmosNorthLongSlitConfigurations(true))(pid)
-            ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-            o       <- ct.traverse(gmosNorthLSObservations(gnls.diff(current), _))
-          } yield o).orError)
-        val gso = gsTgt.map(tgtid =>
-          (for {
-            current <- session.execute(Statements.selectGmosSouthLongSlitConfigurations(true))(pid)
-            ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-            o       <- ct.traverse(gmosSouthLSObservations(gsls.diff(current), _))
-          } yield o).orError)
+          (session.execute(Statements.selectGmosNorthLongSlitConfigurations(true))(pid))
+            .flatMap { current =>
+              val pendingConfigs = gnls.diff(current)
+              // We don't want to create a target if there are no pending configurations
+              if (pendingConfigs.nonEmpty) {
+                (for {
+                  ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                  o       <- ct.traverse(gmosNorthLSObservations(pendingConfigs, _))
+                } yield o).orError
+              } else {
+                List.empty[Observation.Id].pure[F]
+              }
+            })
+
+        val gso: Option[F[List[Observation.Id]]] = gsTgt.map(tgtid =>
+          (session.execute(Statements.selectGmosSouthLongSlitConfigurations(true))(pid))
+            .flatMap { current =>
+              val pendingConfigs = gsls.diff(current)
+              // We don't want to create a target if there are no pending configurations
+              if (pendingConfigs.nonEmpty) {
+                (for {
+                  ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                  o       <- ct.traverse(gmosSouthLSObservations(pendingConfigs, _))
+                } yield o).orError
+              } else {
+                List.empty[Observation.Id].pure[F]
+              }
+            })
+
         (gno, gso).mapN((_, _).mapN(_ ::: _)).getOrElse(Nil.pure[F])
       }
 
