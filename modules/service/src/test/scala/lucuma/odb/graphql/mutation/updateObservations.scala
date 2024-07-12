@@ -10,21 +10,25 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
 class updateObservations extends OdbSuite
                             with UpdateConstraintSetOps {
 
-  val pi: User = TestUsers.Standard.pi(nextId, nextId)
-  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi: User    = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User   = TestUsers.Standard.pi(nextId, nextId)
+  val staff: User = TestUsers.Standard.staff(nextId, nextId)
 
-  override lazy val validUsers: List[User] = List(pi, pi2)
+  override lazy val validUsers: List[User] = List(pi, pi2, staff)
 
   private def oneUpdateTest(
     user:     User,
@@ -1813,6 +1817,7 @@ class updateObservations extends OdbSuite
   test("update scienceBand") {
     for {
       pid <- createProgramAs(pi)
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
       oid <- createObservationAs(pi, pid)
       _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
       b1  <- observationsWhere(pi, "scienceBand: { EQ: BAND2 }")
@@ -1822,11 +1827,41 @@ class updateObservations extends OdbSuite
   test("null scienceBand") {
     for {
       pid <- createProgramAs(pi)
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
       oid <- createObservationAs(pi, pid)
       _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
       _   <- setScienceBandAs(pi, oid, none[ScienceBand])
       bn  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, scienceBand: { IS_NULL: true }""")
     } yield assertEquals(bn, List(oid))
+  }
+
+  test("attempt to assign an invalid scienceBand") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(pi,
+        s"""
+          mutation {
+            updateObservations(
+              input: {
+                SET: {
+                  scienceBand: BAND1
+                }
+                WHERE: {
+                  id: { EQ: "$oid" }
+                }
+              }
+            ) {
+              observations {
+                id
+              }
+            }
+          }
+        """,
+        List(s"One or more programs have not been allocated time in BAND1: [$pid]").asLeft
+      )
+    } yield ()
   }
 
 }

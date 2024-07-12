@@ -74,6 +74,7 @@ import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
+import lucuma.odb.syntax.resultT.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -113,7 +114,11 @@ sealed trait ObservationService[F[_]] {
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
-  def setScienceBand(
+  /**
+   * Sets the science band in all the observations of this program.  This
+   * is used internally by other services and does not perform any validation.
+   */
+  def setScienceBandInAllObservationsNoValidation(
     pid:  Program.Id,
     band: ScienceBand
   )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]]
@@ -361,6 +366,9 @@ object ObservationService {
         which: AppliedFragment
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
         Trace[F].span("updateObservation") {
+          def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
+            SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
+
           val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
             for {
               r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
@@ -370,6 +378,7 @@ object ObservationService {
                    })
               g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
               u  = g.values.reduceOption(_ ++ _).orEmpty  // ungrouped: List[Observation.Id]
+              _ <- validateBand(g.keys.toList)
               _ <- ResultT(updateObservingModes(SET.observingMode, u))
               _ <- ResultT(setTimingWindows(u, SET.timingWindows.foldPresent(_.orEmpty)))
               _ <- ResultT(g.toList.traverse { case (pid, oids) =>
@@ -388,7 +397,7 @@ object ObservationService {
           } yield r
         }
 
-      override def setScienceBand(
+      override def setScienceBandInAllObservationsNoValidation(
         pid:  Program.Id,
         band: ScienceBand
       )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]] =
