@@ -105,8 +105,11 @@ object CallForProposalsService {
             .compile
             .toList
             .map(_.success)
-            .recover { case SqlState.CheckViolation(_) =>
-              OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+            .recover {
+              case SqlState.CheckViolation(_)  =>
+                OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+              case SqlState.RaiseException(ex) =>
+                OdbError.UpdateFailed(ex.message.some).asFailure
             }
         }
       }
