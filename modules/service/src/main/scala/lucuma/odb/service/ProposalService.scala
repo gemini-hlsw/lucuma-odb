@@ -522,8 +522,7 @@ object ProposalService {
         LEFT JOIN t_cfp cfp
           ON prop.c_cfp_id = cfp.c_cfp_id
         WHERE
-          prog.c_program_id = $program_id AND
-          (prop.c_cfp_id IS NULL OR cfp.c_existence = 'present'::e_existence)
+          prog.c_program_id = $program_id
       """.apply(pid) |+|
       ProgramService.Statements.andWhereUserAccess(user, pid)
 
