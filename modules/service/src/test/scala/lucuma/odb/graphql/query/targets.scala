@@ -315,7 +315,7 @@ class targets extends OdbSuite {
               Right(Json.obj(
                 "targets" -> Json.obj(
                   "matches" -> Json.fromValues {
-                      // Only Photometric targets
+                      // Only Tellric targets
                       tids.map { id =>
                         Json.obj(
                           "id" -> id.asJson,

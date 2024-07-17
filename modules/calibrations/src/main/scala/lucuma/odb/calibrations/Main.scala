@@ -22,6 +22,7 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.UserService
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
@@ -32,6 +33,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
 
+import java.time.Instant
 import scala.concurrent.duration.*
 
 sealed trait MainParams {
@@ -127,13 +129,18 @@ object CMain extends MainParams {
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
     } yield top
 
-  def runCalibrationsDaemon[F[_]: Concurrent: Logger](
+  def runCalibrationsDaemon[F[_]: Async: Logger](
     obsTopic: Topic[F, ObservationTopic.Element],  services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally(calibrationsService.recalculateCalibrations(elem.programId))
+              services.useTransactionally{
+                for {
+                  t <- Sync[F].delay(Instant.now())
+                  _ <- calibrationsService.recalculateCalibrations(elem.programId, t)
+                } yield ()
+              }
             }.compile.drain.start.void)
     } yield ()
 
@@ -143,7 +150,10 @@ object CMain extends MainParams {
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
-        Services.forUser(u, enums)(pool).pure[F]
+        Services.forUser(u, enums)(pool).pure[F].flatTap { s =>
+          val us = UserService.fromSession(pool)
+          Services.asSuperUser(us.canonicalizeUser(u))
+        }
       case Some(u) =>
         Logger[F].error(s"User $u is not allowed to execute this service") *>
           MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
