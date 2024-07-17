@@ -26,7 +26,10 @@ import Services.Syntax.*
 trait AllocationService[F[_]] {
   def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
 
-  /** Validats that the given `band` may be assigned to these `pids`. */
+  /**
+   * Validates that the given `band` may be assigned to observations in the
+   * programs referenced by `pids`.
+   */
   def validateBand(band: ScienceBand, pids: List[Program.Id]): F[Result[Unit]]
 }
 
@@ -45,27 +48,30 @@ object AllocationService {
           }
         }
 
-      private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
-        session.execute(Statements.DeleteAllocations)(pid).void
-
-      private def validateObservations(input: SetAllocationsInput)(using Transaction[F]): F[Result[Unit]] =
-        val noneBands  = session.execute(Statements.ObservationsWithDefinedBand)(input.programId)
-        NonEmptyList.fromList(input.bands.toList).fold(noneBands) { nel =>
-          session.execute(Statements.invalidObservationsForBands(nel))(input.programId, nel)
-        }.map {
-          case Nil => Result.unit
-          case os  => OdbError.InvalidArgument(s"The following observations now have a science band for which no time is allocated: ${os.mkString(", ")}".some).asWarning(())
-        }
-
       def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
         deleteAllocations(input.programId) *>
         NonEmptyList.fromList(input.allocations).traverse_ { lst =>
           session.execute(Statements.setAllocations(lst))((input.programId, lst))
         }                                  *>
         session
-          .execute(Statements.SetScienceBand)(input.programId, input.bands.head)
+          .execute(Statements.SetScienceBandWhereNull)(input.programId, input.bands.head)
           .whenA(input.bands.sizeIs == 1)  *>
         validateObservations(input)
+
+      private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.DeleteAllocations)(pid).void
+
+      // If any observations have already been assigned bands which are not in
+      // the given SetAllocationsInput, then generate a warning result listing
+      // them.
+      private def validateObservations(input: SetAllocationsInput)(using Transaction[F]): F[Result[Unit]] =
+        val noneBands  = session.execute(Statements.ObservationsWithNonNullBand)(input.programId)
+        NonEmptyList.fromList(input.bands.toList).fold(noneBands) { nel =>
+          session.execute(Statements.invalidObservationsForBands(nel))(input.programId, nel)
+        }.map {
+          case Nil => Result.unit
+          case os  => OdbError.InvalidArgument(s"The following observations now have a science band for which no time is allocated: ${os.mkString(", ")}".some).asWarning(())
+        }
     }
 
   object Statements {
@@ -98,7 +104,7 @@ object AllocationService {
         WHERE t_allocation.c_program_id = $program_id
       """.command
 
-    val ObservationsWithDefinedBand: Query[Program.Id, Observation.Id] =
+    val ObservationsWithNonNullBand: Query[Program.Id, Observation.Id] =
       sql"""
         SELECT c_observation_id
         FROM t_observation
@@ -114,7 +120,8 @@ object AllocationService {
           AND c_science_band NOT IN (${science_band.values.list(validBands.size)})
       """.query(observation_id).contramap { (pid, nel) => (pid, nel.toList) }
 
-    val SetScienceBand: Query[(Program.Id, ScienceBand), Observation.Id] =
+    // Sets all the observations with NULL science bands to the given value.
+    val SetScienceBandWhereNull: Query[(Program.Id, ScienceBand), Observation.Id] =
       sql"""
         UPDATE t_observation
         SET c_science_band = $science_band
