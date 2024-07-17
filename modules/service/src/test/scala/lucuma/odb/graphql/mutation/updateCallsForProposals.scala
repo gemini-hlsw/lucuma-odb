@@ -6,6 +6,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.CallForProposals
@@ -13,9 +14,10 @@ import lucuma.core.model.User
 
 class updateCallsForProposals extends OdbSuite {
 
-  val service    = TestUsers.service(3)
-  val staff      = TestUsers.Standard.staff(4, 44)
-  val validUsers = List(service, staff)
+  val pi         = TestUsers.Standard.pi(nextId, nextId)
+  val service    = TestUsers.service(nextId)
+  val staff      = TestUsers.Standard.staff(nextId, nextId)
+  val validUsers = List(pi, service, staff)
 
   val createCall: IO[CallForProposals.Id] =
     query(
@@ -789,5 +791,134 @@ class updateCallsForProposals extends OdbSuite {
         """.asRight
       )
     }
+  }
+
+  test("cannot delete an in-use Cfp") {
+    for {
+      cid <- createCall
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                existence: DELETED
+              },
+              WHERE: {
+                id: { EQ: "$cid" }
+              }
+            }) {
+              callsForProposals {
+                existence
+              }
+            }
+          }
+        """,
+        List(s"""Cannot delete this Call for Proposals, or change its type or semester, because dependent proposals reference it: ["$pid"].""").asLeft
+      )
+    } yield ()
+  }
+
+  test("cannot change the semester in an in-use Cfp") {
+    for {
+      cid <- createCall
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                semester: "2024B"
+              },
+              WHERE: {
+                id: { EQ: "$cid" }
+              }
+            }) {
+              callsForProposals {
+                semester
+              }
+            }
+          }
+        """,
+        List(s"""Cannot delete this Call for Proposals, or change its type or semester, because dependent proposals reference it: ["$pid"].""").asLeft
+      )
+    } yield ()
+  }
+
+  test("cannot change the type in an in-use Cfp") {
+    for {
+      cid <- createCall
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                type: DEMO_SCIENCE
+              },
+              WHERE: {
+                id: { EQ: "$cid" }
+              }
+            }) {
+              callsForProposals {
+                type
+              }
+            }
+          }
+        """,
+        List(s"""Cannot delete this Call for Proposals, or change its type or semester, because dependent proposals reference it: ["$pid"].""").asLeft
+      )
+    } yield ()
+  }
+
+  test("can change the active period in an in-use Cfp") {
+    for {
+      cid <- createCall
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                activeStart: "2024-12-31"
+                activeEnd:   "2026-01-01"
+              },
+              WHERE: {
+                id: { EQ: "$cid" }
+              }
+            }) {
+              callsForProposals {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "active": {
+                    "start": "2024-12-31",
+                    "end":   "2026-01-01"
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    } yield ()
   }
 }
