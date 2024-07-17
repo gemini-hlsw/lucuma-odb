@@ -8,6 +8,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.Partner
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
@@ -23,7 +24,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
-  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Unit]
+  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
 
   /** Validats that the given `band` may be assigned to these `pids`. */
   def validateBand(band: ScienceBand, pids: List[Program.Id]): F[Result[Unit]]
@@ -39,23 +40,32 @@ object AllocationService {
           session.execute(Statements.validPidsForBand(nelPids))((band, nelPids)).map { validPids =>
             (pids.toSet &~ validPids.toSet).toList match {
               case Nil => Result.unit  // there are no `pids` not in `validPids`
-              case ps  => OdbError.InvalidArgument(s"One or more programs have not been allocated time in ${band.tag.toScreamingSnakeCase}: ${pids.mkString("[", ", ", "]")}".some).asFailure
+              case ps  => OdbError.InvalidArgument(s"One or more programs have not been allocated time in ${band.tag.toScreamingSnakeCase}: ${pids.mkString(", ")}".some).asFailure
             }
           }
         }
 
-      def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
+      private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
         session.execute(Statements.DeleteAllocations)(pid).void
 
-      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Unit] =
+      private def validateObservations(input: SetAllocationsInput)(using Transaction[F]): F[Result[Unit]] =
+        val noneBands  = session.execute(Statements.ObservationsWithDefinedBand)(input.programId)
+        NonEmptyList.fromList(input.bands.toList).fold(noneBands) { nel =>
+          session.execute(Statements.invalidObservationsForBands(nel))(input.programId, nel)
+        }.map {
+          case Nil => Result.unit
+          case os  => OdbError.InvalidArgument(s"The following observations now have a science band for which no time is allocated: ${os.mkString(", ")}".some).asWarning(())
+        }
+
+      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
         deleteAllocations(input.programId) *>
         NonEmptyList.fromList(input.allocations).traverse_ { lst =>
           session.execute(Statements.setAllocations(lst))((input.programId, lst))
         }                                  *>
-        observationService
-          .setScienceBandInAllObservationsNoValidation(input.programId, input.bands.head)
-          .whenA(input.bands.sizeIs == 1)
-
+        session
+          .execute(Statements.SetScienceBand)(input.programId, input.bands.head)
+          .whenA(input.bands.sizeIs == 1)  *>
+        validateObservations(input)
     }
 
   object Statements {
@@ -88,6 +98,31 @@ object AllocationService {
         WHERE t_allocation.c_program_id = $program_id
       """.command
 
+    val ObservationsWithDefinedBand: Query[Program.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
+        WHERE c_program_id = $program_id
+          AND c_science_band IS NOT NULL
+      """.query(observation_id)
+
+    def invalidObservationsForBands(validBands: NonEmptyList[ScienceBand]): Query[(Program.Id, validBands.type), Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
+        WHERE c_program_id = $program_id
+          AND c_science_band NOT IN (${science_band.values.list(validBands.size)})
+      """.query(observation_id).contramap { (pid, nel) => (pid, nel.toList) }
+
+    val SetScienceBand: Query[(Program.Id, ScienceBand), Observation.Id] =
+      sql"""
+        UPDATE t_observation
+        SET c_science_band = $science_band
+        WHERE c_program_id = $program_id
+        AND c_science_band IS NULL
+        RETURNING c_observation_id
+      """.query(observation_id)
+         .contramap { (s, p) => (p, s) }
   }
 
 }

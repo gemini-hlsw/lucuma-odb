@@ -447,7 +447,7 @@ class createObservation extends OdbSuite {
               }
             }
           """,
-          List(s"One or more programs have not been allocated time in BAND1: [$pid]").asLeft
+          List(s"One or more programs have not been allocated time in BAND1: $pid").asLeft
         )
       }
   }
