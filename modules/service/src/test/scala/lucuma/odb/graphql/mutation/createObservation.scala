@@ -44,9 +44,11 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
@@ -396,32 +398,58 @@ class createObservation extends OdbSuite {
   }
 
   test("[general] created observation should have specified science band") {
-    createProgramAs(pi).flatMap { pid =>
-      query(pi,
-        s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                scienceBand: BAND2
-              }
-            }) {
-              observation {
-                scienceBand
+    createProgramAs(pi)
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatMap { pid =>
+        query(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  scienceBand: BAND2
+                }
+              }) {
+                observation {
+                  scienceBand
+                }
               }
             }
-          }
-          """).flatMap { js =>
-        val get = js.hcursor
-          .downField("createObservation")
-          .downField("observation")
-          .downField("scienceBand")
-          .as[Option[ScienceBand]]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-        assertIO(get, ScienceBand.Band2.some)
+            """).flatMap { js =>
+          val get = js.hcursor
+            .downField("createObservation")
+            .downField("observation")
+            .downField("scienceBand")
+            .as[Option[ScienceBand]]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+          assertIO(get, ScienceBand.Band2.some)
+        }
       }
-    }
+  }
+
+  test("[general] cannot create observation with inappropriate science band") {
+    createProgramAs(pi)
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatMap { pid =>
+        expect(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  scienceBand: BAND1
+                }
+              }) {
+                observation {
+                  scienceBand
+                }
+              }
+            }
+          """,
+          List(s"One or more programs have not been allocated time in BAND1: [$pid]").asLeft
+        )
+      }
   }
 
   test("[general] created observation should have specified visualization time") {
