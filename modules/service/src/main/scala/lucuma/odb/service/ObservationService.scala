@@ -257,19 +257,22 @@ object ObservationService {
         input: CreateObservationInput
       )(using Transaction[F]): F[Result[Observation.Id]] = {
 
-        def create(pid: Program.Id): F[Result[Observation.Id]] =
-          createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default))
+        def create(pid: Program.Id): ResultT[F, Observation.Id] =
+          input.SET.flatMap(_.scienceBand).fold(ResultT.unit) { band =>
+            ResultT(allocationService.validateBand(band, List(pid)))
+          } *> ResultT(createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)))
 
-        def insertAsterism(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
-          input.asterism.toOption.traverse { a =>
-            asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
-          }.map(_.getOrElse(Result.unit))
+
+        def insertAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
+          input.asterism.toOption.fold(ResultT.unit) { a =>
+            ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
+          }
 
         val go =
           for
             pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-            oid <- ResultT(create(pid))
-            _   <- ResultT(insertAsterism(pid, oid))
+            oid <- create(pid)
+            _   <- insertAsterism(pid, oid)
           yield oid
 
         go.value.flatTap: r =>
