@@ -506,7 +506,7 @@ object ProposalService {
 
     def selectProposalContext(user: User, pid: Program.Id): AppliedFragment =
       sql"""
-        SELECT 
+        SELECT
           prog.c_program_type,
           prog.c_proposal_status,
           prop.c_program_id IS NOT NULL,

@@ -8,14 +8,24 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
+import io.circe.Json
 import io.circe.refined.*
+import lucuma.core.math.Angle
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference.Description
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.CalibrationsService
+
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 class calibrations extends OdbSuite {
 
@@ -24,7 +34,11 @@ class calibrations extends OdbSuite {
 
   val validUsers = List(pi, service)
 
-  case class CalibObs(id: Observation.Id, groupId: Option[Group.Id], calibrationRole: Option[CalibrationRole]) derives Decoder
+  val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
+
+  case class CalibTarget(id: Target.Id) derives Decoder
+  case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Decoder
+  case class CalibObs(id: Observation.Id, groupId: Option[Group.Id], calibrationRole: Option[CalibrationRole], targetEnvironment: Option[CalibTE]) derives Decoder
 
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
     query(
@@ -43,7 +57,35 @@ class calibrations extends OdbSuite {
   private def queryCalibrationObservations(pid: Program.Id): IO[List[CalibObs]] =
     query(
       service,
-      s"""query { observations(WHERE: {program: {id: {EQ: "$pid"}}}) { matches {id groupId calibrationRole} } }"""
+      s"""query {
+            observations(
+              WHERE: {
+                program: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }) {
+                matches {
+                  id
+                  groupId
+                  calibrationRole
+                  targetEnvironment {
+                    firstScienceTarget {
+                      id
+                      sidereal {
+                        ra {
+                          degrees
+                        }
+                        dec {
+                          degrees
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }"""
     ).flatMap { c =>
       (for {
         id    <- c.hcursor.downField("observations").downField("matches").as[List[CalibObs]]
@@ -52,13 +94,67 @@ class calibrations extends OdbSuite {
         .liftTo[IO]
      }
 
+  private def updateTargetProperties(tid: Target.Id, ra: Long, dec: Long, rv:  Double): IO[Json] =
+    query(
+      service,
+      s"""
+          mutation {
+            updateTargets(input: {
+              SET: {
+                sidereal: {
+                  ra: { degrees: ${Angle.fromMicroarcseconds(ra).toDoubleDegrees} }
+                  dec: { degrees: ${Angle.fromMicroarcseconds(dec).toDoubleDegrees} }
+                  radialVelocity: { metersPerSecond: $rv }
+                  epoch: "J2000.000"
+                }
+              }
+              WHERE: {
+                id: { EQ: "$tid"}
+              }
+            }) {
+              targets {
+                id
+              }
+            }
+          }
+      """
+    )
+
+  def formatLD(ld: LocalDate): String = {
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
+    ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
+  }
+
+  private def updateVizTime(oid: Observation.Id, vt: LocalDate): IO[Json] =
+    query(
+      service,
+      s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: {
+              id: {
+                EQ: "$oid"
+              }
+            },
+            SET: {
+              visualizationTime: "${formatLD(vt)}"
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    )
+
   test("no calibrations group if not needed") {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid)(using xa)
+                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -77,7 +173,7 @@ class calibrations extends OdbSuite {
       gr  <- groupElementsAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid)(using xa)
+                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -102,7 +198,7 @@ class calibrations extends OdbSuite {
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid)(using xa)
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -111,12 +207,12 @@ class calibrations extends OdbSuite {
       val oids = gr1.collect { case Right(oid) => oid }
       val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, _, Some(_)) => true
-        case _                       => false
+        case CalibObs(_, _, Some(_), _) => true
+        case _                          => false
       }
       // calibs belong to the calib group
       val obsGids = ob.collect {
-        case CalibObs(_, Some(gid), _) => gid
+        case CalibObs(_, Some(gid), _, _) => gid
       }
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 2)
@@ -125,27 +221,142 @@ class calibrations extends OdbSuite {
   }
 
   test("add calibrations is idempotent") {
-        for {
-          pid  <- createProgramAs(pi)
-          oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
-          oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
-          _    <- withServices(service) { services =>
-                    services.session.transaction.use { xa =>
-                      services.calibrationsService.recalculateCalibrations(pid)(using xa) *>
-                        services.calibrationsService.recalculateCalibrations(pid)(using xa)
-                    }
-                  }
-          gr1  <- groupElementsAs(pi, pid, None)
-          ob   <- queryCalibrationObservations(pid)
-        } yield {
-          val oids = gr1.collect { case Right(oid) => oid }
-          val cCount = ob.count {
-            case CalibObs(_, _, Some(_)) => true
-            case _                       => false
-          }
-          assertEquals(cCount, 2)
-          assertEquals(oids.size, 2)
-        }
+    for {
+      pid  <- createProgramAs(pi)
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
+                    services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryCalibrationObservations(pid)
+    } yield {
+      val oids = gr1.collect { case Right(oid) => oid }
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), _) => true
+        case _                          => false
+      }
+      assertEquals(cCount, 2)
+      assertEquals(oids.size, 2)
+    }
   }
 
+  val spectroPhotometricTargets: List[(String, Long, Long, Double, String)] =
+    List(
+      ("BD+28  4211",
+        1180065332865L,
+        103910367627L,
+        0.000,
+        """{
+          "sourceProfile": {
+            "point": {
+                "emissionLines": null,
+                "bandNormalized": {
+                    "sed": null,
+                    "brightnesses": [
+                        {
+                            "band": "U",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "8.922"
+                        },
+                        {
+                            "band": "B",
+                            "error": "0.03",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.25"
+                        },
+                        {
+                            "band": "V",
+                            "error": "0.05",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.58"
+                        },
+                        {
+                            "band": "R",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.656"
+                        },
+                        {
+                            "band": "I",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.831"
+                        },
+                        {
+                            "band": "J",
+                            "error": "0.026",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.275"
+                        },
+                        {
+                            "band": "H",
+                            "error": "0.036",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.438"
+                        },
+                        {
+                            "band": "K",
+                            "error": "0.028",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.556"
+                        },
+                        {
+                            "band": "GAIA",
+                            "error": "0.002851",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.45304"
+                        }
+                    ]
+                }
+            },
+            "uniform": null,
+            "gaussian": null
+          }
+      }""")
+    )
+
+  test("select calibration target") {
+    for {
+      tpid <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create(None).some,
+                      CalibrationRole.SpectroPhotometric,
+                      Description.unsafeFrom("SPECTROTEST"))(using xa)
+                }
+              }
+      // Add some spectrophotometric targets
+      _    <- spectroPhotometricTargets.traverse {  case (n, ra, dec, rv, s) =>
+                 createTargetAs(service, tpid, n).flatTap(tid =>
+                   updateTargetProperties(tid, ra, dec, rv)
+                 )
+              }
+      // PI program
+      pid  <- createProgramAs(pi)
+      _    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some).flatTap { oid =>
+                updateVizTime(oid, LocalDate.of(2024, 1, 1))
+              }
+      _    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some).flatTap { oid =>
+                updateVizTime(oid, LocalDate.of(2024, 1, 1))
+              }
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryCalibrationObservations(pid)
+    } yield {
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), Some(_)) => true
+        case _                                => false
+      }
+      assertEquals(cCount, 2)
+    }
+  }
 }
