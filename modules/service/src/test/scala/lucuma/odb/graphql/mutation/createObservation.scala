@@ -452,6 +452,70 @@ class createObservation extends OdbSuite {
       }
   }
 
+  test("[general] create observation with a single science band allocation") {
+    createProgramAs(pi)
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatMap { pid =>
+        expect(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: { }
+              }) {
+                observation {
+                  scienceBand
+                }
+              }
+            }
+          """,
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "scienceBand": "BAND2"
+                }
+              }
+            }
+          """.asRight
+        )
+      }
+  }
+
+  test("[general] create observation with a multiple science band allocation") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)
+    )
+    createProgramAs(pi)
+      .flatTap(pid => setAllocationsAs(staff, pid, allocations))
+      .flatMap { pid =>
+        expect(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: { }
+              }) {
+                observation {
+                  scienceBand
+                }
+              }
+            }
+          """,
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "scienceBand": null
+                }
+              }
+            }
+          """.asRight
+        )
+      }
+  }
+
   test("[general] created observation should have specified visualization time") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
