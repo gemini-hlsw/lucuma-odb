@@ -74,6 +74,7 @@ import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
+import lucuma.odb.syntax.resultT.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -112,11 +113,6 @@ sealed trait ObservationService[F[_]] {
     SET:   ObservationPropertiesInput.Edit,
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
-
-  def setScienceBand(
-    pid:  Program.Id,
-    band: ScienceBand
-  )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]]
 
   def cloneObservation(
     input: CloneObservationInput
@@ -252,19 +248,22 @@ object ObservationService {
         input: CreateObservationInput
       )(using Transaction[F]): F[Result[Observation.Id]] = {
 
-        def create(pid: Program.Id): F[Result[Observation.Id]] =
-          createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default))
+        def create(pid: Program.Id): ResultT[F, Observation.Id] =
+          input.SET.flatMap(_.scienceBand).fold(ResultT.unit) { band =>
+            ResultT(allocationService.validateBand(band, List(pid)))
+          } *> ResultT(createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)))
 
-        def insertAsterism(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
-          input.asterism.toOption.traverse { a =>
-            asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
-          }.map(_.getOrElse(Result.unit))
+
+        def insertAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
+          input.asterism.toOption.fold(ResultT.unit) { a =>
+            ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
+          }
 
         val go =
           for
             pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-            oid <- ResultT(create(pid))
-            _   <- ResultT(insertAsterism(pid, oid))
+            oid <- create(pid)
+            _   <- insertAsterism(pid, oid)
           yield oid
 
         go.value.flatTap: r =>
@@ -361,6 +360,9 @@ object ObservationService {
         which: AppliedFragment
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
         Trace[F].span("updateObservation") {
+          def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
+            SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
+
           val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
             for {
               r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
@@ -370,6 +372,7 @@ object ObservationService {
                    })
               g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
               u  = g.values.reduceOption(_ ++ _).orEmpty  // ungrouped: List[Observation.Id]
+              _ <- validateBand(g.keys.toList)
               _ <- ResultT(updateObservingModes(SET.observingMode, u))
               _ <- ResultT(setTimingWindows(u, SET.timingWindows.foldPresent(_.orEmpty)))
               _ <- ResultT(g.toList.traverse { case (pid, oids) =>
@@ -386,14 +389,6 @@ object ObservationService {
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
-        }
-
-      override def setScienceBand(
-        pid:  Program.Id,
-        band: ScienceBand
-      )(using Transaction[F], Services.StaffAccess): F[List[Observation.Id]] =
-        Trace[F].span("setScienceBand") {
-          session.execute(Statements.SetScienceBand)(pid, band)
         }
 
       private def cloneObservationImpl(
@@ -1081,15 +1076,6 @@ object ObservationService {
       void"""
         RETURNING c_observation_id
       """
-
-    val SetScienceBand: Query[(Program.Id, ScienceBand), Observation.Id] =
-      sql"""
-        UPDATE t_observation
-        SET c_science_band = $science_band
-        WHERE c_program_id = $program_id
-        RETURNING c_observation_id
-      """.query(observation_id)
-         .contramap { (s, p) => (p, s) }
 
     def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
       sql"""

@@ -527,7 +527,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("setAllocations", SetAllocationsInput.Binding): (input, child) =>
       services.useTransactionally:
         requireStaffAccess:
-          allocationService.setAllocations(input).as(
+          allocationService.setAllocations(input).map(_ *>
             allocationResultSubquery(input.programId, child)
           )
 
