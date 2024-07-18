@@ -46,6 +46,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.DateInterval
@@ -179,6 +180,7 @@ object ObservationService {
   def InvalidInstrumentMsg(instr: Instrument) = s"Instrument $instr not part of Call for Proposals."
   def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
+  def InvalidScienceBandMsg(b: ScienceBand) = s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
 
   case class CloneIds(
     originalId: Observation.Id,
@@ -580,11 +582,20 @@ object ObservationService {
             case Some(_) => ObservationValidationMap.empty
             case None => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
 
+        def validateScienceBand: F[ObservationValidationMap] =
+          session
+            .option(Statements.SelectInvalidBand)(oid)
+            .map { invalidBand =>
+              val m = ObservationValidationMap.empty
+              invalidBand.fold(m)(b => m.add(ObservationValidation.configuration(InvalidScienceBandMsg(b))))
+            }
+
         for {
           (genVals, op) <- generatorValidations
           cfpVals       <- cfpValidations
           itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
-        } yield (genVals |+| itcVals |+| cfpVals).toList
+          bandVals      <- validateScienceBand
+        } yield (genVals |+| itcVals |+| cfpVals |+| bandVals).toList
       }
     }
 
@@ -1127,6 +1138,23 @@ object ObservationService {
         FROM t_cfp_instrument
         WHERE c_cfp_id = $cfp_id
       """.query(instrument)
+
+    // Select the science band of an observation if it is not NULL and there is
+    // no corresponding time allocation for it.
+    val SelectInvalidBand: Query[Observation.Id, ScienceBand] =
+      sql"""
+        SELECT c_science_band
+        FROM t_observation o
+        WHERE o.c_observation_id = $observation_id
+          AND (
+            o.c_science_band IS NOT NULL AND
+            o.c_science_band NOT IN (
+              SELECT DISTINCT c_science_band
+              FROM t_allocation a
+              WHERE a.c_program_id = o.c_program_id
+            )
+          )
+      """.query(science_band)
   }
 
 }
