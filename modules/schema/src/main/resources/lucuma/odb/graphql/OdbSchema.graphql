@@ -8417,7 +8417,42 @@ type Observation {
   """
   observerNotes: NonEmptyString
 
+  """
+  Parameters relevant to approved configurations.
+  """
+  configuration: Configuration!
+
 }
+
+type Configuration {
+  conditions: ConfigurationConditions!
+  referenceCoordinates: Coordinates # may not be available
+  observingMode: ConfigurationObservingMode
+}
+
+type ConfigurationConditions {
+  imageQuality: ImageQuality!
+  cloudExtinction: CloudExtinction!
+  skyBackground: SkyBackground!
+  waterVapor: WaterVapor!
+}
+
+type ConfigurationObservingMode {
+  instrument: Instrument!
+  mode: ObservingModeType!
+  gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
+  gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+}
+
+type ConfigurationGmosNorthLongSlit {
+  grating: GmosNorthGrating!
+}
+
+type ConfigurationGmosSouthLongSlit {
+  grating: GmosSouthGrating!
+}
+
+
 
 type Itc {
   """
@@ -10816,6 +10851,16 @@ type TargetEnvironment {
     """
     includeDeleted: Boolean! = false
   ): Target
+
+  """
+  Explicit (if defined) or computed base position at the specified time, if known.
+  """
+  basePosition(
+    """
+    The time used for the base position calculations.
+    """
+    observationTime: Timestamp!
+  ): Coordinates
 
   """
   The guide star(s) and related information

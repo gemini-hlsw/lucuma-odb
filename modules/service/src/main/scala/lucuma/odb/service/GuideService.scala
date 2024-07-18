@@ -94,6 +94,10 @@ trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
   import GuideService.GuideEnvironment
 
+  def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
+    NoTransaction[F]
+  ): F[Result[ObjectTracking]]
+
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F]
   ): F[Result[List[GuideEnvironment]]]
@@ -755,6 +759,15 @@ object GuideService {
 
       def guideStarIdFromName(name: GuideStarName): Result[Long] = 
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
+
+      override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F]
+      ): F[Result[ObjectTracking]] =
+        (for {
+          obsInfo       <- ResultT(getObservationInfo(oid))
+          asterism      <- ResultT(getAsterism(pid, oid))
+          baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
+        } yield baseTracking).value
 
       def lookupGuideStar(
         pid: Program.Id,
