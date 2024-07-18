@@ -80,42 +80,17 @@ class GitHub_249 extends OdbSuite {
                       "observations" : {
                         "matches" : [
                           {
-                            "id" : $oid0
-                          }
-                        ]
-                      },
-                      "asterism" : [
-                        {
-                          "id" : ${tids(3)}
-                        }
-                      ]
-                    },
-                    {
-                      "observations" : {
-                        "matches" : [
-                          {
                             "id" : $oid3
                           }
                         ]
                       },
                       "asterism" : [
                         {
-                          "id" : ${tids(2)}
+                          "id" : ${tids(1)}
                         },
                         {
-                          "id" : ${tids(1)}
+                          "id" : ${tids(2)}
                         }
-                      ]
-                    },
-                    {
-                      "observations" : {
-                        "matches" : [
-                          {
-                            "id" : $oid4
-                          }
-                        ]
-                      },
-                      "asterism" : [
                       ]
                     },
                     {
@@ -134,6 +109,31 @@ class GitHub_249 extends OdbSuite {
                           "id" : ${tids(1)}
                         }
                       ]
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid0
+                          }
+                        ]
+                      },
+                      "asterism" : [
+                        {
+                          "id" : ${tids(3)}
+                        }
+                      ]
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid4
+                          }
+                        ]
+                      },
+                      "asterism" : [
+                      ]
                     }
                   ]
                 }
@@ -147,3 +147,4 @@ class GitHub_249 extends OdbSuite {
   }
 
 }
+
