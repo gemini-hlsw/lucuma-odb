@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
@@ -181,4 +182,59 @@ class setAllocations extends OdbSuite {
     } yield b
     assertIO(band, none[ScienceBand])
   }
+
+  test("warning for invalid bands") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
+      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+    )
+    for {
+      pid  <- createProgramAs(pi)
+      _    <- setAllocationsAs(staff, pid, allocations)
+      oid0 <- createObservationAs(pi, pid)
+      _    <- setScienceBandAs(pi, oid0, ScienceBand.Band1.some)
+      oid1 <- createObservationAs(pi, pid)
+      _    <- setScienceBandAs(pi, oid1, ScienceBand.Band2.some)
+      _    <- expectIor(staff,
+        s"""
+          mutation {
+            setAllocations(input: {
+              programId:   "$pid"
+              allocations: [
+                {
+                  partner: US
+                  scienceBand: BAND1
+                  duration: { hours: "5.79" }
+                }
+              ]
+            }) {
+              allocations {
+                partner
+                scienceBand
+                duration { hours }
+              }
+            }
+          }
+        """,
+        Ior.both(
+          List(s"The following observations now have a science band for which no time is allocated: $oid1"),
+          json"""
+            {
+              "setAllocations": {
+                "allocations": [
+                  {
+                    "partner": "US",
+                    "scienceBand": "BAND1",
+                    "duration": { "hours": 5.790000 }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    } yield ()
+
+  }
+
 }
