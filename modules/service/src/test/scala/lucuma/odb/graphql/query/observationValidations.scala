@@ -7,16 +7,22 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import clue.ResponseException
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.Partner
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ScienceBand
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
 class observationValidations extends OdbSuite with ObservingModeSetupOperations {
@@ -499,6 +505,36 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
           ObservationValidation.callForProposals(
             ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
             ObservationService.AsterismOutOfRangeMsg
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("invalid band") {
+    val allocations = List(
+      AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(Partner.CA, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        _   <- setAllocationsAs(staff, pid, allocations)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
+        _   <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+        _   <- setAllocationsAs(staff, pid, allocations.tail).intercept[ResponseException[Json]].void
+      } yield oid
+
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.InvalidScienceBandMsg(ScienceBand.Band1)
           )
         ).asRight
       )

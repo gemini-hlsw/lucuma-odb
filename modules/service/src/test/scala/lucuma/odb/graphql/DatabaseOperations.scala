@@ -560,8 +560,8 @@ trait DatabaseOperations { this: OdbSuite =>
     user:        User,
     pid:         Program.Id,
     allocations: List[AllocationInput]
-  ): IO[Unit] = {
-    val q = query(
+  ): IO[Json] =
+    query(
       user = user,
       query = s"""
         mutation {
@@ -589,19 +589,13 @@ trait DatabaseOperations { this: OdbSuite =>
       """
     )
 
-    assertIO(
-      q.flatMap(readAllocations("setAllocations", _)),
-      allocations.map(a => (a.partner, a.scienceBand, a.duration.toHours)).toSet
-    )
-  }
-
   def setOneAllocationAs(
     user: User,
     pid: Program.Id,
     partner: Partner,
     scienceBand: ScienceBand,
     duration: TimeSpan,
-  ): IO[Unit] =
+  ): IO[Json] =
     setAllocationsAs(user, pid, List(AllocationInput(partner, scienceBand, duration)))
 
   def linkAs(
