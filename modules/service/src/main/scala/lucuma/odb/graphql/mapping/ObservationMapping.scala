@@ -76,6 +76,7 @@ trait ObservationMapping[F[_]]
       SqlField("groupIndex", ObservationView.GroupIndex),
       SqlField("calibrationRole", ObservationView.CalibrationRole),
       SqlField("observerNotes", ObservationView.ObserverNotes),
+      SqlObject("configuration"),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
