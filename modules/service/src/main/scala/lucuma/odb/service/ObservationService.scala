@@ -15,6 +15,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
@@ -250,11 +251,30 @@ object ObservationService {
         input: CreateObservationInput
       )(using Transaction[F]): F[Result[Observation.Id]] = {
 
-        def create(pid: Program.Id): ResultT[F, Observation.Id] =
-          input.SET.flatMap(_.scienceBand).fold(ResultT.unit) { band =>
-            ResultT(allocationService.validateBand(band, List(pid)))
-          } *> ResultT(createObservationImpl(pid, input.SET.getOrElse(ObservationPropertiesInput.Create.Default)))
+        // Extracts the observation creation properties, validating the band
+        // choice (if any), or else setting the band in the case of a single
+        // band allocation.
+        def observationProperties(pid: Program.Id): ResultT[F, ObservationPropertiesInput.Create] = {
+          val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
 
+          props.scienceBand.fold(
+
+            // No science band in the input, but if the proposal has a time
+            // allocation in single band select it.
+            ResultT(allocationService.selectScienceBands(pid).map { bands =>
+              bands.toList match {
+                case b :: Nil => ObservationPropertiesInput.Create.scienceBand.replace(b.some)(props).success
+                case _        => props.success
+              }
+            })
+
+          ) { band => ResultT(allocationService.validateBand(band, List(pid))).as(props) }
+        }
+
+        def create(pid: Program.Id): ResultT[F, Observation.Id] =
+          observationProperties(pid).flatMap { props =>
+            ResultT(createObservationImpl(pid, props))
+          }
 
         def insertAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
           input.asterism.toOption.fold(ResultT.unit) { a =>

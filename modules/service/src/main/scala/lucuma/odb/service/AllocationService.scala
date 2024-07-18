@@ -24,6 +24,13 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AllocationService[F[_]] {
+
+  /**
+   * Selects the science bands for which time has been allocated, if any, for
+   * the given program.
+   */
+  def selectScienceBands(pid: Program.Id): F[Set[ScienceBand]]
+
   def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
 
   /**
@@ -37,6 +44,9 @@ object AllocationService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
+
+      def selectScienceBands(pid: Program.Id): F[Set[ScienceBand]] =
+        session.execute(Statements.SelectScienceBands)(pid).map(_.toSet)
 
       def validateBand(band: ScienceBand, pids: List[Program.Id]): F[Result[Unit]] =
         NonEmptyList.fromList(pids).fold(Result.unit.pure[F]) { nelPids =>
@@ -75,6 +85,15 @@ object AllocationService {
     }
 
   object Statements {
+
+    val SelectScienceBands: Query[Program.Id, ScienceBand] =
+      sql"""
+        SELECT DISTINCT c_science_band
+        FROM t_allocation
+        WHERE c_program_id = $program_id
+        AND c_science_band IS NOT NULL
+        AND c_duration > INTERVAL '0'
+      """.query(science_band)
 
     /**
      * Obtains the subset of `pids` to which a given science band may be legally
