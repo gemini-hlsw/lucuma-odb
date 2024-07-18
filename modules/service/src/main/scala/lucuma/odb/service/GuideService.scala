@@ -85,6 +85,10 @@ trait GuideService[F[_]] {
   import GuideService.Error
   import GuideService.GuideEnvironment
 
+  def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
+    NoTransaction[F]
+  ): F[Either[Error, ObjectTracking]]
+
   def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F]
   ): F[Either[Error, List[GuideEnvironment]]]
@@ -618,6 +622,15 @@ object GuideService {
           .flatten
           .getOrElse(SortedMap.empty)
       }
+
+      override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
+        NoTransaction[F]
+      ): F[Either[Error, ObjectTracking]] =
+        (for {
+          obsInfo       <- EitherT(getObservationInfo(pid, oid))
+          asterism      <- EitherT(getAsterism(pid, oid))
+          baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
+        } yield baseTracking).value
 
       override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
         NoTransaction[F]

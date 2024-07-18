@@ -24,6 +24,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.AsterismTargetTable
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -34,6 +35,7 @@ import org.http4s.client.Client
 
 import binding.*
 import table.*
+import lucuma.core.math.Coordinates
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 
@@ -66,6 +68,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
+      EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId"))
     )
@@ -112,6 +115,23 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       end   <- Elab.liftR(rEnd)
       env   <- Elab.env(AvailabilityStartParam -> start, AvailabilityEndParam -> end)
     } yield env
+  }
+
+  def basePositionQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
+
+    val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[Option[Coordinates]]] =
+      (pid, oid, obsTime) =>
+        services.use { implicit s =>
+          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+            .getObjectTracking(pid, oid)
+            .map {
+              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
+              case Right(s) => s.at(obsTime.toInstant).map(_.value).success
+            }
+        }
+    
+    effectHandler(readEnv, calculate)
   }
 
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
