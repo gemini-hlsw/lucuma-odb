@@ -43,6 +43,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
@@ -176,6 +177,7 @@ object CalibrationsService {
                         none,
                         List(tid).some
                       ).some,
+                      constraintSet = ConstraintSetInput.Calibration.some,
                       group = gid.some,
                       posAngleConstraint = PosAngleConstraintInput(
                         mode = PosAngleConstraintMode.AverageParallactic.some, none
