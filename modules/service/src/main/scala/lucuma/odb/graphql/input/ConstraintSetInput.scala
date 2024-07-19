@@ -49,12 +49,30 @@ object ConstraintSetInput {
       elevationRange  = ElevationRange.AirMass.Default
     )
 
+  val CalibrationConstraints: ConstraintSet =
+    ConstraintSet(
+      cloudExtinction = CloudExtinction.PointThree,
+      imageQuality    = ImageQuality.PointTwo,
+      skyBackground   = SkyBackground.Bright,
+      waterVapor      = WaterVapor.Wet,
+      elevationRange  = ElevationRange.AirMass.Default
+    )
+
   val Default: ConstraintSetInput =
     ConstraintSetInput(
       NominalConstraints.cloudExtinction.some,
       NominalConstraints.imageQuality.some,
       NominalConstraints.skyBackground.some,
       NominalConstraints.waterVapor.some,
+      ElevationRangeInput.Default.some
+    )
+
+  val Calibration: ConstraintSetInput =
+    ConstraintSetInput(
+      CalibrationConstraints.cloudExtinction.some,
+      CalibrationConstraints.imageQuality.some,
+      CalibrationConstraints.skyBackground.some,
+      CalibrationConstraints.waterVapor.some,
       ElevationRangeInput.Default.some
     )
 
