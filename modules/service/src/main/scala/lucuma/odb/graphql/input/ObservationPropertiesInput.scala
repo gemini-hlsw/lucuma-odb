@@ -20,6 +20,8 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
+import monocle.Focus
+import monocle.Lens
 
 object ObservationPropertiesInput {
 
@@ -55,6 +57,9 @@ object ObservationPropertiesInput {
   ) extends AsterismInput
 
   object Create {
+
+    val scienceBand: Lens[Create, Option[ScienceBand]] =
+      Focus[Create](_.scienceBand)
 
     val Default: Create =
       Create(
