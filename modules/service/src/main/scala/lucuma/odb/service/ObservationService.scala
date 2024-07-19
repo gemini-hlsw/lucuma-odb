@@ -251,6 +251,9 @@ object ObservationService {
                   }
                 }
               }
+          }.recoverWith {
+             case SqlState.CheckViolation(ex) =>
+               OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
           }
         }
 
@@ -414,7 +417,7 @@ object ObservationService {
             _ <- moveObservations(SET.group, SET.groupIndex, which)
             r <- updates.value.recoverWith {
                    case SqlState.CheckViolation(ex) =>
-                    OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                     OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r

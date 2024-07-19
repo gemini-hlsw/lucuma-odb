@@ -49,6 +49,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.service.ObservationService
 
 import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
@@ -448,6 +449,64 @@ class createObservation extends OdbSuite {
             }
           """,
           List(s"One or more programs have not been allocated time in BAND1: $pid").asLeft
+        )
+      }
+  }
+
+  test("[general] created ready observation must have a science band") {
+    createProgramAs(pi)
+      .flatTap(pid => setOneAllocationAs(staff, pid, Partner.US, ScienceBand.Band2, 1.hourTimeSpan))
+      .flatMap { pid =>
+        query(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  scienceBand: BAND2
+                  status: READY
+                }
+              }) {
+                observation {
+                  scienceBand
+                  status
+                }
+              }
+            }
+            """).flatMap { js =>
+          val get = js.hcursor
+            .downField("createObservation")
+            .downField("observation")
+            .downField("scienceBand")
+            .as[Option[ScienceBand]]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+          assertIO(get, ScienceBand.Band2.some)
+        }
+      }
+  }
+
+  test("[general] created ready observation must fail without a science band") {
+    createProgramAs(pi)
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan), AllocationInput(Partner.CA, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatMap { pid =>
+        expect(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  status: READY
+                }
+              }) {
+                observation {
+                  scienceBand
+                  status
+                }
+              }
+            }
+          """,
+          List(ObservationService.MissingScienceBandConstraint.message).asLeft
         )
       }
   }
