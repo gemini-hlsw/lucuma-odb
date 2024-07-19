@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.refined.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
@@ -537,6 +538,90 @@ class calibrations extends OdbSuite {
       assertEquals(cCount, 1)
       assertEquals(oids.size, 2)
     }
+  }
+
+  test("calibration observations can't be modified by the pi") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      cid = ob.collect {
+        case CalibObs(cid, _, Some(_), _) => cid
+      }
+      _    <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        constraintSet: {
+                          cloudExtinction: ONE_POINT_ZERO
+                        }
+                      },
+                      WHERE: {
+                        id: { EQ: "${cid.get(0).get}" }
+                      }
+                    }) {
+                      observations {
+                        constraintSet {
+                          cloudExtinction
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected =json"""
+                  {
+                    "updateObservations": {
+                      "observations": []
+                    }
+                  }
+                """.asRight
+              )
+    } yield ()
+  }
+
+  test("calibration observations can't be cloned") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      cid = ob.collect {
+        case CalibObs(cid, _, Some(_), _) => cid
+      }.head
+      _    <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    cloneObservation(input: {
+                      observationId: "$cid"
+                    }) {
+                      originalObservation {
+                        id
+                      }
+                      newObservation {
+                        id
+                      }
+                    }
+                  }
+                """,
+                expected = List(s"Cannot clone calibration observations: $cid").asLeft
+              )
+    } yield ()
   }
 
 }
