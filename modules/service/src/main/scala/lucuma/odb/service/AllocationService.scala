@@ -8,13 +8,13 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.util.Codecs.*

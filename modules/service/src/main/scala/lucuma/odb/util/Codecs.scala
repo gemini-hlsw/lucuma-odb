@@ -18,6 +18,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.ScienceBand
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
@@ -57,7 +58,6 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
