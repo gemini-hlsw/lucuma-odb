@@ -13,7 +13,7 @@ import lucuma.core.math.HourAngle
 import lucuma.core.math.RightAscension
 import lucuma.core.math.skycalc.ImprovedSkyCalc
 import lucuma.core.model.ObservingNight
-import lucuma.odb.data.DateInterval
+import lucuma.core.util.DateInterval
 import lucuma.odb.graphql.binding.*
 
 import java.time.Duration

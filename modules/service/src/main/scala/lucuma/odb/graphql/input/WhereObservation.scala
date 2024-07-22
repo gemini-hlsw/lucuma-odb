@@ -11,8 +11,8 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
 object WhereObservation {

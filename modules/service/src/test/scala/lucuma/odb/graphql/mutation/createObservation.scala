@@ -30,6 +30,7 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
@@ -47,7 +48,6 @@ import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
