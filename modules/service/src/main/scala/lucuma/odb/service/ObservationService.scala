@@ -153,6 +153,12 @@ object ObservationService {
       "hourAngle constraint requires both minHours and maxHours."
     )
 
+  val MissingScienceBandConstraint: DatabaseConstraint =
+    DatabaseConstraint(
+      "obs_status_science_band",
+      "a science band must be assigned to ready, executing or executed observations"
+    )
+
   val BothExplicitCoordinatesConstraint: DatabaseConstraint =
     DatabaseConstraint(
       "explicit_base_neither_or_both",
@@ -166,6 +172,7 @@ object ObservationService {
     List(
       MissingAirMassConstraint,
       MissingHourAngleConstraint,
+      MissingScienceBandConstraint,
       BothExplicitCoordinatesConstraint
     )
 
@@ -244,6 +251,9 @@ object ObservationService {
                   }
                 }
               }
+          }.recoverWith {
+             case SqlState.CheckViolation(ex) =>
+               OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
           }
         }
 
@@ -407,7 +417,7 @@ object ObservationService {
             _ <- moveObservations(SET.group, SET.groupIndex, which)
             r <- updates.value.recoverWith {
                    case SqlState.CheckViolation(ex) =>
-                    OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                     OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
