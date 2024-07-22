@@ -36,7 +36,7 @@ import lucuma.odb.sequence.data.SciExposureTime
  * @tparam L filter enumeration
  * @tparam U FPU enumeration
  */
-sealed abstract class CoreGenerator[S, D, G, L, U](
+sealed abstract class PureLongSlit[S, D, G, L, U](
   static:      S,
   acqFilters:  NonEmptyList[L],
   acqSequence: Acquisition[D, G, L, U],
@@ -74,9 +74,9 @@ sealed abstract class CoreGenerator[S, D, G, L, U](
 }
 
 
-object CoreGenerator {
+object PureLongSlit {
 
-  object GmosNorth extends CoreGenerator(
+  object GmosNorth extends PureLongSlit(
     StaticConfig.GmosNorth(
       FollowXy,
       HamamatsuNorth,
@@ -88,7 +88,7 @@ object CoreGenerator {
     Science.GmosNorth
   )
 
-  object GmosSouth extends CoreGenerator(
+  object GmosSouth extends PureLongSlit(
     StaticConfig.GmosSouth(
       FollowXyz,
       HamamatsuSouth,
