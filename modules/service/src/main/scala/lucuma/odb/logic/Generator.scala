@@ -323,7 +323,7 @@ object Generator {
         config: gmos.longslit.Config.GmosNorth
       ): EitherT[F, Error, (GmosNorth[F], IdBase.Acq, IdBase.Sci)] =
         protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosNorth(exp.gmosNorth).forConfig(config),
+          gmos.longslit.LongSlit.gmosNorth(exp.gmosNorth).forConfig(config).scienceTarget,
           ctx,
           calculator.gmosNorth
         )(_.selectGmosNorthCompletionState(ctx.oid))
@@ -333,7 +333,7 @@ object Generator {
         config: gmos.longslit.Config.GmosSouth
       ): EitherT[F, Error, (GmosSouth[F], IdBase.Acq, IdBase.Sci)] =
         protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosSouth(exp.gmosSouth).forConfig(config),
+          gmos.longslit.LongSlit.gmosSouth(exp.gmosSouth).forConfig(config).scienceTarget,
           ctx,
           calculator.gmosSouth
         )(_.selectGmosSouthCompletionState(ctx.oid))

@@ -26,16 +26,24 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 
+trait LongSlit[F[_], S, D] {
+
+  def scienceTarget: Generator[F, S, D]
+
+  def spectoPhotometric: Generator[F, S, D]
+
+}
+
 /**
  * GMOS Long Slit generators.
  */
 object LongSlit {
 
   private def instantiate[F[_]: Concurrent, S, D, G, L, U](
-    pureGen:  CoreGenerator[S, D, G, L, U],
+    pureGen:  PureLongSlit[S, D, G, L, U],
     expander: SmartGcalExpander[F, D],
     config:   Config[G, L, U]
-  ): Generator[F, S, D] =
+  ): LongSlit[F, S, D] =
 
     // Creates a smart arc as a single step in an atom with a given description
     def smartArc(description: String, d: D): ProtoAtom[ProtoStep[D]] =
@@ -150,47 +158,52 @@ object LongSlit {
          }
       }
 
+    new LongSlit[F, S, D] {
+      override def scienceTarget: Generator[F, S, D] =
+        new Generator[F, S, D] {
 
-    new Generator[F, S, D] {
+          def generate(
+            acquisitionItc: IntegrationTime,
+            scienceItc:     IntegrationTime,
+            completion:     Completion.Matcher[D]
+          ): Either[String, ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[D]], Long)]]] =
+            pureGen
+              .generate(acquisitionItc, scienceItc, config)
+              .map { p =>
+                p.mapSequences(
+                  defaultExpandAndFilter(expander, completion.acq), // acquisition
+                  scienceSequence(completion.sci)                   // science
+                )
+              }
 
-      def generate(
-        acquisitionItc: IntegrationTime,
-        scienceItc:     IntegrationTime,
-        completion:     Completion.Matcher[D]
-      ): Either[String, ProtoExecutionConfig[F, S, Either[String, (ProtoAtom[ProtoStep[D]], Long)]]] =
-        pureGen
-          .generate(acquisitionItc, scienceItc, config)
-          .map { p =>
-            p.mapSequences(
-              defaultExpandAndFilter(expander, completion.acq), // acquisition
-              scienceSequence(completion.sci)                   // science
-            )
-          }
+        }
 
+      override def spectoPhotometric: Generator[F, S, D] =
+        ???
     }
 
-  case class GmosNorthGenerator[F[_]: Concurrent](
+  case class GmosNorthLongSlit[F[_]: Concurrent](
     expander: SmartGcalExpander[F, DynamicConfig.GmosNorth]
   ) {
-    def forConfig(c: Config.GmosNorth): Generator[F, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
-      instantiate(CoreGenerator.GmosNorth, expander, c)
+    def forConfig(c: Config.GmosNorth): LongSlit[F, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
+      instantiate(PureLongSlit.GmosNorth, expander, c)
   }
 
-  case class GmosSouthGenerator[F[_]: Concurrent](
+  case class GmosSouthLongSlit[F[_]: Concurrent](
     expander: SmartGcalExpander[F, DynamicConfig.GmosSouth]
   ) {
-    def forConfig(c: Config.GmosSouth): Generator[F, StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
-      instantiate(CoreGenerator.GmosSouth, expander, c)
+    def forConfig(c: Config.GmosSouth): LongSlit[F, StaticConfig.GmosSouth, DynamicConfig.GmosSouth] =
+      instantiate(PureLongSlit.GmosSouth, expander, c)
   }
 
   def gmosNorth[F[_]: Concurrent](
     expander: SmartGcalExpander[F, DynamicConfig.GmosNorth]
-  ): GmosNorthGenerator[F] =
-    GmosNorthGenerator(expander)
+  ): GmosNorthLongSlit[F] =
+    GmosNorthLongSlit(expander)
 
   def gmosSouth[F[_]: Concurrent](
     expander: SmartGcalExpander[F, DynamicConfig.GmosSouth]
-  ): GmosSouthGenerator[F] =
-    GmosSouthGenerator(expander)
+  ): GmosSouthLongSlit[F] =
+    GmosSouthLongSlit(expander)
 
 }
