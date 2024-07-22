@@ -11,10 +11,10 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.optics.Format
+import lucuma.core.util.DateInterval
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.DateInterval
 import org.typelevel.cats.time.given
 
 import java.time.LocalDate
