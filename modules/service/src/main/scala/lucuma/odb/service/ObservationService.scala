@@ -49,9 +49,9 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent

@@ -6,11 +6,11 @@ package lucuma.odb.json
 import io.circe.Encoder
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
+import lucuma.core.util.DateInterval
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.arb.ArbTimeSpan
 import lucuma.core.util.arb.ArbTimestampInterval
-import lucuma.odb.data.DateInterval
 import munit.DisciplineSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Cogen
