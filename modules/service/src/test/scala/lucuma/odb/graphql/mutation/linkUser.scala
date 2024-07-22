@@ -7,11 +7,11 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.ScienceBand
 
 class linkUser extends OdbSuite {
 

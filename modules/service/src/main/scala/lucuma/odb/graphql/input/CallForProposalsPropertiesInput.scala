@@ -15,8 +15,8 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Semester
 import lucuma.core.syntax.string.*
+import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*

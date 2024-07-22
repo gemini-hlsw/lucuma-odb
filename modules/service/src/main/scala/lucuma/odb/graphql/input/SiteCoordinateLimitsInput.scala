@@ -7,7 +7,7 @@ package input
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import lucuma.core.enums.Site
-import lucuma.odb.data.DateInterval
+import lucuma.core.util.DateInterval
 import lucuma.odb.graphql.binding.*
 
 object SiteCoordinateLimitsInput {

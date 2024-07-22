@@ -12,13 +12,13 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 import monocle.Focus
 import monocle.Lens

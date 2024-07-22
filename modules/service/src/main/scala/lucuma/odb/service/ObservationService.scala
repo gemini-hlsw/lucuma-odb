@@ -23,6 +23,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
@@ -48,9 +49,9 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.DateInterval
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.Absent
@@ -60,7 +61,6 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
