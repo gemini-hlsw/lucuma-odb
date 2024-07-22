@@ -19,6 +19,7 @@ import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
@@ -54,7 +55,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given

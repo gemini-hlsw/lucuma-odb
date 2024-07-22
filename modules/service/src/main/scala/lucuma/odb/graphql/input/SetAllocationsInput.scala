@@ -7,8 +7,8 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Program
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.binding.*
 
 case class SetAllocationsInput(

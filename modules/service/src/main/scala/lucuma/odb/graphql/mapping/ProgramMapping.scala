@@ -16,6 +16,7 @@ import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -24,7 +25,6 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView

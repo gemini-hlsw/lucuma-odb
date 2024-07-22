@@ -10,11 +10,11 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
-import lucuma.odb.data.ScienceBand
 import lucuma.odb.graphql.input.AllocationInput
 
 class observations extends OdbSuite {

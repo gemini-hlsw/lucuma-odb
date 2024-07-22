@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ScienceBand
+import lucuma.core.enums.ScienceBand
 
 val ScienceBandBinding: Matcher[ScienceBand] =
   enumeratedBinding
