@@ -307,7 +307,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
       sc  <- Resource.eval(Http4sWebSocketClient.of[IO, Nothing](uri)(using Async[IO], Logger[IO], sbe))
       ps   = Map("Authorization" -> Json.fromString(s"Bearer ${Gid[User.Id].fromString.reverseGet(user.id)}"))
-      _   <- Resource.make(sc.connect() *> sc.initialize(ps.pure[IO]))(_ => sc.terminate() *> sc.disconnect())
+      _   <- Resource.make(sc.connect(ps.pure[IO]))(_ => sc.disconnect())
     } yield sc
 
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
