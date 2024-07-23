@@ -17,6 +17,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import fs2.Stream
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
@@ -39,6 +40,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
@@ -166,10 +168,21 @@ object Generator {
         s"The generated sequence is too long (more than $SequenceAtomLimit atoms)."
     }
 
+    case class NotImplemented(
+      instrument:      Instrument,
+      calibrationRole: Option[CalibrationRole]
+    ) extends Error {
+      def format: String =
+        s"${instrument.longName} ${calibrationRole.fold("science")(_.tag)} observation sequence generation not supported."
+    }
+
     val sequenceTooLong: Error = SequenceTooLong
 
     def missingSmartGcalDef(key: String): Error =
       MissingSmartGcalDef(key)
+
+    def notImplemented(instrument: Instrument, calibrationRole: Option[CalibrationRole]): Error =
+      NotImplemented(instrument, calibrationRole)
   }
 
   private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
@@ -303,18 +316,12 @@ object Generator {
       )(
         comp: Transaction[F] ?=> SequenceService[F] => F[Completion.Matcher[D]]
       ): EitherT[F, Error, (ExpandedAndEstimatedProtoExecutionConfig[F, S, D], IdBase.Acq, IdBase.Sci)] =
-        EitherT.liftF(services.transactionally { comp(sequenceService) }).flatMap { m =>
-          EitherT.fromEither(
-            gen
-              .generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
-              .bimap(
-                msg   => InvalidData(ctx.oid, msg),
-                proto => (
-                  proto.mapBothSequences(calc.estimateSequence(proto.static)),
-                  IdBase.Acq(m.acq.idBase),
-                  IdBase.Sci(m.sci.idBase)
-                )
-              )
+        EitherT.liftF(services.transactionally { comp(sequenceService) }).map { m =>
+          val p = gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
+          (
+            p.mapBothSequences(calc.estimateSequence(p.static)),
+            IdBase.Acq(m.acq.idBase),
+            IdBase.Sci(m.sci.idBase)
           )
         }
 
@@ -322,21 +329,23 @@ object Generator {
         ctx:    Context,
         config: gmos.longslit.Config.GmosNorth
       ): EitherT[F, Error, (GmosNorth[F], IdBase.Acq, IdBase.Sci)] =
-        protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosNorth(exp.gmosNorth).forConfig(config).scienceTarget,
-          ctx,
-          calculator.gmosNorth
-        )(_.selectGmosNorthCompletionState(ctx.oid))
+        val gen = gmos.longslit.LongSlit.gmosNorth(config, exp.gmosNorth, None)
+                      .toRight(Error.notImplemented(Instrument.GmosNorth, None))
+        for {
+          g <- EitherT.fromEither(gen)
+          t <- protoExecutionConfig(g, ctx, calculator.gmosNorth)(_.selectGmosNorthCompletionState(ctx.oid))
+        } yield t
 
       private def gmosSouthLongSlit(
         ctx:    Context,
         config: gmos.longslit.Config.GmosSouth
       ): EitherT[F, Error, (GmosSouth[F], IdBase.Acq, IdBase.Sci)] =
-        protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosSouth(exp.gmosSouth).forConfig(config).scienceTarget,
-          ctx,
-          calculator.gmosSouth
-        )(_.selectGmosSouthCompletionState(ctx.oid))
+        val gen = gmos.longslit.LongSlit.gmosSouth(config, exp.gmosSouth, None)
+                      .toRight(Error.notImplemented(Instrument.GmosSouth, None))
+        for {
+          g <- EitherT.fromEither(gen)
+          t <- protoExecutionConfig(g, ctx, calculator.gmosSouth)(_.selectGmosSouthCompletionState(ctx.oid))
+        } yield t
 
       private def calcDigestFromContext(
         ctx: Context

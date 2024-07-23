@@ -27,20 +27,24 @@ import lucuma.odb.sequence.data.SciExposureTime
  *
  * @tparam D dynamic config type
  * @tparam G grating type
- * @tparam F filter type
+ * @tparam L filter type
  * @tparam U FPU type
  */
-trait ScienceAtomSequenceState[D, G, F, U] extends SequenceState[D] {
+trait ScienceAtomSequenceState[D, G, L, U] extends SequenceState[D] {
 
-  def optics: DynamicOptics[D, G, F, U]
+  def optics: DynamicOptics[D, G, L, U]
 
-  def sequence(
-    mode: Config[G, F, U],
+  def stream(
+    mode:         Config[G, L, U],
+    exposureTime: SciExposureTime
+  ): Stream[Pure, ScienceAtom[D]]
+
+  def unfold(
+    mode: Config[G, L, U],
     time: SciExposureTime,
     Δλs:  Stream[Pure, WavelengthDither],
     qs:   Stream[Pure, Offset.Q]
-  ): Stream[Pure, ScienceAtom[D]] =
-
+  ): Stream[Pure, ScienceAtom[D]] = {
     val λ = mode.centralWavelength
 
     val init = (for {
@@ -70,5 +74,5 @@ trait ScienceAtomSequenceState[D, G, F, U] extends SequenceState[D] {
       val a = nextAtom(o, wds.head.toList.head, sos.head.toList.head, d)
       Some((a, (o.next, wds.tail, sos.tail, a.science.value)))
     }
-
+  }
 }
