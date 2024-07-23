@@ -60,13 +60,13 @@ object UserInvitationService:
 
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
-      
+
       def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation)(
         using Transaction[F]): F[Result[EmailId]] = {
         val subject: NonEmptyString = NonEmptyString.unsafeFrom(
           s"Invitation to collaborate from ${user.displayName}"
         )
-      
+
         val textMessage: NonEmptyString = NonEmptyString.unsafeFrom(
           s"""${user.displayName} has invited you to collaborate on a Gemini proposal. To accept this invitation go to ${emailConfig.exploreUrl} to log in, then from the upper right menu select "Redeem Invitations" and enter the following key:
           |
@@ -86,7 +86,7 @@ object UserInvitationService:
           .use: pq =>
             pq.unique(emailId, invitationId).as(Result.unit)
 
-      def createInvitationAsPi(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type, partner: Partner): F[Result[UserInvitation]] =
+      def createInvitationAsPi(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type, partner: Option[Partner]): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createInvitationAsPi)
           .use: pq =>
@@ -180,26 +180,26 @@ object UserInvitationService:
       """
         .query(user_invitation)
         .contramap {
-          case (u, CreateUserInvitationInput.Coi(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.Coi, Tag(partner.tag).some, pid)
-          case (u, CreateUserInvitationInput.CoiRO(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.CoiRO, Tag(partner.tag).some, pid)
+          case (u, CreateUserInvitationInput.Coi(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.Coi, partner.map(p => Tag(p.tag)), pid)
+          case (u, CreateUserInvitationInput.CoiRO(pid, e, partner)) => (u.id, pid, e, ProgramUserRole.CoiRO, partner.map(p => Tag(p.tag)), pid)
           case (u, CreateUserInvitationInput.Support(pid, e)) => (u.id, pid, e, ProgramUserRole.Support, none, pid)
         }
 
-    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, Partner), UserInvitation] =
+    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, Option[Partner]), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
           $email_address,
           $program_user_role,
-          $tag,
+          ${tag.opt},
           null
         ) from t_program
         where c_program_id = $program_id
         and c_pi_user_id = $user_id
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, Tag(p.tag), pid, u.id))
+        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.map(p => Tag(p.tag)), pid, u.id))
 
     val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, Option[Tag])] =
       sql"""

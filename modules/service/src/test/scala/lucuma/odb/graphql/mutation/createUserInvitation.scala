@@ -77,6 +77,14 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
+    test(s"invite ${role.toString.toLowerCase} (without partner)") {
+      createProgramAs(pi).flatMap { pid =>
+        createUserInvitationAs(pi, pid, role, partner = None)
+      }
+    }
+  }
+
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)") {
       createProgramAs(pi).flatMap { pid =>

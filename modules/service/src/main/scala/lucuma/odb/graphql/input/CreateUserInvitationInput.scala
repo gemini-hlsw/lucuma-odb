@@ -21,8 +21,8 @@ import lucuma.odb.graphql.binding.ProgramUserRoleBinding
 enum CreateUserInvitationInput:
   def programId: Program.Id
   def recipientEmail: EmailAddress
-  case Coi(programId: Program.Id, recipientEmail: EmailAddress, partner: Partner)
-  case CoiRO(programId: Program.Id, recipientEmail: EmailAddress, partner: Partner)
+  case Coi(programId: Program.Id, recipientEmail: EmailAddress, partner: Option[Partner])
+  case CoiRO(programId: Program.Id, recipientEmail: EmailAddress, partner: Option[Partner])
   case Support(programId: Program.Id, recipientEmail: EmailAddress)
 
 object CreateUserInvitationInput:
@@ -36,8 +36,7 @@ object CreateUserInvitationInput:
         PartnerBinding.Option("partner", rPartner),
       ) =>
         (rProgramId, rRecipientEmail, rRole, rPartner).parTupled.flatMap:
-          case (pid, email, PUR.Coi, Some(p)) => Result(CreateUserInvitationInput.Coi(pid, email, p))
-          case (pid, email, PUR.CoiRO, Some(p)) => Result(CreateUserInvitationInput.CoiRO(pid, email, p))
+          case (pid, email, PUR.Coi, p)        => Result(CreateUserInvitationInput.Coi(pid, email, p))
+          case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p))
           case (pid, email, PUR.Support, None) => Result(CreateUserInvitationInput.Support(pid, email))
-          case (_, _, PUR.Coi | PUR.CoiRO, None) => OdbError.InvalidArgument("A partner must be specified for co-investigator invitations.".some).asFailure
-          case (_, _, PUR.Support, Some(_)) => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
+          case (_, _, PUR.Support, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
