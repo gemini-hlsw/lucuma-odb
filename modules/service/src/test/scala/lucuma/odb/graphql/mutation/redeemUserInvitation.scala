@@ -90,6 +90,41 @@ class redeemUserInvitation extends OdbSuite {
     }
   }
 
+  test("redeem an invitation without partner") {
+    createProgramAs(pi).flatMap { pid =>
+      createUserInvitationAs(pi, pid, partner = None).flatMap { inv =>
+        expect(
+          user = pi2,
+          query = redeem(inv),
+          expected = Right(json"""
+            {
+              "redeemUserInvitation" : {
+                "invitation" : {
+                  "id" : ${UserInvitation.Id.fromString.reverseGet(inv.id)},
+                  "status" : ${InvitationStatus.Redeemed},
+                  "issuer" : {
+                    "id" : ${pi.id}
+                  },
+                  "redeemer" : {
+                    "id" : ${pi2.id}
+                  },
+                  "program" : {
+                    "users" : [
+                      {
+                        "role" : ${ProgramUserRole.Coi.tag.toUpperCase},
+                        "userId" : ${pi2.id}
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          """)
+        )
+      }
+    }
+  }
+
   test("can't redeem an invitation that has been revoked") {
     createProgramAs(pi).flatMap { pid =>
       createUserInvitationAs(pi, pid).flatMap { inv =>
