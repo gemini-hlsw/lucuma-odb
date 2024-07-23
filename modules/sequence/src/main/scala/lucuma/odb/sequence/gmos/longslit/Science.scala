@@ -32,7 +32,7 @@ import scala.annotation.tailrec
  */
 sealed trait Science[D, G, F, U] extends ScienceAtomSequenceState[D, G, F, U] {
 
-  def compute(
+  override def stream(
     mode:          Config[G, F, U],
     exposureTime:  SciExposureTime
   ): Stream[Pure, ScienceAtom[D]] = {
@@ -56,7 +56,7 @@ sealed trait Science[D, G, F, U] extends ScienceAtomSequenceState[D, G, F, U] {
       case os  => Stream.emits(os).repeat
     }
 
-    val seq = sequence(mode, exposureTime, Δλs, qs)
+    val seq = unfold(mode, exposureTime, Δλs, qs)
 
     // If the number of unique configs is reasonably small (as it almost always
     // should be), pre-generate them and then just repeat.  Otherwise, we'll

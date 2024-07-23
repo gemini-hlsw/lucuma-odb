@@ -25,13 +25,13 @@ import lucuma.odb.sequence.data.SciExposureTime
  *
  * @tparam D dynamic config type
  * @tparam G grating type
- * @tparam F filter type
+ * @tparam L filter type
  * @tparam U FPU type
  */
-sealed trait SpectroPhotometric[D, G, F, U] extends ScienceAtomSequenceState[D, G, F, U] {
+sealed trait SpectroPhotometric[D, G, L, U] extends ScienceAtomSequenceState[D, G, L, U] {
 
-  def compute(
-    mode:         Config[G, F, U],
+  override def stream(
+    mode:         Config[G, L, U],
     exposureTime: SciExposureTime
   ): Stream[Pure, ScienceAtom[D]] =
 
@@ -40,7 +40,7 @@ sealed trait SpectroPhotometric[D, G, F, U] extends ScienceAtomSequenceState[D, 
     val Δλs     = Stream.emits(dithers).repeat
     val qs      = Stream(Offset.Q.Zero).repeat
 
-    sequence(mode, exposureTime, Δλs, qs).take(dithers.length)
+    unfold(mode, exposureTime, Δλs, qs).take(dithers.length)
 
 }
 
