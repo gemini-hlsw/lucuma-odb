@@ -60,6 +60,7 @@ import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import skunk.AppliedFragment
+import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
@@ -68,6 +69,11 @@ import skunk.syntax.all.*
 import java.time.Instant
 
 trait CalibrationsService[F[_]] {
+  def setCalibrationRole(
+    oid:  Observation.Id,
+    role: Option[CalibrationRole]
+  )(using Transaction[F]): F[Unit]
+
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
@@ -90,6 +96,12 @@ object CalibrationsService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
+
+      override def setCalibrationRole(
+        oid:  Observation.Id,
+        role: Option[CalibrationRole]
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetCalibrationRole)(oid, role).void
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
         if (size > 0) {
@@ -326,6 +338,13 @@ object CalibrationsService {
     }
 
   object Statements {
+
+    val SetCalibrationRole: Command[(Observation.Id, Option[CalibrationRole])] =
+      sql"""
+        UPDATE t_observation
+        SET c_calibration_role = ${calibration_role.opt}
+        WHERE c_observation_id = $observation_id
+      """.command.contramap((a, b) => (b, a))
 
     def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
       void"UPDATE t_observation " |+|
