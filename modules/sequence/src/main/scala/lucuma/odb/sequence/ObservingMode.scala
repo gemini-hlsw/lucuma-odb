@@ -3,7 +3,10 @@
 
 package lucuma.odb.sequence
 
+import cats.Eq
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 import lucuma.odb.sequence.util.HashBytes
@@ -12,6 +15,20 @@ import lucuma.odb.sequence.util.HashBytes
  * All observing mode options.
  */
 type ObservingMode = GmosNorth | GmosSouth
+
+given Eq[ObservingMode] =
+  Eq.instance {
+    case (a: GmosNorth, b: GmosNorth) => a === b
+    case (a: GmosSouth, b: GmosSouth) => a === b
+    case _                            => false
+  }
+
+extension (self: ObservingMode)
+  def observingModeType: ObservingModeType =
+    self match {
+      case a: GmosNorth => ObservingModeType.GmosNorthLongSlit
+      case b: GmosSouth => ObservingModeType.GmosSouthLongSlit
+    }
 
 object ObservingMode {
 
@@ -28,5 +45,6 @@ object ObservingMode {
         case gs: GmosSouth => gs.hashBytes
       }
   }
+
 
 }

@@ -17,6 +17,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import fs2.Stream
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
@@ -39,6 +40,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams
@@ -166,10 +168,21 @@ object Generator {
         s"The generated sequence is too long (more than $SequenceAtomLimit atoms)."
     }
 
+    case class NotImplemented(
+      instrument:      Instrument,
+      calibrationRole: Option[CalibrationRole]
+    ) extends Error {
+      def format: String =
+        s"${instrument.longName} ${calibrationRole.fold("science")(_.tag)} observation sequence generation not supported."
+    }
+
     val sequenceTooLong: Error = SequenceTooLong
 
     def missingSmartGcalDef(key: String): Error =
       MissingSmartGcalDef(key)
+
+    def notImplemented(instrument: Instrument, calibrationRole: Option[CalibrationRole]): Error =
+      NotImplemented(instrument, calibrationRole)
   }
 
   private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
@@ -303,40 +316,38 @@ object Generator {
       )(
         comp: Transaction[F] ?=> SequenceService[F] => F[Completion.Matcher[D]]
       ): EitherT[F, Error, (ExpandedAndEstimatedProtoExecutionConfig[F, S, D], IdBase.Acq, IdBase.Sci)] =
-        EitherT.liftF(services.transactionally { comp(sequenceService) }).flatMap { m =>
-          EitherT.fromEither(
-            gen
-              .generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
-              .bimap(
-                msg   => InvalidData(ctx.oid, msg),
-                proto => (
-                  proto.mapBothSequences(calc.estimateSequence(proto.static)),
-                  IdBase.Acq(m.acq.idBase),
-                  IdBase.Sci(m.sci.idBase)
-                )
-              )
+        EitherT.liftF(services.transactionally { comp(sequenceService) }).map { m =>
+          val p = gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
+          (
+            p.mapBothSequences(calc.estimateSequence(p.static)),
+            IdBase.Acq(m.acq.idBase),
+            IdBase.Sci(m.sci.idBase)
           )
         }
 
       private def gmosNorthLongSlit(
         ctx:    Context,
-        config: gmos.longslit.Config.GmosNorth
+        config: gmos.longslit.Config.GmosNorth,
+        role:   Option[CalibrationRole]
       ): EitherT[F, Error, (GmosNorth[F], IdBase.Acq, IdBase.Sci)] =
-        protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosNorth(exp.gmosNorth).forConfig(config),
-          ctx,
-          calculator.gmosNorth
-        )(_.selectGmosNorthCompletionState(ctx.oid))
+        val gen = gmos.longslit.LongSlit.gmosNorth(config, exp.gmosNorth, role)
+                      .toRight(Error.notImplemented(Instrument.GmosNorth, role))
+        for {
+          g <- EitherT.fromEither(gen)
+          t <- protoExecutionConfig(g, ctx, calculator.gmosNorth)(_.selectGmosNorthCompletionState(ctx.oid))
+        } yield t
 
       private def gmosSouthLongSlit(
         ctx:    Context,
-        config: gmos.longslit.Config.GmosSouth
+        config: gmos.longslit.Config.GmosSouth,
+        role:   Option[CalibrationRole]
       ): EitherT[F, Error, (GmosSouth[F], IdBase.Acq, IdBase.Sci)] =
-        protoExecutionConfig(
-          gmos.longslit.LongSlit.gmosSouth(exp.gmosSouth).forConfig(config),
-          ctx,
-          calculator.gmosSouth
-        )(_.selectGmosSouthCompletionState(ctx.oid))
+        val gen = gmos.longslit.LongSlit.gmosSouth(config, exp.gmosSouth, role)
+                      .toRight(Error.notImplemented(Instrument.GmosSouth, role))
+        for {
+          g <- EitherT.fromEither(gen)
+          t <- protoExecutionConfig(g, ctx, calculator.gmosSouth)(_.selectGmosSouthCompletionState(ctx.oid))
+        } yield t
 
       private def calcDigestFromContext(
         ctx: Context
@@ -345,11 +356,11 @@ object Generator {
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.exposures.value <= SequenceAtomLimit) *>
         (ctx.params match {
-          case GeneratorParams.GmosNorthLongSlit(_, config) =>
-            gmosNorthLongSlit(ctx, config).flatMap { (p, _, _) => executionDigest(p, calculator.gmosNorth.estimateSetup) }
+          case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
+            gmosNorthLongSlit(ctx, config, role).flatMap { (p, _, _) => executionDigest(p, calculator.gmosNorth.estimateSetup) }
 
-          case GeneratorParams.GmosSouthLongSlit(_, config) =>
-            gmosSouthLongSlit(ctx, config).flatMap { (p, _, _) => executionDigest(p, calculator.gmosSouth.estimateSetup) }
+          case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
+            gmosSouthLongSlit(ctx, config, role).flatMap { (p, _, _) => executionDigest(p, calculator.gmosSouth.estimateSetup) }
         })
 
       override def generate(
@@ -367,15 +378,15 @@ object Generator {
         lim: FutureLimit
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match {
-          case GeneratorParams.GmosNorthLongSlit(_, config) =>
+          case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
             for {
-              (p, a, s) <- gmosNorthLongSlit(ctx, config)
+              (p, a, s) <- gmosNorthLongSlit(ctx, config, role)
               r         <- executionConfig(p, ctx.namespace, a, s, lim)
             } yield InstrumentExecutionConfig.GmosNorth(r)
 
-          case GeneratorParams.GmosSouthLongSlit(_, config) =>
+          case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
             for {
-              (p, a, s) <- gmosSouthLongSlit(ctx, config)
+              (p, a, s) <- gmosSouthLongSlit(ctx, config, role)
               r         <- executionConfig(p, ctx.namespace, a, s, lim)
             } yield InstrumentExecutionConfig.GmosSouth(r)
         }

@@ -5,30 +5,19 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
-import cats.data.NonEmptyList
 import cats.syntax.eq.*
-import cats.syntax.option.*
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.ObserveClass
-import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.optics.syntax.lens.*
-import lucuma.core.optics.syntax.optional.*
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
 import scala.annotation.tailrec
@@ -41,14 +30,12 @@ import scala.annotation.tailrec
  * @tparam F filter type
  * @tparam U FPU type
  */
-sealed trait Science[D, G, F, U] extends SequenceState[D] {
+sealed trait Science[D, G, F, U] extends ScienceAtomSequenceState[D, G, F, U] {
 
-  def optics: DynamicOptics[D, G, F, U]
-
-  def compute(
+  override def stream(
     mode:          Config[G, F, U],
     exposureTime:  SciExposureTime
-  ): Stream[Pure, Science.Atom[D]] = {
+  ): Stream[Pure, ScienceAtom[D]] = {
 
     @tailrec def gcd(a: BigInt, b: BigInt): BigInt = if (b === 0) a else gcd(b, a%b)
     def lcm(as: BigInt*): BigInt = as.reduce { (a, b) => a/gcd(a,b)*b }
@@ -60,8 +47,6 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
       math.max(mode.spatialOffsets.size, 1)
     )
 
-    val λ    = mode.centralWavelength
-    val p0   = Offset.P.Zero
     val Δλs  = mode.wavelengthDithers match {
       case Nil => Stream(WavelengthDither.Zero).repeat
       case ws  => Stream.emits(ws).repeat
@@ -71,35 +56,7 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
       case os  => Stream.emits(os).repeat
     }
 
-    def nextAtom(stepOrder: Science.StepOrder, Δ: WavelengthDither, q: Offset.Q, d: D): Science.Atom[D] =
-      (for {
-        w <- optics.wavelength := λ.offset(Δ).getOrElse(λ)
-        s <- scienceStep(Offset(p0, q), ObserveClass.Science)
-        f <- flatStep(ObserveClass.PartnerCal)
-        label = f"q ${Angle.signedDecimalArcseconds.get(q.toAngle)}%.1f″, λ ${Wavelength.decimalNanometers.reverseGet(w.getOrElse(λ))}%.1f nm"
-      } yield Science.Atom(NonEmptyString.unsafeFrom(label), stepOrder, s, f)).runA(d).value
-
-    val init: D =
-      (for {
-        _ <- optics.exposure    := exposureTime.timeSpan
-        _ <- optics.grating     := (mode.grating, GmosGratingOrder.One, λ).some
-        _ <- optics.filter      := mode.filter
-        _ <- optics.fpu         := GmosFpuMask.builtin.reverseGet(mode.fpu).some
-
-        _ <- optics.xBin        := mode.xBin
-        _ <- optics.yBin        := mode.yBin
-        _ <- optics.ampReadMode := mode.ampReadMode
-        _ <- optics.ampGain     := mode.ampGain
-
-        _ <- optics.roi         := mode.roi
-      } yield ()).runS(initialConfig).value
-
-    val seq =
-     Stream.unfold((Science.StepOrder.ScienceThenFlat, Δλs, qs, init)) { case (o, wds, sos, d) =>
-       // TODO: head.toList.head ? there's got to be a better way
-       val a = nextAtom(o, wds.head.toList.head, sos.head.toList.head, d)
-       Some((a, (o.next, wds.tail, sos.tail, a.science.value)))
-     }
+    val seq = unfold(mode, exposureTime, Δλs, qs)
 
     // If the number of unique configs is reasonably small (as it almost always
     // should be), pre-generate them and then just repeat.  Otherwise, we'll
@@ -112,32 +69,6 @@ sealed trait Science[D, G, F, U] extends SequenceState[D] {
 }
 
 object Science {
-
-  enum StepOrder:
-    def next: StepOrder =
-      this match {
-        case ScienceThenFlat => FlatThenScience
-        case FlatThenScience => ScienceThenFlat
-      }
-    case ScienceThenFlat, FlatThenScience
-
-  /**
-   * Science and associated matching flat.
-   */
-  final case class Atom[D](
-    description: NonEmptyString,
-    stepOrder:   StepOrder,
-    science:     ProtoStep[D],
-    flat:        ProtoStep[D]
-  ) {
-
-    def steps: NonEmptyList[ProtoStep[D]] =
-      stepOrder match {
-        case StepOrder.ScienceThenFlat => NonEmptyList.of(science, flat)
-        case StepOrder.FlatThenScience => NonEmptyList.of(flat, science)
-      }
-
-  }
 
   object GmosNorth extends GmosNorthInitialDynamicConfig
                       with Science[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {

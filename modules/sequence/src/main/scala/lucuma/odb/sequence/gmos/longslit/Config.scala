@@ -28,6 +28,7 @@ import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
@@ -51,6 +52,8 @@ import java.io.DataOutputStream
  */
 sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable {
   def grating: G
+
+  def coverage: WavelengthDelta
 
   def filter: Option[L]
 
@@ -171,6 +174,9 @@ object Config {
     explicitSpatialOffsets:    Option[List[Q]]
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
 
+    override def coverage: WavelengthDelta =
+      grating.simultaneousCoverage
+
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
 
@@ -268,6 +274,9 @@ object Config {
     explicitWavelengthDithers: Option[List[WavelengthDither]],
     explicitSpatialOffsets:    Option[List[Q]]
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
+
+    override def coverage: WavelengthDelta =
+      grating.simultaneousCoverage
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
