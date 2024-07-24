@@ -34,6 +34,7 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
@@ -150,7 +151,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
         for {
           ps <- params
-          oms = ps.collect { case Params(oid, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
+          oms = ps.collect { case Params(oid, _, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
           m  <- observingModeServices.selectObservingMode(oms)
         } yield
           ps.groupBy(_.observationId).map { case (oid, oParams) =>
@@ -217,7 +218,7 @@ object GeneratorParamsService {
                   gn.roi.some),
                 λ)
             }
-            .map(GeneratorParams.GmosNorthLongSlit(_, gn))
+            .map(GeneratorParams(_, gn, params.head.calibrationRole))
             .toEither
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
@@ -232,7 +233,7 @@ object GeneratorParamsService {
                   gs.roi.some),
                 λ)
             }
-            .map(GeneratorParams.GmosSouthLongSlit(_, gs))
+            .map(GeneratorParams(_, gs, params.head.calibrationRole))
             .toEither
         }
 
@@ -284,6 +285,7 @@ object GeneratorParamsService {
 
   final case class Params(
     observationId:   Observation.Id,
+    calibrationRole: Option[CalibrationRole],
     constraints:     ConstraintSet,
     signalToNoise:   Option[SignalToNoise],
     signalToNoiseAt: Option[Wavelength],
@@ -304,6 +306,7 @@ object GeneratorParamsService {
 
     val params: Decoder[Params] =
       (observation_id          *:
+       calibration_role.opt    *:
        constraint_set          *:
        signal_to_noise.opt     *:
        wavelength_pm.opt       *:
@@ -316,6 +319,7 @@ object GeneratorParamsService {
     private def ParamColumns(tab: String): String =
       s"""
         $tab.c_observation_id,
+        $tab.c_calibration_role,
         $tab.c_image_quality,
         $tab.c_cloud_extinction,
         $tab.c_sky_background,

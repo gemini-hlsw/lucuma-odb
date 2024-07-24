@@ -31,8 +31,8 @@ class ScienceSuite extends ScalaCheckSuite {
 
   def northSequence(
     ls: Config.GmosNorth,
-  ): Stream[Pure, Science.Atom[GmosNorth]] =
-    Science.GmosNorth.compute(ls, tenMin)
+  ): Stream[Pure, ScienceAtom[GmosNorth]] =
+    Science.GmosNorth.stream(ls, tenMin)
 
   def sequencesEqual[A](
     obtained: Stream[Pure, A],

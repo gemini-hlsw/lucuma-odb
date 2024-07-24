@@ -54,13 +54,13 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
-import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import skunk.AppliedFragment
+import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
@@ -69,6 +69,11 @@ import skunk.syntax.all.*
 import java.time.Instant
 
 trait CalibrationsService[F[_]] {
+  def setCalibrationRole(
+    oid:  Observation.Id,
+    role: Option[CalibrationRole]
+  )(using Transaction[F]): F[Unit]
+
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
@@ -91,6 +96,12 @@ object CalibrationsService {
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
+
+      override def setCalibrationRole(
+        oid:  Observation.Id,
+        role: Option[CalibrationRole]
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetCalibrationRole)(oid, role).void
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
         if (size > 0) {
@@ -129,9 +140,9 @@ object CalibrationsService {
 
       private def uniqueConfiguration(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[GmosNConfigs], List[GmosSConfigs])] = {
         val all: F[List[Config.GmosNorth | Config.GmosSouth]] = services.generatorParamsService.selectAll(pid, selection = selection)
-          .map(_.values.toList.collect {
-            case Right(GeneratorParams.GmosNorthLongSlit(_, mode)) => mode
-            case Right(GeneratorParams.GmosSouthLongSlit(_, mode)) => mode
+          .map(_.values.toList.map(_.map(_.observingMode)).collect {
+            case Right(mode: Config.GmosNorth) => mode
+            case Right(mode: Config.GmosSouth) => mode
           })
 
         val gnLSDiff = all
@@ -327,6 +338,13 @@ object CalibrationsService {
     }
 
   object Statements {
+
+    val SetCalibrationRole: Command[(Observation.Id, Option[CalibrationRole])] =
+      sql"""
+        UPDATE t_observation
+        SET c_calibration_role = ${calibration_role.opt}
+        WHERE c_observation_id = $observation_id
+      """.command.contramap((a, b) => (b, a))
 
     def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
       void"UPDATE t_observation " |+|
