@@ -60,6 +60,7 @@ import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
@@ -222,10 +223,10 @@ object GuideService {
   ) {
     val timeEstimate                         = digest.fullTimeEstimate.sum
     val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
-    val (site, agsParams): (Site, AgsParams) = params match
-      case GeneratorParams.GmosNorthLongSlit(_, mode) =>
+    val (site, agsParams): (Site, AgsParams) = params.observingMode match
+      case mode: gmos.longslit.Config.GmosNorth =>
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side))
-      case GeneratorParams.GmosSouthLongSlit(_, mode) =>
+      case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side))
 
   }

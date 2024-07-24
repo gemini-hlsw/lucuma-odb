@@ -278,7 +278,7 @@ object ItcService {
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
         (for {
-          r <- EitherT(callRemote(params))
+          r <- EitherT(callRemoteItc(params.itc))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
         } yield r).value
 
@@ -293,11 +293,6 @@ object ItcService {
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
-
-      private val itcInputs: GeneratorParams => NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
-        case GeneratorParams.GmosNorthLongSlit(specs, _) => specs
-        case GeneratorParams.GmosSouthLongSlit(specs, _) => specs
-      }
 
       // Selects the asterism result as a whole by selecting all the individual
       // target results.  If any individual result is not found then the asterism
@@ -321,7 +316,8 @@ object ItcService {
               )
             })
 
-        itcInputs(params)
+        params
+          .itc
           .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
           .value
           .map(_.flatMap{ lst =>
@@ -355,7 +351,7 @@ object ItcService {
                val asterismResult: Option[AsterismResult] =
                  params
                    .get(oid)
-                   .map(itcInputs)
+                   .map(_.itc)
                    .flatMap(
                      _.traverse { case (tid, input) =>
                        cachedResults.get(tid).collect { case (h, sciTime, acqTime) if hash(input) === h =>
@@ -376,14 +372,6 @@ object ItcService {
              }
              .collect { case (oid, Some(a)) => (oid, a) }
           )
-
-      private def callRemote(
-        params:   GeneratorParams
-      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
-        params match {
-          case GeneratorParams.GmosNorthLongSlit(itc, _) => callRemoteItc(itc)
-          case GeneratorParams.GmosSouthLongSlit(itc, _) => callRemoteItc(itc)
-        }
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
