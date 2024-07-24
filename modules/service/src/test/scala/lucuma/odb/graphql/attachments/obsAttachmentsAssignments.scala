@@ -81,43 +81,6 @@ class obsAttachmentsAssignments extends ObsAttachmentsSuite {
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
-  def deleteObservation(
-    user: User,
-    oid:  Observation.Id
-  ): IO[Unit] =
-    expect(
-      user = user,
-      query = s"""
-        mutation {
-          updateObservations(
-            input: {
-              WHERE: {
-                id: {
-                  EQ: ${oid.asJson}
-                }
-              }
-              SET: {
-                existence: DELETED
-              }
-            }
-          ) {
-            observations {
-             id
-            }
-          }
-        }
-      """,
-      expected = Right(
-        Json.obj(
-          "updateObservations" -> Json.obj(
-            "observations" -> Json.arr(
-              Json.obj("id" -> oid.asJson)
-            )
-          )
-        )
-      )
-    )
-
   def updateObservation(
     user:  User,
     oid:   Observation.Id,

@@ -138,17 +138,17 @@ object CalibrationsService {
           }
         } else none.pure[F]
 
-      private def uniqueConfiguration(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[GmosNConfigs], List[GmosSConfigs])] = {
-        val all: F[List[Config.GmosNorth | Config.GmosSouth]] = services.generatorParamsService.selectAll(pid, selection = selection)
-          .map(_.values.toList.map(_.map(_.observingMode)).collect {
-            case Right(mode: Config.GmosNorth) => mode
-            case Right(mode: Config.GmosSouth) => mode
+      private def uniqueConfiguration(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[(Observation.Id, GmosNConfigs)], List[(Observation.Id, GmosSConfigs)])] = {
+        val all: F[List[(Observation.Id, Config.GmosNorth) | (Observation.Id, Config.GmosSouth)]] = services.generatorParamsService.selectAll(pid, selection = selection)
+          .map(_.toList.map(_.map(_.map(_.observingMode))).collect {
+            case (oid, Right(mode: Config.GmosNorth)) => (oid, mode)
+            case (oid, Right(mode: Config.GmosSouth)) => (oid, mode)
           })
 
         val gnLSDiff = all
           .map(_.collect {
-              case mode: Config.GmosNorth => mode
-            }.distinctBy(m =>
+              case (oid, mode: Config.GmosNorth) => (oid, mode)
+            }.distinctBy((_, m) =>
                (m.grating,
                 m.filter,
                 m.fpu,
@@ -156,13 +156,14 @@ object CalibrationsService {
                 m.xBin,
                 m.yBin
             ))).map { _.map {
-              case c @ Config.GmosNorth(g, of, f, w, _, _, _, _, _, _, _, _, _) => ((g, of, f, w, c.xBin, c.yBin))
+              case (oid, c @ Config.GmosNorth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
+                (oid, (g, of, f, w, c.xBin, c.yBin))
             }}
 
         val gsLSDiff = all
           .map(_.collect {
-              case mode: Config.GmosSouth => mode
-            }.distinctBy(m =>
+              case (oid, mode: Config.GmosSouth) => (oid, mode)
+            }.distinctBy((_, m) =>
                (m.grating,
                 m.filter,
                 m.fpu,
@@ -170,7 +171,8 @@ object CalibrationsService {
                 m.xBin,
                 m.yBin
             ))).map { _.map {
-              case c @ Config.GmosSouth(g, of, f, w, _, _, _, _, _, _, _, _, _) => ((g, of, f, w, c.xBin, c.yBin))
+              case (oid, c @ Config.GmosSouth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
+                (oid, (g, of, f, w, c.xBin, c.yBin))
             }}
 
         (gnLSDiff, gsLSDiff).tupled
@@ -206,7 +208,14 @@ object CalibrationsService {
             )
           ).orError
 
-      private def calibrationObservations(pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[List[Observation.Id]] = {
+      private def calibrationObservations(
+        pid: Program.Id,
+        gid: Group.Id,
+        gnls: List[GmosNConfigs],
+        gsls: List[GmosSConfigs],
+        gnTgt: Option[Target.Id],
+        gsTgt: Option[Target.Id]
+      )(using Transaction[F]): F[List[Observation.Id]] = {
 
         def gmosNorthLSObservations(gnls: List[GmosNConfigs], tid: Target.Id) =
           gnls.traverse { case (g, of, f, w, xb, yb) =>
@@ -291,7 +300,33 @@ object CalibrationsService {
         } yield ()
       }
 
-      private def spectroPhotometricTargets(when: Instant)(rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]): List[(Target.Id, Coordinates)] =
+      private def removeUnnecessaryCalibrations(
+        calibsNLS: List[(Observation.Id, GmosNConfigs)],
+        gnls: List[(Observation.Id, GmosNConfigs)],
+        calibsSLS: List[(Observation.Id, GmosSConfigs)],
+        gsls: List[(Observation.Id, GmosSConfigs)]
+      )(using Transaction[F]): F[Unit] = {
+        val o1 = calibsNLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
+
+          if (gnls.exists(_._2 === c)) l else oid :: l
+        }
+        val o2 = calibsSLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
+
+          if (gsls.exists(_._2 === c)) l else oid :: l
+        }
+        val oids = o1 ::: o2
+        // delete targets, asterisms and observations
+        (for {
+          tids <- session.execute(Statements.linkedTargets(oids))(oids)
+          _    <- session.executeCommand(Statements.deleteLinkedAsterisms(tids))
+          _    <- session.executeCommand(Statements.deleteTargets(tids))
+          _    <- session.executeCommand(Statements.deleteOldObservation(oids))
+        } yield ()).whenA(oids.nonEmpty).void
+      }
+
+      private def spectroPhotometricTargets(when: Instant)(
+        rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
+      ): List[(Target.Id, Coordinates)] =
         rows.map { case (tid, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
           (tid,
             SiderealTracking(
@@ -330,9 +365,10 @@ object CalibrationsService {
           gnTgt = bestTarget(gncoords, tgts)
           (scienceGmosNLS, scienceGmosSLS) <- uniqueConfiguration(pid, ObservationSelection.Science)
           (calibGmosNLS, calibGmosSLS)     <- uniqueConfiguration(pid, ObservationSelection.Calibration)
-          gnls = scienceGmosNLS.diff(calibGmosNLS)
-          gsls = scienceGmosSLS.diff(calibGmosSLS)
+          gnls  = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
+          gsls  = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
           _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
+          _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
         } yield ()
       }
     }
@@ -349,6 +385,29 @@ object CalibrationsService {
     def setCalibRole(oids: List[Observation.Id], role: CalibrationRole): AppliedFragment =
       void"UPDATE t_observation " |+|
         sql"SET c_calibration_role = $calibration_role "(role) |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
+    def linkedTargets(oids: List[Observation.Id]): Query[List[Observation.Id], Target.Id] =
+      (sql"""
+         SELECT
+           c_target_id
+         FROM t_asterism_target
+         WHERE c_observation_id IN(${observation_id.list(oids.size)})""")
+        .query(target_id)
+
+    def deleteLinkedAsterisms(tids: List[Target.Id]): AppliedFragment =
+      void"DELETE FROM t_asterism_target " |+|
+        void"WHERE c_target_id IN (" |+|
+          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteTargets(tids: List[Target.Id]): AppliedFragment =
+      void"DELETE FROM t_target " |+|
+        void"WHERE c_target_id IN (" |+|
+          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteOldObservation(oids: List[Observation.Id]): AppliedFragment =
+      void"DELETE FROM t_observation " |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
