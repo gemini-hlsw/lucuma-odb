@@ -14,6 +14,7 @@ import lucuma.odb.data.CalibrationRole
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
+
 import java.nio.charset.StandardCharsets.UTF_8
 
 case class GeneratorParams(
