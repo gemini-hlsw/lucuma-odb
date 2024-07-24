@@ -624,5 +624,37 @@ class calibrations extends OdbSuite {
     } yield ()
   }
 
+  test("unnecessary calibrations are removed") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(oid1, tid1) *> prepareObservation(oid2, tid2)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      _    <- deleteObservation(pi, oid2)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    } yield {
+      val oids = gr1.collect { case Right(oid) => oid }
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), _) => true
+        case _                          => false
+      }
+      // Only one calibration as we removed a config
+      assertEquals(cCount, 1)
+      assertEquals(oids.size, 1)
+    }
+  }
 }
 
