@@ -54,7 +54,6 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
-import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
@@ -129,9 +128,9 @@ object CalibrationsService {
 
       private def uniqueConfiguration(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[GmosNConfigs], List[GmosSConfigs])] = {
         val all: F[List[Config.GmosNorth | Config.GmosSouth]] = services.generatorParamsService.selectAll(pid, selection = selection)
-          .map(_.values.toList.collect {
-            case Right(GeneratorParams.GmosNorthLongSlit(_, mode)) => mode
-            case Right(GeneratorParams.GmosSouthLongSlit(_, mode)) => mode
+          .map(_.values.toList.map(_.map(_.observingMode)).collect {
+            case Right(mode: Config.GmosNorth) => mode
+            case Right(mode: Config.GmosSouth) => mode
           })
 
         val gnLSDiff = all
