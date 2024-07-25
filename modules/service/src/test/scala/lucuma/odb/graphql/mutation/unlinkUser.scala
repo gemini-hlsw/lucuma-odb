@@ -14,6 +14,7 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.TimeAccountingCategory
 
 class unlinkUser extends OdbSuite {
 
@@ -145,7 +146,7 @@ class unlinkUser extends OdbSuite {
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
           _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
-          _   <- setOneAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
+          _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
           _   <- unlinkAs(ngo, pi2.id, pid)
         yield ()
       } {

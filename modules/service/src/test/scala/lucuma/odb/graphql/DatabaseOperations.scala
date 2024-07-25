@@ -55,6 +55,7 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
@@ -544,11 +545,11 @@ trait DatabaseOperations { this: OdbSuite =>
   def readAllocations(
     topLevelField: String,
     json:          Json
-  ): IO[Set[(Partner, ScienceBand, BigDecimal)]] =
+  ): IO[Set[(TimeAccountingCategory, ScienceBand, BigDecimal)]] =
     json.hcursor.downFields(topLevelField, "allocations").values.toList.flatten.traverse { obj =>
       val c = obj.hcursor
       (for {
-        p <- c.downField("partner").as[Partner]
+        p <- c.downField("category").as[TimeAccountingCategory]
         b <- c.downField("scienceBand").as[ScienceBand]
         d <- c.downFields("duration", "hours").as[BigDecimal]
       } yield (p, b, d))
@@ -570,7 +571,7 @@ trait DatabaseOperations { this: OdbSuite =>
             allocations: ${allocations.map { a =>
               s"""
                 {
-                  partner: ${a.partner.tag.toScreamingSnakeCase}
+                  category: ${a.category.tag.toScreamingSnakeCase}
                   scienceBand: ${a.scienceBand.tag.toScreamingSnakeCase}
                   duration: {
                     hours: "${a.duration.toHours}"
@@ -580,7 +581,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }.mkString("[\n", ",\n", "]")}
           }) {
             allocations {
-              partner
+              category
               scienceBand
               duration { hours }
             }
@@ -592,11 +593,11 @@ trait DatabaseOperations { this: OdbSuite =>
   def setOneAllocationAs(
     user: User,
     pid: Program.Id,
-    partner: Partner,
+    category: TimeAccountingCategory,
     scienceBand: ScienceBand,
     duration: TimeSpan,
   ): IO[Json] =
-    setAllocationsAs(user, pid, List(AllocationInput(partner, scienceBand, duration)))
+    setAllocationsAs(user, pid, List(AllocationInput(category, scienceBand, duration)))
 
   def linkAs(
     user: User,

@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -18,6 +17,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
@@ -1817,7 +1817,7 @@ class updateObservations extends OdbSuite
   test("update scienceBand") {
     for {
       pid <- createProgramAs(pi)
-      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan)))
       oid <- createObservationAs(pi, pid)
       _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
       b1  <- observationsWhere(pi, "scienceBand: { EQ: BAND2 }")
@@ -1827,7 +1827,7 @@ class updateObservations extends OdbSuite
   test("null scienceBand") {
     for {
       pid <- createProgramAs(pi)
-      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan)))
       oid <- createObservationAs(pi, pid)
       _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
       _   <- setScienceBandAs(pi, oid, none[ScienceBand])
@@ -1838,7 +1838,7 @@ class updateObservations extends OdbSuite
   test("attempt to assign an invalid scienceBand") {
     for {
       pid <- createProgramAs(pi)
-      _   <- setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)))
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan)))
       oid <- createObservationAs(pi, pid)
       _   <- expect(pi,
         s"""
@@ -1882,7 +1882,7 @@ class updateObservations extends OdbSuite
   test("constraint set: science band / ready set together") {
     for
       pid <- createProgramAs(pi)
-      _   <- setOneAllocationAs(staff, pid, Partner.US, ScienceBand.Band1, 1.hourTimeSpan)
+      _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan)
       oid <- createObservationAs(pi, pid)
       _   <- expect(
         user   = pi,
