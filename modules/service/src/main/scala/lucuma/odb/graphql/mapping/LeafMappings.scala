@@ -51,6 +51,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
@@ -170,6 +171,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[TimeAccountingCategory](TimeAccountingCategoryType),
       LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),

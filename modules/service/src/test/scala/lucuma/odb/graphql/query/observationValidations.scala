@@ -12,7 +12,6 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
@@ -22,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
@@ -513,8 +513,8 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
 
   test("invalid band") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan),
-      AllocationInput(Partner.CA, ScienceBand.Band2, 4.hourTimeSpan)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
     )
 
     val setup: IO[Observation.Id] =

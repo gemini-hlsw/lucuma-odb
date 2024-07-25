@@ -60,6 +60,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
@@ -481,6 +482,9 @@ trait Codecs {
 
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
+
+  val time_accounting_category: Codec[TimeAccountingCategory] =
+    enumerated(Type.varchar)
 
   val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
     enumerated(Type("e_time_charge_correction_op"))
