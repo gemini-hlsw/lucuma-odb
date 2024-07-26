@@ -988,6 +988,11 @@ enum EditType {
   EditType Updated
   """
   UPDATED
+
+  """
+  EditType Deleted
+  """
+  DELETED
 }
 
 """

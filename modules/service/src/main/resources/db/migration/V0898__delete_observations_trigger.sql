@@ -4,10 +4,13 @@ DROP FUNCTION ch_observation_edit();
 CREATE OR REPLACE FUNCTION ch_observation_edit()
   RETURNS trigger AS $$
 DECLARE
-  observation record;
 BEGIN
-  observation := COALESCE(NEW, OLD);
-  PERFORM pg_notify('ch_observation_edit', observation.c_observation_id || ',' || observation.c_program_id || ',' || TG_OP);
+  IF (TG_OP = 'DELETE') THEN
+    PERFORM pg_notify('ch_observation_edit', OLD.c_observation_id || ',' || OLD.c_program_id  || ',' || TG_OP);
+  END IF;
+  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+    PERFORM pg_notify('ch_observation_edit', NEW.c_observation_id || ',' || NEW.c_program_id  || ',' || TG_OP);
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -44,11 +47,12 @@ DECLARE
 BEGIN
   -- notify old group, if any
   IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
-    PERFORM pg_notify('ch_group_edit', coalesce(NEW.c_group_id, OLD.c_group_id) || ',' || coalesce(NEW.c_program_id, OLD.c_program_id) || ',' || TG_OP);
+    PERFORM pg_notify('ch_group_edit', coalesce(OLD.c_group_id, 'null') || ',' || coalesce(NEW.c_program_id, OLD.c_program_id, 'null') || ',' || TG_OP);
   END IF;
   -- notify new group, if any
   IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
-      PERFORM pg_notify('ch_group_edit', coalesce(NEW.c_group_id, OLD.c_group_id) || ',' || coalesce(NEW.c_program_id, OLD.c_program_id) || ',' || TG_OP);
+      -- PERFORM pg_notify('ch_group_edit', TG_OP || coalesce(NEW.c_group_id, 'null1') || ',' || coalesce(OLD.c_group_id, 'null2') || ',' || coalesce(NEW.c_program_id, 'null3') || ',' || coalesce(OLD.c_program_id, 'null3') || ',' ||  TG_OP);
+      PERFORM pg_notify('ch_group_edit', coalesce(NEW.c_group_id, 'null') || ',' || coalesce(NEW.c_program_id, OLD.c_program_id, 'null') || ',' || TG_OP);
   END IF;
   RETURN NEW; -- n.b. doesn't matter, it's an AFTER trigger
 END;
