@@ -49,7 +49,6 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.CalibrationRole
-import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -219,9 +218,6 @@ trait Codecs {
       a => Declination.fromAngle.getOption(a).toRight(s"Invalid declination: $a"))(
       Declination.fromAngle.reverseGet
     )
-
-  val edit_type: Codec[EditType] =
-    enumerated(Type("e_edit_type"))
 
   val email_address: Codec[EmailAddress] =
     codecFromPrism(EmailAddress.from, Type("citext"))

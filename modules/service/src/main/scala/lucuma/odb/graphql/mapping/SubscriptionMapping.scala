@@ -18,6 +18,7 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.EditType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
@@ -147,7 +148,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                 i.groupId match
                   case Nullable.Absent       => true
                   case Nullable.Null         => e.groupId.isEmpty
-                  case Nullable.NonNull(gid) => e.groupId.exists(_ == gid)            
+                  case Nullable.NonNull(gid) => e.groupId.exists(_ == gid)
           }
         }
         .map { e =>
@@ -164,16 +165,16 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
           Result(
             Environment(
-              Env("editType" -> e.editType, "programId" -> e.programId), 
+              Env("editType" -> e.editType, "programId" -> e.programId),
               Unique(
                 Filter(
                   Predicates.groupEdit.program.id.eql(e.programId),
                   addValueFilter(child)
                 )
-              )                
+              )
             )
           )
-          
+
         }
     }
 
