@@ -8,9 +8,10 @@ package mapping
 import grackle.Result
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.ProgramTable
 
 
-trait ObservationEditMapping[F[_]] extends ObservationView[F] {
+trait ObservationEditMapping[F[_]] extends ObservationView[F] with ProgramTable[F] {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ObservationEditMapping: ObjectMapping =
@@ -18,7 +19,7 @@ trait ObservationEditMapping[F[_]] extends ObservationView[F] {
       SqlField("synthetic-id", ObservationView.Id, key = true, hidden = true),
       CursorField("id", _ => Result(0L), List("synthetic-id")),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
-      SqlObject("value")
+      SqlObject("value", Join(List(ProgramTable.Id -> ObservationView.ProgramId)))
     )
 
 }

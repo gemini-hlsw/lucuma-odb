@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package subscription
 
+import cats.data.NonEmptyList
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
@@ -79,7 +80,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
   def subtitleUpdated(subtitle: String): Json =
     subtitleObservationEdit(EditType.Updated, subtitle)
 
-  val titleSubscription = 
+  val titleSubscription =
     s"""
       subscription {
         observationEdit {
@@ -102,7 +103,15 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         )
       )
     )
-  
+
+  def calibrationDeleted(oid: Observation.Id): Json =
+    Json.obj(
+      "observationEdit" -> Json.obj(
+        "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
+        "value"    -> Json.Null
+      )
+    )
+
   def updateTargetName(user: User, tid: Target.Id, name: String) =
     sleep >>
       query(
@@ -252,7 +261,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED","id":0}}""")
     )
   }
-  
+
   test("triggers for adding target to observation") {
     import Group1.pi
 
@@ -343,6 +352,30 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         mutations =
           Right(updateTargetEpoch(pi, tid0, Epoch.B1950)),
         expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "Zero"))
+      )
+    } yield ()
+  }
+
+  test("triggers for deleting an observation") {
+    import Group1.pi
+    def deleteCalibrationObservation(oid: Observation.Id) =
+      withServices(Group1.service) { services =>
+        services.session.transaction.use { xa =>
+          services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
+        }
+      }
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      // An observation with a single target is essentially a calib observation
+      oid <- createObservationAs(pi, pid, None, tid0)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = titleSubscription,
+        mutations =
+          Right(deleteCalibrationObservation(oid)),
+        expected  = List(calibrationDeleted(oid))
       )
     } yield ()
   }
