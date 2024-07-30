@@ -99,15 +99,16 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .observation
         .subscribe(1024)
         .filter { e =>
-          e.canRead(user) &&
-          input.flatMap(_.programId).forall(_ === e.programId) &&
-          input.flatMap(_.observationId).forall(_ === e.observationId)
+          e.canRead(user) && ((
+            input.flatMap(_.programId).forall(_ === e.programId) &&
+            input.flatMap(_.observationId).forall(_ === e.observationId)
+          ) || e.editType === EditType.Deleted)
         }
         .map { e =>
           Result(
             Environment(
               Env("editType" -> e.editType),
-              Unique(Filter(Predicates.observationEdit.value.id.eql(e.observationId), child))
+              Filter(Predicates.observationEdit.value.id.eql(e.observationId), child)
             )
           )
         }

@@ -51,14 +51,13 @@ object GroupTopic {
   /** Infinite stream of group id, program id, event id, and edit type. */
   def updates[F[_]: Logger](s: Session[F], maxQueued: Int): Stream[F, (Option[Group.Id], Program.Id, EditType)] =
     s.channel(id"ch_group_edit").listen(maxQueued).flatMap { n =>
-      println(n.value)
       n.value.split(",") match {
         case Array(_oid, _pid, _tg_op) =>
           (Gid[Group.Id].fromString.getOption(_oid), Gid[Program.Id].fromString.getOption(_pid), EditType.fromTgOp(_tg_op)) match {
             case (gid, Some(pid), Some(op)) => Stream((gid, pid, op))
-            case _                          => Stream.exec(Logger[F].warn(s"Invalid o group and/or event: $n"))
+            case _                          => Stream.exec(Logger[F].warn(s"Invalid group and/or event: $n"))
           }
-        case _ => Stream.exec(Logger[F].warn(s"Invalid group 1 and/or event: $n"))
+        case _ => Stream.exec(Logger[F].warn(s"Invalid group and/or event: $n"))
       }
     }
 
