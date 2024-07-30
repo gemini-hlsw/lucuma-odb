@@ -10,20 +10,20 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
 import lucuma.core.model.Access
 import lucuma.core.model.Group
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
+import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.core.model.Observation
-import lucuma.odb.graphql.input.ObservationPropertiesInput
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]

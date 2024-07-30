@@ -4,12 +4,12 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.odb.graphql.binding.GroupIdBinding
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ObservationIdBinding
-import lucuma.odb.graphql.binding.GroupIdBinding
-import grackle.Result
 
 final case class GroupElementInput(value: Either[Group.Id, Observation.Id])
 
