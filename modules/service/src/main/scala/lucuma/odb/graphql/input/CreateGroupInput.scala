@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import lucuma.core.model.Group
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.odb.graphql.binding.*
-import lucuma.core.model.Group
-import lucuma.core.model.Observation
 
 case class CreateGroupInput(
   programId:         Option[Program.Id],
