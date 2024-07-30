@@ -301,54 +301,6 @@ object CalibrationsService {
         } yield ()
       }
 
-      val existenceOff = ObservationPropertiesInput.Edit(
-        Nullable.Absent,
-        None,
-        None,
-        Nullable.Absent,
-        Nullable.Absent,
-        None,
-        None,
-        None,
-        Nullable.Absent,
-        Nullable.Absent,
-        None,
-        Nullable.Absent,
-        Some(Existence.Deleted),
-        Nullable.Null,
-        None,
-        Nullable.Absent
-      )
-
-      private def removeUnnecessaryCalibrations(
-        calibsNLS: List[(Observation.Id, GmosNConfigs)],
-        gnls: List[(Observation.Id, GmosNConfigs)],
-        calibsSLS: List[(Observation.Id, GmosSConfigs)],
-        gsls: List[(Observation.Id, GmosSConfigs)]
-      )(using Transaction[F]): F[Unit] = {
-        val o1 = calibsNLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
-
-          if (gnls.exists(_._2 === c)) l else oid :: l
-        }
-        val o2 = calibsSLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
-
-          if (gsls.exists(_._2 === c)) l else oid :: l
-        }
-        val oids = o1 ::: o2
-        println(s"Delet ${oids}")
-        // delete targets, asterisms and observations
-        (for {
-          // _    <- oids.traverse(o => session.execute(Statements.removeObsFromGroups(o))(o))
-          _    <- oids.traverse(o =>
-                    services.observationService.updateObservations(existenceOff, sql"$observation_id"(o))
-                  )
-          tids <- session.execute(Statements.linkedTargets(oids))(oids)
-          _    <- session.executeCommand(Statements.deleteLinkedAsterisms(tids))
-          _    <- session.executeCommand(Statements.deleteTargets(tids))
-          _    <- session.executeCommand(Statements.deleteOldObservation(oids))
-        } yield ()).whenA(oids.nonEmpty).void
-      }
-
       private def spectroPhotometricTargets(when: Instant)(
         rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
       ): List[(Target.Id, Coordinates)] =
@@ -393,7 +345,7 @@ object CalibrationsService {
           gnls  = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
           gsls  = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
           _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
-          _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
+          // _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
         } yield ()
       }
     }
@@ -412,34 +364,6 @@ object CalibrationsService {
         sql"SET c_calibration_role = $calibration_role "(role) |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-
-    def linkedTargets(oids: List[Observation.Id]): Query[List[Observation.Id], Target.Id] =
-      (sql"""
-         SELECT
-           c_target_id
-         FROM t_asterism_target
-         WHERE c_observation_id IN(${observation_id.list(oids.size)})""")
-        .query(target_id)
-
-    def deleteLinkedAsterisms(tids: List[Target.Id]): AppliedFragment =
-      void"DELETE FROM t_asterism_target " |+|
-        void"WHERE c_target_id IN (" |+|
-          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
-
-    def deleteTargets(tids: List[Target.Id]): AppliedFragment =
-      void"DELETE FROM t_target " |+|
-        void"WHERE c_target_id IN (" |+|
-          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
-
-    def deleteOldObservation(oids: List[Observation.Id]): AppliedFragment =
-      void"DELETE FROM t_observation " |+|
-        void"WHERE c_observation_id IN (" |+|
-          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-
-    def removeObsFromGroups(oid: Observation.Id): Query[Observation.Id, Unit] =
-      sql"""
-        SELECT group_move_observation($observation_id, null, null)
-      """.query(void)
 
     def selectCalibrationTargets: Query[CalibrationRole, (Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
