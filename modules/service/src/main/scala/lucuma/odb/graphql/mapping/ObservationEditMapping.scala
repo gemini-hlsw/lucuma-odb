@@ -16,10 +16,10 @@ trait ObservationEditMapping[F[_]] extends ObservationView[F] with ProgramTable[
   // N.B. env is populated by the subscription elaborator
   lazy val ObservationEditMapping: ObjectMapping =
     ObjectMapping(ObservationEditType)(
-      SqlField("synthetic-id", ObservationView.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
       CursorField("id", _ => Result(0L), List("synthetic-id")),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
-      SqlObject("value", Join(List(ProgramTable.Id -> ObservationView.ProgramId)))
+      SqlObject("value", Join(ProgramTable.Id, ObservationView.ProgramId))
     )
 
 }

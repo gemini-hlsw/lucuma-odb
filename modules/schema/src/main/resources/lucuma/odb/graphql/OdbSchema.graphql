@@ -3057,7 +3057,7 @@ type ObservationEdit { #implements Event {
   """
   Edited object
   """
-  value: Observation!
+  value: Observation
   id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
 }
 

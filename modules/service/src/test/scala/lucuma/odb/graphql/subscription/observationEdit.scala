@@ -93,6 +93,15 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
 
+  val deletedSubscription =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+        }
+      }
+    """
+
   def titleUpdated(oid: Observation.Id, title: String): Json =
     Json.obj(
       "observationEdit" -> Json.obj(
@@ -356,10 +365,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     } yield ()
   }
 
-  test("triggers for deleting an observation") {
+  test("triggers for deleting a calibration observation") {
     import Group1.pi
     def deleteCalibrationObservation(oid: Observation.Id) =
-      withServices(Group1.service) { services =>
+      withServices(pi) { services =>
         services.session.transaction.use { xa =>
           services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
         }
@@ -369,10 +378,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       pid  <- createProgram(pi, "foo")
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
-      oid <- createObservationAs(pi, pid, None, tid0)
+      oid  <- createObservationAs(pi, pid, None, tid0)
       _    <- subscriptionExpect(
         user      = pi,
-        query     = titleSubscription,
+        query     = deletedSubscription,
         mutations =
           Right(deleteCalibrationObservation(oid)),
         expected  = List(calibrationDeleted(oid))
