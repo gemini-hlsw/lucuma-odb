@@ -22,6 +22,8 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.core.model.Observation
+import lucuma.odb.graphql.input.ObservationPropertiesInput
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
@@ -37,16 +39,28 @@ object GroupService {
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
 
-      private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create, system: Boolean)(using Transaction[F]): F[Group.Id] =
+      private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean)(using Transaction[F]): F[Group.Id] =
         for {
           _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
           i <- openHole(pid, SET.parentGroupId, SET.parentGroupIndex)
           g <- session.prepareR(Statements.InsertGroup).use(_.unique(((pid, SET), i), system))
+          _ <- initialContents.traverse:
+            case Left(c)  => moveGroupToEnd(c, g)
+            case Right(o) => moveObservationToEnd(o, g)
         } yield g
+
+      private def moveGroupToEnd(child: Group.Id, parent: Group.Id): F[Unit] =
+        moveGroups(Nullable.NonNull(parent), None, sql"$group_id"(child), AppliedFragment.empty).void
+
+      private def moveObservationToEnd(child: Observation.Id, parent: Group.Id)(using Transaction[F]): F[Unit] =
+        observationService.updateObservations(
+          ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.NonNull(parent)),
+          sql"$observation_id"(child)
+        ).void
 
       override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
         programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
-          r.traverse(createGroupImpl(_, input.SET, system))
+          r.traverse(createGroupImpl(_, input.SET, input.initialContents, system))
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
