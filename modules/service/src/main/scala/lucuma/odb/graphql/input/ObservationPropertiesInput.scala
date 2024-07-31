@@ -143,6 +143,26 @@ object ObservationPropertiesInput {
 
   object Edit {
 
+    val Empty: Edit =
+      Edit(
+        subtitle =           Nullable.Absent,
+        status =             None,
+        activeStatus =       None,
+        scienceBand =        Nullable.Absent,
+        visualizationTime =  Nullable.Absent,
+        posAngleConstraint = None,
+        targetEnvironment =  None,
+        constraintSet =      None,
+        timingWindows =      Nullable.Absent,
+        obsAttachments =     Nullable.Absent,
+        scienceRequirements =None,
+        observingMode =      Nullable.Absent,
+        existence =          None,
+        group =              Nullable.Absent,
+        groupIndex =         None,
+        observerNotes =      Nullable.Absent,
+      )
+
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
         case List(
