@@ -7306,6 +7306,12 @@ type GroupElement {
   existence: Existence!
 }
 
+"A group element identifier. Exactly one of groupId and observationId must be provided."
+input GroupElementInput {
+  groupId: GroupId
+  observationId: ObservationId
+}
+
 input GroupPropertiesInput {
 
   "Group name (optional)."
@@ -7347,6 +7353,9 @@ input CreateGroupInput {
   proposalReference: ProposalReferenceLabel
   programReference: ProgramReferenceLabel
   SET: GroupPropertiesInput
+  
+  "Group elements specified here, if any, will be moved into the created group in the specified order."
+  initialContents: [GroupElementInput]
 }
 
 "The result of creating a new group."
