@@ -7,10 +7,10 @@ package data
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
 import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes

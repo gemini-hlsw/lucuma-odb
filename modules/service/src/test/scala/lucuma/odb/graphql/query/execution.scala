@@ -11,6 +11,7 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -30,7 +31,6 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.Completion
 
