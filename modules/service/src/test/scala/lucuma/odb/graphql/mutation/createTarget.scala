@@ -8,13 +8,13 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.CalibrationRole
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
