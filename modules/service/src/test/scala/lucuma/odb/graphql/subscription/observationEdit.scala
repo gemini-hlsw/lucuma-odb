@@ -97,7 +97,11 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     s"""
       subscription {
         observationEdit {
+          observationId
           editType
+          value {
+            id
+          }
         }
       }
     """
@@ -116,6 +120,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
   def calibrationDeleted(oid: Observation.Id): Json =
     Json.obj(
       "observationEdit" -> Json.obj(
+        "observationId" -> oid.asJson,
         "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
         "value"    -> Json.Null
       )
@@ -384,7 +389,18 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         query     = deletedSubscription,
         mutations =
           Right(deleteCalibrationObservation(oid)),
-        expected  = List(calibrationDeleted(oid))
+        expected  = List(
+          json"""
+            {
+              "observationEdit" : {
+                "observationId" : $oid,
+                "editType" : "UPDATED",
+                "value" : null
+              }
+            }
+          """,
+          calibrationDeleted(oid)
+        )
       )
     } yield ()
   }
