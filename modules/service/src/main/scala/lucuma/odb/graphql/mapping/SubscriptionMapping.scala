@@ -9,6 +9,7 @@ import cats.data.Nested
 import cats.syntax.all.*
 import fs2.Stream
 import grackle.Env
+import grackle.Predicate.Or
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -107,8 +108,16 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map { e =>
           Result(
             Environment(
-              Env("editType" -> e.editType),
-              Filter(Predicates.observationEdit.value.id.eql(e.observationId), child)
+              Env(
+                "editType" -> e.editType,
+                "observationId" -> e.observationId,
+              ),
+              Filter(
+                Or(
+                  Predicates.observationEdit.value.id.eql(e.observationId),
+                  Predicates.observationEdit.value.id.isNull(true), // join will fail on delete
+                 ), child
+              )
             )
           )
         }
