@@ -102,7 +102,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(sequence, smartgcal)
+  .dependsOn(phase0, sequence, smartgcal)
   .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
@@ -159,5 +159,22 @@ lazy val calibrations = project
     name := "calibrations-service",
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     reStart / envVars += "PORT" -> "8082"
+  )
+
+lazy val phase0 = project
+  .in(file("modules/phase0"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-odb-phase0",
+    libraryDependencies ++= Seq(
+      "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
+      "co.fs2"         %% "fs2-core"                        % fs2Version,
+      "co.fs2"         %% "fs2-io"                          % fs2Version,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+    )
   )
 
