@@ -3054,6 +3054,8 @@ type ObservationEdit { #implements Event {
   """
   editType: EditType!
 
+  observationId: ObservationId!
+
   """
   Edited object
   """
