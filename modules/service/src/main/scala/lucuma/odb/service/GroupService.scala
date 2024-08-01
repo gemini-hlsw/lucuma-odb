@@ -8,6 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
+import grackle.ResultT
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -24,15 +25,20 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.graphql.input.CloneObservationInput
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(programId: Program.Id): F[GroupTree]
   def selectPid(groupId: Group.Id): F[Option[Program.Id]]
+  // def cloneGroup(groupId: Group.Id): F[Result[Group.Id]]
 }
 
 object GroupService {
+
+  object GroupElement:
+    type Id = Either[Group.Id, Observation.Id]
 
   // TODO: check access control
 
@@ -61,6 +67,73 @@ object GroupService {
       override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
         programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
           r.traverse(createGroupImpl(_, input.SET, input.initialContents, system))
+
+      // Clone the `elem` into `dest`, at the end.
+      private def cloneGroupElementInto(elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
+        elem match
+          case Left(gid)  => cloneGroupInto(gid, dest).map(_.asLeft)
+          case Right(oid) => cloneObservationInto(oid, dest).map(_.asRight)
+
+      // Clone `oid` into `dest`, at the end.
+      private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
+        ResultT(
+          observationService.cloneObservation(
+            CloneObservationInput(
+              observationId  = Some(oid),
+              observationRef = None,
+              SET = Some(
+                ObservationPropertiesInput.Edit.Empty.copy(
+                  group = Nullable.orNull(dest)
+                )
+              )
+            )
+          )
+        ).map(_.cloneId)
+
+      private def selectProgramId(gid: Group.Id): ResultT[F, Program.Id] =
+        ResultT.success:
+          session.prepareR(Statements.SelectPid).use: pq =>
+            pq.unique(gid)
+
+      private def selectGroupAsInput(gid: Group.Id): ResultT[F, CreateGroupInput] =
+        ResultT.success:
+          session.prepareR(Statements.SelectGroupAsInput).use: pq =>
+            pq.unique(gid)
+
+      // Clone `gid` into `dest`, at the end, as an empty group.
+      private def cloneAsEmptyGroupInto(gid: Group.Id, dest: Option[Group.Id], index: Option[NonNegShort] = None)(using Transaction[F]): ResultT[F, Group.Id] =
+        selectGroupAsInput(gid).flatMap: input => 
+          ResultT(createGroup(input.copy(SET = input.SET.copy(parentGroupId = dest, parentGroupIndex = None))))
+        
+      // Clone `gid` into `dest`, at the end, and clone its contents too.
+      private def cloneGroupInto(gid: Group.Id, dest: Option[Group.Id], index: Option[NonNegShort] = None)(using Transaction[F]): ResultT[F, Group.Id] =
+        for
+          gid0 <- cloneAsEmptyGroupInto(gid, dest, index)
+          es   <- selectGroupElements(gid) // find the children of the source group
+          _    <- es.traverse(cloneGroupElementInto(_, Some(gid0))) // clone the children, recursively, into the new group
+        yield gid
+
+      // Select the elements of `gid`, in order.
+      private def selectGroupElements(gid: Group.Id): ResultT[F, List[GroupElement.Id]] =
+        ???
+
+      extension (n: NonNegShort) def unsafeSucc: NonNegShort =
+        NonNegShort.unsafeFrom((n.value + 1).toShort)
+
+      extension (SET: GroupPropertiesInput.Create) def nextSibling: GroupPropertiesInput.Create =
+        SET.copy(parentGroupIndex = SET.parentGroupIndex.map(_.unsafeSucc))
+
+      extension (input: CreateGroupInput) def nextSibling: CreateGroupInput =
+        input.copy(SET = input.SET.nextSibling)
+
+      // Clone `gid` as a sibling.
+      private def cloneGroupAsSibling(gid: Group.Id)(using Transaction[F]): ResultT[F, Group.Id] =
+        for
+          inp <- selectGroupAsInput(gid)
+          clo <- ResultT(createGroup(inp.nextSibling, false))
+          els <- selectGroupElements(gid)
+          _   <- els.traverse(cloneGroupElementInto(_, Some(clo)))
+        yield clo
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
@@ -249,6 +322,58 @@ object GroupService {
          WHERE
            c_group_id = $group_id
        """.query(program_id)
+
+      /** Select a `CreateGroupInput` for a given `Group.Id` that can be used to create an empty clone. */
+      val SelectGroupAsInput: Query[Group.Id, CreateGroupInput] =
+        sql"""
+          SELECT
+            c_progam_id,
+            c_parent_id,
+            c_parent_index,
+            c_name,
+            c_description,
+            c_min_required,
+            c_ordered,
+            c_min_interval,
+            c_max_interval,
+            c_existence,
+          FROM
+            t_group
+          WHERE
+            c_group_id = $group_id
+        """.query(
+            program_id ~ 
+            group_id.opt ~
+            int2_nonneg ~
+            text_nonempty.opt ~
+            text_nonempty.opt ~
+            int2_nonneg.opt ~
+            bool ~
+            time_span.opt ~
+            time_span.opt ~
+            existence
+          ).map: 
+            case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi =>
+              CreateGroupInput(
+                programId = Some(pid),
+                proposalReference = None,
+                programReference = None,
+                SET = GroupPropertiesInput.Create(
+                  name = nam,
+                  description = des,
+                  minimumRequired = mre,
+                  ordered = ord,
+                  minimumInterval = min,
+                  maximumInterval = max,
+                  parentGroupId = gid,
+                  parentGroupIndex = Some(gix),
+                  existence = exi,
+                ),
+                initialContents = Nil
+              )
+            
+
+
   }
 
 }
