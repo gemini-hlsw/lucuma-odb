@@ -6,6 +6,7 @@ package mapping
 
 
 import grackle.Result
+import lucuma.core.model.Observation
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
@@ -19,6 +20,7 @@ trait ObservationEditMapping[F[_]] extends ObservationView[F] with ProgramTable[
       SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
       CursorField("id", _ => Result(0L), List("synthetic-id")),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
+      CursorField("observationId", _.envR[Observation.Id]("observationId"), List("synthetic-id")),
       SqlObject("value", Join(ProgramTable.Id, ObservationView.ProgramId))
     )
 
