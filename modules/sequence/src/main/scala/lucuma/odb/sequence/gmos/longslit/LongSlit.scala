@@ -14,13 +14,13 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import fs2.Pipe
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.StepType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.sequence.data.CalLocation
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoAtom

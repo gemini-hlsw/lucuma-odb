@@ -9,10 +9,10 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class cloneTarget extends OdbSuite {
