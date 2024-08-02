@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.MonadThrow
 import cats.data.Nested
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -301,6 +302,24 @@ object CalibrationsService {
         } yield ()
       }
 
+      private def removeUnnecessaryCalibrations(
+        calibsNLS: List[(Observation.Id, GmosNConfigs)],
+        gnls: List[(Observation.Id, GmosNConfigs)],
+        calibsSLS: List[(Observation.Id, GmosSConfigs)],
+        gsls: List[(Observation.Id, GmosSConfigs)]
+      )(using Transaction[F]): F[Unit] = {
+        val o1 = calibsNLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
+
+          if (gnls.exists(_._2 === c)) l else oid :: l
+        }
+        val o2 = calibsSLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
+
+          if (gsls.exists(_._2 === c)) l else oid :: l
+        }
+        val oids = NonEmptyList.fromList(o1 ::: o2)
+        oids.map(observationService.deleteCalibrationObservations(_).void).getOrElse(Applicative[F].unit)
+      }
+
       private def spectroPhotometricTargets(when: Instant)(
         rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
       ): List[(Target.Id, Coordinates)] =
@@ -345,7 +364,7 @@ object CalibrationsService {
           gnls  = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
           gsls  = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
           _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
-          // _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
+          _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
         } yield ()
       }
     }
