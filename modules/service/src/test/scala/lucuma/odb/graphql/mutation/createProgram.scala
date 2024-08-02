@@ -8,11 +8,11 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class createProgram extends OdbSuite {
