@@ -14,6 +14,9 @@ import fs2.Stream
 import fs2.text
 import lucuma.core.enums.Instrument
 
+/**
+ * Reads and parses the configuration file into instrument-specific rows.
+ */
 class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
 
   final class ReadException(
@@ -21,6 +24,10 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
     val error:      Parser.Error
   ) extends RuntimeException(s"$fileName, line ${lineNumber.value}:\n${error.show}")
 
+  // Representing the line number as a PosInt, so if there are more than MaxInt
+  // lines then there are `tooManyLines`.  This is a theoretical problem not an
+  // actual one, since in reality there are only hundreds of lines per
+  // instrument at most.
   def tooManyLines[A]: Stream[F, A] =
     Stream.raiseError(new RuntimeException(s"$fileName contains too many lines."))
 

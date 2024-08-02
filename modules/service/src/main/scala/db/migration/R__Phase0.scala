@@ -10,6 +10,10 @@ import org.postgresql.core.BaseConnection
 
 import java.io.InputStream
 
+/**
+ * A repeatable migration that is executed whenver the input .tsv file is
+ * changed.
+ */
 class R__Phase0 extends RepeatableMigration("Phase 0 Instrument Options") {
 
   val fileName: String = "Phase0_Instrument_Matrix - Spectroscopy.tsv"
