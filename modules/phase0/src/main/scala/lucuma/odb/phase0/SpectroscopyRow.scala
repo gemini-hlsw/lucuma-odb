@@ -21,6 +21,10 @@ import lucuma.core.parser.MiscParsers.posInt
 Instrument	Config	Focal Plane	fpu	slit width	slit length	disperser	filter	wave min	wave max	wave optimal	wave coverage	resolution	AO	capabilities	site
 GMOS-N	B1200 0.25"	singleslit,multislit	0.25"	0.250	330	B1200	none	0.36	0.72	0.463	0.164	7488	no		n
  */
+
+/**
+ * Represents a single row in the spectroscopy instrument option "phase 0" table.
+ */
 case class SpectroscopyRow(
   instrument:     Instrument,
   description:    String,
@@ -93,6 +97,11 @@ object SpectroscopyRow {
       case _   => none
     }
 
+  /**
+   * A single line in the .tsv file is split into 1 or more rows according to the FPU option.  So a
+    * value of "singleslit,multislit" becames two rows identical in every respect except tht one is
+    * single slit and the other multislit (MOS).
+   */
   val rows: Parser[List[SpectroscopyRow]] = (
     (instrument <* htab) ~
     (string     <* htab) ~
@@ -115,18 +124,5 @@ object SpectroscopyRow {
       SpectroscopyRow(inst, desc, fpuOpt, fpu, slitWidth, slitLength, disp, filter, min, max, opt, cov, res, ao, capability, site)
     }
   }
-
-  def main(args: Array[String]): Unit =
-    val x = (
-      (instrument <* htab) ~
-      (string     <* htab) ~
-      (fpuOptions <* htab) ~
-      (string     <* htab) ~
-      (arcsec     <* htab)
-    )
-
-    println(x.parseAll("GMOS-N\tB1200 0.25\"\tsingleslit,multislit\t0.25\"\t0.250\t"))
-    val s = "GMOS-N\tB1200 0.25\"\tsingleslit,multislit\t0.25\"\t0.250\t330\tB1200\tnone\t0.36\t0.72\t0.463\t0.164\t7488\tno\t\tn"
-    println(rows.parseAll(s))
 
 }

@@ -19,7 +19,11 @@ import org.postgresql.core.BaseConnection
 import java.io.InputStream
 
 /**
- * Loads a Phase 0 configuration file into the corresponding table.
+ * Loads a Phase 0 configuration file into the corresponding tables.  There are
+ * two tables: the general spectroscopy table (where for example the grating,
+ * filter and FPU are identified with strings) and the instrument specific
+ * spectroscopy table (where instrument specific grating, filter and FPU values
+ * are referenced as FKs).
  */
 class Phase0Loader[A](
   val instrument: Instrument,
@@ -39,7 +43,9 @@ class Phase0Loader[A](
        .resource
        .lastOrError
 
-    val s: Stream[IO, (String, String)] =
+    // Each element of the Stream will contain a general spectroscopy table
+    // entry and an instrument-specific entry.
+    val rows: Stream[IO, (String, String)] =
       readInputStream(is, ByteChunkSize, closeAfterUse = true)
         .through(pipe)
         .map { (a, idx) => (
@@ -47,11 +53,18 @@ class Phase0Loader[A](
           instTable.stdinLine(a, idx)
         )}
 
+    // 1. Truncate the instrument table, it will be replaced with entries from
+    //    the .tsv file.
+    // 2. Delete from the general spectroscopy table where the instrument
+    //    matches.  The general table holds all the entries for all the
+    //    instruments so we can't just truncate it.
+    // 3. Bulk copy in to the spectroscopy table.
+    // 4. Bulk copy in to the instrument table.
     for {
       _  <- bc.ioUpdate(instTable.truncate)
       _  <- bc.ioUpdate(Phase0Table.Spectroscopy.deleteFrom(instrument))
-      _  <- bc.ioCopyIn(Phase0Table.Spectroscopy.copyFromStdin, toInputStream(s.map(_._1)))
-      _  <- bc.ioCopyIn(instTable.copyFromStdin, toInputStream(s.map(_._2)))
+      _  <- bc.ioCopyIn(Phase0Table.Spectroscopy.copyFromStdin, toInputStream(rows.map(_._1)))
+      _  <- bc.ioCopyIn(instTable.copyFromStdin, toInputStream(rows.map(_._2)))
     } yield ()
 
   }
