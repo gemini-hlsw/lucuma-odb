@@ -18,6 +18,7 @@ import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
@@ -51,7 +52,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate

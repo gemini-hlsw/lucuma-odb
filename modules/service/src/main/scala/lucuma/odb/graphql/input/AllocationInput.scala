@@ -7,8 +7,8 @@ package input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.binding.*
 
 case class AllocationInput(

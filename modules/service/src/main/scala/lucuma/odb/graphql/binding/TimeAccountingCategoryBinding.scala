@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.TimeAccountingCategory
+import lucuma.core.enums.TimeAccountingCategory
 
 val TimeAccountingCategoryBinding: Matcher[TimeAccountingCategory] =
   enumeratedBinding

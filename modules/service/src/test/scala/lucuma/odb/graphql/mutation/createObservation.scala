@@ -34,6 +34,7 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -48,7 +49,6 @@ import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 

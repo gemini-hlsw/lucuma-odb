@@ -39,7 +39,6 @@ import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
-import lucuma.odb.syntax.partner.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*

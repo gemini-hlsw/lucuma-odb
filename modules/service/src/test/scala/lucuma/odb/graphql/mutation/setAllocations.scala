@@ -10,11 +10,11 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 
 class setAllocations extends OdbSuite {

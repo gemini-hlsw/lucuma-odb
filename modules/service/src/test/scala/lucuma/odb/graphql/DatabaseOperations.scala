@@ -25,6 +25,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
@@ -55,7 +56,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.ProgramUserRole
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given

@@ -28,6 +28,7 @@ import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
@@ -43,7 +44,6 @@ import lucuma.core.model.sequence.Step
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data.TimeAccountingCategory
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
