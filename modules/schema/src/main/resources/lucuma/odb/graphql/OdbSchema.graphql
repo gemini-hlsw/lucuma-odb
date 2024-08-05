@@ -11143,6 +11143,9 @@ input WhereCallForProposals {
 
   "Matches whether the call is still open for some partner."
   isOpen: WhereBoolean
+
+  "Matches whether non-partner PIs may participate."
+  allowsNonPartnerPi: WhereBoolean
 }
 
 """
