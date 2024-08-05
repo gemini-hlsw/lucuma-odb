@@ -56,7 +56,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Docker compose up
-        run: docker-compose up -d
+        run: docker compose up -d
 
       - name: Check that workflows are up to date
         run: sbt -v -J-Xmx6g githubWorkflowCheck
@@ -93,7 +93,7 @@ jobs:
         uses: codecov/codecov-action@v4
 
       - name: Docker compose down
-        run: docker-compose down
+        run: docker compose down
 
   publish:
     name: Publish Artifacts

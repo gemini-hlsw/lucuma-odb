@@ -6,8 +6,8 @@ package lucuma.odb.graphql.predicate
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
-import lucuma.odb.data.CalibrationRole
 
 class TargetPredicates(path: Path) {
   lazy val existence = ExistencePredicates(path / "existence")

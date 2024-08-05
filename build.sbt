@@ -15,11 +15,11 @@ val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.6"
 val log4catsVersion            = "2.7.0"
-val lucumaCatalogVersion       = "0.47.2"
-val lucumaItcVersion           = "0.21.16"
-val lucumaCoreVersion          = "0.100.1"
+val lucumaCatalogVersion       = "0.47.3"
+val lucumaItcVersion           = "0.21.17"
+val lucumaCoreVersion          = "0.101.2"
 val lucumaGraphQLRoutesVersion = "0.8.13"
-val lucumaSsoVersion           = "0.6.20"
+val lucumaSsoVersion           = "0.6.21"
 val munitVersion               = "0.7.29" // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
@@ -102,7 +102,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(sequence, smartgcal)
+  .dependsOn(phase0, sequence, smartgcal)
   .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-odb-service",
@@ -159,5 +159,22 @@ lazy val calibrations = project
     name := "calibrations-service",
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     reStart / envVars += "PORT" -> "8082"
+  )
+
+lazy val phase0 = project
+  .in(file("modules/phase0"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-odb-phase0",
+    libraryDependencies ++= Seq(
+      "org.typelevel"  %% "cats-parse"                      % catsParseVersion,
+      "co.fs2"         %% "fs2-core"                        % fs2Version,
+      "co.fs2"         %% "fs2-io"                          % fs2Version,
+      "edu.gemini"     %% "lucuma-core"                     % lucumaCoreVersion,
+      "edu.gemini"     %% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
+      "org.scalameta"  %% "munit"                           % munitVersion               % Test,
+      "org.scalameta"  %% "munit-scalacheck"                % munitVersion               % Test,
+      "org.typelevel"  %% "discipline-munit"                % munitDisciplineVersion     % Test,
+    )
   )
 

@@ -6,6 +6,7 @@ package data
 package arb
 
 import cats.data.NonEmptyList
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
@@ -14,7 +15,6 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.itc.client.arb.ArbInstrumentMode
 import lucuma.itc.client.arb.ArbIntegrationTimeInput
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import org.scalacheck.*

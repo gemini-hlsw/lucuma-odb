@@ -7,10 +7,10 @@ package query
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class targets extends OdbSuite {
