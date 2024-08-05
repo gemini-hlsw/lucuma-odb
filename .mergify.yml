@@ -24,6 +24,14 @@ pull_request_rules:
       add:
       - calibrations
       remove: []
+- name: Label phase0 PRs
+  conditions:
+  - files~=^modules/phase0/
+  actions:
+    label:
+      add:
+      - phase0
+      remove: []
 - name: Label schema PRs
   conditions:
   - files~=^modules/schema/
