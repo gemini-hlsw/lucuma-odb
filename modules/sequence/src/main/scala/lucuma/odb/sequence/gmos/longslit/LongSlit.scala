@@ -14,13 +14,13 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import fs2.Pipe
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.StepType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.sequence.data.CalLocation
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoAtom
@@ -126,11 +126,16 @@ object LongSlit {
                Completion.SequenceMatch.matchCurrent(atom).map { vid =>
                  val genAtom = Option.unless(vid.isDefined)(atom)
                  val genArc  = Option.when(acc.shouldGenerateArc(arcConfig))(arc.atom)
+                 // The atoms tupled with a consistent unique "index".  This will be folded into the
+                 // atom id generation. The indices have to stay the same regardless of which atoms
+                 // are executed (and therefore not emitted again in the stream).  We don't care
+                 // about the actual number or whether they increment by exactly one for each atom,
+                 // but rather that they are unique and consistent from run to run.
                  val atoms = arc.location match {
                    case CalLocation.Before => genArc.tupleRight(acc.index + 1).toList ++ genAtom.tupleRight(acc.index + 2).toList
                    case CalLocation.After  => genAtom.tupleRight(acc.index + 1).toList ++ genArc.tupleRight(acc.index + 2).toList
                  }
-                 (1 + (if (acc.generatedArcs(arcConfig)) 0 else 1), arcConfig.some, atoms)
+                 (2, arcConfig.some, atoms)
                }
 
              val update = for {

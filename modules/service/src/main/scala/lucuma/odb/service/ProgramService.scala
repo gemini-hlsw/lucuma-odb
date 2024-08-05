@@ -12,6 +12,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access

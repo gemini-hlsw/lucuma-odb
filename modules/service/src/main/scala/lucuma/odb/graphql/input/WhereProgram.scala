@@ -9,9 +9,9 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Program
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.binding.*
 
 object WhereProgram {

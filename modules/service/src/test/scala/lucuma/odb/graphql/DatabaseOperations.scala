@@ -12,6 +12,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
@@ -50,7 +51,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -769,7 +769,14 @@ trait DatabaseOperations { this: OdbSuite =>
   def undeleteTargetAs(user: User, tid: Target.Id): IO[Unit] =
     updateTargetExistencetAs(user, tid, Existence.Present)
 
-  def createGroupAs(user: User, pid: Program.Id, parentGroupId: Option[Group.Id] = None, parentIndex: Option[NonNegShort] = None, minRequired: Option[NonNegShort] = None): IO[Group.Id] =
+  def createGroupAs(
+    user: User,
+    pid: Program.Id,
+    parentGroupId: Option[Group.Id] = None,
+    parentIndex: Option[NonNegShort] = None,
+    minRequired: Option[NonNegShort] = None,
+    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None 
+  ): IO[Group.Id] =
     query(
       user = user,
       query = s"""
@@ -781,6 +788,13 @@ trait DatabaseOperations { this: OdbSuite =>
                 parentGroup: ${parentGroupId.asJson.spaces2}
                 parentGroupIndex: ${parentIndex.map(_.value).asJson.spaces2}
                 minimumRequired: ${minRequired.map(_.value).asJson.spaces2}
+              }
+              ${
+                initialContents.foldMap: es =>
+                  es.map {
+                    case Left(gid)  => s"{ groupId: ${gid.asJson.noSpaces} }\n"
+                    case Right(oid) => s"{ observationId: ${oid.asJson.noSpaces} }\n"
+                  }.mkString("initialContents: [", " ", "]")
               }
             }
           ) {

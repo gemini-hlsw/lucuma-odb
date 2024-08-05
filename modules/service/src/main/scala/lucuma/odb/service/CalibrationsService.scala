@@ -10,6 +10,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -38,7 +39,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
@@ -129,7 +129,8 @@ object CalibrationsService {
                           parentGroupId = none,
                           parentGroupIndex = none,
                           existence = Existence.Present
-                        )
+                        ),
+                        Nil
                       ),
                     system = true
                   ).map(_.toOption)

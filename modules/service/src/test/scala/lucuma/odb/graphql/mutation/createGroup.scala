@@ -151,6 +151,17 @@ class createGroup extends OdbSuite {
     } yield assertEquals(ids, List(Left(g1), Left(g3), Left(g2)))
   }
 
+  test("create a group with initial contents") {
+    for {
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      g1  <- createGroupAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      g2  <- createGroupAs(pi, pid, initialContents = Some(List(Right(o1), Left(g1), Right(o2))))
+      ids  <- groupElementsAs(pi, pid, Some(g2))
+    } yield assertEquals(ids, List(Right(o1), Left(g1), Right(o2)))
+  }
+
   test("create group with a proposal reference") {
     val createWithReference: IO[Unit] =
       expect(
