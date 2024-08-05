@@ -250,6 +250,8 @@ class createCallForProposals extends OdbSuite {
                  submissionDeadlineOverride
                  submissionDeadline
                }
+               allowsNonPartnerPi
+               nonPartnerDeadline
              }
           }
         }
@@ -276,7 +278,9 @@ class createCallForProposals extends OdbSuite {
                   "submissionDeadlineOverride": "2025-07-31 10:00:01",
                   "submissionDeadline": "2025-07-31 10:00:01"
                 }
-              ]
+              ],
+              "allowsNonPartnerPi": true,
+              "nonPartnerDeadline": "2025-07-31 10:00:01"
             }
           }
         }
@@ -303,6 +307,8 @@ class createCallForProposals extends OdbSuite {
              callForProposals {
                id
                partners { partner }
+               allowsNonPartnerPi
+               nonPartnerDeadline
              }
           }
         }
@@ -312,7 +318,9 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id": "c-102",
-              "partners": []
+              "partners": [],
+              "allowsNonPartnerPi": false,
+              "nonPartnerDeadline": null
             }
           }
         }
@@ -550,4 +558,87 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("director's time - non-partner accepted") {
+
+    // existence defaults to PRESENT
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        DIRECTORS_TIME
+                semester:    "2024B"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
+                submissionDeadlineDefault: "2025-07-31 10:00:02"
+              }
+            }
+          ) {
+            callForProposals {
+              id
+              type
+              allowsNonPartnerPi
+              nonPartnerDeadline
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id":   "c-106",
+              "type": "DIRECTORS_TIME",
+              "allowsNonPartnerPi": true,
+              "nonPartnerDeadline": "2025-07-31 10:00:02"
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("demo science - non-partner prohibited") {
+
+    // existence defaults to PRESENT
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        DEMO_SCIENCE
+                semester:    "2024B"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
+                submissionDeadlineDefault: "2025-07-31 10:00:02"
+              }
+            }
+          ) {
+            callForProposals {
+              id
+              type
+              allowsNonPartnerPi
+              nonPartnerDeadline
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "id":   "c-107",
+              "type": "DEMO_SCIENCE",
+              "allowsNonPartnerPi": false,
+              "nonPartnerDeadline": null
+            }
+          }
+        }
+      """.asRight
+    )
+  }
 }
