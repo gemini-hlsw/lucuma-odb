@@ -10,6 +10,7 @@ import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
 
 class redeemUserInvitation extends OdbSuite {
@@ -92,7 +93,7 @@ class redeemUserInvitation extends OdbSuite {
 
   test("redeem an invitation without partner") {
     createProgramAs(pi).flatMap { pid =>
-      createUserInvitationAs(pi, pid, partner = None).flatMap { inv =>
+      createUserInvitationAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap { inv =>
         expect(
           user = pi2,
           query = redeem(inv),
@@ -189,7 +190,7 @@ class redeemUserInvitation extends OdbSuite {
 
   test("redeeming an invitation works if you aready have that role, but it's a no-op in terms of linking") {
     createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, Some(Partner.CA)) >>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.CA)) >>
       createUserInvitationAs(pi, pid).flatMap { inv =>
         expect(
           user = pi2,
