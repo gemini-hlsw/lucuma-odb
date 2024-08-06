@@ -3213,6 +3213,42 @@ enum Partner {
    "United States"        US
 }
 
+"Represents the association of a user with a `Partner`, if any."
+interface PartnerAssociation {
+  "Indicates whether the association has been made."
+  isSet: Boolean!
+}
+
+"""
+A `PartnerAssociation` employed when a user is associated with a specific
+`Partner`.
+"""
+type HasPartner implements PartnerAssociation {
+  "Always true"
+  isSet: Boolean!
+
+  "The associated partner."
+  partner: Partner!
+}
+
+"""
+A `PartnerAssociation` employed when a user is explicitly associated with
+no `Partner`.
+"""
+type HasNoPartner implements PartnerAssociation {
+  "Always true"
+  isSet: Boolean!
+}
+
+"""
+A `PartnerAssociation` employed when a user's `PartnerAssociation` has not
+(yet) been made.
+"""
+type NoAssociation implements PartnerAssociation {
+  "Always false"
+  isSet: Boolean!
+}
+
 """
 Partner splits detail how requested time for a Queue or Classical proposal
 should be distributed amongst Gemini partners.
