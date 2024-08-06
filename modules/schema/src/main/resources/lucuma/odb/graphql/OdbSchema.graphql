@@ -118,7 +118,7 @@ input AirMassRangeInput {
 An individual time allocation.
 """
 type Allocation {
-  partner:     Partner!
+  category:    TimeAccountingCategory!
   scienceBand: ScienceBand!
   duration:    TimeSpan!
 }
@@ -127,7 +127,7 @@ type Allocation {
 An individual time allocation input.
 """
 input AllocationInput {
-  partner:     Partner!
+  category:    TimeAccountingCategory!
   scienceBand: ScienceBand!
   duration:    TimeSpanInput!
 }
@@ -3204,10 +3204,26 @@ enum Partner {
 }
 
 """
-Partner time allocation
+Partner splits detail how requested time for a Queue or Classical proposal
+should be distributed amongst Gemini partners.
+"""
+type PartnerSplit {
+
+  partner: Partner!
+
+  "Percentage of requested time that should be associated with the partner."
+  percent: IntPercent!
+}
+
+"""
+Time request percentage that should be associated with a particular partner for
+Queue and Classical proposals.
 """
 input PartnerSplitInput {
+
   partner: Partner!
+
+  "Percentage of requested time that should be associated with the partner."
   percent: IntPercent!
 }
 
@@ -4510,6 +4526,29 @@ input TargetPropertiesInput {
   nonsidereal: NonsiderealInput
   sourceProfile: SourceProfileInput
   existence: Existence
+}
+
+"""
+Time Accounting Categories.  Each successful proposal is given one or more
+time allocations and each allocation has a time accounting category.
+"""
+enum TimeAccountingCategory {
+  "Argentina"                AR
+  "Brazil"                   BR
+  "Canada"                   CA
+  "CFHT Exchange"            CFHT
+  "Chile"                    CL
+  "Director's Time"          DD
+  "Demo Science"             DS
+  "Guaranteed Time"          GT
+  "Subaru"                   JP
+  "Keck Exchange"            KECK
+  "Republic of Korea"        KR
+  "Large Program"            LP
+  "Limited-term Participant" LTP
+  "System Verification"      SV
+  "University of Hawaii"     UH
+  "United States"            US
 }
 
 """
@@ -8201,18 +8240,6 @@ type Parallax {
   Parallax in milliarcseconds
   """
   milliarcseconds: BigDecimal!
-}
-
-type PartnerSplit {
-  """
-  Partner
-  """
-  partner: Partner!
-
-  """
-  Percentage of observation time
-  """
-  percent: IntPercent!
 }
 
 """

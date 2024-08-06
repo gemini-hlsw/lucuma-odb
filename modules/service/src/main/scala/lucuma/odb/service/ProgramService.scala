@@ -489,8 +489,8 @@ object ProgramService {
       partner: Partner
     ): AppliedFragment =
       sql"""
-        EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_partner=${lucuma.odb.util.Codecs.partner} and c_duration > 'PT')
-        """.apply(programId, partner)
+        EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
+        """.apply(programId, partner.timeAccountingCategory)
 
     def existsUserAccess(
       user:      User,

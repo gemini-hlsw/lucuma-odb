@@ -27,8 +27,8 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
@@ -239,7 +239,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ResultMapping.mutationResult(child, ResultMapping.MaxLimit, "allocations") { q =>
       FilterOrderByOffsetLimit(
         pred   = Predicates.allocation.id.eql(pid).some,
-        oss    = List(OrderSelection[ScienceBand](AllocationType / "scienceBand"), OrderSelection[Partner](AllocationType / "partner")).some,
+        oss    = List(OrderSelection[ScienceBand](AllocationType / "scienceBand"), OrderSelection[TimeAccountingCategory](AllocationType / "category")).some,
         offset = None,
         limit  = None,
         child  = q

@@ -10,6 +10,7 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -31,7 +32,7 @@ class setAllocations extends OdbSuite {
     List(guest, pi, ngo).traverse { user =>
       createProgramAs(user).flatMap { pid =>
         interceptGraphQL(s"User ${user.id} is not authorized to perform this operation.") {
-          setOneAllocationAs(user, pid, Partner.CA, ScienceBand.Band1, 42.hourTimeSpan)
+          setOneAllocationAs(user, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan)
         }
       }
     }
@@ -40,15 +41,15 @@ class setAllocations extends OdbSuite {
   test("admin, staff, service can set (and update) allocation in any program") {
     createProgramAs(pi).flatMap { pid =>
       List((admin, 2L), (staff, 3L), (service, 4L)).traverse { case (user, hours) =>
-        setOneAllocationAs(user, pid, Partner.US, ScienceBand.Band1, TimeSpan.fromHours(hours).get)
+        setOneAllocationAs(user, pid, TimeAccountingCategory.US, ScienceBand.Band1, TimeSpan.fromHours(hours).get)
       }
     }
   }
 
   test("should be able to read allocations back") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
-      AllocationInput(Partner.CA, ScienceBand.Band3, TimeSpan.fromHours(4.56).get)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band3, TimeSpan.fromHours(4.56).get)
     )
     createProgramAs(pi).flatMap { pid =>
       setAllocationsAs(staff, pid, allocations) *>
@@ -58,7 +59,7 @@ class setAllocations extends OdbSuite {
           query {
             program(programId: "$pid") {
               allocations {
-                partner
+                category
                 scienceBand
                 duration {
                   hours
@@ -73,14 +74,14 @@ class setAllocations extends OdbSuite {
               "program" : {
                 "allocations" : [
                   {
-                    "partner" : "US",
+                    "category" : "US",
                     "scienceBand": "BAND2",
                     "duration" : {
                       "hours" : 1.230000
                     }
                   },
                   {
-                    "partner" : "CA",
+                    "category" : "CA",
                     "scienceBand": "BAND3",
                     "duration" : {
                       "hours" : 4.560000
@@ -105,22 +106,22 @@ class setAllocations extends OdbSuite {
               programId:   "$pid"
               allocations: [
                 {
-                  partner: US
+                  category: US
                   scienceBand: BAND2
                   duration: { hours: "1.23" }
                 },
                 {
-                  partner: US
+                  category: US
                   scienceBand: BAND2
                   duration: { hours: "4.56" }
                 }
               ]
             }) {
-              allocations { partner }
+              allocations { category }
             }
           }
         """,
-        expected = List("Argument 'input' is invalid: Each partner + band combination may only appear once.").asLeft
+        expected = List("Argument 'input' is invalid: Each category + band combination may only appear once.").asLeft
       )
     }
   }
@@ -147,8 +148,8 @@ class setAllocations extends OdbSuite {
 
   test("single band allocation sets observation band") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
-      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, TimeSpan.fromHours(1.23).get),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
     )
     val band = for {
       pid <- createProgramAs(pi)
@@ -171,8 +172,8 @@ class setAllocations extends OdbSuite {
 
   test("multiple band allocation does not set observation band") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
-      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
     )
     val band = for {
       pid <- createProgramAs(pi)
@@ -185,8 +186,8 @@ class setAllocations extends OdbSuite {
 
   test("warning for invalid bands") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
-      AllocationInput(Partner.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, TimeSpan.fromHours(1.23).get),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, TimeSpan.fromHours(4.56).get)
     )
     for {
       pid  <- createProgramAs(pi)
@@ -202,14 +203,14 @@ class setAllocations extends OdbSuite {
               programId:   "$pid"
               allocations: [
                 {
-                  partner: US
+                  category: US
                   scienceBand: BAND1
                   duration: { hours: "5.79" }
                 }
               ]
             }) {
               allocations {
-                partner
+                category
                 scienceBand
                 duration { hours }
               }
@@ -223,7 +224,7 @@ class setAllocations extends OdbSuite {
               "setAllocations": {
                 "allocations": [
                   {
-                    "partner": "US",
+                    "category": "US",
                     "scienceBand": "BAND1",
                     "duration": { "hours": 5.790000 }
                   }
