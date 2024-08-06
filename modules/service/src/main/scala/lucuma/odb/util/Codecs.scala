@@ -20,6 +20,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
@@ -481,6 +482,9 @@ trait Codecs {
 
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
+
+  val time_accounting_category: Codec[TimeAccountingCategory] =
+    enumerated(Type.varchar)
 
   val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
     enumerated(Type("e_time_charge_correction_op"))

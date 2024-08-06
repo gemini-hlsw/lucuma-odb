@@ -276,6 +276,7 @@ trait BaseMapping[F[_]]
   lazy val TargetIdType                            = schema.ref("TargetId")
   lazy val TargetSelectResultType                  = schema.ref("TargetSelectResult")
   lazy val TargetType                              = schema.ref("Target")
+  lazy val TimeAccountingCategoryType              = schema.ref("TimeAccountingCategory")
   lazy val TimeChargeCorrectionType                = schema.ref("TimeChargeCorrection")
   lazy val TimeChargeCorrectionOpType              = schema.ref("TimeChargeCorrectionOp")
   lazy val TimeChargeDaylightDiscountType          = schema.ref("TimeChargeDaylightDiscount")

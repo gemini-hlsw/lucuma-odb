@@ -18,6 +18,7 @@ import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
@@ -170,6 +171,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[TimeAccountingCategory](TimeAccountingCategoryType),
       LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
