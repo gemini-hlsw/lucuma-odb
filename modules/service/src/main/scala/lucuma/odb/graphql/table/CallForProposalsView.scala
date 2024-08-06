@@ -44,12 +44,14 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
     }
 
-    val DeadlineDefault = col("c_deadline_default", core_timestamp.opt)
-    val ActiveStart     = col("c_active_start",     date)
-    val ActiveEnd       = col("c_active_end",       date)
-    val Existence       = col("c_existence",        existence)
-    val Instruments     = col("c_instruments",      _instrument)
-    val IsOpen          = col("c_is_open",          bool)
+    val DeadlineDefault    = col("c_deadline_default",     core_timestamp.opt)
+    val ActiveStart        = col("c_active_start",         date)
+    val ActiveEnd          = col("c_active_end",           date)
+    val Existence          = col("c_existence",            existence)
+    val Instruments        = col("c_instruments",          _instrument)
+    val IsOpen             = col("c_is_open",              bool)
+    val AllowsNonPartner   = col("c_allows_non_partner",   bool)
+    val NonPartnerDeadline = col("c_non_partner_deadline", core_timestamp.opt)
   }
 
   object CallForProposalsPartnerView extends TableDef("v_cfp_partner") {

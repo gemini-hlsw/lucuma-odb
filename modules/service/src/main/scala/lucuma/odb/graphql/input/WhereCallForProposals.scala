@@ -15,12 +15,13 @@ import org.typelevel.cats.time.given
 object WhereCallForProposals {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereIdBinding       = WhereOrder.binding(path / "id",               CallForProposalsIdBinding)
-    val WhereTypeBinding     = WhereEq.binding(   path / "type",             CallForProposalsTypeBinding)
-    val WhereSemesterBinding = WhereOrder.binding(path / "semester",         SemesterBinding)
-    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start", DateBinding)
-    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",   DateBinding)
-    val WhereIsOpenBinding   = WhereBoolean.binding(path / "_isOpen",        BooleanBinding)
+    val WhereIdBinding       = WhereOrder.binding(path / "id",                   CallForProposalsIdBinding)
+    val WhereTypeBinding     = WhereEq.binding(   path / "type",                 CallForProposalsTypeBinding)
+    val WhereSemesterBinding = WhereOrder.binding(path / "semester",             SemesterBinding)
+    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start",     DateBinding)
+    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",       DateBinding)
+    val WhereIsOpenBinding   = WhereBoolean.binding(path / "_isOpen",            BooleanBinding)
+    val WhereAllowsNonPartner= WhereBoolean.binding(path / "allowsNonPartnerPi", BooleanBinding)
 
     lazy val WhereCfpBinding = binding(path)
 
@@ -35,10 +36,11 @@ object WhereCallForProposals {
         WhereSemesterBinding.Option("semester", rSemester),
         WhereStartBinding.Option("activeStart", rStart),
         WhereEndBinding.Option("activeEnd", rEnd),
-        WhereIsOpenBinding.Option("isOpen", rIsOpen)
+        WhereIsOpenBinding.Option("isOpen", rIsOpen),
+        WhereAllowsNonPartner.Option("allowsNonPartnerPi", rNonPartner)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd, rIsOpen).parMapN {
-          (AND, OR, NOT, id, cfpType, semester, start, end, isOpen) =>
+        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd, rIsOpen, rNonPartner).parMapN {
+          (AND, OR, NOT, id, cfpType, semester, start, end, isOpen, nonPartner) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -48,7 +50,8 @@ object WhereCallForProposals {
               semester,
               start,
               end,
-              isOpen
+              isOpen,
+              nonPartner
             ).flatten)
         }
     }

@@ -415,6 +415,16 @@ type CallForProposals {
   partners: [CallForProposalsPartner!]!
 
   """
+  Whether this Call allows PIs without a partner to participate.
+  """
+  allowsNonPartnerPi: Boolean!
+
+  """
+  The submission deadline for non-partner PIs, when allowed to participate.
+  """
+  nonPartnerDeadline: Timestamp
+
+  """
   When specified, the observations executed in this Call will only use these
   instruments.  When not specified, all otherwise available instruments may be
   used.
@@ -11160,6 +11170,9 @@ input WhereCallForProposals {
 
   "Matches whether the call is still open for some partner."
   isOpen: WhereBoolean
+
+  "Matches whether non-partner PIs may participate."
+  allowsNonPartnerPi: WhereBoolean
 }
 
 """
