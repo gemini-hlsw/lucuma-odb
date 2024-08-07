@@ -57,6 +57,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
@@ -586,6 +587,11 @@ trait Codecs {
     (angle_µas *: angle_µas).imap { (p, q) =>
       Offset(Offset.P(p), Offset.Q(q))
     }(o => (o.p.toAngle, o.q.toAngle))
+
+  val partner_association: Codec[PartnerLink] =
+    (partner.opt *: bool).imap((p, b) => PartnerLink.fromEither(p.toRight(s))) { pa =>
+      (pa.partnerOption, pa.isNonPartner)
+    }
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
     (gcal_continuum.opt *:

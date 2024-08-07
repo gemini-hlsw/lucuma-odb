@@ -10,7 +10,9 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole as PUR
+import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.EmailAddressBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding

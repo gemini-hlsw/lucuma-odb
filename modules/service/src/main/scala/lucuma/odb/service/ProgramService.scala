@@ -230,8 +230,8 @@ object ProgramService {
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
-            case LinkUserRequest.Coi(programId, partner, userId) => Statements.linkCoi(programId, userId, Tag(partner.tag), user)
-            case LinkUserRequest.CoiRo(programId, partner, userId) => Statements.linkCoiReadOnly(programId, userId, Tag(partner.tag), user)
+            case LinkUserRequest.Coi(programId, partner, userId) => Statements.linkCoi(programId, userId, partner, user)
+            case LinkUserRequest.CoiRo(programId, partner, userId) => Statements.linkCoiReadOnly(programId, userId, partner, user)
             case LinkUserRequest.Support(programId, userId) => Statements.linkSupport(programId, userId, user)
           }
         af match {
@@ -542,11 +542,11 @@ object ProgramService {
       """.query(program_id)
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[Tag])] =
+    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, PartnerLink)] =
       sql"""
-         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner)
-         SELECT $program_id, $user_id, 'standard', $program_user_role, ${tag.opt}
-        """
+         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner, c_is_no_partner)
+         SELECT $program_id, $user_id, 'standard', $program_user_role, ${partner.opt}, $bool
+        """.contramap { (pid, uid, role, pa) => (pid, uid, role, pa.partnerOption, pa.isNoPartner) }
 
     /**
      * Link a co-investigator to a program.
@@ -557,10 +557,11 @@ object ProgramService {
     def linkCoi(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
-      partner: Tag,
+      partner: Partner,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, Some(partner))
+      // TODO: PartnerAssociation
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, PartnerLink.HasPartner(partner))
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -580,10 +581,11 @@ object ProgramService {
     def linkCoiReadOnly(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
-      partner: Tag,
+      partner: Partner,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, Some(partner))
+      // TODO: PartnerAssociation
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, PartnerLink.HasPartner(partner))
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -609,7 +611,8 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, None)
+      // TODO: PartnerAssociation
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, PartnerLink.NoPartnerLink)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

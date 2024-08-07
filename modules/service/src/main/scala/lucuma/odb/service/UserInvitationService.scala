@@ -25,6 +25,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.input.CreateUserInvitationInput
@@ -140,12 +141,12 @@ object UserInvitationService:
               .use(_.option(user, status, input.key))
               .flatMap:
                 case None => OdbError.InvitationError(input.key.id, Some("Invitation is invalid, or has already been accepted, declined, or revoked.")).asFailureF
-                case Some(r, pid, partner) =>
+                case Some(r, pid, partner) => // TODO: PartnerAssociation
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>
                     session
                       .prepareR(ProgramService.Statements.LinkUser.command)
-                      .use(_.execute(pid, user.id, r, partner))
+                      .use(_.execute(pid, user.id, r, partner.fold(PartnerLink.NoPartnerLink)(PartnerLink.HasPartner(_))))
                       .as(Result(input.key.id))
                       .recoverWith:
                         case SqlState.UniqueViolation(_) =>
@@ -185,23 +186,24 @@ object UserInvitationService:
           case (u, CreateUserInvitationInput.Support(pid, e)) => (u.id, pid, e, ProgramUserRole.Support, none, pid)
         }
 
-    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, Option[Partner]), UserInvitation] =
+    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, PartnerLink), UserInvitation] =
       sql"""
         select insert_invitation(
           $user_id,
           $program_id,
           $email_address,
           $program_user_role,
-          ${tag.opt},
+          ${partner.opt},
+          $bool
           null
         ) from t_program
         where c_program_id = $program_id
         and c_pi_user_id = $user_id
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.map(p => Tag(p.tag)), pid, u.id))
+        .contramap((u, pid, e, r, p, b) => (u.id, pid, e, r, PartnerLink.fromFields(p, b)), pid, u.id))
 
-    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, Option[Tag])] =
+    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, PartnerLink)] =
       sql"""
         update t_invitation
         set c_status = $user_invitation_status, c_redeemer_id = $user_id
@@ -209,8 +211,8 @@ object UserInvitationService:
         and c_invitation_id = $user_invitation_id
         and c_key_hash = md5($varchar)
         and c_issuer_id <> $user_id -- can't redeem your own invitation
-        returning c_role, c_program_id, c_partner
-      """.query(program_user_role *: program_id *: tag.opt)
+        returning c_role, c_program_id, c_partner, c_is_no_partner
+      """.query(program_user_role *: program_id *: partner_association)
         .contramap((u, s, i) => (s, u.id, i.id, i.body, u.id))
 
     val revokeUserInvitation: Query[(UserInvitation.Id, User.Id), UserInvitation.Id] =

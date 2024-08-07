@@ -8,26 +8,26 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
-import lucuma.odb.data.PartnerAssociation
+import lucuma.odb.data.PartnerLink
 
 class partner {
 
-  given Encoder[PartnerAssociation] =
+  given Encoder[PartnerLink] =
     Encoder.instance { a =>
       Json.fromFields(
         ("isSet" -> a.isSet.asJson) :: (a match {
-          case PartnerAssociation.HasPartner(p) => List("partner" -> p.asJson)
+          case PartnerLink.HasPartner(p) => List("partner" -> p.asJson)
           case _ => Nil
         })
       )
     }
 
-  given Decoder[PartnerAssociation] =
+  given Decoder[PartnerLink] =
     Decoder.instance { c =>
       for {
-        s <- c.downField("isSet").as[Boolean]
         p <- c.downField("partner").as[Option[Partner]]
-      } yield PartnerAssociation.fromFields(s, p)
+        s <- c.downField("isSet").as[Boolean]
+      } yield PartnerLink.fromEither(p.toRight(s))
     }
 
 }

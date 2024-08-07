@@ -2544,8 +2544,8 @@ input LinkUserInput {
   "The role this user will play in the program."
   role: ProgramUserRole!
 
-  "Partner (co-investigators only)"
-  partner: Partner
+  "Partner associated with this user, if any."
+  partnerLink: PartnerLinkInput!
 
 }
 
@@ -2565,8 +2565,8 @@ input CreateUserInvitationInput {
   "The role this user will play in the program."
   role: ProgramUserRole!
 
-  "Partner (co-investigators only)"
-  partner: Partner
+  "Partner associated with this user, if any."
+  partnerLink: PartnerLinkInput!
 
 }
 
@@ -2610,8 +2610,8 @@ type UserInvitation {
   "The role the redeemer will play in the program."
   role: ProgramUserRole!
 
-  "Redeemer's partner (co-investigators only)"
-  partner: Partner
+  "Redeemer's partner, if any."
+  partnerLink: PartnerLink!
 
   "The email sent for the invitation"
   email: Email
@@ -3213,40 +3213,75 @@ enum Partner {
    "United States"        US
 }
 
+"""
+Partner link options (and `PartnerLink` discriminator). A user / partner
+relationship is one of (a) the user is associated with a particular partner
+(i.e., `HAS_PARTNER`), (b) the user is explicitly associated with no partner
+(i.e., `HAS_NON_PARTNER`), or (c) the link is simply not set.
+"""
+enum PartnerLinkType {
+  HAS_PARTNER
+  HAS_NON_PARTNER
+  UNSPECIFIED_PARTNER
+}
+
 "Represents the association of a user with a `Partner`, if any."
-interface PartnerAssociation {
-  "Indicates whether the association has been made."
-  isSet: Boolean!
+interface PartnerLink {
+
+  "Partner link discriminator."
+  linkType: PartnerLinkType!
+
 }
 
 """
-A `PartnerAssociation` employed when a user is associated with a specific
+A `PartnerLink` employed when a user is associated with a specific
 `Partner`.
 """
-type HasPartner implements PartnerAssociation {
-  "Always true"
-  isSet: Boolean!
+type HasPartner implements PartnerLink {
+  "Always `HAS_PARTNER`"
+  linkType: PartnerLinkType!
 
   "The associated partner."
   partner: Partner!
 }
 
 """
-A `PartnerAssociation` employed when a user is explicitly associated with
+A `PartnerLink` employed when a user is explicitly associated with
 no `Partner`.
 """
-type HasNoPartner implements PartnerAssociation {
-  "Always true"
-  isSet: Boolean!
+type HasNonPartner implements PartnerLink {
+  "Always `HAS_NON_PARTNER"
+  linkType: PartnerLinkType!
 }
 
 """
-A `PartnerAssociation` employed when a user's `PartnerAssociation` has not
+A `PartnerLink` employed when a user's `PartnerLink` has not
 (yet) been made.
 """
-type NoAssociation implements PartnerAssociation {
-  "Always false"
-  isSet: Boolean!
+type UnspecifiedPartner implements PartnerLink {
+  "Always `UNSPECIFIED_PARTNER`"
+  linkType: PartnerLinkType!
+}
+
+"""
+Describes the user / partner association.  Only one of `partner` or `linkType`
+should be specified, but as long as they are consistent both may be supplied.
+"""
+input PartnerLinkInput {
+
+  """
+  Describes the state of the association between a user and a partner. The
+  link type is assumed to be `HAS_PARTNER` if the `partner` is specified.
+  Otherwise, if `partner` is `null`, the link type is required.
+  """
+  linkType: PartnerLinkType
+
+  """
+  If the user should be associated with a particular partner, it is specified
+  here.  Only set `partner` or `linkType`, but not both.
+  """
+  partner: Partner
+
 }
 
 """
@@ -3333,9 +3368,9 @@ input ProgramPropertiesInput {
 The role a user a plays when assigned to a program.
 """
 enum ProgramUserRole {
-  "Co-Investigator"             COI
+  "Co-Investigator"                    COI
   "Co-Investigator (read-only access)" COI_RO
-  "Staff/Partner Support"       SUPPORT
+  "Staff/Partner Support"              SUPPORT
 }
 
 """
@@ -3350,10 +3385,10 @@ enum ProgramUserSupportRoleType {
 An assignment of a user to a program.
 """
 type ProgramUser {
-  role:   ProgramUserRole!
-  partner: Partner
-  userId: UserId!
-  user:   User
+  role:        ProgramUserRole!
+  partnerLink: PartnerLink!
+  userId:      UserId!
+  user:        User
 }
 
 """
