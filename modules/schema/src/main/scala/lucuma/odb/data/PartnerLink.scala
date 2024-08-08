@@ -9,7 +9,13 @@ import lucuma.core.enums.Partner
 import lucuma.core.util.Enumerated
 import monocle.Iso
 
-
+/**
+ * Embodies the association between a user and a partner, if any.  There are
+ * three possible values: `HasPartner` (meaning the user is tied to a particular
+ * `Partner`), `HasNonPartner` (the user is explicitly not associated with any
+ * `Partner`) and `HasUnspecifiedPartner` (the relationship is not yet
+ * determined).
+ */
 sealed trait PartnerLink extends Product with Serializable {
 
   import PartnerLink.LinkType
@@ -21,9 +27,16 @@ sealed trait PartnerLink extends Product with Serializable {
       _ => LinkType.HasPartner
     )
 
+  /**
+   * Converts to an either where Left(true) is `HasNonPartner`, Left(false) is
+   * `HasUnspecifiedPartner` and Right(partner) is `HasPartner`.
+   */
   def toEither: Either[Boolean, Partner] =
     fold(false.asLeft, true.asLeft, _.asRight)
 
+  /**
+   * Creates an Option[Partner] which is Some when this link is `HasPartner`.
+   */
   def toOption: Option[Partner] =
     toEither.toOption
 
