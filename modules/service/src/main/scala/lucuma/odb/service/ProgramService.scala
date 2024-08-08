@@ -560,7 +560,6 @@ object ProgramService {
       partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      // TODO: PartnerAssociation
       val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, partnerLink)
       user.role match {
         case GuestRole                    => None
@@ -584,7 +583,6 @@ object ProgramService {
       partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      // TODO: PartnerAssociation
       val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, partnerLink)
       user.role match {
         case GuestRole                    => None
@@ -611,7 +609,6 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      // TODO: PartnerAssociation
       val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
