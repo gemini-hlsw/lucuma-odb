@@ -9,6 +9,8 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.PartnerLink
+import lucuma.odb.data.PartnerLink.HasUnspecifiedPartner
 import lucuma.odb.data.ProgramUserRole.Coi
 import lucuma.odb.data.ProgramUserRole.CoiRO
 import lucuma.odb.data.ProgramUserRole.Support
@@ -24,14 +26,14 @@ object LinkUserInput {
         ProgramIdBinding("programId", rProgramId),
         UserIdBinding("userId", rUserId),
         ProgramUserRoleBinding("role", rRole),
-        PartnerBinding.Option("partner", rPartner),
+        PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
       ) =>
-        (rProgramId, rUserId, rRole, rPartner).parTupled.flatMap {
-          case (pid, uid, Coi, Some(partner)) => Result(LinkUserRequest.Coi(pid, partner, uid))
-          case (pid, uid, CoiRO, Some(partner)) => Result(LinkUserRequest.CoiRo(pid, partner, uid))
+        (rProgramId, rUserId, rRole, rPartnerLink).parTupled.flatMap {
+          case (pid, uid, Coi, p) => Result(LinkUserRequest.Coi(pid, p.getOrElse(HasUnspecifiedPartner), uid))
+          case (pid, uid, CoiRO, p) => Result(LinkUserRequest.CoiRo(pid, p.getOrElse(HasUnspecifiedPartner), uid))
           case (pid, uid, Support, None) => Result(LinkUserRequest.Support(pid, uid))
-          case (_, _, Coi | CoiRO, None) => OdbError.InvalidArgument("A partner must be specified for co-investigators.".some).asFailure
-          case (_, _, Support, Some(_)) => OdbError.InvalidArgument("A partner may not be specified for support users.".some).asFailure
+          case (pid, uid, Support, Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid))
+          case (_, _, Support, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
         }
     }
 

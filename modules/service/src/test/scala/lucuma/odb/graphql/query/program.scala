@@ -90,7 +90,12 @@ class program extends OdbSuite {
                     email {
                       status
                     }
-                    partner
+                    partnerLink {
+                      linkType
+                      ... on HasPartner {
+                        partner
+                      }
+                    }
                   }
                 }
               }
@@ -113,7 +118,10 @@ class program extends OdbSuite {
                       "email": {
                         "status": ${EmailStatus.Queued}
                       },
-                      "partner": "US"
+                      "partnerLink": {
+                        "linkType": "HAS_PARTNER",
+                        "partner": "US"
+                      }
                     }
                   ]
                 }

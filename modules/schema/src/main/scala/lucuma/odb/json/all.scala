@@ -10,6 +10,7 @@ object all {
        with EpochCodec
        with GmosCodec
        with NumericCodec
+       with PartnerLinkCodec
        with SequenceCodec
        with SourceProfileCodec
        with StepConfigCodec

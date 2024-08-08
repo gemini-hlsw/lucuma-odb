@@ -21,6 +21,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
 import org.http4s.Charset
 import org.http4s.UrlForm
@@ -78,9 +79,17 @@ class createUserInvitation extends OdbSuite {
   }
 
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
-    test(s"invite ${role.toString.toLowerCase} (without partner)") {
+    test(s"invite ${role.toString.toLowerCase} (non-partner)") {
       createProgramAs(pi).flatMap { pid =>
-        createUserInvitationAs(pi, pid, role, partner = None)
+        createUserInvitationAs(pi, pid, role, partnerLink = PartnerLink.HasNonPartner)
+      }
+    }
+  }
+
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
+    test(s"invite ${role.toString.toLowerCase} (unspecified partner)") {
+      createProgramAs(pi).flatMap { pid =>
+        createUserInvitationAs(pi, pid, role, partnerLink = PartnerLink.HasUnspecifiedPartner)
       }
     }
   }
@@ -97,7 +106,9 @@ class createUserInvitation extends OdbSuite {
                 programId: "$pid"
                 recipientEmail: "$successRecipient"
                 role: ${pur.tag.toUpperCase}
-                partner: US
+                partnerLink: {
+                  partner: US
+                }
               }
             ) {
               invitation {
@@ -211,7 +222,9 @@ class createUserInvitation extends OdbSuite {
             programId: "p-ffff"
             recipientEmail: "$successRecipient"
             role: ${ProgramUserRole.Coi.tag.toUpperCase}
-            partner: US
+            partnerLink: {
+              partner: US
+            }
           }
         ) {
           key
@@ -236,7 +249,9 @@ class createUserInvitation extends OdbSuite {
               programId: "$pid"
               recipientEmail: "$successRecipient"
               role: ${ProgramUserRole.Coi.tag.toUpperCase}
-              partner: US
+              partnerLink: {
+                partner: US
+              }
             }
           ) {
             key
@@ -262,7 +277,9 @@ class createUserInvitation extends OdbSuite {
                 programId: "$pid"
                 recipientEmail: "$successRecipient"
                 role: ${ProgramUserRole.Coi.tag.toUpperCase}
-                partner: US
+                partnerLink: {
+                  partner: US
+                }
               }
             ) {
               key
