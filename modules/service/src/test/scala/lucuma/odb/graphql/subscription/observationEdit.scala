@@ -16,6 +16,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
+import lucuma.odb.data.Existence
 
 class observationEdit extends OdbSuite with SubscriptionUtils {
 
@@ -84,7 +85,11 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     s"""
       subscription {
         observationEdit {
+          observationId
           editType
+          meta: value {
+            existence
+          }
           value {
             id
             title
@@ -99,6 +104,9 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         observationEdit {
           observationId
           editType
+          meta: value {
+            existence
+          }
           value {
             id
           }
@@ -109,10 +117,14 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
   def titleUpdated(oid: Observation.Id, title: String): Json =
     Json.obj(
       "observationEdit" -> Json.obj(
-        "editType" -> Json.fromString(EditType.Updated.tag.toUpperCase),
-        "value"    -> Json.obj(
+        "observationId" -> Json.fromString(oid.show),
+        "editType"      -> Json.fromString(EditType.Updated.tag.toUpperCase),
+        "meta"          -> Json.obj(
+          "existence" -> Json.fromString(Existence.Present.tag.toUpperCase)
+        ),
+        "value"         -> Json.obj(
           "id"    -> oid.asJson,
-          "title" -> Json.fromString(title)
+          "title" -> Json.fromString(title),
         )
       )
     )
@@ -122,6 +134,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       "observationEdit" -> Json.obj(
         "observationId" -> oid.asJson,
         "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
+        "meta"     -> Json.Null,
         "value"    -> Json.Null
       )
     )
@@ -395,6 +408,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
               "observationEdit" : {
                 "observationId" : $oid,
                 "editType" : "UPDATED",
+                "meta" : null,
                 "value" : null
               }
             }
