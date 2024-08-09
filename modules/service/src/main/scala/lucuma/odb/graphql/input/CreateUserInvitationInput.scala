@@ -6,23 +6,23 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.data.EmailAddress
-import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.PartnerLink
+import lucuma.odb.data.PartnerLink.HasUnspecifiedPartner
 import lucuma.odb.data.ProgramUserRole as PUR
 import lucuma.odb.graphql.binding.EmailAddressBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.PartnerBinding
 import lucuma.odb.graphql.binding.ProgramIdBinding
 import lucuma.odb.graphql.binding.ProgramUserRoleBinding
 
 enum CreateUserInvitationInput:
   def programId: Program.Id
   def recipientEmail: EmailAddress
-  case Coi(programId: Program.Id, recipientEmail: EmailAddress, partner: Option[Partner])
-  case CoiRO(programId: Program.Id, recipientEmail: EmailAddress, partner: Option[Partner])
+  case Coi(programId: Program.Id, recipientEmail: EmailAddress, partnerLink: PartnerLink)
+  case CoiRO(programId: Program.Id, recipientEmail: EmailAddress, partnerLink: PartnerLink)
   case Support(programId: Program.Id, recipientEmail: EmailAddress)
 
 object CreateUserInvitationInput:
@@ -33,10 +33,10 @@ object CreateUserInvitationInput:
         ProgramIdBinding("programId", rProgramId),
         EmailAddressBinding("recipientEmail", rRecipientEmail),
         ProgramUserRoleBinding("role", rRole),
-        PartnerBinding.Option("partner", rPartner),
+        PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink)
       ) =>
-        (rProgramId, rRecipientEmail, rRole, rPartner).parTupled.flatMap:
-          case (pid, email, PUR.Coi, p)        => Result(CreateUserInvitationInput.Coi(pid, email, p))
-          case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p))
+        (rProgramId, rRecipientEmail, rRole, rPartnerLink).parTupled.flatMap:
+          case (pid, email, PUR.Coi, p)        => Result(CreateUserInvitationInput.Coi(pid, email, p.getOrElse(HasUnspecifiedPartner)))
+          case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p.getOrElse(HasUnspecifiedPartner)))
           case (pid, email, PUR.Support, None) => Result(CreateUserInvitationInput.Support(pid, email))
           case (_, _, PUR.Support, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure

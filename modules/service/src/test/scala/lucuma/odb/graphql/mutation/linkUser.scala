@@ -10,9 +10,11 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.ProgramUserRole.Coi
 
 class linkUser extends OdbSuite {
 
@@ -230,6 +232,52 @@ class linkUser extends OdbSuite {
         linkCoiAs(pi, service.id -> pid, Partner.US)
       }
     }
+  }
+
+  def testInvalidInput(partnerLinkInput: String): IO[Unit] =
+    createUsers(pi, pi2) >>
+    createProgramAs(pi).flatMap { pid =>
+    expect(
+      user = pi,
+      query = s"""
+        mutation {
+          linkUser(input: {
+            programId: "$pid"
+            userId: "$pi2"
+            role: ${Coi.tag.toScreamingSnakeCase}
+            partnerLink: {
+              $partnerLinkInput
+            }
+          }) {
+            user {
+              userId
+            }
+          }
+        }
+      """,
+      expected = List("Argument 'input.partnerLink' is invalid: Specify either 'linkType' (as `HAS_NON_PARTNER` or `HAS_UNSPECIFIED_PARTNER`) or 'partner'.").asLeft
+    )
+  }
+
+  test("[general] (empty link)") {
+    testInvalidInput("")
+  }
+
+  test("[general] (missing partner)") {
+    testInvalidInput(
+      """
+        linkType: HAS_PARTNER
+      """.stripMargin
+    )
+  }
+
+  test("[general] (conflicting)") {
+    testInvalidInput(
+      """
+        linkType: HAS_NON_PARTNER
+        partner: US
+      """.stripMargin
+    )
   }
 
 }
