@@ -102,8 +102,8 @@ object ProgramService {
     def userId: User.Id
 
   object LinkUserRequest:
-    case class Coi(programId: Program.Id, partner: Partner, userId: User.Id) extends LinkUserRequest
-    case class CoiRo(programId: Program.Id, partner: Partner, userId: User.Id) extends LinkUserRequest
+    case class Coi(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id)   extends LinkUserRequest
+    case class CoiRo(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id) extends LinkUserRequest
     case class Support(programId: Program.Id, userId: User.Id) extends LinkUserRequest
 
   sealed trait LinkUserResponse extends Product with Serializable
@@ -230,8 +230,8 @@ object ProgramService {
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
         val af: Option[AppliedFragment] =
           req match {
-            case LinkUserRequest.Coi(programId, partner, userId) => Statements.linkCoi(programId, userId, Tag(partner.tag), user)
-            case LinkUserRequest.CoiRo(programId, partner, userId) => Statements.linkCoiReadOnly(programId, userId, Tag(partner.tag), user)
+            case LinkUserRequest.Coi(programId, partnerLink, userId) => Statements.linkCoi(programId, userId, partnerLink, user)
+            case LinkUserRequest.CoiRo(programId, partnerLink, userId) => Statements.linkCoiReadOnly(programId, userId, partnerLink, user)
             case LinkUserRequest.Support(programId, userId) => Statements.linkSupport(programId, userId, user)
           }
         af match {
@@ -542,11 +542,11 @@ object ProgramService {
       """.query(program_id)
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, Option[Tag])] =
+    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, PartnerLink)] =
       sql"""
-         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner)
-         SELECT $program_id, $user_id, 'standard', $program_user_role, ${tag.opt}
-        """
+        INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner_link, c_partner)
+        SELECT $program_id, $user_id, 'standard', $program_user_role, $partner_link
+      """
 
     /**
      * Link a co-investigator to a program.
@@ -557,10 +557,10 @@ object ProgramService {
     def linkCoi(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
-      partner: Tag,
+      partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, Some(partner))
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, partnerLink)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -580,10 +580,10 @@ object ProgramService {
     def linkCoiReadOnly(
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
-      partner: Tag,
+      partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, Some(partner))
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, partnerLink)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -609,7 +609,7 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, None)
+      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this
