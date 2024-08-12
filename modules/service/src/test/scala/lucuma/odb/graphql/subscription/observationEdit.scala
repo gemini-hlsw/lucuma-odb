@@ -98,10 +98,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
 
-  val deletedSubscription =
+  def deletedSubscription(pid: Program.Id) =
     s"""
       subscription {
-        observationEdit {
+        observationEdit(input: { programId: "${pid.show}" }) {
           observationId
           editType
           meta: value {
@@ -109,6 +109,25 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           }
           value {
             id
+          }
+        }
+      }
+    """
+
+  def exploreSubscription(pid: Program.Id) =
+    s"""
+      subscription {
+        observationEdit(input: { programId: "${pid.show}" }) {
+          observationId
+          editType
+          meta: value {
+            existence
+          }
+          value {
+            id
+            obsAttachments {
+              id
+            }
           }
         }
       }
@@ -198,6 +217,23 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     }
   }
 
+  test("trigger for new observations with an explore-like query") {
+    import Group1._
+    for {
+      pid  <- createProgram(pi, "foo")
+      _    <-
+      subscriptionExpect(
+        user      = pi,
+        query     = exploreSubscription(pid),
+        mutations =
+          Right(
+              createObservation(pi, "foo subtitle 0", pid) >> createObservation(pi, "foo subtitle 1", pid)
+          ),
+        expected  = List(subtitleCreated("foo subtitle 0"), subtitleCreated("foo subtitle 1"))
+      )
+    } yield ()
+  }
+
   test("trigger for my own new observations (but nobody else's) as guest user") {
     import Group2._
     subscriptionExpect(
@@ -277,7 +313,6 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         subscription {
           observationEdit {
             editType
-            id
           }
         }
       """,
@@ -285,7 +320,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap(createObservation(pi, "foo obs", _)).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED","id":0}}""")
+      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED"}}""")
     )
   }
 
@@ -397,9 +432,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
       oid  <- createObservationAs(pi, pid, None, tid0)
+      // _    <- createObservationAs(pi, pid, None, tid0)
       _    <- subscriptionExpect(
         user      = pi,
-        query     = deletedSubscription,
+        query     = deletedSubscription(pid),
         mutations =
           Right(deleteCalibrationObservation(oid)),
         expected  = List(
