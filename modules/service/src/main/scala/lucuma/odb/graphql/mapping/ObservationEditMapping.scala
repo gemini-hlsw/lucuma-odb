@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 
-import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ObservationView
