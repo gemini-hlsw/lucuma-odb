@@ -27,7 +27,22 @@ object GroupPropertiesInput {
     parentGroupId: Option[Group.Id],
     parentGroupIndex: Option[NonNegShort],
     existence: Existence
-  )
+  ) {
+
+    def withEdit(edit: Edit): Create =
+      Create(
+        edit.name.toOptionOption.getOrElse(name),
+        edit.description.toOptionOption.getOrElse(description),
+        edit.minimumRequired.toOptionOption.getOrElse(minimumRequired),
+        edit.ordered.getOrElse(ordered),
+        edit.minimumInterval.toOptionOption.getOrElse(minimumInterval),
+        edit.maximumInterval.toOptionOption.getOrElse(maximumInterval),
+        edit.parentGroupId.toOptionOption.getOrElse(parentGroupId),
+        edit.parentGroupIndex.orElse(parentGroupIndex),
+        edit.existence.getOrElse(existence)
+      )
+
+  }
 
   case class Edit(
     name: Nullable[NonEmptyString],
