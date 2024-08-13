@@ -16,6 +16,10 @@ import lucuma.core.model.Program
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.CloneGroupInput
+import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -25,10 +29,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.graphql.input.CloneObservationInput
-import lucuma.odb.graphql.input.CloneGroupInput
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
