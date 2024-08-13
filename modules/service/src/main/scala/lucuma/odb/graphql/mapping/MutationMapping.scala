@@ -555,7 +555,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       and(List(
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-        Predicates.observation.calibrationRole.isNull(true),
         WHERE.getOrElse(True)
       ))
     MappedQuery(

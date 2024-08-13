@@ -588,6 +588,101 @@ class calibrations extends OdbSuite {
     } yield ()
   }
 
+  test("calibration observations viz time can be changed") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      cid = ob.collect {
+        case CalibObs(cid, _, Some(_), _) => cid
+      }
+      _    <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        visualizationTime: "2011-12-03T10:15:30Z"
+                      },
+                      WHERE: {
+                        id: { EQ: "${cid.get(0).get}" }
+                      }
+                    }) {
+                      observations {
+                        visualizationTime
+                      }
+                    }
+                  }
+                """,
+                expected =json"""
+                  {
+                    "updateObservations": {
+                      "observations": [ {
+                          "visualizationTime": "2011-12-03 10:15:30"
+                        }
+                      ]
+                    }
+                  }
+                """.asRight
+              )
+    } yield ()
+  }
+
+  test("calibration observations viz time and another field can't be changed") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      cid = ob.collect {
+        case CalibObs(cid, _, Some(_), _) => cid
+      }
+      _    <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        visualizationTime: "2011-12-03T10:15:30Z",
+                        constraintSet: {
+                          cloudExtinction: ONE_POINT_ZERO
+                        }
+                      },
+                      WHERE: {
+                        id: { EQ: "${cid.get(0).get}" }
+                      }
+                    }) {
+                      observations {
+                        visualizationTime
+                      }
+                    }
+                  }
+                """,
+                expected =json"""
+                  {
+                    "updateObservations": {
+                      "observations": [ ]
+                    }
+                  }
+                """.asRight
+              )
+    } yield ()
+  }
+
+
   test("calibration observations can't be cloned") {
     for {
       pid  <- createProgramAs(pi)

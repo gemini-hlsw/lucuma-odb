@@ -387,6 +387,13 @@ object ObservationService {
             val af = Statements.moveObservations(gid.toOption, index, which)
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
+      private def updateVizTime(set: Nullable[Timestamp], which: List[Observation.Id]): F[Unit] =
+        Statements.updateVizTime(set, which).map(af =>
+          session.prepareR(af.fragment.command).use { pq =>
+            pq.execute(af.argument).void
+          }
+        ).getOrElse(Applicative[F].unit)
+
       override def updateObservations(
         SET:   ObservationPropertiesInput.Edit,
         which: AppliedFragment
@@ -405,6 +412,7 @@ object ObservationService {
               g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
               u  = g.values.reduceOption(_ ++ _).orEmpty  // ungrouped: List[Observation.Id]
               _ <- validateBand(g.keys.toList)
+              _ <- ResultT.liftF(updateVizTime(SET.visualizationTime, u).whenA(u.nonEmpty))
               _ <- ResultT(updateObservingModes(SET.observingMode, u))
               _ <- ResultT(setTimingWindows(u, SET.timingWindows.foldPresent(_.orEmpty)))
               _ <- ResultT(g.toList.traverse { case (pid, oids) =>
@@ -965,7 +973,6 @@ object ObservationService {
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
-      val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
 
       val ups: List[AppliedFragment] =
@@ -976,7 +983,6 @@ object ObservationService {
           SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.visualizationTime.foldPresent(upVisualizationTime),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1012,7 +1018,7 @@ object ObservationService {
       def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
         void"UPDATE t_observation "                                              |+|
           void"SET " |+| us.intercalate(void", ") |+| void" "                    |+|
-          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") " |+|
+          void"WHERE t_observation.c_calibration_role IS NULL AND t_observation.c_observation_id IN (" |+| which |+| void") " |+|
           void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
 
       def selectOnly: AppliedFragment =
@@ -1021,7 +1027,23 @@ object ObservationService {
           void"WHERE o.c_observation_id IN (" |+| which |+| void")"
 
       updates(SET).map(_.fold(selectOnly)(update))
+    }
 
+    def updateVizTime(
+      ts:    Nullable[Timestamp],
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] = {
+
+      def update(ts: Option[Timestamp]): AppliedFragment =
+        void"UPDATE t_observation "                                 |+|
+          sql"SET c_visualization_time = ${core_timestamp.opt} "(ts) |+|
+          void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
+
+      ts match {
+        case Nullable.Absent    => none
+        case Nullable.Null      => update(none).some
+        case Nullable.NonNull(t)=> update(t.some).some
+      }
     }
 
     def updateObservingModeType(

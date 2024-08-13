@@ -280,8 +280,7 @@ object CalibrationsService {
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
-      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[Unit] = {
-
+      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[Unit] =
         for {
           cg  <- calibrationsGroup(pid, gnls.size + gsls.size)
           _   <- cg.map(g =>
@@ -290,7 +289,6 @@ object CalibrationsService {
                    }
                  ).getOrElse(Applicative[F].unit)
         } yield ()
-      }
 
       private def spectroPhotometricTargets(when: Instant)(rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]): List[(Target.Id, Coordinates)] =
         rows.map { case (tid, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
