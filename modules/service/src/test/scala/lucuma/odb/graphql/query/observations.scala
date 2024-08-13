@@ -9,8 +9,8 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -133,8 +133,8 @@ class observations extends OdbSuite {
 
   test("select science bands") {
     val allocs = List(
-      AllocationInput(Partner.CA, ScienceBand.Band1, 1.hourTimeSpan),
-      AllocationInput(Partner.CL, ScienceBand.Band2, 10.minTimeSpan)
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CL, ScienceBand.Band2, 10.minTimeSpan)
     )
 
     for {

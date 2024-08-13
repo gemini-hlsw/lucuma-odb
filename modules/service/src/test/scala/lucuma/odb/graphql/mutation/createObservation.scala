@@ -34,6 +34,7 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -400,7 +401,7 @@ class createObservation extends OdbSuite {
 
   test("[general] created observation should have specified science band") {
     createProgramAs(pi)
-      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))))
       .flatMap { pid =>
         query(pi,
           s"""
@@ -431,7 +432,7 @@ class createObservation extends OdbSuite {
 
   test("[general] cannot create observation with inappropriate science band") {
     createProgramAs(pi)
-      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))))
       .flatMap { pid =>
         expect(pi,
           s"""
@@ -455,7 +456,7 @@ class createObservation extends OdbSuite {
 
   test("[general] created ready observation must have a science band") {
     createProgramAs(pi)
-      .flatTap(pid => setOneAllocationAs(staff, pid, Partner.US, ScienceBand.Band2, 1.hourTimeSpan))
+      .flatTap(pid => setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))
       .flatMap { pid =>
         query(pi,
           s"""
@@ -488,7 +489,7 @@ class createObservation extends OdbSuite {
 
   test("[general] created ready observation must fail without a science band") {
     createProgramAs(pi)
-      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan), AllocationInput(Partner.CA, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan), AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 1.hourTimeSpan))))
       .flatMap { pid =>
         expect(pi,
           s"""
@@ -513,7 +514,7 @@ class createObservation extends OdbSuite {
 
   test("[general] create observation with a single science band allocation") {
     createProgramAs(pi)
-      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan))))
+      .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))))
       .flatMap { pid =>
         expect(pi,
           s"""
@@ -543,8 +544,8 @@ class createObservation extends OdbSuite {
 
   test("[general] create observation with a multiple science band allocation") {
     val allocations = List(
-      AllocationInput(Partner.US, ScienceBand.Band1, 1.hourTimeSpan),
-      AllocationInput(Partner.US, ScienceBand.Band2, 1.hourTimeSpan)
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan)
     )
     createProgramAs(pi)
       .flatTap(pid => setAllocationsAs(staff, pid, allocations))

@@ -8,10 +8,10 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class programs extends OdbSuite {

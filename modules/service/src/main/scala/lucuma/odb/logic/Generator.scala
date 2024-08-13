@@ -17,6 +17,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -40,7 +41,6 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.GeneratorParams

@@ -15,8 +15,8 @@ import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
@@ -159,7 +159,7 @@ trait ProgramMapping[F[_]]
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(
           OrderSelection[ScienceBand](AllocationType / "scienceBand"),
-          OrderSelection[Partner](AllocationType / "partner")
+          OrderSelection[TimeAccountingCategory](AllocationType / "category")
         )), child)
       }
 

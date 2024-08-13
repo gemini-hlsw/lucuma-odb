@@ -7,7 +7,6 @@ import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -110,11 +109,11 @@ object AllocationService {
 
     def setAllocations(allocations: NonEmptyList[AllocationInput]): Command[(Program.Id, allocations.type)] =
       sql"""
-        INSERT INTO t_allocation (c_program_id, c_partner, c_science_band, c_duration)
-        VALUES ${(program_id *: partner *: science_band *: time_span).values.list(allocations.size)}
+        INSERT INTO t_allocation (c_program_id, c_ta_category, c_science_band, c_duration)
+        VALUES ${(program_id *: time_accounting_category *: science_band *: time_span).values.list(allocations.size)}
       """.command
          .contramap {
-           (pid, allocs) => allocs.toList.map { a => (pid, a.partner, a.scienceBand, a.duration) }
+           (pid, allocs) => allocs.toList.map { a => (pid, a.category, a.scienceBand, a.duration) }
          }
 
     val DeleteAllocations: Command[Program.Id] =

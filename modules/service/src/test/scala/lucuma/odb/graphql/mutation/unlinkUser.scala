@@ -5,14 +5,17 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.eq.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
 
 class unlinkUser extends OdbSuite {
@@ -67,6 +70,10 @@ class unlinkUser extends OdbSuite {
     yield ()
   }
 
+  private def partnerLinkFor(role: ProgramUserRole): PartnerLink =
+    if (role === ProgramUserRole.Support) PartnerLink.HasUnspecifiedPartner
+    else PartnerLink.HasPartner(Partner.US)
+
   // What can a Guest do?
 
   Enumerated[ProgramUserRole].all.foreach: role =>
@@ -75,7 +82,7 @@ class unlinkUser extends OdbSuite {
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
-          _   <- linkAs(admin, pi2.id, pid, role, Option.when(role != ProgramUserRole.Support)(Partner.US))
+          _   <- linkAs(admin, pi2.id, pid, role, partnerLinkFor(role))
           _   <- unlinkAs(guest, pi2.id, pid)
         yield ()
       } {
@@ -90,18 +97,18 @@ class unlinkUser extends OdbSuite {
       for
         _   <- createUsers(pi1, pi2, pi3)
         pid <- createProgramAs(pi1)
-        _   <- linkAs(pi1, pi2.id, pid, link, Some(Partner.CA))
+        _   <- linkAs(pi1, pi2.id, pid, link, PartnerLink.HasPartner(Partner.CA))
         _   <- assertIO(unlinkAs(pi1, pi2.id, pid), true)
       yield ()
     }
 
-  List(ProgramUserRole.Support).foreach: link =>
-    test(s"PI can't unlink $link (NotAuthorized).") {
+  List(ProgramUserRole.Support).foreach: role =>
+    test(s"PI can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
+          _   <- linkAs(admin, pi2.id, pid, role, partnerLinkFor(role))
           _   <- unlinkAs(pi1, pi2.id, pid)
         yield ()
       } {
@@ -121,13 +128,13 @@ class unlinkUser extends OdbSuite {
     yield ()
   }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
-    test(s"Coi can't unlink $link (NotAuthorized).") {
+  List(ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+    test(s"Coi can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, pi3, admin)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
+          _   <- linkAs(admin, pi2.id, pid, role, partnerLinkFor(role))
           _   <- linkCoiAs(pi1, pi3.id -> pid, Partner.US)
           _   <- unlinkAs(pi3, pi2.id, pid)
         yield ()
@@ -138,14 +145,14 @@ class unlinkUser extends OdbSuite {
 
   // What can NGO user do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
-    test(s"Ngo (CA) can't unlink $link (NotAuthorized).") {
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+    test(s"Ngo (CA) can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
-          _   <- setOneAllocationAs(admin, pid, Partner.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
+          _   <- linkAs(admin, pi2.id, pid, role, partnerLinkFor(role))
+          _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
           _   <- unlinkAs(ngo, pi2.id, pid)
         yield ()
       } {
@@ -156,12 +163,12 @@ class unlinkUser extends OdbSuite {
   // What can superusers do?
 
   List(staff, admin, service).foreach: u =>
-    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: link =>
-      test(s"${u.role.access} can unlink $link.") {
+    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+      test(s"${u.role.access} can unlink $role.") {
         for
           _   <- createUsers(pi1, pi2, u)
           pid <- createProgramAs(pi1)
-          _   <- linkAs(admin, pi2.id, pid, link, Option.when(link != ProgramUserRole.Support)(Partner.US))
+          _   <- linkAs(admin, pi2.id, pid, role, partnerLinkFor(role))
           _   <- assertIO(unlinkAs(u, pi2.id, pid), true)
         yield ()
       }

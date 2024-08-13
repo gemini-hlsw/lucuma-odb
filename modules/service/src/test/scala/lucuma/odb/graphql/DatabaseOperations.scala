@@ -12,6 +12,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
@@ -24,6 +25,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
@@ -50,14 +52,15 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
+import lucuma.odb.json.partnerlink.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.service.EmailService
 import lucuma.odb.syntax.instrument.*
@@ -544,11 +547,11 @@ trait DatabaseOperations { this: OdbSuite =>
   def readAllocations(
     topLevelField: String,
     json:          Json
-  ): IO[Set[(Partner, ScienceBand, BigDecimal)]] =
+  ): IO[Set[(TimeAccountingCategory, ScienceBand, BigDecimal)]] =
     json.hcursor.downFields(topLevelField, "allocations").values.toList.flatten.traverse { obj =>
       val c = obj.hcursor
       (for {
-        p <- c.downField("partner").as[Partner]
+        p <- c.downField("category").as[TimeAccountingCategory]
         b <- c.downField("scienceBand").as[ScienceBand]
         d <- c.downFields("duration", "hours").as[BigDecimal]
       } yield (p, b, d))
@@ -570,7 +573,7 @@ trait DatabaseOperations { this: OdbSuite =>
             allocations: ${allocations.map { a =>
               s"""
                 {
-                  partner: ${a.partner.tag.toScreamingSnakeCase}
+                  category: ${a.category.tag.toScreamingSnakeCase}
                   scienceBand: ${a.scienceBand.tag.toScreamingSnakeCase}
                   duration: {
                     hours: "${a.duration.toHours}"
@@ -580,7 +583,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }.mkString("[\n", ",\n", "]")}
           }) {
             allocations {
-              partner
+              category
               scienceBand
               duration { hours }
             }
@@ -592,18 +595,18 @@ trait DatabaseOperations { this: OdbSuite =>
   def setOneAllocationAs(
     user: User,
     pid: Program.Id,
-    partner: Partner,
+    category: TimeAccountingCategory,
     scienceBand: ScienceBand,
     duration: TimeSpan,
   ): IO[Json] =
-    setAllocationsAs(user, pid, List(AllocationInput(partner, scienceBand, duration)))
+    setAllocationsAs(user, pid, List(AllocationInput(category, scienceBand, duration)))
 
   def linkAs(
     user: User,
     uid: User.Id,
     pid: Program.Id,
     role: ProgramUserRole,
-    partner: Option[Partner]
+    partnerLink: PartnerLink
   ): IO[Unit] =
     expect(
       user = user,
@@ -613,11 +616,19 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: ${pid.asJson}
             userId: ${uid.asJson}
             role: ${role.tag.toUpperCase}
-            ${partner.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
+            partnerLink: {
+              linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
+              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
+            }
           }) {
             user {
               role
-              partner
+              partnerLink {
+                linkType
+                ... on HasPartner {
+                  partner
+                }
+              }
               userId
             }
           }
@@ -628,7 +639,7 @@ trait DatabaseOperations { this: OdbSuite =>
           "linkUser" : {
             "user": {
               "role" : $role,
-              "partner" : $partner,
+              "partnerLink" : $partnerLink,
               "userId" : $uid
             }
           }
@@ -637,19 +648,19 @@ trait DatabaseOperations { this: OdbSuite =>
     )
 
   def linkCoiAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Coi, Some(partner))
+    linkAs(user, uid, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(partner))
 
   def linkCoiAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
     linkCoiAs(user, arrow._1, arrow._2, partner)
 
   def linkObserverAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.CoiRO, Some(partner))
+    linkAs(user, uid, pid, ProgramUserRole.CoiRO, PartnerLink.HasPartner(partner))
 
   def linkObserverAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
     linkObserverAs(user, arrow._1, arrow._2, partner)
 
   def linkSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, None)
+    linkAs(user, uid, pid, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
 
   def linkSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
     linkSupportAs(user, arrow._1, arrow._2)
@@ -1311,8 +1322,8 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid: Program.Id,
     role: ProgramUserRole = ProgramUserRole.Coi,
-    partner: Option[Partner] = Some(Partner.US),
-    recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get
+    partnerLink: PartnerLink = PartnerLink.HasPartner(Partner.US),
+    recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get,
   ): IO[UserInvitation] =
     query(
       user = user,
@@ -1323,7 +1334,10 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             recipientEmail: "$recipientEmail"
             role: ${role.tag.toUpperCase}
-            ${partner.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
+            partnerLink: {
+              linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
+              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
+            }
           }
         ) {
           key
