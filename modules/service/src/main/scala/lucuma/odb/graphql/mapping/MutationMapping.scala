@@ -51,6 +51,7 @@ import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
+import lucuma.odb.graphql.input.CloneGroupInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -97,7 +98,6 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.CloneGroupInput
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
