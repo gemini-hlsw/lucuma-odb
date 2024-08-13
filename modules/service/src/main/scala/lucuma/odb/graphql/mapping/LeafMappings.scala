@@ -15,8 +15,10 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
@@ -41,12 +43,12 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.PartnerLink.LinkType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
@@ -139,6 +141,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Partner](PartnerType),
+      LeafMapping[LinkType](PartnerLinkTypeType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
@@ -170,6 +173,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
       LeafMapping[Target.Id](TargetIdType),
+      LeafMapping[TimeAccountingCategory](TimeAccountingCategoryType),
       LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),

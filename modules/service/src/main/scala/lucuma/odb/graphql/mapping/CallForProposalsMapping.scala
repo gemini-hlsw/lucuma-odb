@@ -39,10 +39,12 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       SqlObject("coordinateLimits"),
       SqlField("submissionDeadlineDefault", CallForProposalsView.DeadlineDefault),
       SqlObject("active"),
-      SqlObject("partners",   Join(CallForProposalsView.Id, CallForProposalsPartnerView.CfpId)),
-      SqlField("instruments", CallForProposalsView.Instruments),
-      SqlField("existence",   CallForProposalsView.Existence),
-      SqlField("_isOpen",     CallForProposalsView.IsOpen, hidden = true)
+      SqlObject("partners",          Join(CallForProposalsView.Id, CallForProposalsPartnerView.CfpId)),
+      SqlField("allowsNonPartnerPi", CallForProposalsView.AllowsNonPartner),
+      SqlField("nonPartnerDeadline", CallForProposalsView.NonPartnerDeadline),
+      SqlField("instruments",        CallForProposalsView.Instruments),
+      SqlField("existence",          CallForProposalsView.Existence),
+      SqlField("_isOpen",            CallForProposalsView.IsOpen, hidden = true)
     )
 
   lazy val CallForProposalsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

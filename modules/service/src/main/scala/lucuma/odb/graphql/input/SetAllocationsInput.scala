@@ -31,8 +31,8 @@ object SetAllocationsInput {
       ) =>
         val rValidAllocations = rAllocations.flatMap { allocations =>
           Matcher
-            .validationFailure("Each partner + band combination may only appear once.")
-            .unlessA(allocations.map(a => (a.partner, a.scienceBand)).toSet.size === allocations.size)
+            .validationFailure("Each category + band combination may only appear once.")
+            .unlessA(allocations.map(a => (a.category, a.scienceBand)).toSet.size === allocations.size)
             .as(allocations)
         }
         (rProgramId, rValidAllocations).mapN(apply)

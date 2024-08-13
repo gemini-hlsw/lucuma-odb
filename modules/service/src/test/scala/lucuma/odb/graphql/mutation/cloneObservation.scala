@@ -12,8 +12,8 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
@@ -278,7 +278,7 @@ class cloneObservation extends OdbSuite {
     val setup =
       for
         pid <- createProgramAs(pi)
-        _   <- setOneAllocationAs(staff, pid, Partner.US, ScienceBand.Band1, 1.hourTimeSpan)
+        _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan)
         oid <- createObservationAs(pi, pid)
         _   <- updateFields(oid)
       yield oid

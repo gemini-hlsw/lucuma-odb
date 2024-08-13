@@ -300,4 +300,35 @@ class callsForProposals extends OdbSuite {
     }
   }
 
+  test("WHERE allowsNonPartnerPi") {
+    expect(pi,
+      s"""
+        query {
+          callsForProposals(WHERE: { allowsNonPartnerPi: { EQ: true } }) {
+            matches {
+              id
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "callsForProposals": {
+            "matches": [
+              {
+                "id": "c-100"
+              },
+              {
+                "id": "c-102"
+              },
+              {
+                "id": "c-103"
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+  }
+
 }

@@ -4,6 +4,7 @@
 package lucuma.odb.util
 
 import cats.syntax.apply.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -16,9 +17,11 @@ import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
@@ -48,7 +51,6 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.CalibrationRole
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -56,6 +58,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
@@ -381,6 +384,9 @@ trait Codecs {
       ObservationReference.fromString.reverseGet
     )
 
+  val partner_link_type: Codec[PartnerLink.LinkType] =
+    enumerated(Type("e_partner_link"))
+
   val proposal_reference: Codec[ProposalReference] =
     text.eimap(
       s => ProposalReference.fromString.getOption(s).toRight(s"Invalid proposal reference: $s"))(
@@ -482,6 +488,9 @@ trait Codecs {
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
 
+  val time_accounting_category: Codec[TimeAccountingCategory] =
+    enumerated(Type.varchar)
+
   val time_charge_correction_op: Codec[TimeChargeCorrection.Op] =
     enumerated(Type("e_time_charge_correction_op"))
 
@@ -582,6 +591,15 @@ trait Codecs {
     (angle_µas *: angle_µas).imap { (p, q) =>
       Offset(Offset.P(p), Offset.Q(q))
     }(o => (o.p.toAngle, o.q.toAngle))
+
+  val partner_link: Codec[PartnerLink] =
+    (partner_link_type *: partner.opt).eimap { (l, p) =>
+      l match {
+        case PartnerLink.LinkType.HasPartner            => p.toRight("Invalid data: has_partner link type without partner").map(PartnerLink.HasPartner.apply)
+        case PartnerLink.LinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
+        case PartnerLink.LinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
+      }
+    } { pl => (pl.linkType, pl.toOption) }
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
     (gcal_continuum.opt *:
