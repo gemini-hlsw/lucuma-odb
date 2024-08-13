@@ -232,6 +232,7 @@ object ProgramService {
                 case ServiceUser(_, _) =>
                   Concurrent[F].unit
                 case nonServiceUser    =>
+                  // Link the PI to the program.
                   session.executeCommand(
                     Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
                   ).void

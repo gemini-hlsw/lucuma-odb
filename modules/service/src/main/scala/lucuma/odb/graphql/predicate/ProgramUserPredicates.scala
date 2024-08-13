@@ -10,8 +10,8 @@ import lucuma.odb.data.ProgramUserRole
 
 class ProgramUserPredicates(path: Path) {
 
-  lazy val role     = LeafPredicates[ProgramUserRole](path / "role")
-  lazy val user     = LeafPredicates[User.Id](path / "userId")
+  lazy val role = LeafPredicates[ProgramUserRole](path / "role")
+  lazy val user = LeafPredicates[User.Id](path / "userId")
 
   def isPi: Predicate =
     role.eql(ProgramUserRole.Pi)
