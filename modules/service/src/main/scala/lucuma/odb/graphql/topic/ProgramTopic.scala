@@ -66,22 +66,9 @@ object ProgramTopic {
   ): F[List[User.Id]] =
     val q =
       sql"""
-        select c_pi_user_id from t_program where c_program_id = '#${pid.toString}'
-        and c_pi_user_id is not null
-        union
         select c_user_id from t_program_user where c_program_id = '#${pid.toString}'
-        """.query(user_id)
+      """.query(user_id)
     s.execute(q)
-
-  // def SelectProgramUsers: Query[Program.Id, User.Id] =
-  //   sql"""
-  //     select c_pi_user_id from t_program where c_program_id = $program_id
-  //     and c_pi_user_id is not null
-  //     union
-  //     select c_user_id from t_program_user where c_program_id = $program_id
-  //     """
-  //     .query(user_id)
-  //     .contramap(pid => pid ~ pid)
 
   def elements[F[_]: Concurrent: Logger](
     s: Session[F],

@@ -3385,6 +3385,7 @@ input ProgramPropertiesInput {
 The role a user a plays when assigned to a program.
 """
 enum ProgramUserRole {
+  "Primary Investigator"               PI
   "Co-Investigator"                    COI
   "Co-Investigator (read-only access)" COI_RO
   "Staff/Partner Support"              SUPPORT
@@ -8483,7 +8484,7 @@ type Program {
   proposalStatus: ProposalStatus!
 
   "Principal Investigator"
-  pi: User
+  pi: ProgramUser
 
   "Users assigned to this science program"
   users:   [ProgramUser!]!

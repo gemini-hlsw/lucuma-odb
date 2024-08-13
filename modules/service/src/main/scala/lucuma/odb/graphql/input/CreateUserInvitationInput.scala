@@ -40,3 +40,4 @@ object CreateUserInvitationInput:
           case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p.getOrElse(HasUnspecifiedPartner)))
           case (pid, email, PUR.Support, None) => Result(CreateUserInvitationInput.Support(pid, email))
           case (_, _, PUR.Support, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
+          case (_, _, PUR.Pi, _)               => OdbError.InvalidArgument("Cannot create an invitation for the PI.".some).asFailure
