@@ -29,7 +29,9 @@ SELECT
   null::d_tag,
   'has_unspecified_partner'::e_partner_link
 FROM t_program p
-WHERE p.c_pi_user_id IS NOT NULL;
+WHERE p.c_pi_user_id IS NOT NULL
+ON CONFLICT (c_program_id, c_user_id)
+DO UPDATE SET c_role = EXCLUDED.c_role;
 
 
 ALTER TABLE t_chron_program_update
