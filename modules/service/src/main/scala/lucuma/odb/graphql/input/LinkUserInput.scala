@@ -13,6 +13,7 @@ import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.PartnerLink.HasUnspecifiedPartner
 import lucuma.odb.data.ProgramUserRole.Coi
 import lucuma.odb.data.ProgramUserRole.CoiRO
+import lucuma.odb.data.ProgramUserRole.Pi
 import lucuma.odb.data.ProgramUserRole.Support
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.service.ProgramService
@@ -34,6 +35,7 @@ object LinkUserInput {
           case (pid, uid, Support, None) => Result(LinkUserRequest.Support(pid, uid))
           case (pid, uid, Support, Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid))
           case (_, _, Support, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
+          case (_, _, Pi, _) => OdbError.InvalidArgument("PIs are linked at program creation time.".some).asFailure
         }
     }
 

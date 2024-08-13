@@ -40,6 +40,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val observationEdit               = ObservationEditPredicates(Path.from(ObservationEditType))
     val program                       = ProgramPredicates(Path.from(ProgramType))
     val programEdit                   = ProgramEditPredicates(Path.from(ProgramEditType))
+    val programUser                   = ProgramUserPredicates(Path.from(ProgramUserType))
     val proposal                      = ProposalPredicates(Path.from(ProposalType))
     val proposalAttachment            = ProposalAttachmentPredicates(Path.from(ProposalAttachmentType))
     val recordDatasetResult           = RecordDatasetResultPredicates(Path.from(RecordDatasetResultType))

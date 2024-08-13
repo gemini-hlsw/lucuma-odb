@@ -87,6 +87,7 @@ class unlinkUser extends OdbSuite {
         yield ()
       } {
         case OdbError.NotAuthorized(guest.id, _) => // this is what we expect
+        case OdbError.InvalidArgument(Some("Argument 'input' is invalid: PIs are linked at program creation time.")) => // ok
       }
     }
 
