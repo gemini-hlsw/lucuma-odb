@@ -3099,11 +3099,6 @@ input ObservationPropertiesInput {
   scienceBand: ScienceBand
 
   """
-  Reference time used for time-dependent calculations such as average parallactic angle
-  """
-  visualizationTime: Timestamp
-
-  """
   Position angle constraint, if any. Set to null to remove all position angle constraints
   """
   posAngleConstraint: PosAngleConstraintInput

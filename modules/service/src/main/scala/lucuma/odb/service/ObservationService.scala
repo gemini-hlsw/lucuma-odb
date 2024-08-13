@@ -50,7 +50,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
-import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
@@ -661,7 +660,6 @@ object ObservationService {
           SET.status.getOrElse(ObsStatus.New),
           SET.activeStatus.getOrElse(ObsActiveStatus.Active),
           SET.scienceBand,
-          SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           SET.targetEnvironment.flatMap(_.explicitBase),
@@ -683,7 +681,6 @@ object ObservationService {
       status:              ObsStatus,
       activeState:         ObsActiveStatus,
       scienceBand:         Option[ScienceBand],
-      visualizationTime:   Option[Timestamp],
       posAngleConsMode:    PosAngleConstraintMode,
       posAngle:            Angle,
       explicitBase:        Option[Coordinates],
@@ -707,7 +704,6 @@ object ObservationService {
            status      ,
            activeState ,
            scienceBand ,
-           visualizationTime             ,
            posAngleConsMode              ,
            posAngle                      ,
            explicitBase.map(_.ra)        ,
@@ -752,7 +748,6 @@ object ObservationService {
       ObsStatus                        ,
       ObsActiveStatus                  ,
       Option[ScienceBand]              ,
-      Option[Timestamp]                ,
       PosAngleConstraintMode           ,
       Angle                            ,
       Option[RightAscension]           ,
@@ -788,7 +783,6 @@ object ObservationService {
           c_status,
           c_active_status,
           c_science_band,
-          c_visualization_time,
           c_pac_mode,
           c_pac_angle,
           c_explicit_ra,
@@ -823,7 +817,6 @@ object ObservationService {
           $obs_status,
           $obs_active_status,
           ${science_band.opt},
-          ${core_timestamp.opt},
           $pac_mode,
           $angle_µas,
           ${right_ascension.opt},
@@ -965,7 +958,6 @@ object ObservationService {
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
-      val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
 
       val ups: List[AppliedFragment] =
@@ -976,7 +968,6 @@ object ObservationService {
           SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.visualizationTime.foldPresent(upVisualizationTime),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
