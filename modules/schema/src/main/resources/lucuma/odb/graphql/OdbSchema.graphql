@@ -2483,6 +2483,16 @@ type GmosSouthStep {
 
 }
 
+input CloneGroupInput {
+  groupId: GroupId!
+  SET: GroupPropertiesInput
+}
+
+type CloneGroupResult {
+  originalGroup: Group!
+  newGroup: Group!
+}
+
 """
 Whether guiding is enabled for a particular science step.
 """
@@ -2766,6 +2776,13 @@ type Mutation {
     """
     input: CloneObservationInput!
   ): CloneObservationResult!
+
+  """
+  Copy this group and its contents, recursively, as a sibling of itself.
+  """
+  cloneGroup(
+    input: CloneGroupInput!
+  ): CloneGroupResult!
 
   """
   Makes a copy of an existing target, setting it to unobserved and to PRESENT.  If `REPLACE_IN` observationIds are specified in the input, the clone will replace the existing target in those observations

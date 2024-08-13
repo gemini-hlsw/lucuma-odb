@@ -1425,4 +1425,22 @@ trait DatabaseOperations { this: OdbSuite =>
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
+
+  def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          cloneGroup(input: {
+            groupId: "$gid"
+          }) {
+            newGroup {
+              id
+            }
+          }
+        }
+        """
+    ).map: j =>
+      j.hcursor.downFields("cloneGroup", "newGroup", "id").require[Group.Id]
+
 }

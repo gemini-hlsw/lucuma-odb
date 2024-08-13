@@ -26,13 +26,16 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 import lucuma.odb.graphql.input.CloneObservationInput
+import lucuma.odb.graphql.input.CloneGroupInput
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(programId: Program.Id): F[GroupTree]
   def selectPid(groupId: Group.Id): F[Option[Program.Id]]
-  // def cloneGroup(groupId: Group.Id): F[Result[Group.Id]]
+  def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
 }
 
 object GroupService {
@@ -68,12 +71,6 @@ object GroupService {
         programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
           r.traverse(createGroupImpl(_, input.SET, input.initialContents, system))
 
-      // Clone the `elem` into `dest`, at the end.
-      private def cloneGroupElementInto(elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
-        elem match
-          case Left(gid)  => cloneGroupInto(gid, dest).map(_.asLeft)
-          case Right(oid) => cloneObservationInto(oid, dest).map(_.asRight)
-
       // Clone `oid` into `dest`, at the end.
       private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
         ResultT(
@@ -90,50 +87,51 @@ object GroupService {
           )
         ).map(_.cloneId)
 
-      private def selectProgramId(gid: Group.Id): ResultT[F, Program.Id] =
-        ResultT.success:
-          session.prepareR(Statements.SelectPid).use: pq =>
-            pq.unique(gid)
-
-      private def selectGroupAsInput(gid: Group.Id): ResultT[F, CreateGroupInput] =
-        ResultT.success:
-          session.prepareR(Statements.SelectGroupAsInput).use: pq =>
-            pq.unique(gid)
-
       // Clone `gid` into `dest`, at the end, as an empty group.
-      private def cloneAsEmptyGroupInto(gid: Group.Id, dest: Option[Group.Id], index: Option[NonNegShort] = None)(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneAsEmptyGroupInto(gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
         selectGroupAsInput(gid).flatMap: input => 
           ResultT(createGroup(input.copy(SET = input.SET.copy(parentGroupId = dest, parentGroupIndex = None))))
         
       // Clone `gid` into `dest`, at the end, and clone its contents too.
-      private def cloneGroupInto(gid: Group.Id, dest: Option[Group.Id], index: Option[NonNegShort] = None)(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneGroupInto(gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
         for
-          gid0 <- cloneAsEmptyGroupInto(gid, dest, index)
+          gid0 <- cloneAsEmptyGroupInto(gid, dest)
           es   <- selectGroupElements(gid) // find the children of the source group
           _    <- es.traverse(cloneGroupElementInto(_, Some(gid0))) // clone the children, recursively, into the new group
         yield gid
 
+      // Clone the `elem` into `dest`, at the end.
+      private def cloneGroupElementInto(elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
+        elem match
+          case Left(gid)  => cloneGroupInto(gid, dest).map(_.asLeft)
+          case Right(oid) => cloneObservationInto(oid, dest).map(_.asRight)
+
+      /** Construct a CreateGroupInput that would clone `gid`. */
+      private def selectGroupAsInput(gid: Group.Id): ResultT[F, CreateGroupInput] =
+        ResultT:
+          session.prepareR(Statements.SelectGroupAsInput).use: pq =>
+            pq.unique(gid).map:
+              case (cgi, false) => Result.success(cgi)
+              case (_, true)    => OdbError.UpdateFailed(Some("System groups cannot be cloned.")).asFailure
+
       // Select the elements of `gid`, in order.
       private def selectGroupElements(gid: Group.Id): ResultT[F, List[GroupElement.Id]] =
-        ???
-
-      extension (n: NonNegShort) def unsafeSucc: NonNegShort =
-        NonNegShort.unsafeFrom((n.value + 1).toShort)
-
-      extension (SET: GroupPropertiesInput.Create) def nextSibling: GroupPropertiesInput.Create =
-        SET.copy(parentGroupIndex = SET.parentGroupIndex.map(_.unsafeSucc))
-
-      extension (input: CreateGroupInput) def nextSibling: CreateGroupInput =
-        input.copy(SET = input.SET.nextSibling)
+        ResultT:
+          session.prepareR(Statements.SelectGroupElements).use: pq =>
+            pq.stream(gid, 1024).compile.toList.map(Result.success)
 
       // Clone `gid` as a sibling.
-      private def cloneGroupAsSibling(gid: Group.Id)(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneGroupImpl(input: CloneGroupInput)(using Transaction[F]): ResultT[F, Group.Id] =
         for
-          inp <- selectGroupAsInput(gid)
-          clo <- ResultT(createGroup(inp.nextSibling, false))
-          els <- selectGroupElements(gid)
-          _   <- els.traverse(cloneGroupElementInto(_, Some(clo)))
-        yield clo
+          cgi   <- selectGroupAsInput(input.groupId)
+          cgiʹ   = cgi.copy(SET = input.SET.foldLeft(cgi.SET)(_.withEdit(_)))
+          clone <- ResultT(createGroup(cgiʹ, false))
+          elems <- selectGroupElements(input.groupId)
+          _     <- elems.traverse(cloneGroupElementInto(_, Some(clone)))
+        yield clone
+
+      def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]] =
+        cloneGroupImpl(input).value
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of
@@ -323,11 +321,31 @@ object GroupService {
            c_group_id = $group_id
        """.query(program_id)
 
+      /** Select group elements in a group, in order. */
+      val SelectGroupElements: Query[Group.Id, GroupElement.Id] =
+        sql"""
+          SELECT c_group_id, c_observation_id
+          FROM (
+            SELECT null c_group_id, c_observation_id, c_group_index
+            FROM t_observation WHERE c_group_id = $group_id
+            UNION
+            SELECT c_group_id, null, c_parent_index
+            FROM t_group WHERE c_parent_id = $group_id
+          ) sub ORDER BY c_group_index
+        """
+          .contramap[Group.Id](a => (a, a))
+          .query(
+            (group_id.opt ~ observation_id.opt).emap:
+              case (None, Some(oid)) => Right(Right(oid))
+              case (Some(gid), None) => Right(Left(gid))
+              case (a, b)            => Left("SelectGroupElements: unpossible row: $a, $b")
+          )
+
       /** Select a `CreateGroupInput` for a given `Group.Id` that can be used to create an empty clone. */
-      val SelectGroupAsInput: Query[Group.Id, CreateGroupInput] =
+      val SelectGroupAsInput: Query[Group.Id, (CreateGroupInput, Boolean)] =
         sql"""
           SELECT
-            c_progam_id,
+            c_program_id,
             c_parent_id,
             c_parent_index,
             c_name,
@@ -337,6 +355,7 @@ object GroupService {
             c_min_interval,
             c_max_interval,
             c_existence,
+            c_system
           FROM
             t_group
           WHERE
@@ -351,10 +370,11 @@ object GroupService {
             bool ~
             time_span.opt ~
             time_span.opt ~
-            existence
+            existence ~
+            bool
           ).map: 
-            case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi =>
-              CreateGroupInput(
+            case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys =>
+              (CreateGroupInput(
                 programId = Some(pid),
                 proposalReference = None,
                 programReference = None,
@@ -370,8 +390,7 @@ object GroupService {
                   existence = exi,
                 ),
                 initialContents = Nil
-              )
-            
+              ), sys)
 
 
   }
