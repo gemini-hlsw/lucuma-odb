@@ -17,15 +17,11 @@ class ProgramPredicates(path: Path) {
   lazy val id             = LeafPredicates[Program.Id](path / "id")
   lazy val referenceLabel = LeafPredicates[ProgramReference](path / "reference" / "label")
   lazy val proposal       = new ProposalPredicates(path / "proposal")
-  lazy val piUserId       = LeafPredicates[User.Id](path / "piUserId")
 
   def isVisibleTo(user: User): Predicate =
     user.role.access match {
       case Guest | Pi =>
-        Or(
-          Contains(path / "users" / "userId", Const(user.id)), // user is linked, or
-          piUserId.eql(user.id)            // user is the PI
-        )
+        Contains(path / "users" / "userId", Const(user.id)) // user is linked
       case Ngo => ???
       case Staff | Admin | Service => True
     }

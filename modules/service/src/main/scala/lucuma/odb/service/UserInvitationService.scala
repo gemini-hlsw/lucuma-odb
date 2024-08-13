@@ -27,6 +27,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
@@ -145,7 +146,7 @@ object UserInvitationService:
                   xa.savepoint.flatMap: sp =>
                     session
                       .prepareR(ProgramService.Statements.LinkUser.command)
-                      .use(_.execute(pid, user.id, r, partnerLink))
+                      .use(_.execute(pid, user.id, UserType.Standard, r, partnerLink))
                       .as(Result(input.key.id))
                       .recoverWith:
                         case SqlState.UniqueViolation(_) =>
@@ -198,10 +199,16 @@ object UserInvitationService:
           null
         ) from t_program
         where c_program_id = $program_id
-        and c_pi_user_id = $user_id
+        and EXISTS (
+          SELECT 1
+          FROM t_program_user u
+          WHERE u.c_program_id = $program_id
+          AND   u.c_user_id    = $user_id
+          AND   u.c_role       = 'pi'
+        )
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.toOption, pid, u.id))
+        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.toOption, pid, pid, u.id))
 
     val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, PartnerLink)] =
       sql"""

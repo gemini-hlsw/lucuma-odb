@@ -20,9 +20,7 @@ class GitHub_1 extends OdbSuite {
         mutation {
           createProgram(input:{ }) {
             program {
-              pi {
-                id
-              }
+              pi { user { id } }
               users {
                 user {
                   id
@@ -38,7 +36,9 @@ class GitHub_1 extends OdbSuite {
             "createProgram" : {
               "program" : {
                 "pi" : {
-                  "id" : ${pi.id}
+                  "user": {
+                    "id" : ${pi.id}
+                  }
                 },
                 "users" : [
                 ]
