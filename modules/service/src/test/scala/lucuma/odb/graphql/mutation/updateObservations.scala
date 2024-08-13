@@ -763,92 +763,6 @@ class updateObservations extends OdbSuite
 
   }
 
-  // test("visualization time: set") {
-  //
-  //   val update   = """
-  //     visualizationTime: "2022-08-30 17:18:00"
-  //   """
-  //
-  //   val query    = "observations { visualizationTime }"
-  //
-  //   val expected = json"""
-  //     {
-  //       "updateObservations": {
-  //         "observations": [
-  //           {
-  //             "visualizationTime": "2022-08-30 17:18:00"
-  //           }
-  //         ]
-  //       }
-  //     }
-  //   """.asRight
-  //
-  //   oneUpdateTest(pi, update, query, expected)
-  // }
-  //
-  // test("visualization time: set ISO-8601") {
-  //
-  //   val update = """
-  //     visualizationTime: "2022-08-30 17:18:00"
-  //   """
-  //
-  //   val query = "observations { visualizationTime }"
-  //
-  //   val expected = json"""
-  //     {
-  //       "updateObservations": {
-  //         "observations": [
-  //           {
-  //             "visualizationTime": "2022-08-30 17:18:00"
-  //           }
-  //         ]
-  //       }
-  //     }
-  //   """.asRight
-  //
-  //   oneUpdateTest(pi, update, query, expected)
-  // }
-  //
-  // test("visualization time: delete") {
-  //
-  //   val update0  = """
-  //     visualizationTime: "2022-08-30 17:18:00"
-  //   """
-  //
-  //   val update1 = """
-  //     visualizationTime: null
-  //   """
-  //
-  //   val query    = "observations { visualizationTime }"
-  //
-  //   val expected0 = json"""
-  //     {
-  //       "updateObservations": {
-  //         "observations": [
-  //           {
-  //             "visualizationTime": "2022-08-30 17:18:00"
-  //           }
-  //         ]
-  //       }
-  //     }
-  //   """.asRight
-  //
-  //   val expected1 = json"""
-  //     {
-  //       "updateObservations": {
-  //         "observations": [
-  //           {
-  //             "visualizationTime": null
-  //           }
-  //         ]
-  //       }
-  //     }
-  //   """.asRight
-  //
-  //   multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
-  //
-  // }
-  //
   test("pos angle constraint: update") {
     oneUpdateTest(
       user = pi,
@@ -1952,6 +1866,38 @@ trait UpdateConstraintSetOps { this: OdbSuite =>
     expect(
       user     = user,
       query    = updateObservationsMutation(oid, update, query),
+      expected = expected.leftMap(msg => List(msg))
+    )
+
+  def updateObservationsTimesMutation(
+    oid:    Observation.Id,
+    update: String,
+    query:  String
+  ): String = s"""
+    mutation {
+      updateObservationsTimes(input: {
+        SET: {
+          $update
+        },
+        WHERE: {
+          id: { EQ: ${oid.asJson} }
+        }
+      }) {
+        $query
+      }
+    }
+  """
+
+  def updateObservationTimes(
+    user:     User,
+    oid:      Observation.Id,
+    update:   String,
+    query:    String,
+    expected: Either[String, Json]
+  ): IO[Unit] =
+    expect(
+      user     = user,
+      query    = updateObservationsTimesMutation(oid, update, query),
       expected = expected.leftMap(msg => List(msg))
     )
 

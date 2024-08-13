@@ -168,33 +168,11 @@ class calibrations extends OdbSuite {
           }
       """
     )
+
   def formatLD(ld: LocalDate): String = {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
     ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
   }
-
-  def updateVizTime(oid: Observation.Id, vt: LocalDate): IO[Json] =
-    query(
-      service,
-      s"""
-        mutation {
-          updateObservations(input: {
-            WHERE: {
-              id: {
-                EQ: "$oid"
-              }
-            },
-            SET: {
-              visualizationTime: "${formatLD(vt)}"
-            }
-          }) {
-            observations {
-              id
-            }
-          }
-        }
-      """
-    )
 
   private def scienceRequirements(oid: Observation.Id): IO[Json] =
     query(
@@ -581,6 +559,53 @@ class calibrations extends OdbSuite {
                   {
                     "updateObservations": {
                       "observations": []
+                    }
+                  }
+                """.asRight
+              )
+    } yield ()
+  }
+
+  test("calibration observations obs time can be changed") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      cid = ob.collect {
+        case CalibObs(cid, _, Some(_), _) => cid
+      }
+      _    <- expect(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservationsTimes(input: {
+                      SET: {
+                        observationTime: "2011-12-03T10:15:30Z"
+                      },
+                      WHERE: {
+                        id: { EQ: "${cid.get(0).get}" }
+                      }
+                    }) {
+                      observations {
+                        observationTime
+                      }
+                    }
+                  }
+                """,
+                expected =json"""
+                  {
+                    "updateObservationsTimes": {
+                      "observations": [ {
+                          "observationTime": "2011-12-03 10:15:30"
+                        }
+                      ]
                     }
                   }
                 """.asRight

@@ -47,12 +47,10 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
 
-import java.time.LocalDateTime
 import scala.collection.immutable.SortedMap
 
 class createObservation extends OdbSuite {
@@ -574,35 +572,6 @@ class createObservation extends OdbSuite {
           """.asRight
         )
       }
-  }
-
-  test("[general] created observation should have specified visualization time") {
-    createProgramAs(pi).flatMap { pid =>
-      query(pi,
-        s"""
-        mutation {
-          createObservation(input: {
-            programId: ${pid.asJson}
-            SET: {
-              visualizationTime: "2022-08-29 18:01:00"
-            }
-          }) {
-            observation {
-              visualizationTime
-            }
-          }
-        }
-        """).flatMap { js =>
-        val get = js.hcursor
-          .downField("createObservation")
-          .downField("observation")
-          .downField("visualizationTime")
-          .as[Timestamp]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-        assertIO(get, Timestamp.fromLocalDateTime(LocalDateTime.of(2022, 8, 29, 18, 1, 0, 0)).get)
-      }
-    }
   }
 
   test("[general] created observation should have specified active status") {
