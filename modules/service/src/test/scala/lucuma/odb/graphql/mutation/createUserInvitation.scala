@@ -265,6 +265,31 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
+  test("pi can't invite a user to become the pi") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+        mutation {
+          createUserInvitation(
+            input: {
+              programId: "$pid"
+              recipientEmail: "$successRecipient"
+              role: ${ProgramUserRole.Pi.tag.toUpperCase}
+              partnerLink: {
+                partner: US
+              }
+            }
+          ) {
+            key
+          }
+        }
+        """,
+        expected = List(s"Argument 'input' is invalid: Cannot create an invitation for the PI.").asLeft
+      )
+    }
+  }
+
   List(guest, ngo).foreach: user =>
     test(s"${user.role.access} can't invite a user") {
       createProgramAs(user).flatMap { pid =>

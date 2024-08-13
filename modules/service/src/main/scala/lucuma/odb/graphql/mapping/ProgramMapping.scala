@@ -69,9 +69,8 @@ trait ProgramMapping[F[_]]
       SqlField("type", ProgramTable.ProgramType),
       SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
 
-      SqlField("piUserId", ProgramTable.PiUserId, hidden = true),
       SqlField("proposalStatus", ProgramTable.ProposalStatus),
-      SqlObject("pi", Join(ProgramTable.PiUserId, UserTable.UserId)),
+      SqlObject("pi", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
       SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
       SqlObject("observations"),
       SqlObject("proposal", Join(ProgramTable.Id, ProposalView.ProgramId)),
@@ -87,6 +86,16 @@ trait ProgramMapping[F[_]]
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (ProgramType, "pi", Nil) =>
+      Elab.transformChild { child =>
+        Unique(Filter(Predicates.programUser.isPi, child))
+      }
+
+    case (ProgramType, "users", Nil) =>
+      Elab.transformChild { child =>
+        Filter(Predicates.programUser.isNotPi, child)
+      }
 
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),

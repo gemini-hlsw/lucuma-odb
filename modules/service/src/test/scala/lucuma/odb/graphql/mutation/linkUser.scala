@@ -14,7 +14,9 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.PartnerLink
 import lucuma.odb.data.ProgramUserRole.Coi
+import lucuma.odb.data.ProgramUserRole.Pi
 
 class linkUser extends OdbSuite {
 
@@ -221,6 +223,15 @@ class linkUser extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${guest.id} does not exist or is of a nonstandard type.") {
         linkCoiAs(pi, guest.id -> pid, Partner.US)
+      }
+    }
+  }
+
+  test("[general] can't link a PI user") {
+    createUsers(pi, pi2) >>
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL(s"Argument 'input' is invalid: PIs are linked at program creation time.") {
+        linkAs(pi, pi2.id, pid, Pi, PartnerLink.HasUnspecifiedPartner)
       }
     }
   }
