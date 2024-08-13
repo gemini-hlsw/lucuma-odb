@@ -1045,7 +1045,7 @@ object ObservationService {
 
       def update(ts: Option[Timestamp]): AppliedFragment =
         void"UPDATE t_observation "                                  |+|
-          sql"SET c_visualization_time = ${core_timestamp.opt} "(ts) |+|
+          sql"SET c_observation_time = ${core_timestamp.opt} "(ts) |+|
           void"WHERE c_observation_id IN (" |+| which |+| void")"    |+|
           void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
 
@@ -1087,7 +1087,7 @@ object ObservationService {
           c_status,
           c_active_status,
           c_science_band,
-          c_visualization_time,
+          c_observation_time,
           c_pts_pi,
           c_pts_uncharged,
           c_pts_execution,
@@ -1124,7 +1124,7 @@ object ObservationService {
           'new',
           'active',
           c_science_band,
-          c_visualization_time,
+          c_observation_time,
           c_pts_pi,
           c_pts_uncharged,
           c_pts_execution,
