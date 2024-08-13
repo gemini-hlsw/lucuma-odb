@@ -50,6 +50,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
@@ -66,6 +67,7 @@ import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
@@ -112,6 +114,11 @@ sealed trait ObservationService[F[_]] {
 
   def updateObservations(
     SET:   ObservationPropertiesInput.Edit,
+    which: AppliedFragment
+  )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
+
+  def updateObservationsTimes(
+    SET:   ObservationTimesInput,
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
@@ -420,6 +427,23 @@ object ObservationService {
                  }
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
+        }
+
+      override def updateObservationsTimes(
+        SET:   ObservationTimesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
+        Trace[F].span("updateObservationTimes") {
+          val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
+            for {
+              r <- ResultT(Statements.updateObsTime(SET.observationTime, which).traverse { af =>
+                      session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
+                        pq.stream(af.argument, chunkSize = 1024).compile.toList
+                      }
+                   })
+              g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
+            } yield g
+          updates.value
         }
 
       private def cloneObservationImpl(
@@ -1012,7 +1036,29 @@ object ObservationService {
           void"WHERE o.c_observation_id IN (" |+| which |+| void")"
 
       updates(SET).map(_.fold(selectOnly)(update))
+    }
 
+    def updateObsTime(
+      ts:    Nullable[Timestamp],
+      which: AppliedFragment
+    ): Result[AppliedFragment] = {
+
+      def update(ts: Option[Timestamp]): AppliedFragment =
+        void"UPDATE t_observation "                                  |+|
+          sql"SET c_visualization_time = ${core_timestamp.opt} "(ts) |+|
+          void"WHERE c_observation_id IN (" |+| which |+| void")"    |+|
+          void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
+
+      def selectOnly: AppliedFragment =
+        void"SELECT o.c_program_id, o.c_observation_id "             |+|
+          void"FROM t_observation o "                                |+|
+          void"WHERE o.c_observation_id IN (" |+| which |+| void")"
+
+      Result(ts match {
+        case Nullable.Absent    => selectOnly
+        case Nullable.Null      => update(none)
+        case Nullable.NonNull(t)=> update(t.some)
+      })
     }
 
     def updateObservingModeType(

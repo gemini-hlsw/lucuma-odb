@@ -80,6 +80,7 @@ import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
+import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -140,6 +141,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateGroups,
       UpdateObsAttachments,
       UpdateObservations,
+      UpdateObservationsTimes,
       UpdatePrograms,
       UpdateProposal,
       UpdateTargets,
@@ -560,16 +562,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
   private def observationIdSelect(
-    includeDeleted: Option[Boolean],
-    WHERE:          Option[Predicate]
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean
   ): Result[AppliedFragment] = {
     val whereObservation: Predicate =
       and(List(
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-        Predicates.observation.calibrationRole.isNull(true),
+        if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
         WHERE.getOrElse(True)
       ))
+
     MappedQuery(
       Filter(whereObservation, Select("id", None, Query.Empty)),
       Context(QueryType, List("observations"), List("observations"), List(ObservationType))
@@ -581,7 +585,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE, false)
 
         val selectObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.traverse { which =>
@@ -682,7 +686,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE, false)
 
         val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
           idSelect.flatTraverse { which =>
@@ -709,6 +713,29 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         } yield tup._2
 
         r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
+      }
+    }
+
+  private lazy val UpdateObservationsTimes: MutationField =
+    MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
+
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.includeDeleted, input.WHERE, true)
+
+        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
+          idSelect.flatTraverse { which =>
+            observationService
+              .updateObservationsTimes(input.SET, which)
+              .map { r =>
+                r.flatMap { m =>
+                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
+                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
+                }
+              }
+          }
+
+        updateObservations.map(_.map(_._2))
       }
     }
 
