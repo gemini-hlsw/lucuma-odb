@@ -51,6 +51,7 @@ import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
+import lucuma.odb.graphql.input.CloneGroupInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -109,6 +110,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddSlewEvent,
       AddStepEvent,
       AddTimeChargeCorrection,
+      CloneGroup,
       CloneObservation,
       CloneTarget,
       CreateCallForProposals,
@@ -286,6 +288,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Result(
               Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
             )
+
+  private lazy val CloneGroup: MutationField =
+    MutationField("cloneGroup", CloneGroupInput.Binding): (input, child) =>
+      services.useTransactionally:
+        groupService.cloneGroup(input).nestMap: id =>
+          Filter(
+            And(
+              Predicates.cloneGroupResult.originalGroup.id.eql(input.groupId),
+              Predicates.cloneGroupResult.newGroup.id.eql(id),
+            ), child)
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>

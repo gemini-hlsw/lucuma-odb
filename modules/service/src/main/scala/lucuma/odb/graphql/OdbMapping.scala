@@ -101,6 +101,7 @@ object OdbMapping {
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
+          with CloneGroupResultMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
           with ConditionsEntryMapping[F]
@@ -265,6 +266,7 @@ object OdbMapping {
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
                 ClassicalMapping,
+                CloneGroupResultMapping,
                 CloneObservationResultMapping,
                 CloneTargetResultMapping,
                 CommissioningProgramReferenceMapping,
