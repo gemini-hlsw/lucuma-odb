@@ -3420,7 +3420,7 @@ An assignment of a user to a program.
 type ProgramUser {
   role:        ProgramUserRole!
   partnerLink: PartnerLink!
-  userId:      UserId!
+  program:     Program
   user:        User
 }
 
@@ -8699,6 +8699,20 @@ enum ProgramType {
   SYSTEM
 }
 
+"""
+The matching program user results, limited to a maximum of 1000 entries.
+"""
+type ProgramUserSelectResult {
+  """
+  Matching program users up to the return size limit of 1000
+  """
+  matches: [ProgramUser!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+}
 
 type ProperMotion {
   """
@@ -9084,6 +9098,31 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ProgramSelectResult!
+
+  """
+  Selects the first `LIMIT` matching program users based on the provided `WHERE`
+  parameter, if any.
+  """
+  programUsers(
+
+    "Filters the selection of program users."
+    WHERE: WhereProgramUser
+
+    "Starts the result set at (or after if not existent) the given user id."
+    OFFSET: UserId
+
+    """
+    Limits the result to at most this number of matches (but never more than
+    1000).
+    """
+    LIMIT: NonNegInt
+
+    """
+    Set to true to include program users linked to deleted programs.
+    """
+    includeDeleted: Boolean! = false
+
+  ): ProgramUserSelectResult!
 
   """
   Metadata for `enum ProposalAttachmentType`

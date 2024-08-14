@@ -261,7 +261,7 @@ class linkUser extends OdbSuite {
             }
           }) {
             user {
-              userId
+              user { id }
             }
           }
         }
