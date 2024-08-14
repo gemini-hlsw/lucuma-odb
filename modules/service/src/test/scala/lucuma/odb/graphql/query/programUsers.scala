@@ -148,4 +148,28 @@ class programUsers extends OdbSuite {
     } yield ()
   }
 
+  test("program user selection limited by visibility") {
+    createProgramAs(guest1).flatMap { pid =>
+      expect(
+        user = guest2,
+        query = s"""
+          query {
+            programUsers() {
+              matches {
+                program { id }
+                user { id }
+              }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programUsers" -> Json.obj(
+              "matches" -> Json.arr()
+            )
+          ).asRight
+      )
+    }
+  }
+
 }
