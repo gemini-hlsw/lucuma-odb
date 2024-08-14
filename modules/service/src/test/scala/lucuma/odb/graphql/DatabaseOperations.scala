@@ -629,7 +629,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   partner
                 }
               }
-              userId
+              user { id }
             }
           }
         }
@@ -640,7 +640,9 @@ trait DatabaseOperations { this: OdbSuite =>
             "user": {
               "role" : $role,
               "partnerLink" : $partnerLink,
-              "userId" : $uid
+              "user" : {
+                "id": $uid
+              }
             }
           }
         }

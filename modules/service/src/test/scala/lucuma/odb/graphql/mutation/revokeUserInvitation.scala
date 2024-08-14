@@ -45,7 +45,7 @@ class revokeUserInvitation extends OdbSuite {
             program {
               users {
                 role
-                userId
+                user { id }
               }
             }
           }
