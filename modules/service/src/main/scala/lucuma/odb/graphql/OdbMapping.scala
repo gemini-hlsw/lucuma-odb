@@ -164,6 +164,7 @@ object OdbMapping {
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
+          with ProgramUserSelectResultMapping[F]
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
@@ -328,6 +329,7 @@ object OdbMapping {
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
+                ProgramUserSelectResultMapping,
                 ProperMotionDeclinationMapping,
                 ProperMotionMapping,
                 ProperMotionRaMapping,
