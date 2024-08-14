@@ -20,8 +20,8 @@ trait ProgramUserMapping[F[_]]
 
   lazy val ProgramUserMapping =
     ObjectMapping(ProgramUserType)(
-      SqlField("programId", ProgramUserTable.ProgramId, key = true),
-      SqlField("userId", ProgramUserTable.UserId, key = true),
+      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
+      SqlField("userId", ProgramUserTable.UserId, hidden = true, key = true),
       SqlField("role", ProgramUserTable.Role),
       SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
       SqlField("partner", ProgramUserTable.Partner, hidden = true),

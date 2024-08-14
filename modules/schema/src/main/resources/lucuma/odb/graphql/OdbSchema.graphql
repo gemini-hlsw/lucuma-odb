@@ -3420,9 +3420,7 @@ An assignment of a user to a program.
 type ProgramUser {
   role:        ProgramUserRole!
   partnerLink: PartnerLink!
-  programId:   ProgramId!
   program:     Program
-  userId:      UserId!
   user:        User
 }
 
