@@ -48,7 +48,7 @@ class redeemUserInvitation extends OdbSuite {
             program {
               users {
                 role
-                userId
+                user { id }
               }
             }
           }
@@ -78,7 +78,9 @@ class redeemUserInvitation extends OdbSuite {
                     "users" : [
                       {
                         "role" : ${ProgramUserRole.Coi.tag.toUpperCase},
-                        "userId" : ${pi2.id}
+                        "user" : {
+                          "id": ${pi2.id}
+                        }
                       }
                     ]
                   }
@@ -113,7 +115,9 @@ class redeemUserInvitation extends OdbSuite {
                     "users" : [
                       {
                         "role" : ${ProgramUserRole.Coi.tag.toUpperCase},
-                        "userId" : ${pi2.id}
+                        "user" :{
+                          "id": ${pi2.id}
+                        }
                       }
                     ]
                   }

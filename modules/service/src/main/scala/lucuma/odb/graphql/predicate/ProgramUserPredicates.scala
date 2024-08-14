@@ -5,13 +5,16 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import grackle.Predicate
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
 
 class ProgramUserPredicates(path: Path) {
 
-  lazy val role = LeafPredicates[ProgramUserRole](path / "role")
-  lazy val user = LeafPredicates[User.Id](path / "userId")
+  lazy val program   = ProgramPredicates(path / "program")
+  lazy val programId = LeafPredicates[Program.Id](path / "programId")
+  lazy val role      = LeafPredicates[ProgramUserRole](path / "role")
+  lazy val userId    = LeafPredicates[User.Id](path / "userId")
 
   def isPi: Predicate =
     role.eql(ProgramUserRole.Pi)

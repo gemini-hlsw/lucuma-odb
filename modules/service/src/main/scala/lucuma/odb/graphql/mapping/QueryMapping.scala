@@ -29,6 +29,7 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
+import lucuma.odb.graphql.input.WhereProgramUser
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
 import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.DatasetPredicates
@@ -61,6 +62,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("observations"),
       SqlObject("program"),
       SqlObject("programs"),
+      SqlObject("programUsers"),
       SqlObject("proposalAttachmentTypeMeta"),
       SqlObject("proposalStatusMeta"),
       SqlObject("spectroscopyConfigOptions"),
@@ -85,6 +87,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Observations,
       Program,
       Programs,
+      ProgramUsers,
       ProposalAttachmentTypeMeta,
       ProposalStatusMeta,
       SpectroscopyConfigOptions,
@@ -465,6 +468,42 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 ),
                 oss = Some(List(
                   OrderSelection[lucuma.core.model.Program.Id](ProgramType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+            }
+          }
+        }
+    }
+  }
+
+  private lazy val ProgramUsers: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    val WhereProgramUserBinding = WhereProgramUser.binding(Path.from(ProgramUserType))
+    {
+      case (QueryType, "programUsers", List(
+        WhereProgramUserBinding.Option("WHERE", rWHERE),
+        UserIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      )) =>
+        Elab.transformChild { child =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(
+                  and(List(
+                    OFFSET.map(Predicates.programUser.userId.gtEql).getOrElse(True),
+                    Predicates.programUser.program.existence.includeDeleted(includeDeleted),
+                    Predicates.programUser.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))
+                ),
+                oss = Some(List(
+                  OrderSelection[lucuma.core.model.User.Id](ProgramUserType / "userId"),
+                  OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
                 )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.
