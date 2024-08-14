@@ -16,7 +16,6 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Target
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -42,7 +41,6 @@ object ObservationPropertiesInput {
     status:              Option[ObsStatus],
     activeStatus:        Option[ObsActiveStatus],
     scienceBand:         Option[ScienceBand],
-    visualizationTime:   Option[Timestamp],
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Create],
     constraintSet:       Option[ConstraintSetInput],
@@ -67,7 +65,6 @@ object ObservationPropertiesInput {
         status              = ObsStatus.New.some,
         activeStatus        = ObsActiveStatus.Active.some,
         scienceBand         = None,
-        visualizationTime   = Option.empty,
         posAngleConstraint  = None,
         targetEnvironment   = None,
         constraintSet       = ConstraintSetInput.Default.some,
@@ -88,7 +85,6 @@ object ObservationPropertiesInput {
           ObsStatusBinding.Option("status", rObsStatus),
           ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           ScienceBandBinding.Option("scienceBand", rScienceBand),
-          TimestampBinding.Option("visualizationTime", rVisualizationTime),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
           TargetEnvironmentInput.Create.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
@@ -105,7 +101,6 @@ object ObservationPropertiesInput {
             rObsStatus,
             rObsActiveStatus,
             rScienceBand,
-            rVisualizationTime,
             rPosAngleConstraint,
             rTargetEnvironment,
             rConstraintSet,
@@ -127,7 +122,6 @@ object ObservationPropertiesInput {
     status:              Option[ObsStatus],
     activeStatus:        Option[ObsActiveStatus],
     scienceBand:         Nullable[ScienceBand],
-    visualizationTime:   Nullable[Timestamp],
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Edit],
     constraintSet:       Option[ConstraintSetInput],
@@ -149,7 +143,6 @@ object ObservationPropertiesInput {
         status =             None,
         activeStatus =       None,
         scienceBand =        Nullable.Absent,
-        visualizationTime =  Nullable.Absent,
         posAngleConstraint = None,
         targetEnvironment =  None,
         constraintSet =      None,
@@ -170,7 +163,6 @@ object ObservationPropertiesInput {
           ObsStatusBinding.Option("status", rObsStatus),
           ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           ScienceBandBinding.Nullable("scienceBand", rScienceBand),
-          TimestampBinding.Nullable("visualizationTime", rVisualizationTime),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
           TargetEnvironmentInput.Edit.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
@@ -187,7 +179,6 @@ object ObservationPropertiesInput {
             rObsStatus,
             rObsActiveStatus,
             rScienceBand,
-            rVisualizationTime,
             rPosAngleConstraint,
             rTargetEnvironment,
             rConstraintSet,
