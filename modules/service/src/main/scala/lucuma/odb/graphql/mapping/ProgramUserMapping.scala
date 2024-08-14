@@ -20,7 +20,7 @@ trait ProgramUserMapping[F[_]]
 
   lazy val ProgramUserMapping =
     ObjectMapping(ProgramUserType)(
-      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
+      SqlField("programId", ProgramUserTable.ProgramId, key = true),
       SqlField("userId", ProgramUserTable.UserId, key = true),
       SqlField("role", ProgramUserTable.Role),
       SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
@@ -33,6 +33,7 @@ trait ProgramUserMapping[F[_]]
         } yield r.asJson,
         List("partner", "linkType")
       ),
+      SqlObject("program", Join(ProgramUserTable.ProgramId, ProgramTable.Id)),
       SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId))
     )
 
