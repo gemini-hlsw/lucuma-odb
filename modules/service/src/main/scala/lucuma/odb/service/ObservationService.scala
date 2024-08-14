@@ -67,6 +67,7 @@ import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
@@ -113,6 +114,11 @@ sealed trait ObservationService[F[_]] {
 
   def updateObservations(
     SET:   ObservationPropertiesInput.Edit,
+    which: AppliedFragment
+  )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
+
+  def updateObservationsTimes(
+    SET:   ObservationTimesInput,
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
@@ -423,6 +429,23 @@ object ObservationService {
           } yield r
         }
 
+      override def updateObservationsTimes(
+        SET:   ObservationTimesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
+        Trace[F].span("updateObservationTimes") {
+          val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
+            for {
+              r <- ResultT(Statements.updateObsTime(SET.observationTime, which).traverse { af =>
+                      session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
+                        pq.stream(af.argument, chunkSize = 1024).compile.toList
+                      }
+                   })
+              g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
+            } yield g
+          updates.value
+        }
+
       private def cloneObservationImpl(
         observationId: Observation.Id,
         SET:           Option[ObservationPropertiesInput.Edit]
@@ -661,7 +684,6 @@ object ObservationService {
           SET.status.getOrElse(ObsStatus.New),
           SET.activeStatus.getOrElse(ObsActiveStatus.Active),
           SET.scienceBand,
-          SET.visualizationTime,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
           SET.targetEnvironment.flatMap(_.explicitBase),
@@ -683,7 +705,6 @@ object ObservationService {
       status:              ObsStatus,
       activeState:         ObsActiveStatus,
       scienceBand:         Option[ScienceBand],
-      visualizationTime:   Option[Timestamp],
       posAngleConsMode:    PosAngleConstraintMode,
       posAngle:            Angle,
       explicitBase:        Option[Coordinates],
@@ -707,7 +728,6 @@ object ObservationService {
            status      ,
            activeState ,
            scienceBand ,
-           visualizationTime             ,
            posAngleConsMode              ,
            posAngle                      ,
            explicitBase.map(_.ra)        ,
@@ -752,7 +772,6 @@ object ObservationService {
       ObsStatus                        ,
       ObsActiveStatus                  ,
       Option[ScienceBand]              ,
-      Option[Timestamp]                ,
       PosAngleConstraintMode           ,
       Angle                            ,
       Option[RightAscension]           ,
@@ -788,7 +807,6 @@ object ObservationService {
           c_status,
           c_active_status,
           c_science_band,
-          c_visualization_time,
           c_pac_mode,
           c_pac_angle,
           c_explicit_ra,
@@ -823,7 +841,6 @@ object ObservationService {
           $obs_status,
           $obs_active_status,
           ${science_band.opt},
-          ${core_timestamp.opt},
           $pac_mode,
           $angle_µas,
           ${right_ascension.opt},
@@ -965,7 +982,6 @@ object ObservationService {
       val upStatus            = sql"c_status = $obs_status"
       val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
-      val upVisualizationTime = sql"c_visualization_time = ${core_timestamp.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
 
       val ups: List[AppliedFragment] =
@@ -976,7 +992,6 @@ object ObservationService {
           SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.visualizationTime.foldPresent(upVisualizationTime),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1021,7 +1036,29 @@ object ObservationService {
           void"WHERE o.c_observation_id IN (" |+| which |+| void")"
 
       updates(SET).map(_.fold(selectOnly)(update))
+    }
 
+    def updateObsTime(
+      ts:    Nullable[Timestamp],
+      which: AppliedFragment
+    ): Result[AppliedFragment] = {
+
+      def update(ts: Option[Timestamp]): AppliedFragment =
+        void"UPDATE t_observation "                                  |+|
+          sql"SET c_observation_time = ${core_timestamp.opt} "(ts) |+|
+          void"WHERE c_observation_id IN (" |+| which |+| void")"    |+|
+          void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
+
+      def selectOnly: AppliedFragment =
+        void"SELECT o.c_program_id, o.c_observation_id "             |+|
+          void"FROM t_observation o "                                |+|
+          void"WHERE o.c_observation_id IN (" |+| which |+| void")"
+
+      Result(ts match {
+        case Nullable.Absent    => selectOnly
+        case Nullable.Null      => update(none)
+        case Nullable.NonNull(t)=> update(t.some)
+      })
     }
 
     def updateObservingModeType(
@@ -1050,7 +1087,7 @@ object ObservationService {
           c_status,
           c_active_status,
           c_science_band,
-          c_visualization_time,
+          c_observation_time,
           c_pts_pi,
           c_pts_uncharged,
           c_pts_execution,
@@ -1087,7 +1124,7 @@ object ObservationService {
           'new',
           'active',
           c_science_band,
-          c_visualization_time,
+          c_observation_time,
           c_pts_pi,
           c_pts_uncharged,
           c_pts_execution,

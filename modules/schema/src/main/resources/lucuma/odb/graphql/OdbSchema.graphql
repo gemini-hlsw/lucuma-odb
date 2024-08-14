@@ -2984,6 +2984,16 @@ type Mutation {
   ): UpdateObservationsResult!
 
   """
+  Updates existing observations times (execution and duration)
+  """
+  updateObservationsTimes(
+    """
+    Parameters for editing existing observations times.
+    """
+    input: UpdateObservationsTimesInput!
+  ): UpdateObservationsResult!
+
+  """
   Updates existing programs.
   """
   updatePrograms(
@@ -3099,11 +3109,6 @@ input ObservationPropertiesInput {
   scienceBand: ScienceBand
 
   """
-  Reference time used for time-dependent calculations such as average parallactic angle
-  """
-  visualizationTime: Timestamp
-
-  """
   Position angle constraint, if any. Set to null to remove all position angle constraints
   """
   posAngleConstraint: PosAngleConstraintInput
@@ -3157,6 +3162,16 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
+}
+
+"""
+Observation times properties
+"""
+input ObservationTimesInput {
+  """
+  Expected execution time used for time-dependent calculations such as average parallactic angle
+  """
+  observationTime: Timestamp
 }
 
 type Offset {
@@ -4918,6 +4933,32 @@ input UpdateObservationsInput {
   Describes the observation values to modify.
   """
   SET: ObservationPropertiesInput!
+
+  """
+  Filters the observations to be updated according to those that match the given constraints.
+  """
+  WHERE: WhereObservation
+
+  """
+  Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  """
+  LIMIT: NonNegInt
+
+  """
+  Set to `true` to include deleted observations.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
+Observation selection and times update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
+"""
+input UpdateObservationsTimesInput {
+
+  """
+  Describes the observation time values to modify.
+  """
+  SET: ObservationTimesInput!
 
   """
   Filters the observations to be updated according to those that match the given constraints.
@@ -7491,7 +7532,7 @@ input CreateGroupInput {
   proposalReference: ProposalReferenceLabel
   programReference: ProgramReferenceLabel
   SET: GroupPropertiesInput
-  
+
   "Group elements specified here, if any, will be moved into the created group in the specified order."
   initialContents: [GroupElementInput]
 }
@@ -8109,9 +8150,9 @@ type Observation {
   scienceBand: ScienceBand
 
   """
-  Reference time used by default for visualization and time-dependent calculations (e.g., average parallactic angle)
+  Reference time used for execution and visualization and time-dependent calculations (e.g., average parallactic angle)
   """
-  visualizationTime: Timestamp
+  observationTime: Timestamp
 
   """
   Position angle constraint, if any.
