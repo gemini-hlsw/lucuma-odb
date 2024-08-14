@@ -14,6 +14,7 @@ class ProgramUserPredicates(path: Path) {
   lazy val program   = ProgramPredicates(path / "program")
   lazy val programId = LeafPredicates[Program.Id](path / "programId")
   lazy val role      = LeafPredicates[ProgramUserRole](path / "role")
+  lazy val user      = LeafPredicates[User.Id](path / "user")
   lazy val userId    = LeafPredicates[User.Id](path / "userId")
 
   def isPi: Predicate =

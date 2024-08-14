@@ -2993,6 +2993,10 @@ type Mutation {
     input: UpdateObservationsTimesInput!
   ): UpdateObservationsResult!
 
+  updatePartnerLinks(
+    input: UpdatePartnerLinksInput!
+  ): UpdatePartnerLinksResult!
+
   """
   Updates existing programs.
   """
@@ -4988,6 +4992,21 @@ type UpdateObservationsResult {
   """
   `true` when there were additional edits that were not returned.
   """
+  hasMore: Boolean!
+}
+
+input UpdatePartnerLinksInput {
+  SET: PartnerLinkInput!
+
+  WHERE: WhereProgramUser
+
+  LIMIT: NonNegInt
+
+}
+
+type UpdatePartnerLinksResult {
+  users: [ProgramUser!]!
+
   hasMore: Boolean!
 }
 

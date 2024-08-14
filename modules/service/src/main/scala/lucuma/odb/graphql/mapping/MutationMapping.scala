@@ -81,6 +81,7 @@ import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdatePartnerLinksInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -142,6 +143,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateObsAttachments,
       UpdateObservations,
       UpdateObservationsTimes,
+      UpdatePartnerLinks,
       UpdatePrograms,
       UpdateProposal,
       UpdateTargets,
@@ -736,6 +738,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           }
 
         updateObservations.map(_.map(_._2))
+      }
+    }
+
+  private lazy val UpdatePartnerLinks =
+    MutationField("updatePartnerLinks", UpdatePartnerLinksInput.binding(Path.from(ProgramUserType))) { (input, child) =>
+      services.useTransactionally {
+        val filterPredicate = and(List(
+          Predicates.programUser.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        ???
       }
     }
 
