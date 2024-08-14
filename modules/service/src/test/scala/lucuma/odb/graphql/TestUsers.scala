@@ -42,17 +42,24 @@ object TestUsers {
 
   object Standard {
 
-    def apply(id: Long, role: StandardRole): StandardUser =
+    def apply(
+      id:           Long,
+      role:         StandardRole,
+      givenName:    Option[String] = None,
+      familyName:   Option[String] = None,
+      creditName:   Option[String] = None,
+      primaryEmail: Option[String] = None
+    ): StandardUser =
       StandardUser(
         id         = Gid[User.Id].fromLong.getOption(id).get,
         role       = role,
         otherRoles = Nil,
         profile    = OrcidProfile(
           orcidId      = orcidId(id),
-          givenName    = None,
-          familyName   = None,
-          creditName   = None,
-          primaryEmail = None,
+          givenName    = givenName,
+          familyName   = familyName,
+          creditName   = creditName,
+          primaryEmail = primaryEmail
         )
       )
 

@@ -11529,6 +11529,60 @@ input WhereEqPartner {
 }
 
 """
+Filters on equality (or not) of the partner link type. All supplied criteria
+must match, but usually only one is selected.
+"""
+input WhereEqPartnerLinkType {
+  """
+  Matches if the partner link type is exactly the supplied value.
+  """
+  EQ: PartnerLinkType
+
+  """
+  Matches if the partner link type is not the supplied value.
+  """
+  NEQ: PartnerLinkType
+
+  """
+  Matches if the partner link type is any of the supplied options.
+  """
+  IN: [PartnerLinkType!]
+
+  """
+  Matches if the partner link type is none of the supplied values.
+  """
+  NIN: [PartnerLinkType!]
+}
+
+"""
+Filters on equality (or not) of the program user role type and the supplied
+criteria. All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqProgramUserRole {
+
+  """
+  Matches if the role is exactly the supplied value.
+  """
+  EQ: ProgramUserRole
+
+  """
+  Matches if the role is not the supplied value.
+  """
+  NEQ: ProgramUserRole
+
+  """
+  Matches if the role is any of the supplied options.
+  """
+  IN: [ProgramUserRole!]
+
+  """
+  Matches if the role is none of the supplied values.
+  """
+  NIN: [ProgramUserRole!]
+
+}
+
+"""
 Filters on equality (or not) of the program type and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "CALIBRATION"' will match when the type is "CALIBRATION".
@@ -11660,6 +11714,34 @@ input WhereEqToOActivation {
   Matches if the property value is none of the supplied values.
   """
   NIN: [ToOActivation!]
+}
+
+"""
+Filters on equality (or not) of the user type value and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqUserType {
+
+  """
+  Matches if the user type is exactly the supplied value.
+  """
+  EQ: UserType
+
+  """
+  Matches if the user type is not the supplied value.
+  """
+  NEQ: UserType
+
+  """
+  Matches if the user type is any of the supplied options.
+  """
+  IN: [UserType!]
+
+  """
+  Matches if the user type is none of the supplied values.
+  """
+  NIN: [UserType!]
+
 }
 
 """
@@ -11969,6 +12051,40 @@ input WhereOptionEqCalibrationRole {
   Matches if the property value is none of the supplied values.
   """
   NIN: [CalibrationRole!]
+}
+
+"""
+Filters on equality (or not) of the (optional) partner. All supplied criteria
+must match, but usually only one is selected.
+"""
+input WhereOptionEqPartner {
+
+  """
+  When `true`, matches if the partner is not defined. When `false` matches if
+  the partner is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the partrner is exactly the supplied value.
+  """
+  EQ: Partner
+
+  """
+  Matches if the partner is not the supplied value.
+  """
+  NEQ: Partner
+
+  """
+  Matches if the partner is any of the supplied options.
+  """
+  IN: [Partner!]
+
+  """
+  Matches if the partner is none of the supplied values.
+  """
+  NIN: [Partner!]
+
 }
 
 """
@@ -12838,6 +12954,50 @@ input WhereOrderProgramId {
   LTE: ProgramId
 }
 
+input WhereOrderUserId {
+
+  """
+  Matches if the user id is exactly the supplied value.
+  """
+  EQ: UserId
+
+  """
+  Matches if the user id is not the supplied value.
+  """
+  NEQ: UserId
+
+  """
+  Matches if the user id is any of the supplied options.
+  """
+  IN: [UserId!]
+
+  """
+  Matches if the user id is none of the supplied values.
+  """
+  NIN: [UserId!]
+
+  """
+  Matches if the user id is ordered after (>) the supplied value.
+  """
+  GT: UserId
+
+  """
+  Matches if the user id is ordered before (<) the supplied value.
+  """
+  LT: UserId
+
+  """
+  Matches if the user id is ordered after or equal (>=) the supplied value.
+  """
+  GTE: UserId
+
+  """
+  Matches if the user id is ordered before or equal (<=) the supplied value.
+  """
+  LTE: UserId
+
+}
+
 input WhereProposalReference {
 
   "Matches if the proposal reference is not defined."
@@ -13195,6 +13355,24 @@ input WhereOrderTargetId {
 }
 
 """
+Partner link filter options.  All specified items much match.
+"""
+input WherePartnerLink {
+
+  """
+  Matches on equality of the link type.
+  """
+  linkType: WhereEqPartnerLinkType
+
+  """
+  Matches on the partner itself, if applicable.  Only `HAS_PARTNER` link types
+  will have a partner.  For other link types it will be `null`.
+  """
+  partner: WhereOptionEqPartner
+
+}
+
+"""
 Program filter options.  All specified items must match.
 """
 input WhereProgram {
@@ -13234,6 +13412,11 @@ input WhereProgram {
   reference: WhereProgramReference
 
   """
+  Matches the PI.
+  """
+  pi: WhereProgramUser
+
+  """
   Matches the proposalStatus.
   """
   proposalStatus: WhereEqProposalStatus
@@ -13271,6 +13454,48 @@ input WhereProgramReference {
 
   "Matches the science subtype in the program reference, if any."
   scienceSubtype: WhereEqScienceSubtype
+}
+
+"""
+Program user options.  All specified items must match.
+"""
+input WhereProgramUser {
+
+  """
+  A list of nested program user filters that all must match in order for the AND group as a whole to match.
+  """
+  AND: [WhereProgramUser!]
+
+  """
+  A list of nested program user filters where any one match causes the entire OR group as a whole to match.
+  """
+  OR: [WhereProgramUser!]
+
+  """
+  A nested program user filter that must not match in order for the NOT itself to match.
+  """
+  NOT: WhereProgramUser
+
+  """
+  Matches the program.
+  """
+  program: WhereProgram
+
+  """
+  Matches the user.
+  """
+  user: WhereUser
+
+  """
+  Matches the role.
+  """
+  role: WhereEqProgramUserRole
+
+  """
+  Matches the partner.
+  """
+  partnerLink: WherePartnerLink
+
 }
 
 """
@@ -13488,6 +13713,41 @@ input WhereTarget {
   Matches the calibration role.
   """
   calibrationRole: WhereOptionEqCalibrationRole
+}
+
+"""
+User filter options.  All specified items must match.
+"""
+input WhereUser {
+
+  """
+  A list of nested user filters that all must match in order for the AND group
+  as a whole to match.
+  """
+  AND:             [WhereUser!]
+
+  """
+  A list of nested user filters that all must match in order for the OR group
+  as a whole to match.
+  """
+  OR:              [WhereUser!]
+
+  """
+  A nested user filter that must not match in order for the NOT itself to match.
+  """
+  NOT:             WhereUser
+
+  "Matches the user Id."
+  id:              WhereOrderUserId
+
+  "Matches the user type."
+  type:            WhereEqUserType
+
+  orcidId:         WhereOptionString
+  orcidGivenName:  WhereOptionString
+  orcidCreditName: WhereOptionString
+  orcidFamilyName: WhereOptionString
+  orcidEmail:      WhereOptionString
 }
 
 input WhereWavelength {
