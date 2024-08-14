@@ -21,6 +21,7 @@ object WhereProgram {
     val WhereNameBinding             = WhereOptionString.binding(path / "name")
     val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
     val WhereProgramReferenceBinding = WhereProgramReference.binding(path / "reference")
+    val WherePiBinding               = WhereProgramUser.binding(path / "pi")
     val WhereEqProposalStatus        = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     val WhereProposalBinding         = WhereProposal.binding(path / "proposal")
     val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
@@ -36,12 +37,13 @@ object WhereProgram {
         WhereNameBinding.Option("name", rName),
         WhereTypeBinding.Option("type", rType),
         WhereProgramReferenceBinding.Option("reference", rRef),
+        WherePiBinding.Option("pi", rPi),
         WhereEqProposalStatus.Option("proposalStatus", rPs),
         WhereProposalBinding.Option("proposal", rPro),
         WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPs, rPro, rCalibRole).parMapN {
-            (AND, OR, NOT, id, name, ptype, ref, ps, pro, calib) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole).parMapN {
+            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -50,6 +52,7 @@ object WhereProgram {
                 name,
                 ptype,
                 ref,
+                pi,
                 ps,
                 pro,
                 calib
