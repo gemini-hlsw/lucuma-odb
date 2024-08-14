@@ -11,16 +11,34 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
+import lucuma.core.model.StandardRole
 import lucuma.core.model.User
+import lucuma.core.util.Gid
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
 class programs extends OdbSuite {
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
-  val service = TestUsers.service(3)
+  val guest1  = TestUsers.guest(3)
+  val guest2  = TestUsers.guest(4)
+  val staff   = TestUsers.Standard.staff(5, 34)
 
-  val validUsers = List(pi, pi2, service).toList
+  val piCharles = TestUsers.Standard(
+    6,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(6).get),
+    primaryEmail = "charles@guiteau.com".some
+  )
+
+  val piLeon    = TestUsers.Standard(
+    7,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
+    primaryEmail = "leon@czolgosz.edu".some
+  )
+
+  val service = TestUsers.service(10)
+
+  val validUsers = List(pi, pi2, guest1, guest2, staff, piCharles, piLeon, service).toList
 
   test("simple program selection") {
     createProgramAs(pi).replicateA(5).flatMap { pids =>
@@ -128,4 +146,97 @@ class programs extends OdbSuite {
             )
     } yield ()
   }
+
+  test("program selection via PI email") {
+    createProgramAs(piLeon) >>
+    createProgramAs(piCharles).replicateA(2).flatMap { pids =>
+      expect(
+        user = staff,
+        query = s"""
+          query {
+            programs(
+              WHERE: {
+                pi: {
+                  user: {
+                    orcidEmail: { EQ: "charles@guiteau.com" }
+                  }
+                }
+              }
+            ) {
+              matches { id }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programs" -> Json.obj(
+              "matches" -> Json.fromValues(
+                  pids.map { id =>
+                    Json.obj("id" -> id.asJson)
+                  }
+              )
+            )
+          ).asRight
+      )
+    }
+  }
+
+  test("program selection via user type") {
+    createProgramAs(guest1).flatMap { pid1 =>
+      createProgramAs(guest2).flatMap { pid2 =>
+        expect(
+          user = staff,
+          query = s"""
+            query {
+              programs(
+                WHERE: {
+                  pi: {
+                    user: { type: { EQ: GUEST } }
+                  }
+                }
+              ) {
+                matches { id }
+              }
+            }
+          """,
+          expected =
+            Json.obj(
+              "programs" -> Json.obj(
+                "matches" -> Json.fromValues(
+                    List(pid1, pid2).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            ).asRight
+        )
+      }
+    }
+  }
+
+  test("program selection via partner (empty)") {
+    expect(
+      user = staff,
+      query = s"""
+        query {
+          programs(
+            WHERE: {
+              pi: {
+                partnerLink: { partner: { EQ: US } }
+              }
+            }
+          ) {
+            matches { id }
+          }
+        }
+      """,
+      expected =
+        Json.obj(
+          "programs" -> Json.obj(
+            "matches" -> Json.arr()
+          )
+        ).asRight
+    )
+  }
+
 }
