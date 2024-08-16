@@ -9,22 +9,21 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
-import lucuma.odb.data.PartnerLink
 import lucuma.odb.graphql.binding.*
 
-case class UpdatePartnerLinksInput(
-  SET: PartnerLink,
+case class UpdateProgramUsersInput(
+  SET:   ProgramUserPropertiesInput,
   WHERE: Option[Predicate],
   LIMIT: Option[NonNegInt]
 )
 
-object UpdatePartnerLinksInput {
+object UpdateProgramUsersInput {
 
-  def binding(path: Path): Matcher[UpdatePartnerLinksInput] =
+  def binding(path: Path): Matcher[UpdateProgramUsersInput] =
     val WhereProgramUsersBinding = WhereProgramUser.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        PartnerLinkInput.Binding("SET", rSET),
+        ProgramUserPropertiesInput.Binding("SET", rSET),
         WhereProgramUsersBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ) =>
