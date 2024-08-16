@@ -9,7 +9,7 @@ import cats.data.Nested
 import cats.syntax.all.*
 import fs2.Stream
 import grackle.Env
-import grackle.Predicate.Or
+import grackle.Predicate
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -27,6 +27,7 @@ import lucuma.odb.graphql.input.GroupEditInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.input.TargetEditInput
+import lucuma.odb.graphql.mapping.ResultMapping.mapSomeFields
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
@@ -113,10 +114,18 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                 "observationId" -> e.observationId,
               ),
               Filter(
-                Or(
-                  Predicates.observationEdit.value.id.eql(e.observationId),
-                  Predicates.observationEdit.value.id.isNull(true), // join will fail on delete
-                 ), child
+                Predicates.observationEdit.programId.eql(e.programId),
+                Query.mapSomeFields(child):
+                  case Select("value", a, c) =>
+                    Select("value", a,
+                      // This predicate needs to be down here
+                      Filter(
+                        if e.editType === EditType.Deleted
+                        then Predicate.False 
+                        else Predicates.observation.id.eql(e.observationId),
+                        c
+                      )        
+                    )
               )
             )
           )

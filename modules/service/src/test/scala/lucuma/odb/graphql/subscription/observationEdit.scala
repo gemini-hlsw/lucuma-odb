@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.effect.kernel.Deferred
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
@@ -133,6 +135,22 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
 
+  def exploreResponse(ref: Deferred[IO, Observation.Id]) =
+    ref.get.map: oid =>
+      Json.obj(
+        "observationEdit" -> Json.obj(
+          "observationId" -> Json.fromString(oid.show),
+          "editType"      -> Json.fromString(EditType.Created.tag.toUpperCase),
+          "meta"          -> Json.obj(
+            "existence" -> Json.fromString(Existence.Present.tag.toUpperCase)
+          ),
+          "value" -> Json.obj(
+            "id"             -> oid.asJson,
+            "obsAttachments" -> List.empty[Json].asJson
+          )
+        )
+      )
+
   def titleUpdated(oid: Observation.Id, title: String): Json =
     Json.obj(
       "observationEdit" -> Json.obj(
@@ -221,15 +239,18 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     import Group1._
     for {
       pid  <- createProgram(pi, "foo")
+      ref0 <- Deferred[IO, Observation.Id]
+      ref1 <- Deferred[IO, Observation.Id]
       _    <-
-      subscriptionExpect(
+      subscriptionExpectF(
         user      = pi,
         query     = exploreSubscription(pid),
         mutations =
           Right(
-              createObservation(pi, "foo subtitle 0", pid) >> createObservation(pi, "foo subtitle 1", pid)
+              createObservation(pi, "foo subtitle 0", pid).flatMap(ref0.complete) >>
+              createObservation(pi, "foo subtitle 1", pid).flatMap(ref1.complete)
           ),
-        expected  = List(subtitleCreated("foo subtitle 0"), subtitleCreated("foo subtitle 1"))
+        expectedF = List(ref0, ref1).traverse(exploreResponse)
       )
     } yield ()
   }
