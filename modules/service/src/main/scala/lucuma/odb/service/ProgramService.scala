@@ -35,6 +35,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UnlinkUserInput
@@ -92,6 +93,8 @@ trait ProgramService[F[_]] {
 
   /** Check to see if the user has access to the given program. */
   def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean]
+
+  def updateProgramUsers(SET: ProgramUserPropertiesInput, which: AppliedFragment)(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]]
 
 }
 
@@ -354,6 +357,16 @@ object ProgramService {
 
       }
 
+      override def updateProgramUsers(
+        SET:   ProgramUserPropertiesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]] =
+        Statements.updateProgramUsers(SET, which).fold(Nil.success.pure[F]) { af =>
+          session.prepareR(af.fragment.query(program_id *: user_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+          }
+        }
+
       def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean] =
         Statements.existsUserAccess(user, programId).fold(true.pure[F]) { af =>
           val stmt = sql"SELECT ${af.fragment}".query(bool)
@@ -489,6 +502,26 @@ object ProgramService {
           RETURNING t_program.c_program_id
         """
       }
+
+    def updateProgramUsers(
+      SET: ProgramUserPropertiesInput,
+      which: AppliedFragment
+    ): Option[AppliedFragment] = {
+      val ups = NonEmptyList.fromList(
+        SET.partnerLink.toList.flatMap { pl => List(
+          sql"c_partner_link = $partner_link_type"(pl.linkType),
+          sql"c_partner      = ${partner.opt}"(pl.toOption)
+        )}
+      )
+
+      ups.map { us =>
+        void"""
+          UPDATE t_program_user
+          SET """ |+| us.intercalate(void", ") |+| void" " |+|
+        void"WHERE (c_program_id, c_user_id) IN (" |+| which |+| void") " |+|
+        void"RETURNING c_program_id, c_user_id"
+      }
+    }
 
     def existsUserAs(
       programId: Program.Id,
