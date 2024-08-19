@@ -58,9 +58,10 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.PartnerLink
+import lucuma.core.model.PartnerLink
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -384,7 +385,7 @@ trait Codecs {
       ObservationReference.fromString.reverseGet
     )
 
-  val partner_link_type: Codec[PartnerLink.LinkType] =
+  val partner_link_type: Codec[PartnerLinkType] =
     enumerated(Type("e_partner_link"))
 
   val proposal_reference: Codec[ProposalReference] =
@@ -595,11 +596,11 @@ trait Codecs {
   val partner_link: Codec[PartnerLink] =
     (partner_link_type *: partner.opt).eimap { (l, p) =>
       l match {
-        case PartnerLink.LinkType.HasPartner            => p.toRight("Invalid data: has_partner link type without partner").map(PartnerLink.HasPartner.apply)
-        case PartnerLink.LinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
-        case PartnerLink.LinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
+        case PartnerLinkType.HasPartner            => p.toRight("Invalid data: has_partner link type without partner").map(PartnerLink.HasPartner.apply)
+        case PartnerLinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
+        case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
       }
-    } { pl => (pl.linkType, pl.toOption) }
+    } { pl => (pl.linkType, pl.partnerOption) }
 
   val step_config_gcal: Codec[StepConfig.Gcal] =
     (gcal_continuum.opt *:

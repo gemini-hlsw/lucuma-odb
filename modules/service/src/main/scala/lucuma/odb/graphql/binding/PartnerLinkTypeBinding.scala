@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.PartnerLink.LinkType
+import lucuma.core.enums.PartnerLinkType
 
-val PartnerLinkTypeBinding: Matcher[LinkType] =
+val PartnerLinkTypeBinding: Matcher[PartnerLinkType] =
   enumeratedBinding

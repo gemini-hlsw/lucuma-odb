@@ -12,8 +12,8 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.util.Gid
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole
 
 class programUsers extends OdbSuite {
 

@@ -11,6 +11,7 @@ import grackle.ResultT
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.PartnerLinkType
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
@@ -25,8 +26,8 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
@@ -182,9 +183,9 @@ object UserInvitationService:
       """
         .query(user_invitation)
         .contramap {
-          case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.toOption, pid)
-          case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.toOption, pid)
-          case (u, CreateUserInvitationInput.Support(pid, e))  => (u.id, pid, e, ProgramUserRole.Support, PartnerLink.LinkType.HasUnspecifiedPartner, none, pid)
+          case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.partnerOption, pid)
+          case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.partnerOption, pid)
+          case (u, CreateUserInvitationInput.Support(pid, e))  => (u.id, pid, e, ProgramUserRole.Support, PartnerLinkType.HasUnspecifiedPartner, none, pid)
         }
 
     val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, PartnerLink), UserInvitation] =
@@ -208,7 +209,7 @@ object UserInvitationService:
         )
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.toOption, pid, pid, u.id))
+        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.partnerOption, pid, pid, u.id))
 
     val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, PartnerLink)] =
       sql"""

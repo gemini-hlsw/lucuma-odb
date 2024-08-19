@@ -21,8 +21,8 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl

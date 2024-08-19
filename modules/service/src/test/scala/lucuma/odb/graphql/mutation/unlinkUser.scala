@@ -15,8 +15,8 @@ import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole
 
 class unlinkUser extends OdbSuite {
 
