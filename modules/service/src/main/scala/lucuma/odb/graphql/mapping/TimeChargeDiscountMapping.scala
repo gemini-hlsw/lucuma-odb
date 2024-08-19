@@ -61,15 +61,15 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
           case d                              => Result.internalError(s"No TimeChargeDiscount implementation for ${d.dbTag}")
         }
 
-      private def mkPredicate(discountType: DiscountDiscriminator): Option[Predicate] =
-        Eql(TimeChargeDiscountType / "type", Const(discountType)).some
+      private def mkPredicate(discountType: DiscountDiscriminator): Result[Predicate] =
+        Result(Eql(TimeChargeDiscountType / "type", Const(discountType)))
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
         tpe match {
           case TimeChargeDaylightDiscountType => mkPredicate(DiscountDiscriminator.Daylight)
           case TimeChargeNoDataDiscountType   => mkPredicate(DiscountDiscriminator.NoData)
           case TimeChargeQaDiscountType       => mkPredicate(DiscountDiscriminator.Qa)
-          case _                              => none
+          case t                              => Result.internalError(s"TimeChargeDiscountMapping.discriminator: cannot narrow to $t")
         }
     }
 

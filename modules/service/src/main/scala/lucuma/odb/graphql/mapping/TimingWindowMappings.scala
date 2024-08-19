@@ -45,14 +45,14 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       }
     }
 
-    def narrowPredicate(subtpe: Type): Option[Predicate] = {
-      def mkPredicate(tpe: TimingWindowEndTypeEnum): Option[Predicate] =
-        Some(Eql(TimingWindowEndType / "endType", Const(tpe)))
+    def narrowPredicate(subtpe: Type): Result[Predicate] = {
+      def mkPredicate(tpe: TimingWindowEndTypeEnum): Result[Predicate] =
+        Result(Eql(TimingWindowEndType / "endType", Const(tpe)))
 
       subtpe match {
         case TimingWindowEndAtType => mkPredicate(TimingWindowEndTypeEnum.At)
         case TimingWindowEndAfterType => mkPredicate(TimingWindowEndTypeEnum.After)
-        case _ => None
+        case t                        => Result.internalError(s"TimingWindowMappings.endDiscriminator: cannot narrow to $t")
       }
     }
   }
