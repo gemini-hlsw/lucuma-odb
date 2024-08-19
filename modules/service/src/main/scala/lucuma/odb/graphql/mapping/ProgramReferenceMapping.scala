@@ -54,10 +54,10 @@ trait ProgramReferenceMapping[F[_]]
           case PT.System        => Result(SystemProgramReferenceType)
         }
 
-      private def mkPredicate(tpe: PT): Option[Predicate] =
-        Eql(ProgramReferenceType / "type", Const(tpe)).some
+      private def mkPredicate(tpe: PT): Result[Predicate] =
+        Result(Eql(ProgramReferenceType / "type", Const(tpe)))
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
         tpe match {
           case CalibrationProgramReferenceType   => mkPredicate(PT.Calibration)
           case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)
@@ -67,7 +67,7 @@ trait ProgramReferenceMapping[F[_]]
           case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
           case ScienceProgramReferenceType       => mkPredicate(PT.Science)
           case SystemProgramReferenceType        => mkPredicate(PT.System)
-          case _                                 => none
+          case t                                 => Result.internalError(s"programReferenceTypeDiscriminator: cannot narrow to $t")
         }
     }
 

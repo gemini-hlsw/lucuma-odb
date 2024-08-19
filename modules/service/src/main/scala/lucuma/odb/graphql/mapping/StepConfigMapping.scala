@@ -38,17 +38,17 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
           case SmartGcal => SmartGcalType
         }
 
-      private def mkPredicate(stepType: StepType): Option[Predicate] =
-        Eql(StepConfigType / "stepType", Const(stepType)).some
+      private def mkPredicate(stepType: StepType): Result[Predicate] =
+        Result(Eql(StepConfigType / "stepType", Const(stepType)))
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
         tpe match {
           case BiasType      => mkPredicate(Bias)
           case DarkType      => mkPredicate(Dark)
           case GcalType      => mkPredicate(Gcal)
           case ScienceType   => mkPredicate(Science)
           case SmartGcalType => mkPredicate(SmartGcal)
-          case _             => none
+          case t             => Result.internalError(s"stepConfigDiscriminator: cannot narrow to $t")
         }
     }
 

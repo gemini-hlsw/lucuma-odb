@@ -53,10 +53,10 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
         }
 
-      private def mkPredicate(tpe: ScienceSubtype): Option[Predicate] =
-        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).some
+      private def mkPredicate(tpe: ScienceSubtype): Result[Predicate] =
+        Result(Eql(ProposalTypeType / "scienceSubtype", Const(tpe)))
 
-      override def narrowPredicate(tpe:  Type): Option[Predicate] =
+      override def narrowPredicate(tpe:  Type): Result[Predicate] =
         tpe match {
           case ClassicalType          => mkPredicate(ScienceSubtype.Classical)
           case DemoScienceType        => mkPredicate(ScienceSubtype.DemoScience)
@@ -66,7 +66,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case PoorWeatherType        => mkPredicate(ScienceSubtype.PoorWeather)
           case QueueType              => mkPredicate(ScienceSubtype.Queue)
           case SystemVerificationType => mkPredicate(ScienceSubtype.SystemVerification)
-          case _                      => none
+          case t                      => Result.internalError(s"proposalTypeDiscriminator: cannot narrow to $t")
         }
     }
 

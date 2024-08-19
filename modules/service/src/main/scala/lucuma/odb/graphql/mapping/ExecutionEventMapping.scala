@@ -61,17 +61,17 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
           case Dataset  => DatasetEventType
         }
 
-      private def mkPredicate(eventType: lucuma.odb.data.ExecutionEventType): Option[Predicate] =
-        Eql(ExecutionEventType / "eventType", Const(eventType)).some
+      private def mkPredicate(eventType: lucuma.odb.data.ExecutionEventType): Result[Predicate] =
+        Result(Eql(ExecutionEventType / "eventType", Const(eventType)))
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
         tpe match {
           case SequenceEventType => mkPredicate(Sequence)
           case SlewEventType     => mkPredicate(Slew)
           case AtomEventType     => mkPredicate(Atom)
           case StepEventType     => mkPredicate(Step)
           case DatasetEventType  => mkPredicate(Dataset)
-          case _                 => none
+          case t                 => Result.internalError(s"executionEventTypeDiscriminator: cannot narrow to $t")
         }
     }
 
