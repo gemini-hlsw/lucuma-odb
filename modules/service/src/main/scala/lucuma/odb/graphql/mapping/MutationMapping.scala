@@ -81,6 +81,7 @@ import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateProgramUsersInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -143,6 +144,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateObservations,
       UpdateObservationsTimes,
       UpdatePrograms,
+      UpdateProgramUsers,
       UpdateProposal,
       UpdateTargets,
     )
@@ -267,6 +269,25 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       collectionField = "programs",
       child
     )
+
+  def programUsersResultSubquery(ids: List[(Program.Id, User.Id)], limit: Option[NonNegInt], child: Query) = {
+    val pred   = Predicates.programUser.key.in(ids)
+    val order  = List(
+      OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
+      OrderSelection[User.Id](ProgramUserType / "user" / "id")
+    )
+    val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value) + 1
+
+    ResultMapping.mutationResult(child, limitʹ, "programUsers") { q =>
+      FilterOrderByOffsetLimit(
+        pred   = pred.some,
+        oss    = order.some,
+        offset = None,
+        limit  = limitʹ.some,
+        child  = q
+      )
+    }
+  }
 
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
@@ -736,6 +757,33 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           }
 
         updateObservations.map(_.map(_._2))
+      }
+    }
+
+  private lazy val UpdateProgramUsers =
+    MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))) { (input, child) =>
+      services.useTransactionally {
+        val filterPredicate = and(List(
+          Predicates.programUser.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val selection: Result[AppliedFragment] =
+          MappedQuery(
+            Filter(filterPredicate, Query.Group(List(
+              Select("programId", None, Empty),
+              Select("userId", None, Empty)
+            ))),
+            Context(QueryType, List("programUsers"), List("programUsers"), List(ProgramUserType))
+          ).flatMap(_.fragment)
+
+        selection.flatTraverse { which =>
+          programService
+            .updateProgramUsers(input.SET, which)
+            .map(
+              _.flatMap(programUsersResultSubquery(_, input.LIMIT, child))
+            )
+        }
       }
     }
 

@@ -311,6 +311,7 @@ trait BaseMapping[F[_]]
   lazy val UpdateObsAttachmentsResultType          = schema.ref("UpdateObsAttachmentsResult")
   lazy val UpdateObservationsResultType            = schema.ref("UpdateObservationsResult")
   lazy val UpdateProgramsResultType                = schema.ref("UpdateProgramsResult")
+  lazy val UpdateProgramUsersResultType            = schema.ref("UpdateProgramUsersResult")
   lazy val UpdateProposalAttachmentsResultType     = schema.ref("UpdateProposalAttachmentsResult")
   lazy val UpdateProposalResultType                = schema.ref("UpdateProposalResult")
   lazy val UpdateTargetsResultType                 = schema.ref("UpdateTargetsResult")
