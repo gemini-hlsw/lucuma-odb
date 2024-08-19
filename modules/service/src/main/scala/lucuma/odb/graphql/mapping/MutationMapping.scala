@@ -271,8 +271,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     )
 
   def programUsersResultSubquery(ids: List[(Program.Id, User.Id)], limit: Option[NonNegInt], child: Query) = {
-    println(s"ids = ${ids.mkString(", ")}")
-
     val pred   = Predicates.programUser.In(ids)
     val order  = List(
       OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
