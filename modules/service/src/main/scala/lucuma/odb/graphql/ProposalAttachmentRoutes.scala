@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.Parallel
 import cats.effect.*
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -32,7 +33,7 @@ object ProposalAttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Trace](
+  def apply[F[_]: Async: Parallel: Trace](
     pool:                  Resource[F, Session[F]],
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],

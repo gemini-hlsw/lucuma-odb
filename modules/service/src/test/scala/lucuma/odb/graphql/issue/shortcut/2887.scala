@@ -12,7 +12,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
-import lucuma.core.model.Target
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupport

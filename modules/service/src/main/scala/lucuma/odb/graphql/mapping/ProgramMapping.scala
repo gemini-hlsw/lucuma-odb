@@ -27,7 +27,6 @@ import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculator

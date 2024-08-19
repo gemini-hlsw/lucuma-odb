@@ -17,10 +17,6 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
-import lucuma.core.model.Access.Admin
-import lucuma.core.model.Access.Guest
-import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
@@ -35,7 +31,6 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data.*
-import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput

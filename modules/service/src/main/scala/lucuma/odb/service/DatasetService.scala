@@ -23,7 +23,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.DatasetPropertiesInput
 import lucuma.odb.graphql.input.RecordDatasetInput
-import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool

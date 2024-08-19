@@ -159,7 +159,7 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Concurrent: UUIDGen: Trace: Logger](
+  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
     user: Option[User],
     enums: Enums
   )(pool: Session[F]): F[Services[F]] =
@@ -181,7 +181,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Logger: Trace: Console: Network]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network]: Resource[F, ExitCode] =
     for {
       c           <- Resource.eval(Config.fromCiris.load[F])
       _           <- Resource.eval(banner[F](c))
@@ -194,7 +194,7 @@ object CMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]:   Async: Logger: Trace: Network: Console]: F[ExitCode] =
+  def runF[F[_]:   Async: Parallel: Logger: Trace: Network: Console]: F[ExitCode] =
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }

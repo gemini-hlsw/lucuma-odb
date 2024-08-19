@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.Eq
 import cats.effect.Resource
 import cats.syntax.functor.*
 import grackle.Env
@@ -108,7 +107,7 @@ trait ObservationMapping[F[_]]
   def itcQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResult]] =
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResults]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService(itcClient)

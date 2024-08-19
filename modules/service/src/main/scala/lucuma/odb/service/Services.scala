@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.Parallel
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
@@ -11,7 +12,6 @@ import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Access
-import lucuma.core.model.Access.Service
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
@@ -190,7 +190,7 @@ object Services:
    * lazily.
    */
   def forUser[F[_]](u: User, e: Enums)(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F]
   ): Services[F[_]] =
     new Services[F]:
       val user = u

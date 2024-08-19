@@ -4,29 +4,33 @@
 package lucuma.odb.service
 
 import cats.Order
+import cats.Parallel
 import cats.data.EitherT
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.data.OptionT
 import cats.effect.Async
 import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
 import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.order.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import clue.ResponseException
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
+import io.circe.Decoder
+import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
@@ -34,31 +38,31 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.model.brightestProfileAt
 import lucuma.core.util.TimeSpan
-import lucuma.itc.ErrorCode
+import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
-import lucuma.itc.client.ImagingIntegrationTimeInput
+import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.sequence.data.GeneratorAsterismParams
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos.longslit.Acquisition
+import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
+import skunk.circe.codec.json.*
 import skunk.codec.text.text
 import skunk.implicits.*
 
-import java.security.MessageDigest
 import scala.concurrent.duration.*
 
 sealed trait ItcService[F[_]] {
 
-  import ItcService.AsterismResult
+  import ItcService.AsterismResults
   import ItcService.Error
 
   /**
@@ -68,7 +72,7 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
+  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
@@ -78,7 +82,7 @@ sealed trait ItcService[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     params:        GeneratorParams
-  )(using NoTransaction[F]): F[Either[Error, AsterismResult]]
+  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
@@ -88,7 +92,7 @@ sealed trait ItcService[F[_]] {
     programId:    Program.Id,
     observatinId: Observation.Id,
     params:       GeneratorParams
-  )(using Transaction[F]): F[Option[AsterismResult]]
+  )(using Transaction[F]): F[Option[AsterismResults]]
 
   /**
    * Selects the cached ITC results for a program, for those observations where
@@ -98,7 +102,7 @@ sealed trait ItcService[F[_]] {
   def selectAll(
     programId: Program.Id,
     params:    Map[Observation.Id, GeneratorParams]
-  )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]]
+  )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]]
 
 }
 
@@ -133,29 +137,28 @@ object ItcService {
     }
 
     case class RemoteServiceErrors(
-      problems: NonEmptyList[(Target.Id, String)]
+      problems: NonEmptyList[(Option[Target.Id], String)]
     ) extends Error {
       def format: String = {
-        val ps = problems.map { case (tid, msg) => s"Target '$tid': $msg"}
+        val ps = problems.map { 
+          case (None, msg)      => s"Asterism: $msg"
+          case (Some(tid), msg) => s"Target '$tid': $msg"
+        }
         s"ITC returned errors: ${ps.intercalate(", ")}"
       }
     }
 
-    case object TargetMissmatch extends Error {
+    case object TargetMismatch extends Error {
       def format: String =
         s"ITC provide conflicting results"
     }
   }
 
-  sealed trait TargetResult {
-    val targetId: Target.Id
-    val value:    IntegrationTime
-
+  case class TargetResult(targetId: Target.Id, value: IntegrationTime) {
     def totalTime: Option[TimeSpan] = {
-      val total = BigInt(value.exposureTime.toMicroseconds) * value.exposures.value
+      val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
       Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
     }
-
   }
 
   object TargetResult {
@@ -169,52 +172,37 @@ object ItcService {
         Json.obj(
           "targetId"      -> s.targetId.asJson,
           "exposureTime"  -> s.value.exposureTime.asJson,
-          "exposures"     -> s.value.exposures.value.asJson,
+          "exposureCount" -> s.value.exposureCount.value.asJson,
           "signalToNoise" -> s.value.signalToNoise.asJson
         )
       }
+
+    given Decoder[TargetResult] =
+      Decoder.instance { c =>
+        for {
+          targetId      <- c.downField("targetId").as[Target.Id]
+          exposureTime  <- c.downField("exposureTime").as[TimeSpan]
+          exposureCount <- c.downField("exposureCount").as[PosInt]
+          signalToNoise <- c.downField("signalToNoise").as[SignalToNoise]
+        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount, signalToNoise))
+      }
   }
 
-  case class TargetSpectroscopyResult(
-    targetId: Target.Id,
-    input:    SpectroscopyIntegrationTimeInput,
-    value:    IntegrationTime
-  ) extends TargetResult
-
-  case class TargetImagingResult(
-    targetId: Target.Id,
-    input:    ImagingIntegrationTimeInput,
-    value:    IntegrationTime
-  ) extends TargetResult
-
-  case class AsterismResult private (
-    acquisitionResult: Zipper[TargetImagingResult],
-    scienceResult: Zipper[TargetSpectroscopyResult]
+  case class AsterismResults private (
+    acquisitionResult: Zipper[TargetResult],
+    scienceResult: Zipper[TargetResult]
   ) {
     assert(acquisitionResult.focus.targetId === scienceResult.focus.targetId)
   }
 
-  object AsterismResult {
+  object AsterismResults {
 
-    def fromResults(acquisition: NonEmptyList[TargetImagingResult], science: NonEmptyList[TargetSpectroscopyResult]): Option[AsterismResult] = {
-      val wv = science.head.input.wavelength
-      // results for acquisition and sciencce should contain the same set of targets
-      if (acquisition.map(_.targetId).sortBy(_.value) === science.map(_.targetId).sortBy(_.value)) {
-        // Find the target with the brightest magnitude for the relevant wavelength
-        val brightestTarget = science.brightestProfileAt(_.input.sourceProfile)(wv)
+    def fromResults(acquisition: Zipper[TargetResult], science: Zipper[TargetResult]): Option[AsterismResults] =
+      if (acquisition.toNel.map(_.targetId).sortBy(_.value) === science.toNel.map(_.targetId).sortBy(_.value)) {
+        AsterismResults(acquisition, science).some
+      } else none
 
-        brightestTarget.flatMap { t =>
-          val selectedTarget = t.targetId
-
-          // Focus each zipper on the selected science target
-          val a = Zipper.fromNel[TargetImagingResult](acquisition).findFocus(_.targetId === selectedTarget)
-          val s = Zipper.fromNel[TargetSpectroscopyResult](science).findFocus(_.targetId === selectedTarget)
-          (a, s).mapN(AsterismResult(_, _))
-        }
-      } else None
-    }
-
-    given Encoder[AsterismResult] =
+    given Encoder[AsterismResults] =
       Encoder.instance { rs =>
         Json.obj(
           "science" -> rs.scienceResult.widen[TargetResult].asJson,
@@ -222,14 +210,15 @@ object ItcService {
         )
       }
 
+    given Decoder[AsterismResults] =
+      Decoder.instance { c =>
+        for {
+          science     <- c.downField("science").as[Zipper[TargetResult]]
+          acquisition <- c.downField("acquisition").as[Zipper[TargetResult]]
+          result      <- fromResults(acquisition, science).toRight(DecodingFailure("Target mismatch", c.history))
+        } yield result
+      }
   }
-
-  private def hash[A: Encoder](input: A): Md5Hash =
-    Md5Hash.unsafeFromByteArray {
-      MessageDigest
-        .getInstance("MD5")
-        .digest(input.asJson.noSpaces.getBytes("UTF-8"))
-    }
 
   def pollVersionsForever[F[_]: Async: Temporal: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -239,7 +228,7 @@ object ItcService {
     val pollOnce: F[Unit] =
       for {
         v <- client.use(_.versions)
-        _ <- session.use { s => s.transaction.use(_ => s.execute(Statements.UpdateItcVersion)(v.server.some, v.data)) }
+        _ <- session.use { s => s.transaction.use(_ => s.execute(Statements.UpdateItcVersion)(v.serverVersion.some, v.dataVersion)) }
       } yield ()
 
     val pollOnceLogError: F[Unit] =
@@ -257,7 +246,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Parallel](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
       import Error.*
@@ -265,7 +254,7 @@ object ItcService {
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
+      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
@@ -276,17 +265,17 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
+      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (for {
           r <- EitherT(callRemoteItc(params.itc))
-          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, r)))
+          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, params.itc, r)))
         } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResult])]] =
+      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
@@ -294,157 +283,96 @@ object ItcService {
           } yield (p, r)).value
         }
 
-      // Selects the asterism result as a whole by selecting all the individual
-      // target results.  If any individual result is not found then the asterism
-      // as a whole is considered not found.
       override def selectOne(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using Transaction[F]): F[Option[AsterismResult]] = {
-
-        def selectSingleTarget(
-          tid:   Target.Id,
-          input: (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)
-        ): F[Option[(TargetImagingResult, TargetSpectroscopyResult)]] =
-          session
-            .option(Statements.SelectOneItcResult)(pid, oid, tid)
-            .map(_.collect { case (h, sciTime, acqTime) if h === hash(input) =>
-              (
-                TargetImagingResult(tid, input._1, acqTime),
-                TargetSpectroscopyResult(tid, input._2, sciTime)
-              )
-            })
-
-        params
-          .itc
-          .traverse { case (tid, input) => OptionT(selectSingleTarget(tid, input)) }
-          .value
-          .map(_.flatMap{ lst =>
-            val it  = lst.map(_._1)
-            val st = lst.map(_._2)
-            AsterismResult.fromResults(it, st)
-          })
-      }
+      )(using Transaction[F]): F[Option[AsterismResults]] =
+        val inputHash = Md5Hash.unsafeFromByteArray(params.itc.md5)
+        session 
+          .option(Statements.SelectOneItcResult)(pid, oid)
+          .map:
+            _.collect { case (h, rs) if h === inputHash => rs }
 
       override def selectAll(
         pid:    Program.Id,
         params: Map[Observation.Id, GeneratorParams]
-      )(using Transaction[F]): F[Map[Observation.Id, AsterismResult]] =
+      )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]] = 
         session
           .execute(Statements.SelectAllItcResults)(pid)
-          .map(
-            _.groupBy(_._1)
-             .map { case (oid, lst) =>
+          .map: (rows: List[(Observation.Id, Md5Hash, AsterismResults)]) =>
+            rows.map: (oid, hash, results) =>
+              params.get(oid).map(_.itc).flatMap: obsParams => 
+                val inputHash = Md5Hash.unsafeFromByteArray(obsParams.md5)
+                Option.when(hash === inputHash)(oid -> results)
+            .flattenOption
+            .toMap
 
-               // Get the cached result, if any, for each target in the
-               // observation's asterism.
-               val cachedResults: Map[Target.Id, (Md5Hash, IntegrationTime, IntegrationTime)] =
-                 lst.map { case (_, tid, h, sciTime, acqTime) =>
-                  tid -> (h, sciTime, acqTime)
-                 }.toMap
-
-               // Get the GeneratorParams for the observation, lookup the ITC
-               // inputs (there's one per target), then find the corresponding
-               // cached result.  Assuming the hash matches, it is still valid.
-               // If they are all still valid, we can create an AsterismResult.
-               val asterismResult: Option[AsterismResult] =
-                 params
-                   .get(oid)
-                   .map(_.itc)
-                   .flatMap(
-                     _.traverse { case (tid, input) =>
-                       cachedResults.get(tid).collect { case (h, sciTime, acqTime) if hash(input) === h =>
-                        (
-                          TargetImagingResult(tid, input._1, acqTime),
-                          TargetSpectroscopyResult(tid, input._2, sciTime)
-                        )
-                       }
-                     }
-                   )
-                   .flatMap { lst => // NonEmptyList[(TargetResult, TargetResult)]
-                     val it = lst.map(_._1)
-                     val st = lst.map(_._2)
-                     AsterismResult.fromResults(it, st)
-                   }
-
-               (oid, asterismResult)
-             }
-             .collect { case (oid, Some(a)) => (oid, a) }
-          )
+      private def convertRemoteErrors(targets: GeneratorAsterismParams)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error = 
+        RemoteServiceErrors(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(ii: ImagingIntegrationTimeInput): F[Zipper[IntegrationTime]] =
-        client.imaging(ii, useCache = false)
-          .map(_.result)
-          .recover {
-            case ResponseException(errors, _) if errors.exists(_.extensions.exists(_.exists(_ === ("errorCode" -> ErrorCode.SourceTooBright.asJson)))) =>
-              // Use default if target is too bright
-              Acquisition.DefaultIntegrationTime
-          }.map {
-            case r if r.focus.exposureTime > Acquisition.MaxExposureTime => r.map(_.copy(exposureTime = Acquisition.MaxExposureTime))
-            case r if r.focus.exposureTime < Acquisition.MinExposureTime => r.map(_.copy(exposureTime = Acquisition.MinExposureTime))
-            case r => r
-
-          }
-
+      private def safeAcquisitionCall(targets:  GeneratorAsterismParams): F[Either[Error, AsterismIntegrationTimes]] =
+        client
+          .imaging(targets.imagingInput, useCache = false)
+          .map:
+            _.targetTimes.modifyValue:
+              _.map:
+                _.modifyValue:
+                  case Left(lucuma.itc.Error.SourceTooBright(_)) => 
+                    Acquisition.DefaultIntegrationTime.asRight
+                  case Right(r) if r.times.focus.exposureTime > Acquisition.MaxExposureTime => 
+                    r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MaxExposureTime))).asRight
+                  case Right(r) if r.times.focus.exposureTime < Acquisition.MinExposureTime => 
+                    r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MinExposureTime))).asRight
+                  case other => other
+            .partitionErrors
+            .leftMap(convertRemoteErrors(targets))
+          
       private def callRemoteItc(
-        targets:  NonEmptyList[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))]
-      )(using NoTransaction[F]): F[Either[Error, AsterismResult]] =
-        targets.traverse { case (tid, (ii, si)) =>
-          (safeAcquisitionCall(ii), client.spectroscopy(si, useCache = false)).mapN {
-            case (img, IntegrationTimeResult(_, spec)) =>
-              (TargetImagingResult(tid, ii, img.focus), TargetSpectroscopyResult(tid, si, spec.focus)).rightNel
-          }
-          .handleError { t => (tid, t.getMessage).leftNel }
-        }.map(_.sequence.bimap(
-          errors  => (RemoteServiceErrors(errors): Error).asLeft[AsterismResult],
-          targets =>
-            AsterismResult.fromResults(targets.map(_._1), targets.map(_._2)).toRight[Error](Error.TargetMissmatch)
-        ).merge)
+        targets:  GeneratorAsterismParams
+      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+        (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
+          case (imgResult, IntegrationTimeResult(_, specOutcomes)) =>
+            val specResult = specOutcomes.partitionErrors.leftMap(convertRemoteErrors(targets))
+
+            for
+              img    <- imgResult
+              spec   <- specResult
+              result <-
+                AsterismResults.fromResults(
+                  img.value.zipWithIndex.map { case (targetIntegrationTime, index) => 
+                    val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
+                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus)
+                  },
+                  spec.value.zipWithIndex.map { case (targetIntegrationTime, index) => 
+                    val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
+                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus)
+                  },
+                ).toRight[Error](Error.TargetMismatch)
+            yield result
+        }
+        .handleError: t => 
+          RemoteServiceErrors(NonEmptyList.one(None, t.getMessage)).asLeft
 
       private def insertOrUpdate(
-        pid:       Program.Id,
-        oid:       Observation.Id,
-        resultSet: AsterismResult
+        pid:     Program.Id,
+        oid:     Observation.Id,
+        input:   GeneratorAsterismParams,
+        results: AsterismResults
       )(using Transaction[F]): F[Unit] = {
-
-        def insertOrUpdateSingleTarget(acquisition: TargetImagingResult)(science: TargetSpectroscopyResult): F[Unit] = {
-          val h = hash(acquisition.input, science.input)            
-          session.execute(Statements.InsertOrUpdateItcResult)(
-            pid,
-            oid,
-            science.targetId,
-            h,
-            science.value.exposureTime,
-            science.value.exposures,
-            science.value.signalToNoise,
-            acquisition.value.exposureTime,
-            acquisition.value.exposures,
-            acquisition.value.signalToNoise,
-            h,
-            science.value.exposureTime,
-            science.value.exposures,
-            science.value.signalToNoise,
-            acquisition.value.exposureTime,
-            acquisition.value.exposures,
-            acquisition.value.signalToNoise,
-          ).ensuring(acquisition.targetId === science.targetId).void
-        }
-
-
-        resultSet.scienceResult.traverse { r =>
-          val acqResult = resultSet.acquisitionResult.find(_.targetId === r.targetId)
-          acqResult.traverse(insertOrUpdateSingleTarget(_)(r))
-        }.void
+        val h = Md5Hash.unsafeFromByteArray(input.md5)
+        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results).void
       }
 
     }
 
   object Statements {
-    private val integration_time: Codec[IntegrationTime] =
-      (time_span *: int4_pos *: signal_to_noise).to[IntegrationTime]
+    private val asterism_results: Codec[AsterismResults] =
+      jsonb.eimap(
+        _.as[AsterismResults].leftMap(f => s"Could not decode AsterismResults: ${f.message}")
+      )(_.asJson)
 
     val UpdateItcVersion: Command[(
       Option[String],
@@ -459,91 +387,49 @@ object ItcService {
     val SelectOneItcResult: Query[(
       Program.Id,
       Observation.Id,
-      Target.Id
-    ), (Md5Hash, IntegrationTime, IntegrationTime)] =
+    ), (Md5Hash, AsterismResults)] =
       sql"""
         SELECT
           c_hash,
-          c_sci_exposure_time,
-          c_sci_exposure_count,
-          c_sci_signal_to_noise,
-          c_acq_exposure_time,
-          c_acq_exposure_count,
-          c_acq_signal_to_noise
+          c_asterism_results
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
-              c_observation_id = $observation_id AND
-              c_target_id      = $target_id
-      """.query(md5_hash *: integration_time *: integration_time)
+              c_observation_id = $observation_id
+      """.query(md5_hash *: asterism_results)
 
-    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Target.Id, Md5Hash, IntegrationTime, IntegrationTime)] =
+    val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, AsterismResults)] =
       sql"""
         SELECT
           c_observation_id,
-          c_target_id,
           c_hash,
-          c_sci_exposure_time,
-          c_sci_exposure_count,
-          c_sci_signal_to_noise,
-          c_acq_exposure_time,
-          c_acq_exposure_count,
-          c_acq_signal_to_noise
+          c_asterism_results
         FROM t_itc_result
         WHERE c_program_id = $program_id
-      """.query(observation_id *: target_id *: md5_hash *: integration_time *: integration_time)
+      """.query(observation_id *: md5_hash *: asterism_results)
 
     val InsertOrUpdateItcResult: Command[(
       Program.Id,
       Observation.Id,
-      Target.Id,
       Md5Hash,
-      TimeSpan,
-      PosInt,
-      SignalToNoise,
-      TimeSpan,
-      PosInt,
-      SignalToNoise,
+      AsterismResults,
       Md5Hash,
-      TimeSpan,
-      PosInt,
-      SignalToNoise,
-      TimeSpan,
-      PosInt,
-      SignalToNoise,
+      AsterismResults      
     )] =
       sql"""
         INSERT INTO t_itc_result (
           c_program_id,
           c_observation_id,
-          c_target_id,
           c_hash,
-          c_sci_exposure_time,
-          c_sci_exposure_count,
-          c_sci_signal_to_noise,
-          c_acq_exposure_time,
-          c_acq_exposure_count,
-          c_acq_signal_to_noise
+          c_asterism_results
         ) SELECT
           $program_id,
           $observation_id,
-          $target_id,
           $md5_hash,
-          $time_span,
-          $int4_pos,
-          $signal_to_noise,
-          $time_span,
-          $int4_pos,
-          $signal_to_noise
+          $asterism_results
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash                 = $md5_hash,
-              c_sci_exposure_time    = $time_span,
-              c_sci_exposure_count   = $int4_pos,
-              c_sci_signal_to_noise  = $signal_to_noise,
-              c_acq_exposure_time    = $time_span,
-              c_acq_exposure_count   = $int4_pos,
-              c_acq_signal_to_noise  = $signal_to_noise
+          SET c_hash             = $md5_hash,
+              c_asterism_results = $asterism_results
       """.command
-
 
   }
 
