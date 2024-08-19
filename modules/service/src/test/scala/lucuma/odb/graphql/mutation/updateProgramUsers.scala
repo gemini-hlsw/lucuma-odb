@@ -7,14 +7,17 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.Partner.US
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 import lucuma.odb.data.PartnerLink
+import lucuma.odb.data.ProgramUserRole
 
 class updateProgramUsers extends OdbSuite {
 
@@ -25,14 +28,14 @@ class updateProgramUsers extends OdbSuite {
   val staff   = TestUsers.Standard.staff(5, 34)
 
   val piCharles = TestUsers.Standard(
-    6,
-    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(6).get),
+    7,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
     primaryEmail = "charles@guiteau.com".some
   )
 
   val piLeon    = TestUsers.Standard(
-    7,
-    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
+    8,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
     primaryEmail = "leon@czolgosz.edu".some
   )
 
@@ -40,57 +43,119 @@ class updateProgramUsers extends OdbSuite {
 
   val validUsers = List(pi, pi2, guest1, guest2, staff, piCharles, piLeon, service).toList
 
-  test("simple update pi") {
-    createProgramAs(pi).flatMap { pid =>
+  def updateUserMutation(u: User, pl: PartnerLink): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              partnerLink: {
+                ${pl.fold("linkType: HAS_UNSPECIFIED_PARTNER", "linkType: HAS_NON_PARTNER", p => s"partner: ${p.tag.toScreamingSnakeCase}")}
+              }
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              }
+            }
+          }
+        ) {
+          hasMore
+          programUsers {
+            program { id }
+            user { id }
+            partnerLink {
+              linkType
+              ... on HasPartner {
+                partner
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def expected(ts: (Program.Id, User, PartnerLink)*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "hasMore" -> Json.False,
+        "programUsers" -> ts.toList.map { case (pid, user, link) =>
+          Json.obj(
+            "program" -> Json.obj("id" -> pid.asJson),
+            "user"    -> Json.obj("id" -> user.id.asJson),
+            "partnerLink" -> Json.fromFields(
+              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.toOption.toList.map { p =>
+                "partner" -> p.tag.toScreamingSnakeCase.asJson
+              }
+            )
+          )
+        }.asJson
+      )
+    )
+
+  test("update pi partner") {
+    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
       expect(
-        user = pi,
-        query = s"""
+        user     = pi,
+        query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
+        expected = expected((pid, pi, PartnerLink.HasPartner(US))).asRight
+      )
+    }
+  }
+
+  test("update coi partner") {
+    createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserMutation(pi2, PartnerLink.HasNonPartner),
+          expected = expected((pid, pi2, PartnerLink.HasNonPartner)).asRight
+        )
+    }
+  }
+
+  test("cannot update another pi's partner as a PI") {
+    createProgramAs(piCharles).flatMap { pid =>
+      expect(
+        user     = piCharles,
+        query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
+        expected = expected().asRight
+      )
+    }
+  }
+
+  test("cannot update another pi's partner") {
+    createProgramAs(piLeon).flatMap { pid =>
+      linkAs(piLeon, piCharles.id, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner) >>
+      expect(
+        user     = piCharles,
+        query    = s"""
           mutation {
             updateProgramUsers(
               input: {
                 SET: {
-                  partnerLink: {
-                    partner: US
-                  }
+                  partnerLink: { linkType: HAS_NON_PARTNER }
                 }
                 WHERE: {
-                  user: {
-                    id: { EQ: "${pi.id}" }
+                  program: {
+                    id: { EQ: "$pid" }
                   }
                 }
               }
             ) {
-              hasMore
               programUsers {
-                program { id }
                 user { id }
-                partnerLink {
-                  linkType
-                  ... on HasPartner {
-                    partner
-                  }
-                }
               }
             }
           }
         """,
-        expected =
-          Right(Json.obj(
-            "updateProgramUsers" -> Json.obj(
-              "hasMore" -> Json.False,
-              "programUsers" -> Json.arr(
-                Json.obj(
-                  "program" -> Json.obj("id" -> pid.asJson),
-                  "user"    -> Json.obj("id" -> pi.id.asJson),
-                  "partnerLink" -> Json.obj(
-                    "linkType" -> PartnerLink.LinkType.HasPartner.tag.toScreamingSnakeCase.asJson,
-                    "partner"  -> Partner.US.tag.toScreamingSnakeCase.asJson
-                  )
-                )
-              )
-            )
-          )
-        )
+        expected = json"""
+          {
+            "updateProgramUsers": {
+              "programUsers": []
+            }
+          }
+        """.asRight
       )
     }
   }

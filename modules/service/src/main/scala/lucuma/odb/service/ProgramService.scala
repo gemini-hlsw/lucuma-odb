@@ -35,8 +35,8 @@ import lucuma.core.model.User
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.input.ProgramPropertiesInput
-import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
@@ -361,7 +361,7 @@ object ProgramService {
         SET:   ProgramUserPropertiesInput,
         which: AppliedFragment
       )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]] =
-        Statements.updateProgramUsers(SET, which).fold(Nil.success.pure[F]) { af =>
+        Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]) { af =>
           session.prepareR(af.fragment.query(program_id *: user_id)).use { pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
           }
@@ -504,9 +504,12 @@ object ProgramService {
       }
 
     def updateProgramUsers(
-      SET: ProgramUserPropertiesInput,
+      user:  User,
+      SET:   ProgramUserPropertiesInput,
       which: AppliedFragment
     ): Option[AppliedFragment] = {
+      val alias = "o"
+
       val ups = NonEmptyList.fromList(
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),
@@ -514,14 +517,30 @@ object ProgramService {
         )}
       )
 
-      ups.map { us =>
-        void"""
-          UPDATE t_program_user
-          SET """ |+| us.intercalate(void", ") |+| void" " |+|
-        void"WHERE (c_program_id, c_user_id) IN (" |+| which |+| void") " |+|
-        void"RETURNING c_program_id, c_user_id"
+      ups.map { nel =>
+        val up =
+          sql"""
+            UPDATE t_program_user AS #$alias
+            SET """(Void) |+| nel.intercalate(void", ") |+| void" " |+|
+          sql"WHERE (#$alias.c_program_id, #$alias.c_user_id) IN ("(Void) |+| which |+| void")"
+
+        (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
+          up |+| void" AND " |+| exists
+        }) |+| sql" RETURNING #$alias.c_program_id, #$alias.c_user_id"(Void)
       }
     }
+
+    // This is the same as `existsUserAs` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsUserAs(
+      userId:     User.Id,
+      outerAlias: String,
+      innerAlias: String,
+      role:       ProgramUserRole
+    ): AppliedFragment =
+      sql"""
+        EXISTS (SELECT 1 FROM t_program_user #$innerAlias where #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_user_id = $user_id and #$innerAlias.c_role = $program_user_role)
+      """.apply(userId, role)
 
     def existsUserAs(
       programId: Program.Id,
@@ -544,13 +563,23 @@ object ProgramService {
     ): AppliedFragment =
       existsUserAs(programId, userId, ProgramUserRole.Coi)
 
+    // This is the same as `existsAllocationForPartner` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsAllocationForPartner(
+      outerAlias: String,
+      innerAlias: String
+    ): AppliedFragment =
+      sql"""
+        EXISTS (SELECT 1 FROM t_allocation WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_partner and #$innerAlias.c_duration > 'PT')
+      """(Void)
+
     def existsAllocationForPartner(
       programId: Program.Id,
       partner: Partner
     ): AppliedFragment =
       sql"""
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
-        """.apply(programId, partner.timeAccountingCategory)
+      """.apply(programId, partner.timeAccountingCategory)
 
     def existsUserAccess(
       user:      User,
@@ -561,6 +590,22 @@ object ProgramService {
         case Pi(_)                 => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void")").some
         case Ngo(_, partner)       => existsAllocationForPartner(programId, partner).some
         case ServiceRole(_) |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_) => none
+      }
+
+    // This is the same as `existsUserAccess` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsUserAccess(
+      user:       User,
+      outerAlias: String,
+      innerAlias: String
+    ): Option[AppliedFragment] =
+      user.role match {
+        case GuestRole             => correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Pi).some
+        case Pi(_)                 => (void"(" |+| correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Pi) |+| void" OR " |+| correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Coi) |+| void")").some
+        case Ngo(_, partner)       => correlatedExistsAllocationForPartner(outerAlias, innerAlias).some
+        case ServiceRole(_)        |
              StandardRole.Admin(_) |
              StandardRole.Staff(_) => none
       }
