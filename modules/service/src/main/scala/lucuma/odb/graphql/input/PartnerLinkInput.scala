@@ -10,8 +10,8 @@ import grackle.syntax.*
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.PartnerLink.LinkType
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.model.PartnerLink
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PartnerBinding
@@ -21,7 +21,7 @@ import lucuma.odb.graphql.binding.PartnerLinkTypeBinding
 object PartnerLinkInput:
 
   private val InvalidResult: Result[Nothing] =
-    OdbError.InvalidArgument(s"Specify either 'linkType' (as `${LinkType.HasNonPartner.tag.toScreamingSnakeCase}` or `${LinkType.HasUnspecifiedPartner.tag.toScreamingSnakeCase}`) or 'partner'.".some).asFailure
+    OdbError.InvalidArgument(s"Specify either 'linkType' (as `${PartnerLinkType.HasNonPartner.tag.toScreamingSnakeCase}` or `${PartnerLinkType.HasUnspecifiedPartner.tag.toScreamingSnakeCase}`) or 'partner'.".some).asFailure
 
   val Binding: Matcher[PartnerLink] =
     ObjectFieldsBinding.rmap:
@@ -33,12 +33,12 @@ object PartnerLinkInput:
           case (None,    None)        => InvalidResult
           case (None,    Some(p))     => PartnerLink.HasPartner(p).success
           case (Some(t), None)        => t match {
-            case LinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.success
-            case LinkType.HasNonPartner         => PartnerLink.HasNonPartner.success
-            case LinkType.HasPartner            => InvalidResult
+            case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.success
+            case PartnerLinkType.HasNonPartner         => PartnerLink.HasNonPartner.success
+            case PartnerLinkType.HasPartner            => InvalidResult
           }
           case (Some(t), Some(p))     => t match {
-            case LinkType.HasUnspecifiedPartner => InvalidResult
-            case LinkType.HasNonPartner         => InvalidResult
-            case LinkType.HasPartner            => PartnerLink.HasPartner(p).success
+            case PartnerLinkType.HasUnspecifiedPartner => InvalidResult
+            case PartnerLinkType.HasNonPartner         => InvalidResult
+            case PartnerLinkType.HasPartner            => PartnerLink.HasPartner(p).success
           }

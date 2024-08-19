@@ -7,7 +7,7 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.odb.data.PartnerLink
+import lucuma.core.model.PartnerLink
 import lucuma.odb.graphql.binding.*
 
 case class ProgramUserPropertiesInput(

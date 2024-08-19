@@ -14,9 +14,9 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole.Coi
-import lucuma.odb.data.ProgramUserRole.Pi
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole.Coi
+import lucuma.core.enums.ProgramUserRole.Pi
 
 class linkUser extends OdbSuite {
 

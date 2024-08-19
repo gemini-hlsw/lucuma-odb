@@ -11,7 +11,7 @@ import grackle.Result
 import grackle.Term
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.enums.ProgramUserRole
 
 class ProgramUserPredicates(path: Path) {
 

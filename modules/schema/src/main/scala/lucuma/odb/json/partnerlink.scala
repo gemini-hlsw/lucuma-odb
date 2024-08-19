@@ -9,7 +9,8 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
-import lucuma.odb.data.PartnerLink
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.model.PartnerLink
 
 trait PartnerLinkCodec {
 
@@ -28,10 +29,10 @@ trait PartnerLinkCodec {
 
   given Decoder[PartnerLink] =
     Decoder.instance { c =>
-      c.downField("linkType").as[PartnerLink.LinkType].flatMap:
-        case PartnerLink.LinkType.HasPartner            => c.as[PartnerLink.HasPartner]
-        case PartnerLink.LinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
-        case PartnerLink.LinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
+      c.downField("linkType").as[PartnerLinkType].flatMap:
+        case PartnerLinkType.HasPartner            => c.as[PartnerLink.HasPartner]
+        case PartnerLinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
+        case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
     }
 
   given Encoder[PartnerLink] =

@@ -15,12 +15,14 @@ import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramReference.Description
@@ -513,7 +515,7 @@ object ProgramService {
       val ups = NonEmptyList.fromList(
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),
-          sql"c_partner      = ${partner.opt}"(pl.toOption)
+          sql"c_partner      = ${partner.opt}"(pl.partnerOption)
         )}
       )
 

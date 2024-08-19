@@ -55,8 +55,8 @@ import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.model.PartnerLink
+import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
@@ -618,7 +618,7 @@ trait DatabaseOperations { this: OdbSuite =>
             role: ${role.tag.toUpperCase}
             partnerLink: {
               linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
+              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
             }
           }) {
             user {
@@ -1338,7 +1338,7 @@ trait DatabaseOperations { this: OdbSuite =>
             role: ${role.tag.toUpperCase}
             partnerLink: {
               linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
+              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
             }
           }
         ) {
