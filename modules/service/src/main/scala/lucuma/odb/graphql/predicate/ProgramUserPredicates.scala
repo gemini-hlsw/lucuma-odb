@@ -6,7 +6,9 @@ package lucuma.odb.graphql.predicate
 import grackle.Cursor
 import grackle.Path
 import grackle.Predicate
+import grackle.Predicate.*
 import grackle.Result
+import grackle.Term
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ProgramUserRole
@@ -21,14 +23,26 @@ class ProgramUserPredicates(path: Path) {
   lazy val role      = LeafPredicates[ProgramUserRole](path / "role")
   lazy val userId    = LeafPredicates[User.Id](userIdPath)
 
-  case class In(ids: List[(Program.Id, User.Id)]) extends Predicate {
-    override def apply(c: Cursor): Result[Boolean] =
+  case object keyTerm extends Term[(Program.Id, User.Id)] {
+    def apply(c: Cursor): Result[(Program.Id, User.Id)] =
       for {
         p <- programIdPath.asTerm[Program.Id](c)
         u <- userIdPath.asTerm[User.Id](c)
-      } yield ids.contains((p, u))
+      } yield (p, u)
 
-    override def children = Nil
+    override def children =
+      List(programIdPath, userIdPath)
+  }
+
+  object key {
+    def eql(a: (Program.Id, User.Id)): Predicate =
+      Eql(keyTerm, Const(a))
+
+    def neql(a: (Program.Id, User.Id)): Predicate =
+      NEql(keyTerm, Const(a))
+
+    def in(as: List[(Program.Id, User.Id)]): Predicate =
+      In(keyTerm, as)
   }
 
   def isPi: Predicate =
