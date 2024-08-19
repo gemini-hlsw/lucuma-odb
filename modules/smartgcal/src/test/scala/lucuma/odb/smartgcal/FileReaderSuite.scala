@@ -7,7 +7,6 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
-import fs2.io
 import lucuma.odb.smartgcal.data.Gmos.FileEntry
 
 final class FileReaderSuite extends munit.FunSuite {

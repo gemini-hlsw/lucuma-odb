@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 
 import cats.data.Ior
+import cats.data.NonEmptyChain
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.effect.std.UUIDGen
@@ -34,15 +35,19 @@ import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
+import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
+import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcVersions
+import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.client.ImagingIntegrationTimeInput
 import lucuma.itc.client.IntegrationTimeResult
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.ItcVersions
 import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
@@ -57,8 +62,6 @@ import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
-import org.http4s.Response
-import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -156,6 +159,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
+  val FakeBand: Band =
+    Band.B
+
   val FakeItcResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
@@ -173,7 +179,15 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
         IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(fakeItcResult)
+          AsterismIntegrationTimeOutcomes(
+            NonEmptyChain.fromSeq(
+              List.fill(input.asterism.length)(
+                TargetIntegrationTimeOutcome(
+                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                )
+              )
+            ).get
+          )
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] = {
@@ -181,20 +195,28 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> IntegrationTimeResult(
           FakeItcVersions,
-          Zipper.one(fakeItcResult)
+          AsterismIntegrationTimeOutcomes(
+            NonEmptyChain.fromSeq(
+              List.fill(input.asterism.length)(
+                TargetIntegrationTimeOutcome(
+                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                )
+              )
+            ).get
+          )
         ).pure[IO]
       }
 
-      def optimizedSpectroscopyGraph(
-        input: lucuma.itc.client.OptimizedSpectroscopyGraphInput,
+      def spectroscopyGraphs(
+        input: lucuma.itc.client.SpectroscopyGraphsInput,
         useCache: Boolean
-      ): IO[lucuma.itc.client.OptimizedSpectroscopyGraphResult] =
-        IO.raiseError(new java.lang.RuntimeException("optimizedSpectroscopyGraph: not implemented"))
+      ): IO[lucuma.itc.client.SpectroscopyGraphsResult] =
+        IO.raiseError(new java.lang.RuntimeException("spectroscopyGraph: not implemented"))
 
-      def spectroscopyIntegrationTimeAndGraph(
-        input:    lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphInput,
+      def spectroscopyIntegrationTimeAndGraphs(
+        input:    lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput,
         useCache: Boolean = true
-      ): IO[lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphResult] =
+      ): IO[lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult] =
         IO.raiseError(new java.lang.RuntimeException("spectroscopyIntegrationTimeAndGraph: not implemented"))
 
       override def versions: IO[ItcVersions] =
@@ -244,7 +266,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined,
       invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
-      exploreUrl = Uri.fromString("https://nonsense.kom").toOption.get
+      exploreUrl = org.http4s.Uri.fromString("https://nonsense.kom").toOption.get
     )
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.

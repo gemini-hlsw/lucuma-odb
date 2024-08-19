@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Eq
 import cats.data.EitherNel
 import cats.data.NonEmptyList
+import cats.data.Validated
 import cats.data.ValidatedNel
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
@@ -30,14 +31,16 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.GmosFpu
-import lucuma.itc.client.ImagingIntegrationTimeInput
+import lucuma.itc.client.ImagingIntegrationTimeParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.TargetInput
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.data.GeneratorAsterismParams
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.util.Codecs.*
@@ -147,24 +150,24 @@ object GeneratorParamsService {
         doSelect(selectAllParams(pid, minStatus, selection))
 
       private def doSelect(
-        params: F[List[Params]]
+        params: F[List[ParamsRow]]
       )(using Transaction[F]): F[Map[Observation.Id, EitherNel[Error, GeneratorParams]]] =
         for {
-          ps <- params
-          oms = ps.collect { case Params(oid, _, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
+          paramsRows <- params
+          oms = paramsRows.collect { case ParamsRow(oid, _, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
           m  <- observingModeServices.selectObservingMode(oms)
         } yield
-          ps.groupBy(_.observationId).map { case (oid, oParams) =>
-            oid -> toGeneratorParams(NonEmptyList.fromListUnsafe(oParams), m.get(oid))
-          }
+          NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
+            ObsParams.fromParamsRows(paramsRowsNel).map: (obsId, obsParams) =>
+              obsId -> toObsGeneratorParams(obsParams, m.get(obsId))
 
       private def selectManyParams(
         pid:  Program.Id,
         oids: List[Observation.Id]
-      ): F[List[Params]] =
+      ): F[List[ParamsRow]] =
         NonEmptyList
           .fromList(oids)
-          .fold(List.empty[Params].pure[F]) { oids =>
+          .fold(List.empty[ParamsRow].pure[F]) { oids =>
             executeSelect(Statements.selectManyParams(user, pid, oids))
           }
 
@@ -172,16 +175,16 @@ object GeneratorParamsService {
         pid:       Program.Id,
         minStatus: ObsStatus,
         selection: ObservationSelection
-      ): F[List[Params]] =
+      ): F[List[ParamsRow]] =
         executeSelect(Statements.selectAllParams(user, pid, minStatus, selection))
 
-      private def executeSelect(af: AppliedFragment): F[List[Params]] =
+      private def executeSelect(af: AppliedFragment): F[List[ParamsRow]] =
         session
           .prepareR(af.fragment.query(Statements.params))
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
 
       private def observingMode(
-        params: NonEmptyList[Params],
+        params: NonEmptyList[TargetParams],
         config: Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, ObservingMode] = {
         val configs: EitherNel[Error, NonEmptyList[ObservingMode]] =
@@ -201,89 +204,82 @@ object GeneratorParamsService {
         }
       }
 
-      private def toGeneratorParams(
-        params: NonEmptyList[Params],
-        config: Option[SourceProfile => ObservingMode]
+      private def toObsGeneratorParams(
+        obsParams: ObsParams,
+        config:    Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, GeneratorParams] =
-        observingMode(params, config).flatMap {
+        observingMode(obsParams.targets, config).flatMap {
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
-            params.traverse { p =>
-              itcParams(
-                p,
-                InstrumentMode.GmosNorthSpectroscopy(
-                  g,
-                  f,
-                  GmosFpu.North.builtin(u),
-                  gn.ccdMode.some,
-                  gn.roi.some),
-                λ)
-            }
-            .map(GeneratorParams(_, gn, params.head.calibrationRole))
-            .toEither
-
+            itcObsParams(
+              obsParams,
+              InstrumentMode.GmosNorthSpectroscopy(
+                g,
+                f,
+                GmosFpu.North.builtin(u),
+                gn.ccdMode.some,
+                gn.roi.some),
+              λ)
+          .map(GeneratorParams(_, gn, obsParams.calibrationRole))
+          .toEither
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
-            params.traverse { p =>
-              itcParams(
-                p,
-                InstrumentMode.GmosSouthSpectroscopy(
-                  g,
-                  f,
-                  GmosFpu.South.builtin(u),
-                  gs.ccdMode.some,
-                  gs.roi.some),
-                λ)
-            }
-            .map(GeneratorParams(_, gs, params.head.calibrationRole))
+            itcObsParams(
+              obsParams,
+              InstrumentMode.GmosSouthSpectroscopy(
+                g,
+                f,
+                GmosFpu.South.builtin(u),
+                gs.ccdMode.some,
+                gs.roi.some),
+              λ)
+            .map(GeneratorParams(_, gs, obsParams.calibrationRole))
             .toEither
         }
 
-      private def itcParams(
-        params:     Params,
+      private def itcObsParams(
+        obsParams:  ObsParams,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): ValidatedNel[Error, (Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))] = {
-        val sourceProf = params.sourceProfile.map(_.gaiaFree)
-        val targetBand = sourceProf.flatMap(_.nearestBand(wavelength)).map(_._1)
-        (params.signalToNoise.toValidNel(Error.missing("signal to noise")),
-         params.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
-         params.targetId.toValidNel(Error.missing("target"))
-        ).tupled.andThen { case (s2n, s2nA, tid) =>
-          // these are dependent on having a target in the first place
-          (targetBand.toValidNel(Error.targetMissing(tid, "brightness measure")),
-           params.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity")),
-           sourceProf.toValidNel(Error.targetMissing(tid, "source profile"))
-          ).mapN { case (b, rv, sp) =>
-            tid ->
-            (
-              ImagingIntegrationTimeInput(
-                wavelength,
-                Acquisition.AcquisitionSN,
-                sp,
-                b,
-                rv,
-                params.constraints,
-                mode.asImaging(wavelength)
-              ),
-              SpectroscopyIntegrationTimeInput(
-                wavelength,
-                s2n,
-                s2nA.some,
-                sp,
-                b,
-                rv,
-                params.constraints,
-                mode
-              )
-            )
-          }
+      ): ValidatedNel[Error, GeneratorAsterismParams] = {
+        (obsParams.signalToNoise.toValidNel(Error.missing("signal to noise")),
+         obsParams.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
+         obsParams.targets.traverse(itcTargetParams)
+        ).mapN { case (s2n, s2nA, targets) =>
+          GeneratorAsterismParams(
+            ImagingIntegrationTimeParameters(
+              wavelength,
+              Acquisition.AcquisitionSN,
+              obsParams.constraints,
+              mode.asImaging(wavelength)
+            ),
+            SpectroscopyIntegrationTimeParameters(
+              wavelength,
+              s2n,
+              s2nA.some,
+              obsParams.constraints,
+              mode
+            ),
+            targets
+          )
         }
+      }
 
+      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[Error, (Target.Id, TargetInput)] = {
+        val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
+        val brightnesses = 
+          sourceProf.flatMap: sp =>
+            SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
+
+        targetParams.targetId.toValidNel(Error.missing("target")).andThen: tid =>
+          (sourceProf.toValidNel(Error.targetMissing(tid, "source profile")),
+           Validated.condNel(brightnesses.exists(_.nonEmpty), (), Error.targetMissing(tid, "brightness measure")),
+           targetParams.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity"))
+          ).mapN: (sp, _, rv) =>
+            tid -> TargetInput(sp, rv)
       }
 
     }
 
-
-  final case class Params(
+  case class ParamsRow(
     observationId:   Observation.Id,
     calibrationRole: Option[CalibrationRole],
     constraints:     ConstraintSet,
@@ -295,6 +291,40 @@ object GeneratorParamsService {
     sourceProfile:   Option[SourceProfile]
   )
 
+  case class TargetParams(
+    targetId:        Option[Target.Id],
+    radialVelocity:  Option[RadialVelocity],
+    sourceProfile:   Option[SourceProfile]
+  )
+
+  case class ObsParams(
+    observationId:   Observation.Id,
+    calibrationRole: Option[CalibrationRole],
+    constraints:     ConstraintSet,
+    signalToNoise:   Option[SignalToNoise],
+    signalToNoiseAt: Option[Wavelength],
+    observingMode:   Option[ObservingModeType],
+    targets:         NonEmptyList[TargetParams]
+  )
+
+  object ObsParams {
+    def fromParamsRows(ps: NonEmptyList[ParamsRow]): Map[Observation.Id, ObsParams] =
+      ps.groupBy(_.observationId).view.mapValues: oParams =>
+        ObsParams(
+          oParams.head.observationId,
+          oParams.head.calibrationRole,
+          oParams.head.constraints,
+          oParams.head.signalToNoise,
+          oParams.head.signalToNoiseAt,
+          oParams.head.observingMode,
+          oParams.map: r =>
+            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile)
+        )
+      .toMap
+  }
+
+
+
   object Statements {
 
     import ProgramService.Statements.existsUserAccess
@@ -304,7 +334,7 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
-    val params: Decoder[Params] =
+    val params: Decoder[ParamsRow] =
       (observation_id          *:
        calibration_role.opt    *:
        constraint_set          *:
@@ -314,7 +344,7 @@ object GeneratorParamsService {
        target_id.opt           *:
        radial_velocity.opt     *:
        source_profile.opt
-      ).to[Params]
+      ).to[ParamsRow]
 
     private def ParamColumns(tab: String): String =
       s"""

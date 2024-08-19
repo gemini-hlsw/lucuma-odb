@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.Parallel
 import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
@@ -50,7 +51,7 @@ object GraphQLRoutes {
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
-  def apply[F[_]: Async: Trace: Logger](
+  def apply[F[_]: Async: Parallel: Trace: Logger](
     itcClient:   ItcClient[F],
     commitHash:  CommitHash,
     ssoClient:   SsoClient[F, User],

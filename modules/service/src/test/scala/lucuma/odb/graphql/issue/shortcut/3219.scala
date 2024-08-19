@@ -9,7 +9,6 @@ import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime

@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.input
 
-import cats.Eq
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*

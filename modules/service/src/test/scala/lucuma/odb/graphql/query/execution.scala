@@ -620,14 +620,14 @@ class execution extends ExecutionTestSupport {
         ObsActiveStatus.Active
       )
 
-    val setup: IO[(Observation.Id, Target.Id)] =
+    val setup: IO[Observation.Id] =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservation(pi, p, List(t))
-      } yield (o, t)
+      } yield o
 
-    setup.flatMap { case (oid, tid) =>
+    setup.flatMap { oid =>
       expect(
         user  = pi,
         query =
@@ -648,7 +648,7 @@ class execution extends ExecutionTestSupport {
                }
              }
            """,
-          expected = List(s"ITC returned errors: Target '$tid': Artifical exception for test cases.").asLeft
+          expected = List(s"ITC returned errors: Asterism: Artifical exception for test cases.").asLeft
       )
     }
 
