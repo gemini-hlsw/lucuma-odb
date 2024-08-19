@@ -27,6 +27,6 @@ class ProgramPredicates(path: Path) {
     }
 
   def isWritableBy(user: User): Predicate =
-    isVisibleTo(user) // this is true for now
+    isVisibleTo(user) // TODO: not true for COI_RO
 
 }

@@ -3003,6 +3003,14 @@ type Mutation {
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
 
+  "Updates existing program users."
+  updateProgramUsers(
+
+    "Parameters for updating an existing program user."
+    input: UpdateProgramUsersInput!
+
+  ): UpdateProgramUsersResult!
+
   """
   Updates an existing proposal.
   """
@@ -3394,6 +3402,15 @@ input ProgramPropertiesInput {
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
   """
   existence: Existence
+}
+
+"""
+Editable properties that define a program / user connection.
+"""
+input ProgramUserPropertiesInput {
+
+  "The user's partner."
+  partnerLink: PartnerLinkInput
 }
 
 """
@@ -4988,6 +5005,44 @@ type UpdateObservationsResult {
   """
   `true` when there were additional edits that were not returned.
   """
+  hasMore: Boolean!
+}
+
+"""
+Parameters for the 'updateProgramUsers' mutation.  Use 'SET' to specify the
+changes, 'WHERE' to select the program users to update, and 'LIMIT' to control
+the size of the return value.
+"""
+input UpdateProgramUsersInput {
+
+  "Defines the program user properties to modify."
+  SET: ProgramUserPropertiesInput!
+
+  "Filters the program users according to those that match the given constraints."
+  WHERE: WhereProgramUser
+
+  """
+  Caps the number of results returned to the given value (if additional program
+  users match the 'WHERE' clause they will be updated not returned).
+  """
+  LIMIT: NonNegInt
+
+}
+
+"""
+The result of calling 'updateProgramUsers', up to 'LIMIT' or the maximum of
+1000.  If 'hasMore' is true, additional program users were modified but not
+included in the result.
+"""
+type UpdateProgramUsersResult {
+
+  """
+  The first program users that were updated (up to the LIMIT specified in the
+  mutation).
+  """
+  programUsers: [ProgramUser!]!
+
+  "Whether there were additional updated program users that were not returned."
   hasMore: Boolean!
 }
 
