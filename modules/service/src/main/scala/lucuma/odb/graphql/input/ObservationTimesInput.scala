@@ -11,12 +11,12 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
-case class ObservationTimesInput( observationTime:   Nullable[Timestamp])
+case class ObservationTimesInput(observationTime: Nullable[Timestamp])
 
 object ObservationTimesInput {
   val Empty: ObservationTimesInput =
     ObservationTimesInput(
-      observationTime =  Nullable.Absent,
+      observationTime = Nullable.Absent,
     )
 
   val Binding: Matcher[ObservationTimesInput] =

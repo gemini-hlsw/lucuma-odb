@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.MonadThrow
 import cats.data.Nested
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -39,9 +40,11 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CreateGroupInput
@@ -77,6 +80,11 @@ trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
+  )(using Transaction[F]): F[Unit]
+
+  def recalculateCalibrationTarget(
+    pid: Program.Id,
+    oid: Observation.Id,
   )(using Transaction[F]): F[Unit]
 }
 
@@ -336,6 +344,48 @@ object CalibrationsService {
           _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
         } yield ()
       }
+
+      // Recalcula the target of a calibration observation
+      def recalculateCalibrationTarget(
+        pid: Program.Id,
+        oid: Observation.Id,
+      )(using Transaction[F]): F[Unit] = {
+        Applicative[F].unit
+        for {
+          o <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
+          // Find the original target
+          otgs <- o.map(_._1).map { oid =>
+                    asterismService.getAsterism(pid, oid).map(_.map(_._1))
+                  }.getOrElse(List.empty.pure[F])
+          // Select a new target
+          tgts <- o match {
+                  case Some(oid, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
+                    val gncoords = idealLocation(Site.GN, ot.toInstant)
+                    session
+                      .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
+                      .map(spectroPhotometricTargets(ot.toInstant).map(bestTarget(gncoords, _)))
+                  case Some(oid, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
+                    val gscoords = idealLocation(Site.GS, ot.toInstant)
+                    session
+                      .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
+                      .map(spectroPhotometricTargets(ot.toInstant).map(bestTarget(gscoords, _)))
+                  case _ =>
+                    none.pure[F]
+               }
+            // Update the target on the calibration
+            _ <- (o.map(_._1), tgts).mapN { (oid, tgtid) =>
+                    for {
+                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                      _  <- ct.traverse(ct => asterismService
+                              .updateAsterism(
+                                NonEmptyList.one(oid), 
+                                Some(NonEmptyList.one(ct)), 
+                                NonEmptyList.fromList(otgs))
+                              )
+                    } yield ()
+                }.getOrElse(Result.unit.pure[F])
+        } yield ()
+      }
     }
 
   object Statements {
@@ -369,6 +419,17 @@ object CalibrationsService {
             WHERE t_program.c_calibration_role=$calibration_role
               AND t_program.c_existence='present'
           """.query(target_id *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
+
+    val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, Option[Timestamp], Option[ObservingModeType])] =
+      sql"""
+        SELECT
+            c_observation_id,
+            c_observation_time,
+            c_observing_mode_type
+          FROM t_observation
+          WHERE c_observation_id = $observation_id AND c_calibration_role IS NOT NULL
+          """.query(observation_id *: core_timestamp.opt *: observing_mode_type.opt)
+
   }
 
 }

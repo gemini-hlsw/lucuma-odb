@@ -131,6 +131,7 @@ sealed trait ObservationService[F[_]] {
     oid: Observation.Id,
     itcClient: ItcClient[F],
   )(using Transaction[F]): F[List[ObservationValidation]]
+
 }
 
 object ObservationService {
@@ -653,6 +654,7 @@ object ObservationService {
           bandVals      <- validateScienceBand
         } yield (genVals |+| itcVals |+| cfpVals |+| bandVals).toList
       }
+
     }
 
   object Statements {
@@ -1225,6 +1227,7 @@ object ObservationService {
             )
           )
       """.query(science_band)
+
   }
 
 }
