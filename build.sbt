@@ -32,8 +32,8 @@ val pprintVersion              = "0.9.0"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.12"
-ThisBuild / scalaVersion       := "3.4.2"
-ThisBuild / crossScalaVersions := Seq("3.4.2")
+ThisBuild / scalaVersion       := "3.4.3"
+ThisBuild / crossScalaVersions := Seq("3.4.3")
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
