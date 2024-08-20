@@ -3,6 +3,7 @@
 
 package lucuma.odb.json
 
+import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
@@ -19,6 +20,8 @@ object coordinates:
         "ra"  -> cs.ra.asJson,
         "dec" -> cs.dec.asJson
       )
+
+    given Decoder_Coordinates: Decoder[Coordinates] = ???
 
   object query extends QueryCodec
 

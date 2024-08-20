@@ -43,7 +43,9 @@ trait ConfigurationMapping[F[_]]
       // N.B. the reference time here has no zone information, so it's interpreted as UTC. This will
       // almost certainly never matter, but if it does matter at some point then we can change it
       // to use the timezone of the site associated with the instrument. In any case this value is
-      // the midpoint of the active period for the observation's associated CFP (if any).
+      // a computed column in the view and is the midpoint of the active period for the observation's 
+      // associated CFP (if any). The reference time is used when computing coordintes for approved
+      // configurations; it is not related to visualization time.
       SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
 
       SqlObject("conditions"),
