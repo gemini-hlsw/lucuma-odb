@@ -28,7 +28,6 @@ object ObservationTopic {
   /**
    * @param observationId the id of the observation that was inserted or edited
    * @param programId the observation's program's id
-   * @param eventId serial event id
    * @param editType determines creation vs update
    * @param users users associated with this program
    */

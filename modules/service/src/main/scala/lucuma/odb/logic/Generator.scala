@@ -69,8 +69,8 @@ sealed trait Generator[F[_]] {
 
   /**
    * Looks up the parameters required to calculate the ExecutionDigest, and checks
-   * the cache. If not in the cache, it performs the calculation and caches the 
-   * results. If the observation is not completely defined (e.g., if missing the 
+   * the cache. If not in the cache, it performs the calculation and caches the
+   * results. If the observation is not completely defined (e.g., if missing the
    * observing mode), an Error is produced.
    */
   def digest(

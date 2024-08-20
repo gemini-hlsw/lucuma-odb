@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.Eq
+import cats.derived.*
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -40,7 +42,7 @@ class calibrations extends OdbSuite {
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   case class CalibTarget(id: Target.Id) derives Decoder
-  case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Decoder
+  case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Eq, Decoder
   case class CalibObs(id: Observation.Id, groupId: Option[Group.Id], calibrationRole: Option[CalibrationRole], targetEnvironment: Option[CalibTE]) derives Decoder
 
   private def queryGroup(gid: Group.Id): IO[(Group.Id, Boolean, NonEmptyString)] =
@@ -407,6 +409,78 @@ class calibrations extends OdbSuite {
             "uniform": null,
             "gaussian": null
           }
+      }"""),
+      ("BD+25  2534",
+        681652742505L,
+        90239867922L,
+        0.000,
+        """{
+          "sourceProfile": {
+            "point": {
+                "emissionLines": null,
+                "bandNormalized": {
+                    "sed": null,
+                    "brightnesses": [
+                        {
+                            "band": "U",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "8.922"
+                        },
+                        {
+                            "band": "B",
+                            "error": "0.03",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.25"
+                        },
+                        {
+                            "band": "V",
+                            "error": "0.05",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.58"
+                        },
+                        {
+                            "band": "R",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.656"
+                        },
+                        {
+                            "band": "I",
+                            "error": null,
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.831"
+                        },
+                        {
+                            "band": "J",
+                            "error": "0.026",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.275"
+                        },
+                        {
+                            "band": "H",
+                            "error": "0.036",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.438"
+                        },
+                        {
+                            "band": "K",
+                            "error": "0.028",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "11.556"
+                        },
+                        {
+                            "band": "GAIA",
+                            "error": "0.002851",
+                            "units": "VEGA_MAGNITUDE",
+                            "value": "10.45304"
+                        }
+                    ]
+                }
+            },
+            "uniform": null,
+            "gaussian": null
+          }
       }""")
     )
 
@@ -610,6 +684,57 @@ class calibrations extends OdbSuite {
                   }
                 """.asRight
               )
+    } yield ()
+  }
+
+  test("calibration observations obs time can switch target") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- prepareObservation(oid1, tid1)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      ob   <- queryObservations(pid)
+      (cid1, ct1) = ob.collect {
+        case CalibObs(cid, _, Some(_), Some(ct1)) => (cid, ct1)
+      }.head
+      _    <- query(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservationsTimes(input: {
+                      SET: {
+                        observationTime: "2026-08-15T01:15:30Z"
+                      },
+                      WHERE: {
+                        id: { EQ: "$cid1" }
+                      }
+                    }) {
+                      observations {
+                        observationTime
+                      }
+                    }
+                  }
+                """
+              )
+      // In reality this is done listening to events but we can explicitly call the function here
+      _     <- withServices(service) { services =>
+                 services.session.transaction.use { xa =>
+                   services.calibrationsService.recalculateCalibrationTarget(pid, cid1)(using xa)
+                 }
+               }
+      ob2   <- queryObservations(pid)
+      (cid2, ct2) = ob2.collect {
+        case CalibObs(cid, _, Some(_), Some(ct2)) => (cid, ct2)
+      }.head
+      // Some observation
+      _     <- assertIOBoolean(IO(ob2.map(_.id) === ob.map(_.id)))
+      // Target changed
+      _     <- assertIOBoolean(IO(ct1 =!= ct2 && cid1 === cid2))
     } yield ()
   }
 
