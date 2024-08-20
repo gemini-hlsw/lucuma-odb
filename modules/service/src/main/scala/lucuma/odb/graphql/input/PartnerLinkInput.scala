@@ -7,11 +7,11 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.model.PartnerLink
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.core.enums.PartnerLinkType
-import lucuma.core.model.PartnerLink
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PartnerBinding
