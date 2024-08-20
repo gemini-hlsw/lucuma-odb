@@ -17,6 +17,8 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
@@ -48,9 +50,7 @@ import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.PartnerLink.LinkType
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
@@ -141,7 +141,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[ObsStatus](ObsStatusType),
       LeafMapping[Partner](PartnerType),
-      LeafMapping[LinkType](PartnerLinkTypeType),
+      LeafMapping[PartnerLinkType](PartnerLinkTypeType),
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),

@@ -15,11 +15,11 @@ val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.6"
 val log4catsVersion            = "2.7.0"
-val lucumaCatalogVersion       = "0.47.3"
-val lucumaItcVersion           = "0.21.17"
-val lucumaCoreVersion          = "0.101.2"
+val lucumaCatalogVersion       = "0.47.4"
+val lucumaItcVersion           = "0.21.18"
+val lucumaCoreVersion          = "0.103.0"
 val lucumaGraphQLRoutesVersion = "0.8.13"
-val lucumaSsoVersion           = "0.6.21"
+val lucumaSsoVersion           = "0.6.22"
 val munitVersion               = "0.7.29" // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
@@ -31,7 +31,7 @@ val skunkVersion               = "0.6.4"
 val pprintVersion              = "0.9.0"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.11"
+ThisBuild / tlBaseVersion      := "0.12"
 ThisBuild / scalaVersion       := "3.4.2"
 ThisBuild / crossScalaVersions := Seq("3.4.2")
 

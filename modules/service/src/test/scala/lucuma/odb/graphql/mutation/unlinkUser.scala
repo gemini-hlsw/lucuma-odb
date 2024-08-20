@@ -8,15 +8,15 @@ import cats.effect.IO
 import cats.syntax.eq.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 
 class unlinkUser extends OdbSuite {
 

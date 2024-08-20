@@ -9,13 +9,13 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.Partner
-import lucuma.odb.data.PartnerLink.LinkType
+import lucuma.core.enums.PartnerLinkType
 import lucuma.odb.graphql.binding.*
 
 object WherePartnerLink {
 
   def binding(path: Path): Matcher[Predicate] =
-    val WherePartnerLinkType = WhereEq.binding[LinkType](path / "linkType", PartnerLinkTypeBinding)
+    val WherePartnerLinkType = WhereEq.binding[PartnerLinkType](path / "linkType", PartnerLinkTypeBinding)
     val WherePartner         = WhereOptionEq.binding[Partner](path / "partner", PartnerBinding)
 
     ObjectFieldsBinding.rmap {
