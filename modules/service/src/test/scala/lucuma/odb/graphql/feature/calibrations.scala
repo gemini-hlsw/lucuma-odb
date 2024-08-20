@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package feature
 
 import cats.Eq
+import cats.derived.*
 import cats.effect.IO
 import cats.syntax.all.*
-import cats.derived.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Json
