@@ -11,13 +11,13 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.Partner.US
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 
 class updateProgramUsers extends OdbSuite {
 
@@ -84,7 +84,7 @@ class updateProgramUsers extends OdbSuite {
             "program" -> Json.obj("id" -> pid.asJson),
             "user"    -> Json.obj("id" -> user.id.asJson),
             "partnerLink" -> Json.fromFields(
-              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.toOption.toList.map { p =>
+              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.partnerOption.toList.map { p =>
                 "partner" -> p.tag.toScreamingSnakeCase.asJson
               }
             )
