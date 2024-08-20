@@ -7,14 +7,14 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.core.model.PartnerLink
-import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
 import lucuma.core.enums.ProgramUserRole.Coi
 import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.enums.ProgramUserRole.Pi
 import lucuma.core.enums.ProgramUserRole.Support
+import lucuma.core.model.PartnerLink
+import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProgramService.LinkUserRequest

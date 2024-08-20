@@ -11,13 +11,13 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.Partner.US
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
-import lucuma.core.model.PartnerLink
-import lucuma.core.enums.ProgramUserRole
 
 class updateProgramUsers extends OdbSuite {
 

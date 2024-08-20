@@ -12,9 +12,11 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
 import lucuma.core.enums.PartnerLinkType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
@@ -26,8 +28,6 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.core.model.PartnerLink
-import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput

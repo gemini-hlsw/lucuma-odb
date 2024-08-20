@@ -20,6 +20,8 @@ import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
@@ -35,6 +37,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.*
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.UserInvitation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
@@ -58,10 +61,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeType
-import lucuma.core.model.PartnerLink
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.core.enums.PartnerLinkType
-import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
