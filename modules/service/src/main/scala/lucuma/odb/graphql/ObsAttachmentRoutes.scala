@@ -42,7 +42,7 @@ object ObsAttachmentRoutes {
     maxUploadMb:           Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums)).map(_.obsAttachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa: ObsAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).map(_.obsAttachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )

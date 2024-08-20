@@ -31,6 +31,11 @@ import skunk.codec.all.*
 import skunk.syntax.all.*
 
 import scala.util.NotGiven
+import io.circe.Json
+import grackle.Mapping
+import grackle.ResultT
+import lucuma.graphql.routes.GraphQLService
+import io.circe.JsonObject
 
 /** Witnesses that there is no transaction in context. */
 type NoTransaction[F[_]] = NotGiven[Transaction[F]]
@@ -43,6 +48,9 @@ trait Services[F[_]]:
 
   /** The underlying `Session`. */
   def session: Session[F]
+
+  /** Recursively execute a graphql query using the resources of this `Service` instance. */
+  def runGraphQLQuery(query: String, op: Option[String] = None, vars: Option[JsonObject] = None): F[Result[Json]]
 
   /** The associated `User`. */
   def user: User
@@ -189,7 +197,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](u: User, e: Enums)(s: Session[F])(
+  def forUser[F[_]](u: User, e: Enums, m: Option[Mapping[F]])(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F]
   ): Services[F[_]] =
     new Services[F]:
@@ -198,6 +206,21 @@ object Services:
       val enums = e
 
       given Services[F] = this // need is for `instantiate` calls below
+
+      private val graphQlService: Result[GraphQLService[F]] =
+        m match
+          case None => Result.internalError("No GraphQL Mapping available for this Services instance.")
+          case Some(value) => Result(GraphQLService(value))
+
+      def runGraphQLQueryImpl(query: String, op: Option[String], vars: Option[JsonObject]): ResultT[F, Json] =
+        for
+          svc  <- ResultT(graphQlService.pure[F])
+          op   <- ResultT(svc.parse(query, op, vars).pure[F])
+          json <- ResultT(svc.query(op))
+        yield json
+
+      def runGraphQLQuery(query: String, op: Option[String], vars: Option[JsonObject]): F[Result[Json]] =
+        runGraphQLQueryImpl(query, op, vars).value
 
       def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F]

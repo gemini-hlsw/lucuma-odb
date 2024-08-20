@@ -246,7 +246,7 @@ object OdbMapping {
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
-          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums))
+          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums, Some(this)))
           override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
