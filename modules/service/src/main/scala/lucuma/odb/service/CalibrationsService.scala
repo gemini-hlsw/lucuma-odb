@@ -426,7 +426,7 @@ object CalibrationsService {
             c_observation_id,
             c_observation_time,
             c_observing_mode_type
-          FROM v_generator_params
+          FROM t_observation
           WHERE c_observation_id = $observation_id AND c_calibration_role IS NOT NULL
           """.query(observation_id *: core_timestamp.opt *: observing_mode_type.opt)
 
