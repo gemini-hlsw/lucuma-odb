@@ -153,11 +153,8 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
       _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally{
-                for {
-                  t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                  _ <- calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
-                } yield ()
+              services.useTransactionally {
+                calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
               }
             }.compile.drain.start.void)
     } yield ()
