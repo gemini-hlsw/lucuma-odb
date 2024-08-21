@@ -15,12 +15,14 @@ import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.Access.Admin
 import lucuma.core.model.Access.Guest
 import lucuma.core.model.Access.Service
 import lucuma.core.model.Access.Staff
 import lucuma.core.model.GuestRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramReference.Description
@@ -36,6 +38,7 @@ import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.service.ProgramService.LinkUserResponse.Success
@@ -92,6 +95,8 @@ trait ProgramService[F[_]] {
 
   /** Check to see if the user has access to the given program. */
   def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean]
+
+  def updateProgramUsers(SET: ProgramUserPropertiesInput, which: AppliedFragment)(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]]
 
 }
 
@@ -224,7 +229,20 @@ object ProgramService {
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session.prepareR(Statements.InsertProgram).use(_.unique(SETʹ.name, user))
+          session
+            .prepareR(Statements.InsertProgram)
+            .use(_.unique(SETʹ.name))
+            .flatTap { pid =>
+              user match {
+                case ServiceUser(_, _) =>
+                  Concurrent[F].unit
+                case nonServiceUser    =>
+                  // Link the PI to the program.
+                  session.executeCommand(
+                    Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
+                  ).void
+              }
+            }
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -307,6 +325,7 @@ object ProgramService {
         session.prepareR(af.fragment.query(program_user_role)).use: pq =>
           pq.option(af.argument).flatMap:
             case None             => Result(false).pure[F] // no such link, or not visible
+            case Some(R.Pi)       => OdbError.InvalidArgument("Cannot unlink the PI".some).asFailureF
             case Some(R.Coi)      => unlinkCoi(input)
             case Some(R.CoiRO)    => unlinkObserver(input)
             case Some(R.Support)  => requireStaffAccess(unlinkUnconditionally(input))
@@ -339,6 +358,16 @@ object ProgramService {
         } yield ids).value
 
       }
+
+      override def updateProgramUsers(
+        SET:   ProgramUserPropertiesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]] =
+        Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]) { af =>
+          session.prepareR(af.fragment.query(program_id *: user_id)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+          }
+        }
 
       def userHasAccess(programId: Program.Id)(using Transaction[F]): F[Boolean] =
         Statements.existsUserAccess(user, programId).fold(true.pure[F]) { af =>
@@ -389,29 +418,37 @@ object ProgramService {
 
     val UnlinkCoiAsPi: Command[(User.Id, Program.Id, User.Id)] =
       sql"""
-        DELETE FROM t_program_user u
-        USING t_program p
-        WHERE p.c_program_id = u.c_program_id
-        AND   p.c_program_id = $program_id
-        AND   p.c_pi_user_id = $user_id
-        AND   u.c_role = 'coi'
-        AND   u.c_user_id = $user_id
+        DELETE FROM t_program_user
+        WHERE c_program_id = $program_id
+        AND   c_user_id    = $user_id
+        AND   c_role       = 'coi'
+        AND EXISTS (
+          SELECT 1
+          FROM t_program_user u
+          WHERE u.c_program_id = $program_id
+          AND   u.c_user_id = $user_id
+          AND   u.c_role = 'pi'
+        )
       """
         .command
-        .contramap((caller, pid, uid) => (pid, caller, uid))
+        .contramap((caller, pid, uid) => (pid, uid, pid, caller))
 
     val UnlinkObserverAsPiOrCoi: Command[(User.Id, Program.Id, User.Id)] =
       sql"""
-        DELETE FROM t_program_user u
-        USING t_program p
-        WHERE p.c_program_id = u.c_program_id
-        AND   p.c_program_id = $program_id
-        AND   (p.c_pi_user_id = $user_id OR exists(SELECT * FROM t_program_user x WHERE x.c_role = 'coi' AND x.c_user_id = $user_id))
-        AND   u.c_role = 'coi_ro'
-        AND   u.c_user_id = $user_id
+        DELETE FROM t_program_user
+        WHERE c_program_id = $program_id
+        AND   c_user_id    = $user_id
+        AND   c_role       = 'coi_ro'
+        AND EXISTS (
+          SELECT 1
+          FROM t_program_user u
+          WHERE u.c_program_id = $program_id
+          AND   u.c_user_id    = $user_id
+          AND   (u.c_role = 'pi' OR u.c_role = 'coi')
+        )
       """
         .command
-        .contramap((caller, pid, uid) => (pid, caller, caller, uid))
+        .contramap((caller, pid, uid) => (pid, uid, pid, caller))
 
     val SetProgramReference: Query[(Program.Id, ProgramReferencePropertiesInput), Option[ProgramReference]] =
       sql"""
@@ -468,21 +505,75 @@ object ProgramService {
         """
       }
 
+    def updateProgramUsers(
+      user:  User,
+      SET:   ProgramUserPropertiesInput,
+      which: AppliedFragment
+    ): Option[AppliedFragment] = {
+      val alias = "o"
+
+      val ups = NonEmptyList.fromList(
+        SET.partnerLink.toList.flatMap { pl => List(
+          sql"c_partner_link = $partner_link_type"(pl.linkType),
+          sql"c_partner      = ${partner.opt}"(pl.partnerOption)
+        )}
+      )
+
+      ups.map { nel =>
+        val up =
+          sql"""
+            UPDATE t_program_user AS #$alias
+            SET """(Void) |+| nel.intercalate(void", ") |+| void" " |+|
+          sql"WHERE (#$alias.c_program_id, #$alias.c_user_id) IN ("(Void) |+| which |+| void")"
+
+        (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
+          up |+| void" AND " |+| exists
+        }) |+| sql" RETURNING #$alias.c_program_id, #$alias.c_user_id"(Void)
+      }
+    }
+
+    // This is the same as `existsUserAs` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsUserAs(
+      userId:     User.Id,
+      outerAlias: String,
+      innerAlias: String,
+      role:       ProgramUserRole
+    ): AppliedFragment =
+      sql"""
+        EXISTS (SELECT 1 FROM t_program_user #$innerAlias where #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_user_id = $user_id and #$innerAlias.c_role = $program_user_role)
+      """.apply(userId, role)
+
+    def existsUserAs(
+      programId: Program.Id,
+      userId: User.Id,
+      role: ProgramUserRole
+    ): AppliedFragment =
+      sql"""
+        EXISTS (select c_role from t_program_user where c_program_id = $program_id and c_user_id = $user_id and c_role = $program_user_role)
+      """.apply(programId, userId, role)
+
     def existsUserAsPi(
       programId: Program.Id,
       userId: User.Id,
     ): AppliedFragment =
-      sql"""
-        EXISTS (select c_program_id from t_program where c_program_id = $program_id and c_pi_user_id = $user_id)
-      """.apply(programId, userId)
+      existsUserAs(programId, userId, ProgramUserRole.Pi)
 
     def existsUserAsCoi(
       programId: Program.Id,
       userId: User.Id,
     ): AppliedFragment =
+      existsUserAs(programId, userId, ProgramUserRole.Coi)
+
+    // This is the same as `existsAllocationForPartner` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsAllocationForPartner(
+      outerAlias: String,
+      innerAlias: String
+    ): AppliedFragment =
       sql"""
-        EXISTS (select c_role from t_program_user where c_program_id = $program_id and c_user_id = $user_id and c_role = 'coi')
-      """.apply(programId, userId)
+        EXISTS (SELECT 1 FROM t_allocation WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_partner and #$innerAlias.c_duration > 'PT')
+      """(Void)
 
     def existsAllocationForPartner(
       programId: Program.Id,
@@ -490,7 +581,7 @@ object ProgramService {
     ): AppliedFragment =
       sql"""
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
-        """.apply(programId, partner.timeAccountingCategory)
+      """.apply(programId, partner.timeAccountingCategory)
 
     def existsUserAccess(
       user:      User,
@@ -501,6 +592,22 @@ object ProgramService {
         case Pi(_)                 => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void")").some
         case Ngo(_, partner)       => existsAllocationForPartner(programId, partner).some
         case ServiceRole(_) |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_) => none
+      }
+
+    // This is the same as `existsUserAccess` but where the program is
+    // correlated to an outer query program instead of provided as a parameter.
+    private def correlatedExistsUserAccess(
+      user:       User,
+      outerAlias: String,
+      innerAlias: String
+    ): Option[AppliedFragment] =
+      user.role match {
+        case GuestRole             => correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Pi).some
+        case Pi(_)                 => (void"(" |+| correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Pi) |+| void" OR " |+| correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Coi) |+| void")").some
+        case Ngo(_, partner)       => correlatedExistsAllocationForPartner(outerAlias, innerAlias).some
+        case ServiceRole(_)        |
              StandardRole.Admin(_) |
              StandardRole.Staff(_) => none
       }
@@ -522,16 +629,12 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[(Option[NonEmptyString], User), Program.Id] =
+    val InsertProgram: Query[Option[NonEmptyString], Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name, c_pi_user_id, c_pi_user_type)
-        VALUES (${text_nonempty.opt}, ${(user_id ~ user_type).opt})
+        INSERT INTO t_program (c_name)
+        VALUES (${text_nonempty.opt})
         RETURNING c_program_id
       """.query(program_id)
-         .contramap {
-            case (oNes, ServiceUser(_, _)) => (oNes, None)
-            case (oNes, nonServiceUser   ) => (oNes, Some(nonServiceUser.id, UserType.fromUser(nonServiceUser)))
-         }
 
     /** Insert a calibration program, without a user for a staff program */
     val InsertCalibrationProgram: Query[(Option[NonEmptyString], CalibrationRole, String), Program.Id] =
@@ -542,10 +645,10 @@ object ProgramService {
       """.query(program_id)
 
     /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, ProgramUserRole, PartnerLink)] =
+    val LinkUser: Fragment[(Program.Id, User.Id, UserType, ProgramUserRole, PartnerLink)] =
       sql"""
         INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner_link, c_partner)
-        SELECT $program_id, $user_id, 'standard', $program_user_role, $partner_link
+        SELECT $program_id, $user_id, $user_type, $program_user_role, $partner_link
       """
 
     /**
@@ -560,7 +663,7 @@ object ProgramService {
       partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Coi, partnerLink)
+      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.Coi, partnerLink)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -583,7 +686,7 @@ object ProgramService {
       partnerLink: PartnerLink,
       user: User, // current user
     ): Option[AppliedFragment] = {
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.CoiRO, partnerLink)
+      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.CoiRO, partnerLink)
       user.role match {
         case GuestRole                    => None
         case ServiceRole(_)               => Some(up)
@@ -609,7 +712,7 @@ object ProgramService {
       user: User, // current user
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
+      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this

@@ -20,6 +20,7 @@ import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
@@ -36,6 +37,7 @@ import lucuma.core.model.ExecutionEvent.StepEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -55,8 +57,6 @@ import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
@@ -656,7 +656,7 @@ trait DatabaseOperations { this: OdbSuite =>
             role: ${role.tag.toUpperCase}
             partnerLink: {
               linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
+              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
             }
           }) {
             user {
@@ -667,7 +667,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   partner
                 }
               }
-              userId
+              user { id }
             }
           }
         }
@@ -678,7 +678,9 @@ trait DatabaseOperations { this: OdbSuite =>
             "user": {
               "role" : $role,
               "partnerLink" : $partnerLink,
-              "userId" : $uid
+              "user" : {
+                "id": $uid
+              }
             }
           }
         }
@@ -1374,7 +1376,7 @@ trait DatabaseOperations { this: OdbSuite =>
             role: ${role.tag.toUpperCase}
             partnerLink: {
               linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.toOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
+              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
             }
           }
         ) {
@@ -1477,4 +1479,22 @@ trait DatabaseOperations { this: OdbSuite =>
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
+
+  def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          cloneGroup(input: {
+            groupId: "$gid"
+          }) {
+            newGroup {
+              id
+            }
+          }
+        }
+        """
+    ).map: j =>
+      j.hcursor.downFields("cloneGroup", "newGroup", "id").require[Group.Id]
+
 }

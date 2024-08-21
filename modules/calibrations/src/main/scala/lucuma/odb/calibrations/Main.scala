@@ -18,6 +18,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
@@ -33,7 +34,10 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
 
-import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
 import scala.concurrent.duration.*
 
 sealed trait MainParams {
@@ -122,24 +126,35 @@ object CMain extends MainParams {
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]):
-   Resource[F, Topic[F, ObservationTopic.Element]] =
+   Resource[F, (Topic[F, ObservationTopic.Element], Topic[F, CalibTimeTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
+      ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
       top <- Resource.eval(ObservationTopic(ses, 1024, sup))
-    } yield top
+    } yield (top, ctt)
 
   def runCalibrationsDaemon[F[_]: Async: Logger](
-    obsTopic: Topic[F, ObservationTopic.Element],  services: Resource[F, Services[F]]
+    obsTopic: Topic[F, ObservationTopic.Element], calibTopic: Topic[F, CalibTimeTopic.Element], services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally{
                 for {
-                  t <- Sync[F].delay(Instant.now())
-                  _ <- calibrationsService.recalculateCalibrations(elem.programId, t)
+                  t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
+                  _ <- calibrationsService
+                        .recalculateCalibrations(
+                          elem.programId,
+                          LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                        )
                 } yield ()
+              }
+            }.compile.drain.start.void)
+      _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
+      _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
+              services.useTransactionally {
+                calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
               }
             }.compile.drain.start.void)
     } yield ()
@@ -168,14 +183,14 @@ object CMain extends MainParams {
    */
   def server[F[_]: Async: Logger: Trace: Console: Network]: Resource[F, ExitCode] =
     for {
-      c     <- Resource.eval(Config.fromCiris.load[F])
-      _     <- Resource.eval(banner[F](c))
-      ep    <- entryPointResource(c)
-      pool  <- databasePoolResource[F](c.database)
-      enums <- Resource.eval(pool.use(Enums.load))
-      obsT  <- topics(pool)
-      user  <- Resource.eval(serviceUser[F](c))
-      _     <- runCalibrationsDaemon(obsT, pool.evalMap(services(user, enums)))
+      c           <- Resource.eval(Config.fromCiris.load[F])
+      _           <- Resource.eval(banner[F](c))
+      ep          <- entryPointResource(c)
+      pool        <- databasePoolResource[F](c.database)
+      enums       <- Resource.eval(pool.use(Enums.load))
+      (obsT, ctT) <- topics(pool)
+      user        <- Resource.eval(serviceUser[F](c))
+      _           <- runCalibrationsDaemon(obsT, ctT, pool.evalMap(services(user, enums)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

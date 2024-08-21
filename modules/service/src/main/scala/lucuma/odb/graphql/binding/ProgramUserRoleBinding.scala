@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ProgramUserRole
+import lucuma.core.enums.ProgramUserRole
 
 val ProgramUserRoleBinding: Matcher[ProgramUserRole] =
   enumeratedBinding

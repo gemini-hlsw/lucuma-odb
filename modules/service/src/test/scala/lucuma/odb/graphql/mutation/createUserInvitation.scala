@@ -18,11 +18,11 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl
@@ -261,6 +261,31 @@ class createUserInvitation extends OdbSuite {
         expected = Left(
           List(s"Specified program does not exist, or user is not the PI.")
         )
+      )
+    }
+  }
+
+  test("pi can't invite a user to become the pi") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+        mutation {
+          createUserInvitation(
+            input: {
+              programId: "$pid"
+              recipientEmail: "$successRecipient"
+              role: ${ProgramUserRole.Pi.tag.toUpperCase}
+              partnerLink: {
+                partner: US
+              }
+            }
+          ) {
+            key
+          }
+        }
+        """,
+        expected = List(s"Argument 'input' is invalid: Cannot create an invitation for the PI.").asLeft
       )
     }
   }

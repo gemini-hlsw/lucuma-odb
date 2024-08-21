@@ -8,10 +8,10 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 
 class redeemUserInvitation extends OdbSuite {
 
@@ -48,7 +48,7 @@ class redeemUserInvitation extends OdbSuite {
             program {
               users {
                 role
-                userId
+                user { id }
               }
             }
           }
@@ -78,7 +78,9 @@ class redeemUserInvitation extends OdbSuite {
                     "users" : [
                       {
                         "role" : ${ProgramUserRole.Coi.tag.toUpperCase},
-                        "userId" : ${pi2.id}
+                        "user" : {
+                          "id": ${pi2.id}
+                        }
                       }
                     ]
                   }
@@ -113,7 +115,9 @@ class redeemUserInvitation extends OdbSuite {
                     "users" : [
                       {
                         "role" : ${ProgramUserRole.Coi.tag.toUpperCase},
-                        "userId" : ${pi2.id}
+                        "user" :{
+                          "id": ${pi2.id}
+                        }
                       }
                     ]
                   }

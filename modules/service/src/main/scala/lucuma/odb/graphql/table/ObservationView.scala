@@ -22,7 +22,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val Status: ColumnRef            = col("c_status",             obs_status)
       val ActiveStatus: ColumnRef      = col("c_active_status",      obs_active_status)
       val ScienceBand: ColumnRef       = col("c_science_band",       science_band.opt)
-      val VisualizationTime: ColumnRef = col("c_visualization_time", core_timestamp.opt)
+      val ObservationTime: ColumnRef   = col("c_observation_time",   core_timestamp.opt)
       val AsterismGroup: ColumnRef     = col("c_asterism_group",     jsonb)
       val GroupId: ColumnRef           = col("c_group_id",           group_id.opt)
       val GroupIndex: ColumnRef        = col("c_group_index",        int2_nonneg)

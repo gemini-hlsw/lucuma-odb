@@ -8,15 +8,15 @@ import cats.effect.IO
 import cats.syntax.eq.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
 
 class unlinkUser extends OdbSuite {
 
@@ -87,6 +87,7 @@ class unlinkUser extends OdbSuite {
         yield ()
       } {
         case OdbError.NotAuthorized(guest.id, _) => // this is what we expect
+        case OdbError.InvalidArgument(Some("Argument 'input' is invalid: PIs are linked at program creation time.")) => // ok
       }
     }
 
@@ -173,4 +174,15 @@ class unlinkUser extends OdbSuite {
         yield ()
       }
 
+  test(s"Nobody can unlink the PI.") {
+    interceptOdbError {
+      for
+        _   <- createUsers(pi1, admin)
+        pid <- createProgramAs(pi1)
+        _   <- assertIO(unlinkAs(admin, pi1.id, pid), false)
+      yield ()
+    } {
+      case OdbError.InvalidArgument(Some("Cannot unlink the PI")) => // expected
+    }
+  }
 }

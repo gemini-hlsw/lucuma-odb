@@ -104,9 +104,7 @@ class createProgram extends OdbSuite {
               ) {
                 program {
                   name
-                  pi {
-                    id
-                  }
+                  pi { user { id } }
                 }
               }
             }
@@ -118,7 +116,9 @@ class createProgram extends OdbSuite {
                 "program": {
                   "name" : $name,
                   "pi" : {
+                    "user": {
                       "id" : ${u.id}
+                    }
                   }
                 }
               }
@@ -145,9 +145,7 @@ class createProgram extends OdbSuite {
             ) {
               program {
                 name
-                pi {
-                  id
-                }
+                pi { user { id } }
               }
             }
           }
@@ -190,9 +188,7 @@ class createProgram extends OdbSuite {
                     id
                     name
                     calibrationRole
-                    pi {
-                      id
-                    }
+                    pi { user { id } }
                   }
                 }
               """,
@@ -226,12 +222,8 @@ class createProgram extends OdbSuite {
             "c_program_id"          : ${pid},
             "c_mod_existence"       : true,
             "c_new_existence"       : "present",
-            "c_mod_pi_user_id"      : true,
             "c_mod_program_id"      : true,
-            "c_new_pi_user_id"      : "u-1",
             "c_new_program_id"      : ${pid},
-            "c_mod_pi_user_type"    : true,
-            "c_new_pi_user_type"    : "standard",
             "c_mod_pts_execution"   : true,
             "c_mod_pts_uncharged"   : true,
             "c_new_pts_execution"   : "PT0S",

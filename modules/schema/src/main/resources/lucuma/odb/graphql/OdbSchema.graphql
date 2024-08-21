@@ -2498,6 +2498,16 @@ type GmosSouthStep {
 
 }
 
+input CloneGroupInput {
+  groupId: GroupId!
+  SET: GroupPropertiesInput
+}
+
+type CloneGroupResult {
+  originalGroup: Group!
+  newGroup: Group!
+}
+
 """
 Whether guiding is enabled for a particular science step.
 """
@@ -2783,6 +2793,13 @@ type Mutation {
   ): CloneObservationResult!
 
   """
+  Copy this group and its contents, recursively, as a sibling of itself.
+  """
+  cloneGroup(
+    input: CloneGroupInput!
+  ): CloneGroupResult!
+
+  """
   Makes a copy of an existing target, setting it to unobserved and to PRESENT.  If `REPLACE_IN` observationIds are specified in the input, the clone will replace the existing target in those observations
   """
   cloneTarget(
@@ -2972,6 +2989,16 @@ type Mutation {
   ): UpdateObservationsResult!
 
   """
+  Updates existing observations times (execution and duration)
+  """
+  updateObservationsTimes(
+    """
+    Parameters for editing existing observations times.
+    """
+    input: UpdateObservationsTimesInput!
+  ): UpdateObservationsResult!
+
+  """
   Updates existing programs.
   """
   updatePrograms(
@@ -2980,6 +3007,14 @@ type Mutation {
     """
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
+
+  "Updates existing program users."
+  updateProgramUsers(
+
+    "Parameters for updating an existing program user."
+    input: UpdateProgramUsersInput!
+
+  ): UpdateProgramUsersResult!
 
   """
   Updates an existing proposal.
@@ -3089,11 +3124,6 @@ input ObservationPropertiesInput {
   scienceBand: ScienceBand
 
   """
-  Reference time used for time-dependent calculations such as average parallactic angle
-  """
-  visualizationTime: Timestamp
-
-  """
   Position angle constraint, if any. Set to null to remove all position angle constraints
   """
   posAngleConstraint: PosAngleConstraintInput
@@ -3147,6 +3177,16 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
+}
+
+"""
+Observation times properties
+"""
+input ObservationTimesInput {
+  """
+  Expected execution time used for time-dependent calculations such as average parallactic angle
+  """
+  observationTime: Timestamp
 }
 
 type Offset {
@@ -3372,9 +3412,19 @@ input ProgramPropertiesInput {
 }
 
 """
+Editable properties that define a program / user connection.
+"""
+input ProgramUserPropertiesInput {
+
+  "The user's partner."
+  partnerLink: PartnerLinkInput
+}
+
+"""
 The role a user a plays when assigned to a program.
 """
 enum ProgramUserRole {
+  "Primary Investigator"               PI
   "Co-Investigator"                    COI
   "Co-Investigator (read-only access)" COI_RO
   "Staff/Partner Support"              SUPPORT
@@ -3394,7 +3444,7 @@ An assignment of a user to a program.
 type ProgramUser {
   role:        ProgramUserRole!
   partnerLink: PartnerLink!
-  userId:      UserId!
+  program:     Program
   user:        User
 }
 
@@ -4925,6 +4975,32 @@ input UpdateObservationsInput {
 }
 
 """
+Observation selection and times update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
+"""
+input UpdateObservationsTimesInput {
+
+  """
+  Describes the observation time values to modify.
+  """
+  SET: ObservationTimesInput!
+
+  """
+  Filters the observations to be updated according to those that match the given constraints.
+  """
+  WHERE: WhereObservation
+
+  """
+  Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
+  """
+  LIMIT: NonNegInt
+
+  """
+  Set to `true` to include deleted observations.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
 The result of updating the selected observations, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional observations were modified and not included here.
 """
 type UpdateObservationsResult {
@@ -4936,6 +5012,44 @@ type UpdateObservationsResult {
   """
   `true` when there were additional edits that were not returned.
   """
+  hasMore: Boolean!
+}
+
+"""
+Parameters for the 'updateProgramUsers' mutation.  Use 'SET' to specify the
+changes, 'WHERE' to select the program users to update, and 'LIMIT' to control
+the size of the return value.
+"""
+input UpdateProgramUsersInput {
+
+  "Defines the program user properties to modify."
+  SET: ProgramUserPropertiesInput!
+
+  "Filters the program users according to those that match the given constraints."
+  WHERE: WhereProgramUser
+
+  """
+  Caps the number of results returned to the given value (if additional program
+  users match the 'WHERE' clause they will be updated not returned).
+  """
+  LIMIT: NonNegInt
+
+}
+
+"""
+The result of calling 'updateProgramUsers', up to 'LIMIT' or the maximum of
+1000.  If 'hasMore' is true, additional program users were modified but not
+included in the result.
+"""
+type UpdateProgramUsersResult {
+
+  """
+  The first program users that were updated (up to the LIMIT specified in the
+  mutation).
+  """
+  programUsers: [ProgramUser!]!
+
+  "Whether there were additional updated program users that were not returned."
   hasMore: Boolean!
 }
 
@@ -7480,7 +7594,7 @@ input CreateGroupInput {
   proposalReference: ProposalReferenceLabel
   programReference: ProgramReferenceLabel
   SET: GroupPropertiesInput
-  
+
   "Group elements specified here, if any, will be moved into the created group in the specified order."
   initialContents: [GroupElementInput]
 }
@@ -8098,9 +8212,9 @@ type Observation {
   scienceBand: ScienceBand
 
   """
-  Reference time used by default for visualization and time-dependent calculations (e.g., average parallactic angle)
+  Reference time used for execution and visualization and time-dependent calculations (e.g., average parallactic angle)
   """
-  visualizationTime: Timestamp
+  observationTime: Timestamp
 
   """
   Position angle constraint, if any.
@@ -8473,7 +8587,7 @@ type Program {
   proposalStatus: ProposalStatus!
 
   "Principal Investigator"
-  pi: User
+  pi: ProgramUser
 
   "Users assigned to this science program"
   users:   [ProgramUser!]!
@@ -8647,6 +8761,20 @@ enum ProgramType {
   SYSTEM
 }
 
+"""
+The matching program user results, limited to a maximum of 1000 entries.
+"""
+type ProgramUserSelectResult {
+  """
+  Matching program users up to the return size limit of 1000
+  """
+  matches: [ProgramUser!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+}
 
 type ProperMotion {
   """
@@ -9032,6 +9160,31 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ProgramSelectResult!
+
+  """
+  Selects the first `LIMIT` matching program users based on the provided `WHERE`
+  parameter, if any.
+  """
+  programUsers(
+
+    "Filters the selection of program users."
+    WHERE: WhereProgramUser
+
+    "Starts the result set at (or after if not existent) the given user id."
+    OFFSET: UserId
+
+    """
+    Limits the result to at most this number of matches (but never more than
+    1000).
+    """
+    LIMIT: NonNegInt
+
+    """
+    Set to true to include program users linked to deleted programs.
+    """
+    includeDeleted: Boolean! = false
+
+  ): ProgramUserSelectResult!
 
   """
   Metadata for `enum ProposalAttachmentType`
@@ -11518,6 +11671,60 @@ input WhereEqPartner {
 }
 
 """
+Filters on equality (or not) of the partner link type. All supplied criteria
+must match, but usually only one is selected.
+"""
+input WhereEqPartnerLinkType {
+  """
+  Matches if the partner link type is exactly the supplied value.
+  """
+  EQ: PartnerLinkType
+
+  """
+  Matches if the partner link type is not the supplied value.
+  """
+  NEQ: PartnerLinkType
+
+  """
+  Matches if the partner link type is any of the supplied options.
+  """
+  IN: [PartnerLinkType!]
+
+  """
+  Matches if the partner link type is none of the supplied values.
+  """
+  NIN: [PartnerLinkType!]
+}
+
+"""
+Filters on equality (or not) of the program user role type and the supplied
+criteria. All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqProgramUserRole {
+
+  """
+  Matches if the role is exactly the supplied value.
+  """
+  EQ: ProgramUserRole
+
+  """
+  Matches if the role is not the supplied value.
+  """
+  NEQ: ProgramUserRole
+
+  """
+  Matches if the role is any of the supplied options.
+  """
+  IN: [ProgramUserRole!]
+
+  """
+  Matches if the role is none of the supplied values.
+  """
+  NIN: [ProgramUserRole!]
+
+}
+
+"""
 Filters on equality (or not) of the program type and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "CALIBRATION"' will match when the type is "CALIBRATION".
@@ -11649,6 +11856,34 @@ input WhereEqToOActivation {
   Matches if the property value is none of the supplied values.
   """
   NIN: [ToOActivation!]
+}
+
+"""
+Filters on equality (or not) of the user type value and the supplied criteria.
+All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqUserType {
+
+  """
+  Matches if the user type is exactly the supplied value.
+  """
+  EQ: UserType
+
+  """
+  Matches if the user type is not the supplied value.
+  """
+  NEQ: UserType
+
+  """
+  Matches if the user type is any of the supplied options.
+  """
+  IN: [UserType!]
+
+  """
+  Matches if the user type is none of the supplied values.
+  """
+  NIN: [UserType!]
+
 }
 
 """
@@ -11958,6 +12193,40 @@ input WhereOptionEqCalibrationRole {
   Matches if the property value is none of the supplied values.
   """
   NIN: [CalibrationRole!]
+}
+
+"""
+Filters on equality (or not) of the (optional) partner. All supplied criteria
+must match, but usually only one is selected.
+"""
+input WhereOptionEqPartner {
+
+  """
+  When `true`, matches if the partner is not defined. When `false` matches if
+  the partner is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the partrner is exactly the supplied value.
+  """
+  EQ: Partner
+
+  """
+  Matches if the partner is not the supplied value.
+  """
+  NEQ: Partner
+
+  """
+  Matches if the partner is any of the supplied options.
+  """
+  IN: [Partner!]
+
+  """
+  Matches if the partner is none of the supplied values.
+  """
+  NIN: [Partner!]
+
 }
 
 """
@@ -12827,6 +13096,50 @@ input WhereOrderProgramId {
   LTE: ProgramId
 }
 
+input WhereOrderUserId {
+
+  """
+  Matches if the user id is exactly the supplied value.
+  """
+  EQ: UserId
+
+  """
+  Matches if the user id is not the supplied value.
+  """
+  NEQ: UserId
+
+  """
+  Matches if the user id is any of the supplied options.
+  """
+  IN: [UserId!]
+
+  """
+  Matches if the user id is none of the supplied values.
+  """
+  NIN: [UserId!]
+
+  """
+  Matches if the user id is ordered after (>) the supplied value.
+  """
+  GT: UserId
+
+  """
+  Matches if the user id is ordered before (<) the supplied value.
+  """
+  LT: UserId
+
+  """
+  Matches if the user id is ordered after or equal (>=) the supplied value.
+  """
+  GTE: UserId
+
+  """
+  Matches if the user id is ordered before or equal (<=) the supplied value.
+  """
+  LTE: UserId
+
+}
+
 input WhereProposalReference {
 
   "Matches if the proposal reference is not defined."
@@ -13184,6 +13497,24 @@ input WhereOrderTargetId {
 }
 
 """
+Partner link filter options.  All specified items much match.
+"""
+input WherePartnerLink {
+
+  """
+  Matches on equality of the link type.
+  """
+  linkType: WhereEqPartnerLinkType
+
+  """
+  Matches on the partner itself, if applicable.  Only `HAS_PARTNER` link types
+  will have a partner.  For other link types it will be `null`.
+  """
+  partner: WhereOptionEqPartner
+
+}
+
+"""
 Program filter options.  All specified items must match.
 """
 input WhereProgram {
@@ -13223,6 +13554,11 @@ input WhereProgram {
   reference: WhereProgramReference
 
   """
+  Matches the PI.
+  """
+  pi: WhereProgramUser
+
+  """
   Matches the proposalStatus.
   """
   proposalStatus: WhereEqProposalStatus
@@ -13260,6 +13596,48 @@ input WhereProgramReference {
 
   "Matches the science subtype in the program reference, if any."
   scienceSubtype: WhereEqScienceSubtype
+}
+
+"""
+Program user options.  All specified items must match.
+"""
+input WhereProgramUser {
+
+  """
+  A list of nested program user filters that all must match in order for the AND group as a whole to match.
+  """
+  AND: [WhereProgramUser!]
+
+  """
+  A list of nested program user filters where any one match causes the entire OR group as a whole to match.
+  """
+  OR: [WhereProgramUser!]
+
+  """
+  A nested program user filter that must not match in order for the NOT itself to match.
+  """
+  NOT: WhereProgramUser
+
+  """
+  Matches the program.
+  """
+  program: WhereProgram
+
+  """
+  Matches the user.
+  """
+  user: WhereUser
+
+  """
+  Matches the role.
+  """
+  role: WhereEqProgramUserRole
+
+  """
+  Matches the partner.
+  """
+  partnerLink: WherePartnerLink
+
 }
 
 """
@@ -13477,6 +13855,41 @@ input WhereTarget {
   Matches the calibration role.
   """
   calibrationRole: WhereOptionEqCalibrationRole
+}
+
+"""
+User filter options.  All specified items must match.
+"""
+input WhereUser {
+
+  """
+  A list of nested user filters that all must match in order for the AND group
+  as a whole to match.
+  """
+  AND:             [WhereUser!]
+
+  """
+  A list of nested user filters that all must match in order for the OR group
+  as a whole to match.
+  """
+  OR:              [WhereUser!]
+
+  """
+  A nested user filter that must not match in order for the NOT itself to match.
+  """
+  NOT:             WhereUser
+
+  "Matches the user Id."
+  id:              WhereOrderUserId
+
+  "Matches the user type."
+  type:            WhereEqUserType
+
+  orcidId:         WhereOptionString
+  orcidGivenName:  WhereOptionString
+  orcidCreditName: WhereOptionString
+  orcidFamilyName: WhereOptionString
+  orcidEmail:      WhereOptionString
 }
 
 input WhereWavelength {
