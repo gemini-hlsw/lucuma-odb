@@ -101,6 +101,7 @@ object OdbMapping {
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
+          with CloneGroupResultMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
           with ConditionsEntryMapping[F]
@@ -163,6 +164,7 @@ object OdbMapping {
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
+          with ProgramUserSelectResultMapping[F]
           with ProperMotionDeclinationMapping[F]
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
@@ -212,6 +214,7 @@ object OdbMapping {
           with UpdateObsAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
+          with UpdateProgramUsersResultMapping[F]
           with UpdateProposalResultMapping[F]
           with UpdateTargetsResultMapping[F]
           with UserMapping[F]
@@ -265,6 +268,7 @@ object OdbMapping {
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
                 ClassicalMapping,
+                CloneGroupResultMapping,
                 CloneObservationResultMapping,
                 CloneTargetResultMapping,
                 CommissioningProgramReferenceMapping,
@@ -326,6 +330,7 @@ object OdbMapping {
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
+                ProgramUserSelectResultMapping,
                 ProperMotionDeclinationMapping,
                 ProperMotionMapping,
                 ProperMotionRaMapping,
@@ -394,6 +399,7 @@ object OdbMapping {
                 UpdateObsAttachmentsResultMapping,
                 UpdateObservationsResultMapping,
                 UpdateProgramsResultMapping,
+                UpdateProgramUsersResultMapping,
                 UpdateProposalResultMapping,
                 UpdateTargetsResultMapping,
                 UserMapping,

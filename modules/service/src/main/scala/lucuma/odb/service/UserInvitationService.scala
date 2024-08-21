@@ -11,9 +11,12 @@ import grackle.ResultT
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.PartnerLinkType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
@@ -25,8 +28,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.ProgramUserRole
+import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
@@ -145,7 +147,7 @@ object UserInvitationService:
                   xa.savepoint.flatMap: sp =>
                     session
                       .prepareR(ProgramService.Statements.LinkUser.command)
-                      .use(_.execute(pid, user.id, r, partnerLink))
+                      .use(_.execute(pid, user.id, UserType.Standard, r, partnerLink))
                       .as(Result(input.key.id))
                       .recoverWith:
                         case SqlState.UniqueViolation(_) =>
@@ -181,9 +183,9 @@ object UserInvitationService:
       """
         .query(user_invitation)
         .contramap {
-          case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.toOption, pid)
-          case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.toOption, pid)
-          case (u, CreateUserInvitationInput.Support(pid, e))  => (u.id, pid, e, ProgramUserRole.Support, PartnerLink.LinkType.HasUnspecifiedPartner, none, pid)
+          case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.partnerOption, pid)
+          case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.partnerOption, pid)
+          case (u, CreateUserInvitationInput.Support(pid, e))  => (u.id, pid, e, ProgramUserRole.Support, PartnerLinkType.HasUnspecifiedPartner, none, pid)
         }
 
     val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, PartnerLink), UserInvitation] =
@@ -198,10 +200,16 @@ object UserInvitationService:
           null
         ) from t_program
         where c_program_id = $program_id
-        and c_pi_user_id = $user_id
+        and EXISTS (
+          SELECT 1
+          FROM t_program_user u
+          WHERE u.c_program_id = $program_id
+          AND   u.c_user_id    = $user_id
+          AND   u.c_role       = 'pi'
+        )
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.toOption, pid, u.id))
+        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.partnerOption, pid, pid, u.id))
 
     val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, PartnerLink)] =
       sql"""

@@ -51,6 +51,7 @@ import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
+import lucuma.odb.graphql.input.CloneGroupInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
@@ -79,6 +80,8 @@ import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
+import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateProgramUsersInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateProposalInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
@@ -109,6 +112,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddSlewEvent,
       AddStepEvent,
       AddTimeChargeCorrection,
+      CloneGroup,
       CloneObservation,
       CloneTarget,
       CreateCallForProposals,
@@ -138,7 +142,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UpdateGroups,
       UpdateObsAttachments,
       UpdateObservations,
+      UpdateObservationsTimes,
       UpdatePrograms,
+      UpdateProgramUsers,
       UpdateProposal,
       UpdateTargets,
     )
@@ -264,6 +270,25 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child
     )
 
+  def programUsersResultSubquery(ids: List[(Program.Id, User.Id)], limit: Option[NonNegInt], child: Query) = {
+    val pred   = Predicates.programUser.key.in(ids)
+    val order  = List(
+      OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
+      OrderSelection[User.Id](ProgramUserType / "user" / "id")
+    )
+    val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value) + 1
+
+    ResultMapping.mutationResult(child, limitʹ, "programUsers") { q =>
+      FilterOrderByOffsetLimit(
+        pred   = pred.some,
+        oss    = order.some,
+        offset = None,
+        limit  = limitʹ.some,
+        child  = q
+      )
+    }
+  }
+
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
     def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
@@ -286,6 +311,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Result(
               Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
             )
+
+  private lazy val CloneGroup: MutationField =
+    MutationField("cloneGroup", CloneGroupInput.Binding): (input, child) =>
+      services.useTransactionally:
+        groupService.cloneGroup(input).nestMap: id =>
+          Filter(
+            And(
+              Predicates.cloneGroupResult.originalGroup.id.eql(input.groupId),
+              Predicates.cloneGroupResult.newGroup.id.eql(id),
+            ), child)
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
@@ -548,16 +583,18 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // An applied fragment that selects all observation ids that satisfy
   // `filterPredicate`
   private def observationIdSelect(
-    includeDeleted: Option[Boolean],
-    WHERE:          Option[Predicate]
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean
   ): Result[AppliedFragment] = {
     val whereObservation: Predicate =
       and(List(
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-        Predicates.observation.calibrationRole.isNull(true),
+        if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
         WHERE.getOrElse(True)
       ))
+
     MappedQuery(
       Filter(whereObservation, Select("id", None, Query.Empty)),
       Context(QueryType, List("observations"), List("observations"), List(ObservationType))
@@ -569,7 +606,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE, false)
 
         val selectObservations: F[Result[(List[Observation.Id], Query)]] =
           idSelect.traverse { which =>
@@ -670,7 +707,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally {
 
         val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE)
+          observationIdSelect(input.includeDeleted, input.WHERE, false)
 
         val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
           idSelect.flatTraverse { which =>
@@ -697,6 +734,56 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         } yield tup._2
 
         r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
+      }
+    }
+
+  private lazy val UpdateObservationsTimes: MutationField =
+    MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))) { (input, child) =>
+      services.useTransactionally {
+
+        val idSelect: Result[AppliedFragment] =
+          observationIdSelect(input.includeDeleted, input.WHERE, true)
+
+        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
+          idSelect.flatTraverse { which =>
+            observationService
+              .updateObservationsTimes(input.SET, which)
+              .map { r =>
+                r.flatMap { m =>
+                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
+                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
+                }
+              }
+          }
+
+        updateObservations.map(_.map(_._2))
+      }
+    }
+
+  private lazy val UpdateProgramUsers =
+    MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))) { (input, child) =>
+      services.useTransactionally {
+        val filterPredicate = and(List(
+          Predicates.programUser.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val selection: Result[AppliedFragment] =
+          MappedQuery(
+            Filter(filterPredicate, Query.Group(List(
+              Select("programId", None, Empty),
+              Select("userId", None, Empty)
+            ))),
+            Context(QueryType, List("programUsers"), List("programUsers"), List(ProgramUserType))
+          ).flatMap(_.fragment)
+
+        selection.flatTraverse { which =>
+          programService
+            .updateProgramUsers(input.SET, which)
+            .map(
+              _.flatMap(programUsersResultSubquery(_, input.LIMIT, child))
+            )
+        }
       }
     }
 

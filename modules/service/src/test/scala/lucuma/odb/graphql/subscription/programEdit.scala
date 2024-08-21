@@ -10,6 +10,7 @@ import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Partner
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.UserInvitation
 
 import scala.concurrent.duration.*
@@ -41,6 +42,17 @@ class programEdit extends OdbSuite with SubscriptionUtils {
   test("trigger for my own new programs") {
     import Group1._
     List(pi, guest, service).traverse { user =>
+      val allEvents = List(
+        json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+        json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo" } } }""",
+        json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
+        json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "bar" } } }"""
+      )
+      val expected = user match {
+        case ServiceUser(_, _) => List(allEvents(0), allEvents(2)) // service users are not linked
+        case _                 => allEvents // pi and guest generate a separate update when linked
+      }
+
       subscriptionExpect(
         user = user,
         query =
@@ -59,11 +71,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
             createProgram(user, "foo") >>
             createProgram(user, "bar")
           ),
-        expected =
-          List(
-            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
-            json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
-          )
+        expected = expected
       )
     }
   }
@@ -92,6 +100,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo" } } }"""
         )
     )
   }
@@ -120,6 +129,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "bar" } } }"""
         )
     )
   }
@@ -148,8 +158,10 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo" } } }""",
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "bar" } } }""",
-          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "bar" } } }""",
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }"""
         )
     )
   }
@@ -194,6 +206,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo" } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo" } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo2" } } }""",
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "baz" } } }""",
         )
@@ -216,7 +229,12 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgramAs(pi).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"programEdit":{"editType":"CREATED","id":0}}""")
+      expected = List(
+        json"""{"programEdit":{"editType":"CREATED","id":0}}""",
+        json"""{"programEdit":{"editType":"UPDATED","id":0}}""",
+        json"""{"programEdit":{"editType":"CREATED","id":0}}""",
+        json"""{"programEdit":{"editType":"UPDATED","id":0}}"""
+      )
     )
   }
 
@@ -264,6 +282,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": null } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "title": "initial" } } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "title": "updated" } } } }"""
         )
@@ -337,6 +356,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": null } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [] } } } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
         )
@@ -372,6 +392,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "users": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "users": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "users": [ { "role": "COI" } ] } } }"""
         )
     )
@@ -409,6 +430,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "recipientEmail": "here@there.com" } ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "REVOKED", "recipientEmail": "here@there.com" } ] } } }"""
         )
@@ -450,6 +472,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "QUEUED"}} ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "ACCEPTED"}} ] } } }"""
         )

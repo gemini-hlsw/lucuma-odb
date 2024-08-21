@@ -7,13 +7,14 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.ProgramUserRole.Coi
+import lucuma.core.enums.ProgramUserRole.CoiRO
+import lucuma.core.enums.ProgramUserRole.Pi
+import lucuma.core.enums.ProgramUserRole.Support
+import lucuma.core.model.PartnerLink
+import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.PartnerLink.HasUnspecifiedPartner
-import lucuma.odb.data.ProgramUserRole.Coi
-import lucuma.odb.data.ProgramUserRole.CoiRO
-import lucuma.odb.data.ProgramUserRole.Support
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.service.ProgramService
 import lucuma.odb.service.ProgramService.LinkUserRequest
@@ -34,6 +35,7 @@ object LinkUserInput {
           case (pid, uid, Support, None) => Result(LinkUserRequest.Support(pid, uid))
           case (pid, uid, Support, Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid))
           case (_, _, Support, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
+          case (_, _, Pi, _) => OdbError.InvalidArgument("PIs are linked at program creation time.".some).asFailure
         }
     }
 

@@ -6,12 +6,12 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.ProgramUserRole as PUR
+import lucuma.core.model.PartnerLink
+import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
-import lucuma.odb.data.PartnerLink
-import lucuma.odb.data.PartnerLink.HasUnspecifiedPartner
-import lucuma.odb.data.ProgramUserRole as PUR
 import lucuma.odb.graphql.binding.EmailAddressBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
@@ -40,3 +40,4 @@ object CreateUserInvitationInput:
           case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p.getOrElse(HasUnspecifiedPartner)))
           case (pid, email, PUR.Support, None) => Result(CreateUserInvitationInput.Support(pid, email))
           case (_, _, PUR.Support, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
+          case (_, _, PUR.Pi, _)               => OdbError.InvalidArgument("Cannot create an invitation for the PI.".some).asFailure
