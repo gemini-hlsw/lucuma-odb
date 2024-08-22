@@ -8,6 +8,8 @@ import io.circe.Encoder
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
 import io.circe.Json
+import lucuma.core.math.RightAscension
+import lucuma.core.math.Declination
 
 object coordinates:
 
@@ -21,7 +23,11 @@ object coordinates:
         "dec" -> cs.dec.asJson
       )
 
-    given Decoder_Coordinates: Decoder[Coordinates] = ???
+    given Decoder_Coordinates: Decoder[Coordinates] = hc =>
+      for 
+        r <- hc.downField("ra").as[RightAscension]
+        d <- hc.downField("dec").as[Declination]
+      yield Coordinates(r, d)
 
   object query extends QueryCodec
 

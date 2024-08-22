@@ -25,9 +25,10 @@ import org.http4s.client.Client
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.table.ConfigurationRequestTable
 
 trait ConfigurationMapping[F[_]]
-  extends ObservationView[F] {
+  extends ObservationView[F] with ConfigurationRequestTable[F] {
 
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
@@ -35,8 +36,22 @@ trait ConfigurationMapping[F[_]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
 
-  lazy val ConfigurationMapping: ObjectMapping =
-    ObjectMapping(ConfigurationType)(
+  lazy val ConfigurationMappings =
+    List(
+      ObservationConfigurationMapping,
+      ConfigurationRequestConfigurationMapping,
+    )
+
+  private lazy val ConfigurationRequestConfigurationMapping: ObjectMapping =
+    ObjectMapping(ConfigurationRequestType / "configuration")(
+      SqlField("synthetic-id", ConfigurationRequestTable.Id, key = true, hidden = true),
+      SqlObject("conditions"),
+      SqlObject("referenceCoordinates"),
+      SqlObject("observingMode"),
+    )
+
+  private lazy val ObservationConfigurationMapping: ObjectMapping =
+    ObjectMapping(ObservationType / "configuration")(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
 

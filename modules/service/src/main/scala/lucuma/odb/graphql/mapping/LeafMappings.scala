@@ -57,6 +57,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
+import lucuma.odb.data.ConfigurationRequest
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -80,6 +81,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
+      LeafMapping[ConfigurationRequest.Status](ConfigurationRequestStatusType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),

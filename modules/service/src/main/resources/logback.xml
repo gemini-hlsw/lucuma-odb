@@ -12,7 +12,7 @@
 
   <logger name="lucuma-odb" level="INFO" />
   <logger name="lucuma-odb-container" level="DEBUG" />
-  <logger name="lucuma-odb-test" level="ERROR" />
+  <logger name="lucuma-odb-test" level="ALL" />
   <logger name="org.http4s.server.middleware.Logger" level="WARN" />
   <logger name="org.testcontainers" level="WARN" />
   <logger name="org.http4s.server.service-errors" level="OFF" />
