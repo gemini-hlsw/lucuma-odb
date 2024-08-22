@@ -3063,6 +3063,13 @@ type Mutation {
     input: RevokeUserInvitationInput!
   ): RevokeUserInvitationResult!
 
+  """
+  Create a configuration request.
+  """
+  createConfigurationRequest(
+    input: CreateConfigurationRequestInput!
+  ): ConfigurationRequest!
+
 }
 
 """
@@ -8423,7 +8430,6 @@ type Observation {
   configuration: Configuration!
 
 }
-
 type Configuration {
   conditions: ConfigurationConditions!
   referenceCoordinates: Coordinates # may not be available
@@ -8452,7 +8458,23 @@ type ConfigurationGmosSouthLongSlit {
   grating: GmosSouthGrating!
 }
 
+scalar ConfigurationRequestId
 
+enum ConfigurationRequestStatus {
+  REQUESTED
+  APPROVED
+  DENIED
+}
+
+type ConfigurationRequest {
+  id: ConfigurationRequestId!
+  status: ConfigurationRequestStatus!
+  configuration: Configuration!
+}
+
+input CreateConfigurationRequestInput {
+  observationId: ObservationId
+}
 
 type Itc {
   """

@@ -13,9 +13,16 @@ import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.service.ExecutionEventService.liftF
 import skunk.Query
 import skunk.Transaction
+import skunk.syntax.all.*
+import lucuma.odb.util.Codecs.*
 
 import Services.Syntax.*
 import io.circe.ACursor
+import lucuma.odb.data.Configuration.Conditions
+import lucuma.core.math.Coordinates
+import lucuma.odb.data.ObservingModeType
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.odb.util.GmosCodecs.*
 
 trait ConfigurationService[F[_]] {
 
@@ -158,7 +165,113 @@ object ConfigurationService {
   private object Statements {
 
     val InsertRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
-      ???
+      sql"""
+        INSERT INTO t_configuration_request (
+          c_program_id,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_reference_ra,
+          c_reference_dec,
+          c_observing_mode_type,
+          c_gmos_north_longslit_grating,
+          c_gmos_south_longslit_grating
+        ) VALUES (
+          (select c_program_id from t_observation where c_observation_id = $observation_id),
+          $cloud_extinction,
+          $image_quality,
+          $sky_background,
+          $water_vapor,
+          $right_ascension,
+          $declination,
+          $observing_mode_type,
+          ${gmos_north_grating.opt},
+          ${gmos_south_grating.opt}
+        ) RETURNING
+          c_configuration_request_id,
+          c_status,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_reference_ra,
+          c_reference_dec,
+          c_observing_mode_type,
+          c_gmos_north_longslit_grating,
+          c_gmos_south_longslit_grating
+      """.query(
+        (
+          configuration_request_id *:
+          configuration_request_status *:
+          cloud_extinction         *:
+          image_quality            *:
+          sky_background           *:
+          water_vapor              *:
+          right_ascension          *:
+          declination              *:
+          observing_mode_type      *:
+          gmos_north_grating.opt                  *:
+          gmos_south_grating.opt
+        ).emap:       
+          { case 
+            id                       *:
+            status                   *:
+            cloudExtinction          *:
+            imageQuality             *:
+            skyBackground            *:
+            waterVapor               *:
+            rightAscension           *:
+            declination              *:
+            observingModeType        *:
+            gmosNorthLongSlitGrating *:
+            gmosSouthLongSlitGrating *:
+            EmptyTuple =>
+
+              val mode: Either[String, Configuration.ObservingMode] = 
+                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+
+                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                    Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
+                  
+                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                    Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
+                  
+                  case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
+
+              mode.map: m =>
+                ConfigurationRequest(
+                  id, 
+                  status,
+                  Configuration(
+                    Conditions(
+                      cloudExtinction,
+                      imageQuality,
+                      skyBackground,
+                      waterVapor
+                    ),
+                    Coordinates(
+                      rightAscension,
+                      declination
+                    ),
+                    m
+                  )
+                )
+
+          }
+      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
+        oid                                                         *:
+        cfg.conditions.cloudExtinction                              *:
+        cfg.conditions.imageQuality                                 *:
+        cfg.conditions.skyBackground                                *:
+        cfg.conditions.waterVapor                                   *:
+        cfg.refererenceCoordinates.ra                               *:
+        cfg.refererenceCoordinates.dec                              *:
+        cfg.observingMode.tpe                                       *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
+        EmptyTuple
+      }
 
   }
 

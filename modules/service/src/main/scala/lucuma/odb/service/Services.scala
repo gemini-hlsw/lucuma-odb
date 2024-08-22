@@ -96,6 +96,9 @@ trait Services[F[_]]:
   /** The `ChronicleService`. */
   def chronicleService: ChronicleService[F]
 
+  /** The `ConfigurationService`. */
+  def configurationService: ConfigurationService[F]
+
   /** The `DatasetService`. */
   def datasetService: DatasetService[F]
 
@@ -240,6 +243,7 @@ object Services:
       lazy val callForProposalsService = CallForProposalsService.instantiate
       lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
+      lazy val configurationService = ConfigurationService.instantiate
       lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
@@ -288,6 +292,7 @@ object Services:
     def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
+    def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService

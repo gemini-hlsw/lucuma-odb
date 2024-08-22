@@ -112,6 +112,7 @@ object OdbMapping {
           with ConfigurationConditionsMapping[F]
           with ConfigurationGmosLongSlitMapping[F]
           with ConfigurationMapping[F]
+          with ConfigurationRequestMapping[F]
           with ConfigurationObservingModeMapping[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
@@ -285,12 +286,11 @@ object OdbMapping {
                 ConfigurationConditionsMapping,
                 ConfigurationGmosNorthLongSlitMapping,
                 ConfigurationGmosSouthLongSlitMapping,
-                ConfigurationMapping,
+                ConfigurationRequestMapping,
                 ConfigurationObservingModeMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,
                 ConstraintSetMapping,
-                CoordinatesMapping,
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
@@ -422,6 +422,8 @@ object OdbMapping {
                 AngleMappings,
                 AtomRecordSelectResultMappings,
                 CategorizedTimeMappings,
+                ConfigurationMappings,
+                CoordinatesMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,
                 DateIntervalMappings,

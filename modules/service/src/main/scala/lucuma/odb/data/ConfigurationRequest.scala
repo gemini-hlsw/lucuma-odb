@@ -15,7 +15,6 @@ case class ConfigurationRequest(
   id: ConfigurationRequest.Id,
   status: ConfigurationRequest.Status,
   configuration: Configuration
-  // todo: status, etc.
 )
 object ConfigurationRequest extends WithGid('x'.refined) {
 

@@ -79,6 +79,7 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import lucuma.odb.data.ConfigurationRequest
 
 
 // Codecs for some atomic types.
@@ -336,6 +337,12 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
+
+  val configuration_request_id: Codec[ConfigurationRequest.Id] =
+    gid[ConfigurationRequest.Id]
+
+  val configuration_request_status: Codec[ConfigurationRequest.Status] =
+    enumerated(Type("e_configuration_request_status"))
 
   val observing_mode_type: Codec[ObservingModeType] =
     enumerated(Type("e_observing_mode_type"))
