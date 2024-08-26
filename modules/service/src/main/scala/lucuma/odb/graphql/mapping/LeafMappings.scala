@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.EditType
+import lucuma.odb.data.EducationalStatus
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
@@ -88,6 +89,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[DatasetStage](DatasetStageType),
       LeafMapping[LocalDate](DateType),
       LeafMapping[EditType](EditTypeType),
+      LeafMapping[EducationalStatus](EducationalStatusType),
       LeafMapping[EmailAddress](EmailAddressType),
       LeafMapping[EmailStatus](EmailStatusType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
