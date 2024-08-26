@@ -279,7 +279,6 @@ object ObservationService {
           None,
           None,
           Nullable.Absent,
-          Nullable.Absent,
           None,
           None,
           None,
@@ -299,7 +298,7 @@ object ObservationService {
                     // set the existence to deleted, so it gets removed from groups too
                     updateObservations(existenceOff, sql"$observation_id"(o))
                   )
-          // Look the linked targets
+          // Look for the linked targets
           tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
           // Delete asterisms and targets
           _    <- NonEmptyList

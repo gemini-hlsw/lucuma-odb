@@ -77,10 +77,17 @@ trait CalibrationsService[F[_]] {
     role: Option[CalibrationRole]
   )(using Transaction[F]): F[Unit]
 
+  /**
+    * Recalculates the calibrations for a program
+    *
+    * @param pid Program.Id
+    * @param referenceInstant time used to calculate targets
+    * @return list of added and removed calibration observations
+    */
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])]
 
   def recalculateCalibrationTarget(
     pid: Program.Id,
@@ -297,16 +304,18 @@ object CalibrationsService {
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
-      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[Unit] = {
-
-        for {
-          cg  <- calibrationsGroup(pid, gnls.size + gsls.size)
-          _   <- cg.map(g =>
-                   calibrationObservations(pid, g, gnls, gsls, gnTgt, gsTgt).flatMap { oids =>
-                     setCalibRoleAndGroup(oids, CalibrationRole.SpectroPhotometric).whenA(oids.nonEmpty)
-                   }
-                 ).getOrElse(Applicative[F].unit)
-        } yield ()
+      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[List[Observation.Id]] = {
+        if (gnls.isEmpty && gsls.isEmpty) {
+          List.empty.pure[F]
+        } else
+          for {
+            cg   <- calibrationsGroup(pid, gnls.size + gsls.size)
+            oids <- cg.map(g =>
+                      calibrationObservations(pid, g, gnls, gsls, gnTgt, gsTgt).flatTap { oids =>
+                        setCalibRoleAndGroup(oids, CalibrationRole.SpectroPhotometric).whenA(oids.nonEmpty)
+                      }
+                    ).getOrElse(List.empty.pure[F])
+          } yield oids
       }
 
       private def removeUnnecessaryCalibrations(
@@ -314,7 +323,7 @@ object CalibrationsService {
         gnls: List[(Observation.Id, GmosNConfigs)],
         calibsSLS: List[(Observation.Id, GmosSConfigs)],
         gsls: List[(Observation.Id, GmosSConfigs)]
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F]): F[List[Observation.Id]] = {
         val o1 = calibsNLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
 
           if (gnls.exists(_._2 === c)) l else oid :: l
@@ -324,7 +333,9 @@ object CalibrationsService {
           if (gsls.exists(_._2 === c)) l else oid :: l
         }
         val oids = NonEmptyList.fromList(o1 ::: o2)
-        oids.map(observationService.deleteCalibrationObservations(_).void).getOrElse(Applicative[F].unit)
+        oids
+          .map(oids => observationService.deleteCalibrationObservations(oids).as(oids.toList))
+          .getOrElse(List.empty.pure[F])
       }
 
       private def spectroPhotometricTargets(when: Instant)(
@@ -357,7 +368,7 @@ object CalibrationsService {
         Coordinates(ra, dec)
       }
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[Unit] = {
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] = {
         val gncoords = idealLocation(Site.GN, referenceInstant)
         val gscoords = idealLocation(Site.GS, referenceInstant)
 
@@ -370,9 +381,9 @@ object CalibrationsService {
           (calibGmosNLS, calibGmosSLS)     <- uniqueConfiguration(pid, ObservationSelection.Calibration)
           gnls  = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
           gsls  = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
-          _                                <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt).whenA(gnls.nonEmpty || gsls.nonEmpty)
-          _                                <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
-        } yield ()
+          addedOids                        <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt)
+          removedOids                      <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
+        } yield (addedOids, removedOids)
       }
 
       // Recalcula the target of a calibration observation
@@ -408,8 +419,8 @@ object CalibrationsService {
                       ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
-                                NonEmptyList.one(oid), 
-                                Some(NonEmptyList.one(ct)), 
+                                NonEmptyList.one(oid),
+                                Some(NonEmptyList.one(ct)),
                                 NonEmptyList.fromList(otgs))
                               )
                     } yield ()
