@@ -100,6 +100,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
 
+
   def deletedSubscription(pid: Program.Id) =
     s"""
       subscription {

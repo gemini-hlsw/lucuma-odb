@@ -13,6 +13,7 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.refined.*
+import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
@@ -31,13 +32,114 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import lucuma.odb.graphql.subscription.SubscriptionUtils
+import lucuma.odb.data.EditType
+import cats.effect.kernel.Ref
 
-class calibrations extends OdbSuite {
-
+class calibrations extends OdbSuite with SubscriptionUtils {
   val pi       = TestUsers.Standard.pi(1, 101)
   val service  = TestUsers.service(3)
 
-  val validUsers = List(pi, service)
+  override val validUsers = List(pi, service)
+
+  def updateTargetProperties(pi: User, tid: Target.Id, ra: Long, dec: Long, rv:  Double): IO[Json] =
+    query(
+      pi,
+      s"""
+          mutation {
+            updateTargets(input: {
+              SET: {
+                sidereal: {
+                  ra: { degrees: ${Angle.fromMicroarcseconds(ra).toDoubleDegrees} }
+                  dec: { degrees: ${Angle.fromMicroarcseconds(dec).toDoubleDegrees} }
+                  radialVelocity: { metersPerSecond: $rv }
+                  epoch: "J2000.000"
+                  radialVelocity: {
+                    kilometersPerSecond: 0.0
+                  }
+                },
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: B5_III
+                      },
+                      brightnesses: [
+                        {
+                          band: R
+                          value: 15.0
+                          units: VEGA_MAGNITUDE
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: "$tid"}
+              }
+            }) {
+              targets {
+                id
+              }
+            }
+          }
+      """
+    )
+
+  def scienceRequirements(pi: User, oid: Observation.Id): IO[Json] =
+    query(
+      pi,
+      s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                scienceRequirements: {
+                  mode: SPECTROSCOPY,
+                  spectroscopy: {
+                    wavelength: {
+                      nanometers: 400.000
+                    },
+                    resolution: 10,
+                    signalToNoise: 75.000,
+                    signalToNoiseAt: {
+                      nanometers: 410.000
+                    },
+                    wavelengthCoverage: {
+                      nanometers: 0.010
+                    },
+                    focalPlane: SINGLE_SLIT,
+                    focalPlaneAngle: {
+                      arcseconds: 5
+                    }
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: "$oid"}
+              }
+            }) {
+              observations {
+                id
+              }
+            }
+          }
+      """
+    )
+
+  def prepareObservation(pi: User, oid: Observation.Id, tid: Target.Id): IO[Unit] =
+    for {
+      _ <- updateTargetProperties(
+        pi,
+             tid,
+             RightAscension.Zero.toAngle.toMicroarcseconds,
+             Declination.Zero.toAngle.toMicroarcseconds,
+             0.0
+           )
+      _ <- scienceRequirements(pi, oid)
+    } yield ()
+
+
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
@@ -99,51 +201,6 @@ class calibrations extends OdbSuite {
         .liftTo[IO]
      }
 
-  private def updateTargetProperties(tid: Target.Id, ra: Long, dec: Long, rv:  Double): IO[Json] =
-    query(
-      pi,
-      s"""
-          mutation {
-            updateTargets(input: {
-              SET: {
-                sidereal: {
-                  ra: { degrees: ${Angle.fromMicroarcseconds(ra).toDoubleDegrees} }
-                  dec: { degrees: ${Angle.fromMicroarcseconds(dec).toDoubleDegrees} }
-                  radialVelocity: { metersPerSecond: $rv }
-                  epoch: "J2000.000"
-                  radialVelocity: {
-                    kilometersPerSecond: 0.0
-                  }
-                },
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
-                      },
-                      brightnesses: [
-                        {
-                          band: R
-                          value: 15.0
-                          units: VEGA_MAGNITUDE
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-              WHERE: {
-                id: { EQ: "$tid"}
-              }
-            }) {
-              targets {
-                id
-              }
-            }
-          }
-      """
-    )
-
   def unsetSED(tid: Target.Id): IO[Json] =
     query(
       pi,
@@ -176,56 +233,6 @@ class calibrations extends OdbSuite {
     ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
   }
 
-  private def scienceRequirements(oid: Observation.Id): IO[Json] =
-    query(
-      pi,
-      s"""
-          mutation {
-            updateObservations(input: {
-              SET: {
-                scienceRequirements: {
-                  mode: SPECTROSCOPY,
-                  spectroscopy: {
-                    wavelength: {
-                      nanometers: 400.000
-                    },
-                    resolution: 10,
-                    signalToNoise: 75.000,
-                    signalToNoiseAt: {
-                      nanometers: 410.000
-                    },
-                    wavelengthCoverage: {
-                      nanometers: 0.010
-                    },
-                    focalPlane: SINGLE_SLIT,
-                    focalPlaneAngle: {
-                      arcseconds: 5
-                    }
-                  }
-                }
-              }
-              WHERE: {
-                id: { EQ: "$oid"}
-              }
-            }) {
-              observations {
-                id
-              }
-            }
-          }
-      """
-    )
-
-  def prepareObservation(oid: Observation.Id, tid: Target.Id): IO[Unit] =
-    for {
-      _ <- updateTargetProperties(
-             tid,
-             RightAscension.Zero.toAngle.toMicroarcseconds,
-             Declination.Zero.toAngle.toMicroarcseconds,
-             0.0
-           )
-      _ <- scienceRequirements(oid)
-    } yield ()
 
   test("no calibrations group if not needed") {
     for {
@@ -250,7 +257,7 @@ class calibrations extends OdbSuite {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "One")
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- prepareObservation(oid, tid)
+      _   <- prepareObservation(pi, oid, tid)
       gr  <- groupElementsAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
@@ -278,7 +285,7 @@ class calibrations extends OdbSuite {
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(oid1, tid1) *> prepareObservation(oid2, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -311,7 +318,7 @@ class calibrations extends OdbSuite {
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
               // No target for oid2 -> no conf
-      _    <- prepareObservation(oid1, tid1) *> scienceRequirements(oid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -498,7 +505,7 @@ class calibrations extends OdbSuite {
       // Add some spectrophotometric targets
       _    <- spectroPhotometricTargets.traverse {  case (n, ra, dec, rv, s) =>
                  createTargetAs(service, tpid, n).flatTap(tid =>
-                   updateTargetProperties(tid, ra, dec, rv)
+                   updateTargetProperties(pi, tid, ra, dec, rv)
                  )
               }
       // PI program
@@ -506,10 +513,10 @@ class calibrations extends OdbSuite {
       tid1 <- createTargetAs(pi, pid, "One")
       tid2 <- createTargetAs(pi, pid, "Two")
       _    <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1).flatTap { oid =>
-                prepareObservation(oid, tid1)
+                prepareObservation(pi, oid, tid1)
               }
       _    <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2).flatTap { oid =>
-                prepareObservation(oid, tid2)
+                prepareObservation(pi, oid, tid2)
               }
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
@@ -533,7 +540,7 @@ class calibrations extends OdbSuite {
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(oid1, tid1) *> prepareObservation(oid2, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
@@ -566,7 +573,7 @@ class calibrations extends OdbSuite {
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(oid1, tid1) *> scienceRequirements(oid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
@@ -597,7 +604,7 @@ class calibrations extends OdbSuite {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(oid1, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -645,7 +652,7 @@ class calibrations extends OdbSuite {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(oid1, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -692,7 +699,7 @@ class calibrations extends OdbSuite {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(oid1, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -743,7 +750,7 @@ class calibrations extends OdbSuite {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(oid1, tid1)
+      _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -781,7 +788,7 @@ class calibrations extends OdbSuite {
       tid2 <- createTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
-      _    <- prepareObservation(oid1, tid1) *> prepareObservation(oid2, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
                   services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
@@ -805,6 +812,130 @@ class calibrations extends OdbSuite {
       assertEquals(cCount, 1)
       assertEquals(oids.size, 1)
     }
+  }
+
+  def deletedSubscription(pid: Program.Id) =
+    s"""
+      subscription {
+        observationEdit(input: { programId: "${pid.show}" }) {
+          observationId
+          editType
+          value {
+            id
+          }
+        }
+      }
+    """
+
+  def calibrationDeleted(oid: Observation.Id): Json =
+    Json.obj(
+      "observationEdit" -> Json.obj(
+        "observationId" -> oid.asJson,
+        "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
+        "value"    -> Json.Null
+      )
+    )
+
+  def recalculateCalibrations(pid: Program.Id): IO[(List[Observation.Id], List[Observation.Id])] =
+    withServices(pi) { services =>
+      services.session.transaction.use { xa =>
+        services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+      }
+    }
+
+  test("subscription events created when calibrations are calculated") {
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      // An observation with a single target is essentially a calib observation
+      oid  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid0)
+      _    <- prepareObservation(pi, oid, tid0)
+      a    <- Ref.of[IO, Option[Observation.Id]](none) // Added observation
+      _    <- subscriptionExpectF(
+                user      = pi,
+                query     = deletedSubscription(pid),
+                mutations =
+                  Right(recalculateCalibrations(pid).flatMap { case (cids, _) =>
+                    a.set(cids.headOption)
+                  }),
+                expectedF = a.get.map(cid => List(
+                  json"""
+                    {
+                      "observationEdit" : {
+                        "observationId" : $cid,
+                        "editType" : "CREATED",
+                        "value" : {
+                          "id" : $cid,
+                          "title": "HD 289002"
+                        }
+                      }
+                    }
+                  """,
+                  json"""
+                    {
+                      "observationEdit" : {
+                        "observationId" : $cid,
+                        "editType" : "UPDATED",
+                        "value" : {
+                          "id" : $cid,
+                          "title": "HD 289002"
+                        }
+                      }
+                    }
+                  """,
+                ))
+      )
+    } yield ()
+  }
+
+  test("events for deleting a calibration observation") {
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- recalculateCalibrations(pid)
+      _    <- deleteObservation(pi, oid2)
+      _ <- IO.println(s"Deleted observation $oid1 $oid2")
+      a <- Ref.of[IO, Option[Observation.Id]](none) // Removed observation
+      _    <- subscriptionExpectF(
+                user      = pi,
+                query     = deletedSubscription(pid),
+                mutations =
+                  Right(recalculateCalibrations(pid).flatMap { case (_, cids) =>
+                    a.set(cids.headOption)
+                  }),
+                expectedF = a.get.map(cid => List(
+                  json"""
+                    {
+                      "observationEdit" : {
+                        "observationId" : $cid,
+                        "editType" : "UPDATED",
+                        "value" : {
+                          "id" : $cid
+                        }
+                      }
+                    }
+                  """,
+                  json"""
+                    {
+                      "observationEdit" : {
+                        "observationId" : $cid,
+                        "editType" : "DELETED",
+                        "value" : {
+                          "id" : $cid
+                        }
+                      }
+                    }
+                  """,
+                )
+              )
+      )
+    } yield ()
   }
 }
 
