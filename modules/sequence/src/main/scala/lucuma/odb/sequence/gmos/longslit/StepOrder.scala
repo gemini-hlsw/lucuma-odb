@@ -3,6 +3,8 @@
 
 package lucuma.odb.sequence.gmos.longslit
 
+// TODO: Delete me?
+
 /**
  * Science atoms consist of a science exposure and a corresponding flat, but
  * not necessarily in that order.  StepOrder specifies the correct order.

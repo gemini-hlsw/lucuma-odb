@@ -5,6 +5,8 @@ package lucuma.odb.sequence.data
 
 import lucuma.core.util.Enumerated
 
+// TODO: Delete me?
+
 /**
  * Indicates whether a calibration comes before or after its corresponding
  * science step.

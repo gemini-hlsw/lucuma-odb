@@ -45,6 +45,7 @@ import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -679,6 +680,50 @@ object SequenceService {
         INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
         WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
       ).query(step_id *: step_config)
+
+    private def step_record[D](dynamic_config: Decoder[D]): Decoder[StepRecord[D]] =
+      (
+        step_id              *:
+        atom_id              *:
+        visit_id             *:
+        int4_pos             *:
+        step_config          *:
+        instrument           *:
+        dynamic_config       *:
+        core_timestamp       *:
+        sequence_type        *:
+        obs_class            *:
+        step_execution_state *:
+        dataset_qa_state.opt
+      ).to[StepRecord[D]]
+
+    def selectStepRecord[D](
+      instTable:   String,
+      instAlias:   String,
+      instColumns: List[String],
+      instDecoder: Decoder[D]
+    ): Query[Observation.Id, StepRecord[D]] =
+      (sql"""
+        SELECT
+          v.c_step_id,
+          v.c_atom_id,
+          v.c_visit_id,
+          v.c_step_index,
+          v.c_step_type,
+          #${encodeColumns("v".some, StepConfigGcalColumns)},
+          #${encodeColumns("v".some, StepConfigScienceColumns)},
+          #${encodeColumns("v".some, StepConfigSmartGcalColumns)},
+          v.c_instrument,
+          #${encodeColumns(instAlias.some, instColumns)},
+          v.c_created,
+          a.c_sequence_type,
+          v.c_observe_class,
+          v.c_qa_state
+        FROM v_step_record v
+        INNER JOIN #$instTable #$instAlias ON #$instAlias.c_stepId = v.c_step_id
+        INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
+        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
+      ).query(step_record(instDecoder)) //id *: step_config *: instDecoder *: core_timestamp)
 
     val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
       sql"""

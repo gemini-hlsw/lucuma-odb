@@ -20,6 +20,8 @@ import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
 import lucuma.odb.sequence.data.SciExposureTime
 
+// TODO: delete me
+
 /**
  * GMOS long slit science atoms
  *
@@ -32,11 +34,13 @@ trait ScienceAtomSequenceState[D, G, L, U] extends SequenceState[D] {
 
   def optics: DynamicOptics[D, G, L, U]
 
+  // TODO: delete me
   def stream(
     mode:         Config[G, L, U],
     exposureTime: SciExposureTime
   ): Stream[Pure, ScienceAtom[D]]
 
+  // TODO: delete me
   def unfold(
     mode: Config[G, L, U],
     time: SciExposureTime,

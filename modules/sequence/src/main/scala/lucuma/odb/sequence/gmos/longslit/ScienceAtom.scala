@@ -7,6 +7,8 @@ import cats.data.NonEmptyList
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.sequence.data.ProtoStep
 
+// TODO: delete me?
+
 /**
  * Science and associated matching flat.
  */

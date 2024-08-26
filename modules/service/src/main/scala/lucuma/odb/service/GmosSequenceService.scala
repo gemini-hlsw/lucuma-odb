@@ -16,6 +16,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -30,6 +31,14 @@ trait GmosSequenceService[F[_]] {
     stepId:  Step.Id,
     dynamic: DynamicConfig.GmosNorth
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectGmosNorthStepRecord(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, StepRecord[DynamicConfig.GmosNorth]]
+
+  def selectGmosSouthStepRecord(
+    observationId: Observation.Id
+  )(using Transaction[F]): Stream[F, StepRecord[DynamicConfig.GmosSouth]]
 
   /**
    * Selects the static configuration corresponding to the given visit.
@@ -109,6 +118,38 @@ object GmosSequenceService {
       )(using Transaction[F]): F[Option[StaticConfig.GmosNorth]] =
         session.option(Statements.SelectGmosNorthStatic)(visitId)
 
+      private def selectGmosStepRecord[A](
+        observationId: Observation.Id,
+        site:          String,
+        decoderA:      Decoder[A]
+      )(using Transaction[F]): Stream[F, StepRecord[A]] =
+        session.stream(
+          SequenceService.Statements.selectStepRecord(
+            s"t_gmos_${site}_dynamic",
+            s"gmos$site",
+            Statements.GmosDynamicColumns,
+            decoderA
+          )
+        )(observationId, 1024)
+
+      override def selectGmosNorthStepRecord(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, StepRecord[DynamicConfig.GmosNorth]] =
+        selectGmosStepRecord(
+          observationId,
+          "north",
+          gmos_north_dynamic
+        )
+
+      override def selectGmosSouthStepRecord(
+        observationId: Observation.Id
+      )(using Transaction[F]): Stream[F, StepRecord[DynamicConfig.GmosSouth]] =
+        selectGmosStepRecord(
+          observationId,
+          "south",
+          gmos_south_dynamic
+        )
+
       override def selectGmosNorthDynamicForObs(
         observationId: Observation.Id
       )(using Transaction[F]): Stream[F, (Step.Id, DynamicConfig.GmosNorth)] =
@@ -168,7 +209,7 @@ object GmosSequenceService {
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
-    private val GmosDynamicColumns: List[String] =
+    val GmosDynamicColumns: List[String] =
       List(
         "c_exposure_time",
         "c_xbin",

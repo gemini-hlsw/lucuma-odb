@@ -19,6 +19,8 @@ import lucuma.core.model.sequence.StepConfig
 import monocle.Focus
 import monocle.Lens
 
+// TODO: Delete me
+
 /**
  * Internal structures required for completion state tracking in an observation.
  * The Completion.State is built up completed step by completed step using a
