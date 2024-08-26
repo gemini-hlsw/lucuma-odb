@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.Eq
 import cats.Eval
 import cats.Traverse
+import cats.syntax.eq.*
 import cats.syntax.functor.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
@@ -20,9 +21,11 @@ case class ProtoStep[A](
   stepConfig:   StepConfig,
   observeClass: ObserveClass,
   breakpoint:   Breakpoint = Breakpoint.Disabled
-)
+):
+  def matches(step: StepRecord[A])(using Eq[A]): Boolean =
+    stepConfig === step.stepConfig && value === step.instrumentConfig
 
-object ProtoStep {
+object ProtoStep:
 
   def smartGcal[A](a: A, t: SmartGcalType): ProtoStep[A] =
     ProtoStep(a, StepConfig.SmartGcal(t), ObserveClass.PartnerCal)
@@ -65,4 +68,4 @@ object ProtoStep {
       f(fa.value, lb)
   }
 
-}
+end ProtoStep

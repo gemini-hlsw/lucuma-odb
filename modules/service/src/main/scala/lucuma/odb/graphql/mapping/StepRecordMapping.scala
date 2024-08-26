@@ -75,6 +75,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
 
+  // TODO: delete this and just use the v_step_record
   private lazy val qaStateHandler: EffectHandler[F] =
     keyValueEffectHandler[Step.Id,Option[DatasetQaState]]("id") { sid =>
       services.useTransactionally {

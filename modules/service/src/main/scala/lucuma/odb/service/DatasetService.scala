@@ -233,6 +233,7 @@ object DatasetService {
            AND d.c_visit_id = $visit_id
       """.query(atom_id *: dataset_id)
 
+    // TODO: i put this in v_step_record now, so maybe we can delete this?
     val SelectStepQaState: Query[Step.Id, Option[DatasetQaState]] =
       sql"""
         SELECT MAX(c_qa_state)

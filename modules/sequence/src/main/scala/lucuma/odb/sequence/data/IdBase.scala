@@ -5,6 +5,8 @@ package lucuma.odb.sequence.data
 
 import lucuma.core.util.NewType
 
+// TODO: delete me
+
 /**
  * The IdBase is an integer which is folded into the generation of atom (and
  * therefore) step ids.  When the visit or (in the case of acquisition)
