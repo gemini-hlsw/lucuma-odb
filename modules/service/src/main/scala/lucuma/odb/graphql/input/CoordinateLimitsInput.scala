@@ -56,7 +56,9 @@ object CoordinateLimitsInput {
 
       // LST at start and end
       val sc       = ImprovedSkyCalc(site.place)
-      def lstAt(instant: Instant): LocalTime = sc.getLst(instant).withZoneSameInstant(UTC).toLocalTime
+      def lstAt(instant: Instant): LocalTime =
+        sc.getLst(instant).withZoneSameInstant(UTC).toLocalTime
+
       val lstStart = lstAt(start.plus(Buffer))
       val lstEnd   = lstAt(end.minus(Buffer))
 
