@@ -114,6 +114,17 @@ class updateProgramUsers extends OdbSuite {
     }
   }
 
+  test("update coi partner 2") {
+    createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserMutation(pi2, PartnerLink.HasNonPartner),
+          expected = expected((pid, pi2, PartnerLink.HasNonPartner)).asRight
+        )
+    }
+  }
+
   test("cannot update another pi's partner as a PI") {
     createProgramAs(piCharles).flatMap { pid =>
       expect(
