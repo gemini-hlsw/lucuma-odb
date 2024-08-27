@@ -5,17 +5,33 @@ package lucuma.odb.graphql
 package mapping
 
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.ConfigurationRequestTable
 
 trait ConfigurationConditionsMapping[F[_]]
-  extends ObservationView[F] {
+  extends ObservationView[F] 
+     with ConfigurationRequestTable[F] {
 
-  lazy val ConfigurationConditionsMapping: ObjectMapping =
-    ObjectMapping(ConfigurationConditionsType)(
+  lazy val ConfigurationConditionsMappings = List(
+    ObservationConfigurationConditionsMapping,
+    RequestConfigurationConditionsMapping
+  )
+
+  lazy val ObservationConfigurationConditionsMapping: ObjectMapping =
+    ObjectMapping(ObservationType / "configuration" / "conditions")(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("cloudExtinction", ObservationView.ConstraintSet.CloudExtinction),
       SqlField("imageQuality",    ObservationView.ConstraintSet.ImageQuality),
       SqlField("skyBackground",   ObservationView.ConstraintSet.SkyBackground),
       SqlField("waterVapor",      ObservationView.ConstraintSet.WaterVapor),
+    )
+
+  lazy val RequestConfigurationConditionsMapping: ObjectMapping =
+    ObjectMapping(ConfigurationRequestType / "configuration" / "conditions")(
+      SqlField("id", ConfigurationRequestTable.Id, key = true, hidden = true),
+      SqlField("cloudExtinction", ConfigurationRequestTable.Conditions.CloudExtinction),
+      SqlField("imageQuality",    ConfigurationRequestTable.Conditions.ImageQuality),
+      SqlField("skyBackground",   ConfigurationRequestTable.Conditions.SkyBackground),
+      SqlField("waterVapor",      ConfigurationRequestTable.Conditions.WaterVapor),
     )
 
 }

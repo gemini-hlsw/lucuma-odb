@@ -31,11 +31,30 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                     id
                     status
                     configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
                       referenceCoordinates {
-                        ra {
-                          hms
+                        ra { 
+                          hms 
+                        }
+                        dec { 
+                          dms 
                         }
                       }
+                #      observingMode {
+                #        instrument
+                #        mode
+                #        gmosNorthLongSlit {
+                #          grating
+                #        }
+                #        gmosSouthLongSlit {
+                #          grating
+                #        }
+                #     }
                     }
                   }
                 }
