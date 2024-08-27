@@ -3411,6 +3411,9 @@ input ProgramUserPropertiesInput {
 
   "The user's partner."
   partnerLink: PartnerLinkInput
+
+  "The user's eduacational status."
+  educationalStatus: EducationalStatus
 }
 
 """
