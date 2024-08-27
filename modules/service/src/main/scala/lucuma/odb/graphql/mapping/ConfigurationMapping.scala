@@ -26,6 +26,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.table.ConfigurationRequestTable
+import io.circe.Json
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestTable[F] {
