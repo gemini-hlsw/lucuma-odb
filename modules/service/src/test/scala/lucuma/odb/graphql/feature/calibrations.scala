@@ -7,6 +7,7 @@ package feature
 import cats.Eq
 import cats.derived.*
 import cats.effect.IO
+import cats.effect.kernel.Ref
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
@@ -24,17 +25,16 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.EditType
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.service.CalibrationsService
 
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import lucuma.odb.graphql.subscription.SubscriptionUtils
-import lucuma.odb.data.EditType
-import cats.effect.kernel.Ref
 
 class calibrations extends OdbSuite with SubscriptionUtils {
   val pi       = TestUsers.Standard.pi(1, 101)
@@ -822,6 +822,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
           editType
           value {
             id
+            title
           }
         }
       }
@@ -900,8 +901,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- recalculateCalibrations(pid)
       _    <- deleteObservation(pi, oid2)
-      _ <- IO.println(s"Deleted observation $oid1 $oid2")
-      a <- Ref.of[IO, Option[Observation.Id]](none) // Removed observation
+      a    <- Ref.of[IO, Option[Observation.Id]](none) // Removed observation
       _    <- subscriptionExpectF(
                 user      = pi,
                 query     = deletedSubscription(pid),
@@ -915,9 +915,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                       "observationEdit" : {
                         "observationId" : $cid,
                         "editType" : "UPDATED",
-                        "value" : {
-                          "id" : $cid
-                        }
+                        "value" : null
                       }
                     }
                   """,
@@ -926,9 +924,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                       "observationEdit" : {
                         "observationId" : $cid,
                         "editType" : "DELETED",
-                        "value" : {
-                          "id" : $cid
-                        }
+                        "value" : null
                       }
                     }
                   """,

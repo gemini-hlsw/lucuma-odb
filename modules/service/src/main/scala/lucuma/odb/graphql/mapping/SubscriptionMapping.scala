@@ -9,7 +9,6 @@ import cats.data.Nested
 import cats.syntax.all.*
 import fs2.Stream
 import grackle.Env
-import grackle.Predicate
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
