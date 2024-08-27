@@ -7,6 +7,7 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
+import skunk.codec.all.*
 
 trait ProgramUserTable[F[_]] extends BaseMapping[F] {
 
@@ -17,6 +18,7 @@ trait ProgramUserTable[F[_]] extends BaseMapping[F] {
     val Partner           = col("c_partner", partner.opt)
     val PartnerLink       = col("c_partner_link", partner_link_type)
     val EducationalStatus = col("c_educational_status", educational_status.opt)
+    val Thesis            = col("c_thesis", bool.opt)
   }
 
 }
