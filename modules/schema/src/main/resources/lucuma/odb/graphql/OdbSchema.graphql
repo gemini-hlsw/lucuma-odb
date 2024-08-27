@@ -3442,7 +3442,16 @@ type ProgramUser {
   partnerLink:       PartnerLink!
   program:           Program
   user:              User
+
+  """
+  User educational status. PHD/Undergrad/Grad/Other
+  """
   educationalStatus: EducationalStatus
+
+  """
+  Flag indicating whether the user's proposal is part of a thesis.
+  """
+  thesis:            Boolean
 }
 
 """

@@ -105,7 +105,7 @@ class programUsers extends OdbSuite {
         expected =
           Json.obj(
             "programUsers" -> Json.obj(
-              "matches" -> Json.fromValues(
+              "matches"    -> Json.fromValues(
                   pids.map { id =>
                     Json.obj(
                       "program" -> Json.obj("id" -> id.asJson),
@@ -136,6 +136,7 @@ class programUsers extends OdbSuite {
                 program { id }
                 user { id }
                 educationalStatus
+                thesis
               }
             }
           }
@@ -143,12 +144,52 @@ class programUsers extends OdbSuite {
         expected =
           Json.obj(
             "programUsers" -> Json.obj(
-              "matches" -> Json.fromValues(
+              "matches"    -> Json.fromValues(
                   pids.map { id =>
                     Json.obj(
                       "program"           -> Json.obj("id" -> id.asJson),
                       "user"              -> Json.obj("id" -> piPhd.id.asJson),
-                      "educationalStatus" -> Json.Null
+                      "educationalStatus" -> Json.Null,
+                      "thesis"            -> Json.Null
+                    )
+                  }
+              )
+            )
+          ).asRight
+      )
+    }
+  }
+
+  test("program user selection via thesis") {
+    createProgramAs(piPhd).replicateA(2).flatMap { pids =>
+      expect(
+        user = piPhd,
+        query = s"""
+          query {
+            programUsers(
+              WHERE: {
+                thesis: {
+                  EQ: true
+                }
+              }
+            ) {
+              matches {
+                program { id }
+                user { id }
+                thesis
+              }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programUsers" -> Json.obj(
+              "matches"    -> Json.fromValues(
+                  pids.map { id =>
+                    Json.obj(
+                      "program" -> Json.obj("id" -> id.asJson),
+                      "user"    -> Json.obj("id" -> piPhd.id.asJson),
+                      "thesis"  -> Json.Null
                     )
                   }
               )

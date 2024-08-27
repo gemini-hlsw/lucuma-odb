@@ -27,6 +27,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
       SqlField("partner", ProgramUserTable.Partner, hidden = true),
       SqlField("educationalStatus", ProgramUserTable.EducationalStatus),
+      SqlField("thesis", ProgramUserTable.Thesis),
       CursorFieldJson("partnerLink", c =>
         for {
           l <- c.fieldAs[PartnerLinkType]("linkType")
