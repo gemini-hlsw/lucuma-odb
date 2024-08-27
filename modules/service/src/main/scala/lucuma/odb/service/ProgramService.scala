@@ -512,14 +512,18 @@ object ProgramService {
     ): Option[AppliedFragment] = {
       val alias = "o"
 
-      val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(List(
+      val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
+        List(
+          SET.thesis.map(th =>
+            sql"c_thesis = ${bool}"(th)
+          ),
+          SET.educationalStatus.map(es =>
+            sql"c_educational_status = ${educational_status}"(es)
+          )).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),
           sql"c_partner      = ${partner.opt}"(pl.partnerOption)
-        )},
-        SET.educationalStatus.map(es =>
-          sql"c_educational_status = ${educational_status}"(es)
-        ).toList).flatten
+        )}
       )
 
       ups.map { nel =>

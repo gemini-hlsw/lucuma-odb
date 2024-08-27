@@ -27,6 +27,7 @@ class updateProgramUsers extends OdbSuite {
   val guest1  = TestUsers.guest(3)
   val guest2  = TestUsers.guest(4)
   val staff   = TestUsers.Standard.staff(5, 34)
+  val pi3     = TestUsers.Standard.pi(6, 35)
 
   val piCharles = TestUsers.Standard(
     7,
@@ -39,7 +40,6 @@ class updateProgramUsers extends OdbSuite {
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
     primaryEmail = "leon@czolgosz.edu".some
   )
-  val pi3     = TestUsers.Standard.pi(9, 36)
 
   val service = TestUsers.service(10)
 
@@ -104,6 +104,33 @@ class updateProgramUsers extends OdbSuite {
       }
     """
 
+  def updateUserThesisFlag(p: Program.Id, u: User, th: Boolean): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              thesis: $th
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            thesis
+          }
+        }
+      }
+    """
+
   def expected(ts: (Program.Id, User, PartnerLink)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -125,11 +152,24 @@ class updateProgramUsers extends OdbSuite {
   def expectedES(ts: (Program.Id, User, EducationalStatus)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
-        "programUsers" -> ts.toList.map { case (pid, user, link) =>
+        "programUsers" -> ts.toList.map { case (pid, user, es) =>
           Json.obj(
             "program"           -> Json.obj("id" -> pid.asJson),
             "user"              -> Json.obj("id" -> user.id.asJson),
-            "educationalStatus" -> link.tag.toScreamingSnakeCase.asJson
+            "educationalStatus" -> es.tag.toScreamingSnakeCase.asJson
+          )
+        }.asJson
+      )
+    )
+
+  def expectedThesis(ts: (Program.Id, User, Boolean)*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, th) =>
+          Json.obj(
+            "program" -> Json.obj("id" -> pid.asJson),
+            "user"    -> Json.obj("id" -> user.id.asJson),
+            "thesis"  -> th.asJson
           )
         }.asJson
       )
@@ -163,6 +203,17 @@ class updateProgramUsers extends OdbSuite {
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, EducationalStatus.UndergradStudent),
           expected = expectedES((pid, pi2, EducationalStatus.UndergradStudent)).asRight
+        )
+    }
+  }
+
+  test("update pi thesis flag") {
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi3.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserThesisFlag(pid, pi3, true),
+          expected = expectedThesis((pid, pi3, true)).asRight
         )
     }
   }

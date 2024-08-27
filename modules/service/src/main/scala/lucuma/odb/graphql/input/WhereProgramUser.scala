@@ -16,11 +16,13 @@ import lucuma.odb.graphql.binding.*
 object WhereProgramUser {
 
   def binding(path: Path): Matcher[Predicate] =
-    lazy val WhereProgramBinding              = WhereProgram.binding(path / "program")
-    val WhereUserBinding                      = WhereUser.binding(path / "user")
-    val WhereRoleBinding                      = WhereEq.binding[ProgramUserRole](path / "role", ProgramUserRoleBinding)
-    val WherePartnerLinkBinding               = WherePartnerLink.binding(path)
-    val WhereEducationalStatusBinding         = WhereOptionEq.binding[EducationalStatus](path / "educationalStatus", EducationalStatusBinding)
+
+    lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")
+    val WhereUserBinding              = WhereUser.binding(path / "user")
+    val WhereRoleBinding              = WhereEq.binding(path / "role", ProgramUserRoleBinding)
+    val WherePartnerLinkBinding       = WherePartnerLink.binding(path)
+    val WhereEducationalStatusBinding = WhereOptionEq.binding(path / "educationalStatus", EducationalStatusBinding)
+    val WhereThesisBinding            = WhereOptionBoolean.binding(path / "thesis", BooleanBinding)
 
     lazy val WhereProgramUserBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -32,10 +34,11 @@ object WhereProgramUser {
         WhereUserBinding.Option("user", rUser),
         WhereRoleBinding.Option("role", rRole),
         WherePartnerLinkBinding.Option("partnerLink", rPartnerLink),
-        WhereEducationalStatusBinding.Option("educationalStatus", rEducationalStatus)
+        WhereEducationalStatusBinding.Option("educationalStatus", rEducationalStatus),
+        WhereThesisBinding.Option("thesis", rThesis)
       ) =>
-        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rEducationalStatus).parMapN {
-          (AND, OR, NOT, program, user, role, partnerLink, educationalStatus) =>
+        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rEducationalStatus, rThesis).parMapN {
+          (AND, OR, NOT, program, user, role, partnerLink, educationalStatus, thesis) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -44,7 +47,8 @@ object WhereProgramUser {
               user,
               role,
               partnerLink,
-              educationalStatus
+              educationalStatus,
+              thesis
             ).flatten)
         }
     }

@@ -3412,8 +3412,11 @@ input ProgramUserPropertiesInput {
   "The user's partner."
   partnerLink: PartnerLinkInput
 
-  "The user's eduacational status."
+  "The user's educational status."
   educationalStatus: EducationalStatus
+
+  "Is a thesis included in the proposal."
+  thesis: Boolean
 }
 
 """
@@ -11395,6 +11398,21 @@ input WhereBoolean {
 
 }
 
+input WhereOptionBoolean {
+  """
+  Matches if the value is not defined.
+  """
+  IS_NULL: Boolean
+
+
+  """
+  Matches if the boolean is the provided value.
+  """
+  EQ: Boolean
+
+}
+
+
 input WhereCallForProposals {
 
   """
@@ -13705,6 +13723,10 @@ input WhereProgramUser {
   """
   educationalStatus: WhereOptionEqEducationalStatus
 
+  """
+  Matches the thesis flag.
+  """
+  thesis: WhereOptionBoolean
 }
 
 """
