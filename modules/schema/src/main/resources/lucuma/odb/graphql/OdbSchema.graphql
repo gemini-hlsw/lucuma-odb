@@ -990,7 +990,7 @@ enum EditType {
   UPDATED
 
   """
-  EditType Deleted
+  EditType Deleted. Used for hard deletion of entities
   """
   DELETED
 }
@@ -3089,10 +3089,13 @@ type ObservationEdit { #implements Event {
   """
   editType: EditType!
 
+  """
+  The observationId of the edited object
+  """
   observationId: ObservationId!
 
   """
-  Edited object
+  Edited object, can be null if the value was deleted
   """
   value: Observation
 

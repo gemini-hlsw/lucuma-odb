@@ -324,14 +324,8 @@ object CalibrationsService {
         calibsSLS: List[(Observation.Id, GmosSConfigs)],
         gsls: List[(Observation.Id, GmosSConfigs)]
       )(using Transaction[F]): F[List[Observation.Id]] = {
-        val o1 = calibsNLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
-
-          if (gnls.exists(_._2 === c)) l else oid :: l
-        }
-        val o2 = calibsSLS.foldLeft(List.empty[Observation.Id]) { case (l, (oid, c)) =>
-
-          if (gsls.exists(_._2 === c)) l else oid :: l
-        }
+        val o1 = calibsNLS.collect { case (oid, c) if (!gnls.exists(_._2 === c)) => oid }
+        val o2 = calibsSLS.collect { case (oid, c) if (!gsls.exists(_._2 === c)) => oid }
         val oids = NonEmptyList.fromList(o1 ::: o2)
         oids
           .map(oids => observationService.deleteCalibrationObservations(oids).as(oids.toList))

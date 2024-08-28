@@ -303,12 +303,10 @@ object ObservationService {
                   // Delete asterisms and targets
           _    <- NonEmptyList
                     .fromList(tids)
-                    .map(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
-                    .getOrElse(Applicative[F].unit)
+                    .traverse(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
           _    <- NonEmptyList
                     .fromList(tids)
-                    .map(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
-                    .getOrElse(Applicative[F].unit)
+                    .traverse(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
                   // Actually delete the observations
           _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
         } yield Result.unit
