@@ -4,6 +4,9 @@
 package lucuma.odb.graphql
 package subscription
 
+import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.effect.kernel.Deferred
 import cats.syntax.show.*
 import cats.syntax.traverse.*
 import io.circe.Json
@@ -15,6 +18,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
+import lucuma.odb.data.Existence
 
 class observationEdit extends OdbSuite with SubscriptionUtils {
 
@@ -79,11 +83,15 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
   def subtitleUpdated(subtitle: String): Json =
     subtitleObservationEdit(EditType.Updated, subtitle)
 
-  val titleSubscription = 
+  val titleSubscription =
     s"""
       subscription {
         observationEdit {
+          observationId
           editType
+          meta: value {
+            existence
+          }
           value {
             id
             title
@@ -92,17 +100,83 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       }
     """
 
+
+  def deletedSubscription(pid: Program.Id) =
+    s"""
+      subscription {
+        observationEdit(input: { programId: "${pid.show}" }) {
+          observationId
+          editType
+          meta: value {
+            existence
+          }
+          value {
+            id
+          }
+        }
+      }
+    """
+
+  def exploreSubscription(pid: Program.Id) =
+    s"""
+      subscription {
+        observationEdit(input: { programId: "${pid.show}" }) {
+          observationId
+          editType
+          meta: value {
+            existence
+          }
+          value {
+            id
+            obsAttachments {
+              id
+            }
+          }
+        }
+      }
+    """
+
+  def exploreResponse(ref: Deferred[IO, Observation.Id]) =
+    ref.get.map: oid =>
+      Json.obj(
+        "observationEdit" -> Json.obj(
+          "observationId" -> Json.fromString(oid.show),
+          "editType"      -> Json.fromString(EditType.Created.tag.toUpperCase),
+          "meta"          -> Json.obj(
+            "existence" -> Json.fromString(Existence.Present.tag.toUpperCase)
+          ),
+          "value" -> Json.obj(
+            "id"             -> oid.asJson,
+            "obsAttachments" -> List.empty[Json].asJson
+          )
+        )
+      )
+
   def titleUpdated(oid: Observation.Id, title: String): Json =
     Json.obj(
       "observationEdit" -> Json.obj(
-        "editType" -> Json.fromString(EditType.Updated.tag.toUpperCase),
-        "value"    -> Json.obj(
+        "observationId" -> Json.fromString(oid.show),
+        "editType"      -> Json.fromString(EditType.Updated.tag.toUpperCase),
+        "meta"          -> Json.obj(
+          "existence" -> Json.fromString(Existence.Present.tag.toUpperCase)
+        ),
+        "value"         -> Json.obj(
           "id"    -> oid.asJson,
-          "title" -> Json.fromString(title)
+          "title" -> Json.fromString(title),
         )
       )
     )
-  
+
+  def calibrationDeleted(oid: Observation.Id): Json =
+    Json.obj(
+      "observationEdit" -> Json.obj(
+        "observationId" -> oid.asJson,
+        "editType" -> Json.fromString(EditType.DeletedCal.tag.toUpperCase),
+        "meta"     -> Json.Null,
+        "value"    -> Json.Null
+      )
+    )
+
   def updateTargetName(user: User, tid: Target.Id, name: String) =
     sleep >>
       query(
@@ -160,6 +234,26 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         expected  = List(subtitleCreated("foo subtitle 0"), subtitleCreated("foo subtitle 1"))
       )
     }
+  }
+
+  test("trigger for new observations with an explore-like query") {
+    import Group1._
+    for {
+      pid  <- createProgram(pi, "foo")
+      ref0 <- Deferred[IO, Observation.Id]
+      ref1 <- Deferred[IO, Observation.Id]
+      _    <-
+      subscriptionExpectF(
+        user      = pi,
+        query     = exploreSubscription(pid),
+        mutations =
+          Right(
+              createObservation(pi, "foo subtitle 0", pid).flatMap(ref0.complete) >>
+              createObservation(pi, "foo subtitle 1", pid).flatMap(ref1.complete)
+          ),
+        expectedF = List(ref0, ref1).traverse(exploreResponse)
+      )
+    } yield ()
   }
 
   test("trigger for my own new observations (but nobody else's) as guest user") {
@@ -241,7 +335,6 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         subscription {
           observationEdit {
             editType
-            id
           }
         }
       """,
@@ -249,10 +342,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap(createObservation(pi, "foo obs", _)).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED","id":0}}""")
+      expected = List.fill(2)(json"""{"observationEdit":{"editType":"CREATED"}}""")
     )
   }
-  
+
   test("triggers for adding target to observation") {
     import Group1.pi
 
@@ -343,6 +436,42 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         mutations =
           Right(updateTargetEpoch(pi, tid0, Epoch.B1950)),
         expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "Zero"))
+      )
+    } yield ()
+  }
+
+  test("triggers for deleting a calibration observation") {
+    import Group1.pi
+    def deleteCalibrationObservation(oid: Observation.Id) =
+      withServices(pi) { services =>
+        services.session.transaction.use { xa =>
+          services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
+        }
+      }
+
+    for {
+      pid  <- createProgram(pi, "foo")
+      tid0 <- createTargetAs(pi, pid, "Zero")
+      // An observation with a single target is essentially a calib observation
+      oid  <- createObservationAs(pi, pid, None, tid0)
+      _    <- subscriptionExpect(
+        user      = pi,
+        query     = deletedSubscription(pid),
+        mutations =
+          Right(deleteCalibrationObservation(oid)),
+        expected  = List(
+          json"""
+            {
+              "observationEdit" : {
+                "observationId" : $oid,
+                "editType" : "UPDATED",
+                "meta" : null,
+                "value" : null
+              }
+            }
+          """,
+          calibrationDeleted(oid)
+        )
       )
     } yield ()
   }

@@ -988,6 +988,11 @@ enum EditType {
   EditType Updated
   """
   UPDATED
+
+  """
+  EditType Deleted. Used for hard deletion of calibrations
+  """
+  DELETED_CAL
 }
 
 """
@@ -3085,10 +3090,15 @@ type ObservationEdit { #implements Event {
   editType: EditType!
 
   """
-  Edited object
+  The observationId of the edited object
   """
-  value: Observation!
-  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
+  observationId: ObservationId!
+
+  """
+  Edited object, can be null if the value was deleted
+  """
+  value: Observation
+
 }
 
 """
