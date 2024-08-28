@@ -26,6 +26,8 @@ trait ProgramUserMapping[F[_]]
       SqlField("role", ProgramUserTable.Role),
       SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
       SqlField("partner", ProgramUserTable.Partner, hidden = true),
+      SqlField("educationalStatus", ProgramUserTable.EducationalStatus),
+      SqlField("thesis", ProgramUserTable.Thesis),
       CursorFieldJson("partnerLink", c =>
         for {
           l <- c.fieldAs[PartnerLinkType]("linkType")
@@ -35,7 +37,7 @@ trait ProgramUserMapping[F[_]]
         List("partner", "linkType")
       ),
       SqlObject("program", Join(ProgramUserTable.ProgramId, ProgramTable.Id)),
-      SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId))
+      SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId)),
     )
 
 }
