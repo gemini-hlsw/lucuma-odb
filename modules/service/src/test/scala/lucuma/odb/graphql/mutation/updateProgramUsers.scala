@@ -18,6 +18,7 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
+import lucuma.odb.data.EducationalStatus
 
 class updateProgramUsers extends OdbSuite {
 
@@ -26,6 +27,7 @@ class updateProgramUsers extends OdbSuite {
   val guest1  = TestUsers.guest(3)
   val guest2  = TestUsers.guest(4)
   val staff   = TestUsers.Standard.staff(5, 34)
+  val pi3     = TestUsers.Standard.pi(6, 35)
 
   val piCharles = TestUsers.Standard(
     7,
@@ -41,7 +43,7 @@ class updateProgramUsers extends OdbSuite {
 
   val service = TestUsers.service(10)
 
-  val validUsers = List(pi, pi2, guest1, guest2, staff, piCharles, piLeon, service).toList
+  val validUsers = List(pi, pi2, pi3, guest1, guest2, staff, piCharles, piLeon, service).toList
 
   def updateUserMutation(u: User, pl: PartnerLink): String =
     s"""
@@ -75,6 +77,60 @@ class updateProgramUsers extends OdbSuite {
       }
     """
 
+  def updateUserEducationalStatus(p: Program.Id, u: User, es: EducationalStatus): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              educationalStatus: ${es.tag.toScreamingSnakeCase}
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            educationalStatus
+          }
+        }
+      }
+    """
+
+  def updateUserThesisFlag(p: Program.Id, u: User, th: Boolean): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              thesis: $th
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            thesis
+          }
+        }
+      }
+    """
+
   def expected(ts: (Program.Id, User, PartnerLink)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -88,6 +144,32 @@ class updateProgramUsers extends OdbSuite {
                 "partner" -> p.tag.toScreamingSnakeCase.asJson
               }
             )
+          )
+        }.asJson
+      )
+    )
+
+  def expectedES(ts: (Program.Id, User, EducationalStatus)*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, es) =>
+          Json.obj(
+            "program"           -> Json.obj("id" -> pid.asJson),
+            "user"              -> Json.obj("id" -> user.id.asJson),
+            "educationalStatus" -> es.tag.toScreamingSnakeCase.asJson
+          )
+        }.asJson
+      )
+    )
+
+  def expectedThesis(ts: (Program.Id, User, Boolean)*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, th) =>
+          Json.obj(
+            "program" -> Json.obj("id" -> pid.asJson),
+            "user"    -> Json.obj("id" -> user.id.asJson),
+            "thesis"  -> th.asJson
           )
         }.asJson
       )
@@ -114,6 +196,28 @@ class updateProgramUsers extends OdbSuite {
     }
   }
 
+  test("update pi educational status") {
+    createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserEducationalStatus(pid, pi2, EducationalStatus.UndergradStudent),
+          expected = expectedES((pid, pi2, EducationalStatus.UndergradStudent)).asRight
+        )
+    }
+  }
+
+  test("update pi thesis flag") {
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi3.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserThesisFlag(pid, pi3, true),
+          expected = expectedThesis((pid, pi3, true)).asRight
+        )
+    }
+  }
+
   test("cannot update another pi's partner as a PI") {
     createProgramAs(piCharles).flatMap { pid =>
       expect(
@@ -135,6 +239,42 @@ class updateProgramUsers extends OdbSuite {
               input: {
                 SET: {
                   partnerLink: { linkType: HAS_NON_PARTNER }
+                }
+                WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }
+              }
+            ) {
+              programUsers {
+                user { id }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProgramUsers": {
+              "programUsers": []
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("cannot update another pi's educational status") {
+    createProgramAs(piLeon).flatMap { pid =>
+      linkAs(piLeon, piCharles.id, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner) >>
+      expect(
+        user     = piCharles,
+        query    = s"""
+          mutation {
+            updateProgramUsers(
+              input: {
+                SET: {
+                  educationalStatus: PHD
                 }
                 WHERE: {
                   program: {

@@ -55,6 +55,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.EditType
+import lucuma.odb.data.EducationalStatus
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -226,6 +227,9 @@ trait Codecs {
 
   val edit_type: Codec[EditType] =
     enumerated(Type("e_edit_type"))
+
+  val educational_status: Codec[EducationalStatus] =
+    enumerated(Type("e_educational_status"))
 
   val email_address: Codec[EmailAddress] =
     codecFromPrism(EmailAddress.from, Type("citext"))
