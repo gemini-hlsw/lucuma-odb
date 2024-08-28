@@ -11,7 +11,6 @@ import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Access
-import lucuma.core.model.Access.Service
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient

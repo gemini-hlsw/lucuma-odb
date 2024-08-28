@@ -123,7 +123,6 @@ class addSequenceEvent extends OdbSuite with ExecutionState {
     val user = service
     val mode = ObservingModeType.GmosNorthLongSlit
 
-    import StepExecutionState.*
 
     for {
       pid  <- createProgramAs(user)

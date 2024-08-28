@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -19,7 +18,6 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
 /**

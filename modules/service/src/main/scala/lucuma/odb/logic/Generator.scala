@@ -19,7 +19,6 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation

@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.math.Coordinates
@@ -21,7 +20,7 @@ object CoordinatesInput {
       Edit.Binding.emap:
         case Edit(Some(ra), Some(dec)) => Right(Coordinates(ra, dec))
         case _ => Left("Both ra and dec are required in order to specify a coordinate.")
-        
+
   final case class Edit(
     ra:  Option[RightAscension],
     dec: Option[Declination]

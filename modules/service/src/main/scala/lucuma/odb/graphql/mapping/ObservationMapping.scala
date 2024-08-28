@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.Eq
 import cats.effect.Resource
 import cats.syntax.functor.*
 import grackle.Env

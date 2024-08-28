@@ -7,7 +7,6 @@ package email
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
-import cats.effect.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
@@ -28,7 +27,7 @@ class emailWebhookRoutes extends OdbSuite {
   val validUsers = List(pi)
 
   // match the signing key to the test message below
-  override val emailConfig = 
+  override val emailConfig =
     Config.Email(
       apiKey            = "apiKey".refined,
       domain            = "gpp.com".refined,
@@ -44,14 +43,14 @@ class emailWebhookRoutes extends OdbSuite {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    routes = 
+    routes =
       session
         .map(EmailWebhookService.fromSession)
         .map(EmailWebhookRoutes(_, emailConfig).orNotFound)
   }
 
   private val emailId: IO[EmailId] = UUIDGen[IO].randomUUID.map(uuid => EmailId.unsafeFromString(uuid.toString))
-  private def request(body: Json): Request[IO] = 
+  private def request(body: Json): Request[IO] =
     Request[IO](
       method = Method.POST,
       uri = uri"mailgun"
@@ -131,7 +130,7 @@ class emailWebhookRoutes extends OdbSuite {
     }
   }
 
-  private def validAccepted(emailId: EmailId) = 
+  private def validAccepted(emailId: EmailId) =
     json"""
       {
         "signature":{
@@ -152,7 +151,7 @@ class emailWebhookRoutes extends OdbSuite {
       }
     """
 
-  private def validDelivered(emailId: EmailId) = 
+  private def validDelivered(emailId: EmailId) =
     json"""
       {
         "signature":{
@@ -173,7 +172,7 @@ class emailWebhookRoutes extends OdbSuite {
       }
     """
 
-  private def validPermanentFailure(emailId: EmailId) = 
+  private def validPermanentFailure(emailId: EmailId) =
     json"""
       {
         "signature":{
@@ -195,7 +194,7 @@ class emailWebhookRoutes extends OdbSuite {
       }
     """
 
-  private def validTemporaryFailure(emailId: EmailId) = 
+  private def validTemporaryFailure(emailId: EmailId) =
     json"""
       {
         "signature":{
@@ -217,7 +216,7 @@ class emailWebhookRoutes extends OdbSuite {
       }
     """
 
-  private def badSignature(emailId: EmailId) = 
+  private def badSignature(emailId: EmailId) =
     json"""
       {
         "signature":{

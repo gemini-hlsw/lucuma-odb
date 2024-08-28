@@ -54,7 +54,6 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.ObservingModeType
@@ -666,7 +665,6 @@ object ObservationService {
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
 
-    import ProgramService.Statements.existsUserAccess
     import ProgramService.Statements.whereUserAccess
 
     def insertObservationAs(

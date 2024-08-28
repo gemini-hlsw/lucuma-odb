@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.literal.*
 import lucuma.core.model.Observation
-import lucuma.core.model.Target
 import lucuma.odb.graphql.query.ExecutionTestSupport
 
 class GitHub_1023 extends ExecutionTestSupport {

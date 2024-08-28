@@ -10,7 +10,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.Atom
 import lucuma.odb.json.gmos.given
 import lucuma.odb.json.time.transport.given

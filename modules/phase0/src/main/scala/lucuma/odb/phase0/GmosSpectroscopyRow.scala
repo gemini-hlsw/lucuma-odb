@@ -4,7 +4,6 @@
 package lucuma.odb.phase0
 
 import cats.parse.*
-import cats.parse.Parser.*
 import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu

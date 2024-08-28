@@ -6,7 +6,6 @@ package data
 
 import cats.Eq
 import cats.data.NonEmptyList
-import cats.syntax.eq.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
 import lucuma.itc.client.ImagingIntegrationTimeInput
