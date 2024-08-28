@@ -35,9 +35,17 @@ class programUsers extends OdbSuite {
     primaryEmail = "leon@czolgosz.edu".some
   )
 
+  val piPhd    = TestUsers.Standard(
+    8,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
+    primaryEmail = "leon@czolgosz.edu".some
+  )
+
+  val pi3     = TestUsers.Standard.pi(9, 35)
+
   val service = TestUsers.service(10)
 
-  val validUsers = List(pi, pi2, guest1, guest2, staff, piCharles, piLeon, service).toList
+  val validUsers = List(pi, pi2, pi3, guest1, guest2, staff, piCharles, piLeon, piPhd, service).toList
 
   test("simple program user selection") {
     createProgramAs(pi).replicateA(5).flatMap { pids =>
@@ -50,6 +58,7 @@ class programUsers extends OdbSuite {
               matches {
                 program { id }
                 user { id }
+                educationalStatus
               }
             }
           }
@@ -61,8 +70,9 @@ class programUsers extends OdbSuite {
               "matches" -> Json.fromValues(
                   pids.map { id =>
                     Json.obj(
-                      "program" -> Json.obj("id" -> id.asJson),
-                      "user"    -> Json.obj("id" -> pi.id.asJson)
+                      "program"           -> Json.obj("id" -> id.asJson),
+                      "user"              -> Json.obj("id" -> pi.id.asJson),
+                      "educationalStatus" -> Json.Null
                     )
                   }
               )
@@ -97,11 +107,91 @@ class programUsers extends OdbSuite {
         expected =
           Json.obj(
             "programUsers" -> Json.obj(
-              "matches" -> Json.fromValues(
+              "matches"    -> Json.fromValues(
                   pids.map { id =>
                     Json.obj(
                       "program" -> Json.obj("id" -> id.asJson),
                       "user"    -> Json.obj("id" -> piCharles.id.asJson)
+                    )
+                  }
+              )
+            )
+          ).asRight
+      )
+    }
+  }
+
+  test("program user selection via educational status") {
+    createProgramAs(piPhd).replicateA(2).flatMap { pids =>
+      expect(
+        user = piPhd,
+        query = s"""
+          query {
+            programUsers(
+              WHERE: {
+                educationalStatus: {
+                  IS_NULL: true
+                }
+              }
+            ) {
+              matches {
+                program { id }
+                user { id }
+                educationalStatus
+                thesis
+              }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programUsers" -> Json.obj(
+              "matches"    -> Json.fromValues(
+                  pids.map { id =>
+                    Json.obj(
+                      "program"           -> Json.obj("id" -> id.asJson),
+                      "user"              -> Json.obj("id" -> piPhd.id.asJson),
+                      "educationalStatus" -> Json.Null,
+                      "thesis"            -> Json.Null
+                    )
+                  }
+              )
+            )
+          ).asRight
+      )
+    }
+  }
+
+  test("program user selection via thesis") {
+    createProgramAs(pi3).replicateA(2).flatMap { pids =>
+      expect(
+        user = pi3,
+        query = s"""
+          query {
+            programUsers(
+              WHERE: {
+                thesis: {
+                  IS_NULL: true
+                }
+              }
+            ) {
+              matches {
+                program { id }
+                user { id }
+                thesis
+              }
+            }
+          }
+        """,
+        expected =
+          Json.obj(
+            "programUsers" -> Json.obj(
+              "matches"    -> Json.fromValues(
+                  pids.map { id =>
+                    Json.obj(
+                      "program" -> Json.obj("id" -> id.asJson),
+                      "user"    -> Json.obj("id" -> pi3.id.asJson),
+                      "thesis"  -> Json.Null
                     )
                   }
               )
