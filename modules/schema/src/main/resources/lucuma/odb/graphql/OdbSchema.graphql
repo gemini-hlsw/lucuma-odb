@@ -990,9 +990,9 @@ enum EditType {
   UPDATED
 
   """
-  EditType Deleted. Used for hard deletion of entities
+  EditType Deleted. Used for hard deletion of calibrations
   """
-  DELETED
+  DELETED_CAL
 }
 
 """

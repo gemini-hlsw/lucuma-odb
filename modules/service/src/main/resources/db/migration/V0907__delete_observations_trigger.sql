@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION ch_observation_edit()
 DECLARE
 BEGIN
   IF (TG_OP = 'DELETE') THEN
-    PERFORM pg_notify('ch_observation_edit', OLD.c_observation_id || ',' || OLD.c_program_id  || ',' || TG_OP);
+    PERFORM pg_notify('ch_observation_edit', OLD.c_observation_id || ',' || OLD.c_program_id  || ',' || 'DELETE_CAL');
   END IF;
   IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
     PERFORM pg_notify('ch_observation_edit', NEW.c_observation_id || ',' || NEW.c_program_id  || ',' || TG_OP);

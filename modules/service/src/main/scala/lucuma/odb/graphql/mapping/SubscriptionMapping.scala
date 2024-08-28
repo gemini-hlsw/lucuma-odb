@@ -119,7 +119,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
-                        if e.editType === EditType.Deleted
+                        if e.editType === EditType.DeletedCal
                         then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.observation.id.eql(e.observationId),
                         c

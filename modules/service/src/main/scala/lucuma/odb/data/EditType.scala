@@ -9,12 +9,12 @@ sealed abstract class EditType(val tag: String) extends Product with Serializabl
 
 object EditType {
 
-  case object Created extends EditType("created")
-  case object Updated extends EditType("updated")
-  case object Deleted extends EditType("deleted")
+  case object Created    extends EditType("created")
+  case object Updated    extends EditType("updated")
+  case object DeletedCal extends EditType("deleted_cal")
 
   implicit val EnumeratedUserType: Enumerated[EditType] =
-    Enumerated.from(Created, Updated, Deleted).withTag(_.tag)
+    Enumerated.from(Created, Updated, DeletedCal).withTag(_.tag)
 
   /**
    * Map `TG_OP` to `EditType`.
@@ -22,10 +22,10 @@ object EditType {
    */
   def fromTgOp(s: String): Option[EditType] =
     s match {
-      case "INSERT" => Some(Created)
-      case "UPDATE" => Some(Updated)
-      case "DELETE" => Some(Deleted)
-      case _        => None
+      case "INSERT"     => Some(Created)
+      case "UPDATE"     => Some(Updated)
+      case "DELETE_CAL" => Some(DeletedCal)
+      case _            => None
     }
 
 }
