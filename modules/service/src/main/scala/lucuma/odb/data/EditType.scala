@@ -22,10 +22,10 @@ object EditType {
    */
   def fromTgOp(s: String): Option[EditType] =
     s match {
-      case "INSERT"     => Some(Created)
-      case "UPDATE"     => Some(Updated)
-      case "DELETE_CAL" => Some(DeletedCal)
-      case _            => None
+      case "INSERT" => Some(Created)
+      case "UPDATE" => Some(Updated)
+      case "DELETE" => Some(DeletedCal)
+      case _        => None
     }
 
 }
