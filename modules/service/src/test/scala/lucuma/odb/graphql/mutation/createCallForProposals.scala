@@ -641,4 +641,59 @@ class createCallForProposals extends OdbSuite {
       """.asRight
     )
   }
+
+  test("negative LST bug") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type: FAST_TURNAROUND
+                semester: "2024B"
+                activeStart: "2024-10-01"
+                activeEnd: "2024-12-31"
+                submissionDeadlineDefault: "2024-08-31T22:00:00Z"
+                partners: [{ partner: US }]
+                instruments: [GMOS_NORTH, GMOS_SOUTH]
+              }
+            }
+          ) {
+            callForProposals {
+              coordinateLimits {
+                north {
+                  raStart { hms }
+                  raEnd { hms }
+                }
+                south {
+                  raStart { hms }
+                  raEnd { hms }
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "coordinateLimits": {
+                "north": {
+                  "raStart": { "hms": "20:00:00.000000" },
+                  "raEnd": { "hms": "12:00:00.000000" }
+                },
+                "south": {
+                  "raStart": { "hms": "20:00:00.000000" },
+                  "raEnd": { "hms": "10:00:00.000000" }
+                }
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
 }
