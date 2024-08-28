@@ -225,6 +225,9 @@ trait Codecs {
       Declination.fromAngle.reverseGet
     )
 
+  val edit_type: Codec[EditType] =
+    enumerated(Type("e_edit_type"))
+
   val educational_status: Codec[EducationalStatus] =
     enumerated(Type("e_educational_status"))
 

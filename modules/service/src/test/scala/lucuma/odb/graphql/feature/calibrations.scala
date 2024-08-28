@@ -130,7 +130,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   def prepareObservation(pi: User, oid: Observation.Id, tid: Target.Id): IO[Unit] =
     for {
       _ <- updateTargetProperties(
-        pi,
+             pi,
              tid,
              RightAscension.Zero.toAngle.toMicroarcseconds,
              Declination.Zero.toAngle.toMicroarcseconds,

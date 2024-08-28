@@ -86,7 +86,7 @@ object OdbSuite:
     case _: AttachmentException => ()
     case _: S3Exception => ()
     case e: SocketException if e.getMessage == "Connection reset" => ()
-    case e => print(s"OdbSuite.reportFailure: "); e.printStackTrace
+    case e => print("OdbSuite.reportFailure: "); e.printStackTrace
 
   // a runtime that is constructed the same as global, but lets us see unhandled errors (above)
   val runtime: IORuntime =

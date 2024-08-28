@@ -103,7 +103,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           e.canRead(user) && ((
             input.flatMap(_.programId).forall(_ === e.programId) &&
             input.flatMap(_.observationId).forall(_ === e.observationId)
-          ) || e.editType === EditType.Deleted)
+          ))
         }
         .map { e =>
           Result(
@@ -123,7 +123,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                         then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.observation.id.eql(e.observationId),
                         c
-                      )        
+                      )
                     )
               )
             )
