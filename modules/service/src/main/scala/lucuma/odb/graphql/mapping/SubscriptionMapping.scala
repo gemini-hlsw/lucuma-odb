@@ -18,6 +18,7 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.EditType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
@@ -25,6 +26,7 @@ import lucuma.odb.graphql.input.GroupEditInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.input.TargetEditInput
+import lucuma.odb.graphql.mapping.ResultMapping.mapSomeFields
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
@@ -98,15 +100,32 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .observation
         .subscribe(1024)
         .filter { e =>
-          e.canRead(user) &&
-          input.flatMap(_.programId).forall(_ === e.programId) &&
-          input.flatMap(_.observationId).forall(_ === e.observationId)
+          e.canRead(user) && ((
+            input.flatMap(_.programId).forall(_ === e.programId) &&
+            input.flatMap(_.observationId).forall(_ === e.observationId)
+          ))
         }
         .map { e =>
           Result(
             Environment(
-              Env("editType" -> e.editType),
-              Unique(Filter(Predicates.observationEdit.value.id.eql(e.observationId), child))
+              Env(
+                "editType" -> e.editType,
+                "observationId" -> e.observationId,
+              ),
+              Filter(
+                Predicates.observationEdit.programId.eql(e.programId),
+                Query.mapSomeFields(child):
+                  case Select("value", a, c) =>
+                    Select("value", a,
+                      // This predicate needs to be down here
+                      Filter(
+                        if e.editType === EditType.DeletedCal
+                        then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
+                        else Predicates.observation.id.eql(e.observationId),
+                        c
+                      )
+                    )
+              )
             )
           )
         }
@@ -147,7 +166,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                 i.groupId match
                   case Nullable.Absent       => true
                   case Nullable.Null         => e.groupId.isEmpty
-                  case Nullable.NonNull(gid) => e.groupId.exists(_ == gid)            
+                  case Nullable.NonNull(gid) => e.groupId.exists(_ == gid)
           }
         }
         .map { e =>
@@ -164,16 +183,16 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
           Result(
             Environment(
-              Env("editType" -> e.editType, "programId" -> e.programId), 
+              Env("editType" -> e.editType, "programId" -> e.programId),
               Unique(
                 Filter(
                   Predicates.groupEdit.program.id.eql(e.programId),
                   addValueFilter(child)
                 )
-              )                
+              )
             )
           )
-          
+
         }
     }
 

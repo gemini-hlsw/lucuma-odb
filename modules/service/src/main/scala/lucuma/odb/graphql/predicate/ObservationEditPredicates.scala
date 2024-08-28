@@ -4,7 +4,9 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
+import lucuma.core.model.Program
 
 class ObservationEditPredicates(path: Path) {
   val value = ObservationPredicates(path / "value")
+  val programId = LeafPredicates[Program.Id](path / "synthetic-id")
 }

@@ -9,11 +9,12 @@ sealed abstract class EditType(val tag: String) extends Product with Serializabl
 
 object EditType {
 
-  case object Created extends EditType("created")
-  case object Updated extends EditType("updated")
+  case object Created    extends EditType("created")
+  case object Updated    extends EditType("updated")
+  case object DeletedCal extends EditType("deleted_cal")
 
   implicit val EnumeratedUserType: Enumerated[EditType] =
-    Enumerated.from(Created, Updated).withTag(_.tag)
+    Enumerated.from(Created, Updated, DeletedCal).withTag(_.tag)
 
   /**
    * Map `TG_OP` to `EditType`.
@@ -23,6 +24,7 @@ object EditType {
     s match {
       case "INSERT" => Some(Created)
       case "UPDATE" => Some(Updated)
+      case "DELETE" => Some(DeletedCal)
       case _        => None
     }
 

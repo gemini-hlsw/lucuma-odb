@@ -83,6 +83,7 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
+import skunk.data.Completion
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -125,6 +126,10 @@ sealed trait ObservationService[F[_]] {
   def cloneObservation(
     input: CloneObservationInput
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
+
+  def deleteCalibrationObservations(
+    oids: NonEmptyList[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def observationValidations(
     pid: Program.Id,
@@ -264,6 +269,50 @@ object ObservationService {
           }
         }
 
+      // This will fully delete a calibration observation
+      // It assumes the imple case where the observation has no extra timing windows or attachments
+      def deleteCalibrationObservations(
+        oids: NonEmptyList[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] = {
+        val existenceOff = ObservationPropertiesInput.Edit(
+          Nullable.Absent,
+          None,
+          None,
+          Nullable.Absent,
+          None,
+          None,
+          None,
+          Nullable.Absent,
+          Nullable.Absent,
+          None,
+          Nullable.Absent,
+          Some(Existence.Deleted),
+          Nullable.Null,
+          None,
+          Nullable.Absent
+        )
+
+        // delete targets, asterisms and observations
+        for {
+          _    <- oids.traverse(o =>
+                    // set the existence to deleted, so it gets removed from groups too
+                    updateObservations(existenceOff, sql"$observation_id"(o))
+                  )
+                  // Look for the linked targets
+          tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
+                  // Delete asterisms and targets
+          _    <- NonEmptyList
+                    .fromList(tids)
+                    .traverse(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
+          _    <- NonEmptyList
+                    .fromList(tids)
+                    .traverse(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
+                  // Actually delete the observations
+          _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
+        } yield Result.unit
+
+      }
+
       override def createObservation(
         input: CreateObservationInput
       )(using Transaction[F]): F[Result[Observation.Id]] = {
@@ -333,7 +382,7 @@ object ObservationService {
 
       private def updateObservingModeType(
         newMode: Option[ObservingModeType],
-        which:   List[Observation.Id]
+        which:   NonEmptyList[Observation.Id]
       ): F[Unit] = {
         val af = Statements.updateObservingModeType(newMode, which)
         session.prepareR(af.fragment.command).use { pq =>
@@ -343,12 +392,12 @@ object ObservationService {
 
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
-        oids:  List[Observation.Id],
+        oids:  NonEmptyList[Observation.Id],
       )(using Transaction[F]): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
-            m <- selectObservingModes(oids)
+            m <- selectObservingModes(oids.toList)
             _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
               (existingMode, oEdit) match {
@@ -409,11 +458,11 @@ object ObservationService {
                         pq.stream(af.argument, chunkSize = 1024).compile.toList
                       }
                    })
-              g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
-              u  = g.values.reduceOption(_ ++ _).orEmpty  // ungrouped: List[Observation.Id]
+              g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
+              u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
               _ <- validateBand(g.keys.toList)
-              _ <- ResultT(updateObservingModes(SET.observingMode, u))
-              _ <- ResultT(setTimingWindows(u, SET.timingWindows.foldPresent(_.orEmpty)))
+              _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
+              _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
               _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                      obsAttachmentAssignmentService.setAssignments(pid, oids, SET.obsAttachments)
                    }.map(_.sequence))
@@ -1065,7 +1114,7 @@ object ObservationService {
 
     def updateObservingModeType(
       newMode: Option[ObservingModeType],
-      which:   List[Observation.Id]
+      which:   NonEmptyList[Observation.Id]
     ): AppliedFragment =
       void"UPDATE t_observation " |+|
          void"SET " |+|
@@ -1228,6 +1277,29 @@ object ObservationService {
           )
       """.query(science_band)
 
+    // Brute force statements to delete a calibration observations
+    def linkedTargets(oids: NonEmptyList[Observation.Id]): Query[List[Observation.Id], Target.Id] =
+      (sql"""
+        SELECT
+          c_target_id
+        FROM t_asterism_target
+        WHERE c_observation_id IN(${observation_id.list(oids.size)})""")
+        .query(target_id)
+
+    def deleteLinkedAsterisms(tids: NonEmptyList[Target.Id]): AppliedFragment =
+      void"DELETE FROM t_asterism_target " |+|
+        void"WHERE c_target_id IN (" |+|
+          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteTargets(tids: NonEmptyList[Target.Id]): AppliedFragment =
+      void"DELETE FROM t_target " |+|
+        void"WHERE c_target_id IN (" |+|
+          tids.map(sql"$target_id").intercalate(void", ") |+| void")"
+
+    def deleteCalibrationObservations(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"DELETE FROM t_observation " |+|
+        void"WHERE c_observation_id IN (" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
   }
 
 }
