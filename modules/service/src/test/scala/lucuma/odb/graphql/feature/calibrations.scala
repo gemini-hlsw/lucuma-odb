@@ -832,7 +832,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     Json.obj(
       "observationEdit" -> Json.obj(
         "observationId" -> oid.asJson,
-        "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
+        "editType" -> Json.fromString(EditType.DeletedCal.tag.toUpperCase),
         "value"    -> Json.Null
       )
     )
@@ -923,7 +923,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                     {
                       "observationEdit" : {
                         "observationId" : $cid,
-                        "editType" : "DELETED",
+                        "editType" : "DELETED_CAL",
                         "value" : null
                       }
                     }

@@ -171,7 +171,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
     Json.obj(
       "observationEdit" -> Json.obj(
         "observationId" -> oid.asJson,
-        "editType" -> Json.fromString(EditType.Deleted.tag.toUpperCase),
+        "editType" -> Json.fromString(EditType.DeletedCal.tag.toUpperCase),
         "meta"     -> Json.Null,
         "value"    -> Json.Null
       )
