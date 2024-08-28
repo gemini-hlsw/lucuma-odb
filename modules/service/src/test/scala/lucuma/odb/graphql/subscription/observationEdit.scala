@@ -454,7 +454,6 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid0 <- createTargetAs(pi, pid, "Zero")
       // An observation with a single target is essentially a calib observation
       oid  <- createObservationAs(pi, pid, None, tid0)
-      // _    <- createObservationAs(pi, pid, None, tid0)
       _    <- subscriptionExpect(
         user      = pi,
         query     = deletedSubscription(pid),

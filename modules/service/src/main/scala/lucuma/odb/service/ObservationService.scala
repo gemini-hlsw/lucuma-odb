@@ -298,9 +298,9 @@ object ObservationService {
                     // set the existence to deleted, so it gets removed from groups too
                     updateObservations(existenceOff, sql"$observation_id"(o))
                   )
-          // Look for the linked targets
+                  // Look for the linked targets
           tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
-          // Delete asterisms and targets
+                  // Delete asterisms and targets
           _    <- NonEmptyList
                     .fromList(tids)
                     .map(tids => session.executeCommand(Statements.deleteLinkedAsterisms(tids)).void)
@@ -309,7 +309,7 @@ object ObservationService {
                     .fromList(tids)
                     .map(tids => session.executeCommand(Statements.deleteTargets(tids)).void)
                     .getOrElse(Applicative[F].unit)
-          // Actually delete the observations
+                  // Actually delete the observations
           _    <- session.executeCommand(Statements.deleteCalibrationObservations(oids))
         } yield Result.unit
 
@@ -460,7 +460,7 @@ object ObservationService {
                         pq.stream(af.argument, chunkSize = 1024).compile.toList
                       }
                    })
-              g  = r.groupMap(_._1)(_._2)                                  // grouped:   Map[Program.Id, List[Observation.Id]]
+              g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
               u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
               _ <- validateBand(g.keys.toList)
               _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
