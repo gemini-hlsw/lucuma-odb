@@ -187,6 +187,7 @@ object OdbMapping {
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationsResultMapping[F]
+          with SetGuideTargetNameResultMapping[F]
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
@@ -360,6 +361,7 @@ object OdbMapping {
                 SpectroscopyConfigOptionGmosSouthMapping,
                 SpectroscopyScienceRequirementsMapping,
                 SetAllocationsResultMapping,
+                SetGuideTargetNameResultMapping,
                 SetProgramReferenceResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,

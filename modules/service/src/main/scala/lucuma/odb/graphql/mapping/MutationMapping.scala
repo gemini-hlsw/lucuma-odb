@@ -41,6 +41,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
@@ -71,6 +72,7 @@ import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationsInput
+import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
@@ -91,6 +93,7 @@ import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
@@ -133,6 +136,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RedeemUserInvitation,
       RevokeUserInvitation,
       SetAllocations,
+      SetGuideTargetName,
       SetProgramReference,
       SetProposalStatus,
       UnlinkUser,
@@ -160,7 +164,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
   val httpClient: Client[F]
+  val itcClient: ItcClient[F]
   def emailConfig: Config.Email
+  val commitHash: CommitHash
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
@@ -565,6 +571,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           allocationService.setAllocations(input).map(_ *>
             allocationResultSubquery(input.programId, child)
           )
+
+  private lazy val SetGuideTargetName = 
+    MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(input)
+          .nestMap: oid =>
+            Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

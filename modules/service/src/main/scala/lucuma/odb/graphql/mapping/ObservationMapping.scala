@@ -57,6 +57,7 @@ trait ObservationMapping[F[_]]
       SqlField("activeStatus", ObservationView.ActiveStatus),
       SqlField("scienceBand", ObservationView.ScienceBand),
       SqlField("observationTime", ObservationView.ObservationTime),
+      SqlObject("observationDuration"),
       SqlObject("posAngleConstraint"),
       SqlObject("targetEnvironment"),
       SqlObject("constraintSet"),

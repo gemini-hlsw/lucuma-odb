@@ -7,23 +7,29 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
-case class ObservationTimesInput(observationTime: Nullable[Timestamp])
+case class ObservationTimesInput(
+  observationTime:     Nullable[Timestamp],
+  observationDuration: Nullable[TimeSpan]
+)
 
 object ObservationTimesInput {
   val Empty: ObservationTimesInput =
     ObservationTimesInput(
-      observationTime = Nullable.Absent,
+      observationTime =     Nullable.Absent,
+      observationDuration = Nullable.Absent
     )
 
   val Binding: Matcher[ObservationTimesInput] =
     ObjectFieldsBinding.rmap {
       case List(
         TimestampBinding.Nullable("observationTime", rObservationTime),
+        TimeSpanInput.Binding.Nullable("observationDuration", rObservationDuration)
       ) =>
-        rObservationTime.map(ObservationTimesInput.apply)
+        (rObservationTime, rObservationDuration).parMapN(ObservationTimesInput.apply)
     }
 }

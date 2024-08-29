@@ -1503,4 +1503,69 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: j =>
       j.hcursor.downFields("cloneGroup", "newGroup", "id").require[Group.Id]
 
+  def setObservationTimeAndDuration(
+    user:  User,
+    oid:   Observation.Id,
+    obsTime: Option[Timestamp],
+    obsDuration: Option[TimeSpan]
+  ): IO[Unit] = {
+    val time = obsTime.fold("null")(ts => s"\"${ts.isoFormat}\"")
+    val duration = obsDuration.fold("null")(ts => s"{ microseconds: ${ts.toMicroseconds} }")
+    val q = s"""
+      mutation {
+        updateObservationsTimes(input: {
+          SET: {
+            observationTime: $time
+            observationDuration: $duration
+          }
+          WHERE: {
+            id: {EQ: ${oid.asJson}}}
+        }) {
+          observations {
+            observationTime
+            observationDuration { microseconds }
+          }
+        }
+      }
+    """
+
+    val expectDur: Json = obsDuration.fold(Json.Null)(ts => Json.obj("microseconds" -> ts.toMicroseconds.asJson))
+    val expected = json"""
+      {
+        "updateObservationsTimes": {
+          "observations": [
+            {
+              "observationTime": ${obsTime.map(_.format)},
+              "observationDuration": $expectDur
+            }
+          ]
+        }
+      }
+    """.asRight
+    expect(user = user, query = q, expected = expected)
+  }
+  
+  def setGuideTargetName(
+    user: User,
+    pid: Program.Id,
+    oid: Observation.Id,
+    guideTargetName: Option[String]
+  ): IO[Unit] = {
+    val q = s"""
+      mutation {
+        setGuideTargetName(
+          input: {
+            programId: ${pid.asJson}
+            observationId: ${oid.asJson}
+            targetName: ${guideTargetName.asJson}
+          }
+        ) {
+          observation {
+            id
+          }
+        }
+      }
+    """
+    query(user = user, query = q).void
+  }
 }
