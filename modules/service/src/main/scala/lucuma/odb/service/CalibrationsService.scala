@@ -67,6 +67,7 @@ import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.int8
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Instant
@@ -89,13 +90,54 @@ trait CalibrationsService[F[_]] {
     referenceInstant: Instant
   )(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])]
 
+  /**
+    * Returns the calibration targets for a given role adjusted to a reference instant
+    */
+  def calibrationTargets(role: CalibrationRole, referenceInstant: Instant): F[List[(Target.Id, String, Coordinates)]]
+
   def recalculateCalibrationTarget(
     pid: Program.Id,
     oid: Observation.Id,
   )(using Transaction[F]): F[Unit]
 }
 
-object CalibrationsService {
+trait SpecPhotoCalibrations {
+  def bestTarget(ref: Coordinates, tgts: List[(Target.Id, String, Coordinates)]): Option[Target.Id] =
+    tgts.minimumByOption(_._3.angularDistance(ref))(Angle.SignedAngleOrder).map(_._1)
+
+  def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
+    val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+    val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
+    val ra = RightAscension(HourAngle.fromHMS(h + 1, m, s, 0, n / 1000))
+    val dec = site.place.latitude
+    Coordinates(ra, dec)
+  }
+
+  def targetCoordinates(when: Instant)(
+    rows: List[(Target.Id, String, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
+  ): List[(Target.Id, String, Coordinates)] =
+    rows.map { case (tid, name, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
+      (tid,
+        name,
+        SiderealTracking(
+          Coordinates(ra, dec),
+          epoch,
+          (pmra, pmdec).mapN{ case (r, d) =>
+            ProperMotion(ProperMotion.μasyRA(r), ProperMotion.μasyDec(d))
+          },
+          rv,
+          parallax
+        ).at(when)
+      )
+    }.collect {
+      case (tid, name, Some(st)) => (tid, name, st)
+    }
+
+}
+
+object SpecPhotoCalibrations extends SpecPhotoCalibrations
+
+object CalibrationsService extends SpecPhotoCalibrations {
   type GmosNConfigs = (GmosNorthGrating, Option[GmosNorthFilter], GmosNorthFpu, Wavelength, GmosXBinning, GmosYBinning)
   type GmosSConfigs = (GmosSouthGrating, Option[GmosSouthFilter], GmosSouthFpu, Wavelength, GmosXBinning, GmosYBinning)
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
@@ -332,49 +374,22 @@ object CalibrationsService {
           .getOrElse(List.empty.pure[F])
       }
 
-      private def spectroPhotometricTargets(when: Instant)(
-        rows: List[(Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
-      ): List[(Target.Id, Coordinates)] =
-        rows.map { case (tid, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
-          (tid,
-            SiderealTracking(
-              Coordinates(ra, dec),
-              epoch,
-              (pmra, pmdec).mapN{ case (r, d) =>
-                ProperMotion(ProperMotion.μasyRA(r), ProperMotion.μasyDec(d))
-              },
-              rv,
-              parallax
-            ).at(when)
-          )
-        }.collect {
-          case (tid, Some(st)) => (tid, st)
-        }
-
-      private def bestTarget(ref: Coordinates, tgts: List[(Target.Id, Coordinates)]): Option[Target.Id] =
-        tgts.minimumByOption(_._2.angularDistance(ref))(Angle.SignedAngleOrder).map(_._1)
-
-      private def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
-        val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
-        val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
-        val ra = RightAscension(HourAngle.fromHMS(h - 1, m, s, 0, n / 1000))
-        val dec = site.place.latitude
-        Coordinates(ra, dec)
-      }
+      override def calibrationTargets(role: CalibrationRole, referenceInstant: Instant): F[List[(Target.Id, String, Coordinates)]] =
+          session.execute(Statements.selectCalibrationTargets)(role)
+            .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] = {
         val gncoords = idealLocation(Site.GN, referenceInstant)
         val gscoords = idealLocation(Site.GS, referenceInstant)
 
         for {
-          tgts <- session.execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-            .map(spectroPhotometricTargets(referenceInstant))
-          gsTgt = bestTarget(gscoords, tgts)
-          gnTgt = bestTarget(gncoords, tgts)
+          tgts                             <- calibrationTargets(CalibrationRole.SpectroPhotometric, referenceInstant)
+          gsTgt                             = bestTarget(gscoords, tgts)
+          gnTgt                             = bestTarget(gncoords, tgts)
           (scienceGmosNLS, scienceGmosSLS) <- uniqueConfiguration(pid, ObservationSelection.Science)
           (calibGmosNLS, calibGmosSLS)     <- uniqueConfiguration(pid, ObservationSelection.Calibration)
-          gnls  = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
-          gsls  = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
+          gnls                              = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
+          gsls                              = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
           addedOids                        <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt)
           removedOids                      <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
         } yield (addedOids, removedOids)
@@ -398,12 +413,12 @@ object CalibrationsService {
                     val gncoords = idealLocation(Site.GN, ot.toInstant)
                     session
                       .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-                      .map(spectroPhotometricTargets(ot.toInstant).map(bestTarget(gncoords, _)))
+                      .map(targetCoordinates(ot.toInstant).map(bestTarget(gncoords, _)))
                   case Some(oid, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
                     val gscoords = idealLocation(Site.GS, ot.toInstant)
                     session
                       .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-                      .map(spectroPhotometricTargets(ot.toInstant).map(bestTarget(gscoords, _)))
+                      .map(targetCoordinates(ot.toInstant).map(bestTarget(gscoords, _)))
                   case _ =>
                     none.pure[F]
                }
@@ -438,9 +453,10 @@ object CalibrationsService {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-    def selectCalibrationTargets: Query[CalibrationRole, (Target.Id, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
+    def selectCalibrationTargets: Query[CalibrationRole, (Target.Id, String, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
               c_target_id,
+              t_target.c_name,
               c_sid_ra,
               c_sid_dec,
               c_sid_epoch,
@@ -453,7 +469,7 @@ object CalibrationsService {
             ON t_target.c_program_id=t_program.c_program_id
             WHERE t_program.c_calibration_role=$calibration_role
               AND t_program.c_existence='present'
-          """.query(target_id *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
+          """.query(target_id *: text *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
 
     val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, Option[Timestamp], Option[ObservingModeType])] =
       sql"""
