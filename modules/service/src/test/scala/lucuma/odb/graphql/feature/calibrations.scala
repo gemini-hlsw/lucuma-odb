@@ -16,6 +16,7 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -30,14 +31,13 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.service.CalibrationsService
+import lucuma.odb.service.SpecPhotoCalibrations
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.time.Instant
-import lucuma.core.enums.Site
-import lucuma.odb.service.SpecPhotoCalibrations
 
 class calibrations extends OdbSuite with SubscriptionUtils {
   val pi       = TestUsers.Standard.pi(1, 101)
