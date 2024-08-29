@@ -1,0 +1,6 @@
+{
+  "schemaPath": "modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+  "documents": [
+    "src/**/*.graphql"
+  ],
+}

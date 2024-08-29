@@ -16,6 +16,7 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -30,7 +31,9 @@ import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.service.CalibrationsService
+import lucuma.odb.service.SpecPhotoCalibrations
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -343,153 +346,31 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     }
   }
 
-  val spectroPhotometricTargets: List[(String, Long, Long, Double, String)] =
-    List(
-      ("BD+28  4211",
-        1180065332865L,
-        103910367627L,
-        0.000,
-        """{
-          "sourceProfile": {
-            "point": {
-                "emissionLines": null,
-                "bandNormalized": {
-                    "sed": null,
-                    "brightnesses": [
-                        {
-                            "band": "U",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "8.922"
-                        },
-                        {
-                            "band": "B",
-                            "error": "0.03",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.25"
-                        },
-                        {
-                            "band": "V",
-                            "error": "0.05",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.58"
-                        },
-                        {
-                            "band": "R",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.656"
-                        },
-                        {
-                            "band": "I",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.831"
-                        },
-                        {
-                            "band": "J",
-                            "error": "0.026",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.275"
-                        },
-                        {
-                            "band": "H",
-                            "error": "0.036",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.438"
-                        },
-                        {
-                            "band": "K",
-                            "error": "0.028",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.556"
-                        },
-                        {
-                            "band": "GAIA",
-                            "error": "0.002851",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.45304"
-                        }
-                    ]
-                }
-            },
-            "uniform": null,
-            "gaussian": null
-          }
-      }"""),
-      ("BD+25  2534",
-        681652742505L,
-        90239867922L,
-        0.000,
-        """{
-          "sourceProfile": {
-            "point": {
-                "emissionLines": null,
-                "bandNormalized": {
-                    "sed": null,
-                    "brightnesses": [
-                        {
-                            "band": "U",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "8.922"
-                        },
-                        {
-                            "band": "B",
-                            "error": "0.03",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.25"
-                        },
-                        {
-                            "band": "V",
-                            "error": "0.05",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.58"
-                        },
-                        {
-                            "band": "R",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.656"
-                        },
-                        {
-                            "band": "I",
-                            "error": null,
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.831"
-                        },
-                        {
-                            "band": "J",
-                            "error": "0.026",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.275"
-                        },
-                        {
-                            "band": "H",
-                            "error": "0.036",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.438"
-                        },
-                        {
-                            "band": "K",
-                            "error": "0.028",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "11.556"
-                        },
-                        {
-                            "band": "GAIA",
-                            "error": "0.002851",
-                            "units": "VEGA_MAGNITUDE",
-                            "value": "10.45304"
-                        }
-                    ]
-                }
-            },
-            "uniform": null,
-            "gaussian": null
-          }
-      }""")
-    )
+  def calibrationTargets(role: CalibrationRole, referenceInstant: Instant) =
+    withServices(pi) { services =>
+      services.calibrationsService.calibrationTargets(role, referenceInstant)
+    }
+
+  test("calculate best target for specphoto") {
+
+    val samples: List[(Site, Instant, String)] = List(
+        (Site.GN, Instant.parse("2024-08-28T07:00:00Z"), "HD 340611"),
+        (Site.GN, Instant.parse("2024-08-28T10:00:00Z"), "BD+28  4211"),
+        (Site.GS, Instant.parse("2024-08-28T04:00:00Z"), "LP  877-23"),
+        (Site.GS, Instant.parse("2024-08-28T07:00:00Z"), "CD-28   595"),
+      )
+
+    for {
+      tgts <- calibrationTargets(CalibrationRole.SpectroPhotometric, when)
+      _    <- samples.traverse { case (site, instant, name) =>
+                val loc = SpecPhotoCalibrations.idealLocation(site, instant)
+                val id = SpecPhotoCalibrations.bestTarget(loc, tgts)
+                tgts.find(_._1 === id.get).map(_._2).fold(
+                  IO.raiseError(new RuntimeException(s"Target $id not found"))
+                )(n => assertIOBoolean(IO(n === name)))
+              }
+    } yield ()
+  }
 
   test("select calibration target") {
     for {
@@ -501,12 +382,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                       CalibrationRole.SpectroPhotometric,
                       Description.unsafeFrom("SPECTROTEST"))(using xa)
                 }
-              }
-      // Add some spectrophotometric targets
-      _    <- spectroPhotometricTargets.traverse {  case (n, ra, dec, rv, s) =>
-                 createTargetAs(service, tpid, n).flatTap(tid =>
-                   updateTargetProperties(pi, tid, ra, dec, rv)
-                 )
               }
       // PI program
       pid  <- createProgramAs(pi)
@@ -868,7 +743,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                         "editType" : "CREATED",
                         "value" : {
                           "id" : $cid,
-                          "title": "HD 289002"
+                          "title": "Feige  34"
                         }
                       }
                     }
@@ -880,7 +755,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                         "editType" : "UPDATED",
                         "value" : {
                           "id" : $cid,
-                          "title": "HD 289002"
+                          "title": "Feige  34"
                         }
                       }
                     }
@@ -933,5 +808,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       )
     } yield ()
   }
+
 }
 
