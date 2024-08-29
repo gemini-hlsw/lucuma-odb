@@ -51,8 +51,8 @@ object ConstraintSetInput {
 
   val CalibrationConstraints: ConstraintSet =
     ConstraintSet(
-      cloudExtinction = CloudExtinction.PointThree,
-      imageQuality    = ImageQuality.PointTwo,
+      cloudExtinction = CloudExtinction.ThreePointZero,
+      imageQuality    = ImageQuality.TwoPointZero,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
       elevationRange  = ElevationRange.AirMass.Default
