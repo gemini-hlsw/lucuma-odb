@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.model.User
 
 class updateObservationsTimes extends OdbSuite
@@ -18,6 +19,28 @@ class updateObservationsTimes extends OdbSuite
   val staff: User = TestUsers.Standard.staff(nextId, nextId)
 
   override lazy val validUsers: List[User] = List(pi, pi2, staff)
+
+  private val Query = """
+    observations {
+      observationTime
+      observationDuration { microseconds }
+    }
+  """
+
+  private def expected(time: Option[String], seconds: Option[Int]): Either[Nothing, Json] = 
+    val expectedDuration = seconds.fold(Json.Null)(s => Json.obj("microseconds" -> (s * 1000000).asJson))
+    json"""
+      {
+        "updateObservationsTimes": {
+          "observations": [
+            {
+              "observationTime": $time,
+              "observationDuration": $expectedDuration
+            }
+          ]
+        }
+      }
+    """.asRight
 
   private def oneUpdateTest(
     user:     User,
@@ -45,91 +68,82 @@ class updateObservationsTimes extends OdbSuite
       }
     yield ()
 
-  test("observation time: set") {
-
-    val update   = """
-      observationTime: "2022-08-30 17:18:00"
-    """
-
-    val query    = "observations { observationTime }"
-
-    val expected = json"""
-      {
-        "updateObservationsTimes": {
-          "observations": [
-            {
-              "observationTime": "2022-08-30 17:18:00"
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    oneUpdateTest(pi, update, query, expected)
-  }
-
   test("observation time: set ISO-8601") {
 
-    val update = """
-      observationTime: "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30 17:18:00"
+    val update = s"""
+      observationTime: "$timeStr"
     """
 
-    val query = "observations { observationTime }"
-
-    val expected = json"""
-      {
-        "updateObservationsTimes": {
-          "observations": [
-            {
-              "observationTime": "2022-08-30 17:18:00"
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    oneUpdateTest(pi, update, query, expected)
+    oneUpdateTest(pi, update, Query, expected(timeStr.some, none))
   }
 
+  test("observation duration: set") {
+
+    val update = s"""
+      observationDuration: { seconds: 10 }
+    """
+
+    oneUpdateTest(pi, update, Query, expected(none, 10.some))
+  }
+  
+  test("observation time and duration: set") {
+
+    val timeStr = "2022-08-30 17:18:00"
+    val update = s"""
+      observationTime: "$timeStr", observationDuration: { seconds: 12 }
+    """
+
+    oneUpdateTest(pi, update, Query, expected(timeStr.some, 12.some))
+  }
   test("observation time: delete") {
 
-    val update0  = """
-      observationTime: "2022-08-30 17:18:00"
+    val timeStr = "2022-08-30 17:18:00"
+    val update0 = s"""
+      observationTime: "$timeStr", observationDuration: { seconds: 13 }
     """
 
     val update1 = """
       observationTime: null
     """
 
-    val query    = "observations { observationTime }"
+    val expected0 = expected(timeStr.some, 13.some)
+    val expected1 = expected(none, 13.some)
 
-    val expected0 = json"""
-      {
-        "updateObservationsTimes": {
-          "observations": [
-            {
-              "observationTime": "2022-08-30 17:18:00"
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val expected1 = json"""
-      {
-        "updateObservationsTimes": {
-          "observations": [
-            {
-              "observationTime": null
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
-
+    multiUpdateTest(pi, List((update0, Query, expected0), (update1, Query, expected1)))
   }
 
+  test("observation duration: delete") {
 
+    val timeStr = "2022-08-30 17:18:00"
+    val update0 = s"""
+      observationTime: "$timeStr", observationDuration: { seconds: 10 }
+    """
+
+    val update1 = """
+      observationDuration: null
+    """
+
+    val expected0 = expected(timeStr.some, 10.some)
+    val expected1 = expected(timeStr.some, none)
+
+    multiUpdateTest(pi, List((update0, Query, expected0), (update1, Query, expected1)))
+  }
+  
+  test("observation time and duration: delete") {
+
+    val timeStr = "2022-08-30 17:18:00"
+    val update0 = s"""
+      observationTime: "$timeStr", observationDuration: { seconds: 10 }
+    """
+
+    val update1 = """
+      observationDuration: null, observationTime: null
+    """
+
+    val expected0 = expected(timeStr.some, 10.some)
+    val expected1 = expected(none, none)
+
+    multiUpdateTest(pi, List((update0, Query, expected0), (update1, Query, expected1)))
+  }
 }
