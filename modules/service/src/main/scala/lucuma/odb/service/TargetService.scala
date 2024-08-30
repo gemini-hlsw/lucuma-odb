@@ -57,6 +57,8 @@ trait TargetService[F[_]] {
   def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
+  def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F]): F[Result[Unit]]
+
 }
 
 object TargetService {
@@ -235,6 +237,13 @@ object TargetService {
 
       def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
         cloneTargetIntoImpl(targetId, programId).map(cloneResultTranslation)
+
+      override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] = {
+        val s = Statements.deleteOrphanCalibrationTargets(pid)
+        session
+          .prepareR(s.fragment.command)
+          .use(_.execute(s.argument)).as(Result.unit)
+      }
     }
 
   object Statements {
@@ -504,6 +513,15 @@ object TargetService {
       WHERE  c_target_id = $target_id
       AND    c_observation_id IN (${observation_id.list(which.length)})
       """.apply(to, from, which.toList)
+
+    def deleteOrphanCalibrationTargets(pid: Program.Id): AppliedFragment =
+      sql"""
+      DELETE FROM t_target
+      WHERE  c_calibration_role IS NOT NULL AND
+             c_program_id = $program_id AND NOT EXISTS (
+               SELECT 1 FROM t_asterism_target WHERE c_target_id = t_target.c_target_id
+             )
+      """.apply(pid)
   }
 
 }
