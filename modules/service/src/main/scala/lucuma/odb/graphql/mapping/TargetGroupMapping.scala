@@ -16,7 +16,6 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.predicate.Predicates
 
-import table.ObservationView
 import binding.*
 import table.*
 

@@ -86,7 +86,7 @@ object PureLongSlit {
       seq
         .stream(config, SciExposureTime(itc.exposureTime))
         .map(a => ProtoAtom(a.description.some, a.steps))
-        .take(itc.exposures.value)
+        .take(itc.exposureCount.value)
 
     new PureLongSlit[S, D] {
 

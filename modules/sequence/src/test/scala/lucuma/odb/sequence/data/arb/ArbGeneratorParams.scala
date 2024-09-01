@@ -10,11 +10,13 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
-import lucuma.itc.client.ImagingIntegrationTimeInput
+import lucuma.itc.client.ImagingIntegrationTimeParameters
 import lucuma.itc.client.InstrumentMode
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.TargetInput
 import lucuma.itc.client.arb.ArbInstrumentMode
 import lucuma.itc.client.arb.ArbIntegrationTimeInput
+import lucuma.itc.client.arb.ArbTargetInput
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import org.scalacheck.*
@@ -25,37 +27,31 @@ trait ArbGeneratorParams {
   import ArbEnumerated.given
   import ArbGid.given
   import ArbGmosLongSlitConfig.given
+  import ArbIntegrationTimeInput.given
   import ArbInstrumentMode.given
+  import ArbTargetInput.given
 
-  private def genItc(mo: InstrumentMode): Gen[(ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)] =
+  private def genObsParams(mo: InstrumentMode): Gen[GeneratorAsterismParams] =
     for {
-      sm <- ArbIntegrationTimeInput.genSpectroscopyIntegrationTimeInput(mo)
-      im <- ArbIntegrationTimeInput.genImagingIntegrationTimeInput(mo)
-    } yield (im, sm)
+      im <- arbitrary[ImagingIntegrationTimeParameters]
+      sm <- arbitrary[SpectroscopyIntegrationTimeParameters]
+      s  <- Gen.choose(1, 4)
+      t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput)]).map(NonEmptyList.fromListUnsafe)
+    } yield GeneratorAsterismParams(im.copy(mode = mo), sm.copy(mode = mo), t)
 
   val genGmosNorthLongSlit: Gen[GeneratorParams] = {
-    given Arbitrary[(ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)] =
-      Arbitrary(arbitrary[InstrumentMode.GmosNorthSpectroscopy].flatMap(genItc))
-
     for {
       mo  <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
-      s   <- Gen.choose(1, 4)
-      itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
-        .map(NonEmptyList.fromListUnsafe)
+      itc <- genObsParams(mo)
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
     } yield GeneratorParams(itc, cfg, rol)
   }
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] = {
-    given Arbitrary[(ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput)] =
-      Arbitrary(arbitrary[InstrumentMode.GmosSouthSpectroscopy].flatMap(genItc))
-
     for {
       mo  <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
-      s   <- Gen.choose(1, 4)
-      itc <- Gen.listOfN(s, arbitrary[(Target.Id, (ImagingIntegrationTimeInput, SpectroscopyIntegrationTimeInput))])
-        .map(NonEmptyList.fromListUnsafe)
+      itc <- genObsParams(mo)
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
     } yield GeneratorParams(itc, cfg, rol)

@@ -9,7 +9,6 @@ import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
-import grackle.Result
 import grackle.TypeRef
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
