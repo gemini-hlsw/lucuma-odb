@@ -4,7 +4,6 @@
 package lucuma.odb.phase0
 
 import cats.parse.*
-import cats.parse.Parser.*
 import cats.parse.Rfc5234.htab
 import cats.parse.Rfc5234.sp
 import cats.parse.Rfc5234.vchar

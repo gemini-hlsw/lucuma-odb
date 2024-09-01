@@ -7,7 +7,6 @@ package email
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
-import cats.effect.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress

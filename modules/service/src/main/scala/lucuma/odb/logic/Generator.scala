@@ -19,7 +19,6 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -98,7 +97,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: ItcService.AsterismResult,
+    asterismResult: ItcService.AsterismResults,
     params:         GeneratorParams
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
@@ -201,7 +200,7 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: ItcService.AsterismResult,
+        itcRes: ItcService.AsterismResults,
         params: GeneratorParams
       ) {
 
@@ -223,7 +222,7 @@ object Generator {
           // Integration Time
           List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ing =>
             md5.update(ing.exposureTime.hashBytes)
-            md5.update(ing.exposures.hashBytes)
+            md5.update(ing.exposureCount.hashBytes)
           }
 
           // Commit Hash
@@ -251,7 +250,7 @@ object Generator {
         )(using NoTransaction[F]): EitherT[F, Error, Context] = {
           val itc = itcService(itcClient)
 
-          val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResult])]] =
+          val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResults])]] =
             services.transactionally {
               (for {
                 p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(es => InvalidData(oid, es.map(_.format).intercalate(", ")))))
@@ -259,7 +258,7 @@ object Generator {
               } yield (p, c)).value
             }
 
-          def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResult] =
+          def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResults] =
             EitherT(itc.callRemote(pid, oid, p)).leftMap(ItcError(_): Error)
 
           for {
@@ -288,12 +287,12 @@ object Generator {
         } yield r).value
 
       override def calculateDigest(
-        pid:            Program.Id,
-        oid:            Observation.Id,
-        asterismResult: ItcService.AsterismResult,
-        params:         GeneratorParams
+        pid:             Program.Id,
+        oid:             Observation.Id,
+        asterismResults: ItcService.AsterismResults,
+        params:          GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        calcDigestThenCache(Context(pid, oid, asterismResult, params)).value
+        calcDigestThenCache(Context(pid, oid, asterismResults, params)).value
 
       private def calcDigestThenCache(
         ctx: Context
@@ -354,7 +353,7 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
-          .unlessA(ctx.scienceIntegrationTime.exposures.value <= SequenceAtomLimit) *>
+          .unlessA(ctx.scienceIntegrationTime.exposureCount.value <= SequenceAtomLimit) *>
         (ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role).flatMap { (p, _, _) => executionDigest(p, calculator.gmosNorth.estimateSetup) }

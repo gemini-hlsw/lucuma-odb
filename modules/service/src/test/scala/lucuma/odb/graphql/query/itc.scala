@@ -59,7 +59,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                       exposureTime {
                         seconds
                       }
-                      exposures
+                      exposureCount
                       signalToNoise
                     }
                     all {
@@ -72,7 +72,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                       exposureTime {
                         seconds
                       }
-                      exposures
+                      exposureCount
                       signalToNoise
                     }
                     all {
@@ -95,7 +95,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                        "exposureTime": {
                          "seconds": 10.000000
                        },
-                       "exposures": ${FakeItcResult.exposures.value},
+                       "exposureCount": ${FakeItcResult.exposureCount.value},
                        "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
                      },
                      "all": [
@@ -110,7 +110,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                        "exposureTime": {
                          "seconds": 10.000000
                        },
-                       "exposures": ${FakeItcResult.exposures.value},
+                       "exposureCount": ${FakeItcResult.exposureCount.value},
                        "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
                      },
                      "all": [
@@ -156,7 +156,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "itc": {
                   "science": {
                     "selected": {
-                      "targetId": $tid1
+                      "targetId": $tid0
                     },
                     "all": [
                       {

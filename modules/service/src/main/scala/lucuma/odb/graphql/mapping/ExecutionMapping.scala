@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Eq
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*

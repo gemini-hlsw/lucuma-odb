@@ -12,6 +12,7 @@ import cats.syntax.order.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.data.Zipper
+import lucuma.core.enums.Band
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -33,6 +34,7 @@ import lucuma.core.optics.syntax.lens.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.TargetIntegrationTime
 import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.refined.*
@@ -92,8 +94,11 @@ object Acquisition {
   val AcquisitionSN: SignalToNoise =
     SignalToNoise.FromBigDecimalExact.getOption(10).get
 
-  val DefaultIntegrationTime: Zipper[IntegrationTime] =
-    Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN))
+  val DefaultIntegrationTime: TargetIntegrationTime =
+    TargetIntegrationTime(
+      Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN)),
+      Band.R // Band is meaningless here, but we need to provide one
+    )
 
   val MinExposureTime    = TimeSpan.fromSeconds(1).get
   val MaxExposureTime    = TimeSpan.fromSeconds(180).get

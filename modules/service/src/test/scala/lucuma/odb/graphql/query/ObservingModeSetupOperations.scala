@@ -144,8 +144,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     }
 
   def createTargetWithProfileAs(
-    user: User,
-    pid:  Program.Id
+    user:     User,
+    pid:      Program.Id
   ): IO[Target.Id] =
     query(
       user  = user,

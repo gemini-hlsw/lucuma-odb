@@ -26,7 +26,7 @@ import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
-import lucuma.odb.service.ItcService.AsterismResult
+import lucuma.odb.service.ItcService.AsterismResults
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -59,7 +59,7 @@ object TimeEstimateService {
 
   private case class ObservationData(
     generatorParams: GeneratorParams,
-    asterismResult:  Option[AsterismResult],
+    asterismResults: Option[AsterismResults],
     executionDigest: Option[ExecutionDigest]
   ) {
 
@@ -116,15 +116,15 @@ object TimeEstimateService {
             .orElse {
               // ExecutionDigest not in the cache, we'll need to calculate it.
               // For that we need the ITC results, which may be cached.  Use the
-              // cached ITC AsterismResult if available, else call remote ITC.
-              val asterismResult = OptionT.fromOption(data.asterismResult).orElseF {
+              // cached ITC AsterismResults if available, else call remote ITC.
+              val asterismResults = OptionT.fromOption(data.asterismResults).orElseF {
                  itcService(itcClient)
                    .callRemote(pid, oid, data.generatorParams)
                    .map(_.toOption)
               }
 
               // Calculate time estimate using provided ITC result and params.
-              asterismResult.flatMapF { ar =>
+              asterismResults.flatMapF { ar =>
                 generator(commitHash, itcClient, calculator)
                   .calculateDigest(pid, oid, ar, data.generatorParams)
                   .map(_.toOption.map(_.fullTimeEstimate))
