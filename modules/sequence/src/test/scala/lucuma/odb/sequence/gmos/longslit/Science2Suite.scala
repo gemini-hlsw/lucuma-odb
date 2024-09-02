@@ -50,7 +50,7 @@ class Science2Suite extends ScalaCheckSuite {
   def execCases(timeSpan: TimeSpan, cases: Case*): Unit =
     cases.toList.zipWithIndex.foreach { case (c, idx) =>
       assertEquals(
-        Science2.Goal.goalsFor(Δλs, Δqs, integrationTime(timeSpan, idx+1)),
+        Science2.Goal.compute(Δλs, Δqs, integrationTime(timeSpan, idx+1)),
         c.expected(timeSpan),
         s"""Failure: ${TimeSpan.format(timeSpan)}' x ${idx+1}"""
       )
