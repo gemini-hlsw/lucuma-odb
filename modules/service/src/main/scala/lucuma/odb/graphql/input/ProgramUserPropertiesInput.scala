@@ -7,8 +7,8 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.EducationalStatus
 import lucuma.core.model.PartnerLink
-import lucuma.odb.data.EducationalStatus
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
