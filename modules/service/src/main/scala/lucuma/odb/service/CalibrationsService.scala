@@ -100,10 +100,17 @@ trait CalibrationsService[F[_]] {
   )(using Transaction[F]): F[Unit]
 }
 
-trait SpecPhotoCalibrations {
+trait CalibrationTargetLocator {
   def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
     tgts.minimumByOption(_._4.angularDistance(ref))(Angle.SignedAngleOrder).map(x => (x._3, x._1))
 
+  def idealLocation(site: Site, referenceInstant: Instant): Coordinates
+
+  def bestTarget(site: Site, referenceInstant: Instant, role: CalibrationRole, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
+    bestTargetInList(idealLocation(site, referenceInstant), tgts.filter(_._3 === role))
+}
+
+trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
     val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
     val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
@@ -113,11 +120,25 @@ trait SpecPhotoCalibrations {
   }
 
   def bestTarget(site: Site, referenceInstant: Instant, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
-    bestTargetInList(idealLocation(site, referenceInstant), tgts.filter(_._3 === CalibrationRole.SpectroPhotometric))
-
+    bestTarget(site, referenceInstant, CalibrationRole.SpectroPhotometric, tgts)
 }
 
 object SpecPhotoCalibrations extends SpecPhotoCalibrations
+
+trait TwilightCalibrations extends CalibrationTargetLocator {
+  def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
+    val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+    val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
+    val ra = RightAscension(HourAngle.fromHMS(h - 2, m, s, 0, n / 1000))
+    val dec = site.place.latitude
+    Coordinates(ra, dec)
+  }
+
+  def bestTarget(site: Site, referenceInstant: Instant, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
+    bestTarget(site, referenceInstant, CalibrationRole.Twilight, tgts)
+}
+
+object TwilightCalibrations extends TwilightCalibrations
 
 object CalibrationsService {
   type GmosNConfigs = (GmosNorthGrating, Option[GmosNorthFilter], GmosNorthFpu, Wavelength, GmosXBinning, GmosYBinning)
