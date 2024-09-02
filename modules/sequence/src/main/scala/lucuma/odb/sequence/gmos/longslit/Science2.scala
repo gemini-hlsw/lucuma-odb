@@ -12,10 +12,12 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.order.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GmosGratingOrder
@@ -31,8 +33,6 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -46,13 +46,14 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.util.IndexTracker
 import monocle.Focus
 import monocle.Lens
 import scala.annotation.tailrec
 
 sealed trait Science2[D]:
 
-  def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]]
+  def generate(t: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)]
 
   def record(step: StepRecord[D])(using Eq[D]): Science2[D]
 
@@ -117,7 +118,7 @@ object Science2:
   case class Goal(
     adjustment:        Adjustment,
     perBlockExposures: Int,
-    toalExposures:     Int
+    totalExposures:    Int
   )
 
   object Goal:
@@ -254,7 +255,7 @@ object Science2:
       missingCalsAt(t).isEmpty
 
     lazy val scienceCount: Int =
-      science.count(hasValidCalibrations)
+      if cal.isEmpty then 0 else science.count(hasValidCalibrations)
 
     def remainingScienceTimeFrom(t: Timestamp): TimeSpan =
       calibrationExpiration
@@ -266,7 +267,7 @@ object Science2:
     // blocks)
     def remainingScienceExposuresAt(t: Timestamp, exposureTime: TimeSpan): Int =
       val forCurrentBlock  = (steps.goal.perBlockExposures - scienceCount)           max 0
-      val forWholeObs      = (steps.goal.toalExposures - (completed + scienceCount)) max 0
+      val forWholeObs      = (steps.goal.totalExposures - (completed + scienceCount)) max 0
       val forRemainingTime = (remainingScienceTimeFrom(t).toMicroseconds / exposureTime.toMicroseconds).toInt
       forCurrentBlock min forWholeObs min forRemainingTime
 
@@ -298,26 +299,30 @@ object Science2:
         case StepConfig.Science(_, _) =>
           copy(science = step.created :: science)
 
-    def record(step: StepRecord[D])(using Eq[D]): WavelengthBlock[D] =
-      if !matches(step) then settle
-      else if step.successfullyCompleted then addStep(step)
-      else this
+    def record(step: StepRecord[D])(using Eq[D]): (WavelengthBlock[D], Boolean) =
+      if !matches(step) then (settle, false)
+      else if step.successfullyCompleted then (addStep(step), true)
+      else (this, true)
 
-    def remainderAt(t: Timestamp, exposureTime: TimeSpan): (List[ProtoStep[D]], WavelengthBlock[D]) =
-      val cs = missingCalsAt(t)
+    def remainderAt(t: Timestamp, exposureTime: TimeSpan): (WavelengthBlock[D], List[ProtoStep[D]]) =
+      if completed >= steps.goal.totalExposures then
+        (this, Nil)
+      else
+        val cs = missingCalsAt(t)
 
-      // Add the missing cals as if they just happened.
-      val wb = copy(cal = cs.foldLeft(cal) { (m, calStep) =>
-        m.updatedWith(calStep)(o => (t :: o.toList.flatten).some)
-      })
+        // Add the missing cals as if they just happened.
+        val wb = copy(cal = cs.foldLeft(cal) { (m, calStep) =>
+          m.updatedWith(calStep)(o => (t :: o.toList.flatten).some)
+        })
 
-      val n  = wb.remainingScienceExposuresAt(t, exposureTime)
-      val ss = List.fill(n)(steps.science)
+        val n   = wb.remainingScienceExposuresAt(t, exposureTime)
+        val wbʹ = WavelengthBlock.completed.modify(_ + n)(wb.settle)
+        val ss  = List.fill(n)(steps.science)
 
-      val wbʹ = WavelengthBlock.completed.modify(_ + n)(wb.settle)
-      // If there are no pending science datasets already but the cals at the
-      // beginning.  Otherwise the missing cals should finish the block.
-      if science.isEmpty then (cs ++ ss, wbʹ) else (ss ++ cs, wbʹ)
+        // If there are no pending science datasets already put the cals at the
+        // beginning.  Otherwise the missing cals should finish the block.
+        if science.isEmpty then (wbʹ, cs ++ ss) else (wbʹ, ss ++ cs)
+    end remainderAt
 
   end WavelengthBlock
 
@@ -328,31 +333,40 @@ object Science2:
     def completed[D]: Lens[WavelengthBlock[D], Int] =
       Focus[WavelengthBlock[D]](_.completed)
 
-  case class IdTracker(
-    atomCount: Int,
-    atomId:    Option[Atom.Id],
-    stepCount: Int,
-    stepId:    Option[Step.Id]
-  ):
-    def next[D](step: StepRecord[D]): IdTracker =
-      if stepId.contains(step.id) then this
-      else if atomId.contains(step.atomId) then copy(stepCount = stepCount + 1, stepId = step.id.some)
-      else IdTracker(atomCount + 1, step.atomId.some, stepCount = 1, step.id.some)
-
-  object IdTracker:
-    val zero: IdTracker =
-      IdTracker(0, none, 0, none)
-
   private case class ScienceState[D](
-    blocks:    List[WavelengthBlock[D]],
-    idTracker: IdTracker
+    time:    IntegrationTime,
+    blocks:  List[WavelengthBlock[D]],
+    tracker: IndexTracker,
+    pos:     Int
   ) extends Science2[D]:
 
-    override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
-      Stream.empty
+    val length: Int = blocks.length
+
+    override def generate(t: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+      val (aix, six) = tracker.toTuple
+      Stream
+        .iterate(pos)(idx => (idx + 1) % length)
+        .mapAccumulate((blocks.toVector, aix, six)) { case ((bs, a, s), idx) =>
+          val (wb, steps) = bs(idx).remainderAt(t, time.exposureTime)
+          val bsʹ  = bs.updated(idx, wb)
+          val desc = NonEmptyString.unapply(wb.steps.goal.adjustment.description)
+          val atom = NonEmptyList.fromList(steps).map { nel =>
+            (ProtoAtom(desc, nel.zipWithIndex.map(_.map(_ + six))), aix)
+          }
+          ((bsʹ, aix+1, 0), atom)
+        }
+        .takeWhile { case ((bs, _, _), _) => bs.foldMap(_.completed) < time.exposureCount.value }
+        .collect { case (_, Some(atom)) => atom }
 
     override def record(step: StepRecord[D])(using Eq[D]): Science2[D] =
-      ScienceState(blocks.map(_.record(step)), idTracker.next(step))
+      val (blocksʹ, matches) = blocks.map(_.record(step)).unzip
+
+      // update the position to first matching step starting from current pos
+      val (suffix, prefix) = matches.zipWithIndex.splitAt(pos)
+      val f: PartialFunction[(Boolean, Int), Int] = { case (true, idx) => idx }
+      val posʹ = prefix.collectFirst(f).orElse(suffix.collectFirst(f)).getOrElse(pos)
+
+      ScienceState(time, blocksʹ, tracker.record(step), posʹ)
 
   end ScienceState
 
@@ -365,7 +379,7 @@ object Science2:
     ): F[Either[String, Science2[D]]] =
       EitherT(sc.compute(expander, config, time))
         .map(_.map(WavelengthBlock.init))
-        .map(ScienceState(_, IdTracker.zero))
+        .map(ScienceState(time, _, IndexTracker.Zero, 0))
         .value
   end ScienceState
 

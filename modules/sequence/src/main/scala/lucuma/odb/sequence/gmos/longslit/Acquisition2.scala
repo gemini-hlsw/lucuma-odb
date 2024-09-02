@@ -8,6 +8,7 @@ package longslit
 import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -42,11 +43,12 @@ import lucuma.odb.sequence.data.AcqExposureTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.util.IndexTracker
 import lucuma.refined.*
 
 sealed trait Acquisition2[D]:
 
-  def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]]
+  def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)]
 
   def record(step: StepRecord[D])(using Eq[D]): Acquisition2[D]
 
@@ -152,79 +154,99 @@ object Acquisition2:
     def visitId: Visit.Id
     def steps: Steps[D]
     def recordCompleted(step: StepRecord[D])(using Eq[D]): Acquisition2[D]
+    def tracker: IndexTracker
+
+    def updateTracker(tracker: IndexTracker): AcquisitionState[D]
 
     def updatesVisit(step: StepRecord[D]): Boolean =
       step.visitId =!= visitId
 
     def reset(visitId: Visit.Id): Acquisition2[D] =
-      AcquisitionState.ExpectCcd2(visitId, steps)
+      AcquisitionState.ExpectCcd2(visitId, tracker, steps)
 
     override def record(step: StepRecord[D])(using Eq[D]): Acquisition2[D] =
-      if !step.isAcquisitionSequence     then reset(step.visitId)
-      else if updatesVisit(step)         then reset(step.visitId).record(step)
-      else if step.successfullyCompleted then recordCompleted(step)
-      else this
+      if updatesVisit(step) then
+        reset(step.visitId).record(step)
+      else
+        val a = updateTracker(tracker.record(step))
+        if !step.isAcquisitionSequence     then a.reset(step.visitId)
+        else if step.successfullyCompleted then a.recordCompleted(step)
+        else a
 
   end AcquisitionState
 
   private object AcquisitionState:
-    val InitialAcquisitionTitle: Option[NonEmptyString] =
-      NonEmptyString.unsafeFrom("Initial Acquisition").some
 
-    def fineAdjustments[D](steps: Steps[D]): ProtoAtom[ProtoStep[D]] =
-      ProtoAtom(NonEmptyString.unsafeFrom("Fine adjustments").some, steps.repeatingAtom)
+    def initialAcq[D](
+      steps:   NonEmptyList[ProtoStep[D]],
+      tracker: IndexTracker
+    ): ProtoAtom[(ProtoStep[D], Int)] =
+      ProtoAtom(
+        NonEmptyString.unapply("Initial Acquisition"),
+        steps.zipWithIndex.map(_.map(_ + tracker.stepCount))
+      )
+
+    def fineAdjustments[D](slit: ProtoStep[D]): ProtoAtom[(ProtoStep[D], Int)] =
+      ProtoAtom(NonEmptyString.unapply("Fine adjustments"), NonEmptyList.of((slit, 1)))
+
+    def gen[D](
+      init: Option[NonEmptyList[ProtoStep[D]]],
+      slit: ProtoStep[D],
+      track: IndexTracker
+    ): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+      Stream(
+        (init.fold(fineAdjustments(slit))(nel => initialAcq(nel, track)), track.atomCount),
+        (fineAdjustments(slit), track.atomCount+1)
+      )
 
     case class Init[D](steps: Steps[D]) extends Acquisition2[D]:
 
-      override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
-        Stream(
-          ProtoAtom(InitialAcquisitionTitle, steps.initialAtom),
-          fineAdjustments(steps)
-        )
+      override def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+        gen(steps.initialAtom.some, steps.slit, IndexTracker.Zero)
 
       override def record(step: StepRecord[D])(using Eq[D]): Acquisition2[D] =
-        ExpectCcd2(step.visitId, steps).record(step)
+        ExpectCcd2(step.visitId, IndexTracker.Zero, steps).record(step)
 
     end Init
 
-    case class ExpectCcd2[D](visitId: Visit.Id, steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectCcd2[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
-        Stream(
-          ProtoAtom(InitialAcquisitionTitle, steps.initialAtom),
-          fineAdjustments(steps)
-        )
+      override def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+        gen(steps.initialAtom.some, steps.slit, tracker)
+
+      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
+        copy(tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): Acquisition2[D] =
-        if steps.ccd2.matches(step) then ExpectP10(visitId, steps)
+        if steps.ccd2.matches(step) then ExpectP10(visitId, tracker, steps)
         else this
 
     end ExpectCcd2
 
-    case class ExpectP10[D](visitId: Visit.Id, steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectP10[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
-        Stream(
-          ProtoAtom(InitialAcquisitionTitle, NonEmptyList.of(steps.p10, steps.slit)),
-          fineAdjustments(steps)
-        )
+      override def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+        gen(NonEmptyList.of(steps.p10, steps.slit).some, steps.slit, tracker)
+
+      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
+        copy(tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): Acquisition2[D] =
-        if steps.p10.matches(step) then ExpectSlit(visitId, steps, initialAtom = true)
+        if steps.p10.matches(step) then ExpectSlit(visitId, tracker, steps, initialAtom = true)
         else this
 
     end ExpectP10
 
-    case class ExpectSlit[D](visitId: Visit.Id, steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
+    case class ExpectSlit[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
 
-      override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
-        Stream(
-          if initialAtom then ProtoAtom(InitialAcquisitionTitle, steps.repeatingAtom) else fineAdjustments(steps),
-          fineAdjustments(steps)
-        )
+      override def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+        gen(Option.when(initialAtom)(NonEmptyList.one(steps.slit)), steps.slit, tracker)
+
+      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
+        copy(tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): Acquisition2[D] =
-        if steps.slit.matches(step) then ExpectSlit(visitId, steps, initialAtom = false)
+        if steps.slit.matches(step) then ExpectSlit(visitId, tracker, steps, initialAtom = false)
         else this
 
     end ExpectSlit
