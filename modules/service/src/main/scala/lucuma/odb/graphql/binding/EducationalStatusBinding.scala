@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.EducationalStatus
+import lucuma.core.enums.EducationalStatus
 
 val EducationalStatusBinding: Matcher[EducationalStatus] =
   enumeratedBinding
