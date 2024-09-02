@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.MonadThrow
 import cats.data.Nested
 import cats.data.NonEmptyList
@@ -93,7 +92,7 @@ trait CalibrationsService[F[_]] {
   /**
     * Returns the calibration targets for a given role adjusted to a reference instant
     */
-  def calibrationTargets(role: CalibrationRole, referenceInstant: Instant): F[List[(Target.Id, String, Coordinates)]]
+  def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant): F[List[(Target.Id, String, CalibrationRole, Coordinates)]]
 
   def recalculateCalibrationTarget(
     pid: Program.Id,
@@ -102,8 +101,8 @@ trait CalibrationsService[F[_]] {
 }
 
 trait SpecPhotoCalibrations {
-  def bestTarget(ref: Coordinates, tgts: List[(Target.Id, String, Coordinates)]): Option[Target.Id] =
-    tgts.minimumByOption(_._3.angularDistance(ref))(Angle.SignedAngleOrder).map(_._1)
+  def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
+    tgts.minimumByOption(_._4.angularDistance(ref))(Angle.SignedAngleOrder).map(x => (x._3, x._1))
 
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
     val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
@@ -113,12 +112,50 @@ trait SpecPhotoCalibrations {
     Coordinates(ra, dec)
   }
 
+  def bestTarget(site: Site, referenceInstant: Instant, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
+    bestTargetInList(idealLocation(site, referenceInstant), tgts.filter(_._3 === CalibrationRole.SpectroPhotometric))
+
+}
+
+object SpecPhotoCalibrations extends SpecPhotoCalibrations
+
+object CalibrationsService {
+  type GmosNConfigs = (GmosNorthGrating, Option[GmosNorthFilter], GmosNorthFpu, Wavelength, GmosXBinning, GmosYBinning)
+  type GmosSConfigs = (GmosSouthGrating, Option[GmosSouthFilter], GmosSouthFpu, Wavelength, GmosXBinning, GmosYBinning)
+  val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
+  val CalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+
+  private case class SiteIdealTargets(
+    site: Site,
+    referenceInstant: Instant,
+    tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]
+  ) {
+    def bestSpecPhotoTarget: Option[Target.Id] =
+      SpecPhotoCalibrations.bestTarget(site, referenceInstant, tgts).map(_._2)
+
+    def bestTarget(role: CalibrationRole): Option[Target.Id] =
+      role match {
+        case CalibrationRole.SpectroPhotometric => bestSpecPhotoTarget
+        case _ => none
+      }
+  }
+
+  extension[F[_], A](r: F[Result[A]])
+    def orError(using F: MonadThrow[F]): F[A]  =
+      r.flatMap {
+        case Result.Success(a)       => a.pure[F]
+        case Result.Warning(_, a)    => a.pure[F]
+        case Result.Failure(a)       => F.raiseError(new RuntimeException(a.map(_.message).toList.mkString(", ")))
+        case Result.InternalError(a) => F.raiseError(a)
+      }
+
   def targetCoordinates(when: Instant)(
-    rows: List[(Target.Id, String, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
-  ): List[(Target.Id, String, Coordinates)] =
-    rows.map { case (tid, name, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
+    rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
+  ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
+    rows.map { case (tid, name, role, ra, dec, epoch, pmra, pmdec, rv, parallax) =>
       (tid,
         name,
+        role,
         SiderealTracking(
           Coordinates(ra, dec),
           epoch,
@@ -130,26 +167,8 @@ trait SpecPhotoCalibrations {
         ).at(when)
       )
     }.collect {
-      case (tid, name, Some(st)) => (tid, name, st)
+      case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
-
-}
-
-object SpecPhotoCalibrations extends SpecPhotoCalibrations
-
-object CalibrationsService extends SpecPhotoCalibrations {
-  type GmosNConfigs = (GmosNorthGrating, Option[GmosNorthFilter], GmosNorthFpu, Wavelength, GmosXBinning, GmosYBinning)
-  type GmosSConfigs = (GmosSouthGrating, Option[GmosSouthFilter], GmosSouthFpu, Wavelength, GmosXBinning, GmosYBinning)
-  val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
-
-  extension[F[_], A](r: F[Result[A]])
-    def orError(using F: MonadThrow[F]): F[A]  =
-      r.flatMap {
-        case Result.Success(a)       => a.pure[F]
-        case Result.Warning(_, a)    => a.pure[F]
-        case Result.Failure(a)       => F.raiseError(new RuntimeException(a.map(_.message).toList.mkString(", ")))
-        case Result.InternalError(a) => F.raiseError(a)
-      }
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
@@ -266,98 +285,102 @@ object CalibrationsService extends SpecPhotoCalibrations {
             )
           ).orError
 
-      private def calibrationObservations(
+      private def gmosCalibrations(
         pid: Program.Id,
         gid: Group.Id,
         gnls: List[GmosNConfigs],
         gsls: List[GmosSConfigs],
-        gnTgt: Option[Target.Id],
-        gsTgt: Option[Target.Id]
-      )(using Transaction[F]): F[List[Observation.Id]] = {
+        gnCalc: SiteIdealTargets,
+        gsCalc: SiteIdealTargets
+      )(using Transaction[F]): F[List[(CalibrationRole, Observation.Id)]] = {
+        CalibrationTypes.map { ct =>
 
-        def gmosNorthLSObservations(gnls: List[GmosNConfigs], tid: Target.Id) =
-          gnls.traverse { case (g, of, f, w, xb, yb) =>
-            val conf =
-              GmosLongSlitInput.Create.North(
-                grating = g,
-                filter = of,
-                fpu = f,
-                common = GmosLongSlitInput.Create.Common(
-                  centralWavelength = w,
-                  explicitXBin = xb.some,
-                  explicitYBin = yb.some,
-                  explicitAmpReadMode = none,
-                  explicitAmpGain = none,
-                  explicitRoi = GmosRoi.CentralSpectrum.some,
-                  explicitλDithers = none,
-                  explicitSpatialOffsets = none
-                ))
+          def gmosNorthLSObservations(gnls: List[GmosNConfigs], tid: Target.Id) =
+            gnls.traverse { case (g, of, f, w, xb, yb) =>
+              val conf =
+                GmosLongSlitInput.Create.North(
+                  grating = g,
+                  filter = of,
+                  fpu = f,
+                  common = GmosLongSlitInput.Create.Common(
+                    centralWavelength = w,
+                    explicitXBin = xb.some,
+                    explicitYBin = yb.some,
+                    explicitAmpReadMode = none,
+                    explicitAmpGain = none,
+                    explicitRoi = GmosRoi.CentralSpectrum.some,
+                    explicitλDithers = none,
+                    explicitSpatialOffsets = none
+                  ))
 
-            createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(conf.some, none))
-          }
+              createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(conf.some, none))
+            }
 
-        def gmosSouthLSObservations(gsls: List[GmosSConfigs], tid: Target.Id) =
-          gsls.traverse { case (g, of, f, w, xb, yb) =>
-            val conf =
-              GmosLongSlitInput.Create.South(
-                grating = g,
-                filter = of,
-                fpu = f,
-                common = GmosLongSlitInput.Create.Common(
-                  centralWavelength = w,
-                  explicitXBin = xb.some,
-                  explicitYBin = yb.some,
-                  explicitAmpReadMode = none,
-                  explicitAmpGain = none,
-                  explicitRoi = GmosRoi.CentralSpectrum.some,
-                  explicitλDithers = none,
-                  explicitSpatialOffsets = none
-                ))
+          def gmosSouthLSObservations(gsls: List[GmosSConfigs], tid: Target.Id) =
+            gsls.traverse { case (g, of, f, w, xb, yb) =>
+              val conf =
+                GmosLongSlitInput.Create.South(
+                  grating = g,
+                  filter = of,
+                  fpu = f,
+                  common = GmosLongSlitInput.Create.Common(
+                    centralWavelength = w,
+                    explicitXBin = xb.some,
+                    explicitYBin = yb.some,
+                    explicitAmpReadMode = none,
+                    explicitAmpGain = none,
+                    explicitRoi = GmosRoi.CentralSpectrum.some,
+                    explicitλDithers = none,
+                    explicitSpatialOffsets = none
+                  ))
 
-            createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
-          }
+              createCalibrationObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
+            }
 
-        val gno: Option[F[List[Observation.Id]]] = gnTgt.map(tgtid =>
-            // We don't want to create a target if there are no pending configurations
-            if (gnls.nonEmpty) {
-              (for {
-                ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o       <- ct.traverse(gmosNorthLSObservations(gnls, _))
-              } yield o).orError
-            } else {
-              List.empty[Observation.Id].pure[F]
-            })
+          val gno: Option[F[List[(CalibrationRole, Observation.Id)]]] = gnCalc.bestTarget(ct).map(tgtid =>
+              // We don't want to create a target if there are no pending configurations
+              if (gnls.nonEmpty) {
+                (for {
+                  cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                  o   <- cta.traverse(gmosNorthLSObservations(gnls, _))
+                } yield o).orError.map(_.map((ct, _)))
+              } else {
+                List.empty[(CalibrationRole, Observation.Id)].pure[F]
+              })
 
-        val gso: Option[F[List[Observation.Id]]] = gsTgt.map(tgtid =>
-            // We don't want to create a target if there are no pending configurations
-            if (gsls.nonEmpty) {
-              (for {
-                ct      <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o       <- ct.traverse(gmosSouthLSObservations(gsls, _))
-              } yield o).orError
-            } else {
-              List.empty[Observation.Id].pure[F]
-            })
+          val gso: Option[F[List[(CalibrationRole, Observation.Id)]]] = gsCalc.bestTarget(ct).map(tgtid =>
+              // We don't want to create a target if there are no pending configurations
+              if (gsls.nonEmpty) {
+                (for {
+                  cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                  o   <- cta.traverse(gmosSouthLSObservations(gsls, _))
+                } yield o).orError.map(_.map((ct, _)))
+              } else {
+                List.empty[(CalibrationRole, Observation.Id)].pure[F]
+              })
 
-        (gno, gso).mapN((_, _).mapN(_ ::: _)).getOrElse(Nil.pure[F])
+          (gno, gso).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F])
+        }.sequence.map(_.flatten)
       }
 
       // Set the calibration role of the observations in bulk
-      private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
+      def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
-      private def generateCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: Option[Target.Id], gsTgt: Option[Target.Id])(using Transaction[F]): F[List[Observation.Id]] = {
+      private def generateGMOSLSCalibrations(pid: Program.Id, gnls: List[GmosNConfigs], gsls: List[GmosSConfigs], gnTgt: SiteIdealTargets, gsTgt: SiteIdealTargets)(using Transaction[F]): F[List[Observation.Id]] = {
         if (gnls.isEmpty && gsls.isEmpty) {
           List.empty.pure[F]
         } else
           for {
             cg   <- calibrationsGroup(pid, gnls.size + gsls.size)
             oids <- cg.map(g =>
-                      calibrationObservations(pid, g, gnls, gsls, gnTgt, gsTgt).flatTap { oids =>
-                        setCalibRoleAndGroup(oids, CalibrationRole.SpectroPhotometric).whenA(oids.nonEmpty)
+                      gmosCalibrations(pid, g, gnls, gsls, gnTgt, gsTgt).flatTap { oids =>
+                        oids.groupBy(_._1).toList.traverse { case (role, oids) =>
+                          setCalibRoleAndGroup(oids.map(_._2), role).whenA(oids.nonEmpty)
+                        }
                       }
                     ).getOrElse(List.empty.pure[F])
-          } yield oids
+          } yield oids.map(_._2)
       }
 
       private def removeUnnecessaryCalibrations(
@@ -374,23 +397,22 @@ object CalibrationsService extends SpecPhotoCalibrations {
           .getOrElse(List.empty.pure[F])
       }
 
-      override def calibrationTargets(role: CalibrationRole, referenceInstant: Instant): F[List[(Target.Id, String, Coordinates)]] =
-          session.execute(Statements.selectCalibrationTargets)(role)
+      override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
+        : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
+          session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] = {
-        val gncoords = idealLocation(Site.GN, referenceInstant)
-        val gscoords = idealLocation(Site.GS, referenceInstant)
 
         for {
-          tgts                             <- calibrationTargets(CalibrationRole.SpectroPhotometric, referenceInstant)
-          gsTgt                             = bestTarget(gscoords, tgts)
-          gnTgt                             = bestTarget(gncoords, tgts)
+          tgts                             <- calibrationTargets(CalibrationTypes, referenceInstant)
+          gsTgt = SiteIdealTargets(Site.GS, referenceInstant, tgts)
+          gnTgt = SiteIdealTargets(Site.GN, referenceInstant, tgts)
           (scienceGmosNLS, scienceGmosSLS) <- uniqueConfiguration(pid, ObservationSelection.Science)
           (calibGmosNLS, calibGmosSLS)     <- uniqueConfiguration(pid, ObservationSelection.Calibration)
           gnls                              = scienceGmosNLS.map(_._2).diff(calibGmosNLS.map(_._2))
           gsls                              = scienceGmosSLS.map(_._2).diff(calibGmosSLS.map(_._2))
-          addedOids                        <- generateCalibrations(pid, gnls, gsls, gnTgt, gsTgt)
+          addedOids                        <- generateGMOSLSCalibrations(pid, gnls, gsls, gnTgt, gsTgt)
           removedOids                      <- removeUnnecessaryCalibrations(calibGmosNLS, scienceGmosNLS, calibGmosSLS, scienceGmosSLS)
         } yield (addedOids, removedOids)
       }
@@ -400,9 +422,8 @@ object CalibrationsService extends SpecPhotoCalibrations {
         pid: Program.Id,
         oid: Observation.Id,
       )(using Transaction[F]): F[Unit] = {
-        Applicative[F].unit
         for {
-          o <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
+          o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>
                     asterismService.getAsterism(pid, oid).map(_.map(_._1))
@@ -410,15 +431,13 @@ object CalibrationsService extends SpecPhotoCalibrations {
           // Select a new target
           tgts <- o match {
                   case Some(oid, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
-                    val gncoords = idealLocation(Site.GN, ot.toInstant)
                     session
-                      .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-                      .map(targetCoordinates(ot.toInstant).map(bestTarget(gncoords, _)))
+                      .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
+                      .map(targetCoordinates(ot.toInstant).map(SiteIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestSpecPhotoTarget))
                   case Some(oid, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
-                    val gscoords = idealLocation(Site.GS, ot.toInstant)
                     session
-                      .execute(Statements.selectCalibrationTargets)(CalibrationRole.SpectroPhotometric)
-                      .map(targetCoordinates(ot.toInstant).map(bestTarget(gscoords, _)))
+                      .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
+                      .map(targetCoordinates(ot.toInstant).map(SiteIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestSpecPhotoTarget))
                   case _ =>
                     none.pure[F]
                }
@@ -455,10 +474,11 @@ object CalibrationsService extends SpecPhotoCalibrations {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-    def selectCalibrationTargets: Query[CalibrationRole, (Target.Id, String, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
+    def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
               c_target_id,
               t_target.c_name,
+              t_target.c_calibration_role,
               c_sid_ra,
               c_sid_dec,
               c_sid_epoch,
@@ -469,9 +489,9 @@ object CalibrationsService extends SpecPhotoCalibrations {
             FROM t_target
             INNER JOIN t_program
             ON t_target.c_program_id=t_program.c_program_id
-            WHERE t_program.c_calibration_role=$calibration_role
+            WHERE t_program.c_calibration_role IN(${calibration_role.list(roles.length)})
               AND t_program.c_existence='present'
-          """.query(target_id *: text *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
+          """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
 
     val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, Option[Timestamp], Option[ObservingModeType])] =
       sql"""

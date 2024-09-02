@@ -348,7 +348,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   def calibrationTargets(role: CalibrationRole, referenceInstant: Instant) =
     withServices(pi) { services =>
-      services.calibrationsService.calibrationTargets(role, referenceInstant)
+      services.calibrationsService.calibrationTargets(List(role), referenceInstant)
     }
 
   test("calculate best target for specphoto") {
@@ -363,9 +363,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     for {
       tgts <- calibrationTargets(CalibrationRole.SpectroPhotometric, when)
       _    <- samples.traverse { case (site, instant, name) =>
-                val loc = SpecPhotoCalibrations.idealLocation(site, instant)
-                val id = SpecPhotoCalibrations.bestTarget(loc, tgts)
-                tgts.find(_._1 === id.get).map(_._2).fold(
+                val id = SpecPhotoCalibrations.bestTarget(site, instant, tgts)
+                tgts.find(_._1 === id.map(_._2).get).map(_._2).fold(
                   IO.raiseError(new RuntimeException(s"Target $id not found"))
                 )(n => assertIOBoolean(IO(n === name)))
               }
