@@ -31,6 +31,8 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -326,15 +328,31 @@ object Science2:
     def completed[D]: Lens[WavelengthBlock[D], Int] =
       Focus[WavelengthBlock[D]](_.completed)
 
+  case class IdTracker(
+    atomCount: Int,
+    atomId:    Option[Atom.Id],
+    stepCount: Int,
+    stepId:    Option[Step.Id]
+  ):
+    def next[D](step: StepRecord[D]): IdTracker =
+      if stepId.contains(step.id) then this
+      else if atomId.contains(step.atomId) then copy(stepCount = stepCount + 1, stepId = step.id.some)
+      else IdTracker(atomCount + 1, step.atomId.some, stepCount = 1, step.id.some)
+
+  object IdTracker:
+    val zero: IdTracker =
+      IdTracker(0, none, 0, none)
+
   private case class ScienceState[D](
-    blocks: List[WavelengthBlock[D]]
+    blocks:    List[WavelengthBlock[D]],
+    idTracker: IdTracker
   ) extends Science2[D]:
 
     override def generate: Stream[Pure, ProtoAtom[ProtoStep[D]]] =
       Stream.empty
 
     override def record(step: StepRecord[D])(using Eq[D]): Science2[D] =
-      copy(blocks = blocks.map(_.record(step)))
+      ScienceState(blocks.map(_.record(step)), idTracker.next(step))
 
   end ScienceState
 
@@ -347,7 +365,7 @@ object Science2:
     ): F[Either[String, Science2[D]]] =
       EitherT(sc.compute(expander, config, time))
         .map(_.map(WavelengthBlock.init))
-        .map(ScienceState(_))
+        .map(ScienceState(_, IdTracker.zero))
         .value
   end ScienceState
 
