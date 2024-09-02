@@ -6,6 +6,7 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
@@ -125,7 +126,7 @@ class updateTargets extends OdbSuite {
     }
   }
 
-  test("update calibration targets is allowed directly with the id") {
+  test("update calibration targets is allowed directly with the id by staff") {
     for {
       pid  <- withServices(service) { s =>
                 s.session.transaction.use { xa =>
@@ -167,6 +168,36 @@ class updateTargets extends OdbSuite {
                           "calibrationRole": "PHOTOMETRIC"
                         } ]
                       }
+                    }
+                  """
+                )
+              )
+    } yield ()
+  }
+
+  test("delete orphan calibration targets") {
+    for {
+      pid  <-  createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      _    <- setTargetCalibratioRole(tid, CalibrationRole.Photometric)
+      _    <- withServices(service) { s =>
+                s.session.transaction.use { xa =>
+                  s.targetService.deleteOrphanCalibrationTargets(pid)(using xa)
+                }
+              }
+      _    <- expect(
+                user = staff,
+                query = s"""
+                  query {
+                      target(targetId: ${tid.asJson}) {
+                        id
+                      }
+                    }
+                  """,
+                expected = Right(
+                    json"""
+                    {
+                      "target": null
                     }
                   """
                 )

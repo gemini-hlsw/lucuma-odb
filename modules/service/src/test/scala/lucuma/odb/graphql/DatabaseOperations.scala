@@ -825,7 +825,7 @@ trait DatabaseOperations { this: OdbSuite =>
     parentGroupId: Option[Group.Id] = None,
     parentIndex: Option[NonNegShort] = None,
     minRequired: Option[NonNegShort] = None,
-    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None 
+    initialContents: Option[List[Either[Group.Id, Observation.Id]]] = None
   ): IO[Group.Id] =
     query(
       user = user,
@@ -1478,6 +1478,12 @@ trait DatabaseOperations { this: OdbSuite =>
     val command = sql"update t_group set c_system = $bool where c_group_id = $group_id".command
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(system, id).void))
+  }
+
+  def setTargetCalibratioRole(tid: Target.Id, role: CalibrationRole): IO[Unit] = {
+    val command = sql"update t_target set c_calibration_role = $calibration_role where c_target_id = $target_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(role, tid).void))
   }
 
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
