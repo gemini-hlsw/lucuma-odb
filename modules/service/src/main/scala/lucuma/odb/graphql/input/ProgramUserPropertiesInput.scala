@@ -8,6 +8,7 @@ package input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -15,7 +16,8 @@ import lucuma.odb.graphql.binding.*
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
   educationalStatus: Nullable[EducationalStatus],
-  thesis:            Nullable[Boolean]
+  thesis:            Nullable[Boolean],
+  gender:            Nullable[Gender]
 )
 
 object ProgramUserPropertiesInput {
@@ -25,8 +27,9 @@ object ProgramUserPropertiesInput {
       case List(
         PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
         EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
-        BooleanBinding.Nullable("thesis", rThesis)
-      ) => (rPartnerLink, rEducationalStatus, rThesis).parMapN(ProgramUserPropertiesInput.apply)
+        BooleanBinding.Nullable("thesis", rThesis),
+        GenderBinding.Nullable("gender", rGender),
+      ) => (rPartnerLink, rEducationalStatus, rThesis, rGender).parMapN(ProgramUserPropertiesInput.apply)
     }
 
 }

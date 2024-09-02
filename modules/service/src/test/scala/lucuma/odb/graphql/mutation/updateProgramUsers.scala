@@ -10,6 +10,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.Gender
 import lucuma.core.enums.Partner
 import lucuma.core.enums.Partner.US
 import lucuma.core.enums.ProgramUserRole
@@ -131,6 +132,33 @@ class updateProgramUsers extends OdbSuite {
       }
     """
 
+  def updateUserGender(p: Program.Id, u: User, g: Option[Gender]): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              gender: ${g.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            gender
+          }
+        }
+      }
+    """
+
   def expected(ts: (Program.Id, User, PartnerLink)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -175,6 +203,19 @@ class updateProgramUsers extends OdbSuite {
       )
     )
 
+  def expectedGender(ts: (Program.Id, User, Option[Gender])*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, g) =>
+          Json.obj(
+            "program" -> Json.obj("id" -> pid.asJson),
+            "user"    -> Json.obj("id" -> user.id.asJson),
+            "gender"  -> g.map(_.tag.toScreamingSnakeCase.asJson).getOrElse(Json.Null)
+          )
+        }.asJson
+      )
+    )
+
   test("update pi partner") {
     createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
       expect(
@@ -208,13 +249,34 @@ class updateProgramUsers extends OdbSuite {
   }
 
   test("unset pi educational status") {
-    createProgramAs(pi2) >>
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
       linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
         expect(
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, None),
           expected = expectedES((pid, pi2, None)).asRight
+        )
+    }
+  }
+
+  test("update pi gender") {
+    createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserGender(pid, pi2, Some(Gender.Other)),
+          expected = expectedGender((pid, pi2, Some(Gender.Other))).asRight
+        )
+    }
+  }
+
+  test("unset pi gender") {
+    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserGender(pid, pi2, None),
+          expected = expectedGender((pid, pi2, None)).asRight
         )
     }
   }
