@@ -17,6 +17,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
@@ -46,7 +47,6 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.EditType
-import lucuma.odb.data.EducationalStatus
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction

@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.Partner
 import lucuma.core.enums.Partner.US
 import lucuma.core.enums.ProgramUserRole
@@ -18,7 +19,6 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
-import lucuma.odb.data.EducationalStatus
 
 class updateProgramUsers extends OdbSuite {
 
