@@ -38,6 +38,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import lucuma.odb.service.TwilightCalibrations
 
 class calibrations extends OdbSuite with SubscriptionUtils {
   val pi       = TestUsers.Standard.pi(1, 101)
@@ -364,6 +365,26 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       tgts <- calibrationTargets(CalibrationRole.SpectroPhotometric, when)
       _    <- samples.traverse { case (site, instant, name) =>
                 val id = SpecPhotoCalibrations.bestTarget(site, instant, tgts)
+                tgts.find(_._1 === id.map(_._2).get).map(_._2).fold(
+                  IO.raiseError(new RuntimeException(s"Target $id not found"))
+                )(n => assertIOBoolean(IO(n === name)))
+              }
+    } yield ()
+  }
+
+  test("calculate best target for twilight") {
+
+    val samples: List[(Site, Instant, String)] = List(
+        (Site.GN, Instant.parse("2024-08-28T07:00:00Z"), "Twilight"),
+        (Site.GN, Instant.parse("2024-08-28T10:00:00Z"), "Twilight"),
+        (Site.GS, Instant.parse("2024-08-28T04:00:00Z"), "Twilight"),
+        (Site.GS, Instant.parse("2024-08-28T07:00:00Z"), "Twilight"),
+      )
+
+    for {
+      tgts <- calibrationTargets(CalibrationRole.Twilight, when)
+      _    <- samples.traverse { case (site, instant, name) =>
+                val id = TwilightCalibrations.bestTarget(site, instant, tgts)
                 tgts.find(_._1 === id.map(_._2).get).map(_._2).fold(
                   IO.raiseError(new RuntimeException(s"Target $id not found"))
                 )(n => assertIOBoolean(IO(n === name)))
