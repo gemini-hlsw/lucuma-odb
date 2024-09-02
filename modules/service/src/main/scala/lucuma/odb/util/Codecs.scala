@@ -278,6 +278,9 @@ trait Codecs {
   val gcal_shutter: Codec[GcalShutter] =
     enumerated[GcalShutter](Type.varchar)
 
+  val gender: Codec[Gender] =
+    enumerated(Type("e_gender"))
+
   val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))
 

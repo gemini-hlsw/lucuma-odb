@@ -23,6 +23,7 @@ object WhereProgramUser {
     val WherePartnerLinkBinding       = WherePartnerLink.binding(path)
     val WhereEducationalStatusBinding = WhereOptionEq.binding(path / "educationalStatus", EducationalStatusBinding)
     val WhereThesisBinding            = WhereOptionBoolean.binding(path / "thesis", BooleanBinding)
+    val WhereGenderBinding            = WhereOptionEq.binding(path / "gender", GenderBinding)
 
     lazy val WhereProgramUserBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -35,10 +36,11 @@ object WhereProgramUser {
         WhereRoleBinding.Option("role", rRole),
         WherePartnerLinkBinding.Option("partnerLink", rPartnerLink),
         WhereEducationalStatusBinding.Option("educationalStatus", rEducationalStatus),
-        WhereThesisBinding.Option("thesis", rThesis)
+        WhereThesisBinding.Option("thesis", rThesis),
+        WhereGenderBinding.Option("gender", rGender)
       ) =>
-        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rEducationalStatus, rThesis).parMapN {
-          (AND, OR, NOT, program, user, role, partnerLink, educationalStatus, thesis) =>
+        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rEducationalStatus, rThesis, rGender).parMapN {
+          (AND, OR, NOT, program, user, role, partnerLink, educationalStatus, thesis, gender) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -48,7 +50,8 @@ object WhereProgramUser {
               role,
               partnerLink,
               educationalStatus,
-              thesis
+              thesis,
+              gender
             ).flatten)
         }
     }

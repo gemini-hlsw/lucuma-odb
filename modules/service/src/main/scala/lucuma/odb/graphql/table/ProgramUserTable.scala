@@ -19,6 +19,7 @@ trait ProgramUserTable[F[_]] extends BaseMapping[F] {
     val PartnerLink       = col("c_partner_link", partner_link_type)
     val EducationalStatus = col("c_educational_status", educational_status.opt)
     val Thesis            = col("c_thesis", bool.opt)
+    val Gender            = col("c_gender", gender.opt)
   }
 
 }

@@ -105,6 +105,7 @@ trait BaseMapping[F[_]]
   lazy val ExistenceType                           = schema.ref("Existence")
   lazy val ExtinctionType                          = schema.ref("Extinction")
   lazy val FastTurnaroundType                      = schema.ref("FastTurnaround")
+  lazy val GenderType                              = schema.ref("Gender")
   lazy val FilterTypeMetaType                      = schema.ref("FilterTypeMeta")
   lazy val FilterTypeType                          = schema.ref("FilterType")
   lazy val FocalPlaneType                          = schema.ref("FocalPlane")
