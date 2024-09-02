@@ -87,7 +87,7 @@ object Science2:
 
   object Adjustment:
 
-    def adjustmentsFor(
+    def compute(
       wavelengthDithers: List[WavelengthDither],
       spatialOffsets:    List[Offset.Q]
     ): List[Adjustment] =
@@ -120,19 +120,19 @@ object Science2:
 
   object Goal:
 
-    def goalsFor(
+    def compute(
       wavelengthDithers: List[WavelengthDither],
       spatialOffsets:    List[Offset.Q],
       integration:       IntegrationTime
     ): List[Goal] =
-      val adjs = Adjustment.adjustmentsFor(wavelengthDithers, spatialOffsets)
+      val adjs = Adjustment.compute(wavelengthDithers, spatialOffsets)
       val size = adjs.size
 
       val sci  = SciencePeriod.toMicroseconds
       val time = sci min integration.exposureTime.toNonNegMicroseconds.value
 
       val maxExpPerBlock = (sci / time).toInt
-      val exposureCount  = integration.exposures.value
+      val exposureCount  = integration.exposureCount.value
 
       // The calculation of the number of exposures per block differs depending
       // upon whether we have enough to fill a nominal block of exposures at
@@ -196,7 +196,7 @@ object Science2:
         config:   Config[G, L, U],
         time:     IntegrationTime
       ): F[Either[String, List[Steps[D]]]] =
-        Goal.goalsFor(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
+        Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
           val λ = config.centralWavelength
           val (smartArc, smartFlat, science) = eval {
             for {
