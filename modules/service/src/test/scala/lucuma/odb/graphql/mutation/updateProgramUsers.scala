@@ -77,13 +77,13 @@ class updateProgramUsers extends OdbSuite {
       }
     """
 
-  def updateUserEducationalStatus(p: Program.Id, u: User, es: EducationalStatus): String =
+  def updateUserEducationalStatus(p: Program.Id, u: User, es: Option[EducationalStatus]): String =
     s"""
       mutation {
         updateProgramUsers(
           input: {
             SET: {
-              educationalStatus: ${es.tag.toScreamingSnakeCase}
+              educationalStatus: ${es.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
             }
             WHERE: {
               user: {
@@ -149,14 +149,14 @@ class updateProgramUsers extends OdbSuite {
       )
     )
 
-  def expectedES(ts: (Program.Id, User, EducationalStatus)*): Json =
+  def expectedES(ts: (Program.Id, User, Option[EducationalStatus])*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
         "programUsers" -> ts.toList.map { case (pid, user, es) =>
           Json.obj(
             "program"           -> Json.obj("id" -> pid.asJson),
             "user"              -> Json.obj("id" -> user.id.asJson),
-            "educationalStatus" -> es.tag.toScreamingSnakeCase.asJson
+            "educationalStatus" -> es.map(_.tag.toScreamingSnakeCase.asJson).getOrElse(Json.Null)
           )
         }.asJson
       )
@@ -201,8 +201,20 @@ class updateProgramUsers extends OdbSuite {
       linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
         expect(
           user     = pi,
-          query    = updateUserEducationalStatus(pid, pi2, EducationalStatus.UndergradStudent),
-          expected = expectedES((pid, pi2, EducationalStatus.UndergradStudent)).asRight
+          query    = updateUserEducationalStatus(pid, pi2, Some(EducationalStatus.UndergradStudent)),
+          expected = expectedES((pid, pi2, Some(EducationalStatus.UndergradStudent))).asRight
+        )
+    }
+  }
+
+  test("unset pi educational status") {
+    createProgramAs(pi2) >>
+    createProgramAs(pi).flatMap { pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+        expect(
+          user     = pi,
+          query    = updateUserEducationalStatus(pid, pi2, None),
+          expected = expectedES((pid, pi2, None)).asRight
         )
     }
   }
