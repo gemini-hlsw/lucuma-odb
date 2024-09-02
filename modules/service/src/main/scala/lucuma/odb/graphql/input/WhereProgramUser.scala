@@ -9,8 +9,8 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.ProgramUserRole
-import lucuma.odb.data.EducationalStatus
 import lucuma.odb.graphql.binding.*
 
 object WhereProgramUser {
