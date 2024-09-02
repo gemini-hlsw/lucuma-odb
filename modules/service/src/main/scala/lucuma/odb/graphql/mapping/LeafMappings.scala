@@ -100,6 +100,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
       LeafMapping[FocalPlane](FocalPlaneType),
+      LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),
       LeafMapping[GcalContinuum](GcalContinuumType),
       LeafMapping[GcalDiffuser](GcalDiffuserType),

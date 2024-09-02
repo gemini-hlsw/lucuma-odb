@@ -3427,6 +3427,9 @@ input ProgramUserPropertiesInput {
 
   "Is a thesis included in the proposal."
   thesis: Boolean
+
+  "The user's reported gender."
+  gender: Gender
 }
 
 """
@@ -3460,6 +3463,11 @@ type ProgramUser {
   User educational status. PHD/Undergrad/Grad/Other
   """
   educationalStatus: EducationalStatus
+
+  """
+  Users' reported gender.
+  """
+  gender: Gender
 
   """
   Flag indicating whether the user's proposal is part of a thesis.
@@ -6489,6 +6497,31 @@ type GaussianSource {
   Emission lines spectral definition
   """
   emissionLines: EmissionLinesIntegrated
+}
+
+"""
+Gender Male/Female/Other/NotSpecified
+"""
+enum Gender {
+  """
+  Gender Male
+  """
+  MALE
+
+  """
+  Gender Female
+  """
+  FEMALE
+
+  """
+  Gender Other
+  """
+  OTHER
+
+  """
+  Gender Not Specified
+  """
+  NOT_SPECIFIED
 }
 
 """
@@ -11734,6 +11767,37 @@ input WhereEqExecutionEventType {
 }
 
 """
+Filters on equality (or not) of the user reported geender and the supplied
+criteria. All supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionEqGender {
+  """
+  When `true`, matches if the QaState is not defined. When `false` matches if the QaState is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: Gender
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: Gender
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [Gender!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [Gender!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -13737,6 +13801,11 @@ input WhereProgramUser {
   Matches the thesis flag.
   """
   thesis: WhereOptionBoolean
+
+  """
+  Matches the gender status.
+  """
+  gender: WhereOptionEqGender
 }
 
 """
