@@ -9,12 +9,13 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.EducationalStatus
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
-  educationalStatus: Option[EducationalStatus],
-  thesis:            Option[Boolean]
+  educationalStatus: Nullable[EducationalStatus],
+  thesis:            Nullable[Boolean]
 )
 
 object ProgramUserPropertiesInput {
@@ -23,8 +24,8 @@ object ProgramUserPropertiesInput {
     ObjectFieldsBinding.rmap {
       case List(
         PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
-        EducationalStatusBinding.Option("educationalStatus", rEducationalStatus),
-        BooleanBinding.Option("thesis", rThesis)
+        EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
+        BooleanBinding.Nullable("thesis", rThesis)
       ) => (rPartnerLink, rEducationalStatus, rThesis).parMapN(ProgramUserPropertiesInput.apply)
     }
 
