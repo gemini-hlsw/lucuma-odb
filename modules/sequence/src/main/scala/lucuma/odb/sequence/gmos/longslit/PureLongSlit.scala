@@ -24,6 +24,7 @@ import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.SciExposureTime
 
+// TODO: Delete me
 
 /**
  * Core sequence generator for GMOS Long Slit.  It creates the acquisition
