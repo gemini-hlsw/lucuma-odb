@@ -388,6 +388,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 tgts.find(_._1 === id.map(_._2).get).map(_._2).fold(
                   IO.raiseError(new RuntimeException(s"Target $id not found"))
                 )(n => assertIOBoolean(IO(n === name)))
+
               }
     } yield ()
   }
