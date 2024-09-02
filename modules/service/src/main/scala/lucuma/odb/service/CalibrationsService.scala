@@ -434,6 +434,8 @@ object CalibrationsService extends SpecPhotoCalibrations {
                               )
                     } yield ()
                 }.getOrElse(Result.unit.pure[F])
+            // targets may have been orphaned, delete those
+            _  <- targetService.deleteOrphanCalibrationTargets(pid)
         } yield ()
       }
     }
