@@ -5,8 +5,8 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
-import cats.Eq
 import cats.Comparison.*
+import cats.Eq
 import cats.Monad
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
@@ -14,9 +14,10 @@ import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.order.*
 import cats.syntax.option.*
+import cats.syntax.order.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -37,9 +38,9 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.syntax.timespan.*
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
@@ -49,6 +50,7 @@ import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.IndexTracker
 import monocle.Focus
 import monocle.Lens
+
 import scala.annotation.tailrec
 
 sealed trait Science2[D]:
@@ -166,16 +168,16 @@ object Science2:
    */
   case class Steps[D](
     goal:    Goal,
-    flats:   NonEmptyList[ProtoStep[D]],
-    arcs:    NonEmptyList[ProtoStep[D]],
+    flats:   List[ProtoStep[D]],
+    arcs:    List[ProtoStep[D]],
     science: ProtoStep[D]
   ):
     val flatCounts: Map[ProtoStep[D], Int] = Steps.calCounts(flats)
     val arcCounts:  Map[ProtoStep[D], Int] = Steps.calCounts(arcs)
 
   object Steps:
-    private def calCounts[D](cal: NonEmptyList[ProtoStep[D]]): Map[ProtoStep[D], Int] =
-      cal.toList.groupMapReduce(identity)(_ => 1)(_ + _)
+    private def calCounts[D](cal: List[ProtoStep[D]]): Map[ProtoStep[D], Int] =
+      cal.groupMapReduce(identity)(_ => 1)(_ + _)
 
     sealed trait Computer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
@@ -195,9 +197,10 @@ object Science2:
         } yield ()
 
       def compute[F[_]: Monad](
-        expander: SmartGcalExpander[F, D],
-        config:   Config[G, L, U],
-        time:     IntegrationTime
+        expander:    SmartGcalExpander[F, D],
+        config:      Config[G, L, U],
+        time:        IntegrationTime,
+        includeArcs: Boolean
       ): F[Either[String, List[Steps[D]]]] =
         Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
           val λ = config.centralWavelength
@@ -212,9 +215,9 @@ object Science2:
           }
 
           (for {
-            fs <- EitherT(expander.expandStep(smartFlat))
-            as <- EitherT(expander.expandStep(smartArc))
-          } yield Steps(g, fs, as, science)).value
+            fs <- EitherT(expander.expandStep(smartFlat)).map(_.toList)
+            as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
+          } yield Steps(g, fs, as.toList, science)).value
         }.map(_.sequence)
 
       end compute
@@ -372,29 +375,61 @@ object Science2:
 
   private object ScienceState:
     def instantiate[F[_]: Monad, D, G, L, U](
-      sc:       Steps.Computer[D, G, L, U],
-      expander: SmartGcalExpander[F, D],
-      config:   Config[G, L, U],
-      time:     IntegrationTime
+      sc:          Steps.Computer[D, G, L, U],
+      expander:    SmartGcalExpander[F, D],
+      config:      Config[G, L, U],
+      time:        IntegrationTime,
+      includeArcs: Boolean
     ): F[Either[String, Science2[D]]] =
-      EitherT(sc.compute(expander, config, time))
+      EitherT(sc.compute(expander, config, time, includeArcs))
         .map(_.map(WavelengthBlock.init))
         .map(ScienceState(time, _, IndexTracker.Zero, 0))
         .value
   end ScienceState
 
-  def gmosNorth[F[_]: Monad](
+  def gmosNorthScience[F[_]: Monad](
     expander: SmartGcalExpander[F, GmosNorth],
     config:   Config.GmosNorth,
     time:     IntegrationTime
   ): F[Either[String, Science2[GmosNorth]]] =
-    ScienceState.instantiate(Steps.North, expander, config, time)
+    ScienceState.instantiate(Steps.North, expander, config, time, includeArcs = true)
+
+  private def specPhotDithers[G, L, U](c: Config[G, L, U]): List[WavelengthDither] =
+    val limit = c.coverage.toPicometers.value.value / 10.0
+    if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
+    else List(WavelengthDither.Zero)
+
+  def gmosNorthSpectroPhotometric[F[_]: Monad](
+    expander: SmartGcalExpander[F, GmosNorth],
+    config:   Config.GmosNorth,
+    time:     IntegrationTime
+  ): F[Either[String, Science2[GmosNorth]]] =
+    val dithers = specPhotDithers(config)
+    val configʹ = config.copy(
+      explicitWavelengthDithers = dithers.some,
+      explicitSpatialOffsets    = List(Offset.Q.Zero).some
+    )
+    val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(dithers.length))
+    ScienceState.instantiate(Steps.North, expander, configʹ, timeʹ, includeArcs = false)
 
   def gmosSouth[F[_]: Monad](
     expander: SmartGcalExpander[F, GmosSouth],
     config:   Config.GmosSouth,
     time:     IntegrationTime
   ): F[Either[String, Science2[GmosSouth]]] =
-    ScienceState.instantiate(Steps.South, expander, config, time)
+    ScienceState.instantiate(Steps.South, expander, config, time, includeArcs = true)
+
+  def gmosSouthSpectroPhotometric[F[_]: Monad](
+    expander: SmartGcalExpander[F, GmosSouth],
+    config:   Config.GmosSouth,
+    time:     IntegrationTime
+  ): F[Either[String, Science2[GmosSouth]]] =
+    val dithers = specPhotDithers(config)
+    val configʹ = config.copy(
+      explicitWavelengthDithers = dithers.some,
+      explicitSpatialOffsets    = List(Offset.Q.Zero).some
+    )
+    val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(dithers.length))
+    ScienceState.instantiate(Steps.South, expander, configʹ, timeʹ, includeArcs = false)
 
 end Science2
