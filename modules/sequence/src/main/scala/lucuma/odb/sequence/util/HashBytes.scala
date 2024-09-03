@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.security.MessageDigest
@@ -71,9 +72,18 @@ object HashBytes {
       )
   }
 
+  given HashBytes[Timestamp] with {
+    def hashBytes(a: Timestamp): Array[Byte] =
+      HashBytes[Long].hashBytes(a.toEpochMilli)
+  }
+
   given HashBytes[TimeSpan] with {
     def hashBytes(a: TimeSpan): Array[Byte] =
       HashBytes[Long].hashBytes(a.toMicroseconds)
   }
 
+  given [A](using HashBytes[A]): HashBytes[Option[A]] with {
+    def hashBytes(opt: Option[A]): Array[Byte] =
+      opt.fold(Array.emptyByteArray)(HashBytes[A].hashBytes)
+  }
 }

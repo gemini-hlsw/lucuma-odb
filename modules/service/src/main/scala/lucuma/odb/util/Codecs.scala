@@ -15,6 +15,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
+import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
@@ -232,6 +233,9 @@ trait Codecs {
 
   val email_address: Codec[EmailAddress] =
     codecFromPrism(EmailAddress.from, Type("citext"))
+
+  val guide_target_name: Codec[GuideStarName] =
+    codecFromPrism(GuideStarName.from, Type("text"))
 
   val email_id: Codec[EmailId] =
     text.eimap(EmailId.fromString)(_.value.value)

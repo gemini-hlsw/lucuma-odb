@@ -26,15 +26,21 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
     readEnv:   Env => Result[E],
     calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
   )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
+    readQueryAndCursorEffectHander((_, c) => readEnv(c.fullEnv), calculate)
+
+  protected def readQueryAndCursorEffectHander[E, R](
+    readQueryAndCursor:   (Query, Cursor) => Result[E],
+    calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
+  )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
 
     new EffectHandler[F] {
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, E)]] =
-        queries.traverse { case (_, cursor) =>
+        queries.traverse { case (query, cursor) =>
           for {
             p <- cursor.fieldAs[Program.Id]("programId")
             o <- cursor.fieldAs[Observation.Id]("id")
-            e <- readEnv(cursor.fullEnv)
+            e <- readQueryAndCursor(query, cursor)
           } yield (p, o, e)
         }
 
@@ -55,8 +61,6 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
                  )
           } yield res
         ).value
-
     }
-
 
 }
