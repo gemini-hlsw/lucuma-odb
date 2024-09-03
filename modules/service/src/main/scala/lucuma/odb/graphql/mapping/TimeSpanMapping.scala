@@ -56,7 +56,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "partner", VisitTable.Final.PartnerTime)(VisitTable.Id),
       timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "program", VisitTable.Final.ProgramTime)(VisitTable.Id),
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
-      timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId)
+      timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
+      timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId)
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =

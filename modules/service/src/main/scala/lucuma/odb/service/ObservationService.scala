@@ -484,7 +484,7 @@ object ObservationService {
         Trace[F].span("updateObservationTimes") {
           val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
             for {
-              r <- ResultT(Statements.updateObsTime(SET.observationTime, which).traverse { af =>
+              r <- ResultT(Statements.updateObsTime(SET, which).traverse { af =>
                       session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
                         pq.stream(af.argument, chunkSize = 1024).compile.toList
                       }
@@ -1087,13 +1087,18 @@ object ObservationService {
     }
 
     def updateObsTime(
-      ts:    Nullable[Timestamp],
+      SET:   ObservationTimesInput,
       which: AppliedFragment
     ): Result[AppliedFragment] = {
+      val updates: List[AppliedFragment] =
+        List(
+          SET.observationTime.foldPresent(ts => sql"c_observation_time = ${core_timestamp.opt}"(ts)),
+          SET.observationDuration.foldPresent(ts => sql"c_observation_duration = ${time_span.opt}"(ts)),
+        ).flatten
 
-      def update(ts: Option[Timestamp]): AppliedFragment =
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment = 
         void"UPDATE t_observation "                                  |+|
-          sql"SET c_observation_time = ${core_timestamp.opt} "(ts) |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" "        |+|
           void"WHERE c_observation_id IN (" |+| which |+| void")"    |+|
           void"RETURNING t_observation.c_program_id, t_observation.c_observation_id"
 
@@ -1102,11 +1107,7 @@ object ObservationService {
           void"FROM t_observation o "                                |+|
           void"WHERE o.c_observation_id IN (" |+| which |+| void")"
 
-      Result(ts match {
-        case Nullable.Absent    => selectOnly
-        case Nullable.Null      => update(none)
-        case Nullable.NonNull(t)=> update(t.some)
-      })
+      Result(NonEmptyList.fromList(updates).fold(selectOnly)(update))
     }
 
     def updateObservingModeType(

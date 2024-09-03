@@ -8,6 +8,7 @@ package mapping
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.syntax.all.*
+import grackle.Cursor
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
@@ -15,19 +16,17 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import grackle.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
+import lucuma.odb.service.GuideService.GuideEnvironmentOptions
 import lucuma.odb.service.Services
 import org.http4s.client.Client
 
@@ -50,6 +49,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   private val ObsTimeParam           = "observationTime"
   private val AvailabilityStartParam = "start"
   private val AvailabilityEndParam   = "end"
+  private val LookupIfUndefinedParam = "lookupIfUndefined"
 
   private def asterismObject(name: String): SqlObject =
     SqlObject(
@@ -65,7 +65,8 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
-      EffectField("guideEnvironments", guideEnvironmentQueryHandler, List("id", "programId")),
+      EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
+      EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId"))
     )
 
@@ -103,6 +104,13 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         Elab.env(ObsTimeParam -> obsTime)
       }
 
+    case (TargetEnvironmentType, "guideEnvironment", List(
+      BooleanBinding(LookupIfUndefinedParam, rLookup)
+    )) =>
+      Elab.liftR(rLookup).flatMap { lookup =>
+        Elab.env(LookupIfUndefinedParam -> lookup)
+      }
+
     case (TargetEnvironmentType, "guideAvailability", List(
       TimestampBinding(AvailabilityStartParam, rStart),
       TimestampBinding(AvailabilityEndParam, rEnd)
@@ -113,21 +121,48 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     } yield env
   }
 
-  def guideEnvironmentQueryHandler: EffectHandler[F] = {
+  def guideEnvironmentsQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Timestamp] = _.getR[Timestamp](ObsTimeParam)
 
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
-            .getGuideEnvironment(pid, oid, obsTime)
-            .map {
-              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
-              case Right(s) => s.success
-            }
+            .getGuideEnvironments(pid, oid, obsTime)
         }
 
     effectHandler(readEnv, calculate)
+  }
+
+  def guideEnvironmentQueryHandler: EffectHandler[F] = {
+    val readQueryAndCursor: (Query, Cursor) => Result[GuideService.GuideEnvironmentOptions] = (query, cursor) =>
+      // Determine if the query only contains a request for the target name(s). If so, we can avoid
+      // calling gaia under some circumstances. Explore will only be requesting the name, but
+      // Navigate will want everything.
+      val nameOnly = query match {
+        case Query.Select(_, _, child) => 
+          child match {
+            case Query.Select(name, _, grandChild) if name === "guideTargets" =>
+              grandChild match {
+                // The name query can't actually have children - it's a leaf
+                case Query.Select(name, _, _) if name === "name" => true
+                case _ => false
+              }
+            case _ => false
+          }
+        case _ => false
+      }
+      val lookupIfUndefined = cursor.fullEnv.getR[Boolean](LookupIfUndefinedParam)
+      lookupIfUndefined.map(lookup => GuideEnvironmentOptions(queriedNameOnly = nameOnly, lookupIfUndefined = lookup))
+
+    val calculate: (Program.Id, Observation.Id, GuideEnvironmentOptions) => F[Result[Option[GuideService.GuideEnvironment]]] =
+      (pid, oid, options) =>
+        services.use { implicit s =>
+          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+            .getGuideEnvironment(pid, oid, options)
+        }
+
+    readQueryAndCursorEffectHander(readQueryAndCursor, calculate)
   }
 
   def guideAvailabilityQueryHandler: EffectHandler[F] = {
@@ -144,10 +179,6 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         services.use { implicit s =>
           s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
-            .map {
-              case Left(e)  => OdbError.GuideEnvironmentError(Some(e.format)).asFailure
-              case Right(s) => s.success
-            }
         }
 
     effectHandler(readEnv, calculate)

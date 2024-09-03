@@ -2928,6 +2928,11 @@ type Mutation {
   """
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
 
+  """
+  Set the name of the guide target for an observation.
+  """
+  setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult!
+
   "Set the program reference."
   setProgramReference(input: SetProgramReferenceInput!): SetProgramReferenceResult!
 
@@ -3187,9 +3192,14 @@ Observation times properties
 """
 input ObservationTimesInput {
   """
-  Expected execution time used for time-dependent calculations such as average parallactic angle
+  Expected execution time used for time-dependent calculations such as average parallactic angle and guide star selection.
   """
   observationTime: Timestamp
+
+  """
+  Expected observation duration used in conjunction with observationTime. If not set, remaining observation time is used.
+  """
+  observationDuration: TimeSpanInput
 }
 
 type Offset {
@@ -4175,6 +4185,30 @@ type SetupTime {
 }
 
 """
+Input parameters for setting the guide star name for an observation.
+Identify the observation to clone by specifying either its id or reference.  If
+both are specified, they must refer to the same observation.  If neither is
+specified, an error will be returned.
+"""
+input SetGuideTargetNameInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  """
+  The name of the guide star. This must satisfy the regular expression "^Gaia DR3 (-?\d+)$" where the
+  numeric part is the Gaia source_id. Omit or set to null to delete.
+  """
+  targetName: NonEmptyString
+}
+
+"""
+The result of setting the guide target name for an observation.
+"""
+type SetGuideTargetNameResult {
+  observation: Observation
+}
+
+"""
 Input for setting the program reference.  Identify the program to update with one
 of `programId`, `proposalReference` or `programReference`.  If more than one of
 these is specified, all must match.  Use `SET` to specify the new program
@@ -4973,7 +5007,6 @@ type UpdateGroupsResult {
   """
   hasMore: Boolean!
 }
-
 
 """
 Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
@@ -8289,9 +8322,16 @@ type Observation {
   scienceBand: ScienceBand
 
   """
-  Reference time used for execution and visualization and time-dependent calculations (e.g., average parallactic angle)
+  Reference time used for execution and visualization and time-dependent calculations 
+  (e.g., average parallactic angle and guide star selection)
   """
   observationTime: Timestamp
+
+  """
+  Used in conjunction with observationTime for time-dependentent calulations. If not
+  set, the remaining observation execution time will be used.
+  """
+  observationDuration: TimeSpan
 
   """
   Position angle constraint, if any.
@@ -10786,6 +10826,19 @@ type TargetEnvironment {
     """
     observationTime: Timestamp!
   ): [GuideEnvironment!]!
+
+  """
+  The guide star(s) and related information
+  """
+  guideEnvironment(
+    """
+    If this is set to false, a null will be returned if a guide star is not
+    already set or the current guide star has been invalidated by changes.
+    If this is set to true, gaia will be searched to find the best guide star
+    in the above scenario.
+    """
+    lookupIfUndefined: Boolean! = true
+  ): GuideEnvironment
 
   """
   Availability of guide stars during a specified time range.
