@@ -43,7 +43,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.logic.EstimatorState
 import lucuma.odb.logic.TimeEstimateCalculator
-import lucuma.odb.sequence.data.Completion
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
@@ -54,21 +53,13 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
-  def selectGmosNorthCompletionState(
+  def selectGmosNorthStepRecords(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Completion.Matcher[GmosNorth]]
+  ): Stream[F, StepRecord[GmosNorth]]
 
-  def selectGmosNorthSteps(
+  def selectGmosSouthStepRecords(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]]
-
-  def selectGmosSouthCompletionState(
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Completion.Matcher[GmosSouth]]
-
-  def selectGmosSouthSteps(
-    observationId: Observation.Id
-  )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]]
+  ): Stream[F, StepRecord[GmosSouth]]
 
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
@@ -158,38 +149,15 @@ object SequenceService {
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
-      override def selectGmosNorthCompletionState(
+      override def selectGmosNorthStepRecords(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Completion.Matcher[GmosNorth]] =
-        selectCompletionState(
-          observationId,
-          gmosSequenceService.selectGmosNorthDynamicForObs(observationId)
-        )
+      ): Stream[F, StepRecord[GmosNorth]] =
+        gmosSequenceService.selectGmosNorthStepRecords(observationId)
 
-      override def selectGmosSouthCompletionState(
+      override def selectGmosSouthStepRecords(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Completion.Matcher[GmosSouth]] =
-        selectCompletionState(
-          observationId,
-          gmosSequenceService.selectGmosSouthDynamicForObs(observationId)
-        )
-
-      private def selectCompletionState[D](
-        observationId:  Observation.Id,
-        dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[Completion.Matcher[D]] =
-        stepRecordMap(observationId, dynamicConfigs)
-          .flatMap(completionState(observationId))
-
-      def selectGmosNorthSteps(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Map[Step.Id, (GmosNorth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosNorthDynamicForObs(observationId))
-
-      def selectGmosSouthSteps(
-        observationId: Observation.Id
-      )(using Transaction[F]): F[Map[Step.Id, (GmosSouth, StepConfig)]] =
-        stepRecordMap(observationId, gmosSequenceService.selectGmosSouthDynamicForObs(observationId))
+      ): Stream[F, StepRecord[GmosSouth]] =
+        gmosSequenceService.selectGmosSouthStepRecords(observationId)
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
@@ -238,74 +206,6 @@ object SequenceService {
           services.gmosSequenceService.selectGmosSouthStatic,
           services.gmosSequenceService.selectGmosSouthDynamicForStep
         )
-
-      private def stepRecordMap[D](
-        observationId:  Observation.Id,
-        dynamicConfigs: Stream[F, (Step.Id, D)]
-      )(using Transaction[F]): F[Map[Step.Id, (D, StepConfig)]] = {
-
-        // `configs` is a grouping of a configuration C and the set of steps
-        // that share that same configuration value.  It's grouped this way to
-        // minimize the amount of memory that is needed to hold the entire
-        // executed part of the sequence.
-        //
-        // Here we want to flip this map around (Step.Id -> C), but also map C
-        // to A if possible.  The mapping function is intended to lookup the
-        // instrument configuration associated with a science, gcal, etc.
-        // configuration.  E.g. (Step.Id, Science) => (GmosNorth, Science).
-        def foldConfigs[A, C](
-          configs: Iterable[(C, Set[Step.Id])],
-          z:       Map[Step.Id, A]
-        )(op: (Step.Id, C) => Option[A]): Map[Step.Id, A] =
-          configs.foldLeft(z) { case (zʹ, (c, sids)) =>
-            sids.foldLeft(zʹ) { case (zʹʹ, sid) =>
-              op(sid, c).fold(zʹʹ)(a => zʹʹ + (sid -> a))
-            }
-          }
-
-        def foldStream[A, C](
-          stream: Stream[F, (Step.Id, C)],
-          z:      Map[Step.Id, A]
-        )(op: (Step.Id, C) => Option[A]): F[Map[Step.Id, A]] =
-          stream.fold(Map.empty[C, Set[Step.Id]]) { case (m, (s, c)) =>
-            m.updatedWith(c) { _.map(_ + s).orElse(Set(s).some)}
-          }.compile.onlyOrError.map(foldConfigs(_, z)(op))
-
-        def foldQuery[A, C](
-          query: Query[Observation.Id, (Step.Id, C)],
-          z:     Map[Step.Id, A]
-        )(op: (Step.Id, C) => Option[A]): F[Map[Step.Id, A]] =
-          foldStream(session.stream(query)(observationId, 1024), z)(op)
-
-        for {
-          ds <- foldStream(dynamicConfigs, Map.empty[Step.Id, D])((_, d) => d.some)
-          r  <- foldQuery(Statements.SelectStepConfigForObs, Map.empty[Step.Id, (D, StepConfig)]) { (sid, sc) =>
-            ds.get(sid).tupleRight(sc)
-          }
-        } yield r
-
-      }
-
-      // Want a map from atom configuration to completed count that can be
-      // matched against the generated atoms.
-      private def completionState[D](
-        observationId: Observation.Id
-      )(
-        stepMap: Map[Step.Id, (D, StepConfig)]
-      )(using Transaction[F]): F[Completion.Matcher[D]] =
-
-        // Fold over the stream of completed steps in completion order.  If an
-        // atom is broken up by anything else it shouldn't count as complete.
-        session
-          .stream(Statements.SelectCompletionRows)(observationId, 1024)
-          .fold(Completion.Matcher.Builder.init[D]) { case (state, (vid, stepData)) =>
-            stepData.fold(state.nextVisit(vid)) { case (aid, cnt, seqType, sid) =>
-              stepMap.get(sid).fold(state.reset(vid))(state.nextStep(vid, seqType, aid, cnt, _))
-            }
-          }
-          .compile
-          .onlyOrError
-          .map(_.build)
 
       override def abandonAtomsAndStepsForObservation(
         observationId: Observation.Id
@@ -535,61 +435,6 @@ object SequenceService {
           $time_span
       """.command.contramap { (s, a, i, t, c, g, d) => (s, a, a, i, t, c, g, d) }
 
-    /**
-     * Selects completed step records for a particular observation, folding in
-     * visit records to capture when the visit changes.  A completed step is one
-     * for which the completion time has been set by the reception of an EndStep
-     * step event and for which there are no pending datasets or datasets which
-     * have a QA state set to anything other than Pass.
-     */
-    val SelectCompletionRows: Query[Observation.Id, (Visit.Id, Option[(Atom.Id, NonNegShort, SequenceType, Step.Id)])] =
-      (sql"""
-        SELECT
-          a.c_visit_id,
-          a.c_atom_id,
-          a.c_step_count,
-          a.c_sequence_type,
-          s.c_step_id,
-          s.c_completed AS c_timestamp
-        FROM
-          t_step_record s
-        INNER JOIN
-          t_atom_record a
-        ON a.c_atom_id = s.c_atom_id
-        WHERE  a.c_observation_id = $observation_id AND s.c_execution_state = 'completed'
-          AND NOT EXISTS (
-            SELECT 1
-            FROM   t_dataset d
-            WHERE
-              d.c_step_id = s.c_step_id
-              AND (
-                d.c_end_time IS NULL
-                OR (d.c_qa_state IS NOT NULL AND d.c_qa_state <> 'Pass'::e_dataset_qa_state)
-              )
-          )
-
-        UNION ALL
-
-        SELECT
-          c_visit_id,
-          NULL :: d_atom_id       AS c_atom_id,
-          NULL :: int2            AS c_step_count,
-          NULL :: e_sequence_type AS c_sequence_type,
-          NULL :: d_step_id       AS c_step_id,
-          c_created               AS c_timestamp
-        FROM
-          t_visit
-        WHERE
-          c_observation_id = $observation_id
-
-        ORDER BY c_timestamp
-      """).query(visit_id *: atom_id.opt *: int2_nonneg.opt *: sequence_type.opt *: step_id.opt *: core_timestamp)
-          .dimap[Observation.Id, (Visit.Id, Option[(Atom.Id, NonNegShort, SequenceType, Step.Id)])] {
-            o => (o, o)
-          } {
-            case (v, a, c, t, s, _) => (v, (a, c, t, s).tupled)
-          }
-
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
@@ -718,9 +563,10 @@ object SequenceService {
           v.c_created,
           a.c_sequence_type,
           v.c_observe_class,
+          v.c_execution_state,
           v.c_qa_state
         FROM v_step_record v
-        INNER JOIN #$instTable #$instAlias ON #$instAlias.c_stepId = v.c_step_id
+        INNER JOIN #$instTable #$instAlias ON #$instAlias.c_step_id = v.c_step_id
         INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
         WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
       ).query(step_record(instDecoder)) //id *: step_config *: instDecoder *: core_timestamp)

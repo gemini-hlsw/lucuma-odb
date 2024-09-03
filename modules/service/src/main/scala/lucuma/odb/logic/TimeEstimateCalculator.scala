@@ -4,10 +4,10 @@
 package lucuma.odb.logic
 
 import cats.MonadError
-import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import fs2.Pipe
+import fs2.Pure
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
@@ -20,7 +20,7 @@ import skunk.Session
 trait TimeEstimateCalculator[S, D] {
   def estimateSetup: SetupTime
 
-  def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]]
+  def estimateSequence(static: S): Pipe[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int), (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)]
 
   def estimateStep(static: S, state: EstimatorState[D], next: ProtoStep[D]): StepEstimate
 
@@ -49,19 +49,12 @@ object TimeEstimateCalculator {
         StepEstimate.fromMax(c, d)
       }
 
-      def estimateSequence[F[_]](static: S): Pipe[F, Either[String, (ProtoAtom[ProtoStep[D]], Long)], Either[String, (ProtoAtom[ProtoStep[(D, StepEstimate)]], Long)]] =
-        _.mapAccumulate(EstimatorState.empty[D]) { (s, eAtom) =>
-          eAtom.fold(
-            error =>
-              (s, error.asLeft),
-            atomI =>
-             val (atom, index) = atomI
-             val sa = atom.mapAccumulate(s) { (sʹ, step) =>
-               (sʹ.next(step), step.tupleRight(estimateStep(static, sʹ, step)))
-             }
-             // Restore the atom index and convert to Either
-             sa.tupleRight(index).map(_.asRight)
-          )
+      def estimateSequence(static: S): Pipe[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int), (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)] =
+        _.mapAccumulate(EstimatorState.empty[D]) { case (s, (atom, aix)) =>
+           val sa = atom.mapAccumulate(s) { case (sʹ, (step, six)) =>
+             (sʹ.next(step), (step, six, estimateStep(static, sʹ, step)))
+           }
+           sa.tupleRight(aix)
         }.map(_._2)  // discard the state
     }
 
