@@ -9,9 +9,9 @@ import cats.syntax.option.*
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CalibrationRole.SpectroPhotometric
-import lucuma.itc.IntegrationTime
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep

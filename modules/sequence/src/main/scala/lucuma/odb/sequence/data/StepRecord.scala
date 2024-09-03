@@ -5,9 +5,9 @@ package lucuma.odb.sequence.data
 
 import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
