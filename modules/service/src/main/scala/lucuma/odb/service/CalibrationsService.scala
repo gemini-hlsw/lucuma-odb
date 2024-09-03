@@ -305,14 +305,14 @@ object CalibrationsService extends CalibrationObservations {
                   }.getOrElse(List.empty.pure[F])
           // Select a new target
           tgts <- o match {
-                  case Some(oid, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
+                  case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
                     session
                       .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
-                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestSpecPhotoTarget))
-                  case Some(oid, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
+                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestTarget(cr)))
+                  case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
                     session
                       .execute(Statements.selectCalibrationTargets(CalibrationTypes))(CalibrationTypes)
-                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestSpecPhotoTarget))
+                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case _ =>
                     none.pure[F]
                }
@@ -368,15 +368,16 @@ object CalibrationsService extends CalibrationObservations {
               AND t_program.c_existence='present'
           """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
 
-    val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, Option[Timestamp], Option[ObservingModeType])] =
+    val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, CalibrationRole, Option[Timestamp], Option[ObservingModeType])] =
       sql"""
         SELECT
             c_observation_id,
+            c_calibration_role,
             c_observation_time,
             c_observing_mode_type
           FROM t_observation
           WHERE c_observation_id = $observation_id AND c_calibration_role IS NOT NULL
-          """.query(observation_id *: core_timestamp.opt *: observing_mode_type.opt)
+          """.query(observation_id *: calibration_role *: core_timestamp.opt *: observing_mode_type.opt)
 
   }
 
