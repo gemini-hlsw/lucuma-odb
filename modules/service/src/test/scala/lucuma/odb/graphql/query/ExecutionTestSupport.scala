@@ -51,7 +51,6 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.sequence.data.Completion
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -426,9 +425,6 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val StepConfigScienceP00Q00Json = stepConfigScienceJson(P00Q00)
   val StepConfigScienceP10Q00Json = stepConfigScienceJson(P10Q00)
   val StepConfigScienceP00Q15Json = stepConfigScienceJson(P00Q15)
-
-  def atomMap1[D](steps: Completion.StepMatch[D]*): Completion.AtomMap[D] =
-    Completion.AtomMap.from(steps.toList -> PosInt.unsafeFrom(1))
 
   def genGmosNorthSequence(oid: Observation.Id, seqType: SequenceType, futureLimit: Int): IO[List[Atom.Id]] =
     query(

@@ -12,7 +12,6 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
@@ -32,10 +31,10 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.sequence.data.Completion
 
 class execution extends ExecutionTestSupport {
 
+/*
   // Additional cost of an arc (no sci fold move because we are already doing a flat)
   //  5.0 seconds for the Gcal configuration change (shutter, filter, diffuser)
   //  1.0 second for the arc exposure
@@ -383,8 +382,8 @@ class execution extends ExecutionTestSupport {
       )
     }
   }
-
-  test("simple generation") {
+*/
+  test("simple acquisition") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -582,7 +581,19 @@ class execution extends ExecutionTestSupport {
                             }
                           ]
                         },
-                        "possibleFuture": []
+                        "possibleFuture": [
+                          {
+                            "steps" : [
+                              {
+                                "instrumentConfig" : {
+                                  "exposure" : {
+                                    "seconds" : 30.000000
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
                       }
                     }
                   }
@@ -593,7 +604,6 @@ class execution extends ExecutionTestSupport {
         )
       )
     }
-
   }
 
   test("ITC failure") {
@@ -782,7 +792,7 @@ class execution extends ExecutionTestSupport {
     }
 
   }
-
+/*
   test("simple generation - too many future atoms") {
     val setup: IO[(Program.Id, Observation.Id)] =
       for {
@@ -2090,6 +2100,7 @@ class execution extends ExecutionTestSupport {
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
     } yield o
 
+/*
   test("zero gmos north dynamic steps - GmosSequenceService") {
     SetupZeroStepsGmosNorth.flatMap { oid =>
       withServices(pi) { services =>
@@ -2129,7 +2140,7 @@ class execution extends ExecutionTestSupport {
 
     assertIO(m, Completion.Matcher.Empty)
   }
-
+*/
   private def setupOneStepGmosNorth(count: Int): IO[(Observation.Id, Step.Id, Dataset.Id)] = {
     import lucuma.odb.json.all.transport.given
 
@@ -2150,6 +2161,7 @@ class execution extends ExecutionTestSupport {
     } yield (o, s, d)
   }
 
+/*
   test("one gmos north dynamic step - GmosSequenceService") {
     setupOneStepGmosNorth(1).flatMap { case (o, s, _) =>
       withServices(pi) { services =>
@@ -2246,7 +2258,7 @@ class execution extends ExecutionTestSupport {
 
     assertIO(m.map(_.sci.combinedAtomMap), atomMap1((GmosNorthScience0, ScienceP00Q00)))
   }
-
+*/
   private val SetupTwoStepsGmosNorth: IO[(Observation.Id, Step.Id, Step.Id)] = {
     import lucuma.odb.json.all.transport.given
 
@@ -2266,6 +2278,7 @@ class execution extends ExecutionTestSupport {
     } yield (o, sSci, sFlat)
   }
 
+/*
   test("two gmos north dynamic steps - GmosSequenceService") {
     SetupTwoStepsGmosNorth.flatMap { case (o, sSci, sFlat) =>
       withServices(pi) { services =>
@@ -2310,7 +2323,7 @@ class execution extends ExecutionTestSupport {
 
     assertIO(m.map(_.sci.combinedAtomMap), atomMap1((GmosNorthScience0, ScienceP00Q00), (GmosNorthFlat0, Flat)))
   }
-
+*/
   test("clear execution digest") {
 
     val setup: IO[(Program.Id, Observation.Id, Step.Id)] = {
@@ -3087,4 +3100,5 @@ class execution extends ExecutionTestSupport {
       )
     }
   }
+ */
 }

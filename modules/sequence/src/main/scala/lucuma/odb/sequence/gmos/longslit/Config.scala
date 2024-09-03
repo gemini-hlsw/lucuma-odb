@@ -38,6 +38,7 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
+import monocle.Lens
 import spire.math.Rational
 
 import java.io.ByteArrayOutputStream
@@ -358,6 +359,18 @@ object Config {
       )}
 
   }
+
+  def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =
+    Lens[Config[G, L, U], Option[List[WavelengthDither]]](_.explicitWavelengthDithers) { dithers => {
+      case gn: GmosNorth => gn.copy(explicitWavelengthDithers = dithers)
+      case gs: GmosSouth => gs.copy(explicitWavelengthDithers = dithers)
+    }}
+
+  def explicitSpatialOffsets[G, L, U]: Lens[Config[G, L, U], Option[List[Q]]] =
+    Lens[Config[G, L, U], Option[List[Q]]](_.explicitSpatialOffsets) { qs => {
+      case gn: GmosNorth => gn.copy(explicitSpatialOffsets = qs)
+      case gs: GmosSouth => gs.copy(explicitSpatialOffsets = qs)
+    }}
 
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)

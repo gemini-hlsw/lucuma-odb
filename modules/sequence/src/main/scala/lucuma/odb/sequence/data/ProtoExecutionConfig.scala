@@ -4,30 +4,30 @@
 package lucuma.odb.sequence.data
 
 import cats.syntax.apply.*
+import fs2.Pipe
+import fs2.Pure
 import fs2.Stream
 
-case class ProtoExecutionConfig[F[_], S, A](
+case class ProtoExecutionConfig[S, A](
   static:      S,
-  acquisition: Stream[F, A],
-  science:     Stream[F, A]
+  acquisition: Stream[Pure, A],
+  science:     Stream[Pure, A]
 ) {
 
-  def map[B](f: A => B): ProtoExecutionConfig[F, S, B] =
-    ProtoExecutionConfig[F, S, B](static, acquisition.map(f), science.map(f))
+  def map[B](f: A => B): ProtoExecutionConfig[S, B] =
+    ProtoExecutionConfig[S, B](static, acquisition.map(f), science.map(f))
 
-  def mapSequences[F2[x] >: F[x], B](
-    fa: Stream[F2, A] => Stream[F2, B],
-    fs: Stream[F2, A] => Stream[F2, B]
-  ): ProtoExecutionConfig[F2, S, B] =
+  def pipeSequences[B](
+    fa: Pipe[Pure, A, B],
+    fs: Pipe[Pure, A, B]
+  ): ProtoExecutionConfig[S, B] =
     ProtoExecutionConfig(
       static,
       fa(acquisition),
       fs(science)
     )
 
-  def mapBothSequences[F2[x] >: F[x], B](
-    f: Stream[F2, A] => Stream[F2, B]
-  ): ProtoExecutionConfig[F2, S, B] =
-    mapSequences(f, f)
+  def pipeBothSequences[B](f: Pipe[Pure, A, B]): ProtoExecutionConfig[S, B] =
+    pipeSequences(f, f)
 
 }
