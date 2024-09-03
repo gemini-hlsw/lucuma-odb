@@ -10,6 +10,7 @@ import cats.data.NonEmptyList
 import cats.derived.*
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import fs2.text.utf8
 import grackle.Result
@@ -204,6 +205,7 @@ object GuideService {
 
   case class ObservationInfo(
     id:                 Observation.Id,
+    programId:          Program.Id,
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
     optWavelength:      Option[Wavelength],
@@ -324,10 +326,10 @@ object GuideService {
               .toResult(generalError(s"No targets have been defined for observation $oid.").asProblem)
           )
 
-      def getObservationInfo(pid: Program.Id, oid: Observation.Id)(using
+      def getObservationInfo(oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[ObservationInfo]] = {
-        val af = Statements.getObservationInfo(user, pid, oid)
+        val af = Statements.getObservationInfo(oid)
         session
           .prepareR(
             af.fragment.query(Decoders.obsInfoDecoder)
@@ -336,6 +338,14 @@ object GuideService {
             _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid).asProblem))
           )
       }
+
+      def checkProgramAccess(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
+        services.transactionally(
+          programService.userHasAccess(pid).map(hasAccess =>
+            if (hasAccess) ().success
+            else OdbError.InvalidObservation(oid).asFailure
+          )
+        )
 
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -837,7 +847,7 @@ object GuideService {
       ): F[Result[Option[GuideEnvironment]]] = 
         Trace[F].span("getGuideEnvironment"):
           (for {
-            obsInfo       <- ResultT(getObservationInfo(pid, oid))
+            obsInfo       <- ResultT(getObservationInfo(oid))
             obsTime       <- ResultT.fromResult(obsInfo.obsTime)
             wavelength    <- ResultT.fromResult(obsInfo.wavelength)
             asterism      <- ResultT(getAsterism(pid, oid))
@@ -854,7 +864,7 @@ object GuideService {
         using NoTransaction[F]
       ): F[Result[List[GuideEnvironment]]] =
         (for {
-          obsInfo       <- ResultT(getObservationInfo(pid, oid))
+          obsInfo       <- ResultT(getObservationInfo(oid))
           wavelength    <- ResultT.fromResult(obsInfo.wavelength)
           asterism      <- ResultT(getAsterism(pid, oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
@@ -900,7 +910,7 @@ object GuideService {
                                 s"Period for guide availability cannot be greater than $maxAvailabilityPeriodDays days."
                               ).asFailure
                             )
-            obsInfo       <- ResultT(getObservationInfo(pid, oid))
+            obsInfo       <- ResultT(getObservationInfo(oid))
             genInfo       <- ResultT(getGeneratorInfo(pid, oid))
             newHash        = obsInfo.availabilityHash(genInfo.hash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
@@ -916,31 +926,39 @@ object GuideService {
             availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
           } yield availability).value
 
+      def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
+        targetName.fold(updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)){ name =>
+          (for {
+            gsn    <- ResultT.fromResult(
+                        GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
+                      )
+            genInfo  <- ResultT(getGeneratorInfo(obsInfo.programId, obsInfo.id))
+            duration  = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
+            hash      = obsInfo.newGuideStarHash(genInfo.hash, duration)
+            result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
+          } yield result).value
+        }
+
       override def setGuideTargetName(input: SetGuideTargetNameInput)(
         using NoTransaction[F]): F[Result[Observation.Id]] = 
           Trace[F].span("setGuideTargetName"):
-            input.targetName.fold(updateGuideTargetName(input.programId, input.observationId, none, none)){ name =>
-              (for {
-                gsn    <- ResultT.fromResult(
-                            GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
-                          )
-                obsInfo  <- ResultT(getObservationInfo(input.programId, input.observationId))
-                genInfo  <- ResultT(getGeneratorInfo(input.programId, input.observationId))
-                duration  = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
-                hash      = obsInfo.newGuideStarHash(genInfo.hash, duration)
-                result   <- ResultT(updateGuideTargetName(input.programId, input.observationId, gsn.some, hash.some))
-              } yield result).value
-            }
+            (for {
+            obsId   <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
+            obsInfo <- ResultT(getObservationInfo(obsId))
+            _       <- ResultT(checkProgramAccess(obsInfo.programId, obsInfo.id))
+            result  <- ResultT(setGuideTargetNameImpl(obsInfo, input.targetName))
+          } yield result).value
     }
 
   object Statements {
     import ProgramService.Statements.andWhereUserAccess
     import ProgramService.Statements.whereUserAccess
 
-    def getObservationInfo(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
+    def getObservationInfo(oid: Observation.Id): AppliedFragment =
       sql"""
         select
           obs.c_observation_id,
+          obs.c_program_id,
           obs.c_cloud_extinction,
           obs.c_image_quality,
           obs.c_sky_background,
@@ -959,9 +977,8 @@ object GuideService {
           obs.c_guide_target_name,
           obs.c_guide_target_hash
         from t_observation obs
-        where obs.c_program_id     = $program_id
-          and obs.c_observation_id = $observation_id
-      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+        where obs.c_observation_id = $observation_id
+      """.apply(oid)
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment = 
       sql"""
@@ -1061,6 +1078,7 @@ object GuideService {
 
     val obsInfoDecoder: Decoder[ObservationInfo] =
       (observation_id *:
+        program_id *:
         cloud_extinction *:
         image_quality *:
         sky_background *:
@@ -1078,7 +1096,7 @@ object GuideService {
         time_span.opt *:
         guide_target_name.opt *:
         md5_hash.opt).emap {
-        case (id, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, wavelength, ra, dec, time, duration, guidestarName, guidestarHash) =>
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, wavelength, ra, dec, time, duration, guidestarName, guidestarHash) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1110,7 +1128,7 @@ object GuideService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id, ConstraintSet(image, cloud, sky, water, elev), paConstraint, wavelength, explicitBase, time, duration, guidestarName, guidestarHash)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, wavelength, explicitBase, time, duration, guidestarName, guidestarHash)
           )
       }
 

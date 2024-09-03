@@ -9,12 +9,12 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
+import lucuma.core.model.ObservationReference
 import lucuma.odb.graphql.binding.*
 
 final case class SetGuideTargetNameInput(
-  programId:     Program.Id,
-  observationId: Observation.Id,
+  observationId: Option[Observation.Id],
+  observationRef: Option[ObservationReference],
   targetName:    Option[NonEmptyString]
 )
 
@@ -22,9 +22,9 @@ object SetGuideTargetNameInput {
   val Binding: Matcher[SetGuideTargetNameInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rPid),
-        ObservationIdBinding("observationId", rObsId),
+        ObservationIdBinding.Option("observationId", rObsId),
+        ObservationReferenceBinding.Option("observationReference", rObsRef),
         NonEmptyStringBinding.Option("targetName", rName)
-      ) => (rPid, rObsId, rName).parMapN(apply)
+      ) => (rObsId, rObsRef, rName).parMapN(apply)
     }
 }

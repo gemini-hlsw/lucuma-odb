@@ -7,14 +7,16 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.OdbError
 
 class setGuideTargetName extends query.ExecutionTestSupport {
   val targetName1: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
@@ -34,8 +36,8 @@ class setGuideTargetName extends query.ExecutionTestSupport {
 
   // If name is None, omit from mutation, if the string is empty, set to null, else set name
   private def mutation(
-    pid: Program.Id,
-    oid: Observation.Id,
+    oid:  Option[Observation.Id],
+    oref: Option[ObservationReference],
     name: Option[String],
     resultQuery: String = targetEnvQuery
   ): String =
@@ -48,8 +50,8 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       mutation {
         setGuideTargetName(
           input: {
-            programId: ${pid.asJson}
             observationId: ${oid.asJson}
+            observationReference: ${oref.asJson}
             $update
           }
         ) {
@@ -135,16 +137,16 @@ class setGuideTargetName extends query.ExecutionTestSupport {
     obsId => errors.map(_(obsId)).toList.asLeft
 
   private def setName(
-    user: User,
-    pid: Program.Id,
-    oid: Observation.Id,
-    name: Option[String],
-    expected: Either[List[String], Json],
+    user:        User,
+    oid:         Option[Observation.Id],
+    oref:        Option[ObservationReference],
+    name:        Option[String],
+    expected:    Either[List[String], Json],
     resultQuery: String = targetEnvQuery
   ): IO[Unit] =
     expect(
       user = user,
-      query = mutation(pid, oid, name, resultQuery),
+      query = mutation(oid, oref, name, resultQuery),
       expected = expected
     )
 
@@ -154,7 +156,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- setName(staff, pid, oid, name.some, expected)
+      _   <- setName(staff, oid.some, none, name.some, expected)
     yield ()
   }
 
@@ -163,7 +165,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- setName(staff, pid, oid, targetName1.some, expected(oid))
+      _   <- setName(staff, oid.some, none, targetName1.some, expected(oid))
     yield ()
   }
 
@@ -173,7 +175,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationAs(pi, pid, tid)
-      _   <- setName(staff, pid, oid, targetName1.some, expected(oid))
+      _   <- setName(staff, oid.some, none, targetName1.some, expected(oid))
     yield ()
   }
 
@@ -183,7 +185,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- setName(staff, pid, oid, targetName1.some, expected(oid))
+      _   <- setName(staff, oid.some, none, targetName1.some, expected(oid))
     yield ()
   }
 
@@ -193,7 +195,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(staff, pid, oid, targetName1.some, expectName(targetName1))
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
     yield ()
   }
 
@@ -203,7 +205,62 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(pi, pid, oid, targetName1.some, expectName(targetName1))
+      _   <- setName(pi, oid.some, none, targetName1.some, expectName(targetName1))
+    yield ()
+  }
+
+  test("user must have access to the program") {
+    val expected = expectObsError(oid => OdbError.InvalidObservation(oid).message)
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
+      _   <- setName(pi2, oid.some, none, targetName1.some, expected(oid))
+    yield ()
+  }
+
+  test("can specify observation by reference") {
+    for
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
+      _   <- setName(pi, none, oref.some, targetName1.some, expectName(targetName1))
+    yield ()
+  }
+
+  test("can specify observation by both id and reference") {
+    for
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      oref = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
+      _   <- setName(pi, oid.some, oref.some, targetName1.some, expectName(targetName1))
+    yield ()
+  }
+
+  test("observation id and reference must correspond") {
+    for
+      pid  <- createProgramAs(pi)
+      ref  <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      oref  = ObservationReference(ref.get, PosInt.unsafeFrom(1))
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid1 <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      oid2 <- createObservationAs(pi, pid)
+      exp   = expectError(s"Observation '${oref.label}' (id $oid1) does not correspond to observation id $oid2.")
+      _    <- setName(pi, oid2.some, oref.some, targetName1.some, exp)
+    yield ()
+  }
+
+  test("must specify either observation id or reference") {
+    val expected = expectError("One of observationId or observationReference must be provided.")
+    for
+      _   <- setName(pi, none, none, none, expected)
     yield ()
   }
 
@@ -213,8 +270,8 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(staff, pid, oid, targetName1.some, expectName(targetName1))
-      _   <- setName(pi, pid, oid, none, expectNull)
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
+      _   <- setName(pi, oid.some, none, none, expectNull)
     yield ()
   }
 
@@ -224,8 +281,8 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(staff, pid, oid, targetName1.some, expectName(targetName1))
-      _   <- setName(pi, pid, oid, "".some, expectNull)
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
+      _   <- setName(pi, oid.some, none, "".some, expectNull)
     yield ()
   }
 
@@ -245,7 +302,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(staff, pid, oid, targetName1.some, expectName(targetName1))
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
       _   <- setObservationTimeAndDuration(pi, oid, Later.some, none)
       _   <- justQuery(pi, oid, none)
     yield ()
@@ -257,10 +314,10 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
-      _   <- setName(staff, pid, oid, targetName1.some, expectName(targetName1))
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
       _   <- updateAsterisms(pi, List(oid), List.empty, List(tid), List(oid -> List.empty))
       // only query the id in the response since asking for the target name would give an error
-      _   <- setName(staff, pid, oid, none, expectJustId(oid), idQuery)
+      _   <- setName(staff, oid.some, none, none, expectJustId(oid), idQuery)
     yield ()
   }
 

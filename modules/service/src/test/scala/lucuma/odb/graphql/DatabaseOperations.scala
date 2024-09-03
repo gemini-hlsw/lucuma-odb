@@ -1547,7 +1547,6 @@ trait DatabaseOperations { this: OdbSuite =>
   
   def setGuideTargetName(
     user: User,
-    pid: Program.Id,
     oid: Observation.Id,
     guideTargetName: Option[String]
   ): IO[Unit] = {
@@ -1555,7 +1554,6 @@ trait DatabaseOperations { this: OdbSuite =>
       mutation {
         setGuideTargetName(
           input: {
-            programId: ${pid.asJson}
             observationId: ${oid.asJson}
             targetName: ${guideTargetName.asJson}
           }
