@@ -730,7 +730,7 @@ class guideEnvironment extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, p, o, invalidTargetName.some)
+        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -747,7 +747,7 @@ class guideEnvironment extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, p, o, invalidTargetName.some)
+        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -764,7 +764,7 @@ class guideEnvironment extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, p, o, invalidTargetName.some)
+        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -781,7 +781,7 @@ class guideEnvironment extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, p, o, defaultTargetName.some)
+        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
@@ -795,7 +795,7 @@ class guideEnvironment extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, p, o, otherTargetName.some)
+        _ <- setGuideTargetName(pi, o, otherTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = otherGuideEnvironmentResults)

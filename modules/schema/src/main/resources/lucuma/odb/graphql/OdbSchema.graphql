@@ -4186,17 +4186,13 @@ type SetupTime {
 
 """
 Input parameters for setting the guide star name for an observation.
+Identify the observation to clone by specifying either its id or reference.  If
+both are specified, they must refer to the same observation.  If neither is
+specified, an error will be returned.
 """
 input SetGuideTargetNameInput {
-  """
-  The program id for the observation being set.
-  """
-  programId: ProgramId!
-
-  """
-  The id of the observation to set.
-  """
-  observationId: ObservationId!
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
 
   """
   The name of the guide star. This must satisfy the regular expression "^Gaia DR3 (-?\d+)$" where the
