@@ -45,16 +45,16 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                           dms 
                         }
                       }
-                #      observingMode {
-                #        instrument
-                #        mode
-                #        gmosNorthLongSlit {
-                #          grating
-                #        }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
                 #        gmosSouthLongSlit {
                 #          grating
                 #        }
-                #     }
+                      }
                     }
                   }
                 }
@@ -76,6 +76,13 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                         },
                         "dec" : {
                           "dms" : "-00:06:04.916777"
+                        }
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_NORTH",
+                        "mode" : "GMOS_NORTH_LONG_SLIT",
+                        "gmosNorthLongSlit" : {
+                          "grating" : "R831_G5302"
                         }
                       }
                     }
