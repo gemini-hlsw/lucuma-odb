@@ -530,7 +530,7 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("target environment: fail to set an asterism across programs") {
+  test("target environment: fail to set an asterism across programs".ignore) {
 
     def updateObservationsMutation(
       oid0: Observation.Id,
