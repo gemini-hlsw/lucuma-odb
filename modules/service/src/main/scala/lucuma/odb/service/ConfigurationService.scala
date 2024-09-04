@@ -22,6 +22,8 @@ import lucuma.core.math.Coordinates
 import lucuma.odb.data.ObservingModeType
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 trait ConfigurationService[F[_]] {
 
@@ -58,8 +60,10 @@ object ConfigurationService {
         services.runGraphQLQuery(Queries.selectConfiguration(oid)).map: r =>
           r.flatMap: json =>
             json.hcursor.downField("observation").downField("configuration").as[Configuration] match
-              case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
-              case Right(value) => Result(value)
+              case Right(conf) => Result(conf)
+              case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some("Reference coordinates are not available.")).asFailure
+              case Left(Configuration.DecodingFailures.NoObservingMode) => OdbError.InvalidConfiguration(Some("Observing mode is undefined.")).asFailure
+              case Left(other)  => Result.failure(other.getMessage) // TODO: this probably isn't good enough
 
     def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:

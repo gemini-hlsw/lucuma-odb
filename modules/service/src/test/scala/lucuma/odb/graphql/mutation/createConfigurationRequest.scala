@@ -7,6 +7,7 @@ package mutation
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.data.OdbError
 
 class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperations {
 
@@ -15,7 +16,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   val validUsers = List(pi, admin).toList
 
-  test("select configuration for fully-configured observation") {
+  test("create and select configuration request for fully-configured observation") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None, "Foo") >>
@@ -81,6 +82,82 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                   }
                 }
               """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("can't create configuration request if no targets") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+        createObservationAs(pi, pid).flatMap { oid =>
+          expectOdbError(
+            user = pi,
+            query = s"""
+              mutation {
+                createConfigurationRequest(input: {
+                  observationId: "$oid"
+                }) {
+                  id
+                }
+              }
+            """,
+            expected = {
+              case OdbError.GuideEnvironmentError(Some(s"No targets have been defined for observation $oid.")) => // ok
+            }
+          )
+        }
+      }
+    }
+  }
+
+  test("can't create configuration request if no CFP") {
+      createProgramAs(pi).flatMap { pid =>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expectOdbError(
+              user = pi,
+              query = s"""
+                mutation {
+                  createConfigurationRequest(input: {
+                    observationId: "$oid"
+                  }) {
+                    id
+                  }
+                }
+              """,
+              expected = {
+                case OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available.")) => // ok
+              }
+            )
+          }
+        }
+    }
+  }
+
+  test("can't create configuration request if no observing mode") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createObservationAs(pi, pid, tid).flatMap { oid =>
+            expectOdbError(
+              user = pi,
+              query = s"""
+                mutation {
+                  createConfigurationRequest(input: {
+                    observationId: "$oid"
+                  }) {
+                    id
+                  }
+                }
+              """,
+              expected = {
+                case OdbError.InvalidConfiguration(Some(s"Observing mode is undefined.")) => // ok
+              }
             )
           }
         }
