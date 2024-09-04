@@ -10,12 +10,18 @@ import lucuma.odb.data.ObservingModeType
 
 import table.*
 
-trait ConfigurationObservingModeMapping[F[_]]
+trait ConfigurationObservingModeMappings[F[_]]
   extends ObservationView[F]
+     with ConfigurationRequestTable[F]
      with GmosLongSlitView[F] {
 
-  lazy val ConfigurationObservingModeMapping: ObjectMapping =
-    ObjectMapping(ConfigurationObservingModeType)(
+  lazy val ConfigurationObservingModeMappings = List(
+    ConfigurationObservingModeMapping,
+    ConfigurationRequestObservingModeMapping,
+  )
+
+  private lazy val ConfigurationObservingModeMapping: ObjectMapping =
+    ObjectMapping(ObservationType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
@@ -23,4 +29,13 @@ trait ConfigurationObservingModeMapping[F[_]]
       SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId))
     )
 
+  private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
+    ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
+      SqlField("synthetic_id", ConfigurationRequestTable.Id, key = true, hidden = true),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      SqlField("mode", ConfigurationRequestTable.ObservingModeType),      
+      SqlObject("gmosNorthLongSlit"),
+      SqlObject("gmosSouthLongSlit"),
+    )
+    
 }

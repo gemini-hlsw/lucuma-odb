@@ -110,10 +110,10 @@ object OdbMapping {
           with ConditionsIntuitionMapping[F]
           with ConditionsMeasurementMapping[F]
           with ConfigurationConditionsMapping[F]
-          with ConfigurationGmosLongSlitMapping[F]
+          with ConfigurationGmosLongSlitMappings[F]
           with ConfigurationMapping[F]
           with ConfigurationRequestMapping[F]
-          with ConfigurationObservingModeMapping[F]
+          with ConfigurationObservingModeMappings[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
@@ -283,10 +283,7 @@ object OdbMapping {
                 ConditionsExpectationMapping,
                 ConditionsIntuitionMapping,
                 ConditionsMeasurementMapping,
-                ConfigurationGmosNorthLongSlitMapping,
-                ConfigurationGmosSouthLongSlitMapping,
                 ConfigurationRequestMapping,
-                ConfigurationObservingModeMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,
                 ConstraintSetMapping,
@@ -423,6 +420,9 @@ object OdbMapping {
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
+                ConfigurationGmosNorthLongSlitMappings,
+                ConfigurationGmosSouthLongSlitMappings,
+                ConfigurationObservingModeMappings,
                 CoordinatesMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,

@@ -26,6 +26,6 @@ trait ConfigurationRequestTable[F[_]] extends BaseMapping[F]:
       val Dec = col("c_reference_dec", declination)
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
-    val GmosNorthLongslitGrating = col("c_gmos_north_longslit_grating", gmos_north_grating.opt)
-    val GmosSouthLongslitGrating = col("c_gmos_south_longslit_grating", gmos_south_grating.opt)
+    val GmosNorthLongslitGrating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)
+    val GmosSouthLongslitGrating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
 
