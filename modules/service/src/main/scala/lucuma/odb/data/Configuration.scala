@@ -16,6 +16,7 @@ import lucuma.core.math.Coordinates
 import lucuma.odb.data.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.odb.data.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.odb.json.coordinates.query.given
+import io.circe.DecodingFailure
 
 case class Configuration(conditions: Configuration.Conditions, refererenceCoordinates: Coordinates, observingMode: Configuration.ObservingMode):
   def subsumes(other: Configuration): Boolean =
@@ -25,14 +26,21 @@ case class Configuration(conditions: Configuration.Conditions, refererenceCoordi
 
 object Configuration:
 
+  object DecodingFailures:
+    val NoReferenceCoordinates = DecodingFailure("Reference coordinates are undefined.", Nil)
+    val NoObservingMode = DecodingFailure("Observing mode is undefined.", Nil)
+
   /** A decoder based on the GraphQL schema, used for recursive service queries. */
   given Decoder[Configuration] = hc =>
     (
       hc.downField("conditions").as[Conditions],
-      hc.downField("referenceCoordinates").as[Coordinates],
-      hc.downField("observingMode").as[ObservingMode]
-    ).mapN(apply)
-
+      hc.downField("referenceCoordinates").as[Option[Coordinates]],
+      hc.downField("observingMode").as[Option[ObservingMode]]
+    ).tupled.flatMap:
+      case (conds, Some(coords), Some(mode)) => Right(apply(conds, coords, mode))
+      case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
+      case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
+      
   given Encoder[Configuration] = ???
 
   case class Conditions(

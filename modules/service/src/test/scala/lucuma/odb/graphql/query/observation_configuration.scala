@@ -91,4 +91,73 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
     }
   }
 
+  test("select configuration for non-fully-configured observation (no proposal)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi).flatMap { pid =>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      referenceCoordinates {
+                        ra { 
+                          hms 
+                        }
+                        dec { 
+                          dms 
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_ONE",
+                        "cloudExtinction" : "POINT_ONE",
+                        "skyBackground" : "DARKEST",
+                        "waterVapor" : "WET"
+                      },
+                      "referenceCoordinates" : null,
+                      "observingMode" : {
+                        "instrument" : "GMOS_NORTH",
+                        "mode" : "GMOS_NORTH_LONG_SLIT",
+                        "gmosNorthLongSlit" : {
+                          "grating" : "R831_G5302"
+                        },
+                        "gmosSouthLongSlit" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
 }
