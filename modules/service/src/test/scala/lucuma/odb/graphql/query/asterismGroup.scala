@@ -59,40 +59,11 @@ class asterismGroup extends OdbSuite {
                       "observations" : {
                         "matches" : [
                           {
-                            "id" : $oid1
-                          },
-                          {
-                            "id" : $oid2
+                            "id" : $oid4
                           }
                         ]
                       },
                       "asterism" : [
-                        {
-                          "id" : ${tids(1)}
-                        },
-                        {
-                          "id" : ${tids(0)}
-                        }
-                      ]
-                    },
-                    {
-                      "observations" : {
-                        "matches" : [
-                          {
-                            "id" : $oid3
-                          }
-                        ]
-                      },
-                      "asterism" : [
-                        {
-                          "id" : ${tids(1)}
-                        },
-                        {
-                          "id" : ${tids(2)}
-                        },
-                        {
-                          "id" : ${tids(0)}
-                        }
                       ]
                     },
                     {
@@ -113,11 +84,40 @@ class asterismGroup extends OdbSuite {
                       "observations" : {
                         "matches" : [
                           {
-                            "id" : $oid4
+                            "id" : $oid1
+                          },
+                          {
+                            "id" : $oid2
                           }
                         ]
                       },
                       "asterism" : [
+                        {
+                          "id" : ${tids(0)}
+                        },
+                        {
+                          "id" : ${tids(1)}
+                        }
+                      ]
+                    },
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $oid3
+                          }
+                        ]
+                      },
+                      "asterism" : [
+                        {
+                          "id" : ${tids(1)}
+                        },
+                        {
+                          "id" : ${tids(0)}
+                        },
+                        {
+                          "id" : ${tids(2)}
+                        }
                       ]
                     }
                   ]
