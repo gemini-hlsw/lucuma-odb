@@ -3,13 +3,13 @@
 
 package lucuma.odb.data
 
-import lucuma.core.util.WithGid
-import lucuma.refined.*
 import io.circe.Decoder
-import io.circe.Json
 import io.circe.Encoder
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.util.Enumerated
+import lucuma.core.util.WithGid
+import lucuma.refined.*
 
 case class ConfigurationRequest(
   id: ConfigurationRequest.Id,

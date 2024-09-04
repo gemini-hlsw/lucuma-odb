@@ -18,14 +18,15 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
+import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculator
 import lucuma.odb.sequence.util.CommitHash
@@ -35,7 +36,6 @@ import org.http4s.client.Client
 
 import binding.*
 import table.*
-import lucuma.core.math.Coordinates
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
   extends ObservationEffectHandler[F] 

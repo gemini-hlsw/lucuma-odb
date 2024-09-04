@@ -28,7 +28,6 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                   createConfigurationRequest(input: {
                     observationId: "$oid"
                   }) {
-                    id
                     status
                     configuration {
                       conditions {
@@ -60,7 +59,27 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = Right(json"""
-                42
+                {
+                  "createConfigurationRequest" : {
+                    "status" : "REQUESTED",
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_ONE",
+                        "cloudExtinction" : "POINT_ONE",
+                        "skyBackground" : "DARKEST",
+                        "waterVapor" : "WET"
+                      },
+                      "referenceCoordinates" : {
+                        "ra" : {
+                          "hms" : "05:46:13.138550"
+                        },
+                        "dec" : {
+                          "dms" : "-00:06:04.916777"
+                        }
+                      }
+                    }
+                  }
+                }
               """)
             )
           }

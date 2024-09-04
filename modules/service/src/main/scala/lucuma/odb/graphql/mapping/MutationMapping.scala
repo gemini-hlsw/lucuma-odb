@@ -57,11 +57,11 @@ import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
+import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProposalInput
-import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.DeleteProposalInput
