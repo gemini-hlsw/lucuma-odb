@@ -10,7 +10,6 @@ import grackle.ResultT
 import lucuma.core.model.Observation
 import lucuma.odb.data.Configuration
 import lucuma.odb.data.ConfigurationRequest
-import lucuma.odb.service.ExecutionEventService.liftF
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*

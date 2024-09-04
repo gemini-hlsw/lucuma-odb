@@ -10,11 +10,11 @@ import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.CallForProposalsView
+import lucuma.odb.graphql.table.ConfigurationRequestTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.table.ConfigurationRequestTable
 
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ConfigurationRequestTable[F]

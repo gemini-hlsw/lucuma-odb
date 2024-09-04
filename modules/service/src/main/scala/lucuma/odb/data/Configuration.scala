@@ -6,16 +6,16 @@ import cats.Eq
 import cats.syntax.all.*
 import io.circe.Decoder
 import io.circe.Encoder
+import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.math.Coordinates
-import lucuma.odb.json.coordinates.query.given
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.math.Coordinates
 import lucuma.odb.data.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.odb.data.Configuration.ObservingMode.GmosSouthLongSlit
+import lucuma.odb.json.coordinates.query.given
 
 case class Configuration(conditions: Configuration.Conditions, refererenceCoordinates: Coordinates, observingMode: Configuration.ObservingMode):
   def subsumes(other: Configuration): Boolean =

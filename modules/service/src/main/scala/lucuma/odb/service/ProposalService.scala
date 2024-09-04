@@ -29,7 +29,6 @@ import lucuma.odb.graphql.input.DeleteProposalInput
 import lucuma.odb.graphql.input.ProposalPropertiesInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UpdateProposalInput
-import lucuma.odb.syntax.resultT.*
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace

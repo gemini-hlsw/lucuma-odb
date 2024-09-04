@@ -21,7 +21,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
-
 import Services.Syntax.*
 
 trait VisitService[F[_]] {
@@ -75,7 +74,7 @@ object VisitService {
  
         val rt = for 
           v <- ResultT(insertVisit)
-          _ <- ResultT.success(insertStatic(v.some).void)
+          _ <- ResultT.liftF(insertStatic(v.some).void)
         yield v
 
         rt.value

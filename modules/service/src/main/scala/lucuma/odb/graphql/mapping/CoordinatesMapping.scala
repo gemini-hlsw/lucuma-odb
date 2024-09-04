@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ConfigurationRequestTable
 
 import table.ObservationView
-import lucuma.odb.graphql.table.ConfigurationRequestTable
 
 trait CoordinatesMapping[F[_]] extends ObservationView[F] with ConfigurationRequestTable[F] {
 

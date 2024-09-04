@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ConfigurationRequestTable
+import lucuma.odb.graphql.table.ObservationView
 
 trait ConfigurationConditionsMapping[F[_]]
   extends ObservationView[F] 

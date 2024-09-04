@@ -71,7 +71,6 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
-import lucuma.odb.syntax.resultT.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import org.http4s.Header
