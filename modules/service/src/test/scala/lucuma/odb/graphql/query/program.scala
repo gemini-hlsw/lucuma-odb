@@ -373,6 +373,9 @@ class program extends OdbSuite {
                   "matches": [
                     {
                       "calibrationRole": "SPECTROPHOTOMETRIC"
+                    },
+                    {
+                      "calibrationRole": "TWILIGHT"
                     }
                   ]
                 }
