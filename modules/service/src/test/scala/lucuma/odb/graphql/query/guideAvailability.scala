@@ -13,6 +13,9 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.json.angle.query.given
@@ -269,12 +272,15 @@ class guideAvailability extends ExecutionTestSupport {
       Resource.eval(IO.pure(Response(body = Stream(respStr).through(utf8.encode))))
     }
 
+  private def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+    createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
+
   test("successfully obtain guide availability") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     val periods = List(
       makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAngles),
@@ -349,7 +355,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -375,7 +381,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -400,7 +406,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -425,7 +431,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -450,7 +456,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -475,7 +481,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -500,7 +506,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -525,7 +531,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(
@@ -551,7 +557,7 @@ class guideAvailability extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
       } yield o
     setup.flatMap { oid =>
       val periods1 = List(

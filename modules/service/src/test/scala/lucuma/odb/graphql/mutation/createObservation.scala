@@ -1316,40 +1316,38 @@ class createObservation extends OdbSuite {
            Some(GmosRoi.Ccd2),
            GmosRoi.FullFrame,
            List(
-             json"""{ "nanometers": -7.5 }""",
-             json"""{ "nanometers":  7.1 }""",
-             json"""{ "nanometers":  7.1 }""",
-             json"""{ "nanometers": -7.5 }"""
+             json"""{ "nanometers": -7.500 }""",
+             json"""{ "nanometers":  7.100 }""",
+             json"""{ "nanometers":  7.100 }""",
+             json"""{ "nanometers": -7.500 }"""
            ),
            Some(List(
-             json"""{ "nanometers": -7.5 }""",
-             json"""{ "nanometers":  7.1 }""",
-             json"""{ "nanometers":  7.1 }""",
-             json"""{ "nanometers": -7.5 }"""
+             json"""{ "nanometers": -7.500 }""",
+             json"""{ "nanometers":  7.100 }""",
+             json"""{ "nanometers":  7.100 }""",
+             json"""{ "nanometers": -7.500 }"""
            )),
            List(
-             json"""{ "nanometers": 0.0 }""",
-             json"""{ "nanometers": 5.0 }""",
-             json"""{ "nanometers": 5.0 }""",
-             json"""{ "nanometers": 0.0 }"""
+             json"""{ "nanometers": 0.000 }""",
+             json"""{ "nanometers": 5.000 }""",
+             json"""{ "nanometers": -5.000 }"""
            ),
            List(
-             json"""{ "arcseconds": -10.0}""",
-             json"""{ "arcseconds":  10.0}""",
-             json"""{ "arcseconds":  10.0}""",
-             json"""{ "arcseconds": -10.0}"""
+             json"""{ "arcseconds": -10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds": -10.000000}"""
            ),
            Some(List(
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }"""
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }"""
            )),
            List(
-             json"""{ "arcseconds":  0.0}""",
-             json"""{ "arcseconds": 15.0}""",
-             json"""{ "arcseconds": 15.0}""",
-             json"""{ "arcseconds":  0.0}"""
+             json"""{ "arcseconds":  0.000000}""",
+             json"""{ "arcseconds": 15.000000}""",
+             json"""{ "arcseconds": -15.000000}"""
            )
           )
         )

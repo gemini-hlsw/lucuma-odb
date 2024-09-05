@@ -170,7 +170,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
-  def fakeItcResult: IntegrationTime =
+  def fakeItcImagingResult: IntegrationTime =
+    FakeItcResult
+
+  def fakeItcSpectroscopyResult: IntegrationTime =
     FakeItcResult
 
   private def itcClient: ItcClient[IO] =
@@ -183,7 +186,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBand).asRight
                 )
               )
             ).get
@@ -199,7 +202,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBand).asRight
                 )
               )
             ).get
@@ -415,7 +418,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .assertEquals(errors)
     }, success => {
       op.map(_.spaces2)
-        .flatTap(s => IO.println(s))
+//        .flatTap(s => IO.println(s))
         .assertEquals(success.spaces2) // by comparing strings we get more useful errors
     })
   }
