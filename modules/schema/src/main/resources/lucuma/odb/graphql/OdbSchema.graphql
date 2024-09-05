@@ -8510,6 +8510,21 @@ type ObservationSelectResult {
 }
 
 """
+The matching configuration requests, limited to a maximum of 1000 entries.
+"""
+type ConfigurationRequestSelectResult {
+  """
+  Matching configuration requests up to the return size limit of 1000
+  """
+  matches: [ConfigurationRequest!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+}
+
+"""
 Observation reference type, broken into its constituient parts and including
 a formatted label.
 """
@@ -8787,6 +8802,23 @@ type Program {
   ): ObservationSelectResult!
 
   """
+  All configuration requests associated with the program.
+  """
+  configurationRequests(
+
+    """
+    Starts the result set at (or after if not existent) the given configuration request id.
+    """
+    OFFSET: ConfigurationRequestId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+
+  ): ConfigurationRequestSelectResult!
+
+  """
   ObsAttachments assocated with the program
   """
   obsAttachments: [ObsAttachment!]!
@@ -8830,6 +8862,7 @@ type Program {
   Calibration role of the program
   """
   calibrationRole: CalibrationRole
+
 }
 
 """
