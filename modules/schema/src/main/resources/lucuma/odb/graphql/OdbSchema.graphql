@@ -10828,17 +10828,13 @@ type TargetEnvironment {
   ): [GuideEnvironment!]!
 
   """
-  The guide star(s) and related information
+  The guide target(s) and related information.
+  If a guide target has been set via `guideTargetName`, that target will be
+  returned. If it not found or not usable, an error will be returned.
+  If no guide target has been set, or it has been invalidated by observation/target
+  changes, Gaia will be searched for the best guide target available.
   """
-  guideEnvironment(
-    """
-    If this is set to false, a null will be returned if a guide star is not
-    already set or the current guide star has been invalidated by changes.
-    If this is set to true, gaia will be searched to find the best guide star
-    in the above scenario.
-    """
-    lookupIfUndefined: Boolean! = true
-  ): GuideEnvironment
+  guideEnvironment: GuideEnvironment!
 
   """
   Availability of guide stars during a specified time range.
@@ -10857,6 +10853,13 @@ type TargetEnvironment {
   When set, overrides the default base position of the target group
   """
   explicitBase: Coordinates
+
+  """
+  The name of the guide target, if any, set by `setGuideTargetName`.
+  If the name is no longer valid or a sequence cannot be generated, null will
+  be returned.
+  """
+  guideTargetName: NonEmptyString
 }
 
 type TargetEnvironmentGroup {
