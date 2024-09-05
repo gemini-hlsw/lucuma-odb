@@ -6,14 +6,14 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ConfigurationRequestTable
+import lucuma.odb.graphql.table.ConfigurationRequestView
 
-trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestTable[F] {
+trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] {
 
   lazy val ConfigurationRequestMapping =
     ObjectMapping(ConfigurationRequestType)(
-      SqlField("id", ConfigurationRequestTable.Id, key = true),
-      SqlField("status", ConfigurationRequestTable.Status),
+      SqlField("id", ConfigurationRequestView.Id, key = true),
+      SqlField("status", ConfigurationRequestView.Status),
       SqlObject("configuration")
     )
 

@@ -12,7 +12,7 @@ import table.*
 
 trait ConfigurationObservingModeMappings[F[_]]
   extends ObservationView[F]
-     with ConfigurationRequestTable[F]
+     with ConfigurationRequestView[F]
      with GmosLongSlitView[F] {
 
   lazy val ConfigurationObservingModeMappings = List(
@@ -31,9 +31,9 @@ trait ConfigurationObservingModeMappings[F[_]]
 
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
-      SqlField("synthetic_id", ConfigurationRequestTable.Id, key = true, hidden = true),
+      SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
-      SqlField("mode", ConfigurationRequestTable.ObservingModeType),      
+      SqlField("mode", ConfigurationRequestView.ObservingModeType),      
       SqlObject("gmosNorthLongSlit"),
       SqlObject("gmosSouthLongSlit"),
     )

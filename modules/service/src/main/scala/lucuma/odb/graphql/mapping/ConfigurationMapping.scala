@@ -18,7 +18,7 @@ import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.graphql.table.ConfigurationRequestTable
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.logic.TimeEstimateCalculator
@@ -27,7 +27,7 @@ import lucuma.odb.service.Services
 import org.http4s.client.Client
 
 trait ConfigurationMapping[F[_]]
-  extends ObservationView[F] with ConfigurationRequestTable[F] {
+  extends ObservationView[F] with ConfigurationRequestView[F] {
 
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
@@ -43,7 +43,7 @@ trait ConfigurationMapping[F[_]]
 
   private lazy val ConfigurationRequestConfigurationMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration")(
-      SqlField("synthetic-id", ConfigurationRequestTable.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ConfigurationRequestView.Id, key = true, hidden = true),
       SqlObject("conditions"),
       SqlObject("referenceCoordinates"),
       SqlObject("observingMode"),

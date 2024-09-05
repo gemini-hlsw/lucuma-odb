@@ -51,9 +51,9 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                         gmosNorthLongSlit {
                           grating
                         }
-                #        gmosSouthLongSlit {
-                #          grating
-                #        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
                       }
                     }
                   }
@@ -83,7 +83,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                         "mode" : "GMOS_NORTH_LONG_SLIT",
                         "gmosNorthLongSlit" : {
                           "grating" : "R831_G5302"
-                        }
+                        },
+                        "gmosSouthLongSlit" : null
                       }
                     }
                   }
