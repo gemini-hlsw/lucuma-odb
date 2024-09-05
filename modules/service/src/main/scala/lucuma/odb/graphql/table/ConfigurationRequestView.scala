@@ -7,9 +7,9 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 
-trait ConfigurationRequestTable[F[_]] extends BaseMapping[F]:
+trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
-  object ConfigurationRequestTable extends TableDef("t_configuration_request"):
+  object ConfigurationRequestView extends TableDef("v_configuration_request"):
 
     val Id = col("c_configuration_request_id", configuration_request_id)
     val ProgramId = col("c_program_id", program_id)
@@ -26,6 +26,12 @@ trait ConfigurationRequestTable[F[_]] extends BaseMapping[F]:
       val Dec = col("c_reference_dec", declination)
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
-    val GmosNorthLongslitGrating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)
-    val GmosSouthLongslitGrating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
+
+    object GmosNorthLongSlit:
+      val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)
+
+    object GmosSouthLongSlit:
+      val Id = col("c_gmos_south_longslit_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
 

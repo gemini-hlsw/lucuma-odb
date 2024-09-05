@@ -36,4 +36,12 @@ CREATE TABLE t_configuration_request (
   c_gmos_south_longslit_grating d_tag NULL REFERENCES t_gmos_south_disperser(c_tag) 
     CHECK (c_gmos_south_longslit_grating IS NOT NULL = (c_observing_mode_type = 'gmos_south_long_slit'::e_observing_mode_type))
  
-)
+);
+
+-- A view that lets us define nullable ids for observing mode slices
+CREATE VIEW v_configuration_request AS
+  SELECT 
+    *,
+    case when c_observing_mode_type = 'gmos_north_long_slit' then c_configuration_request_id end as c_gmos_north_longslit_id,
+    case when c_observing_mode_type = 'gmos_south_long_slit' then c_configuration_request_id end as c_gmos_south_longslit_id
+  FROM t_configuration_request;

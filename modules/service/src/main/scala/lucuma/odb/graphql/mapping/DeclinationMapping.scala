@@ -9,7 +9,7 @@ import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
 import lucuma.odb.graphql.table.CallForProposalsView
-import lucuma.odb.graphql.table.ConfigurationRequestTable
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 import skunk.codec.all.*
@@ -17,7 +17,7 @@ import skunk.codec.all.*
 import scala.reflect.ClassTag
 
 trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
-                                  with ConfigurationRequestTable[F]
+                                  with ConfigurationRequestView[F]
                                   with ObservationView[F]
                                   with TargetView[F] {
 
@@ -42,7 +42,7 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
-      declinationMappingAtPath(ConfigurationRequestType / "configuration" / "referenceCoordinates" / "dec", ConfigurationRequestTable.Id, ConfigurationRequestTable.ReferenceCoordinates.Dec),
+      declinationMappingAtPath(ConfigurationRequestType / "configuration" / "referenceCoordinates" / "dec", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Dec),
     )
 
 }
