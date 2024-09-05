@@ -30,7 +30,6 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.NanometersPerPixel
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
@@ -39,7 +38,6 @@ import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.syntax.enumerated.*
 import lucuma.core.util.Enumerated
 import monocle.Lens
-import spire.math.Rational
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -375,12 +373,12 @@ object Config {
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
 
+  // ShortCut 3374
   val DefaultSpatialOffsets: List[Q] =
     List(
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(0)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(0))
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(  0)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal( 15)),
+      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15))
     )
 
   def gapSize(site: Site): Quantity[PosInt, Pixels] =
@@ -389,28 +387,38 @@ object Config {
       case Site.GS => GmosSouthDetector.Hamamatsu.gapSize
     }
 
-  /**
-   * Calculates the wavelength offsets required to fill in the chip gaps,
-   * rounded to the nearest 5 nm.
-   *
-   * @param dispersion - dispersion in nm/pix (see https://www.gemini.edu/sciops/instruments/gmos/spectroscopy-overview/gratings)
-   */
-  def Δλ(site: Site, dispersion: Quantity[Rational, NanometersPerPixel]): WavelengthDither = {
-    val d = dispersion.value.toDouble
-    val g = gapSize(site).value.value
-    val v = d * g * 2.0 // raw value, which we round to nearest 5 nm
-    WavelengthDither.picometers.get(
-      Quantity[Picometer](((v / 5.0).round * 5.0).toInt * 1000)
+  // wavelength dither needed to fill the chip gaps.
+  private def defaultWavelengthDithers(ditherNm: Int): List[WavelengthDither] =
+    List(
+      WavelengthDither.Zero,
+      WavelengthDither.decimalNanometers.getOption(BigDecimal( ditherNm)).get,
+      WavelengthDither.decimalNanometers.getOption(BigDecimal(-ditherNm)).get
     )
-  }
-  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] = {
-    val delta = Δλ(Site.GN, grating.dispersion)
-    List(WavelengthDither.Zero, delta, delta, WavelengthDither.Zero)
-  }
 
-  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[WavelengthDither] = {
-    val delta = Δλ(Site.GS, grating.dispersion)
-    List(WavelengthDither.Zero, delta, delta, WavelengthDither.Zero)
-  }
+  // ShortCut 3374
+  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] =
+    defaultWavelengthDithers(grating match
+      case GmosNorthGrating.B1200_G5301 |
+           GmosNorthGrating.R831_G5302  |
+           GmosNorthGrating.B600_G5303  |
+           GmosNorthGrating.B600_G5307  |
+           GmosNorthGrating.R600_G5304  |
+           GmosNorthGrating.B480_G5309  => 5
+      case GmosNorthGrating.R400_G5305  => 8
+      case GmosNorthGrating.R150_G5306  |
+           GmosNorthGrating.R150_G5308  => 20
+    )
+
+  // ShortCut 3374
+  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[WavelengthDither] =
+    defaultWavelengthDithers(grating match
+      case GmosSouthGrating.B1200_G5321 |
+           GmosSouthGrating.R831_G5322  |
+           GmosSouthGrating.B600_G5323  |
+           GmosSouthGrating.R600_G5324  |
+           GmosSouthGrating.B480_G5327  => 5
+      case GmosSouthGrating.R400_G5325  => 8
+      case GmosSouthGrating.R150_G5326  => 20
+    )
 
 }

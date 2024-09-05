@@ -47,14 +47,6 @@ import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.IndexTracker
 import lucuma.refined.*
 
-//sealed trait Acquisition[D]:
-//
-//  def generate: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)]
-//
-//  def record(step: StepRecord[D])(using Eq[D]): Acquisition[D]
-//
-//end Acquisition
-
 object Acquisition:
   val AcquisitionSN: SignalToNoise =
     SignalToNoise.FromBigDecimalExact.getOption(10).get
@@ -194,7 +186,7 @@ object Acquisition:
       )
 
     def fineAdjustments[D](slit: ProtoStep[D]): ProtoAtom[(ProtoStep[D], Int)] =
-      ProtoAtom(NonEmptyString.unapply("Fine adjustments"), NonEmptyList.of((slit, 1)))
+      ProtoAtom(NonEmptyString.unapply("Fine Adjustments"), NonEmptyList.of((slit, 1)))
 
     def gen[D](
       init: Option[NonEmptyList[ProtoStep[D]]],

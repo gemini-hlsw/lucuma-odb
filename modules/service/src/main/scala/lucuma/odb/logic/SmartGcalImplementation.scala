@@ -67,7 +67,7 @@ object SmartGcalImplementation {
           cache.get((key, sgt)).fold(
             select(key, sgt).map {
               case Nil    =>
-                val error = formatKey(key)
+                val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
                 (cache.updated((key, sgt), error.asLeft), error.asLeft)
               case h :: t =>
                (

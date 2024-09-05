@@ -29,12 +29,15 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
@@ -56,6 +59,14 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
   val createProgram: IO[Program.Id] =
     createProgramAs(user, "SmartGcal Testing")
+
+  // 3 exposures, one per adjustment (0, 0), (5, +15), (-5, -15)
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      10.secTimeSpan,
+      PosInt.unsafeFrom(3),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     Enums.load(s).flatMap { e =>
@@ -222,6 +233,22 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  val AtomQuery: String =
+    s"""
+      steps {
+      instrumentConfig {
+        exposure { seconds }
+      }
+      stepConfig {
+        stepType
+        ... on Gcal {
+           continuum
+           arcs
+        }
+      }
+    }
+  """
+
   test("simple GN expansion") {
     val setup: IO[Observation.Id] =
       for {
@@ -230,8 +257,11 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
       } yield o
 
-    // Should pick definition 2, with the 2 second exposure time based on the
-    // wavelength range [500, 600), which matches the 500nm observing wavelength
+    // For the first two atoms, at +0nm and +5nm, it should pick definition 2,
+    // with the 2 second exposure time based on the wavelength range [500, 600),
+    // which matches the 500nm observing wavelength.  The last atom has a -5nm
+    // dither which drops it into the [0, 500) range with a 1 second exposure
+    // time.
 
     setup.flatMap { oid =>
       expect(
@@ -245,34 +275,10 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                      gmosNorth {
                        science {
                          nextAtom {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                          possibleFuture {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                        }
                      }
@@ -294,11 +300,13 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                             {
                               "instrumentConfig": {
                                 "exposure": {
-                                  "seconds": 10.000000
+                                  "seconds": 1.000000
                                 }
                               },
                               "stepConfig": {
-                                "stepType": "SCIENCE"
+                                "stepType": "GCAL",
+                                "continuum": null,
+                                "arcs": [ "CU_AR_ARC" ]
                               }
                             },
                             {
@@ -309,7 +317,18 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                               },
                               "stepConfig": {
                                 "stepType": "GCAL",
-                                "filter": "GMOS"
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
+                                  "seconds": 10.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "SCIENCE"
                               }
                             }
                           ]
@@ -325,13 +344,36 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "stepConfig": {
                                   "stepType": "GCAL",
-                                  "filter": "NONE"
+                                  "continuum": null,
+                                  "arcs": [ "CU_AR_ARC" ]
+                                }
+                              },
+                              {
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 2.000000
+                                  }
+                                },
+                                "stepConfig": {
+                                  "stepType": "GCAL",
+                                  "continuum": "QUARTZ_HALOGEN5",
+                                  "arcs": []
+                                }
+                              },
+                              {
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 10.000000
+                                  }
+                                },
+                                "stepConfig": {
+                                  "stepType": "SCIENCE"
                                 }
                               }
                             ]
                           },
                           {
-                            "steps": [
+                            "steps" : [
                               {
                                 "instrumentConfig": {
                                   "exposure": {
@@ -340,132 +382,30 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                                 },
                                 "stepConfig": {
                                   "stepType": "GCAL",
-                                  "filter": "NONE"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "steps" : [
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 2.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "GCAL",
-                                  "filter" : "GMOS"
+                                  "continuum": null,
+                                  "arcs": [ "CU_AR_ARC" ]
                                 }
                               },
                               {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 10.000000
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 1.000000
                                   }
                                 },
-                                "stepConfig" : {
-                                  "stepType" : "SCIENCE"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "steps" : [
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 10.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "SCIENCE"
+                                "stepConfig": {
+                                  "stepType": "GCAL",
+                                  "continuum": "QUARTZ_HALOGEN5",
+                                  "arcs": []
                                 }
                               },
                               {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 2.000000
+                                "instrumentConfig": {
+                                  "exposure": {
+                                    "seconds": 10.000000
                                   }
                                 },
-                                "stepConfig" : {
-                                  "stepType" : "GCAL",
-                                  "filter" : "GMOS"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "steps" : [
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 2.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "GCAL",
-                                  "filter" : "GMOS"
-                                }
-                              },
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 10.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "SCIENCE"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "steps" : [
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 10.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "SCIENCE"
-                                }
-                              },
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 2.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "GCAL",
-                                  "filter" : "GMOS"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "steps" : [
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 2.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "GCAL",
-                                  "filter" : "GMOS"
-                                }
-                              },
-                              {
-                                "instrumentConfig" : {
-                                  "exposure" : {
-                                    "seconds" : 10.000000
-                                  }
-                                },
-                                "stepConfig" : {
-                                  "stepType" : "SCIENCE"
+                                "stepConfig": {
+                                  "stepType": "SCIENCE"
                                 }
                               }
                             ]
@@ -507,19 +447,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                      gmosSouth {
                        science {
                          nextAtom {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                        }
                      }
@@ -541,11 +469,13 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                             {
                               "instrumentConfig": {
                                 "exposure": {
-                                  "seconds": 10.000000
+                                  "seconds": 1.000000
                                 }
                               },
                               "stepConfig": {
-                                "stepType": "SCIENCE"
+                                "stepType": "GCAL",
+                                "continuum": null,
+                                "arcs": [ "CU_AR_ARC" ]
                               }
                             },
                             {
@@ -556,7 +486,18 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                               },
                               "stepConfig": {
                                 "stepType": "GCAL",
-                                "filter": "GMOS"
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
+                                  "seconds": 10.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "SCIENCE"
                               }
                             }
                           ]
@@ -607,19 +548,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                      gmosNorth {
                        science {
                          nextAtom {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                        }
                      }
@@ -641,11 +570,13 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                             {
                               "instrumentConfig": {
                                 "exposure": {
-                                  "seconds": 10.000000
+                                  "seconds": 1.000000
                                 }
                               },
                               "stepConfig": {
-                                "stepType": "SCIENCE"
+                                "stepType": "GCAL",
+                                "continuum": null,
+                                "arcs": [ "CU_AR_ARC" ]
                               }
                             },
                             {
@@ -656,7 +587,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                               },
                               "stepConfig": {
                                 "stepType": "GCAL",
-                                "filter": "GMOS"
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
                               }
                             },
                             {
@@ -667,7 +599,18 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                               },
                               "stepConfig": {
                                 "stepType": "GCAL",
-                                "filter": "GMOS"
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
+                                  "seconds": 10.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "SCIENCE"
                               }
                             }
                           ]
@@ -716,19 +659,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                      gmosNorth {
                        science {
                          nextAtom {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                        }
                      }
@@ -750,33 +681,47 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                             {
                               "instrumentConfig": {
                                 "exposure": {
+                                  "seconds": 1.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "GCAL",
+                                "continuum": null,
+                                "arcs": [ "CU_AR_ARC" ]
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
+                                  "seconds": 6.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "GCAL",
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
+                                  "seconds": 6.000000
+                                }
+                              },
+                              "stepConfig": {
+                                "stepType": "GCAL",
+                                "continuum": "QUARTZ_HALOGEN5",
+                                "arcs": []
+                              }
+                            },
+                            {
+                              "instrumentConfig": {
+                                "exposure": {
                                   "seconds": 10.000000
                                 }
                               },
                               "stepConfig": {
                                 "stepType": "SCIENCE"
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": {
-                                  "seconds": 6.000000
-                                }
-                              },
-                              "stepConfig": {
-                                "stepType": "GCAL",
-                                "filter": "GMOS"
-                              }
-                            },
-                            {
-                              "instrumentConfig": {
-                                "exposure": {
-                                  "seconds": 6.000000
-                                }
-                              },
-                              "stepConfig": {
-                                "stepType": "GCAL",
-                                "filter": "GMOS"
                               }
                             }
                           ]
@@ -823,19 +768,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                      gmosNorth {
                        science {
                          nextAtom {
-                           steps {
-                             instrumentConfig {
-                               exposure {
-                                 seconds
-                               }
-                             }
-                             stepConfig {
-                               stepType
-                               ... on Gcal {
-                                 filter
-                               }
-                             }
-                           }
+                           $AtomQuery
                          }
                        }
                      }
@@ -844,8 +777,9 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                }
              }
            """,
-        expected = Left(List("Could not generate a sequence, missing Smart GCAL mapping: GmosNorth { grating: (R600_G5304, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"))
+        expected = Left(List("Could not generate a sequence: missing Smart GCAL mapping: GmosNorth { grating: (R600_G5304, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"))
       )
     }
   }
+
 }

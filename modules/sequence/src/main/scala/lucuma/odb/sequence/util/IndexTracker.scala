@@ -23,7 +23,7 @@ object IndexTracker:
     override def stepCount: Int = 0
 
     override def record[D](step: StepRecord[D]): IndexTracker =
-      Recording(1, step.atomId, 1, step.id)
+      Recording(0, step.atomId, 0, step.id)
 
   case class Recording(
     atomCount: Int,
@@ -35,4 +35,4 @@ object IndexTracker:
     override def record[D](step: StepRecord[D]): IndexTracker =
       if stepId === step.id then this
       else if atomId === step.atomId then copy(stepCount = stepCount + 1, stepId = step.id)
-      else Recording(atomCount + 1, step.atomId, stepCount = 1, step.id)
+      else Recording(atomCount + 1, step.atomId, stepCount = 0, step.id)

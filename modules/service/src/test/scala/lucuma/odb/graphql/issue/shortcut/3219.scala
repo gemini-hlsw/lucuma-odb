@@ -16,10 +16,10 @@ import lucuma.odb.graphql.query.ExecutionTestSupport
 
 class ShortCut_3219 extends ExecutionTestSupport {
 
-  override def fakeItcResult: IntegrationTime =
+  override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
-      1.secTimeSpan,
-      PosInt.unsafeFrom(10),
+      30.minTimeSpan,
+      PosInt.unsafeFrom(40),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 

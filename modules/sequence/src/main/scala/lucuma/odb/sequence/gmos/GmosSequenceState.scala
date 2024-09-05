@@ -17,17 +17,12 @@ trait GmosSequenceState[D, G, L, U] extends SequenceState[D]:
   def optics: DynamicOptics[D, G, L, U]
 
 trait GmosNorthSequenceState extends GmosSequenceState[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
-                                with GmosNorthInitialDynamicConfig {
-
+                                with GmosNorthInitialDynamicConfig:
   override def optics: DynamicOptics[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
     DynamicOptics.North
 
-}
 
 trait GmosSouthSequenceState extends GmosSequenceState[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
-                                with GmosSouthInitialDynamicConfig {
-
+                                with GmosSouthInitialDynamicConfig:
   override def optics: DynamicOptics[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
     DynamicOptics.South
-
-}

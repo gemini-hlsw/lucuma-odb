@@ -15,7 +15,7 @@ case class RecordAtomInput(
   visitId:      Visit.Id,
   instrument:   Instrument,
   sequenceType: SequenceType,
-  stepCount:    NonNegShort,
+  stepCount:    NonNegShort,  // TODO: SEQUENCE UPDATE (i don't think we need this)
   generatedId:  Option[Atom.Id]
 )
 

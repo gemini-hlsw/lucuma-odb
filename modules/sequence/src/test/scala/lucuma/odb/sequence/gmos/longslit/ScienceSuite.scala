@@ -19,7 +19,7 @@ import org.scalacheck.Prop.*
 
 class ScienceSuite extends ScalaCheckSuite {
 
-/*
+/*  TODO: SEQUENCE UPDATE (is any of this still useful?)
   import ArbEnumerated.*
   import ArbGmosLongSlitConfig.given
 

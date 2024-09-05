@@ -568,8 +568,9 @@ object SequenceService {
         FROM v_step_record v
         INNER JOIN #$instTable #$instAlias ON #$instAlias.c_step_id = v.c_step_id
         INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
-        WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
-      ).query(step_record(instDecoder)) //id *: step_config *: instDecoder *: core_timestamp)
+        WHERE a.c_observation_id = $observation_id
+        ORDER BY v.c_created
+      """).query(step_record(instDecoder))
 
     val SetStepExecutionState: Command[(StepExecutionState, Option[Timestamp], Step.Id)] =
       sql"""

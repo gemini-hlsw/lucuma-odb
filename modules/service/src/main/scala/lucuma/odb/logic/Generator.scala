@@ -57,10 +57,9 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.util.Codecs.core_timestamp
 import skunk.*
-import skunk.implicits.*
 import skunk.codec.temporal.timestamptz
+import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.util.UUID
@@ -161,11 +160,9 @@ object Generator {
         s"Could not generate a sequence from the observation $observationId: $message"
     }
 
-    case class MissingDefinition(format: String) extends Error
-
-    case class MissingSmartGcalDef(key: String) extends Error {
+    case class MissingDefinition(msg: String) extends Error {
       def format: String =
-        s"Could not generate a sequence, missing Smart GCAL mapping: $key"
+        s"Could not generate a sequence: $msg"
     }
 
     case object SequenceTooLong extends Error {
