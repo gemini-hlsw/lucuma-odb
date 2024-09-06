@@ -3,11 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.Eq
 import cats.Order
 import cats.Order.*
 import cats.data.NonEmptyList
-import cats.derived.*
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -47,8 +45,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
@@ -97,15 +93,14 @@ import Services.Syntax.*
 trait GuideService[F[_]] {
   import GuideService.AvailabilityPeriod
   import GuideService.GuideEnvironment
-  import GuideService.GuideEnvironmentOptions
 
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
     NoTransaction[F]
   ): F[Result[List[GuideEnvironment]]]
 
-  def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, options: GuideEnvironmentOptions)(using
+  def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F]
-  ): F[Result[Option[GuideEnvironment]]]
+  ): F[Result[GuideEnvironment]]
 
   def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F]
@@ -113,19 +108,13 @@ trait GuideService[F[_]] {
   
   def setGuideTargetName(input: SetGuideTargetNameInput)(
     using NoTransaction[F]): F[Result[Observation.Id]]
+
+  def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using 
+    NoTransaction[F]
+  ): F[Result[Option[NonEmptyString]]]
 }
 
 object GuideService {
-  case class GuideEnvironmentOptions(
-    // if the user only queried for the target name, we don't have to go to gaia, unless
-    // lookupIfUndefined is also true
-    queriedNameOnly: Boolean,
-    // For navigate, we need to go to gaia to get the prospective targets and default to the 
-    // best one if the guidestar name is not set or has been invalidated. However, for explore
-    // we can just return a null because it will do the gaia stuff.
-    lookupIfUndefined: Boolean
-  ) derives Eq
-
   // if any science target or guide star candidate moves more than this many milliarcseconds,
   // we consider it to potentially invalidate the availability.
   val invalidThreshold = 100.0
@@ -156,19 +145,6 @@ object GuideService {
 
   object GuideEnvironment {
     given Encoder[GuideEnvironment] = deriveEncoder
-
-    def forNameOnly(name: GuideStarName): GuideEnvironment =
-      val target =
-        Target.Sidereal(
-          name.toNonEmptyString,
-          SiderealTracking.const(Coordinates.Zero),
-          SourceProfile.Point(SpectralDefinition.BandNormalized(none, SortedMap.empty)),
-          none
-        )
-      GuideEnvironment(
-        posAngle = Angle.Angle0,
-        guideTargets = List(GuideTarget(GuideProbe.GmosOIWFS, target))
-      )
   }
 
   case class AvailabilityPeriod(
@@ -842,9 +818,9 @@ object GuideService {
                            )
         } yield env).value
       
-      override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id, options: GuideEnvironmentOptions)(
+      override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(
         using NoTransaction[F]
-      ): F[Result[Option[GuideEnvironment]]] = 
+      ): F[Result[GuideEnvironment]] = 
         Trace[F].span("getGuideEnvironment"):
           (for {
             obsInfo       <- ResultT(getObservationInfo(oid))
@@ -854,10 +830,22 @@ object GuideService {
             genInfo       <- ResultT(getGeneratorInfo(pid, oid))
             duration       = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
             oGSName        = obsInfo.validGuideStarName(genInfo.hash, duration)
-            result        <- if ((oGSName.isDefined && !options.queriedNameOnly) || (oGSName.isEmpty && options.lookupIfUndefined))
-                              ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, duration)).map(_.some)
-                            else ResultT.pure(oGSName.map(GuideEnvironment.forNameOnly))
+            result        <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, duration))
           } yield result).value
+
+      override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
+        using NoTransaction[F]
+      ): F[Result[Option[NonEmptyString]]] = 
+        (for {
+          obsInfo    <- ResultT(getObservationInfo(oid))
+          genInfo    <- ResultT.liftF(getGeneratorInfo(pid, oid)).map(_.toOption)
+          oGSName    <- ResultT.pure(
+                          genInfo.flatMap{ gi => 
+                            val duration = obsInfo.optObsDuration.getOrElse(gi.timeEstimate)
+                            obsInfo.validGuideStarName(gi.hash, duration)
+                          }
+                        )
+        } yield oGSName.map(_.toNonEmptyString)).value
 
       // TODO: This can go away when Navigate is ready.
       override def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(

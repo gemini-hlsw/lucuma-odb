@@ -26,20 +26,15 @@ class setGuideTargetName extends query.ExecutionTestSupport {
 
   private val targetEnvQuery = """
     targetEnvironment {
-      guideEnvironment(lookupIfUndefined: false) {
-        guideTargets { name }
-      }
+      guideTargetName
     }
   """
-
-  private val idQuery = "id"
 
   // If name is None, omit from mutation, if the string is empty, set to null, else set name
   private def mutation(
     oid:  Option[Observation.Id],
     oref: Option[ObservationReference],
     name: Option[String],
-    resultQuery: String = targetEnvQuery
   ): String =
     val update = name.fold(""){ n =>
       val nn = if (n.isEmpty) "null" else s"\"$n\""
@@ -56,23 +51,18 @@ class setGuideTargetName extends query.ExecutionTestSupport {
           }
         ) {
           observation {
-            $resultQuery
+            $targetEnvQuery
           }
         }
       }
     """
 
   private def justQuery(user: User, oid: Observation.Id, expectedName: Option[String]): IO[Unit] =
-    val guideEnv = expectedName.fold(Json.Null)(name =>
-      Json.obj("guideTargets" ->
-        Json.arr(Json.obj("name" -> name.asJson))
-      )
-    )
     val expected = json"""
       {
         "observation": {
           "targetEnvironment": {
-            "guideEnvironment": $guideEnv
+            "guideTargetName": ${expectedName.asJson}
           }
         }
       }
@@ -92,13 +82,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
         "setGuideTargetName": {
           "observation": {
             "targetEnvironment": {
-              "guideEnvironment": {
-                "guideTargets": [
-                  {
-                    "name": $guideStarName
-                  }
-                ]
-              }
+              "guideTargetName": $guideStarName
             }
           }
         }
@@ -111,20 +95,8 @@ class setGuideTargetName extends query.ExecutionTestSupport {
         "setGuideTargetName": {
           "observation": {
             "targetEnvironment": {
-              "guideEnvironment": null
+              "guideTargetName": null
             }
-          }
-        }
-      }
-    """.asRight
-
-  // for updates where the result query itself would cause an error
-  private def expectJustId(oid: Observation.Id): Either[Nothing, Json] =
-    json"""
-      {
-        "setGuideTargetName": {
-          "observation": {
-            "id": $oid
           }
         }
       }
@@ -142,11 +114,10 @@ class setGuideTargetName extends query.ExecutionTestSupport {
     oref:        Option[ObservationReference],
     name:        Option[String],
     expected:    Either[List[String], Json],
-    resultQuery: String = targetEnvQuery
   ): IO[Unit] =
     expect(
       user = user,
-      query = mutation(oid, oref, name, resultQuery),
+      query = mutation(oid, oref, name),
       expected = expected
     )
 
@@ -179,13 +150,12 @@ class setGuideTargetName extends query.ExecutionTestSupport {
     yield ()
   }
 
-  test("missing observation time") {
-    val expected = expectObsError(oid => s"Observation time not set for observation $oid.")
+  test("can set without an observation time") {
     for
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- setName(staff, oid.some, none, targetName1.some, expected(oid))
+      _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
     yield ()
   }
 
@@ -316,8 +286,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
       _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
       _   <- updateAsterisms(pi, List(oid), List.empty, List(tid), List(oid -> List.empty))
-      // only query the id in the response since asking for the target name would give an error
-      _   <- setName(staff, oid.some, none, none, expectJustId(oid), idQuery)
+      _   <- setName(staff, oid.some, none, none, expectNull)
     yield ()
   }
 
