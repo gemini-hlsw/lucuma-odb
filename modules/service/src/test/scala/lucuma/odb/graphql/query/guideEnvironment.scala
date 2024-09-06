@@ -11,7 +11,6 @@ import fs2.Stream
 import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.util.Timestamp
@@ -376,14 +375,13 @@ class guideEnvironment extends ExecutionTestSupport {
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
-  def guideEnvironmentQuery(oid: Observation.Id, lookupIfUndefined: Option[Boolean] = none) =
-    val lookup = lookupIfUndefined.fold("")(b => s"lookupIfUndefined: $b")
+  def guideEnvironmentQuery(oid: Observation.Id) =
     s"""
       query {
         observation(observationId: "$oid") {
           title
           targetEnvironment {
-            guideEnvironment($lookup) {
+            guideEnvironment {
               posAngle {
                 degrees
               }
@@ -446,38 +444,6 @@ class guideEnvironment extends ExecutionTestSupport {
         }
       }
     """
-
-  def guideTargetNameQuery(oid: Observation.Id, lookupIfUndefined: Option[Boolean] = none) =
-    val lookup = lookupIfUndefined.fold("")(b => s"lookupIfUndefined: $b")
-    s"""
-      query {
-        observation(observationId: "$oid") {
-          targetEnvironment {
-            guideEnvironment($lookup) {
-              guideTargets {
-                name
-              }
-            }
-          }
-        }
-      }
-    """
-
-  def guideTargetNameResult(expectedName: Option[String]): Either[Nothing, Json] =
-    val guideEnv = expectedName.fold(Json.Null)(name =>
-      Json.obj("guideTargets" ->
-        Json.arr(Json.obj("name" -> name.asJson))
-      )
-    )
-    json"""
-    {
-      "observation": {
-        "targetEnvironment": {
-          "guideEnvironment": $guideEnv
-        }
-      }
-    }
-    """.asRight
 
   val emptyGuideEnvironmentResults =
     json"""
@@ -697,33 +663,7 @@ class guideEnvironment extends ExecutionTestSupport {
     }
   }
 
-  test("no name set - successfully obtain guide environment") {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgramAs(pi)
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-      } yield o
-    setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
-    }
-  }
-
-  test("no name set - successfully obtain guide target name") {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgramAs(pi)
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-      } yield o
-    setup.flatMap { oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
-    }
-  }
-
-  test("non-existent name set - fail to get full results") {
+  test("non-existent name set") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -740,37 +680,29 @@ class guideEnvironment extends ExecutionTestSupport {
     }
   }
 
-  test("non-existent name set, lookup true - successfully get name only") {
+  test("no name set - successfully obtain guide environment") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
-      expect(
-        pi,
-        guideTargetNameQuery(oid, true.some),
-        expected = guideTargetNameResult(invalidTargetName.some))
+      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
     }
   }
 
-  test("non-existent name set, lookup false - successfully get name only") {
+  test("no name set - successfully obtain guide environment") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
-        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
-      expect(
-        pi,
-        guideTargetNameQuery(oid, false.some),
-        expected = guideTargetNameResult(invalidTargetName.some))
+      expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
     }
   }
 
