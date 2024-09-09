@@ -67,9 +67,10 @@ object ConfigurationService {
 
     def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:
-        services.runGraphQLQuery(Queries.selectConfiguration(oid)).map: r =>
+        services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
           r.flatMap: json =>
-            json.hcursor.downFields("observation", "program", "configurationRequests").as[List[ConfigurationRequest]] match
+            println(json)
+            json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
 
@@ -125,45 +126,48 @@ object ConfigurationService {
         }
       """
   
-    }
-
-  def selectAllRequestsForProgram(oid: Observation.Id) =
-    s"""
-      query {
-        observation(observationId: "$oid") {
-          program {
-            configurationRequests {
-              id
-              status
-              conditions {
-                imageQuality
-                cloudExtinction
-                skyBackground
-                waterVapor
-              }
-              referenceCoordinates {
-                ra { 
-                  hms 
-                }
-                dec { 
-                  dms 
-                }
-              }
-              observingMode {
-                instrument
-                mode
-                gmosNorthLongSlit {
-                  grating
-                }
-                gmosSouthLongSlit {
-                  grating
+    def selectAllRequestsForProgram(oid: Observation.Id) =
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            program {
+              configurationRequests {
+                matches {
+                  id
+                  status
+                  configuration {
+                    conditions {
+                      imageQuality
+                      cloudExtinction
+                      skyBackground
+                      waterVapor
+                    }
+                    referenceCoordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
+                    }
+                    observingMode {
+                      instrument
+                      mode
+                      gmosNorthLongSlit {
+                        grating
+                      }
+                      gmosSouthLongSlit {
+                        grating
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         }
-      }
-    """
+      """
+  }
 
   private object Statements {
 

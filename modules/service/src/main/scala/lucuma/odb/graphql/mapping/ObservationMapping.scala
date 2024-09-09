@@ -32,6 +32,7 @@ import table.ObsAttachmentTable
 import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
+import lucuma.odb.data.ConfigurationRequest
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
@@ -77,6 +78,7 @@ trait ObservationMapping[F[_]]
       SqlField("calibrationRole", ObservationView.CalibrationRole),
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlObject("configuration"),
+      EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -132,6 +134,19 @@ trait ObservationMapping[F[_]]
           observationService
            .observationValidations(pid, oid, itcClient)
            .map(_.success)
+        }
+
+    effectHandler(readEnv, calculate)
+  }
+
+  lazy val configurationRequestsQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Unit] = _ => ().success
+
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ConfigurationRequest]]] =
+      (_, oid, _) =>
+        services.useTransactionally {
+          configurationService
+            .selectRequests(oid)
         }
 
     effectHandler(readEnv, calculate)

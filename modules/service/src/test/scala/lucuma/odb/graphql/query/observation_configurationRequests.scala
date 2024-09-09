@@ -10,9 +10,9 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.User
 import lucuma.odb.data.ConfigurationRequest
-import lucuma.core.model.Program
+import lucuma.core.model.Observation
 
-class program_configurations extends OdbSuite with ObservingModeSetupOperations {
+class observation_configurationRequests extends OdbSuite with ObservingModeSetupOperations {
 
   val pi       = TestUsers.Standard.pi(1, 30)
   val admin    = TestUsers.Standard.admin(2, 31)
@@ -20,26 +20,22 @@ class program_configurations extends OdbSuite with ObservingModeSetupOperations 
 
   test("create and select some configuration requests") {
 
-    def select(user: User, pid: Program.Id, ids: List[ConfigurationRequest.Id]): IO[Unit] =
+    def select(user: User, oid: Observation.Id, ids: List[ConfigurationRequest.Id]): IO[Unit] =
       expect(
         user = user,
         query = s"""
           query {
-            program(programId: "$pid") {
+            observation(observationId: "$oid") {
               configurationRequests {
-                matches {
-                  id
-                }
+                id
               }
             }
           }
         """,
         expected = Right(json"""                
           {
-            "program" : {
-              "configurationRequests" : {
-                "matches" : ${ids.map(id => Json.obj("id" -> id.asJson))}
-              }
+            "observation" : {
+              "configurationRequests" : ${ids.map(id => Json.obj("id" -> id.asJson))}
             }
           }                
         """)
@@ -52,10 +48,9 @@ class program_configurations extends OdbSuite with ObservingModeSetupOperations 
       tid   <- createTargetWithProfileAs(pi, pid)
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
-      _     <- select(pi, pid, ids)
+      _     <- select(pi, oid, ids)
     yield ()
 
   }
-
 
 }

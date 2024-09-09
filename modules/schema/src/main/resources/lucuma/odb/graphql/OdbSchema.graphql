@@ -8429,6 +8429,11 @@ type Observation {
   """
   configuration: Configuration!
 
+  """
+  Program configuration requests applicable to this observation.
+  """
+  configurationRequests: [ConfigurationRequest!]!
+
 }
 type Configuration {
   conditions: ConfigurationConditions!

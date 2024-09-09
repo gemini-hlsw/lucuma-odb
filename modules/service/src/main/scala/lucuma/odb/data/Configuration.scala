@@ -13,16 +13,20 @@ import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Angle
 import lucuma.odb.data.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.odb.data.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.odb.json.coordinates.query.given
 import io.circe.DecodingFailure
+import cats.kernel.Order
+import io.circe.Json
+import io.circe.syntax.*
 
 case class Configuration(conditions: Configuration.Conditions, refererenceCoordinates: Coordinates, observingMode: Configuration.ObservingMode):
   def subsumes(other: Configuration): Boolean =
-    if observingMode === other.observingMode then
-      ???
-    else false    
+    conditions >= other.conditions &&
+    observingMode.fov.toDoubleDegrees >= refererenceCoordinates.angularDistance(other.refererenceCoordinates).toDoubleDegrees &&
+    observingMode === other.observingMode
 
 object Configuration:
 
@@ -41,7 +45,12 @@ object Configuration:
       case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
       case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
       
-  given Encoder[Configuration] = ???
+  given Encoder[Configuration] = c =>
+    Json.obj(
+      "conditions" -> c.conditions.asJson,
+      "referenceCoordinates" -> c.refererenceCoordinates.asJson,
+      "observingMode" -> c.observingMode.asJson
+    )
 
   case class Conditions(
     cloudExtinction: CloudExtinction,
@@ -49,7 +58,9 @@ object Configuration:
     skyBackground: SkyBackground,
     waterVapor: WaterVapor,
   )
+
   object Conditions:
+
     given Decoder[Conditions] = hc =>
       for 
         c <- hc.downField("cloudExtinction").as[CloudExtinction]
@@ -58,14 +69,25 @@ object Configuration:
         w <- hc.downField("waterVapor").as[WaterVapor]
       yield Conditions(c, i, s, w)
 
-  sealed abstract class ObservingMode(val tpe: ObservingModeType):
+    given Encoder[Conditions] = c =>
+      Json.obj(
+        "cloudExtinction" -> c.cloudExtinction.asJson,
+        "imageQuality" -> c.imageQuality.asJson,
+        "skyBackground" -> c.skyBackground.asJson,
+        "waterVapor" -> c.waterVapor.asJson,
+      )
+
+    given Order[Conditions] = Order.by: conds =>
+      (conds.cloudExtinction, conds.imageQuality, conds.skyBackground, conds.waterVapor)
+
+  sealed abstract class ObservingMode(val tpe: ObservingModeType, val fov: Angle):
     def gmosNorthLongSlit: Option[GmosNorthLongSlit] = Some(this).collect { case m: GmosNorthLongSlit => m }
     def gmosSouthLongSlit: Option[GmosSouthLongSlit] = Some(this).collect { case m: GmosSouthLongSlit => m }
 
   object ObservingMode:
 
-    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit)
-    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit)
+    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit, Angle.fromDoubleArcseconds(1.23))
+    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit, Angle.fromDoubleArcseconds(1.23))
 
     val DecodeGmosNorthLongSlit: Decoder[GmosNorthLongSlit] = hc =>
       hc.downField("grating").as[GmosNorthGrating].map(GmosNorthLongSlit(_))
@@ -77,5 +99,17 @@ object Configuration:
       hc.downField("gmosNorthLongSlit").as(DecodeGmosNorthLongSlit) orElse
       hc.downField("gmosSouthLongSlit").as(DecodeGmosSouthLongSlit)
 
+    given Encoder[ObservingMode] = m => 
+      Json.obj(
+        "gmosNorthLongSlit" -> Json.Null, // one of these will be replaced below
+        "gmosSouthLongSlit" -> Json.Null, // one of these will be replaced below
+        m match
+          case GmosNorthLongSlit(grating) => "gmosNorthLongSlit" -> Json.obj("grating" -> grating.asJson)
+          case GmosSouthLongSlit(grating) => "gmosSouthLongSlit" -> Json.obj("grating" -> grating.asJson)
+      )
+
     given Eq[ObservingMode] =
-      ???
+      Eq.instance:
+        case (GmosNorthLongSlit(g1), GmosNorthLongSlit(g2)) => g1 === g2
+        case (GmosSouthLongSlit(g1), GmosSouthLongSlit(g2)) => g1 === g2
+        case _ => false
