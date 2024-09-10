@@ -73,54 +73,58 @@ class observation_configurationRequests
       """)
     )
 
-  test("create and select some configuration requests"):
+  // set up cfp, program, and fullt configured observation
+  def setup: IO[Observation.Id] =
     for
       cfpid <- createCallForProposalsAs(admin)
       pid   <- createProgramAs(pi)
       _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
       tid   <- createTargetWithProfileAs(pi, pid)
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+    yield oid
+
+  test("create and select some configuration requests"):
+    for
+      oid   <- setup
       ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
       _     <- expectRequests(pi, oid, ids)
     yield ()
 
-  test("configuration request made for one observation should apply to another identical observation"):
+  test("request should apply to identical obs"):
     for
-      cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(pi)
-      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
-      tid   <- createTargetWithProfileAs(pi, pid)
-      oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      rid   <- createConfigurationRequestAs(pi, oid)
+      oid   <- setup
       oid2  <- cloneObservationAs(pi, oid)
+      rid   <- createConfigurationRequestAs(pi, oid)
       _     <- expectRequests(pi, oid2, List(rid))
     yield ()
 
-  test("configuration request made for one observation should not apply to an observation with a faraway base position"):
+  test("request should not apply for faraway base position"):
     for
-      cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(pi)
-      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
-      tid   <- createTargetWithProfileAs(pi, pid)
-      oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      rid   <- createConfigurationRequestAs(pi, oid)
-      oid2  <- cloneObservationAs(pi, oid)
-      _     <- setExplicitBaseAs(pi, oid2, "1:23:45", "6:01:23")
-      _     <- expectRequests(pi, oid2, Nil)
+      oid  <- setup
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
+      _    <- expectRequests(pi, oid, Nil)
     yield ()
 
-  test("configuration request made for one observation should apply to an observation with a nearby base position"):
+  test("request should reappear when base position is moved back"):
     for
-      cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(pi)
-      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
-      tid   <- createTargetWithProfileAs(pi, pid)
-      oid1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _     <- setExplicitBaseAs(pi, oid1, "1:00:00", "2:00:00")
-      oid2  <- cloneObservationAs(pi, oid1)
-      _     <- setExplicitBaseAs(pi, oid2, "1:00:00.01", "2:00:00.01")
-      rid   <- createConfigurationRequestAs(pi, oid1)
-      _     <- expectRequests(pi, oid2, List(rid))
+      oid  <- setup
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
+      _    <- expectRequests(pi, oid, Nil) // sanity check
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      _    <- expectRequests(pi, oid, List(rid))
+    yield ()
+
+  test("request should apply to obs with nearby base position"):
+    for
+      oid  <- setup
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
+      _    <- expectRequests(pi, oid, List(rid))
     yield ()
 
 }
