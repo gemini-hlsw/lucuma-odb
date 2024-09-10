@@ -25,7 +25,7 @@ import io.circe.syntax.*
 case class Configuration(conditions: Configuration.Conditions, refererenceCoordinates: Coordinates, observingMode: Configuration.ObservingMode):
   def subsumes(other: Configuration): Boolean =
     conditions >= other.conditions &&
-    observingMode.fov.toDoubleDegrees >= refererenceCoordinates.angularDistance(other.refererenceCoordinates).toDoubleDegrees &&
+    observingMode.fov.toDoubleDegrees / 2.0 >= refererenceCoordinates.angularDistance(other.refererenceCoordinates).toDoubleDegrees &&
     observingMode === other.observingMode
 
 object Configuration:
@@ -86,8 +86,8 @@ object Configuration:
 
   object ObservingMode:
 
-    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit, Angle.fromDoubleArcseconds(1.23))
-    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit, Angle.fromDoubleArcseconds(1.23))
+    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit, Angle.fromDoubleArcseconds(1.23)) // TODO
+    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit, Angle.fromDoubleArcseconds(1.23)) // TODO
 
     val DecodeGmosNorthLongSlit: Decoder[GmosNorthLongSlit] = hc =>
       hc.downField("grating").as[GmosNorthGrating].map(GmosNorthLongSlit(_))

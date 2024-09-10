@@ -69,7 +69,6 @@ object ConfigurationService {
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
           r.flatMap: json =>
-            println(json)
             json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
