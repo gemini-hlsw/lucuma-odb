@@ -5,11 +5,11 @@ package lucuma.odb.json
 
 import io.circe.Decoder
 import io.circe.Encoder
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
-import io.circe.Json
-import lucuma.core.math.RightAscension
 import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 
 object coordinates:
 
