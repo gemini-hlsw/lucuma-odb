@@ -21,6 +21,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
+
 import Services.Syntax.*
 
 trait VisitService[F[_]] {

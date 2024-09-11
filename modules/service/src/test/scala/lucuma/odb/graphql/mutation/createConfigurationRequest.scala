@@ -6,8 +6,8 @@ package mutation
 
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperations {
 

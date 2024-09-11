@@ -7,23 +7,23 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
+import io.circe.ACursor
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.odb.data.Configuration
+import lucuma.odb.data.Configuration.Conditions
 import lucuma.odb.data.ConfigurationRequest
+import lucuma.odb.data.ObservingModeType
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
-import lucuma.odb.util.Codecs.*
 
 import Services.Syntax.*
-import io.circe.ACursor
-import lucuma.odb.data.Configuration.Conditions
-import lucuma.core.math.Coordinates
-import lucuma.odb.data.ObservingModeType
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.odb.util.GmosCodecs.*
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 trait ConfigurationService[F[_]] {
 

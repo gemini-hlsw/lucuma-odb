@@ -20,6 +20,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
@@ -32,7 +33,6 @@ import table.ObsAttachmentTable
 import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
-import lucuma.odb.data.ConfigurationRequest
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]

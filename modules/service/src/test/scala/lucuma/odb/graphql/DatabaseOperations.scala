@@ -54,6 +54,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -73,7 +74,6 @@ import skunk.syntax.all.*
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import lucuma.odb.data.ConfigurationRequest
 
 trait DatabaseOperations { this: OdbSuite =>
 

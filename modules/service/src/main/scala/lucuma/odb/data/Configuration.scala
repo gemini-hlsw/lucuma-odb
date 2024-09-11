@@ -3,24 +3,24 @@
 
 package lucuma.odb.data
 import cats.Eq
+import cats.kernel.Order
 import cats.syntax.all.*
 import io.circe.Decoder
+import io.circe.DecodingFailure
 import io.circe.Encoder
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
-import lucuma.core.math.Coordinates
 import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
 import lucuma.odb.data.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.odb.data.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.odb.json.coordinates.query.given
-import io.circe.DecodingFailure
-import cats.kernel.Order
-import io.circe.Json
-import io.circe.syntax.*
 
 case class Configuration(conditions: Configuration.Conditions, refererenceCoordinates: Coordinates, observingMode: Configuration.ObservingMode):
   def subsumes(other: Configuration): Boolean =

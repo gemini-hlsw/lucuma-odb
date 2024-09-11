@@ -25,6 +25,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
@@ -36,7 +37,6 @@ import lucuma.odb.service.Services
 import Services.Syntax.*
 import binding.*
 import table.*
-import lucuma.odb.data.ConfigurationRequest
 
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
