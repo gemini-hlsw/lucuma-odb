@@ -77,8 +77,10 @@ object Configuration:
         "waterVapor" -> c.waterVapor.asJson,
       )
 
-    given Order[Conditions] = Order.by: conds =>
-      (conds.cloudExtinction, conds.imageQuality, conds.skyBackground, conds.waterVapor)
+    given Order[Conditions] = 
+      Order.reverse: // larger means better here
+        Order.by: conds =>
+          (conds.cloudExtinction, conds.imageQuality, conds.skyBackground, conds.waterVapor)
 
   // For now we define field of view as a disc of some angular radius on the sky.
   sealed abstract class ObservingMode(val tpe: ObservingModeType, val fov: Angle):

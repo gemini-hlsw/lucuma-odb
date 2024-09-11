@@ -13,6 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.core.enums.CloudExtinction
 
 class observation_configurationRequests 
   extends OdbSuite 
@@ -60,6 +61,14 @@ class observation_configurationRequests
           gmosNorthLongSlit: {
             grating: ${grating.tag.toUpperCase()}
           }
+        }
+      """
+
+  private def updateCloudExtinction(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
+    updateObservationAs(user, oid):
+      s"""
+        constraintSet: {
+          cloudExtinction: ${cloudExtinction.tag.toUpperCase()}
         }
       """
 
@@ -143,15 +152,26 @@ class observation_configurationRequests
       oid  <- setup
       _    <- updateGratingAs(pi, oid, GmosNorthGrating.B600_G5307)
       rid  <- createConfigurationRequestAs(pi, oid)
-      _    <- expectRequests(pi, oid, List(rid)) // sanity check
       _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5306)
       _    <- expectRequests(pi, oid, Nil)
     yield ()
 
-  test("request should not apply for narrower conditions".ignore):
-    ???
+  test("request should not apply for narrower conditions"):
+    for
+      oid  <- setup
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive)
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive) // can't ask for better conditions
+      _    <- expectRequests(pi, oid, Nil)
+    yield ()
 
-  test("request should apply for narrower conditions".ignore):
-    ???
+  test("request should apply for wider conditions"):
+    for
+      oid  <- setup
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive)
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive) // ok to ask for worse conditions
+      _    <- expectRequests(pi, oid, List(rid))
+    yield ()
 
 }
