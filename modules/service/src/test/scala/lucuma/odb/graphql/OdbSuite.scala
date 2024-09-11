@@ -266,7 +266,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined,
       invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
-      exploreUrl = org.http4s.Uri.fromString("https://nonsense.kom").toOption.get
+      exploreUrl = Http4sUri.fromString("https://nonsense.kom").toOption.get
     )
 
   // These are overriden in OdbSuiteWithS3 for tests that need it.
