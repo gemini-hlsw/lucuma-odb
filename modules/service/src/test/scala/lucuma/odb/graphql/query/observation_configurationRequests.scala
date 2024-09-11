@@ -12,6 +12,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.core.enums.GmosNorthGrating
 
 class observation_configurationRequests 
   extends OdbSuite 
@@ -22,18 +23,8 @@ class observation_configurationRequests
   val admin    = TestUsers.Standard.admin(2, 31)
   val validUsers = List(pi, admin)
 
-  def setExplicitBaseAs(user: User, oid: Observation.Id, hms: String, dms: String): IO[Unit] =
-    updateObservation(
-      user = user, 
-      oid = oid,
-      update = s"""
-        targetEnvironment: {
-          explicitBase: {
-            ra: { hms: "$hms"},
-            dec: { dms: "$dms"}
-          }
-        }
-      """,
+  private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
+    updateObservation(user, oid, update,
       query = """
         observations {
           id
@@ -52,7 +43,27 @@ class observation_configurationRequests
       """)
     )
 
-  def expectRequests(user: User, oid: Observation.Id, ids: List[ConfigurationRequest.Id]): IO[Unit] =
+  private def setExplicitBaseAs(user: User, oid: Observation.Id, hms: String, dms: String): IO[Unit] =
+    updateObservationAs(user, oid):
+      s"""
+        targetEnvironment: {
+          explicitBase: {
+            ra: { hms: "$hms"},
+            dec: { dms: "$dms"}
+          }
+        }
+      """
+  private def updateGratingAs(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
+    updateObservationAs(user, oid):
+      s"""
+        observingMode: {
+          gmosNorthLongSlit: {
+            grating: ${grating.tag.toUpperCase()}
+          }
+        }
+      """
+
+  private def expectRequests(user: User, oid: Observation.Id, ids: List[ConfigurationRequest.Id]): IO[Unit] =
     expect(
       user = user,
       query = s"""
@@ -74,7 +85,7 @@ class observation_configurationRequests
     )
 
   // set up cfp, program, and fullt configured observation
-  def setup: IO[Observation.Id] =
+  private def setup: IO[Observation.Id] =
     for
       cfpid <- createCallForProposalsAs(admin)
       pid   <- createProgramAs(pi)
@@ -98,6 +109,15 @@ class observation_configurationRequests
       _     <- expectRequests(pi, oid2, List(rid))
     yield ()
 
+  test("request should apply for nearby base position"):
+    for
+      oid  <- setup
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      rid  <- createConfigurationRequestAs(pi, oid)
+      _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
+      _    <- expectRequests(pi, oid, List(rid))
+    yield ()
+
   test("request should not apply for faraway base position"):
     for
       oid  <- setup
@@ -107,7 +127,7 @@ class observation_configurationRequests
       _    <- expectRequests(pi, oid, Nil)
     yield ()
 
-  test("request should reappear when base position is moved back"):
+  test("request should apply when base position is moved back"):
     for
       oid  <- setup
       _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
@@ -118,13 +138,20 @@ class observation_configurationRequests
       _    <- expectRequests(pi, oid, List(rid))
     yield ()
 
-  test("request should apply to obs with nearby base position"):
+  test("request should not apply for different observing mode"):
     for
       oid  <- setup
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+      _    <- updateGratingAs(pi, oid, GmosNorthGrating.B600_G5307)
       rid  <- createConfigurationRequestAs(pi, oid)
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
-      _    <- expectRequests(pi, oid, List(rid))
+      _    <- expectRequests(pi, oid, List(rid)) // sanity check
+      _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5306)
+      _    <- expectRequests(pi, oid, Nil)
     yield ()
+
+  test("request should not apply for narrower conditions".ignore):
+    ???
+
+  test("request should apply for narrower conditions".ignore):
+    ???
 
 }

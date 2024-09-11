@@ -80,14 +80,19 @@ object Configuration:
     given Order[Conditions] = Order.by: conds =>
       (conds.cloudExtinction, conds.imageQuality, conds.skyBackground, conds.waterVapor)
 
+  // For now we define field of view as a disc of some angular radius on the sky.
   sealed abstract class ObservingMode(val tpe: ObservingModeType, val fov: Angle):
     def gmosNorthLongSlit: Option[GmosNorthLongSlit] = Some(this).collect { case m: GmosNorthLongSlit => m }
     def gmosSouthLongSlit: Option[GmosSouthLongSlit] = Some(this).collect { case m: GmosSouthLongSlit => m }
 
   object ObservingMode:
 
-    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit, Angle.fromDoubleArcseconds(1.23)) // TODO
-    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit, Angle.fromDoubleArcseconds(1.23)) // TODO
+    // TODO: right now we're allowing sufficient slop to allow adjusting the target along [half] the length of the slit, but
+    // this also allows moving to a target that's off the slit entirely since we're just measuring a single offset distance.
+    // What we really need here is a polygon, but that's complicated by position angle (which may be allowed to flip or may
+    // be chosen dynamically based on parallactic angle). 
+    case class GmosNorthLongSlit(grating: GmosNorthGrating) extends ObservingMode(ObservingModeType.GmosNorthLongSlit, Angle.fromDoubleArcseconds(5.5 * 60)) // slit length of 5.5’
+    case class GmosSouthLongSlit(grating: GmosSouthGrating) extends ObservingMode(ObservingModeType.GmosSouthLongSlit, Angle.fromDoubleArcseconds(5.5 * 60)) // slit length of 5.5’
 
     val DecodeGmosNorthLongSlit: Decoder[GmosNorthLongSlit] = hc =>
       hc.downField("grating").as[GmosNorthGrating].map(GmosNorthLongSlit(_))
