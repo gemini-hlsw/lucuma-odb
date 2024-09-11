@@ -24,6 +24,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
+import lucuma.odb.data.ConfigurationRequest
 
 class observationValidations extends OdbSuite with ObservingModeSetupOperations {
   val pi    = TestUsers.Standard.pi(1, 30)
@@ -235,12 +236,30 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
     }
   }
 
+  // temporary, until this is doable via graphql
+  def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
+    import skunk.syntax.all.*
+    import lucuma.odb.util.Codecs.configuration_request_id
+    session.use: s =>
+      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
+        ps.execute(req).void
+
+  def denyConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
+    import skunk.syntax.all.*
+    import lucuma.odb.util.Codecs.configuration_request_id
+    session.use: s =>
+      s.prepareR(sql"update t_configuration_request set c_status = 'denied' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
+        ps.execute(req).void
+
   test("no validations") {
     val setup: IO[Observation.Id] =
       for {
+        cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
@@ -251,44 +270,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
       )
     }
   }
-  
-  test("no validations with CfP") {
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        cid <- createCallForProposalsAs(staff)
-        _   <- addProposal(pi, pid, cid.some)
-        tid <- createTargetWithProfileAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(oid)
-      } yield oid
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        validationQuery(oid),
-        expected = queryResult().asRight
-      )
-    }
-  }
-  
-  test("no validations with no CfP") {
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid)
-        tid <- createTargetWithProfileAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(oid)
-      } yield oid
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        validationQuery(oid),
-        expected = queryResult().asRight
-      )
-    }
-  }
-  
+    
   test("missing target info, invalid instrument") {
     val setup: IO[(Target.Id, Observation.Id)] =
       for {
@@ -323,6 +305,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
@@ -363,12 +346,13 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(oid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))     
+         _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
       List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
         setObservationExplicitBase(oid, ra, dec) >>
+        createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
           expect(
             pi,
             validationQuery(oid),
@@ -391,6 +375,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
     setup.flatMap { oid =>
       List((RaStartWrap, DecStart), (RaEndWrap, DecEnd), (RaStartWrap, DecEnd), (RaCenterWrap, DecCenter)).traverse { (ra, dec) =>
         setObservationExplicitBase(oid, ra, dec) >>
+          createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
           expect(
             pi,
             validationQuery(oid),
@@ -455,6 +440,7 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         tid <- createTargetWithProfileAs(pi, pid)
         _   <- setTargetCoords(tid, RaCenter, DecCenter)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResult(oid)
       } yield oid
     setup.flatMap { oid =>
@@ -535,6 +521,77 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         expected = queryResult(
           ObservationValidation.configuration(
             ObservationService.InvalidScienceBandMsg(ScienceBand.Band1)
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("no configuration request") {
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.ConfigurationRequestMsg.NotRequested
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("unapproved configuration request") {
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid)
+        _   <- computeItcResult(oid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.ConfigurationRequestMsg.Pending
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("denied configuration request") {
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(denyConfigurationRequestHack)
+        _   <- computeItcResult(oid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.ConfigurationRequestMsg.Denied
           )
         ).asRight
       )
