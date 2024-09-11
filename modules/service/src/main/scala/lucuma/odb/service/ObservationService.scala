@@ -52,6 +52,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
@@ -87,7 +88,6 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
-import lucuma.odb.data.ConfigurationRequest
 
 sealed trait ObservationService[F[_]] {
 

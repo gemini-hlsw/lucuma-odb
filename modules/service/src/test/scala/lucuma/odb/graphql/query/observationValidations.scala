@@ -22,9 +22,9 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
-import lucuma.odb.data.ConfigurationRequest
 
 class observationValidations extends OdbSuite with ObservingModeSetupOperations {
   val pi    = TestUsers.Standard.pi(1, 30)
