@@ -8,11 +8,11 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.ConfigurationRequest
-import lucuma.core.model.Observation
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import lucuma.core.enums.GmosNorthGrating
 
 class observation_configurationRequests 
   extends OdbSuite 

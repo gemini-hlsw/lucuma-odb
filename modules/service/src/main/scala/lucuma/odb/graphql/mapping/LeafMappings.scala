@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -57,7 +58,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
-import lucuma.odb.data.ConfigurationRequest
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 

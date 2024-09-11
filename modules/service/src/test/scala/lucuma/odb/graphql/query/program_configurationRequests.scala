@@ -8,9 +8,9 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.ConfigurationRequest
-import lucuma.core.model.Program
 
 class program_configurationRequests extends OdbSuite with ObservingModeSetupOperations {
 

@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GmosLongSlitView
 
 trait ConfigurationGmosLongSlitMappings[F[_]]
   extends GmosLongSlitView[F]
