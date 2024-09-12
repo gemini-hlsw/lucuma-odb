@@ -3192,6 +3192,12 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
+
+  """
+  Sets the "for review" bit.
+  """
+  forReview: Boolean
+  
 }
 
 """
@@ -8434,6 +8440,12 @@ type Observation {
   """
   configurationRequests: [ConfigurationRequest!]!
 
+  """
+  This flag is set to true prior to Phase II, and must be reset to false by the PI prior to observation. The
+  intent is to prompt PIs to review their accepted observations.
+  """
+  forReview: Boolean!
+
 }
 type Configuration {
   conditions: ConfigurationConditions!
@@ -12339,6 +12351,11 @@ input WhereObservation {
   Matches the observation science band.
   """
   scienceBand: WhereOptionOrderScienceBand
+
+  """
+  Matches the "for review" bit.
+  """
+  forReview: WhereBoolean
 
 }
 

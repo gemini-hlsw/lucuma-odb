@@ -84,6 +84,7 @@ import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
+import skunk.codec.boolean.bool
 
 import java.time.Duration
 
@@ -292,7 +293,8 @@ object ObservationService {
           Some(Existence.Deleted),
           Nullable.Null,
           None,
-          Nullable.Absent
+          Nullable.Absent,
+          None
         )
 
         // delete targets, asterisms and observations
@@ -1056,6 +1058,7 @@ object ObservationService {
       val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upForReview         = sql"c_for_review = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1065,6 +1068,7 @@ object ObservationService {
           SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
+          SET.forReview.map(upForReview),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
