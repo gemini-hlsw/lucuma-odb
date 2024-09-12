@@ -10,6 +10,7 @@ import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
+  
      with SchemaSemigroup[F]
      with MappingExtras[F]
      with CirceMappingLike[F] {
@@ -51,7 +52,7 @@ trait BaseMapping[F[_]]
   lazy val CloneGroupResultType                    = schema.ref("CloneGroupResult")
   lazy val CloneObservationResultType              = schema.ref("CloneObservationResult")
   lazy val CloneTargetResultType                   = schema.ref("CloneTargetResult")
-  lazy val CloudExtinctionType                     = schema.ref("CloudExtinction")
+  lazy val CloudExtinctionType                     = schema.ref("CloudExtinction") 
   lazy val CommissioningProgramReferenceType       = schema.ref("CommissioningProgramReference")
   lazy val ConditionsEntryType                     = schema.ref("ConditionsEntry")
   lazy val ConditionsMeasurementType               = schema.ref("ConditionsMeasurement")
@@ -59,6 +60,14 @@ trait BaseMapping[F[_]]
   lazy val ConditionsIntuitionType                 = schema.ref("ConditionsIntuition")
   lazy val ConditionsExpectationType               = schema.ref("ConditionsExpectation")
   lazy val ConditionsExpectationTypeType           = schema.ref("ConditionsExpectationType")
+  lazy val ConfigurationConditionsType             = schema.ref("ConfigurationConditions")
+  lazy val ConfigurationGmosNorthLongSlitType      = schema.ref("ConfigurationGmosNorthLongSlit")
+  lazy val ConfigurationGmosSouthLongSlitType      = schema.ref("ConfigurationGmosSouthLongSlit")
+  lazy val ConfigurationObservingModeType          = schema.ref("ConfigurationObservingMode")
+  lazy val ConfigurationType                       = schema.ref("Configuration")
+  lazy val ConfigurationRequestType                = schema.ref("ConfigurationRequest")
+  lazy val ConfigurationRequestIdType              = schema.ref("ConfigurationRequestId")
+  lazy val ConfigurationRequestStatusType          = schema.ref("ConfigurationRequestStatus")
   lazy val ConstraintSetType                       = schema.ref("ConstraintSet")
   lazy val ConstraintSetGroupType                  = schema.ref("ConstraintSetGroup")
   lazy val ConstraintSetGroupSelectResultType      = schema.ref("ConstraintSetGroupSelectResult")

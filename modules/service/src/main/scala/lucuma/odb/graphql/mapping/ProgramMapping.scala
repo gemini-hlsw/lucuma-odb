@@ -25,6 +25,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
@@ -72,6 +73,7 @@ trait ProgramMapping[F[_]]
       SqlObject("pi", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
       SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
       SqlObject("observations"),
+      SqlObject("configurationRequests"),
       SqlObject("proposal", Join(ProgramTable.Id, ProposalView.ProgramId)),
       SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
@@ -111,6 +113,27 @@ trait ProgramMapping[F[_]]
                 OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
               ))),
               oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+              offset = None,
+              limit = Some(limit + 1),
+              q
+            )
+          }
+        }
+      }
+
+    case (ProgramType, "configurationRequests", List(
+      ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+    )) =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, lim) =>
+          val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(
+                OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql)
+              ),
+              oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id", true, true))),
               offset = None,
               limit = Some(limit + 1),
               q

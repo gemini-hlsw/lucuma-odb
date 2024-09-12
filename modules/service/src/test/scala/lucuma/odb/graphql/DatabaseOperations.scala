@@ -54,6 +54,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ObservingModeType
@@ -1566,4 +1567,23 @@ trait DatabaseOperations { this: OdbSuite =>
     """
     query(user = user, query = q).void
   }
+
+  def createConfigurationRequestAs(user: User, oid: Observation.Id): IO[ConfigurationRequest.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createConfigurationRequest(input: {
+            observationId: "$oid"
+          }) {
+            id
+          }
+        }
+      """
+    ).map: json =>
+      json
+        .hcursor
+        .downFields("createConfigurationRequest", "id")
+        .require[ConfigurationRequest.Id]
+
 }

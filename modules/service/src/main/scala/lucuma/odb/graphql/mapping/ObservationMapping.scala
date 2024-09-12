@@ -20,6 +20,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
@@ -76,6 +77,8 @@ trait ObservationMapping[F[_]]
       SqlField("groupIndex", ObservationView.GroupIndex),
       SqlField("calibrationRole", ObservationView.CalibrationRole),
       SqlField("observerNotes", ObservationView.ObserverNotes),
+      SqlObject("configuration"),
+      EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -131,6 +134,19 @@ trait ObservationMapping[F[_]]
           observationService
            .observationValidations(pid, oid, itcClient)
            .map(_.success)
+        }
+
+    effectHandler(readEnv, calculate)
+  }
+
+  lazy val configurationRequestsQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Unit] = _ => ().success
+
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ConfigurationRequest]]] =
+      (_, oid, _) =>
+        services.useTransactionally {
+          configurationService
+            .selectRequests(oid)
         }
 
     effectHandler(readEnv, calculate)

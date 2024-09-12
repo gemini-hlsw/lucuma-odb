@@ -109,6 +109,12 @@ object OdbMapping {
           with ConditionsExpectationMapping[F]
           with ConditionsIntuitionMapping[F]
           with ConditionsMeasurementMapping[F]
+          with ConfigurationConditionsMapping[F]
+          with ConfigurationGmosLongSlitMappings[F]
+          with ConfigurationMapping[F]
+          with ConfigurationRequestMapping[F]
+          with ConfigurationRequestSelectResultMapping[F]
+          with ConfigurationObservingModeMappings[F]
           with ConstraintSetGroupMapping[F]
           with ConstraintSetGroupSelectResultMapping[F]
           with ConstraintSetMapping[F]
@@ -242,7 +248,7 @@ object OdbMapping {
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
-          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums))
+          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums, Some(this)))
           override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
@@ -278,10 +284,11 @@ object OdbMapping {
                 ConditionsExpectationMapping,
                 ConditionsIntuitionMapping,
                 ConditionsMeasurementMapping,
+                ConfigurationRequestMapping,
+                ConfigurationRequestSelectResultMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,
                 ConstraintSetMapping,
-                CoordinatesMapping,
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
@@ -413,6 +420,12 @@ object OdbMapping {
                 AngleMappings,
                 AtomRecordSelectResultMappings,
                 CategorizedTimeMappings,
+                ConfigurationMappings,
+                ConfigurationConditionsMappings,
+                ConfigurationGmosNorthLongSlitMappings,
+                ConfigurationGmosSouthLongSlitMappings,
+                ConfigurationObservingModeMappings,
+                CoordinatesMappings,
                 CoordinateLimitsMappings,
                 DatasetSelectResultMappings,
                 DateIntervalMappings,

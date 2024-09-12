@@ -41,7 +41,7 @@ object ProposalAttachmentRoutes {
     maxUploadMb:           Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums)).map(_.proposalAttachmentFileService(s3)).use(fa),
+      [A] => (u: User) => (fa :ProposalAttachmentFileService[F] => F[A]) => pool.map(Services.forUser(u, enums, None)).map(_.proposalAttachmentFileService(s3)).use(fa),
       ssoClient,
       maxUploadMb
     )

@@ -59,7 +59,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     Enums.load(s).flatMap { e =>
-      val services = Services.forUser(pi /* doesn't matter*/, e)(s)
+      val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
       services.transactionally {
 
         val flat =
