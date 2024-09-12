@@ -3063,6 +3063,13 @@ type Mutation {
     input: RevokeUserInvitationInput!
   ): RevokeUserInvitationResult!
 
+  """
+  Create a configuration request.
+  """
+  createConfigurationRequest(
+    input: CreateConfigurationRequestInput!
+  ): ConfigurationRequest!
+
 }
 
 """
@@ -8417,6 +8424,61 @@ type Observation {
   """
   observerNotes: NonEmptyString
 
+  """
+  Parameters relevant to approved configurations.
+  """
+  configuration: Configuration!
+
+  """
+  Program configuration requests applicable to this observation.
+  """
+  configurationRequests: [ConfigurationRequest!]!
+
+}
+type Configuration {
+  conditions: ConfigurationConditions!
+  referenceCoordinates: Coordinates # may not be available
+  observingMode: ConfigurationObservingMode
+}
+
+type ConfigurationConditions {
+  imageQuality: ImageQuality!
+  cloudExtinction: CloudExtinction!
+  skyBackground: SkyBackground!
+  waterVapor: WaterVapor!
+}
+
+type ConfigurationObservingMode {
+  instrument: Instrument!
+  mode: ObservingModeType!
+  gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
+  gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+}
+
+type ConfigurationGmosNorthLongSlit {
+  grating: GmosNorthGrating!
+}
+
+type ConfigurationGmosSouthLongSlit {
+  grating: GmosSouthGrating!
+}
+
+scalar ConfigurationRequestId
+
+enum ConfigurationRequestStatus {
+  REQUESTED
+  APPROVED
+  DENIED
+}
+
+type ConfigurationRequest {
+  id: ConfigurationRequestId!
+  status: ConfigurationRequestStatus!
+  configuration: Configuration!
+}
+
+input CreateConfigurationRequestInput {
+  observationId: ObservationId
 }
 
 type Itc {
@@ -8445,6 +8507,21 @@ type ObservationSelectResult {
   Matching observations up to the return size limit of 1000
   """
   matches: [Observation!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+}
+
+"""
+The matching configuration requests, limited to a maximum of 1000 entries.
+"""
+type ConfigurationRequestSelectResult {
+  """
+  Matching configuration requests up to the return size limit of 1000
+  """
+  matches: [ConfigurationRequest!]!
 
   """
   `true` when there were additional matches that were not returned.
@@ -8730,6 +8807,23 @@ type Program {
   ): ObservationSelectResult!
 
   """
+  All configuration requests associated with the program.
+  """
+  configurationRequests(
+
+    """
+    Starts the result set at (or after if not existent) the given configuration request id.
+    """
+    OFFSET: ConfigurationRequestId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+
+  ): ConfigurationRequestSelectResult!
+
+  """
   ObsAttachments assocated with the program
   """
   obsAttachments: [ObsAttachment!]!
@@ -8773,6 +8867,7 @@ type Program {
   Calibration role of the program
   """
   calibrationRole: CalibrationRole
+
 }
 
 """
@@ -10816,6 +10911,16 @@ type TargetEnvironment {
     """
     includeDeleted: Boolean! = false
   ): Target
+
+  """
+  Explicit (if defined) or computed base position at the specified time, if known.
+  """
+  basePosition(
+    """
+    The time used for the base position calculations.
+    """
+    observationTime: Timestamp!
+  ): Coordinates
 
   """
   The guide star(s) and related information

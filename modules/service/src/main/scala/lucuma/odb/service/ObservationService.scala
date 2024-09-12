@@ -52,6 +52,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
@@ -76,7 +77,6 @@ import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
-import lucuma.odb.syntax.resultT.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -199,6 +199,11 @@ object ObservationService {
   def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
   def InvalidScienceBandMsg(b: ScienceBand) = s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+  object ConfigurationRequestMsg:
+    val Unavailable  = "Configuration approval status could not be determined."
+    val NotRequested = "Configuration is unapproved (approval has not been requested)."
+    val Denied       = "Configuration is unapproved (request was denied)."
+    val Pending      = "Configuration is unapproved (request is pending)."
 
   case class CloneIds(
     originalId: Observation.Id,
@@ -694,12 +699,32 @@ object ObservationService {
               invalidBand.fold(m)(b => m.add(ObservationValidation.configuration(InvalidScienceBandMsg(b))))
             }
 
-        for {
-          (genVals, op) <- generatorValidations
-          cfpVals       <- cfpValidations
-          itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
-          bandVals      <- validateScienceBand
-        } yield (genVals |+| itcVals |+| cfpVals |+| bandVals).toList
+        def validateConfiguration: F[ObservationValidationMap] =
+          configurationService.selectRequests(oid).map: r =>
+            val m = ObservationValidationMap.empty
+            r.toOption match
+              case None => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Unavailable))
+              case Some(Nil) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.NotRequested))
+              case Some(lst) if lst.exists(_.status === ConfigurationRequest.Status.Approved) => m
+              case Some(lst) if lst.forall(_.status === ConfigurationRequest.Status.Denied) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Denied))
+              case _ => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Pending))
+
+        val initialMap = 
+          for {
+            (genVals, op) <- generatorValidations
+            cfpVals       <- cfpValidations
+            itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
+            bandVals      <- validateScienceBand
+          } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
+
+        // only compute configuration request status is everything else is ok
+        val secondMap =
+          initialMap.flatMap: m =>
+            if m.isEmpty then validateConfiguration
+            else m.pure[F]          
+
+        secondMap.map(_.toList)
+
       }
 
     }

@@ -57,6 +57,7 @@ import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.ConditionsEntryInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
+import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -119,6 +120,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CloneObservation,
       CloneTarget,
       CreateCallForProposals,
+      CreateConfigurationRequest,
       CreateGroup,
       CreateObservation,
       CreateProgram,
@@ -352,6 +354,17 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         requireStaffAccess {
           callForProposalsService.createCallForProposals(input).nestMap { gid =>
             Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
+          }
+        }
+      }
+    }
+
+  private lazy val CreateConfigurationRequest: MutationField =
+    MutationField("createConfigurationRequest", CreateConfigurationRequestInput.Binding) { (input, child) =>
+      services.useTransactionally {
+        requirePiAccess {
+          configurationService.insertRequest(input).nestMap { req =>
+            Unique(Filter(Predicates.configurationRequest.id.eql(req.id), child))
           }
         }
       }

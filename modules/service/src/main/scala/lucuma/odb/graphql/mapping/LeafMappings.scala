@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -80,6 +81,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
+      LeafMapping[ConfigurationRequest.Status](ConfigurationRequestStatusType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),

@@ -23,6 +23,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val cloneGroupResult              = CloneGroupResultPredicates(Path.from(CloneGroupResultType))
     val cloneObservationResult        = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult             = CloneTargetResultPredicates(Path.from(CloneTargetResultType))
+    val configurationRequest          = ConfigurationRequestPredicates(Path.from(ConfigurationRequestType))
     val constraintSetGroup            = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val createProposalResult          = CreateProposalResultPredicates(Path.from(CreateProposalResultType))
     val dataset                       = DatasetPredicates(Path.from(DatasetType))

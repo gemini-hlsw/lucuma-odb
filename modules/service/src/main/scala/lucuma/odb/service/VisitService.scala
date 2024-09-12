@@ -75,7 +75,7 @@ object VisitService {
  
         val rt = for 
           v <- ResultT(insertVisit)
-          _ <- ResultT.success(insertStatic(v.some).void)
+          _ <- ResultT.liftF(insertStatic(v.some).void)
         yield v
 
         rt.value

@@ -10,10 +10,15 @@ import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
+import grackle.Mapping
 import grackle.Result
+import grackle.ResultT
+import io.circe.Json
+import io.circe.JsonObject
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.graphql.routes.GraphQLService
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
@@ -43,6 +48,9 @@ trait Services[F[_]]:
 
   /** The underlying `Session`. */
   def session: Session[F]
+
+  /** Recursively execute a graphql query using the resources of this `Service` instance. */
+  def runGraphQLQuery(query: String, op: Option[String] = None, vars: Option[JsonObject] = None): F[Result[Json]]
 
   /** The associated `User`. */
   def user: User
@@ -87,6 +95,9 @@ trait Services[F[_]]:
 
   /** The `ChronicleService`. */
   def chronicleService: ChronicleService[F]
+
+  /** The `ConfigurationService`. */
+  def configurationService: ConfigurationService[F]
 
   /** The `DatasetService`. */
   def datasetService: DatasetService[F]
@@ -189,7 +200,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](u: User, e: Enums)(s: Session[F])(
+  def forUser[F[_]](u: User, e: Enums, m: Option[Mapping[F]])(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F]
   ): Services[F[_]] =
     new Services[F]:
@@ -198,6 +209,21 @@ object Services:
       val enums = e
 
       given Services[F] = this // need is for `instantiate` calls below
+
+      private val graphQlService: Result[GraphQLService[F]] =
+        m match
+          case None => Result.internalError("No GraphQL Mapping available for this Services instance.")
+          case Some(value) => Result(GraphQLService(value))
+
+      def runGraphQLQueryImpl(query: String, op: Option[String], vars: Option[JsonObject]): ResultT[F, Json] =
+        for
+          svc  <- ResultT(graphQlService.pure[F])
+          op   <- ResultT(svc.parse(query, op, vars).pure[F])
+          json <- ResultT(svc.query(op))
+        yield json
+
+      def runGraphQLQuery(query: String, op: Option[String], vars: Option[JsonObject]): F[Result[Json]] =
+        runGraphQLQueryImpl(query, op, vars).value
 
       def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F]
@@ -217,6 +243,7 @@ object Services:
       lazy val callForProposalsService = CallForProposalsService.instantiate
       lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
+      lazy val configurationService = ConfigurationService.instantiate
       lazy val datasetService = DatasetService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
@@ -265,6 +292,7 @@ object Services:
     def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
+    def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService

@@ -76,10 +76,6 @@ trait ExecutionEventService[F[_]] {
 }
 
 object ExecutionEventService {
-  extension (x: ResultT.type) {
-    def liftF[F[_], A](fa: F[A])(implicit F: cats.Functor[F]): ResultT[F, A] =
-      ResultT(fa.map(_.success))
-  }
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F] {

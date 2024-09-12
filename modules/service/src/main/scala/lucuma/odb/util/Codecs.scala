@@ -55,6 +55,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -336,6 +337,12 @@ trait Codecs {
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
+
+  val configuration_request_id: Codec[ConfigurationRequest.Id] =
+    gid[ConfigurationRequest.Id]
+
+  val configuration_request_status: Codec[ConfigurationRequest.Status] =
+    enumerated(Type("e_configuration_request_status"))
 
   val observing_mode_type: Codec[ObservingModeType] =
     enumerated(Type("e_observing_mode_type"))

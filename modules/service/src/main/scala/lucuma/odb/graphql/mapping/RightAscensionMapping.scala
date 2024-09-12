@@ -10,12 +10,14 @@ import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.CallForProposalsView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 
 import scala.reflect.ClassTag
 
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
+                                     with ConfigurationRequestView[F]
                                      with ObservationView[F]
                                      with TargetView[F] {
 
@@ -42,6 +44,7 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
+      rightAscensionMappingAtPath(ConfigurationRequestType / "configuration" / "referenceCoordinates" / "ra", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Ra),
     )
 
 }
