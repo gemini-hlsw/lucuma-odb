@@ -1833,6 +1833,48 @@ class updateObservations extends OdbSuite
       )
     yield ()
   }
+
+
+  test("forReview: change value") {
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid) // defaults to false
+      _   <- expect(
+        user   = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                forReview: true
+              },
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }) {
+              observations {
+                id
+                forReview
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "id": $oid,
+                  "forReview": true
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    yield ()
+  }
+
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
