@@ -548,6 +548,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       }
     }
 
+  def subscriptionExpectFT(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None, transform: List[Json] => List[Json]) =
+    subscription(user, query, mutations, variables).flatMap { obt =>
+      expectedF.map { expected =>
+        assertEquals(transform(obt).map(_.spaces2), transform(expected).map(_.spaces2))  // by comparing strings we get more useful errors
+      }
+    }
+
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 

@@ -249,7 +249,7 @@ class createObservation extends OdbSuite {
           }
         """,
         Left(List(
-          "Proposal 'G-2025A-0003' (id p-106) does not correspond to the specified program id p-123."
+          "Proposal 'G-2025A-0003' (id p-107) does not correspond to the specified program id p-123."
         ))
       )
     }
