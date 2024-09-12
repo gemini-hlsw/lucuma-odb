@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import clue.ResponseException
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
@@ -24,9 +25,14 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.graphql.input.AllocationInput
-import lucuma.odb.service.ObservationService
+import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
+import lucuma.odb.service.ObservationService 
 
-class observationValidations extends OdbSuite with ObservingModeSetupOperations {
+class observationValidations 
+  extends OdbSuite
+     with ObservingModeSetupOperations 
+     with UpdateConstraintSetOps {
+
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(3, 103)
   
@@ -592,6 +598,55 @@ class observationValidations extends OdbSuite with ObservingModeSetupOperations 
         expected = queryResult(
           ObservationValidation.configuration(
             ObservationService.ConfigurationRequestMsg.Denied
+          )
+        ).asRight
+      )
+    }
+  }
+
+  test("for review") {
+    def setForReview(oid: Observation.Id): IO[Unit] =
+      updateObservation(
+        user = pi,
+        oid = oid,
+        update = "forReview: true",
+        query = """
+          observations {
+            id
+            forReview
+          }
+        """,
+        expected = Right(json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "id": $oid,
+                  "forReview": true
+                }
+              ]
+            }
+          }
+        """)
+      )
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResult(oid)
+        _   <- setForReview(oid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult(
+          ObservationValidation.configuration(
+            ObservationService.ConfigurationForReviewMsg
           )
         ).asRight
       )
