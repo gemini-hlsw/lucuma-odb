@@ -748,11 +748,14 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           }
 
         def setAsterisms(m: Map[Program.Id, List[Observation.Id]]): F[Result[Unit]] =
-          m.toList.traverse { case (pid, oids) =>
-            NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
+          // The "obvious" implementation with `traverse` doesn't work here because
+          // ResultT isn't a Monad and thus doesn't short-circuit. Doing an explicit
+          // fold with the [non-monadic] short-circuiting `flatMap` fixes it.
+          m.toList.foldRight(ResultT(Result.unit.pure[F])) { case ((pid, oids), accum) =>
+            ResultT(NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
               asterismService.setAsterism(pid, os, input.asterism)
-            }
-          }.map(_.sequence.void)
+            }).flatMap(_ => accum)
+          }.value
 
         val r = for {
           tup <- ResultT(updateObservations)
