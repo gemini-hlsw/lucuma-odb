@@ -116,10 +116,10 @@ class observation extends OdbSuite {
                 "targetEnvironment" : {
                   "asterism" : [
                     {
-                      "id" : "t-13a"
+                      "id" : "t-194"
                     },
                     {
-                      "id" : "t-13b"
+                      "id" : "t-195"
                     }
                   ]
                 }
