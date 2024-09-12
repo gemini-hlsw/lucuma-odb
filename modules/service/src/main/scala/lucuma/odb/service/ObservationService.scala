@@ -82,9 +82,9 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
-import skunk.codec.boolean.bool
 
 import java.time.Duration
 
