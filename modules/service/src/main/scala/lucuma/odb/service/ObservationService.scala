@@ -200,6 +200,7 @@ object ObservationService {
   def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
   def InvalidScienceBandMsg(b: ScienceBand) = s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+  val ConfigurationForReviewMsg = "Observation must be reviewed prior to execution."
   object ConfigurationRequestMsg:
     val Unavailable  = "Configuration approval status could not be determined."
     val NotRequested = "Configuration is unapproved (approval has not been requested)."
@@ -671,18 +672,19 @@ object ObservationService {
           }
         }
 
-        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] =
+        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
           session.unique(Statements.ObservationValidationInfo)(oid)
 
         val cfpValidations: F[ObservationValidationMap] = {
           optCfpId.flatMap(
             _.fold(ObservationValidationMap.empty.pure){ cid =>
               for {
-                (oinstr, ora, odec) <- obsInfo
+                (oinstr, ora, odec, act) <- obsInfo
                 valInstr            <- validateInstrument(cid, oinstr)
                 explicitBase     = (ora, odec).tupled
                 valRaDec            <- validateRaDec(cid, oinstr, explicitBase)
-              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec).flatten)
+                valForactivation  = Option.when(act)(ObservationValidation.configuration(ConfigurationForReviewMsg))
+              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
              }
           )
         }
@@ -1251,15 +1253,16 @@ object ObservationService {
       """.query(cfp_id.opt)
 
     val ObservationValidationInfo:
-      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
+      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
       sql"""
         SELECT
           c_instrument,
           c_explicit_ra,
-          c_explicit_dec
+          c_explicit_dec,
+          c_for_review
         FROM t_observation
         WHERE c_observation_id = $observation_id
-      """.query(instrument.opt *: right_ascension.opt *: declination.opt)
+      """.query(instrument.opt *: right_ascension.opt *: declination.opt *: bool)
 
     def cfpInformation(
       site: Site
