@@ -82,6 +82,7 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -199,6 +200,7 @@ object ObservationService {
   def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
   def InvalidScienceBandMsg(b: ScienceBand) = s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+  val ConfigurationForReviewMsg = "Observation must be reviewed prior to execution."
   object ConfigurationRequestMsg:
     val Unavailable  = "Configuration approval status could not be determined."
     val NotRequested = "Configuration is unapproved (approval has not been requested)."
@@ -292,7 +294,8 @@ object ObservationService {
           Some(Existence.Deleted),
           Nullable.Null,
           None,
-          Nullable.Absent
+          Nullable.Absent,
+          None
         )
 
         // delete targets, asterisms and observations
@@ -669,18 +672,19 @@ object ObservationService {
           }
         }
 
-        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination])] =
+        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
           session.unique(Statements.ObservationValidationInfo)(oid)
 
         val cfpValidations: F[ObservationValidationMap] = {
           optCfpId.flatMap(
             _.fold(ObservationValidationMap.empty.pure){ cid =>
               for {
-                (oinstr, ora, odec) <- obsInfo
+                (oinstr, ora, odec, act) <- obsInfo
                 valInstr            <- validateInstrument(cid, oinstr)
                 explicitBase     = (ora, odec).tupled
                 valRaDec            <- validateRaDec(cid, oinstr, explicitBase)
-              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec).flatten)
+                valForactivation  = Option.when(act)(ObservationValidation.configuration(ConfigurationForReviewMsg))
+              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
              }
           )
         }
@@ -1056,6 +1060,7 @@ object ObservationService {
       val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upForReview         = sql"c_for_review = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1065,6 +1070,7 @@ object ObservationService {
           SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
+          SET.forReview.map(upForReview),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1247,15 +1253,16 @@ object ObservationService {
       """.query(cfp_id.opt)
 
     val ObservationValidationInfo:
-      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination])] =
+      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
       sql"""
         SELECT
           c_instrument,
           c_explicit_ra,
-          c_explicit_dec
+          c_explicit_dec,
+          c_for_review
         FROM t_observation
         WHERE c_observation_id = $observation_id
-      """.query(instrument.opt *: right_ascension.opt *: declination.opt)
+      """.query(instrument.opt *: right_ascension.opt *: declination.opt *: bool)
 
     def cfpInformation(
       site: Site

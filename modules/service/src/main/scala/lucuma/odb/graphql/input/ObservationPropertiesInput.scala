@@ -52,6 +52,7 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
+    forReview:           Option[Boolean],
   ) extends AsterismInput
 
   object Create {
@@ -76,6 +77,7 @@ object ObservationPropertiesInput {
         group               = None,
         groupIndex          = None,
         observerNotes       = None,
+        forReview           = None,
       )
 
     val Binding: Matcher[Create] =
@@ -96,6 +98,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
+          BooleanBinding.Option("forReview", rForReview)
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -112,6 +115,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rForReview,
           ).parMapN(Create.apply)
       }
 
@@ -133,6 +137,7 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
+    forReview:           Option[Boolean],
   ) extends AsterismInput
 
   object Edit {
@@ -154,6 +159,7 @@ object ObservationPropertiesInput {
         group =              Nullable.Absent,
         groupIndex =         None,
         observerNotes =      Nullable.Absent,
+        forReview =          None,
       )
 
     val Binding: Matcher[Edit] =
@@ -174,6 +180,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
+          BooleanBinding.Option("forReview", rForReview)
         ) =>
           (rSubtitle,
             rObsStatus,
@@ -190,6 +197,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rForReview,
           ).parMapN(apply)
       }
   }

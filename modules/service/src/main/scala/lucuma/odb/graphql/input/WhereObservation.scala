@@ -25,6 +25,7 @@ object WhereObservation {
     val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
     val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
+    val ForReviewBinding = WhereOptionBoolean.binding(path / "forReview", BooleanBinding)
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -38,10 +39,11 @@ object WhereObservation {
         SubtitleBinding.Option("subtitle", rSubtitle),
         StatusBinding.Option("status", rStatus),
         ActiveStatusBinding.Option("activeStatus", rActiveStatus),
-        ScienceBandBinding.Option("scienceBand", rScienceBand)
+        ScienceBandBinding.Option("scienceBand", rScienceBand),
+        ForReviewBinding.Option("forReview", rForReview),
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rStatus, rActiveStatus, rScienceBand).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, status, activeStatus, scienceBand) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rStatus, rActiveStatus, rScienceBand, rForReview).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, status, activeStatus, scienceBand, forReview) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -52,7 +54,8 @@ object WhereObservation {
               subtitle,
               status,
               activeStatus,
-              scienceBand
+              scienceBand,
+              forReview
             ).flatten)
         }
     }
