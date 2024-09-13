@@ -37,6 +37,8 @@ import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 trait CalibrationTargetLocator {
   def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
@@ -59,9 +61,9 @@ extension[F[_], A](r: F[Result[A]])
 
 trait SpecPhotoCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
-    val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+    val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant).plusHours(1)
     val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
-    val ra = RightAscension(HourAngle.fromHMS(h + 1, m, s, 0, n / 1000))
+    val ra = RightAscension(HourAngle.fromHMS(h, m, s, 0, n / 1000))
     val dec = site.place.latitude
     Coordinates(ra, dec)
   }
@@ -75,9 +77,18 @@ object SpecPhotoCalibrations extends SpecPhotoCalibrations
 
 trait TwilightCalibrations extends CalibrationTargetLocator {
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
-    val lst = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+    val localT = LocalDateTime.ofInstant(referenceInstant, site.timezone)
+    val localMidnight = LocalDateTime.of(localT.toLocalDate(), LocalTime.MIDNIGHT)
+
+    val lstʹ = ImprovedSkyCalc(site.place).getLst(referenceInstant)
+    // X=+2 if the observation time is before local midnight, and X=-1.5 if the observation time is after local midnight.
+    val lst =
+      if (localT.isBefore(localMidnight))
+        lstʹ.plusHours(2)
+      else
+        lstʹ.minusHours(1).minusMinutes(30)
     val (h, m, s, n) = (lst.getHour, lst.getMinute, lst.getSecond, lst.getNano)
-    val ra = RightAscension(HourAngle.fromHMS(h - 2, m, s, 0, n / 1000))
+    val ra = RightAscension(HourAngle.fromHMS(h, m, s, 0, n / 1000))
     val dec = site.place.latitude
     Coordinates(ra, dec)
   }
