@@ -79,6 +79,7 @@ trait ObservationMapping[F[_]]
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
+      SqlField("forReview", ObservationView.ForReview),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
