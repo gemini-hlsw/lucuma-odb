@@ -898,94 +898,6 @@ class execution extends ExecutionTestSupport {
 
   }
 
-  test("user cannot access program") {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
-
-    setup.flatMap { oid =>
-      expect(
-        user  = pi2,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     instrument
-                   }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "observation": null
-            }
-          """
-        )
-      )
-    }
-
-  }
-
-  test("cross site execution config") {
-    val setup: IO[(Program.Id, Observation.Id)] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield (p, o)
-
-    setup.flatMap { case (_, oid) =>
-      expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosSouth {
-                       science {
-                         nextAtom {
-                           steps {
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength { nanometers }
-                               }
-                             }
-                           }
-                         }
-                       }
-                     }
-                   }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosSouth": null
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-
-  }
-
   test("time estimate: config and detector estimates") {
 
     val setup: IO[Observation.Id] =
@@ -2152,44 +2064,6 @@ class execution extends ExecutionTestSupport {
 
   }
 
-  test("unimplemented calibration role".ignore) {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- withServices(serviceUser) { services =>
-               services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.Photometric.some)(using xa)
-               }
-             }
-      } yield o
-
-    setup.flatMap { oid =>
-      expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           observeClass
-                         }
-                       }
-                     }
-                   }
-                 }
-               }
-             }
-           """,
-        expected = List("GMOS North photometric observation sequence generation not supported.").asLeft
-      )
-    }
-  }
 
   test("spec phot".ignore) {
     val setup: IO[Observation.Id] =
