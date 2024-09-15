@@ -50,6 +50,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.IndexTracker
 import monocle.Focus
 import monocle.Lens
@@ -363,7 +364,7 @@ object Science:
         .takeThrough { case ((bs, _, _), _) => bs.foldMap(_.completed) < time.exposureCount.value }
         .collect { case (_, Some(atom)) => atom }
 
-    override def record(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+    override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       val (blocksʹ, matches) = blocks.map(_.record(step)).unzip
 
       // update the position to first matching step starting from current pos
@@ -372,6 +373,9 @@ object Science:
       val posʹ = prefix.collectFirst(f).orElse(suffix.collectFirst(f)).getOrElse(pos)
 
       ScienceState(time, blocksʹ, tracker.record(step), posʹ)
+
+    override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
+      this
 
   end ScienceState
 

@@ -5,13 +5,15 @@ package lucuma.odb.sequence
 
 import cats.Eq
 import cats.effect.Concurrent
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import fs2.Stream
 import lucuma.core.util.Timestamp
+import lucuma.odb.sequence.util.mergeByTimestamp
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 
 case class ExecutionConfigGenerator[S, D](
   static:      S,
@@ -19,11 +21,15 @@ case class ExecutionConfigGenerator[S, D](
   science:     SequenceGenerator[D]
 ):
   def executionConfig[F[_]: Concurrent](
-    steps: Stream[F, StepRecord[D]],
-    time:  Timestamp
+    visits: Stream[F, VisitRecord],
+    steps:  Stream[F, StepRecord[D]],
+    time:   Timestamp
   )(using Eq[D]): F[ProtoExecutionConfig[S, (ProtoAtom[(ProtoStep[D], Int)], Int)]] =
-    steps.fold((acquisition, science)) { case ((a, s), step) =>
-      (a.record(step), s.record(step))
-    }.compile.onlyOrError.map { (a, s) =>
-      ProtoExecutionConfig(static, a.generate(time), s.generate(time))
-    }
+    mergeByTimestamp(visits, steps)(_.created, _.created)
+      .fold((acquisition, science)) {
+        case ((a, s), Left(visit)) => (a.recordVisit(visit), s.recordVisit(visit))
+        case ((a, s), Right(step)) => (a.recordStep(step), s.recordStep(step))
+      }
+      .compile.onlyOrError.map { (a, s) =>
+        ProtoExecutionConfig(static, a.generate(time), s.generate(time))
+      }
