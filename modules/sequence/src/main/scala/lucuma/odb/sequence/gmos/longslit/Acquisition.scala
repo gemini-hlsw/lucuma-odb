@@ -44,6 +44,7 @@ import lucuma.itc.TargetIntegrationTime
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.IndexTracker
 import lucuma.refined.*
 
@@ -163,14 +164,18 @@ object Acquisition:
     def reset(visitId: Visit.Id): AcquisitionState[D] =
       AcquisitionState.ExpectCcd2(visitId, tracker, steps)
 
-    override def record(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+    override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       if updatesVisit(step) then
-        reset(step.visitId).record(step)
+        reset(step.visitId).recordStep(step)
       else
         val a = updateTracker(tracker.record(step))
         if !step.isAcquisitionSequence     then a.reset(step.visitId)
         else if step.successfullyCompleted then a.recordCompleted(step)
         else a
+
+    override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
+      if visit.visitId === visitId then this
+      else reset(visit.visitId)
 
   end AcquisitionState
 
@@ -203,8 +208,11 @@ object Acquisition:
       override def generate(ignore: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
         gen(steps.initialAtom.some, steps.slit, IndexTracker.Zero)
 
-      override def record(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        ExpectCcd2(step.visitId, IndexTracker.Zero, steps).record(step)
+      override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+        ExpectCcd2(step.visitId, IndexTracker.Zero, steps).recordStep(step)
+
+      override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
+        this
 
     end Init
 

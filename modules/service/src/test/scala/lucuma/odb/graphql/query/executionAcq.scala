@@ -294,13 +294,7 @@ class executionAcq extends ExecutionTestSupport {
     }
   }
 
-  // TODO: SEQUENCE UPDATE
-  //
-  // We query on step records, but that requires an actual step in order to
-  // realize that the visit has changed.  I'll need to right join on visits and
-  // record(step | visit) or something.
-  //
-  test("execute acquisition, make a new visit, back to acquisition".ignore) {
+  test("execute acquisition, make a new visit, back to acquisition") {
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram

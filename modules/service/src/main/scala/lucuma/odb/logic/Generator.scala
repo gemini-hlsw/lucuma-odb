@@ -300,14 +300,16 @@ object Generator {
       type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, (ProtoAtom[(ProtoStep[GmosSouthDynamic], Int, StepEstimate)], Int)]
 
       private def protoExecutionConfig[S, D](
-        gen:   ExecutionConfigGenerator[S, D],
-        calc:  TimeEstimateCalculator[S, D],
-        steps: Stream[F, StepRecord[D]]
+        oid:    Observation.Id,
+        gen:    ExecutionConfigGenerator[S, D],
+        calc:   TimeEstimateCalculator[S, D],
+        steps:  Stream[F, StepRecord[D]]
       )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)]] =
+        val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
             t <- session.unique(CurrentTimestamp)
-            p <- gen.executionConfig(steps, t)
+            p <- gen.executionConfig(visits, steps, t)
           } yield p
         }).map(p => p.pipeBothSequences(calc.estimateSequence(p.static)))
 
@@ -320,7 +322,7 @@ object Generator {
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(g, calculator.gmosNorth, srs)
+          p <- protoExecutionConfig(ctx.oid, g, calculator.gmosNorth, srs)
         } yield p
 
       private def gmosSouthLongSlit(
@@ -332,7 +334,7 @@ object Generator {
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(g, calculator.gmosSouth, srs)
+          p <- protoExecutionConfig(ctx.oid, g, calculator.gmosSouth, srs)
         } yield p
 
       private def calcDigestFromContext(

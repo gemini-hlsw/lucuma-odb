@@ -10,6 +10,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 
 /**
  * Sequence generator.
@@ -20,4 +21,6 @@ trait SequenceGenerator[D]:
 
   def generate(t: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)]
 
-  def record(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D]
+  def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D]
+
+  def recordVisit(visit: VisitRecord): SequenceGenerator[D]
