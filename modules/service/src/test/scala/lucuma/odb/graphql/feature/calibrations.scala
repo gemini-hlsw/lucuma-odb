@@ -18,6 +18,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Group
@@ -374,20 +375,24 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   test("calculate best target for twilight") {
 
-    val samples: List[(Site, Instant, String)] = List(
-        (Site.GN, Instant.parse("2024-08-28T07:00:00Z"), "Twilight"),
-        (Site.GN, Instant.parse("2024-08-28T10:00:00Z"), "Twilight"),
-        (Site.GS, Instant.parse("2024-08-28T04:00:00Z"), "Twilight"),
-        (Site.GS, Instant.parse("2024-08-28T07:00:00Z"), "Twilight"),
+    val samples: List[(Site, Instant, String, Coordinates)] = List(
+        // after midnight
+        (Site.GN, Instant.parse("2024-08-28T10:00:00Z"), "Twilight", Coordinates.fromHmsDms.getOption("19:31:27.840000 +22:20:38.400000").get),
+        // before midnight
+        (Site.GN, Instant.parse("2024-08-24T01:00:00Z"), "Twilight", Coordinates.fromHmsDms.getOption("15:31:05.760000 +26:15:17.600000").get),
+        // before midnight
+        (Site.GS, Instant.parse("2024-08-28T03:00:00Z"), "Twilight", Coordinates.fromHmsDms.getOption("22:07:12.720000 -19:14:43.400000").get),
+        // after midnight
+        (Site.GS, Instant.parse("2024-08-24T10:00:00Z"), "Twilight", Coordinates.fromHmsDms.getOption("01:39:26.570000 -32:50:56.800000").get),
       )
 
     for {
       tgts <- calibrationTargets(CalibrationRole.Twilight, when)
-      _    <- samples.traverse { case (site, instant, name) =>
+      _    <- samples.traverse { case (site, instant, name, coord) =>
                 val id = TwilightCalibrations.bestTarget(site, instant, tgts)
-                tgts.find(_._1 === id.map(_._2).get).map(_._2).fold(
+                tgts.find(_._1 === id.map(_._2).get).fold(
                   IO.raiseError(new RuntimeException(s"Target $id not found"))
-                )(n => assertIOBoolean(IO(n === name)))
+                )((_, n, _, c) => assertIOBoolean(IO(n === name && c == coord)))
               }
     } yield ()
   }
