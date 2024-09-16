@@ -17,6 +17,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
+import lucuma.core.enums.ProgramUserRole
 
 class linkUser extends OdbSuite {
 
@@ -169,41 +170,45 @@ class linkUser extends OdbSuite {
 
   // LINKING SUPPORT
 
-  test("[staff support] guest user can't link a staff support user") {
-    createUsers(guest, pi) >>
-    createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-        linkSupportAs(guest, pi.id -> pid)
+  List[ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type](ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach { role =>
+
+    test(s"[$role] guest user can't link a staff support user") {
+      createUsers(guest, pi) >>
+      createProgramAs(guest).flatMap { pid =>
+        interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
+          linkSupportAs(guest, pi.id, pid, role)
+        }
       }
     }
-  }
 
-  test("[staff support] pi user can't link a staff support user") {
-    createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
-        linkSupportAs(pi, pi2.id -> pid)
-      }
-    }
-  }
-
-  test("[staff support] service, admin, and staff users can add a staff support user to any program") {
-    List(service, admin, staff).traverse_ { user =>
-      createUsers(user) >>
+    test(s"[$role] pi user can't link a staff support user") {
+      createUsers(pi, pi2) >>
       createProgramAs(pi).flatMap { pid =>
-        linkSupportAs(user, pi2.id -> pid)
+        interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
+          linkSupportAs(pi, pi2.id, pid, role)
+        }
       }
     }
-  }
 
-  test("[staff support] ngo user can't add staff support to program with time allocated by user's partner") {
-    createUsers(pi, pi2, ngo, admin) >>
-    createProgramAs(pi).flatMap { pid =>
-      setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkSupportAs(ngo, pi2.id -> pid)
+    test(s"[$role] service, admin, and staff users can add a staff support user to any program") {
+      List(service, admin, staff).traverse_ { user =>
+        createUsers(user) >>
+        createProgramAs(pi).flatMap { pid =>
+          linkSupportAs(user, pi2.id, pid, role)
+        }
       }
     }
+
+    test(s"[$role] ngo user can't add staff support to program with time allocated by user's partner") {
+      createUsers(pi, pi2, ngo, admin) >>
+      createProgramAs(pi).flatMap { pid =>
+        setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+        interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
+          linkSupportAs(ngo, pi2.id, pid, role)
+        }
+      }
+    }
+
   }
 
   // GENERAL RULES
