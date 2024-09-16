@@ -224,7 +224,7 @@ object CalibrationsService extends CalibrationObservations {
                 o   <- cta.traverse(calibObservation(ct, site, pid, gid, configs, _))
               } yield o).orError.map(_.map((ct, _)))
             } else {
-              List.empty[(CalibrationRole, Observation.Id)].pure[F]
+              List.empty.pure[F]
             })
 
         CalibrationTypes.map { ct =>
