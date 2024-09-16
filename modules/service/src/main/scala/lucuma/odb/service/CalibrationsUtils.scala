@@ -76,14 +76,19 @@ trait SpecPhotoCalibrations extends CalibrationTargetLocator {
 object SpecPhotoCalibrations extends SpecPhotoCalibrations
 
 trait TwilightCalibrations extends CalibrationTargetLocator {
-  def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
+  def beforeMidnight(site: Site, referenceInstant: Instant): Boolean = {
     val localT = LocalDateTime.ofInstant(referenceInstant, site.timezone)
-    val localMidnight = LocalDateTime.of(localT.toLocalDate(), LocalTime.MIDNIGHT)
+    val localNoon = LocalDateTime.of(localT.toLocalDate(), LocalTime.NOON)
+    // After noon it is before the next night midnight
+    // Before noon it is after the previous night midnight
+    localT.isAfter(localNoon)
+  }
 
+  def idealLocation(site: Site, referenceInstant: Instant): Coordinates = {
     val lstʹ = ImprovedSkyCalc(site.place).getLst(referenceInstant)
     // X=+2 if the observation time is before local midnight, and X=-1.5 if the observation time is after local midnight.
     val lst =
-      if (localT.isBefore(localMidnight))
+      if (beforeMidnight(site, referenceInstant))
         lstʹ.plusHours(2)
       else
         lstʹ.minusHours(1).minusMinutes(30)
