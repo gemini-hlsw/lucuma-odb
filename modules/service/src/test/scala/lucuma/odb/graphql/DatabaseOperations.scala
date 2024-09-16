@@ -700,11 +700,8 @@ trait DatabaseOperations { this: OdbSuite =>
   def linkObserverAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
     linkObserverAs(user, arrow._1, arrow._2, partner)
 
-  def linkSupportAs(user: User, uid: User.Id, pid: Program.Id): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
-
-  def linkSupportAs(user: User, arrow: (User.Id, Program.Id)): IO[Unit] =
-    linkSupportAs(user, arrow._1, arrow._2)
+  def linkSupportAs(user: User, uid: User.Id, pid: Program.Id, tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type): IO[Unit] =
+    linkAs(user, uid, pid, tpe, PartnerLink.HasUnspecifiedPartner)
 
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs(_)) // TODO: something cheaper

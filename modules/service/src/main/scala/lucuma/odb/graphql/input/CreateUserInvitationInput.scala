@@ -23,7 +23,7 @@ enum CreateUserInvitationInput:
   def recipientEmail: EmailAddress
   case Coi(programId: Program.Id, recipientEmail: EmailAddress, partnerLink: PartnerLink)
   case CoiRO(programId: Program.Id, recipientEmail: EmailAddress, partnerLink: PartnerLink)
-  case Support(programId: Program.Id, recipientEmail: EmailAddress)
+  case Support(programId: Program.Id, recipientEmail: EmailAddress, tpe: PUR.SupportPrimary.type | PUR.SupportSecondary.type)
 
 object CreateUserInvitationInput:
 
@@ -38,6 +38,6 @@ object CreateUserInvitationInput:
         (rProgramId, rRecipientEmail, rRole, rPartnerLink).parTupled.flatMap:
           case (pid, email, PUR.Coi, p)        => Result(CreateUserInvitationInput.Coi(pid, email, p.getOrElse(HasUnspecifiedPartner)))
           case (pid, email, PUR.CoiRO, p)      => Result(CreateUserInvitationInput.CoiRO(pid, email, p.getOrElse(HasUnspecifiedPartner)))
-          case (pid, email, PUR.Support, None) => Result(CreateUserInvitationInput.Support(pid, email))
-          case (_, _, PUR.Support, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
+          case (pid, email, t @ (PUR.SupportPrimary | PUR.SupportSecondary), None) => Result(CreateUserInvitationInput.Support(pid, email, t))
+          case (_, _, PUR.SupportPrimary | PUR.SupportSecondary, Some(_))    => OdbError.InvalidArgument("A partner may not be specified for support invitations.".some).asFailure
           case (_, _, PUR.Pi, _)               => OdbError.InvalidArgument("Cannot create an invitation for the PI.".some).asFailure

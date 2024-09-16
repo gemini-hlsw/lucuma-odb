@@ -7,10 +7,7 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.enums.ProgramUserRole.Coi
-import lucuma.core.enums.ProgramUserRole.CoiRO
-import lucuma.core.enums.ProgramUserRole.Pi
-import lucuma.core.enums.ProgramUserRole.Support
+import lucuma.core.enums.ProgramUserRole.*
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
 import lucuma.odb.data.OdbError
@@ -32,9 +29,9 @@ object LinkUserInput {
         (rProgramId, rUserId, rRole, rPartnerLink).parTupled.flatMap {
           case (pid, uid, Coi, p) => Result(LinkUserRequest.Coi(pid, p.getOrElse(HasUnspecifiedPartner), uid))
           case (pid, uid, CoiRO, p) => Result(LinkUserRequest.CoiRo(pid, p.getOrElse(HasUnspecifiedPartner), uid))
-          case (pid, uid, Support, None) => Result(LinkUserRequest.Support(pid, uid))
-          case (pid, uid, Support, Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid))
-          case (_, _, Support, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
+          case (pid, uid, t @ (SupportPrimary | SupportSecondary), None) => Result(LinkUserRequest.Support(pid, uid, t))
+          case (pid, uid, t @ (SupportPrimary | SupportSecondary), Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid, t))
+          case (_, _, SupportPrimary | SupportSecondary, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
           case (_, _, Pi, _) => OdbError.InvalidArgument("PIs are linked at program creation time.".some).asFailure
         }
     }
