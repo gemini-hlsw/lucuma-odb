@@ -3462,7 +3462,8 @@ enum ProgramUserRole {
   "Primary Investigator"               PI
   "Co-Investigator"                    COI
   "Co-Investigator (read-only access)" COI_RO
-  "Staff/Partner Support"              SUPPORT
+  "Staff/Partner Primary Support"      SUPPORT_PRIMARY
+  "Staff/Partner Secondary Support"    SUPPORT_SECONDARY
 }
 
 """

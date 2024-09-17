@@ -71,7 +71,7 @@ class unlinkUser extends OdbSuite {
   }
 
   private def partnerLinkFor(role: ProgramUserRole): PartnerLink =
-    if (role === ProgramUserRole.Support) PartnerLink.HasUnspecifiedPartner
+    if (role === ProgramUserRole.SupportPrimary || role === ProgramUserRole.SupportSecondary) PartnerLink.HasUnspecifiedPartner
     else PartnerLink.HasPartner(Partner.US)
 
   // What can a Guest do?
@@ -103,7 +103,7 @@ class unlinkUser extends OdbSuite {
       yield ()
     }
 
-  List(ProgramUserRole.Support).foreach: role =>
+  List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"PI can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
@@ -129,7 +129,7 @@ class unlinkUser extends OdbSuite {
     yield ()
   }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"Coi can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
@@ -146,7 +146,7 @@ class unlinkUser extends OdbSuite {
 
   // What can NGO user do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"Ngo (CA) can't unlink $role (NotAuthorized).") {
       interceptOdbError {
         for
@@ -164,7 +164,7 @@ class unlinkUser extends OdbSuite {
   // What can superusers do?
 
   List(staff, admin, service).foreach: u =>
-    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.Support).foreach: role =>
+    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
       test(s"${u.role.access} can unlink $role.") {
         for
           _   <- createUsers(pi1, pi2, u)

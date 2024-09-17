@@ -156,59 +156,60 @@ class createUserInvitation extends OdbSuite {
   }
 
   test("invite support (metadata)") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = staff,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Support.tag.toUpperCase}
-            }
-          ) {
-            invitation {
-              status
-              issuer { id }
-              recipientEmail
-              redeemer { id }
-              program { id }
-              role
-              email {
-                senderEmail
-                status
+    List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).traverse: role =>
+      createProgramAs(pi).flatMap { pid =>
+        expect(
+          user = staff,
+          query = s"""
+          mutation {
+            createUserInvitation(
+              input: {
+                programId: "$pid"
+                recipientEmail: "$successRecipient"
+                role: ${role.tag.toUpperCase}
               }
-            }
-          }
-        }
-        """,
-        expected = Right(
-          json"""
-            {
-              "createUserInvitation" : {
-                "invitation" : {
-                  "status" : ${InvitationStatus.Pending},
-                  "issuer" : {
-                    "id" : ${staff.id}
-                  },
-                  "recipientEmail": $successRecipient,
-                  "redeemer" : null,
-                  "program" : {
-                    "id" : $pid
-                  },
-                  "role" : ${ProgramUserRole.Support: ProgramUserRole},
-                  "email": {
-                    "senderEmail": ${emailConfig.invitationFrom},
-                    "status": ${EmailStatus.Queued}
-                  }
+            ) {
+              invitation {
+                status
+                issuer { id }
+                recipientEmail
+                redeemer { id }
+                program { id }
+                role
+                email {
+                  senderEmail
+                  status
                 }
               }
             }
-          """
+          }
+          """,
+          expected = Right(
+            json"""
+              {
+                "createUserInvitation" : {
+                  "invitation" : {
+                    "status" : ${InvitationStatus.Pending},
+                    "issuer" : {
+                      "id" : ${staff.id}
+                    },
+                    "recipientEmail": $successRecipient,
+                    "redeemer" : null,
+                    "program" : {
+                      "id" : $pid
+                    },
+                    "role" : ${role: ProgramUserRole},
+                    "email": {
+                      "senderEmail": ${emailConfig.invitationFrom},
+                      "status": ${EmailStatus.Queued}
+                    }
+                  }
+                }
+              }
+            """
+          )
         )
-      )
-    }
+      }
   }
 
 
@@ -339,7 +340,7 @@ class createUserInvitation extends OdbSuite {
             input: {
               programId: "$pid"
               recipientEmail: "$badResponseRecipient"
-              role: ${ProgramUserRole.Support.tag.toUpperCase}
+              role: ${ProgramUserRole.SupportPrimary.tag.toUpperCase}
             }
           ) {
             invitation {
