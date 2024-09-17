@@ -7,6 +7,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ProgramUserRole.Coi
 import lucuma.core.enums.ProgramUserRole.Pi
 import lucuma.core.enums.ScienceBand
@@ -17,7 +18,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
-import lucuma.core.enums.ProgramUserRole
 
 class linkUser extends OdbSuite {
 
