@@ -185,7 +185,7 @@ object UserInvitationService:
         .contramap {
           case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.partnerOption, pid)
           case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.partnerOption, pid)
-          case (u, CreateUserInvitationInput.Support(pid, e))  => (u.id, pid, e, ProgramUserRole.Support, PartnerLinkType.HasUnspecifiedPartner, none, pid)
+          case (u, CreateUserInvitationInput.Support(pid, e, t)) => (u.id, pid, e, t, PartnerLinkType.HasUnspecifiedPartner, none, pid)
         }
 
     val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, PartnerLink), UserInvitation] =

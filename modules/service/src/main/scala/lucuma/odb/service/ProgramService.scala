@@ -105,7 +105,7 @@ object ProgramService {
   object LinkUserRequest:
     case class Coi(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id)   extends LinkUserRequest
     case class CoiRo(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id) extends LinkUserRequest
-    case class Support(programId: Program.Id, userId: User.Id) extends LinkUserRequest
+    case class Support(programId: Program.Id, userId: User.Id, tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type) extends LinkUserRequest
 
   sealed trait LinkUserResponse extends Product with Serializable
   object LinkUserResponse {
@@ -246,7 +246,7 @@ object ProgramService {
           req match {
             case LinkUserRequest.Coi(programId, partnerLink, userId) => Statements.linkCoi(programId, userId, partnerLink, user)
             case LinkUserRequest.CoiRo(programId, partnerLink, userId) => Statements.linkCoiReadOnly(programId, userId, partnerLink, user)
-            case LinkUserRequest.Support(programId, userId) => Statements.linkSupport(programId, userId, user)
+            case LinkUserRequest.Support(programId, userId, tpe) => Statements.linkSupport(programId, userId, user, tpe)
           }
         af match {
           case None     =>  Monad[F].pure(LinkUserResponse.NotAuthorized(user))
@@ -324,7 +324,7 @@ object ProgramService {
             case Some(R.Pi)       => OdbError.InvalidArgument("Cannot unlink the PI".some).asFailureF
             case Some(R.Coi)      => unlinkCoi(input)
             case Some(R.CoiRO)    => unlinkObserver(input)
-            case Some(R.Support)  => requireStaffAccess(unlinkUnconditionally(input))
+            case Some(R.SupportPrimary | R.SupportSecondary)  => requireStaffAccess(unlinkUnconditionally(input))
       }
 
       def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
@@ -730,9 +730,10 @@ object ProgramService {
       targetProgram: Program.Id,
       targetUser: User.Id, // user to link
       user: User, // current user
+      tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type
     ): Option[AppliedFragment] = {
       import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.Support, PartnerLink.HasUnspecifiedPartner)
+      val up = LinkUser(targetProgram, targetUser, UserType.Standard, tpe, PartnerLink.HasUnspecifiedPartner)
       user.role.access match {
         case Admin | Staff | Service => Some(up) // ok
         case _                       => None // nobody else can do this
