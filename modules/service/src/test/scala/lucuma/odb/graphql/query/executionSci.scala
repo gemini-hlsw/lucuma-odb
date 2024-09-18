@@ -5,9 +5,11 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
@@ -366,4 +368,152 @@ class executionSci extends ExecutionTestSupport {
     }
 
   }
+
+  test("explicit offsets") {
+
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t),
+          """
+            gmosNorthLongSlit: {
+              grating: R831_G5302,
+              filter:  R_PRIME,
+              fpu:     LONG_SLIT_0_50,
+              centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO,
+              explicitSpatialOffsets: [
+                { arcseconds: -20.0 },
+                { arcseconds:   0.0 },
+                { arcseconds:  20.0 }
+              ]
+            }
+          """
+        )
+      } yield o
+
+    val gcalStep: Json =
+      json"""
+        {
+          "stepConfig": {
+            "stepType": "GCAL"
+          }
+        }
+      """
+
+    def scienceStep(arcsec: Int): Json =
+      json"""
+        {
+          "stepConfig": {
+            "stepType": "SCIENCE",
+            "offset": {
+              "q": {
+                "arcseconds": ${Json.fromBigDecimal(BigDecimal(arcsec).setScale(6))}
+              }
+            }
+          }
+        }
+      """
+
+    def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
+      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+      json"""
+        {
+          "description": $desc,
+          "steps": ${gcalStep :: gcalStep :: (0 until scienceSteps).toList.as(scienceStep(arcsec))}
+        }
+      """
+
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   digest {
+                     science {
+                       offsets {
+                         q { arcseconds }
+                       }
+                     }
+                   }
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
+                               }
+                             }
+                           }
+                         }
+                         possibleFuture {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "digest": {
+                    "science": {
+                      "offsets": [
+                        {
+                          "q": { "arcseconds": -20.000000 }
+                        },
+                        {
+                          "q": { "arcseconds": 0.000000 }
+                        },
+                        {
+                          "q": { "arcseconds": 20.000000 }
+                        }
+                      ]
+                    }
+                  },
+                  "config": {
+                    "gmosNorth": {
+                      "science": {
+                        "nextAtom": ${atom(0, -20, 3)},
+                        "possibleFuture": ${List(
+                          atom( 5,   0, 3),
+                          atom(-5,  20, 3),
+                          atom( 0, -20, 1)
+                        )}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+    }
+  }
+
 }
