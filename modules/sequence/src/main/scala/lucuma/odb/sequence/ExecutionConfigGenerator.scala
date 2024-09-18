@@ -8,12 +8,12 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import fs2.Stream
 import lucuma.core.util.Timestamp
-import lucuma.odb.sequence.util.mergeByTimestamp
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
+import lucuma.odb.sequence.util.mergeByTimestamp
 
 case class ExecutionConfigGenerator[S, D](
   static:      S,
