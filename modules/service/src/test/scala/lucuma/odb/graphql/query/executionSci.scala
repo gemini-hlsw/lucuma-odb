@@ -516,4 +516,113 @@ class executionSci extends ExecutionTestSupport {
     }
   }
 
+  test("explicit wavelength dithers") {
+
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t),
+          """
+            gmosNorthLongSlit: {
+              grating: R831_G5302,
+              filter:  R_PRIME,
+              fpu:     LONG_SLIT_0_50,
+              centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO,
+              explicitWavelengthDithers: [
+                { nanometers: -7.0 },
+                { nanometers:  0.0 },
+                { nanometers:  7.0 }
+              ]
+            }
+          """
+        )
+      } yield o
+
+    def step(nm: Int): Json =
+      json"""
+        {
+          "instrumentConfig": {
+            "gratingConfig": {
+              "wavelength": {
+                "nanometers": ${Json.fromBigDecimal(BigDecimal(500 + nm).setScale(3))}
+              }
+            }
+          }
+        }
+      """
+
+    def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
+      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+      json"""
+        {
+          "description": $desc,
+          "steps": ${(0 until scienceSteps+2).toList.as(step(nm))}
+        }
+      """
+
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           description
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 wavelength { nanometers }
+                               }
+                             }
+                           }
+                         }
+                         possibleFuture {
+                           description
+                           steps {
+                             instrumentConfig {
+                               gratingConfig {
+                                 wavelength { nanometers }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": {
+                    "gmosNorth": {
+                      "science": {
+                        "nextAtom": ${atom(-7, 0, 3)},
+                        "possibleFuture": ${List(
+                          atom(0,  15, 3),
+                          atom(7, -15, 3),
+                          atom(-7,  0, 1)
+                        )}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+    }
+  }
+
 }
