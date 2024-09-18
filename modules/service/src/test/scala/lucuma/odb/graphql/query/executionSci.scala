@@ -5,7 +5,6 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
@@ -15,6 +14,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -421,7 +421,7 @@ class executionSci extends ExecutionTestSupport {
       json"""
         {
           "description": $desc,
-          "steps": ${gcalStep :: gcalStep :: (0 until scienceSteps).toList.as(scienceStep(arcsec))}
+          "steps": ${gcalStep :: gcalStep :: List.fill(scienceSteps)(scienceStep(arcsec))}
         }
       """
 
@@ -558,7 +558,7 @@ class executionSci extends ExecutionTestSupport {
       json"""
         {
           "description": $desc,
-          "steps": ${(0 until scienceSteps+2).toList.as(step(nm))}
+          "steps": ${List.fill(scienceSteps + 2)(step(nm))}
         }
       """
 
@@ -625,4 +625,87 @@ class executionSci extends ExecutionTestSupport {
     }
   }
 
+  test("select min x-binning") {
+    val setup: IO[Observation.Id] =
+      for {
+        p  <- createProgram
+        t0 <- createTargetWithGaussianAs(pi, p, Angle.fromMicroarcseconds(647_200L))  // X-binning of 4
+        t1 <- createTargetWithProfileAs(pi, p)  // X-binning of 1
+        o  <- createObservationWithModeAs(pi, p, List(t0, t1),
+               // use a 5" slit so that won't be a factor
+               """
+                 gmosNorthLongSlit: {
+                   grating: R831_G5302,
+                   filter: R_PRIME,
+                   fpu: LONG_SLIT_5_00,
+                   centralWavelength: {
+                     nanometers: 500
+                   },
+                   explicitYBin: TWO
+                 }
+               """
+             )
+      } yield o
+
+    val step: Json =
+      json"""
+        {
+          "instrumentConfig": {
+            "readout": {
+              "xBin": "ONE",
+              "yBin": "TWO"
+            }
+          }
+        }
+      """
+
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           steps {
+                             instrumentConfig {
+                               readout {
+                                 xBin
+                                 yBin
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": {
+                    "gmosNorth": {
+                      "science": {
+                        "nextAtom": {
+                          "steps": ${List.fill(5)(step)}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+    }
+  }
 }
