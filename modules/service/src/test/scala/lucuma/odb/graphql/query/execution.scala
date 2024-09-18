@@ -13,7 +13,6 @@ import io.circe.literal.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
-import lucuma.core.math.Angle
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
