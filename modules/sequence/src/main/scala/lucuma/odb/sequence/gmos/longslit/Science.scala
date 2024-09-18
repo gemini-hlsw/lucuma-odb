@@ -12,7 +12,6 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
-import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -393,9 +392,9 @@ object Science:
       time:        IntegrationTime,
       calRole:     Option[CalibrationRole]
     ): F[Either[String, SequenceGenerator[D]]] =
-      val steps = calRole match
-        case None =>
-          sc.compute(expander, config, time, includeArcs = true)
+      val e = calRole match
+        case None                                     =>
+          (config, time).asRight[String]
 
         case Some(CalibrationRole.SpectroPhotometric) =>
           val dithers = specPhotDithers(config)
@@ -404,15 +403,15 @@ object Science:
             _ <- Config.explicitSpatialOffsets    := List(Offset.Q.Zero).some
           } yield ()).runS(config).value
           val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(dithers.length))
-          sc.compute(expander, configʹ, timeʹ, includeArcs = false)
+          (configʹ, timeʹ).asRight[String]
 
-        case Some(c) =>
-          s"GMOS Long Slit ${c.tag} not implemented".asLeft.pure[F]
+        case Some(c)                                  =>
+          s"GMOS Long Slit ${c.tag} not implemented".asLeft
 
-      EitherT(steps)
-        .map(_.map(WavelengthBlock.init))
-        .map(ScienceState(time, _, IndexTracker.Zero, 0))
-        .value
+      (for {
+        (configʹ, timeʹ) <- EitherT.fromEither[F](e)
+        steps            <- EitherT(sc.compute(expander, configʹ, timeʹ, includeArcs = calRole.isEmpty))
+      } yield ScienceState(timeʹ, steps.map(WavelengthBlock.init), IndexTracker.Zero, 0)).value
 
   end ScienceState
 
