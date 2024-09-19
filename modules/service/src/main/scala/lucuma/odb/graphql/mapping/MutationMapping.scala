@@ -503,7 +503,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordAtom(
-            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.stepCount, input.sequenceType, input.generatedId),
+            sequenceService.insertAtomRecord(input.visitId, input.instrument, input.sequenceType, input.generatedId),
             Predicates.atomRecord.id,
             child
           )

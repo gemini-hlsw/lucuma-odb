@@ -236,9 +236,6 @@ type AtomRecord {
   "Sequence type."
   sequenceType: SequenceType!
 
-  "Number of valid steps required to complete this atom."
-  stepCount: NonNegShort!
-
   "Recorded steps associated with this atom."
   steps(
 
@@ -3972,12 +3969,15 @@ input RadialVelocityInput {
   kilometersPerSecond: BigDecimal
 }
 
-"Input parameters for creating a new atom record"
+"""
+Input parameters for creating a new atom record.
+(stepCount is deprecated and will be ignored)
+"""
 input RecordAtomInput {
   visitId: VisitId!
   instrument: Instrument!
   sequenceType: SequenceType!
-  stepCount: NonNegShort!
+  stepCount: NonNegShort
   generatedId: AtomId
 }
 
