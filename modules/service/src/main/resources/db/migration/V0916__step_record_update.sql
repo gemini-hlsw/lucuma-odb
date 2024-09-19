@@ -1,4 +1,6 @@
--- Update the view to include the generated step id.
+ALTER TABLE t_atom_record
+  DROP COLUMN c_step_count;
+
 DROP VIEW v_step_record;
 
 CREATE VIEW v_step_record AS

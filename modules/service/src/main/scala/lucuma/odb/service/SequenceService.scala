@@ -16,7 +16,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegShort
 import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.AtomStage
@@ -90,7 +89,6 @@ trait SequenceService[F[_]] {
   def insertAtomRecord(
     visitId:      Visit.Id,
     instrument:   Instrument,
-    stepCount:    NonNegShort,
     sequenceType: SequenceType,
     generatedId:  Option[Atom.Id]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
@@ -263,7 +261,6 @@ object SequenceService {
       def insertAtomRecordImpl(
         visitId:      Visit.Id,
         instrument:   Instrument,
-        stepCount:    NonNegShort,
         sequenceType: SequenceType,
         generatedId:  Option[Atom.Id]
       )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
@@ -271,17 +268,16 @@ object SequenceService {
         (for {
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
-          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, stepCount, sequenceType, generatedId))
+          _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId))
         } yield InsertAtomResponse.Success(aid)).merge
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
         instrument:   Instrument,
-        stepCount:    NonNegShort,
         sequenceType: SequenceType,
         generatedId:  Option[Atom.Id]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]] =
-        insertAtomRecordImpl(visitId, instrument, stepCount, sequenceType, generatedId).map:
+        insertAtomRecordImpl(visitId, instrument, sequenceType, generatedId).map:
           case InsertAtomResponse.VisitNotFound(id, instrument) => OdbError.InvalidVisit(id, Some(s"Visit '$id' not found or is not a ${instrument.longName} visit")).asFailure
           case InsertAtomResponse.Success(aid)                  => Result.success(aid)
 
@@ -375,7 +371,6 @@ object SequenceService {
       Observation.Id,
       Visit.Id,
       Instrument,
-      NonNegShort,
       SequenceType,
       Option[Atom.Id]
     )] =
@@ -385,7 +380,6 @@ object SequenceService {
           c_observation_id,
           c_visit_id,
           c_instrument,
-          c_step_count,
           c_sequence_type,
           c_generated_id
         ) SELECT
@@ -393,7 +387,6 @@ object SequenceService {
           $observation_id,
           $visit_id,
           $instrument,
-          $int2_nonneg,
           $sequence_type,
           ${atom_id.opt}
       """.command

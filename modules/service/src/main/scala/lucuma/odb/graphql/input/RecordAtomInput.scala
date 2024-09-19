@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Visit
@@ -15,7 +14,6 @@ case class RecordAtomInput(
   visitId:      Visit.Id,
   instrument:   Instrument,
   sequenceType: SequenceType,
-  stepCount:    NonNegShort,  // TODO: SEQUENCE UPDATE (i don't think we need this)
   generatedId:  Option[Atom.Id]
 )
 
@@ -27,11 +25,11 @@ object RecordAtomInput {
         VisitIdBinding("visitId", rVisitId),
         InstrumentBinding("instrument", rInstrument),
         SequenceTypeBinding("sequenceType", rSequenceType),
-        NonNegShortBinding("stepCount", rStepCount),
+        NonNegShortBinding.Option("stepCount", rIgnore),
         AtomIdBinding.Option("generatedId", rGenerated)
-      ) => (rVisitId, rInstrument, rSequenceType, rStepCount, rGenerated).parMapN {
-        (visitId, instrument, sequenceType, stepCount, generated) =>
-          RecordAtomInput(visitId, instrument, sequenceType, stepCount, generated)
+      ) => (rVisitId, rInstrument, rSequenceType, rGenerated).parMapN {
+        (visitId, instrument, sequenceType, generated) =>
+          RecordAtomInput(visitId, instrument, sequenceType, generated)
       }
     }
 
