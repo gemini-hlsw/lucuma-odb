@@ -6,7 +6,6 @@ package lucuma.odb
 import cats.*
 import cats.data.Kleisli
 import cats.effect.*
-import cats.effect.std.AtomicCell
 import cats.effect.std.Console
 import cats.implicits.*
 import com.comcast.ip4s.Port
@@ -157,14 +156,11 @@ object FMain extends MainParams {
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
   }
 
-  // See if we can please Scala, which thinks AtomicCell (used below) us unused.
-  val Dummy = AtomicCell
-
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Trace: Network: Console: Logger](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
-    Resource.eval(AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
+    Resource.eval(cats.effect.std.AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
       Session.pooled(
         host     = config.host,
         port     = config.port,
