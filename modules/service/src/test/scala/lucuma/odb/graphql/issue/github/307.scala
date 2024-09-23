@@ -4,12 +4,10 @@
 package lucuma.odb.graphql
 package issue.github
 
-import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/307
 class GitHub_307 extends OdbSuite {
@@ -17,35 +15,14 @@ class GitHub_307 extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  def deleteTarget(user: User, tid: Target.Id): IO[Unit] =
-    query(
-      user = pi,
-      query = s"""
-        mutation {
-          updateTargets(input: {
-            SET: {
-              existence: DELETED
-            }
-            WHERE: {
-              id: { EQ: "$tid"}
-            }
-          }) {
-            targets {
-              id
-            }
-          }
-        }
-      """
-    ).void
-
-  def testIncludeDeleted(includeDeleted: Option[Boolean])(f: Target.Id => Json) = 
+  def testIncludeDeleted(includeDeleted: Option[Boolean])(f: Target.Id => Json) =
     test(s"Query/targetGroup should respect includeDeleted flag ($includeDeleted)") {
-      val setup = 
+      val setup =
         for {
           pid <- createProgramAs(pi)
           tid <- createTargetAs(pi, pid)
           oid <- createObservationAs(pi, pid, tid)
-          _   <- deleteTarget(pi, tid)
+          _   <- deleteTargetAs(pi, tid)
         } yield (pid, tid)
 
       setup.flatMap { (pid, tid) =>
@@ -64,7 +41,7 @@ class GitHub_307 extends OdbSuite {
           }
           """,
           expected = Right(f(tid))
-        )  
+        )
       }
     }
 
@@ -84,7 +61,7 @@ class GitHub_307 extends OdbSuite {
       }
     """
   }
-  
+
   testIncludeDeleted(Some(false)) { _ =>
     json"""
       {
@@ -95,7 +72,7 @@ class GitHub_307 extends OdbSuite {
       }
     """
   }
-  
+
   testIncludeDeleted(None) { _ =>
     json"""
       {
@@ -106,5 +83,5 @@ class GitHub_307 extends OdbSuite {
       }
     """
   }
-  
+
 }
