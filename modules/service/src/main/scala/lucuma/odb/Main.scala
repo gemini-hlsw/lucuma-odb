@@ -158,7 +158,7 @@ object FMain extends MainParams {
   }
 
   // See if we can please Scala, which thinks AtomicCell (used below) us unused.
-  private val Dummy = AtomicCell
+  val Dummy = AtomicCell
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Trace: Network: Console: Logger](
