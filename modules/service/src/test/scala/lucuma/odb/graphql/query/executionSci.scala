@@ -708,4 +708,151 @@ class executionSci extends ExecutionTestSupport {
       )
     }
   }
+
+  test("duplicate offsets and dithers") {
+
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t),
+          """
+            gmosNorthLongSlit: {
+              grating: R831_G5302,
+              filter:  R_PRIME,
+              fpu:     LONG_SLIT_0_50,
+              centralWavelength: { nanometers: 500 },
+              explicitYBin: TWO,
+              explicitSpatialOffsets: [
+                { arcseconds: 0.0 },
+                { arcseconds: 0.0 },
+                { arcseconds: 0.0 }
+              ],
+              explicitWavelengthDithers: [
+                { nanometers: 5.0 },
+                { nanometers: 5.0 },
+                { nanometers: 5.0 }
+              ]
+            }
+          """
+        )
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+
+        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), scienceStep(0, 0), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+
+      } yield o
+
+    val gcalStepJson: Json =
+      json"""
+        {
+          "stepConfig": {
+            "stepType": "GCAL"
+          }
+        }
+      """
+
+    def scienceStepJson(arcsec: Int): Json =
+      json"""
+        {
+          "stepConfig": {
+            "stepType": "SCIENCE",
+            "offset": {
+              "q": {
+                "arcseconds": ${Json.fromBigDecimal(BigDecimal(arcsec).setScale(6))}
+              }
+            }
+          }
+        }
+      """
+
+    def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
+      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+      json"""
+        {
+          "description": $desc,
+          "steps": ${gcalStepJson :: gcalStepJson :: List.fill(scienceSteps)(scienceStepJson(arcsec))}
+        }
+      """
+
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 execution {
+                   config {
+                     gmosNorth {
+                       science {
+                         nextAtom {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
+                               }
+                             }
+                           }
+                         }
+                         possibleFuture {
+                           description
+                           steps {
+                             stepConfig {
+                               stepType
+                               ... on Science {
+                                 offset {
+                                   q { arcseconds }
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "config": {
+                    "gmosNorth": {
+                      "science": {
+                        "nextAtom": {
+                          "description": ${s"5.000 nm, 0.000000″".asJson},
+                          "steps": ${List.fill(2)(scienceStepJson(0))}
+                        },
+                        "possibleFuture": ${List(
+                          atom(5, 0, 3),
+                          atom(5, 0, 3),
+                          atom(5, 0, 1)
+                        )}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+    }
+  }
+
 }

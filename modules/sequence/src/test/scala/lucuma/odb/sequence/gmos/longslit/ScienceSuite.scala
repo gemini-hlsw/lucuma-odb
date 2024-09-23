@@ -19,74 +19,8 @@ import org.scalacheck.Prop.*
 
 class ScienceSuite extends ScalaCheckSuite {
 
-/*  TODO: SEQUENCE UPDATE (is any of this still useful?)
-  import ArbEnumerated.*
-  import ArbGmosLongSlitConfig.given
-
-  val tenMin: SciExposureTime =
-    SciExposureTime.fromDuration(Duration.ofMinutes(10)).get
-
-  def northSequence(
-    ls: Config.GmosNorth,
-  ): Stream[Pure, ScienceAtom[GmosNorth]] =
-    Science.GmosNorth.stream(ls, tenMin)
-
-  def sequencesEqual[A](
-    obtained: Stream[Pure, A],
-    expected: Stream[Pure, A]
-  )(implicit loc: Location): Unit = {
-    val sz = 20
-    assertEquals(obtained.take(sz).toList, expected.take(sz).toList)
-  }
-
-  property("prefers explicitly set parameters") {
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
-
-      sequencesEqual(
-        as.map(a => DynamicOptics.North.yBin.get(a.science.value)),
-        Stream(ls.explicitYBin.getOrElse(ls.defaultYBin)).repeat
-      )
-    }
-  }
-
-  property("cycles through wavelength dithers") {
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
-
-      sequencesEqual(
-        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.value).get),
-        (ls.wavelengthDithers match {
-          case Nil => Stream(WavelengthDither.Zero).repeat
-          case ds  => Stream.emits(ds).repeat
-        }).map { d => ls.centralWavelength.offset(d).getOrElse(ls.centralWavelength) }
-      )
-    }
-  }
-
-  property("cycles through spatial offsets") {
-    val offset =
-      ProtoStep
-        .stepConfig[GmosNorth]
-        .andThen(StepConfig.science)
-        .andThen(StepConfig.Science.offset)
-        .andThen(Offset.q)
-        .andThen(Offset.Component.angle)
-
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
-
-      sequencesEqual(
-        as.map(_.science).flatMap(s => Stream.fromOption(offset.getOption(s))),
-        (ls.spatialOffsets match {
-          case Nil => Stream(Offset.Q.Zero).repeat
-          case qs  => Stream.emits(qs).repeat
-        }).map(_.toAngle)
-      )
-    }
-  }
- */
-
+  private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
+    IntegrationTime(time, PosInt.unsafeFrom(exposures), SignalToNoise.Min)
 
   import Science.Adjustment
   import Science.Goal
@@ -104,9 +38,6 @@ class ScienceSuite extends ScalaCheckSuite {
   )
 
   private val adjs = Δλs.zip(Δqs).map(Adjustment(_, _))
-
-  private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
-    IntegrationTime(time, PosInt.unsafeFrom(exposures), SignalToNoise.Min)
 
   private def goals(goal: List[(Int, Int)]): List[Goal] =
     adjs.zip(goal).map { case (adj, (perBlock, total)) =>

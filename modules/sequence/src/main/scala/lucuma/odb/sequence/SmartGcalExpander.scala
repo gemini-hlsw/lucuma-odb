@@ -3,8 +3,14 @@
 
 package lucuma.odb.sequence
 
+import cats.Id
 import cats.data.NonEmptyList
+import cats.syntax.applicative.*
+import cats.syntax.either.*
 import fs2.Pipe
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SmartGcalType
+import lucuma.core.model.sequence.StepConfig
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -40,5 +46,38 @@ trait SmartGcalExpander[F[_], D] {
    * unsuccessful, the missing mapping is formatted and wrapped with a `Left`.
    */
   def expandSequence: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]]
+
+}
+
+object SmartGcalExpander {
+
+  /**
+   * An expander implementation that always produces the same gcal
+   * configurations regardless of input.
+   */
+  case class Constant[D](
+    inst: (SmartGcalType, D) => D,
+    gcal: SmartGcalType      => StepConfig.Gcal,
+    clas: ObserveClass
+  ) extends SmartGcalExpander[Id, D]:
+    private def expand(step: ProtoStep[D]): ProtoStep[D] =
+      step.stepConfig match
+        case StepConfig.SmartGcal(t) => ProtoStep(inst(t, step.value), gcal(t), clas)
+        case _                       => step
+
+    override def expandStep(
+      step: ProtoStep[D]
+    ): Id[Either[String, NonEmptyList[ProtoStep[D]]]] =
+      NonEmptyList.one(expand(step)).asRight.pure
+
+    override def expandAtom(
+      atom: ProtoAtom[ProtoStep[D]]
+    ): Id[Either[String, ProtoAtom[ProtoStep[D]]]] =
+      ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure
+
+    // TODO: SEQUENCE UPDATE
+    // can this be removed altogether?
+    override def expandSequence: Pipe[Id, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
+      ???
 
 }
