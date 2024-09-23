@@ -8,7 +8,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 
 // https://app.shortcut.com/lucuma/story/1939
-class Shortcut_1939 extends OdbSuite {
+class ShortCut_1939 extends OdbSuite {
   val pi = TestUsers.Standard.pi(nextId, nextId)
   lazy val validUsers = List(pi)
 
