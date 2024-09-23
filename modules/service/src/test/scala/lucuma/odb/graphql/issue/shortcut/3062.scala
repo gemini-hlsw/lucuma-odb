@@ -12,7 +12,7 @@ class ShortCut_3062 extends OdbSuite {
 
   override lazy val validUsers: List[User] = List(pi)
 
-  test("Obs name should be updated when a target is deleted") {
+  test("Deleted targets should be excluded from observation title when asterism is updated") {
     for {
       pid  <- createProgramAs(pi)
       tid0 <- createTargetAs(pi, pid, "Zero")
