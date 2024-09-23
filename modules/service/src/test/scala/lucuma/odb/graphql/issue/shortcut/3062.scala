@@ -39,7 +39,7 @@ class ShortCut_3062 extends OdbSuite {
                   json"""
                     {
                       "observation" : {
-                        "title" : "Zero",
+                        "title" : "One",
                         "targetEnvironment" : {
                           "asterism" : [{
                             "name" : "One"
