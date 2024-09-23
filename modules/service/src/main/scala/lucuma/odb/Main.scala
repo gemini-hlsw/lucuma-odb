@@ -6,6 +6,7 @@ package lucuma.odb
 import cats.*
 import cats.data.Kleisli
 import cats.effect.*
+import cats.effect.std.AtomicCell
 import cats.effect.std.Console
 import cats.implicits.*
 import com.comcast.ip4s.Port
@@ -48,7 +49,6 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
-import cats.effect.std.AtomicCell
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
