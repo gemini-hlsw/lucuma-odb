@@ -48,6 +48,7 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
+import cats.effect.std.AtomicCell
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
