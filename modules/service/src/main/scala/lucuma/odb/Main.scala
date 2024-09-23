@@ -48,6 +48,7 @@ import skunk.{Command as _, *}
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
+import cats.effect.std.AtomicCell
 
 object MainArgs {
   opaque type ResetDatabase = Boolean
@@ -157,21 +158,24 @@ object FMain extends MainParams {
   }
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Trace: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Trace: Network: Console: Logger](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.pooled(
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      password = Some(config.password),
-      database = config.database,
-      ssl      = SSL.Trusted.withFallback(true),
-      max      = config.maxConnections,
-      strategy = Strategy.SearchPath,
-      // debug    = true,
-    )
-
+    Resource.eval(AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
+      Session.pooled(
+        host     = config.host,
+        port     = config.port,
+        user     = config.user,
+        password = Some(config.password),
+        database = config.database,
+        ssl      = SSL.Trusted.withFallback(true),
+        max      = config.maxConnections,
+        strategy = Strategy.SearchPath,
+        // debug    = true,
+      ).map: rsrc =>
+        rsrc
+          .preAllocate(cell.updateAndGet(_ - 1).flatMap(n => Logger[F].debug(s"acquiring session (should be $n remaining)")))
+          .onFinalize(cell.updateAndGet(_ + 1).flatMap(n => Logger[F].debug(s"released session (should be $n remaining)")))
 
   /** A resource that yields a running HTTP server. */
   def serverResource[F[_]: Async](
