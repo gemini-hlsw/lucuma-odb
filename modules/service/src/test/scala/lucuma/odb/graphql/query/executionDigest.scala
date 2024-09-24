@@ -6,32 +6,79 @@ package query
 
 import cats.data.Ior
 import cats.effect.IO
+import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.StepStage
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.syntax.timespan.*
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
-import munit.IgnoreSuite
 
-// TODO: SEQUENCE UPDATE
-@IgnoreSuite
-class execution extends ExecutionTestSupport {
 
-  // Additional cost of an arc (no sci fold move because we are already doing a flat)
-  //  5.0 seconds for the Gcal configuration change (shutter, filter, diffuser)
-  //  1.0 second for the arc exposure
-  // 10.0 seconds for the write cost
-  // 41.1 seconds readout (hamamatsu, 1x2, 12 amp, Low, Slow)
-  // ----
-  // 57.1 seconds per arc
+class executionDigest extends ExecutionTestSupport {
 
-  // 114.2 additional seconds for the two arcs produced by the sequence
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(10),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
+
+  // * Arc:
+  //   * Science Fold.: 15.0
+  //   * Exposure Time:  1.0
+  //   * Readout......: 41.1
+  //   * Writeout.....: 10.0
+  //                    ----
+  //                    67.1
+
+  // * Flat:
+  //   * GCal Change..:  5.0
+  //   * Exposure Time:  1.0
+  //   * Readout......: 41.1
+  //   * Writeout.....: 10.0
+  //                    ----
+  //                    57.1
+
+  // * Science (1):
+  // (there is an offset cost for some steps but it is subsumed by the
+  //  science fold movement)
+  //   * Science Fold:    15.0
+  //   * Exposure Time: 1200.0
+  //   * Readout......:   41.1
+  //   * Writeout.....:   10.0
+  //                      ----
+  //                    1266.1
+
+  // * Science (2 and 3):
+  //   * Exposure Time: 1200.0
+  //   * Readout......:   41.1
+  //   * Writeout.....:   10.0
+  //                      ----
+  //                    1251.1
+
+  extension (s: String)
+    def sec: BigDecimal =
+      BigDecimal(s).setScale(6)
+
+  // 4 atoms, each with an arc and a flat
+  def PartnerTime: BigDecimal =
+    ("67.1".sec * 4) + ("57.1".sec * 4)
+
+  // 4 atoms, all of which incur the 1266.1 cost including the science fold
+  // move, 3 of them have an additional 2 steps each of 1251.1
+  def ProgramTime: BigDecimal =
+    ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
 
   test("digest") {
     val setup: IO[Observation.Id] =
@@ -53,20 +100,6 @@ class execution extends ExecutionTestSupport {
                        full { seconds }
                        reacquisition { seconds }
                      }
-                     acquisition {
-                       observeClass
-                       timeEstimate {
-                         program { seconds }
-                         partner { seconds }
-                         nonCharged { seconds }
-                         total { seconds }
-                       }
-                       offsets {
-                         p { arcseconds }
-                         q { arcseconds }
-                       }
-                       atomCount
-                     }
                      science {
                        observeClass
                        timeEstimate {
@@ -86,7 +119,7 @@ class execution extends ExecutionTestSupport {
                }
              }
            """,
-        expected = Right(
+        expected =
           json"""
             {
               "observation": {
@@ -100,59 +133,31 @@ class execution extends ExecutionTestSupport {
                         "seconds" : 300.000000
                       }
                     },
-                    "acquisition" : {
-                      "observeClass" : "ACQUISITION",
-                      "timeEstimate" : {
-                        "program" : {
-                          "seconds" : 175.162500
-                        },
-                        "partner" : {
-                          "seconds" : 0.000000
-                        },
-                        "nonCharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "total" : {
-                          "seconds" : 175.162500
-                        }
-                      },
-                      "offsets" : [
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        },
-                        {
-                          "p" : {
-                            "arcseconds" : 10.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        }
-                      ],
-                      "atomCount": 1
-                    },
                     "science" : {
                       "observeClass" : "SCIENCE",
                       "timeEstimate" : {
                         "program" : {
-                          "seconds" : 411.600000
+                          "seconds" : ${ProgramTime.asJson}
                         },
                         "partner" : {
-                          "seconds" : 471.800000
+                          "seconds" : ${PartnerTime.asJson}
                         },
                         "nonCharged" : {
                           "seconds" : 0.000000
                         },
                         "total" : {
-                          "seconds" : 883.400000
+                          "seconds" : ${(ProgramTime + PartnerTime).asJson}
                         }
                       },
                       "offsets" : [
+                        {
+                          "p" : {
+                            "arcseconds" : 0.000000
+                          },
+                          "q" : {
+                            "arcseconds" : -15.000000
+                          }
+                        },
                         {
                           "p" : {
                             "arcseconds" : 0.000000
@@ -170,14 +175,13 @@ class execution extends ExecutionTestSupport {
                           }
                         }
                       ],
-                      "atomCount": 8
+                      "atomCount": 4
                     }
                   }
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
     }
 
