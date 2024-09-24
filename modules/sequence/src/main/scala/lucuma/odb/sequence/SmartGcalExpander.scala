@@ -3,11 +3,10 @@
 
 package lucuma.odb.sequence
 
-import cats.Id
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
-import fs2.Pipe
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
@@ -39,45 +38,32 @@ trait SmartGcalExpander[F[_], D] {
     atom: ProtoAtom[ProtoStep[D]]
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
-  /**
-   * Expands the given sequence, attempting to replace smart gcal steps with
-   * normal gcal steps.  For each atom in the Stream, if successful, the
-   * expanded atom without smart gcal steps is emitted in a `Right`.  When
-   * unsuccessful, the missing mapping is formatted and wrapped with a `Left`.
-   */
-  def expandSequence: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]]
-
 }
 
 object SmartGcalExpander {
 
-  /**
-   * An expander implementation that always produces the same gcal
-   * configurations regardless of input.
-   */
-  case class Constant[D](
-    inst: (SmartGcalType, D) => D,
-    gcal: SmartGcalType      => StepConfig.Gcal,
-    clas: ObserveClass
-  ) extends SmartGcalExpander[Id, D]:
-    private def expand(step: ProtoStep[D]): ProtoStep[D] =
-      step.stepConfig match
-        case StepConfig.SmartGcal(t) => ProtoStep(inst(t, step.value), gcal(t), clas)
-        case _                       => step
+  def pure[F[_], D](
+    lookup: (SmartGcalType, D) => (D, StepConfig.Gcal, ObserveClass)
+  )(using Applicative[F]): SmartGcalExpander[F, D] =
+    new SmartGcalExpander[F, D] {
+      private def expand(step: ProtoStep[D]): ProtoStep[D] =
+        step.stepConfig match
+          case StepConfig.SmartGcal(t) =>
+            val (d, g, c) = lookup(t, step.value)
+            ProtoStep(d, g, c)
+          case _                       =>
+            step
 
-    override def expandStep(
-      step: ProtoStep[D]
-    ): Id[Either[String, NonEmptyList[ProtoStep[D]]]] =
-      NonEmptyList.one(expand(step)).asRight.pure
+      override def expandStep(
+        step: ProtoStep[D]
+      ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+        NonEmptyList.one(expand(step)).asRight.pure[F]
 
-    override def expandAtom(
-      atom: ProtoAtom[ProtoStep[D]]
-    ): Id[Either[String, ProtoAtom[ProtoStep[D]]]] =
-      ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure
+      override def expandAtom(
+        atom: ProtoAtom[ProtoStep[D]]
+      ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
+        ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure[F]
 
-    // TODO: SEQUENCE UPDATE
-    // can this be removed altogether?
-    override def expandSequence: Pipe[Id, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
-      ???
+    }
 
 }
