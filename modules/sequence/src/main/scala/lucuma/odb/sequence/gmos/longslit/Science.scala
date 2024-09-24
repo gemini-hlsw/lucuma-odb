@@ -312,8 +312,7 @@ object Science:
           copy(science = step.created :: science)
 
     def record(step: StepRecord[D])(using Eq[D]): WavelengthBlock[D] =
-      if !matches(step) then settle
-      else if step.successfullyCompleted then addStep(step)
+      if step.successfullyCompleted && matches(step) then addStep(step)
       else this
 
     def unexecutedRemainder: (WavelengthBlock[D], List[ProtoStep[D]]) =
@@ -390,30 +389,41 @@ object Science:
         .takeThrough { case ((bs, _), _) => bs.foldMap(_.completed) < time.exposureCount.value }
         .collect { case (_, Some(atom)) => atom }
 
+    private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
+      Stream
+        .iterate(start)(p => (p + 1) % length)
+        .take(length)
+        .dropWhile(p => !blocks(p).matches(step))
+        .head
+        .compile
+        .toList
+        .headOption
+        .getOrElse(pos)
+
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       val trackerʹ = tracker.record(step)
-      val start    = pos + (if tracker.atomCount === trackerʹ.atomCount then 0 else 1)
-      val posʹ     =
-        Stream
-          .iterate(start)(p => (p + 1) % length)
-          .take(length)
-          .dropWhile(p => !blocks(p).matches(step))
-          .head
-          .compile
-          .toList
-          .headOption
-          .getOrElse(pos)
 
-      val blocksʹ =
+      val (blocksʹ, posʹ) =
+        if tracker.atomCount === trackerʹ.atomCount then (blocks, pos)
+        else (blocks.map(_.settle), advancePos(pos+1, step))
+
+      val blocksʹʹ =
         step.stepConfig.stepType match
-          case StepType.Bias | StepType.Dark | StepType.SmartGcal => blocks
-          case StepType.Gcal                                      => blocks.map(_.record(step))
+          case StepType.Bias | StepType.Dark | StepType.SmartGcal =>
+            // GMOS Longslit doesn't use biases or darks, and smart gcal has
+            // been expanded so ignore these.
+            blocksʹ
+          case StepType.Gcal                                      =>
+            // We don't know which spatial offset this is associated with so
+            // record it everywhere
+            blocksʹ.map(_.record(step))
           case StepType.Science                                   =>
-            blocks.zipWithIndex.map { (b, idx) =>
+            // Record the step at the current index, settle all others
+            blocksʹ.zipWithIndex.map { (b, idx) =>
               if posʹ === idx then b.record(step) else b.settle
             }
 
-      ScienceGenerator(time, blocksʹ, trackerʹ, posʹ)
+      ScienceGenerator(time, blocksʹʹ, trackerʹ, posʹ)
 
     end recordStep
 
