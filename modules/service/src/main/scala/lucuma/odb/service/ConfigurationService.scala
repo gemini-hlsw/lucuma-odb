@@ -32,8 +32,8 @@ trait ConfigurationService[F[_]] {
   /** Selects all configuration requests that subsume this observation's configuration. */
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
 
-  /* Inserts a new `ConfigurationRequest` based on the configuration of `oid`. */
-  def insertRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
+  /* Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
+  def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
 
 }
 
@@ -49,8 +49,8 @@ object ConfigurationService {
       override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]] =
         impl.selectRequests(oid).value
 
-      override def insertRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
-        impl.insertRequest(oid).value
+      override def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
+        impl.canonicalizeRequest(oid).value
 
     }
 
@@ -96,10 +96,10 @@ object ConfigurationService {
         else selectConfiguration(oid).map: cfg =>
           crs.filter(_.configuration.subsumes(cfg))
 
-    def insertRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
-      selectConfiguration(oid).flatMap(insertRequest(oid, _))
+    def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
+      selectConfiguration(oid).flatMap(canonicalizeRequest(oid, _))
 
-    def insertRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+    def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       ResultT.liftF:
         session.prepareR(Statements.InsertRequest).use: pq =>
           pq.option(oid, cfg).flatMap:
