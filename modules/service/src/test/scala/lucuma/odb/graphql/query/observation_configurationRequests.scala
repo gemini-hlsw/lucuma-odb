@@ -103,11 +103,11 @@ class observation_configurationRequests
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield oid
 
-  test("create and select some configuration requests"):
+  test("create and select some configuration requests, expect deduplication"):
     for
       oid   <- setup
       ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
-      _     <- expectRequests(pi, oid, ids)
+      _     <- expectRequests(pi, oid, ids.distinct)
     yield ()
 
   test("request should apply to identical obs"):
