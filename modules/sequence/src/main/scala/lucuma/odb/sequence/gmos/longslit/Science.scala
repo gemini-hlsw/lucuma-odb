@@ -302,21 +302,21 @@ object Science:
         .getOrElse(TimeSpan.Zero)
 
     /**
-     * How many science exposures should be generated if this block is empty.
+     * How many science exposures should be generated, ignoring remaining time.
      * This will be the number of per block exposures in general, but never
      * more than required to complete the observation.
      */
-    def unexecutedRemainingScienceExposures: Int =
+    def remainingScienceExposures: Int =
       val forCurrentBlock  = (steps.goal.perBlockExposures - scienceCount)            max 0
       val forWholeObs      = (steps.goal.totalExposures - (completed + scienceCount)) max 0
       forCurrentBlock min forWholeObs
 
     /**
      * How many (more) science exposures should be generated if this block is
-     * partially executed.
+     * partially executed (and therefore we consider remaining time).
      */
     def partiallyExecutedRemainingScienceExposures(t: Timestamp, exposureTime: TimeSpan): Int =
-      unexecutedRemainingScienceExposures min
+      remainingScienceExposures min
         (remainingScienceTimeFrom(t).toMicroseconds / exposureTime.toMicroseconds).toInt
 
     /**
@@ -353,7 +353,7 @@ object Science:
       if step.successfullyCompleted && matches(step) then addStep(step) else this
 
     def unexecutedRemainder: (WavelengthBlock[D], List[ProtoStep[D]]) =
-      val n = unexecutedRemainingScienceExposures
+      val n = remainingScienceExposures
       if n === 0 then (this, Nil) else (
         WavelengthBlock.completed.modify(_ + n)(settle),
         steps.allCals ++ List.fill(n)(steps.science)
