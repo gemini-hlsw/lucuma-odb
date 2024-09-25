@@ -11,6 +11,7 @@ import clue.ResponseException
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ScienceBand
@@ -649,6 +650,22 @@ class observationValidations
             ObservationService.ConfigurationForReviewMsg
           )
         ).asRight
+      )
+    }
+  }
+
+  test("calibrations are not validated") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        oid <- createObservationAs(pi, pid) // is missing target
+        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight
       )
     }
   }

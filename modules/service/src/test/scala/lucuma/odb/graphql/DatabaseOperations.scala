@@ -1484,6 +1484,12 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(role, tid).void))
   }
 
+  def setObservationCalibratioRole(oid: Observation.Id, role: CalibrationRole): IO[Unit] = {
+    val command = sql"update t_observation set c_calibration_role = $calibration_role where c_observation_id = $observation_id".command
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(command).use(_.execute(role, oid).void))
+  }
+
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
     query(
       user = user,
