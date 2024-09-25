@@ -15,11 +15,27 @@ import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.mergeByTimestamp
 
+/**
+ * Combines the static configuration with generators for the acquisition and
+ * science sequences.  The remaining acquisition and science sequences can
+ * then be produced by `executionConfig` supplying the past visits and steps.
+ */
 case class ExecutionConfigGenerator[S, D](
   static:      S,
   acquisition: SequenceGenerator[D],
   science:     SequenceGenerator[D]
 ):
+
+  /**
+   * Given the observation's stream of past visits and steps, produces the
+   * remaining execution config (sequences) for the future for both acquisition
+   * and science.
+   *
+   * @param visits past visits
+   * @param steps past steps
+   * @param time when the sequence is requested.  This is relevant because
+   *             calibration files are only considered valid for a fixed time
+   */
   def executionConfig[F[_]: Concurrent](
     visits: Stream[F, VisitRecord],
     steps:  Stream[F, StepRecord[D]],
@@ -30,6 +46,5 @@ case class ExecutionConfigGenerator[S, D](
         case ((a, s), Left(visit)) => (a.recordVisit(visit), s.recordVisit(visit))
         case ((a, s), Right(step)) => (a.recordStep(step), s.recordStep(step))
       }
-      .compile.onlyOrError.map { (a, s) =>
+      .compile.onlyOrError.map: (a, s) =>
         ProtoExecutionConfig(static, a.generate(time), s.generate(time))
-      }

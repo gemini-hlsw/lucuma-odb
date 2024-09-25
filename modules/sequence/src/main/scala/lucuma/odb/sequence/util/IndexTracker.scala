@@ -8,6 +8,11 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.odb.sequence.data.StepRecord
 
+/**
+ * Keeps counts of atoms and steps as steps are recorded.  Required for
+ * maintaining stable atom ids as sequences are executed and the remaining
+ * atoms generated.
+ */
 sealed trait IndexTracker:
   def atomCount: Int
   def stepCount: Int
