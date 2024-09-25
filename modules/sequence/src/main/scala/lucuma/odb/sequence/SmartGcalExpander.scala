@@ -19,7 +19,7 @@ import lucuma.odb.sequence.data.ProtoStep
  *
  * @tparam D dynamic instrument configuration
  */
-trait SmartGcalExpander[F[_], D] {
+trait SmartGcalExpander[F[_], D]:
 
   /**
    * Expands a single step. If `step` is a smart gcal step it is replaced with
@@ -38,14 +38,14 @@ trait SmartGcalExpander[F[_], D] {
     atom: ProtoAtom[ProtoStep[D]]
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
-}
 
-object SmartGcalExpander {
+object SmartGcalExpander:
 
+  /** A simple implementation for testing. */
   def pure[F[_], D](
     lookup: (SmartGcalType, D) => (D, StepConfig.Gcal, ObserveClass)
   )(using Applicative[F]): SmartGcalExpander[F, D] =
-    new SmartGcalExpander[F, D] {
+    new SmartGcalExpander[F, D]:
       private def expand(step: ProtoStep[D]): ProtoStep[D] =
         step.stepConfig match
           case StepConfig.SmartGcal(t) =>
@@ -63,7 +63,3 @@ object SmartGcalExpander {
         atom: ProtoAtom[ProtoStep[D]]
       ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
         ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure[F]
-
-    }
-
-}
