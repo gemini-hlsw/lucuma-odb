@@ -10,9 +10,19 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SourceProfile.*
+import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.SpectralDefinition.BandNormalized
+import lucuma.core.model.SpectralDefinition.EmissionLines
 import lucuma.odb.graphql.binding.*
 
 object SourceProfileInput {
+  extension [A](sd1: SpectralDefinition[A])
+    def matches(sd2: SpectralDefinition[A]): Boolean =
+      (sd1, sd2) match {
+        case (_: BandNormalized[A], _: BandNormalized[A]) => true
+        case (_: EmissionLines[A], _: EmissionLines[A])   => true
+        case _                                            => false
+      } 
 
   // convenience projections
   implicit class SourceProfileOps(self: SourceProfile) {
@@ -47,8 +57,24 @@ object SourceProfileInput {
 
           // If the user provides an input that can be used for editing or replacement, apply the edit if the source profile types match,
           // otherwise interpret it as a replacement.
-          case (Some(Ior.Both(c, e)), None, None) => Result(sp => sp.point.toOption.map(_.spectralDefinition).fold(Result(c))(e).map(Point(_)))
-          case (None, Some(Ior.Both(c, e)), None) => Result(sp => sp.uniform.toOption.map(_.spectralDefinition).fold(Result(c))(e).map(Uniform(_)))
+          case (Some(Ior.Both(c, e)), None, None) => 
+            Result(
+              sp => 
+                sp.point.toOption.map(_.spectralDefinition)
+                  // do a replace if the original is bandNormalized and the new is emissionLines, or vice verse
+                  .filter(_.matches(c)) 
+                  .fold(Result(c))(e)
+                  .map(Point(_))
+            )
+          case (None, Some(Ior.Both(c, e)), None) => 
+            Result(
+              sp => 
+                sp.uniform.toOption.map(_.spectralDefinition)
+                  // do a replace if the original is bandNormalized and the new is emissionLines, or vice verse
+                  .filter(_.matches(c))
+                  .fold(Result(c))(e)
+                  .map(Uniform(_))
+              )
           case (None, None, Some(Ior.Both(c, e))) => Result(sp => sp.gaussian.toOption.fold(Result(c))(e))
 
           // If the user provides a full definition then we will replace the source profile
