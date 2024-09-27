@@ -58,6 +58,9 @@ object ConstraintSetInput {
       elevationRange  = ElevationRange.AirMass.Default
     )
 
+  val SpecPhotoConstraints: ConstraintSet = CalibrationConstraints
+  val TwilightConstraints: ConstraintSet = CalibrationConstraints.copy(cloudExtinction = CloudExtinction.PointThree)
+
   val Default: ConstraintSetInput =
     ConstraintSetInput(
       NominalConstraints.cloudExtinction.some,
@@ -67,12 +70,21 @@ object ConstraintSetInput {
       ElevationRangeInput.Default.some
     )
 
-  val Calibration: ConstraintSetInput =
+  val SpecPhotoCalibration: ConstraintSetInput =
     ConstraintSetInput(
-      CalibrationConstraints.cloudExtinction.some,
-      CalibrationConstraints.imageQuality.some,
-      CalibrationConstraints.skyBackground.some,
-      CalibrationConstraints.waterVapor.some,
+      SpecPhotoConstraints.cloudExtinction.some,
+      SpecPhotoConstraints.imageQuality.some,
+      SpecPhotoConstraints.skyBackground.some,
+      SpecPhotoConstraints.waterVapor.some,
+      ElevationRangeInput.Default.some
+    )
+
+  val TwilightCalibration: ConstraintSetInput =
+    ConstraintSetInput(
+      TwilightConstraints.cloudExtinction.some,
+      TwilightConstraints.imageQuality.some,
+      TwilightConstraints.skyBackground.some,
+      TwilightConstraints.waterVapor.some,
       ElevationRangeInput.Default.some
     )
 
