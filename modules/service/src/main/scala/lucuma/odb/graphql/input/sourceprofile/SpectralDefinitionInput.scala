@@ -23,7 +23,7 @@ object SpectralDefinitionInput {
 
     def emissionLines  = self match {
       case a: EmissionLines[A]  => Result(a)
-      case u => Matcher.validationFailure(s"Not a emission lines spectral definition ${u}.")
+      case u => Matcher.validationFailure(s"Not an emission lines spectral definition ${u}.")
     }
 
   object Integrated {
