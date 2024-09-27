@@ -659,7 +659,7 @@ class observationValidations
       for {
         pid <- createProgramAs(pi)
         oid <- createObservationAs(pi, pid) // is missing target
-        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric)
+        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric.some)
       } yield oid
     setup.flatMap { oid =>
       expect(

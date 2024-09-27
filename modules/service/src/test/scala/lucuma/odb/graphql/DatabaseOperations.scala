@@ -63,6 +63,7 @@ import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.partnerlink.given
 import lucuma.odb.json.stepconfig.given
+import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -1484,10 +1485,9 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(role, tid).void))
   }
 
-  def setObservationCalibratioRole(oid: Observation.Id, role: CalibrationRole): IO[Unit] = {
-    val command = sql"update t_observation set c_calibration_role = $calibration_role where c_observation_id = $observation_id".command
+  def setObservationCalibratioRole(oid: Observation.Id, role: Option[CalibrationRole]): IO[Unit] = {
     FMain.databasePoolResource[IO](databaseConfig).flatten
-      .use(_.prepareR(command).use(_.execute(role, oid).void))
+      .use(_.prepareR(CalibrationsService.Statements.SetCalibrationRole).use(_.execute(oid, role).void))
   }
 
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =
