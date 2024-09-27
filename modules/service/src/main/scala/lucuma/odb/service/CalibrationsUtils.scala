@@ -166,7 +166,20 @@ trait CalibrationObservations {
       specPhotoObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
     }
 
-  private def specPhotoObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
+  def roleConstraints(role: CalibrationRole) =
+    role match {
+      case CalibrationRole.SpectroPhotometric => ConstraintSetInput.SpecPhotoCalibration
+      case CalibrationRole.Twilight           => ConstraintSetInput.TwilightCalibration
+      case _                                  => ConstraintSetInput.Default
+    }
+
+  private def specPhotoObservation[F[_]: Services: MonadThrow: Transaction](
+    pid: Program.Id,
+    gid: Group.Id,
+    tid: Target.Id,
+    cw: Wavelength,
+    obsMode: ObservingModeInput.Create
+  ): F[Observation.Id] =
 
       observationService.createObservation(
         CreateObservationInput(
@@ -178,7 +191,7 @@ trait CalibrationObservations {
                     none,
                     List(tid).some
                   ).some,
-                  constraintSet = ConstraintSetInput.Calibration.some,
+                  constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
                   group = gid.some,
                   posAngleConstraint = PosAngleConstraintInput(
                     mode = PosAngleConstraintMode.AverageParallactic.some, none
@@ -250,7 +263,7 @@ trait CalibrationObservations {
                     none,
                     List(tid).some
                   ).some,
-                  constraintSet = ConstraintSetInput.Calibration.some,
+                  constraintSet = roleConstraints(CalibrationRole.Twilight).some,
                   group = gid.some,
                   posAngleConstraint = PosAngleConstraintInput(
                     mode = PosAngleConstraintMode.Fixed.some, Angle.Angle0.some
