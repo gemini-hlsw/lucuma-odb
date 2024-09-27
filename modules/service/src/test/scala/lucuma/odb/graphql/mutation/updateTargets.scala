@@ -1222,7 +1222,6 @@ class updateTargets extends OdbSuite {
   }
 
   // ShortCut 2260
-  // Test fails when trying to update to the same point/bandNormalized that works when updating from gaussian
   test("update source profile (point/emissionLines -> point/bandNormalized, complete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1", """
@@ -1422,7 +1421,6 @@ class updateTargets extends OdbSuite {
   }
 
   // ShortCut 2260
-  // Test fails when trying to update to the same point/emissionLines that works when updating from gaussian
   test("update source profile (point/bandNormalized -> point/emissionLines, complete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1").flatMap { tid =>
@@ -1594,7 +1592,6 @@ class updateTargets extends OdbSuite {
   }
 
   // ShortCut 2260
-  // Test fails when trying to update to the same uniform/emissionLines that works when updating from point
   test("update source profile (uniform/emissionLines -> uniform/bandNormalized, complete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1", """
@@ -1619,6 +1616,9 @@ class updateTargets extends OdbSuite {
                   sourceProfile: {
                     uniform: {
                       bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
                         brightnesses: [
                           {
                              band: R
