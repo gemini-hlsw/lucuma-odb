@@ -17,6 +17,8 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.itc.IntegrationTime
 
+import java.util.UUID
+
 object LongSlit:
 
   val GmosNorthStatic: StaticConfig.GmosNorth =
@@ -43,6 +45,8 @@ object LongSlit:
     science.map(_.map(sci => ExecutionConfigGenerator(static, acquisition, sci)))
 
   def gmosNorth[F[_]: Monad](
+    estimator:      TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
+    namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
     acquisitionItc: IntegrationTime,
@@ -51,11 +55,13 @@ object LongSlit:
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
       GmosNorthStatic,
-      Acquisition.gmosNorth(config, acquisitionItc.exposureTime),
-      Science.gmosNorth(expander, config, scienceItc, calRole)
+      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc.exposureTime),
+      Science.gmosNorth(estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
   def gmosSouth[F[_]: Monad](
+    estimator:      TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
+    namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
     acquisitionItc: IntegrationTime,
@@ -64,8 +70,8 @@ object LongSlit:
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(
       GmosSouthStatic,
-      Acquisition.gmosSouth(config, acquisitionItc.exposureTime),
-      Science.gmosSouth(expander, config, scienceItc, calRole)
+      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc.exposureTime),
+      Science.gmosSouth(estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
 end LongSlit

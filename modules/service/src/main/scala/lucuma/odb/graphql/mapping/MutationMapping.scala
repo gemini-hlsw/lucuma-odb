@@ -93,7 +93,7 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -164,7 +164,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   // Resources defined in the final cake.
   def services: Resource[F, Services[F]]
   def user: User
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   val httpClient: Client[F]
   val itcClient: ItcClient[F]
   def emailConfig: Config.Email

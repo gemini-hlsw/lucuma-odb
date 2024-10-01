@@ -21,7 +21,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.json.coordinates.query.given
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import org.http4s.client.Client
@@ -33,7 +33,7 @@ trait ConfigurationMapping[F[_]]
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
   def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val ConfigurationMappings =
     List(

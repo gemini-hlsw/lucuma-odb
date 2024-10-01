@@ -6,9 +6,8 @@ package lucuma.odb.sequence
 import cats.Eq
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
-import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
 
@@ -21,11 +20,9 @@ import lucuma.odb.sequence.data.VisitRecord
 trait SequenceGenerator[D]:
 
   /**
-   * Remaining atoms and their steps for this sequence.  Here the `Int` part
-   * of the tuples (atom and step counts) is an unfortunate requirement to
-   * maintain stable atom ids as required by clients.
+   * Remaining atoms and their steps for this sequence.
    */
-  def generate(t: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)]
+  def generate(timestamp: Timestamp): Stream[Pure, Atom[D]]
 
   /**
    * Records a step and returns an updated generator.

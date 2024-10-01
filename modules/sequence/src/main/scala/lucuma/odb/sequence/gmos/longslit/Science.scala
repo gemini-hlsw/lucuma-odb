@@ -10,14 +10,15 @@ import cats.Eq
 import cats.Monad
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -31,30 +32,34 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
+import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
-import monocle.Focus
-import monocle.Lens
 
+import java.util.UUID
 import scala.annotation.tailrec
+import scala.collection.immutable.SortedMap
 
 object Science:
 
@@ -64,6 +69,15 @@ object Science:
    */
   val CalValidityPeriod: TimeSpan =
     90.minuteTimeSpan
+
+  extension (t: Timestamp)
+    def plusCalValidityPeriod: Timestamp =
+      t.plusMicrosOption(CalValidityPeriod.toMicroseconds).getOrElse(Timestamp.Max)
+
+    def minusCalValidityPeriod: Timestamp =
+      t.plusMicrosOption(- CalValidityPeriod.toMicroseconds).getOrElse(Timestamp.Min)
+
+  private val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
 
   /**
    * The nominal amount of time to spend at one (wavelength dither, spatial
@@ -82,8 +96,10 @@ object Science:
    * @param q small spatial offset in q
    */
   case class Adjustment(Δλ: WavelengthDither, q: Offset.Q):
-    def description: String =
-      s"${Δλ.toNanometers.value} nm, ${Angle.signedDecimalArcseconds.get(q.toAngle)}″"
+    def description: NonEmptyString =
+      NonEmptyString.unsafeFrom(
+        s"${Δλ.toNanometers.value} nm, ${Angle.signedDecimalArcseconds.get(q.toAngle)}″"
+      )
 
   object Adjustment:
 
@@ -163,25 +179,44 @@ object Science:
             case LessThan    => maxExpPerBlock
           Goal(adj, maxExpPerBlock, base + extra)
       end if
+
   end Goal
 
   /**
-   * A description of the steps (arcs, flats, and science) associated with each
-   * Goal.
+   * A description of the steps (arcs, flats, and science) that are associated
+   * with an excution Goal.  The collections of steps is executed together in a
+   * block, or "atom".
    */
-  case class Steps[D](
+  case class BlockDefinition[D](
     goal:    Goal,
     flats:   List[ProtoStep[D]],
     arcs:    List[ProtoStep[D]],
     science: ProtoStep[D]
   ):
-    val flatCounts: Map[ProtoStep[D], Int] = Steps.calCounts(flats)
-    val arcCounts:  Map[ProtoStep[D], Int] = Steps.calCounts(arcs)
-    def allCals: List[ProtoStep[D]] = arcs ++ flats
+    val flatCounts: Map[ProtoStep[D], NonNegInt] = BlockDefinition.calCounts(flats)
+    val arcCounts:  Map[ProtoStep[D], NonNegInt] = BlockDefinition.calCounts(arcs)
+    val allCals: List[ProtoStep[D]] = arcs ++ flats
+    val allCalsCounts: Map[ProtoStep[D], NonNegInt]  = arcCounts ++ flatCounts
 
-  object Steps:
-    private def calCounts[D](cal: List[ProtoStep[D]]): Map[ProtoStep[D], Int] =
+    def matches(step: StepRecord[D])(using Eq[D]): Boolean =
+      step.isScienceSequence && (
+        step.stepConfig.stepType match
+          case StepType.Bias |
+               StepType.Dark |
+               StepType.SmartGcal => false
+          case StepType.Gcal      => arcs.exists(_.matches(step)) || flats.exists(_.matches(step))
+          case StepType.Science   => science.matches(step)
+      )
+
+  end BlockDefinition
+
+  object BlockDefinition:
+
+    private def calCounts[D](cal: List[ProtoStep[D]]): Map[ProtoStep[D], NonNegInt] =
       cal.groupMapReduce(identity)(_ => 1)(_ + _)
+        .view
+        .mapValues(NonNegInt.unsafeFrom)
+        .toMap
 
     sealed trait Computer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
@@ -205,7 +240,7 @@ object Science:
         config:      Config[G, L, U],
         time:        IntegrationTime,
         includeArcs: Boolean
-      ): F[Either[String, List[Steps[D]]]] =
+      ): F[Either[String, List[BlockDefinition[D]]]] =
         Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
           val λ = config.centralWavelength
           val (smartArc, smartFlat, science) = eval {
@@ -221,7 +256,7 @@ object Science:
           (for {
             fs <- EitherT(expander.expandStep(smartFlat)).map(_.toList)
             as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
-          } yield Steps(g, fs, as.toList, science)).value
+          } yield BlockDefinition(g, fs, as.toList, science)).value
         }.map(_.sequence)
 
       end compute
@@ -232,203 +267,253 @@ object Science:
 
     object South extends GmosSouthSequenceState
                     with Computer[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
-  end Steps
+  end BlockDefinition
 
-  /**
-   * A wavelength block corresponds to an "atom" in that it is a run of arcs
-   * and flats + science datasets associated with a single wavelength (and
-   * spatial offset).  The WavelengthBlock tracks when calibrations and
-   * science datasets were recorded for the block and is used to generate the
-   * remainder of the sequence when the recorded steps have all been accounted
-   * for.
-   */
-  case class WavelengthBlock[D](
-    steps:      Steps[D],
-    science:    List[Timestamp],
-    cal:        Map[ProtoStep[D], List[Timestamp]],
-    completed:  Int
+  case class BlockCompletion[D](
+    definition: BlockDefinition[D],
+    completed:  NonNegInt
   ):
+    def add(n: NonNegInt): BlockCompletion[D] =
+      copy(completed = NonNegInt.unsafeFrom(completed.value + n.value))
 
-    def isEmpty: Boolean =
-      science.isEmpty && cal.isEmpty
+    def remainingInObs: NonNegInt =
+      NonNegInt.unsafeFrom((definition.goal.totalExposures - completed.value) max 0)
 
-    // when does the earliest calibration in this block expire?
-    lazy val calibrationExpiration: Option[Timestamp] =
-      cal
-      .values
-      .toList
-      .flatten
-      .minOption
-      .flatMap(_.plusMicrosOption(CalValidityPeriod.toMicroseconds))
-
-    def missingCalsAt(t: Timestamp): List[ProtoStep[D]] =
-      // A map, keyed by calibration step, containing how many instances are
-      // still needed.
-      val remaining = (steps.arcCounts ++ steps.flatCounts).map: (step, n) =>
-        val valid = cal.get(step).fold(0)(_.count(ct => TimeSpan.between(ct, t).exists(_ <= CalValidityPeriod)))
-        (step, (n - valid) max 0)
-
-      // Filter the ordered list of arcs + flats, removing still valid ones from
-      // the beginning.
-      (steps.arcs ++ steps.flats).foldRight((List.empty[ProtoStep[D]], remaining)) { case (step, (res, remainingʹ)) =>
-        val r = remainingʹ(step)
-        if r > 0 then (step :: res, remainingʹ.updated(step, r - 1))
-        else (res, remainingʹ)
-      }._1
-
-    /**
-     * Returns `true` iff there are no missing calibrations.  Because
-     * calibrations expire, the answer will differ depending on when asked
-     * (as provided by the given timestamp).
-     *
-     * @param t timestamp for when this determination is made
-     */
-    def hasValidCalibrations(t: Timestamp): Boolean =
-      missingCalsAt(t).isEmpty
-
-    /**
-     * Count of science exposures for which there are valid calibrations.
-     */
-    lazy val scienceCount: Int =
-      if cal.isEmpty then 0 else science.count(hasValidCalibrations)
-
-    /**
-     * How much time is left for science datasets at timestamp `t`.
-     */
-    def remainingScienceTimeFrom(t: Timestamp): TimeSpan =
-      calibrationExpiration
-        .filter(_ > t)
-        .flatMap(TimeSpan.between(t, _))
-        .getOrElse(TimeSpan.Zero)
-
-    /**
-     * How many science exposures should be generated, ignoring remaining time.
-     * This will be the number of per block exposures in general, but never
-     * more than required to complete the observation.
-     */
-    def remainingScienceExposures: Int =
-      val forCurrentBlock  = (steps.goal.perBlockExposures - scienceCount)            max 0
-      val forWholeObs      = (steps.goal.totalExposures - (completed + scienceCount)) max 0
-      forCurrentBlock min forWholeObs
-
-    /**
-     * How many (more) science exposures should be generated if this block is
-     * partially executed (and therefore we consider remaining time).
-     */
-    def partiallyExecutedRemainingScienceExposures(t: Timestamp, exposureTime: TimeSpan): Int =
-      remainingScienceExposures min
-        (remainingScienceTimeFrom(t).toMicroseconds / exposureTime.toMicroseconds).toInt
-
-    /**
-     * Signals the end of accounting for a particular run of this block, logging
-     * the completed science exposures against the total.
-     */
-    def settle: WavelengthBlock[D] =
-      copy(science = List.empty, cal = Map.empty, completed = completed + scienceCount)
-
-    def matches(step: StepRecord[D])(using Eq[D]): Boolean =
-      step.isScienceSequence && (
-        step.stepConfig.stepType match
-          case StepType.Bias |
-               StepType.Dark |
-               StepType.SmartGcal => false
-          case StepType.Gcal      => steps.arcs.exists(_.matches(step)) || steps.flats.exists(_.matches(step))
-          case StepType.Science   => steps.science.matches(step)
+    def remainingInBlock(pending: Int): NonNegInt =
+      NonNegInt.unsafeFrom(
+        ((remainingInObs.value min definition.goal.perBlockExposures) - pending) max 0
       )
 
-    private def addStep(step: StepRecord[D]): WavelengthBlock[D] =
-      step.stepConfig match
-        case StepConfig.Bias | StepConfig.Dark | StepConfig.SmartGcal(_) =>
-          this
-
-        case StepConfig.Gcal(_, _, _, _) =>
-          copy(cal = cal.updatedWith(step.protoStep) { ots =>
-            (step.created :: ots.toList.flatten).some
-          })
-
-        case StepConfig.Science(_, _) =>
-          copy(science = step.created :: science)
-
-    def record(step: StepRecord[D])(using Eq[D]): WavelengthBlock[D] =
-      if step.successfullyCompleted && matches(step) then addStep(step) else this
-
-    def unexecutedRemainder: (WavelengthBlock[D], List[ProtoStep[D]]) =
-      val n = remainingScienceExposures
-      if n === 0 then (this, Nil) else (
-        WavelengthBlock.completed.modify(_ + n)(settle),
-        steps.allCals ++ List.fill(n)(steps.science)
+    def generate: (NonNegInt, List[ProtoStep[D]]) =
+      val cnt = remainingInBlock(0)
+      (cnt,
+       cnt.value match
+         case 0 => List.empty[ProtoStep[D]]
+         case n => definition.allCals ++ List.fill(n)(definition.science)
       )
 
-    def partiallyExecutedRemainder(
-      atTime: Timestamp,
-      exposureTime: TimeSpan
-    ): (WavelengthBlock[D], List[ProtoStep[D]]) =
-      if completed >= steps.goal.totalExposures then
-        (this, Nil)
+  end BlockCompletion
+
+  object BlockCompletion:
+    def init[D](definition: BlockDefinition[D]): BlockCompletion[D] =
+      BlockCompletion(definition, Zero)
+
+  trait BlockWindow[D]:
+    def missingCalCounts: Map[ProtoStep[D], NonNegInt]
+    def missingCals: List[ProtoStep[D]]
+    def pendingScience: Set[Step.Id]
+    def pendingScienceCount: NonNegInt
+    def calibratedScience: Set[Step.Id]
+    def calibratedScienceCount: NonNegInt =
+      NonNegInt.unsafeFrom(calibratedScience.size)
+
+  object BlockWindow:
+    def apply[D](
+      block: BlockDefinition[D],
+      steps: SortedMap[Timestamp, StepRecord[D]]
+    ): BlockWindow[D] =
+      new BlockWindow[D]:
+        lazy val missingCalCounts: Map[ProtoStep[D], NonNegInt] =
+          steps
+            .values
+            .filter(s => s.successfullyCompleted && s.isGcal)
+            .foldLeft(block.allCalsCounts) { (cals, step) =>
+              cals.updatedWith(step.protoStep)(_.flatMap(n => NonNegInt.unapply(n.value - 1)))
+            }
+
+        lazy val missingCals: List[ProtoStep[D]] =
+          // Filter the ordered list of arcs + flats, removing still valid ones from
+          // the beginning.
+          block.allCals.foldLeft((List.empty[ProtoStep[D]], missingCalCounts)) {
+            case ((res, remaining), calStep) =>
+              NonNegInt
+                .unapply(remaining.getOrElse(calStep, Zero).value - 1)
+                .fold((res, remaining)) { n =>
+                  (calStep :: res, remaining.updated(calStep, n))
+                }
+          }._1.reverse
+
+        lazy val pendingScience: Set[Step.Id] =
+          steps.values.collect {
+            case s if s.successfullyCompleted && s.isScience => s.id
+          }.toSet
+
+        lazy val pendingScienceCount: NonNegInt =
+          NonNegInt.unsafeFrom(pendingScience.size)
+
+        lazy val calibratedScience: Set[Step.Id] =
+          if missingCalCounts.values.exists(_.value > 0) then Set.empty
+          else pendingScience
+
+  end BlockWindow
+
+  case class BlockRecord[D](
+    block: BlockCompletion[D],
+    steps: SortedMap[Timestamp, StepRecord[D]],
+  ):
+    val startTime: Option[Timestamp] =
+      steps.headOption.map(_._2.created)
+
+    val endTime: Option[Timestamp] =
+      steps.lastOption.map(_._2.created)
+
+    val interval: Option[TimestampInterval] =
+      (startTime, endTime).mapN(TimestampInterval.between)
+
+    def windows: Stream[Pure, BlockWindow[D]] =
+      endTime.fold(Stream.empty) { last =>
+        Stream
+          .emits[Pure, Timestamp](steps.keys.toList)
+          .fproduct(_.plusCalValidityPeriod min last)
+          .takeThrough((_, e) => e < last)
+          .map { case (s, e) => BlockWindow(block.definition, steps.rangeFrom(s).rangeTo(e)) }
+      }
+
+    def windowEndingAt(timestamp: Timestamp): BlockWindow[D] =
+      BlockWindow(
+        block.definition,
+        steps.rangeFrom(timestamp.minusCalValidityPeriod).rangeTo(timestamp)
+      )
+
+    lazy val calibratedScience: Set[Step.Id] =
+      windows
+        .fold(Set.empty[Step.Id])((s, w) => s ++ w.calibratedScience)
+        .compile
+        .toList
+        .head
+
+    lazy val calibratedScienceCount: NonNegInt =
+      NonNegInt.unsafeFrom(calibratedScience.size)
+
+    def settle: BlockRecord[D] =
+      if steps.isEmpty then this else copy(
+        block = block.add(calibratedScienceCount),
+        steps = SortedMap.empty
+      )
+
+    def record(step: StepRecord[D])(using Eq[D]): BlockRecord[D] =
+      if block.definition.matches(step) then copy(steps = steps + (step.created -> step))
+      else this
+
+    /**
+     * How much time is left in the current iteration of this block at time
+     * `timestamp`.
+     */
+    def remainingTimeAt(timestamp: Timestamp): TimeSpan =
+      val limit = startTime.map(_.plusCalValidityPeriod).getOrElse(Timestamp.Min)
+      val start = endTime.map(_ max timestamp).getOrElse(Timestamp.Max)
+      Option.when(start <= limit)(TimeSpan.between(start, limit)).flatten.getOrElse(TimeSpan.Zero)
+
+    def generate[S](
+      timestamp: Timestamp,
+      static:    S,
+      estimator: TimeEstimateCalculator[S, D],
+      calcState: TimeEstimateCalculator.State[D]
+    ): (NonNegInt, List[ProtoStep[D]]) =
+
+      // What calibrations are missing in the last window?
+      val window      = windowEndingAt(timestamp)
+      val missingCals = window.missingCals
+
+      // Which pending science in the last window can be completed by adding
+      // missing calibrations? Previous windows may have uncalibrated science,
+      // but those would be lost since we won't get the calibration in time.
+      val uncalibratedScience =
+        if missingCals.isEmpty then Set.empty[Step.Id]
+        else window.pendingScience -- calibratedScience
+
+      // How many, at a maximum, ignoring time, science steps could you do to
+      // finish out the block?
+      val currentCount = (calibratedScience ++ uncalibratedScience).size
+      val maxRemaining = block.remainingInBlock(currentCount)
+
+      // Time estimate calc state up to now.
+      val calcStateʹ = steps.foldLeft(calcState) { case (cur, (_, step)) =>
+         cur.next(step.protoStep)
+      }
+
+      // How long do we have left to fill with science?
+      val calTime       = TimeEstimateCalculator.estimateTimeSpan(estimator, static, calcStateʹ, missingCals)
+      val remainingTime = remainingTimeAt(timestamp) -| calTime
+
+      // How long would the first science step take?  It may be different from
+      // remaining steps if there is a science fold move to make.
+      val firstStepTime = estimator.estimateStep(static, calcState, block.definition.science).total
+
+      // How long would each subsequent science step take?
+      val otherStepTime = estimator.estimateStep(static, calcStateʹ, block.definition.science).total
+
+      if remainingTime < firstStepTime then
+        if uncalibratedScience.sizeIs > 0 then
+          (NonNegInt.unsafeFrom(currentCount), missingCals)
+        else
+          (NonNegInt.unsafeFrom(calibratedScience.size), Nil)
       else
-        val cs = missingCalsAt(atTime)
+        val remainingTimeʹ = remainingTime -| firstStepTime
+        val otherStepCount = (remainingTimeʹ.toMicroseconds / otherStepTime.toMicroseconds).toInt
+        val newCount       = maxRemaining.value min (1 + otherStepCount)
+        val scienceSteps   = List.fill(newCount)(block.definition.science)
+        val steps = if currentCount == 0 then missingCals ++ scienceSteps
+                    else scienceSteps ++ missingCals
+        (NonNegInt.unsafeFrom(currentCount + newCount), steps)
+      end if
 
-        // Add the missing cals as if they just happened.
-        val wb = copy(cal = cs.foldLeft(cal) { (m, calStep) =>
-          m.updatedWith(calStep)(o => (atTime :: o.toList.flatten).some)
-        })
+    end generate
 
-        val n   = wb.partiallyExecutedRemainingScienceExposures(atTime, exposureTime)
-        val wbʹ = WavelengthBlock.completed.modify(_ + n)(wb.settle)
-        val ss  = List.fill(n)(steps.science)
+  end BlockRecord
 
-        // If there are no pending science datasets already put the cals at the
-        // beginning.  Otherwise the missing cals should finish the block.
-        if science.isEmpty then (wbʹ, cs ++ ss) else (wbʹ, ss ++ cs)
-    end partiallyExecutedRemainder
+  object BlockRecord:
+    def init[D](definition: BlockDefinition[D]): BlockRecord[D] =
+      BlockRecord(BlockCompletion.init(definition), SortedMap.empty)
 
-    def remainder(
-      atTime:       Timestamp,
-      exposureTime: TimeSpan
-    ): (WavelengthBlock[D], List[ProtoStep[D]]) =
-      if isEmpty then unexecutedRemainder
-      else partiallyExecutedRemainder(atTime, exposureTime)
+  end BlockRecord
 
-  end WavelengthBlock
-
-  object WavelengthBlock:
-    def init[D](steps: Steps[D]): WavelengthBlock[D] =
-      WavelengthBlock(steps, List.empty, Map.empty, 0)
-
-    def completed[D]: Lens[WavelengthBlock[D], Int] =
-      Focus[WavelengthBlock[D]](_.completed)
-
-  private case class ScienceGenerator[D](
-    time:    IntegrationTime,
-    blocks:  List[WavelengthBlock[D]],
-    tracker: IndexTracker,
-    pos:     Int
+  private case class ScienceGenerator[S, D](
+    estimator:   TimeEstimateCalculator[S, D],
+    static:      S,
+    atomBuilder: AtomBuilder[D],
+    time:        IntegrationTime,
+    records:     List[BlockRecord[D]],
+    tracker:     IndexTracker,
+    pos:         Int
   ) extends SequenceGenerator[D]:
 
-    val length: Int = blocks.length
+    val length: Int = records.length
 
-    override def generate(t: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
+    def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
       val (aix, six) = tracker.toTuple
+      val startState = TimeEstimateCalculator.State.empty[D]
+
+      // The first block requires picking up any unfinished steps from the
+      // current atom so it is handled separately.
+      val rec        = records(pos)
+      val (n, steps) = if rec.steps.isEmpty then rec.block.generate
+                       else rec.generate(timestamp, static, estimator, startState)
+      val desc       = rec.block.definition.goal.adjustment.description
+      val (calcState, firstAtom) = atomBuilder.buildOption(desc.some, aix, six, steps).run(startState).value
+      val blocks     = records.map(_.block).updated(pos, rec.block.add(n)).toVector
+
       Stream
         .iterate(pos)(idx => (idx + 1) % length)
-        .mapAccumulate((blocks.toVector, aix)) { case ((bs, aixʹ), idx) =>
-          val wb   = bs(idx)
-          val (wbʹ, steps) = wb.remainder(t, time.exposureTime)
-          val bsʹ  = bs.updated(idx, wbʹ)
-          val desc = NonEmptyString.unapply(wb.steps.goal.adjustment.description)
-          val sixʹ = if wb.isEmpty then 0 else six
-          val atom = NonEmptyList.fromList(steps).map: nel =>
-            (ProtoAtom(desc, nel.zipWithIndex.map(_.map(_ + sixʹ))), aixʹ)
-          ((bsʹ, aixʹ + 1), atom)
+        .drop(1) // already generated above
+        .mapAccumulate((blocks.toVector, aix + 1, calcState)) { case ((blocks, aixʹ, est), idx) =>
+          val block = blocks(idx)
+
+          val (n, steps)   = block.generate
+          val desc         = block.definition.goal.adjustment.description
+          val (estʹ, atom) = atomBuilder.buildOption(desc.some, aixʹ, 0, steps).run(est).value
+          val blocksʹ      = blocks.updated(idx, block.add(n))
+          ((blocksʹ, aixʹ + 1, estʹ), atom)
         }
-        .takeThrough { case ((bs, _), _) => bs.foldMap(_.completed) < time.exposureCount.value }
+        .cons1((blocks, aix, six), firstAtom) // put the first atom back
+        .takeThrough { case ((bs, _, _), _) => bs.foldMap(_.completed.value) < time.exposureCount.value }
         .collect { case (_, Some(atom)) => atom }
 
     private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
       Stream
         .iterate(start)(p => (p + 1) % length)
         .take(length)
-        .dropWhile(p => !blocks(p).matches(step))
+        .dropWhile(p => !records(p).block.definition.matches(step))
         .head
         .compile
         .toList
@@ -438,26 +523,30 @@ object Science:
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       val trackerʹ = tracker.record(step)
 
-      val (blocksʹ, posʹ) =
-        if tracker.atomCount === trackerʹ.atomCount then (blocks, pos)
-        else (blocks.map(_.settle), advancePos(pos+1, step))
+      val (recordsʹ, posʹ) =
+        if tracker.atomCount === trackerʹ.atomCount then (records, pos)
+        else (records.map(_.settle), advancePos(pos+1, step))
 
-      val blocksʹʹ =
+      val recordsʹʹ =
         step.stepConfig.stepType match
           case StepType.Bias | StepType.Dark | StepType.SmartGcal =>
             // GMOS Longslit doesn't use biases or darks, and smart gcal has
             // been expanded so ignore these.
-            blocksʹ
+            recordsʹ
           case StepType.Gcal                                      =>
             // We don't know which spatial offset this is associated with so
             // record it everywhere
-            blocksʹ.map(_.record(step))
+            recordsʹ.map(_.record(step))
           case StepType.Science                                   =>
             // Record the step at the current index, settle all others
-            blocksʹ.zipWithIndex.map: (b, idx) =>
-              if posʹ === idx then b.record(step) else b.settle
+            recordsʹ.zipWithIndex.map: (rec, idx) =>
+              if posʹ === idx then rec.record(step) else rec.settle
 
-      ScienceGenerator(time, blocksʹʹ, trackerʹ, posʹ)
+      copy(
+        records = recordsʹʹ,
+        tracker = trackerʹ,
+        pos     = posʹ
+      )
 
     end recordStep
 
@@ -473,12 +562,15 @@ object Science:
       if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
       else List(WavelengthDither.Zero)
 
-    def instantiate[F[_]: Monad, D, G, L, U](
-      sc:          Steps.Computer[D, G, L, U],
-      expander:    SmartGcalExpander[F, D],
-      config:      Config[G, L, U],
-      time:        IntegrationTime,
-      calRole:     Option[CalibrationRole]
+    def instantiate[F[_]: Monad, S, D, G, L, U](
+      estimator: TimeEstimateCalculator[S, D],
+      static:    S,
+      namespace: UUID,
+      expander:  SmartGcalExpander[F, D],
+      blockDef:  BlockDefinition.Computer[D, G, L, U],
+      config:    Config[G, L, U],
+      time:      IntegrationTime,
+      calRole:   Option[CalibrationRole]
     ): F[Either[String, SequenceGenerator[D]]] =
       val e = calRole match
         case None                                     =>
@@ -496,27 +588,34 @@ object Science:
         case Some(c)                                  =>
           s"GMOS Long Slit ${c.tag} not implemented".asLeft
 
+      val atomBuilder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
       (for {
         (configʹ, timeʹ) <- EitherT.fromEither[F](e)
-        steps            <- EitherT(sc.compute(expander, configʹ, timeʹ, includeArcs = calRole.isEmpty))
-      } yield ScienceGenerator(timeʹ, steps.map(WavelengthBlock.init), IndexTracker.Zero, 0)).value
+        defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, includeArcs = calRole.isEmpty))
+      } yield ScienceGenerator(estimator, static, atomBuilder, timeʹ, defs.map(BlockRecord.init), IndexTracker.Zero, 0)).value
 
   end ScienceGenerator
 
   def gmosNorth[F[_]: Monad](
-    expander: SmartGcalExpander[F, GmosNorth],
-    config:   Config.GmosNorth,
-    time:     IntegrationTime,
-    calRole:  Option[CalibrationRole]
+    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:    StaticConfig.GmosNorth,
+    namespace: UUID,
+    expander:  SmartGcalExpander[F, GmosNorth],
+    config:    Config.GmosNorth,
+    time:      IntegrationTime,
+    calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosNorth]]] =
-    ScienceGenerator.instantiate(Steps.North, expander, config, time, calRole)
+    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
 
   def gmosSouth[F[_]: Monad](
-    expander: SmartGcalExpander[F, GmosSouth],
-    config:   Config.GmosSouth,
-    time:     IntegrationTime,
-    calRole:  Option[CalibrationRole]
+    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:    StaticConfig.GmosSouth,
+    namespace: UUID,
+    expander:  SmartGcalExpander[F, GmosSouth],
+    config:    Config.GmosSouth,
+    time:      IntegrationTime,
+    calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosSouth]]] =
-    ScienceGenerator.instantiate(Steps.South, expander, config, time, calRole)
+    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
 
 end Science

@@ -54,7 +54,7 @@ import lucuma.odb.FMain
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
@@ -303,7 +303,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
+      ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 

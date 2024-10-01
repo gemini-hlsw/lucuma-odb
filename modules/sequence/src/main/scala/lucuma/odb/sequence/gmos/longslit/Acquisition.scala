@@ -8,7 +8,7 @@ package longslit
 import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
-import cats.syntax.functor.*
+import cats.data.State
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -28,25 +28,30 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
-import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
+import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
 import lucuma.refined.*
+
+import java.util.UUID
 
 object Acquisition:
   val AcquisitionSN: SignalToNoise =
@@ -151,24 +156,26 @@ object Acquisition:
 
   private sealed trait AcquisitionState[D] extends SequenceGenerator[D]:
 
+    def builder: AtomBuilder[D]
     def visitId: Visit.Id
     def steps: Steps[D]
     def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D]
+    def calcState: TimeEstimateCalculator.State[D]
     def tracker: IndexTracker
 
-    def updateTracker(tracker: IndexTracker): AcquisitionState[D]
+    def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D]
 
     def updatesVisit(step: StepRecord[D]): Boolean =
       step.visitId =!= visitId
 
     def reset(visitId: Visit.Id): AcquisitionState[D] =
-      AcquisitionState.ExpectCcd2(visitId, tracker, steps)
+      AcquisitionState.ExpectCcd2(visitId, calcState, tracker, builder, steps)
 
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
       if updatesVisit(step) then
         reset(step.visitId).recordStep(step)
       else
-        val a = updateTracker(tracker.record(step))
+        val a = updateTracker(calcState.next(step.protoStep), tracker.record(step))
         if !step.isAcquisitionSequence     then a.reset(step.visitId)
         else if step.successfullyCompleted then a.recordCompleted(step)
         else a
@@ -182,91 +189,123 @@ object Acquisition:
   private object AcquisitionState:
 
     def initialAcq[D](
+      builder: AtomBuilder[D],
       steps:   NonEmptyList[ProtoStep[D]],
-      tracker: IndexTracker
-    ): ProtoAtom[(ProtoStep[D], Int)] =
-      ProtoAtom(
+      aix:     Int,
+      six:     Int
+    ): State[TimeEstimateCalculator.State[D], Atom[D]] =
+      builder.build(
         NonEmptyString.unapply("Initial Acquisition"),
-        steps.zipWithIndex.map(_.map(_ + tracker.stepCount))
+        aix,
+        six,
+        steps
       )
 
-    def fineAdjustments[D](slit: ProtoStep[D]): ProtoAtom[(ProtoStep[D], Int)] =
-      ProtoAtom(NonEmptyString.unapply("Fine Adjustments"), NonEmptyList.of((slit, 1)))
+    def fineAdjustments[D](
+      builder: AtomBuilder[D],
+      slit:    ProtoStep[D],
+      aix:     Int
+    ): State[TimeEstimateCalculator.State[D], Atom[D]] =
+      builder.build(
+        NonEmptyString.unapply("Fine Adjustments"),
+        aix,
+        1,
+        NonEmptyList.one(slit)
+      )
 
     def gen[D](
-      init: Option[NonEmptyList[ProtoStep[D]]],
-      slit: ProtoStep[D],
-      track: IndexTracker
-    ): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
-      Stream(
-        (init.fold(fineAdjustments(slit))(nel => initialAcq(nel, track)), track.atomCount),
-        (fineAdjustments(slit), track.atomCount+1)
-      )
+      builder:   AtomBuilder[D],
+      init:      Option[NonEmptyList[ProtoStep[D]]],
+      slit:      ProtoStep[D],
+      calcState: TimeEstimateCalculator.State[D],
+      track:     IndexTracker
+    ): Stream[Pure, Atom[D]] =
+      (for {
+        a0 <- init.fold(fineAdjustments(builder, slit, track.atomCount)) { nel =>
+          initialAcq(builder, nel, track.atomCount, track.stepCount)
+        }
+        a1 <- fineAdjustments(builder, slit, track.atomCount+1)
+      } yield Stream(a0, a1)).runA(calcState).value
 
-    case class Init[D](steps: Steps[D]) extends SequenceGenerator[D]:
+    case class Init[D](builder: AtomBuilder[D], steps: Steps[D]) extends SequenceGenerator[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
-        gen(steps.initialAtom.some, steps.slit, IndexTracker.Zero)
+      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+        gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.State.empty[D], IndexTracker.Zero)
 
       override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        ExpectCcd2(step.visitId, IndexTracker.Zero, steps).recordStep(step)
+        ExpectCcd2(step.visitId, TimeEstimateCalculator.State.empty[D], IndexTracker.Zero, builder, steps).recordStep(step)
 
       override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
         this
 
     end Init
 
-    case class ExpectCcd2[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectCcd2[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
-        gen(steps.initialAtom.some, steps.slit, tracker)
+      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+        gen(builder, steps.initialAtom.some, steps.slit, calcState, tracker)
 
-      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
-        copy(tracker = tracker)
+      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+        copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =
-        if steps.ccd2.matches(step) then ExpectP10(visitId, tracker, steps)
+        if steps.ccd2.matches(step) then ExpectP10(visitId, calcState, tracker, builder, steps)
         else this
 
     end ExpectCcd2
 
-    case class ExpectP10[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectP10[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
-        gen(NonEmptyList.of(steps.p10, steps.slit).some, steps.slit, tracker)
+      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+        gen(builder, NonEmptyList.of(steps.p10, steps.slit).some, steps.slit, calcState, tracker)
 
-      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
-        copy(tracker = tracker)
+      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+        copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =
-        if steps.p10.matches(step) then ExpectSlit(visitId, tracker, steps, initialAtom = true)
+        if steps.p10.matches(step) then ExpectSlit(visitId, calcState, tracker, builder, steps, initialAtom = true)
         else this
 
     end ExpectP10
 
-    case class ExpectSlit[D](visitId: Visit.Id, tracker: IndexTracker, steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
+    case class ExpectSlit[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
 
-      override def generate(ignore: Timestamp): Stream[Pure, (ProtoAtom[(ProtoStep[D], Int)], Int)] =
-        gen(Option.when(initialAtom)(NonEmptyList.one(steps.slit)), steps.slit, tracker)
+      override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
+        gen(builder, Option.when(initialAtom)(NonEmptyList.one(steps.slit)), steps.slit, calcState, tracker)
 
-      override def updateTracker(tracker: IndexTracker): AcquisitionState[D] =
-        copy(tracker = tracker)
+      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+        copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =
-        if steps.slit.matches(step) then ExpectSlit(visitId, tracker, steps, initialAtom = false)
+        if steps.slit.matches(step) then ExpectSlit(visitId, calcState, tracker, builder, steps, initialAtom = false)
         else this
 
     end ExpectSlit
 
   end AcquisitionState
 
-  def gmosNorth(config: Config.GmosNorth, exposureTime: TimeSpan): SequenceGenerator[GmosNorth] =
+
+  def gmosNorth(
+    estimator:    TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:       StaticConfig.GmosNorth,
+    namespace:    UUID,
+    config:       Config.GmosNorth,
+    exposureTime: TimeSpan
+  ): SequenceGenerator[GmosNorth] =
     AcquisitionState.Init(
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
       StepComputer.North.compute(GmosNorthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
     )
 
-  def gmosSouth(config: Config.GmosSouth, exposureTime: TimeSpan): SequenceGenerator[GmosSouth] =
+  def gmosSouth(
+    estimator:    TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:       StaticConfig.GmosSouth,
+    namespace:    UUID,
+    config:       Config.GmosSouth,
+    exposureTime: TimeSpan
+  ): SequenceGenerator[GmosSouth] =
     AcquisitionState.Init(
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
       StepComputer.South.compute(GmosSouthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
     )
 

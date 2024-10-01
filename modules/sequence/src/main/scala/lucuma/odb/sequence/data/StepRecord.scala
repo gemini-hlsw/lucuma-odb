@@ -9,6 +9,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepType
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
@@ -44,3 +45,9 @@ case class StepRecord[D](
 
   def protoStep: ProtoStep[D] =
     ProtoStep(instrumentConfig, stepConfig, observeClass)
+
+  def isGcal: Boolean =
+    stepConfig.stepType === StepType.Gcal
+
+  def isScience: Boolean =
+    stepConfig.stepType === StepType.Science
