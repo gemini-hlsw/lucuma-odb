@@ -70,10 +70,15 @@ sealed trait Generator[F[_]] {
    * the cache. If not in the cache, it performs the calculation and caches the
    * results. If the observation is not completely defined (e.g., if missing the
    * observing mode), an Error is produced.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def digest(
     programId:     Program.Id,
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
   /**
@@ -81,10 +86,15 @@ sealed trait Generator[F[_]] {
    * to determine if the digest needed to be recalculated. This is useful in things
    * like the guide star availability calculations which depend on the digest and are
    * also cached.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def digestWithParamsAndHash(
     programId:     Program.Id,
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
@@ -92,22 +102,35 @@ sealed trait Generator[F[_]] {
    * along with the GeneratorParams. This method always performs the calculation
    * and does not attempt to use cached results nor call the ITC.  It will
    * cache the calculation once performed.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
     asterismResult: ItcService.AsterismResults,
-    params:         GeneratorParams
+    params:         GeneratorParams,
+    when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
   /**
    * Generates the execution config if the observation is found and defined
-   * well enough to perform the calculation.
+   * well enough to perform the calculation.  Because the sequences that are
+   * generated may differ depending on when requested, a 'when' parameter option
+   * is provided.  By default this will be "now".
+   *
+   * @param futureLimit cap to place on the number of atoms that map appear in
+   *                    the possibleFuture
+   * @param when perform the generation as if requested at this time (by default
+   *             the sequence is requested generated at the current time)
    */
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
-    futureLimit:   FutureLimit = FutureLimit.Default
+    futureLimit:   FutureLimit = FutureLimit.Default,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
 }
@@ -255,18 +278,20 @@ object Generator {
       }
 
       override def digest(
-        programId:     Program.Id,
-        observationId: Observation.Id
+        pid:  Program.Id,
+        oid:  Observation.Id,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        digestWithParamsAndHash(programId, observationId).map(_.map(_._1))
+        digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
       override def digestWithParamsAndHash(
-        pid: Program.Id,
-        oid: Observation.Id
+        pid:  Program.Id,
+        oid:  Observation.Id,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
         (for {
           c <- Context.lookup(pid, oid)
-          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c))(EitherT.pure(_)))
+          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c, when))(EitherT.pure(_)))
           r  = (d, c.params, c.hash)
         } yield r).value
 
@@ -274,14 +299,16 @@ object Generator {
         pid:             Program.Id,
         oid:             Observation.Id,
         asterismResults: ItcService.AsterismResults,
-        params:          GeneratorParams
+        params:          GeneratorParams,
+        when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        calcDigestThenCache(Context(pid, oid, asterismResults, params)).value
+        calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
       private def calcDigestThenCache(
-        ctx: Context
+        ctx:  Context,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
-        calcDigestFromContext(ctx).flatTap(ctx.cache)
+        calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
       private val tz: Codec[Timestamp] =
         timestamptz.eimap(
@@ -298,12 +325,13 @@ object Generator {
       private def protoExecutionConfig[S, D](
         oid:   Observation.Id,
         gen:   ExecutionConfigGenerator[S, D],
-        steps: Stream[F, StepRecord[D]]
+        steps: Stream[F, StepRecord[D]],
+        when:  Option[Timestamp]
       )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, Atom[D]]] =
         val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
-            t <- session.unique(CurrentTimestamp)
+            t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
             p <- gen.executionConfig(visits, steps, t)
           } yield p
         })
@@ -311,41 +339,44 @@ object Generator {
       private def gmosNorthLongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
-        role:   Option[CalibrationRole]
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
       ): EitherT[F, Error, ProtoGmosNorth] =
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(ctx.oid, g, srs)
+          p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
       private def gmosSouthLongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
-        role:   Option[CalibrationRole]
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
       ): EitherT[F, Error, ProtoGmosSouth] =
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(ctx.oid, g, srs)
+          p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
       private def calcDigestFromContext(
-        ctx: Context
+        ctx:  Context,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.exposureCount.value <= SequenceAtomLimit) *>
         (ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role).flatMap { p =>
+            gmosNorthLongSlit(ctx, config, role, when).flatMap { p =>
               EitherT.fromEither[F](executionDigest(p, calculator.gmosNorth.estimateSetup))
             }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role).flatMap { p =>
+            gmosSouthLongSlit(ctx, config, role, when).flatMap { p =>
               EitherT.fromEither[F](executionDigest(p, calculator.gmosSouth.estimateSetup))
             }
         })
@@ -353,25 +384,27 @@ object Generator {
       override def generate(
         pid: Program.Id,
         oid: Observation.Id,
-        lim: FutureLimit = FutureLimit.Default
+        lim: FutureLimit = FutureLimit.Default,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfigFromContext(c, lim)
+          x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
       private def calcExecutionConfigFromContext(
         ctx: Context,
-        lim: FutureLimit
+        lim: FutureLimit,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role).map { p =>
+            gmosNorthLongSlit(ctx, config, role, when).map { p =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
             }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role).map { p =>
+            gmosSouthLongSlit(ctx, config, role, when).map { p =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
             }
         }

@@ -273,6 +273,9 @@ object Science:
     definition: BlockDefinition[D],
     completed:  NonNegInt
   ):
+    def desc: NonEmptyString =
+      definition.goal.adjustment.description
+
     def add(n: NonNegInt): BlockCompletion[D] =
       copy(completed = NonNegInt.unsafeFrom(completed.value + n.value))
 
@@ -480,34 +483,32 @@ object Science:
 
     val length: Int = records.length
 
-    def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
+    override def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
       val (aix, six) = tracker.toTuple
       val startState = TimeEstimateCalculator.State.empty[D]
 
-      // The first block requires picking up any unfinished steps from the
-      // current atom so it is handled separately.
-      val rec        = records(pos)
-      val (n, steps) = if rec.steps.isEmpty then rec.block.generate
-                       else rec.generate(timestamp, static, estimator, startState)
-      val desc       = rec.block.definition.goal.adjustment.description
-      val (calcState, firstAtom) = atomBuilder.buildOption(desc.some, aix, six, steps).run(startState).value
-      val blocks     = records.map(_.block).updated(pos, rec.block.add(n)).toVector
+      // The first atom will have any unfinished steps from the current atom, so
+      // it is handled separately.
+      val rec         = records(pos)
+      val block       = rec.block
+      val (n, steps)  = if rec.steps.isEmpty then block.generate
+                        else rec.generate(timestamp, static, estimator, startState)
+      val (cs, atom0) = atomBuilder.buildOption(block.desc.some, aix, six, steps).run(startState).value
+      val blocks      = records.map(_.block).updated(pos, block.add(n)).toVector
 
       Stream
-        .iterate(pos)(idx => (idx + 1) % length)
-        .drop(1) // already generated above
-        .mapAccumulate((blocks.toVector, aix + 1, calcState)) { case ((blocks, aixʹ, est), idx) =>
-          val block = blocks(idx)
-
-          val (n, steps)   = block.generate
-          val desc         = block.definition.goal.adjustment.description
-          val (estʹ, atom) = atomBuilder.buildOption(desc.some, aixʹ, 0, steps).run(est).value
-          val blocksʹ      = blocks.updated(idx, block.add(n))
-          ((blocksʹ, aixʹ + 1, estʹ), atom)
+        .iterate((pos + 1) % length)(pos => (pos + 1) % length)
+        .mapAccumulate((blocks, aix + 1, cs)) { case ((blocks, aix, cs), pos) =>
+          val block       = blocks(pos)
+          val (n, steps)  = block.generate
+          val (csʹ, atom) = atomBuilder.buildOption(block.desc.some, aix, 0, steps).run(cs).value
+          val blocksʹ     = blocks.updated(pos, block.add(n))
+          ((blocksʹ, aix + 1, csʹ), atom)
         }
-        .cons1((blocks, aix, six), firstAtom) // put the first atom back
+        .cons1((blocks, 0, 0), atom0) // put the first atom back
         .takeThrough { case ((bs, _, _), _) => bs.foldMap(_.completed.value) < time.exposureCount.value }
         .collect { case (_, Some(atom)) => atom }
+    end generate
 
     private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
       Stream

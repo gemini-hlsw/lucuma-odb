@@ -176,7 +176,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def fakeItcSpectroscopyResult: IntegrationTime =
     FakeItcResult
 
-  private def itcClient: ItcClient[IO] =
+  protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
