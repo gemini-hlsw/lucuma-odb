@@ -854,7 +854,7 @@ class updateTargets extends OdbSuite {
     }
   }
 
-  test("update source profile (point -> gaussian, complete)") {
+  test("update source profile (point/bandNormalized -> gaussian, complete)") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid, "target-1").flatMap { tid =>
         expect(
@@ -927,6 +927,666 @@ class updateTargets extends OdbSuite {
                           }
                         },
                         "point" : null
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (point/emissionLines -> gaussian, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          point: {
+            emissionLines: {
+              lines: []
+              fluxDensityContinuum: {
+                value: 1
+                units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                error: 0.01
+              }
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    gaussian: {
+                      fwhm: { degrees: 42 }
+                      spectralDefinition: {
+                        emissionLines: {
+                          lines: []
+                          fluxDensityContinuum: {
+                            value: 0.8
+                            error: 0.0001
+                            units: W_PER_M_SQUARED_PER_UM
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      fwhm { degrees }
+                      emissionLines {
+                        fluxDensityContinuum {
+                          value
+                          units
+                          error
+                        }
+                      }
+                    }
+                    point {
+                      bandNormalized {
+                        sed {
+                          planetaryNebula
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : {
+                          "fwhm" : {
+                            "degrees" : 42.000000
+                          },
+                          "emissionLines" : {
+                            "fluxDensityContinuum" : {
+                              "value" : "0.8",
+                              "units" : "W_PER_M_SQUARED_PER_UM",
+                              "error" : "0.00010"
+                            }
+                          }
+                        },
+                        "point" : null
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (gaussian -> point/bandNormalized, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          gaussian: {
+            spectralDefinition: {
+              bandNormalized: {
+                sed: {
+                  stellarLibrary: B5_III
+                }
+                brightnesses: []
+              }
+            }
+            fwhm: {
+              microarcseconds: 42
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      bandNormalized {
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                      fwhm {
+                        microarcseconds
+                      }
+                    }
+                    point {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : null,
+                        "point": {
+                          "bandNormalized": {
+                            "sed": {
+                              "stellarLibrary": "B5_III"
+                            },
+                            "brightnesses": []
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  // ShortCut 2260
+  test("update source profile (point/emissionLines -> point/bandNormalized, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          point: {
+            emissionLines: {
+              lines: []
+              fluxDensityContinuum: {
+                value: 1
+                units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                error: 0.01
+              }
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      bandNormalized {
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                      fwhm {
+                        microarcseconds
+                      }
+                    }
+                    point {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : null,
+                        "point": {
+                          "bandNormalized": {
+                            "sed": {
+                              "stellarLibrary": "B5_III"
+                            },
+                            "brightnesses": []
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (gaussian -> point/emissionLines, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          gaussian: {
+            spectralDefinition: {
+              bandNormalized: {
+                sed: {
+                  stellarLibrary: B5_III
+                }
+                brightnesses: []
+              }
+            }
+            fwhm: {
+              microarcseconds: 42
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                  point: {
+                    emissionLines: {
+                      lines: []
+                      fluxDensityContinuum: {
+                        value: 1
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }
+                    }
+                  }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      fwhm {
+                        microarcseconds
+                      }
+                    }
+                    point {
+                      emissionLines {
+                        lines {
+                          lineWidth
+                        }
+                        fluxDensityContinuum {
+                          value
+                          units
+                          error
+                        }
+                      }
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : null,
+                        "point":{
+                          "emissionLines": {
+                            "lines": [],
+                            "fluxDensityContinuum": {
+                              "value": "1",
+                              "units": "ERG_PER_S_PER_CM_SQUARED_PER_A",
+                              "error": null
+                            }
+                          },
+                          "bandNormalized": null
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  // ShortCut 2260
+  test("update source profile (point/bandNormalized -> point/emissionLines, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                  point: {
+                    emissionLines: {
+                      lines: []
+                      fluxDensityContinuum: {
+                        value: 1
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }
+                    }
+                  }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    gaussian {
+                      fwhm {
+                        microarcseconds
+                      }
+                    }
+                    point {
+                      emissionLines {
+                        lines {
+                          lineWidth
+                        }
+                        fluxDensityContinuum {
+                          value
+                          units
+                          error
+                        }
+                      }
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          value
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "gaussian" : null,
+                        "point": {
+                          "emissionLines": {
+                            "lines": [],
+                            "fluxDensityContinuum": {
+                              "value": "1",
+                              "units": "ERG_PER_S_PER_CM_SQUARED_PER_A",
+                              "error": null
+                            }
+                          },
+                          "bandNormalized": null
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  test("update source profile (point/bandNormalized -> uniform/bandNormalized, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1").flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    uniform: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: [
+                          {
+                             band: R
+                             value: 15.0
+                             units: VEGA_MAG_PER_ARCSEC_SQUARED
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    uniform {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "uniform" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "stellarLibrary" : "B5_III"
+                            },
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAG_PER_ARCSEC_SQUARED"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  // ShortCut 2260
+  test("update source profile (uniform/emissionLines -> uniform/bandNormalized, complete)") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, "target-1", """
+        sourceProfile: {
+          uniform: {
+            emissionLines: {
+              lines: []
+              fluxDensityContinuum: {
+                value: 1
+                units: ERG_PER_S_PER_CM_SQUARED_PER_A_PER_ARCSEC_SQUARED
+              }
+            }
+          }
+        }
+      """).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sourceProfile: {
+                    uniform: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: [
+                          {
+                             band: R
+                             value: 15.0
+                             units: VEGA_MAG_PER_ARCSEC_SQUARED
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  sourceProfile {
+                    uniform {
+                      bandNormalized {
+                        sed {
+                          stellarLibrary
+                        }
+                        brightnesses {
+                          band
+                          value
+                          units
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "sourceProfile" : {
+                        "uniform" : {
+                          "bandNormalized" : {
+                            "sed" : {
+                              "stellarLibrary" : "B5_III"
+                            },
+                            "brightnesses" : [
+                              {
+                                "band" : "R",
+                                 "value" : "15.0",
+                                 "units" : "VEGA_MAG_PER_ARCSEC_SQUARED"
+                              }
+                            ]
+                          }
+                        }
                       }
                     }
                   ]
