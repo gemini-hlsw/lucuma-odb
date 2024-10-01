@@ -72,7 +72,7 @@ object OdbMapping {
 
   def apply[F[_]: Async: Parallel: Trace: Logger](
     database:     Resource[F, Session[F]],
-    monitor:      SkunkMonitor[F],
+    monitor0:     SkunkMonitor[F],
     user0:        User,
     topics0:      Topics[F],
     itcClient0:   ItcClient[F],
@@ -80,9 +80,11 @@ object OdbMapping {
     enums:        Enums,
     tec:          TimeEstimateCalculator.ForInstrumentMode,
     httpClient0:  Client[F],
-    emailConfig0: Config.Email
+    emailConfig0: Config.Email,
+    allowSub:     Boolean = true,        // Are submappings (recursive calls) allowed?
+    schema0:      Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
   ):  Mapping[F] =
-        new SkunkMapping[F](database, monitor)
+        new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
@@ -241,14 +243,35 @@ object OdbMapping {
 
           // Our schema
           val schema: Schema =
-            unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
+            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema)
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
-          override val services: Resource[F, Services[F]] = pool.map(Services.forUser(user, enums, Some(this)))
+
+          override val services: Resource[F, Services[F]] = 
+            pool.map: session =>
+              Services.forUser(
+                user, 
+                enums,
+                Option.when(allowSub)(apply(
+                  Resource.pure(session), // Always use this session
+                  monitor0,               // Same args as the outer mapping
+                  user0,
+                  topics0,
+                  itcClient0,
+                  commitHash0,
+                  enums,
+                  tec,
+                  httpClient0,
+                  emailConfig0,            
+                  false,                  // don't allow further sub-mappings; only one level of recursion is allowed
+                  Some(schema),           // don't re-parse the schema
+                ))
+              )(session)
+
           override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
