@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package query
 
 import cats.data.NonEmptySet
+import cats.effect.Clock
 import cats.effect.IO
-import cats.syntax.foldable.*
-import cats.syntax.option.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -32,7 +32,6 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
@@ -42,8 +41,8 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -52,7 +51,11 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.Generator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -447,34 +450,76 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     query(serviceUser, q).void
   }
 
-  def genGmosNorthSequence(oid: Observation.Id, seqType: SequenceType, futureLimit: Int): IO[List[Atom.Id]] =
-    query(
-      user = pi,
-      query = s"""
-        query {
-          observation(observationId: "$oid") {
-            execution {
-              config(futureLimit: $futureLimit) {
-                gmosNorth {
-                  ${seqType.tag} {
-                    nextAtom {
-                      id
-                    }
-                    possibleFuture {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map { json =>
-      val sci = json.hcursor.downFields("observation", "execution", "config", "gmosNorth", seqType.tag)
-      val n   = sci.downFields("nextAtom", "id").require[Atom.Id]
-      val fs  = sci.downFields("possibleFuture").values.toList.flatMap(_.toList.map(_.hcursor.downField("id").require[Atom.Id]))
-      n :: fs
-    }
+  /**
+   * Generates the sequence for the given observation.
+   *
+   * @param limit the future limit, which must be in the range [0, 100]
+   * @param when the timestamp to pass the generator. in other words generate as
+   *             if asked at this time
+   */
+  def generate(
+    pid:   Program.Id,
+    oid:   Observation.Id,
+    limit: Option[Int]       = None,  // [0, 100]
+    when:  Option[Timestamp] = None
+  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+    withSession: session =>
+      for
+        future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
+        enums  <- Enums.load(session)
+        tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
+        srv     = Services.forUser(serviceUser, enums, None)(session)
+        gen     = srv.generator(CommitHash.Zero, itcClient, tec)
+        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+      yield res
+
+  /**
+   * Generates the sequence but fails if it produces an error.
+   *
+   * @param limit the future limit, which must be in the range [0, 100]
+   * @param when the timestamp to pass the generator. in other words generate as
+   *             if asked at this time
+   */
+  def generateOrFail(
+    pid:   Program.Id,
+    oid:   Observation.Id,
+    limit: Option[Int]       = None,  // [0, 100]
+    when:  Option[Timestamp] = None
+  ): IO[InstrumentExecutionConfig] =
+    generate(pid, oid, limit, when).flatMap: res =>
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
+
+  /**
+   * Generates the sequence as if requested after the specified amount of time
+   * has passed.
+   *
+   * @param time amount of time (from now) to use as a timestamp for sequence
+   *             generation; does not delay the computation in any way
+   */
+  def generateAfter(
+    pid:  Program.Id,
+    oid:  Observation.Id,
+    time: TimeSpan
+  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+    for {
+      now  <- Clock[IO].realTimeInstant.map(Timestamp.fromInstantTruncated).map(_.get)
+      when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
+      res  <- generate(pid, oid, when = when.some)
+    } yield res
+
+  /**
+   * Generates the sequence as if requested after the specified amount of time
+   * has passed, fails if the sequence cannot be generated.
+   *
+   * @param time amount of time (from now) to use as a timestamp for sequence
+   *             generation; does not delay the computation in any way
+   */
+  def generateAfterOrFail(
+    pid:  Program.Id,
+    oid:  Observation.Id,
+    time: TimeSpan
+  ): IO[InstrumentExecutionConfig] =
+    generateAfter(pid, oid, time).flatMap: res =>
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
 
 }
