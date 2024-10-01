@@ -26,14 +26,23 @@ import skunk.syntax.all.*
 
 import Services.Syntax.*
 import io.circe.Json
+import lucuma.core.model.Program
+import cats.Monoid
+import lucuma.odb.data.OdbErrorExtensions.asWarning
 
 trait ConfigurationService[F[_]] {
 
   /** Selects all configuration requests that subsume this observation's configuration. */
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
 
-  /* Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
+  /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
+
+  /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each observation in `pid`. */
+  def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]]
+
+  /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
+  def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
 
 }
 
@@ -52,43 +61,74 @@ object ConfigurationService {
       override def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
         impl.canonicalizeRequest(oid).value
 
+      override def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]] =
+        impl.canonicalizeAll(pid).value
+
+      override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
+        session.prepareR(Statements.DeleteRequests).use: pq =>
+          pq.stream(pid, 1024).compile.toList.map(Result(_))
+
     }
 
   /** An implementation with unwrapped parameters and results in more natural types. */
   private class Impl[F[_]: Concurrent](using Services[F]) {
 
-    def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
+    private def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
       ResultT:
         selectConfigurations(List(oid)).value.map: result =>
           result.flatMap: map =>
             map.get(oid) match
               case Some(config) => Result(config)          
               case None => OdbError.InvalidConfiguration(Some("Invalid observation or incomplete configuration.")).asFailure
-      
-    /** Select the configurations for many observations. */
-    def selectConfigurations(oids: List[Observation.Id])(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
-      ResultT:
-        services.runGraphQLQuery(Queries.selectConfigurations(oids)).map: r =>
-          r.flatMap: json =>
-            json.hcursor.downField("observations").downField("matches").as[List[Json]] match
-              case Left(error)  => Result.failure(error.getMessage) // Should never happen
-              case Right(jsons) =>
-                jsons.traverse { json =>
-                  val hc = json.hcursor
-                  (hc.downField("id").as[Observation.Id], hc.downField("configuration").as[Configuration]).tupled match
-                    case Right(pair) => Result(pair)
-                    case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some("Reference coordinates are not available.")).asFailure
-                    case Left(Configuration.DecodingFailures.NoObservingMode) => OdbError.InvalidConfiguration(Some("Observing mode is undefined.")).asFailure
-                    case Left(other)  => Result.failure(other.getMessage) // TODO: this probably isn't good enough
-                } .map(_.toMap)            
 
-    def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
+    // A monoid specifically for the fold below, which concatenates maps
+    private given Monoid[Result[Map[Observation.Id, Configuration]]] =
+      Monoid.instance(Result(Map.empty), (a, b) => (a, b).mapN(_ ++ _))
+
+    /** Select the configurations for many observations, warning for any that are invalid. */
+    private def selectConfigurationsImpl(graphQLQuery: String)(using Transaction[F]): F[Result[Map[Observation.Id, Configuration]]] =
+      services.runGraphQLQuery(graphQLQuery).map: r =>
+        r.flatMap: json =>
+          json.hcursor.downField("observations").downField("matches").as[List[Json]] match
+            case Left(error)  => Result.failure(error.getMessage) // Should never happen
+            case Right(jsons) =>
+              jsons.foldMap: json =>
+                val hc = json.hcursor
+                hc.downField("id").as[Observation.Id] match
+                  case Left(value) => Result.internalError(value.getMessage) 
+                  case Right(obsid) =>                       
+                    hc.downField("configuration").as[Configuration] match
+                      case Right(cfg) => Result(Map(obsid -> cfg))
+                      case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
+                      case Left(Configuration.DecodingFailures.NoObservingMode)        => OdbError.InvalidConfiguration(Some(s"Observing mode is undefined for observation $obsid.")).asWarning(Map.empty)
+                      case Left(other) => Result.internalError(other.getMessage)
+
+    private def selectConfigurations(oids: List[Observation.Id])(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
+      ResultT:
+        selectConfigurationsImpl(Queries.selectConfigurations(oids)).map: res =>
+          oids.foldLeft(res): (res, oid) =>
+            if res.toOption.exists(_.contains(oid)) then res
+            else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is not present or is inaccessible for current user.")).asWarning(Map.empty)
+
+    private def selectConfigurations(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
+      ResultT(selectConfigurationsImpl(Queries.selectConfigurations(pid)))
+
+    private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
           r.flatMap: json =>
             json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
+
+    private def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+      ResultT.liftF:
+        session.prepareR(Statements.InsertRequest).use: pq =>
+          pq.option(oid, cfg).flatMap:
+            case Some(req) => req.pure[F]
+            case None      =>
+              session.prepareR(Statements.SelectRequest).use: pq =>
+                pq.unique(oid, cfg)
 
     def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       selectAllRequestsForProgram(oid).flatMap: crs =>
@@ -99,28 +139,45 @@ object ConfigurationService {
     def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
       selectConfiguration(oid).flatMap(canonicalizeRequest(oid, _))
 
-    def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
-      ResultT.liftF:
-        session.prepareR(Statements.InsertRequest).use: pq =>
-          pq.option(oid, cfg).flatMap:
-            case Some(req) => req.pure[F]
-            case None      =>
-              session.prepareR(Statements.SelectRequest).use: pq =>
-                pq.unique(oid, cfg)
+    def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
+      selectConfigurations(pid).flatMap: map =>
+        map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
 
   } 
 
   private object Queries {
 
-    def selectConfigurations(oids: List[Observation.Id]) =
+    def selectConfigurations(oids: List[Observation.Id]): String =
+      selectConfigurations(whereOidsIn(oids))
+
+    def selectConfigurations(pid: Program.Id): String =
+      selectConfigurations(wherePid(pid))
+
+    private def whereOidsIn(oids: List[Observation.Id]) =
+      s"""
+        WHERE: {
+          id: {
+            IN: ${oids.asJson}
+          }
+        }
+      """
+
+    private def wherePid(pid: Program.Id) =
+      s"""
+        WHERE: {
+          program: {
+            id: {
+              EQ: ${pid.asJson}
+            }
+          }
+        }
+      """
+
+    private def selectConfigurations(where: String): String =
       s"""
         query {
-          observations(            
-            WHERE: {
-              id: {
-                IN: ${oids.asJson}
-              }
-            }
+          observations(           
+            $where
             LIMIT: 1000 # TODO: we need unlimited in this case
           ) {
             matches {
@@ -155,7 +212,6 @@ object ConfigurationService {
           }
         }
       """
-
   
     def selectAllRequestsForProgram(oid: Observation.Id) =
       s"""
@@ -198,6 +254,7 @@ object ConfigurationService {
           }
         }
       """
+
   }
 
   private object Statements {
@@ -414,6 +471,14 @@ object ConfigurationService {
         cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
         EmptyTuple
       }
+
+    val DeleteRequests: Query[Program.Id, ConfigurationRequest.Id] =
+      // todo: access control
+      sql"""
+        delete from t_configuration_request
+        where c_program_id = $program_id
+        returning c_configuration_request_id
+      """.query(configuration_request_id)
 
   }
 
