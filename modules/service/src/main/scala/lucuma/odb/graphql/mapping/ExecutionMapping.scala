@@ -36,7 +36,7 @@ import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -51,7 +51,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val ExecutionMapping: ObjectMapping =
     ObjectMapping(ExecutionType)(

@@ -446,8 +446,8 @@ class executionSci extends ExecutionTestSupport {
       } yield (List(x0, x1, x2, x3, x4), List(x5, x6))
 
     setup.map { (firstAtomIds, secondAtomIds) =>
-      assertEquals(firstAtomIds.distinct.length, 1)
-      assertEquals(secondAtomIds.distinct.length, 1)
+      assertEquals(firstAtomIds.distinct.length, 1, "first")
+      assertEquals(secondAtomIds.distinct.length, 1, "second")
     }
 
   }

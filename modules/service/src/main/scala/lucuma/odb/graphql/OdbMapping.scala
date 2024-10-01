@@ -26,7 +26,7 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util.*
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
@@ -78,7 +78,7 @@ object OdbMapping {
     itcClient0:   ItcClient[F],
     commitHash0:  CommitHash,
     enums:        Enums,
-    tec:          TimeEstimateCalculator.ForInstrumentMode,
+    tec:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:  Client[F],
     emailConfig0: Config.Email,
     allowSub:     Boolean = true,        // Are submappings (recursive calls) allowed?
@@ -272,7 +272,7 @@ object OdbMapping {
                 ))
               )(session)
 
-          override val timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode = tec
+          override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
 

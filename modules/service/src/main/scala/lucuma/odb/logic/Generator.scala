@@ -31,9 +31,7 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -44,9 +42,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gmos.longslit.LongSlit
@@ -177,7 +173,7 @@ object Generator {
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    calculator:   TimeEstimateCalculator.ForInstrumentMode
+    calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): Generator[F] =
     new Generator[F] {
 
@@ -296,33 +292,32 @@ object Generator {
       val CurrentTimestamp: Query[Void, Timestamp] =
         sql"select current_timestamp".query(tz)
 
-      type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, (ProtoAtom[(ProtoStep[GmosNorthDynamic], Int, StepEstimate)], Int)]
-      type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, (ProtoAtom[(ProtoStep[GmosSouthDynamic], Int, StepEstimate)], Int)]
+      type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
+      type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
       private def protoExecutionConfig[S, D](
-        oid:    Observation.Id,
-        gen:    ExecutionConfigGenerator[S, D],
-        calc:   TimeEstimateCalculator[S, D],
-        steps:  Stream[F, StepRecord[D]]
-      )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)]] =
+        oid:   Observation.Id,
+        gen:   ExecutionConfigGenerator[S, D],
+        steps: Stream[F, StepRecord[D]]
+      )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, Atom[D]]] =
         val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
             t <- session.unique(CurrentTimestamp)
             p <- gen.executionConfig(visits, steps, t)
           } yield p
-        }).map(p => p.pipeBothSequences(calc.estimateSequence(p.static)))
+        })
 
       private def gmosNorthLongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole]
       ): EitherT[F, Error, ProtoGmosNorth] =
-        val gen = LongSlit.gmosNorth(exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(ctx.oid, g, calculator.gmosNorth, srs)
+          p <- protoExecutionConfig(ctx.oid, g, srs)
         } yield p
 
       private def gmosSouthLongSlit(
@@ -330,11 +325,11 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole]
       ): EitherT[F, Error, ProtoGmosSouth] =
-        val gen = LongSlit.gmosSouth(exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
-          p <- protoExecutionConfig(ctx.oid, g, calculator.gmosSouth, srs)
+          p <- protoExecutionConfig(ctx.oid, g, srs)
         } yield p
 
       private def calcDigestFromContext(
@@ -372,40 +367,33 @@ object Generator {
         ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role).map { p =>
-              InstrumentExecutionConfig.GmosNorth(
-                executionConfig(p, ctx.namespace, lim)
-              )
+              InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
             }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
             gmosSouthLongSlit(ctx, config, role).map { p =>
-              InstrumentExecutionConfig.GmosSouth(
-                executionConfig(p, ctx.namespace, lim)
-              )
+              InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
             }
         }
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
       private def executionDigest[S, D](
-        proto:     ProtoExecutionConfig[S, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)],
+        proto:     ProtoExecutionConfig[S, Atom[D]],
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] = {
 
-        // Compute the sequence digest from the stream by folding over the steps
-        // if possible. Missing smart gcal definitions may prevent it.
-        def sequenceDigest(
-          s: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)]
-        ): Either[Error, SequenceDigest] =
-          s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, (atom, _)) =>
+        // Compute the sequence digest from the stream by folding over the steps.
+        def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
+          s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap { digest =>
               digest
                 .incrementAtomCount
                 .filter(_.atomCount.value <= SequenceAtomLimit)
                 .toRight(SequenceTooLong)
                 .map { incDigest =>
-                  atom.steps.foldLeft(incDigest) { case (d, (s, _, est)) =>
-                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, est))
+                  atom.steps.foldLeft(incDigest) { case (d, s) =>
+                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.estimate))
                     offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
                   }
                 }
@@ -421,24 +409,15 @@ object Generator {
       }
 
       private def executionConfig[S, D](
-        proto:       ProtoExecutionConfig[S, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)],
-        namespace:   UUID,
+        proto:       ProtoExecutionConfig[S, Atom[D]],
         futureLimit: FutureLimit
       ): ExecutionConfig[S, D] =
-        def executionSequence(
-          s: Stream[Pure, (ProtoAtom[(ProtoStep[D], Int, StepEstimate)], Int)],
-          t: SequenceType
-        ): Option[ExecutionSequence[D]] =
-          val atoms: List[(Atom[D], Boolean)] = s.map { case (atom, aix) =>
-            val atomId = SequenceIds.atomId(namespace, t, aix)
-            val steps  = atom.steps.map { case (ProtoStep(d, sc, oc, bp), six, est) =>
-              Step(SequenceIds.stepId(namespace, t, atomId, six), d, sc, est, oc, bp)
-            }
-            Atom(atomId, atom.description, steps)
-          }.zipWithNext
-           .map(_.map(_.isDefined))
-           .take(1 + futureLimit.value) // 1 (nextAtom) + futureLimit (possibleFuture)
-           .toList
+        def executionSequence(s: Stream[Pure, Atom[D]], t: SequenceType): Option[ExecutionSequence[D]] =
+          val atoms: List[(Atom[D], Boolean)] =
+            s.zipWithNext
+             .map(_.map(_.isDefined))
+             .take(1 + futureLimit.value) // 1 (nextAtom) + futureLimit (possibleFuture)
+             .toList
 
           atoms.headOption.map { case (head, _) =>
             ExecutionSequence(head, atoms.tail.map(_._1), atoms.last._2)
