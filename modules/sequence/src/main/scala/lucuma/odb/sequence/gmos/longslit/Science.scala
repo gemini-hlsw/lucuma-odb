@@ -411,7 +411,7 @@ object Science:
       timestamp: Timestamp,
       static:    S,
       estimator: TimeEstimateCalculator[S, D],
-      calcState: TimeEstimateCalculator.Last[D]
+      lastSteps: TimeEstimateCalculator.Last[D]
     ): (NonNegInt, List[ProtoStep[D]]) =
 
       // What calibrations are missing in the last window?
@@ -430,32 +430,36 @@ object Science:
       val currentCount = (calibratedScience ++ uncalibratedScience).size
       val maxRemaining = block.remainingInBlock(currentCount)
 
-      // Time estimate calc state up to now.
-      val calcStateʹ = steps.foldLeft(calcState) { case (cur, (_, step)) =>
-         cur.next(step.protoStep)
-      }
-
-      // How long do we have left to fill with science?
-      val calTime       = TimeEstimateCalculator.estimateTimeSpan(estimator, static, calcStateʹ, missingCals)
+      // How long do we have left to fill with science?  Adjust lastSteps as
+      // though one or more science steps have just happen.
+      val lastStepsʹ    = lastSteps.next(block.definition.science)
+      val calTime       = TimeEstimateCalculator.estimateTimeSpan(estimator, static, lastStepsʹ, missingCals)
       val remainingTime = remainingTimeAt(timestamp) -| calTime
 
       // How long would the first science step take?  It may be different from
       // remaining steps if there is a science fold move to make.
-      val firstStepTime = estimator.estimateStep(static, calcState, block.definition.science).total
+      val firstStepTime = estimator.estimateStep(static, lastSteps, block.definition.science).total
 
       // How long would each subsequent science step take?
-      val otherStepTime = estimator.estimateStep(static, calcStateʹ, block.definition.science).total
+      val otherStepTime = estimator.estimateStep(static, lastStepsʹ, block.definition.science).total
 
       if remainingTime < firstStepTime then
+        // No time left for more science
         if uncalibratedScience.sizeIs > 0 then
+          // There are some calibrations we could add to save the last science though
           (NonNegInt.unsafeFrom(currentCount), missingCals)
         else
+          // No pending science or cals, just count the science for which we have valid cals
           (NonNegInt.unsafeFrom(calibratedScience.size), Nil)
+        end if
       else
+        // Okay, there's time for at least one more step.
         val remainingTimeʹ = remainingTime -| firstStepTime
         val otherStepCount = (remainingTimeʹ.toMicroseconds / otherStepTime.toMicroseconds).toInt
         val newCount       = maxRemaining.value min (1 + otherStepCount)
         val scienceSteps   = List.fill(newCount)(block.definition.science)
+        // Order the steps according to whether we've just done any science.
+        // We want to avoid switching the science fold more than necessary.
         val steps = if currentCount == 0 then missingCals ++ scienceSteps
                     else scienceSteps ++ missingCals
         (NonNegInt.unsafeFrom(currentCount + newCount), steps)
@@ -474,6 +478,7 @@ object Science:
   private case class ScienceGenerator[S, D](
     estimator:   TimeEstimateCalculator[S, D],
     static:      S,
+    lastSteps:   TimeEstimateCalculator.Last[D],
     atomBuilder: AtomBuilder[D],
     time:        IntegrationTime,
     records:     List[BlockRecord[D]],
@@ -485,15 +490,14 @@ object Science:
 
     override def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
       val (aix, six) = tracker.toTuple
-      val startState = TimeEstimateCalculator.Last.empty[D]
 
       // The first atom will have any unfinished steps from the current atom, so
       // it is handled separately.
       val rec         = records(pos)
       val block       = rec.block
       val (n, steps)  = if rec.steps.isEmpty then block.generate
-                        else rec.generate(timestamp, static, estimator, startState)
-      val (cs, atom0) = atomBuilder.buildOption(block.desc.some, aix, six, steps).run(startState).value
+                        else rec.generate(timestamp, static, estimator, lastSteps)
+      val (cs, atom0) = atomBuilder.buildOption(block.desc.some, aix, six, steps).run(lastSteps).value
       val blocks      = records.map(_.block).updated(pos, block.add(n)).toVector
 
       Stream
@@ -544,9 +548,10 @@ object Science:
               if posʹ === idx then rec.record(step) else rec.settle
 
       copy(
-        records = recordsʹʹ,
-        tracker = trackerʹ,
-        pos     = posʹ
+        lastSteps = lastSteps.next(step.protoStep),
+        records   = recordsʹʹ,
+        tracker   = trackerʹ,
+        pos       = posʹ
       )
 
     end recordStep
@@ -589,11 +594,12 @@ object Science:
         case Some(c)                                  =>
           s"GMOS Long Slit ${c.tag} not implemented".asLeft
 
+      val lastSteps   = TimeEstimateCalculator.Last.empty[D]
       val atomBuilder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
       (for {
         (configʹ, timeʹ) <- EitherT.fromEither[F](e)
         defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, includeArcs = calRole.isEmpty))
-      } yield ScienceGenerator(estimator, static, atomBuilder, timeʹ, defs.map(BlockRecord.init), IndexTracker.Zero, 0)).value
+      } yield ScienceGenerator(estimator, static, lastSteps, atomBuilder, timeʹ, defs.map(BlockRecord.init), IndexTracker.Zero, 0)).value
 
   end ScienceGenerator
 
