@@ -32,13 +32,13 @@ case class ExecutionConfigGenerator[S, D](
    *
    * @param visits past visits
    * @param steps past steps
-   * @param time when the sequence is requested.  This is relevant because
+   * @param when when the sequence is requested.  This is relevant because
    *             calibration files are only considered valid for a fixed time
    */
   def executionConfig[F[_]: Concurrent](
     visits: Stream[F, VisitRecord],
     steps:  Stream[F, StepRecord[D]],
-    time:   Timestamp
+    when:   Timestamp
   )(using Eq[D]): F[ProtoExecutionConfig[S, Atom[D]]] =
     mergeByTimestamp(visits, steps)(_.created, _.created)
       .fold((acquisition, science)) {
@@ -46,4 +46,4 @@ case class ExecutionConfigGenerator[S, D](
         case ((a, s), Right(step)) => (a.recordStep(step), s.recordStep(step))
       }
       .compile.onlyOrError.map: (a, s) =>
-        ProtoExecutionConfig(static, a.generate(time), s.generate(time))
+        ProtoExecutionConfig(static, a.generate(when), s.generate(when))

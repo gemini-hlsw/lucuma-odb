@@ -23,14 +23,14 @@ trait AtomBuilder[D]:
     aix:       Int,
     six:       Int,
     steps:     NonEmptyList[ProtoStep[D]],
-  ): State[TimeEstimateCalculator.State[D], Atom[D]]
+  ): State[TimeEstimateCalculator.Last[D], Atom[D]]
 
   def buildOption(
     desc:      Option[NonEmptyString],
     aix:       Int,
     six:       Int,
     steps:     List[ProtoStep[D]]
-  ): State[TimeEstimateCalculator.State[D], Option[Atom[D]]] =
+  ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
     State(calcState =>
       NonEmptyList.fromList(steps).fold((calcState, none[Atom[D]])) { nel =>
         build(desc, aix, six, nel).map(_.some).run(calcState).value
@@ -53,8 +53,8 @@ object AtomBuilder:
         aix:       Int,
         six:       Int,
         steps:     NonEmptyList[ProtoStep[D]]
-      ): State[TimeEstimateCalculator.State[D], Atom[D]] =
-        State { (calcState: TimeEstimateCalculator.State[D]) =>
+      ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
+        State { (calcState: TimeEstimateCalculator.Last[D]) =>
           steps.mapAccumulate(calcState) { (e, s) =>
             val estimate = estimator.estimateStep(static, e, s)
             (e.next(s), estimate)

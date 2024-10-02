@@ -31,8 +31,8 @@ object TimeEstimateCalculatorImplementation:
       override def estimateSetup: SetupTime =
         setup
 
-      override def estimateStep(static: S, past: TimeEstimateCalculator.State[D], next: ProtoStep[D]): StepEstimate = {
-        val c = configChange.estimate(past, next)
+      override def estimateStep(static: S, last: TimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate = {
+        val c = configChange.estimate(last, next)
         val d = detectorEstimator.estimate(static, next)
         StepEstimate.fromMax(c, d)
       }
