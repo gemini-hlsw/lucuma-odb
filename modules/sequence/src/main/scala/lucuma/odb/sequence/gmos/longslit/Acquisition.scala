@@ -68,7 +68,7 @@ object Acquisition:
   val MaxExpTimeLastStep = 360.secondTimeSpan
 
   def filter[L](acqFilters: NonEmptyList[L], λ: Wavelength, wavelength: L => Wavelength): L =
-    acqFilters.toList.minBy { filter => λ.diff(wavelength(filter)).abs }
+    acqFilters.toList.minBy(filter => λ.diff(wavelength(filter)).abs)
 
   /**
    * Unique step configurations used to form an acquisition sequence.
@@ -160,10 +160,10 @@ object Acquisition:
     def visitId: Visit.Id
     def steps: Steps[D]
     def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D]
-    def calcState: TimeEstimateCalculator.State[D]
+    def calcState: TimeEstimateCalculator.Last[D]
     def tracker: IndexTracker
 
-    def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D]
+    def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D]
 
     def updatesVisit(step: StepRecord[D]): Boolean =
       step.visitId =!= visitId
@@ -180,6 +180,8 @@ object Acquisition:
         else if step.successfullyCompleted then a.recordCompleted(step)
         else a
 
+    // when a new visit is recorded, we reset the acquisition so that it begins
+    // at the first step.
     override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
       if visit.visitId === visitId then this
       else reset(visit.visitId)
@@ -193,7 +195,7 @@ object Acquisition:
       steps:   NonEmptyList[ProtoStep[D]],
       aix:     Int,
       six:     Int
-    ): State[TimeEstimateCalculator.State[D], Atom[D]] =
+    ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
       builder.build(
         NonEmptyString.unapply("Initial Acquisition"),
         aix,
@@ -205,7 +207,7 @@ object Acquisition:
       builder: AtomBuilder[D],
       slit:    ProtoStep[D],
       aix:     Int
-    ): State[TimeEstimateCalculator.State[D], Atom[D]] =
+    ): State[TimeEstimateCalculator.Last[D], Atom[D]] =
       builder.build(
         NonEmptyString.unapply("Fine Adjustments"),
         aix,
@@ -217,7 +219,7 @@ object Acquisition:
       builder:   AtomBuilder[D],
       init:      Option[NonEmptyList[ProtoStep[D]]],
       slit:      ProtoStep[D],
-      calcState: TimeEstimateCalculator.State[D],
+      calcState: TimeEstimateCalculator.Last[D],
       track:     IndexTracker
     ): Stream[Pure, Atom[D]] =
       (for {
@@ -230,22 +232,22 @@ object Acquisition:
     case class Init[D](builder: AtomBuilder[D], steps: Steps[D]) extends SequenceGenerator[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
-        gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.State.empty[D], IndexTracker.Zero)
+        gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[D], IndexTracker.Zero)
 
       override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        ExpectCcd2(step.visitId, TimeEstimateCalculator.State.empty[D], IndexTracker.Zero, builder, steps).recordStep(step)
+        ExpectCcd2(step.visitId, TimeEstimateCalculator.Last.empty[D], IndexTracker.Zero, builder, steps).recordStep(step)
 
       override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
         this
 
     end Init
 
-    case class ExpectCcd2[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectCcd2[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
         gen(builder, steps.initialAtom.some, steps.slit, calcState, tracker)
 
-      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+      override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
         copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =
@@ -254,12 +256,12 @@ object Acquisition:
 
     end ExpectCcd2
 
-    case class ExpectP10[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
+    case class ExpectP10[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
         gen(builder, NonEmptyList.of(steps.p10, steps.slit).some, steps.slit, calcState, tracker)
 
-      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+      override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
         copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =
@@ -268,12 +270,12 @@ object Acquisition:
 
     end ExpectP10
 
-    case class ExpectSlit[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
+    case class ExpectSlit[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
         gen(builder, Option.when(initialAtom)(NonEmptyList.one(steps.slit)), steps.slit, calcState, tracker)
 
-      override def updateTracker(calcState: TimeEstimateCalculator.State[D], tracker: IndexTracker): AcquisitionState[D] =
+      override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
         copy(calcState = calcState, tracker = tracker)
 
       override def recordCompleted(step: StepRecord[D])(using Eq[D]): AcquisitionState[D] =

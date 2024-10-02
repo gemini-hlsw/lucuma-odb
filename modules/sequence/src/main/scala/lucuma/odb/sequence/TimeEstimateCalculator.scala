@@ -11,11 +11,24 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.data.ProtoStep
 
+/**
+ * Estimates the cost of setup and step execution.
+ *
+ * @tparam S static config type
+ * @tparam D dynamic config type
+ */
 trait TimeEstimateCalculator[S, D]:
 
+  /**
+   * Provides a rough estimate of the setup time, which includes acquisition.
+   */
   def estimateSetup: SetupTime
 
-  def estimateStep(static: S, state: TimeEstimateCalculator.State[D], next: ProtoStep[D]): StepEstimate
+  /**
+   * Provides an estimate of the cost for executing the 'next' step, given the
+   * provided 'past' state.
+   */
+  def estimateStep(static: S, last: TimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate
 
 object TimeEstimateCalculator:
 
@@ -29,28 +42,28 @@ object TimeEstimateCalculator:
    *
    * @tparam D instrument dynamic configuration type
    */
-  final case class State[D](
+  final case class Last[D](
     gcal:    Option[StepConfig.Gcal],
     science: Option[StepConfig.Science],
     step:    Option[ProtoStep[D]]
   ):
 
-    def next(step: ProtoStep[D]): State[D] =
+    def next(step: ProtoStep[D]): Last[D] =
       step.stepConfig match
-        case g@StepConfig.Gcal(_, _, _, _) => State(g.some, science, step.some)
-        case s@StepConfig.Science(_, _)    => State(gcal, s.some, step.some)
+        case g@StepConfig.Gcal(_, _, _, _) => Last(g.some, science, step.some)
+        case s@StepConfig.Science(_, _)    => Last(gcal, s.some, step.some)
         case _                             => copy(step = step.some)
 
-  object State:
-    def empty[D]: State[D] =
-      State(none, none, none)
+  object Last:
+    def empty[D]: Last[D] =
+      Last(none, none, none)
 
   def estimateTimeSpan[S, D](
     calc:   TimeEstimateCalculator[S, D],
     static: S,
-    state:  TimeEstimateCalculator.State[D],
-    next: List[ProtoStep[D]]
+    last:   TimeEstimateCalculator.Last[D],
+    next:   List[ProtoStep[D]]
   ): TimeSpan =
     next.foldLeft(TimeSpan.Zero) { (ts, step) =>
-      ts +| calc.estimateStep(static, state, step).total
+      ts +| calc.estimateStep(static, last, step).total
     }

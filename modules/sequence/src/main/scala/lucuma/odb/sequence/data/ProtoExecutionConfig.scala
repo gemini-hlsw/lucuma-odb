@@ -4,30 +4,21 @@
 package lucuma.odb.sequence.data
 
 import cats.syntax.apply.*
-import fs2.Pipe
 import fs2.Pure
 import fs2.Stream
 
+/**
+ * A precursor to an InstrumentConfig, which contains a concrete list of
+ * steps.  The ProtoExecutionConfig provides just a `Stream` of steps of a
+ * generic type because there are multiple uses for a sequence. For example to
+ * calculate the sequence digest we never need to hold the whole sequence in
+ * memory but instead can fold over the stream.
+ *
+ * @tparam S static execution config
+ * @tparam A step type
+ */
 case class ProtoExecutionConfig[S, A](
   static:      S,
   acquisition: Stream[Pure, A],
   science:     Stream[Pure, A]
-) {
-
-  def map[B](f: A => B): ProtoExecutionConfig[S, B] =
-    ProtoExecutionConfig[S, B](static, acquisition.map(f), science.map(f))
-
-  def pipeSequences[B](
-    fa: Pipe[Pure, A, B],
-    fs: Pipe[Pure, A, B]
-  ): ProtoExecutionConfig[S, B] =
-    ProtoExecutionConfig(
-      static,
-      fa(acquisition),
-      fs(science)
-    )
-
-  def pipeBothSequences[B](f: Pipe[Pure, A, B]): ProtoExecutionConfig[S, B] =
-    pipeSequences(f, f)
-
-}
+)

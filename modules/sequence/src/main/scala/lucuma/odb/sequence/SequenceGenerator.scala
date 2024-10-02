@@ -20,9 +20,15 @@ import lucuma.odb.sequence.data.VisitRecord
 trait SequenceGenerator[D]:
 
   /**
-   * Remaining atoms and their steps for this sequence.
+   * Remaining atoms and their steps for this sequence, if it were being
+   * generated at timestamp 'when'.  The sequence may change depending on when
+   * it is generated because, for example, past calibrations eventually expire
+   * and need to be repeated.
+   *
+   * @param when referential time at which the sequence will be generated; does
+   *             not delay the calculation in anyway
    */
-  def generate(timestamp: Timestamp): Stream[Pure, Atom[D]]
+  def generate(when: Timestamp): Stream[Pure, Atom[D]]
 
   /**
    * Records a step and returns an updated generator.

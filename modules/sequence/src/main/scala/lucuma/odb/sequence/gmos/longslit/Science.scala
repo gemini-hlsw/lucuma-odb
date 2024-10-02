@@ -411,7 +411,7 @@ object Science:
       timestamp: Timestamp,
       static:    S,
       estimator: TimeEstimateCalculator[S, D],
-      calcState: TimeEstimateCalculator.State[D]
+      calcState: TimeEstimateCalculator.Last[D]
     ): (NonNegInt, List[ProtoStep[D]]) =
 
       // What calibrations are missing in the last window?
@@ -485,7 +485,7 @@ object Science:
 
     override def generate(timestamp: Timestamp): Stream[Pure, Atom[D]] =
       val (aix, six) = tracker.toTuple
-      val startState = TimeEstimateCalculator.State.empty[D]
+      val startState = TimeEstimateCalculator.Last.empty[D]
 
       // The first atom will have any unfinished steps from the current atom, so
       // it is handled separately.

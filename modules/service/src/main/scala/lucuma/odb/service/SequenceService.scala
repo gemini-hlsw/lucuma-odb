@@ -168,7 +168,7 @@ object SequenceService {
         observationId: Observation.Id,
         staticConfig:  Visit.Id => F[Option[S]],
         dynamicConfig: Step.Id => F[Option[D]]
-      )(using Transaction[F]): F[Option[(S, TimeEstimateCalculator.State[D])]] =
+      )(using Transaction[F]): F[Option[(S, TimeEstimateCalculator.Last[D])]] =
         for {
           vid     <- session.option(Statements.SelectLastVisit)(observationId)
           static  <- vid.flatTraverse(staticConfig)
@@ -177,7 +177,7 @@ object SequenceService {
           step    <- session.option(Statements.SelectLastStepConfig)(observationId)
           dynamic <- step.flatTraverse { case (id, _, _) => dynamicConfig(id) }
         } yield static.tupleRight(
-          TimeEstimateCalculator.State(
+          TimeEstimateCalculator.Last(
             gcal,
             science,
             (step, dynamic).mapN { case ((_, stepConfig, observeClass), d) =>
@@ -188,7 +188,7 @@ object SequenceService {
 
       private def selectGmosNorthEstimatorState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(GmosNorthStatic, TimeEstimateCalculator.State[GmosNorth])]] =
+      )(using Transaction[F]): F[Option[(GmosNorthStatic, TimeEstimateCalculator.Last[GmosNorth])]] =
         selectEstimatorState(
           observationId,
           services.gmosSequenceService.selectGmosNorthStatic,
@@ -197,7 +197,7 @@ object SequenceService {
 
       private def selectGmosSouthEstimatorState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(GmosSouthStatic, TimeEstimateCalculator.State[GmosSouth])]] =
+      )(using Transaction[F]): F[Option[(GmosSouthStatic, TimeEstimateCalculator.Last[GmosSouth])]] =
         selectEstimatorState(
           observationId,
           services.gmosSequenceService.selectGmosSouthStatic,
@@ -299,8 +299,8 @@ object SequenceService {
         stepConfig:          StepConfig,
         observeClass:        ObserveClass,
         generatedId:         Option[Step.Id],
-        timeEstimate:        (S, TimeEstimateCalculator.State[D]) => StepEstimate,
-        estimatorState:      Observation.Id => F[Option[(S, TimeEstimateCalculator.State[D])]],
+        timeEstimate:        (S, TimeEstimateCalculator.Last[D]) => StepEstimate,
+        estimatorState:      Observation.Id => F[Option[(S, TimeEstimateCalculator.Last[D])]],
         insertDynamicConfig: Step.Id => F[Unit]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         val foo = session.option(Statements.SelectObservationId)((atomId, instrument))

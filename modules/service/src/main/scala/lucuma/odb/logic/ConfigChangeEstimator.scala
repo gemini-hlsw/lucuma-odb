@@ -23,7 +23,7 @@ import lucuma.odb.sequence.data.ProtoStep
  */
 trait ConfigChangeEstimator[D] {
 
-  def estimate(past: TimeEstimateCalculator.State[D], present: ProtoStep[D]): List[ConfigChangeEstimate]
+  def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate]
 
 }
 
@@ -42,21 +42,21 @@ object ConfigChangeEstimator {
 
     private abstract class ForInstrument[D] extends ConfigChangeEstimator[D] {
 
-      def check[A: Eq](estimate: enums.TimeEstimate, past: TimeEstimateCalculator.State[D], present: ProtoStep[D])(f: D => A): Option[ConfigChangeEstimate] =
+      def check[A: Eq](estimate: enums.TimeEstimate, past: TimeEstimateCalculator.Last[D], present: ProtoStep[D])(f: D => A): Option[ConfigChangeEstimate] =
         Option.when(past.step.map(s => f(s.value)).exists(_ =!= f(present.value)))(
           estimate.toConfigChange
         )
 
-      def instrumentChecks(past: TimeEstimateCalculator.State[D], present: ProtoStep[D]): List[Option[ConfigChangeEstimate]]
+      def instrumentChecks(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[Option[ConfigChangeEstimate]]
 
-      def estimate(past: TimeEstimateCalculator.State[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
+      def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
         instrumentChecks(past, present).flattenOption ++ gcal(past, present) ++ offset(past, present)
 
     }
 
     lazy val gmosNorth: ConfigChangeEstimator[DynamicConfig.GmosNorth] =
       new ForInstrument[DynamicConfig.GmosNorth] {
-        override def instrumentChecks(past: TimeEstimateCalculator.State[DynamicConfig.GmosNorth], present: ProtoStep[DynamicConfig.GmosNorth]): List[Option[ConfigChangeEstimate]] =
+        override def instrumentChecks(past: TimeEstimateCalculator.Last[DynamicConfig.GmosNorth], present: ProtoStep[DynamicConfig.GmosNorth]): List[Option[ConfigChangeEstimate]] =
           List(
             check(enums.TimeEstimate.GmosNorthFilter, past, present)(_.filter),
             check(enums.TimeEstimate.GmosNorthFpu, past, present)(_.fpu),
@@ -67,7 +67,7 @@ object ConfigChangeEstimator {
 
     lazy val gmosSouth: ConfigChangeEstimator[DynamicConfig.GmosSouth] =
       new ForInstrument[DynamicConfig.GmosSouth] {
-        override def instrumentChecks(past: TimeEstimateCalculator.State[DynamicConfig.GmosSouth], present: ProtoStep[DynamicConfig.GmosSouth]): List[Option[ConfigChangeEstimate]] =
+        override def instrumentChecks(past: TimeEstimateCalculator.Last[DynamicConfig.GmosSouth], present: ProtoStep[DynamicConfig.GmosSouth]): List[Option[ConfigChangeEstimate]] =
           List(
             check(enums.TimeEstimate.GmosSouthFilter, past, present)(_.filter),
             check(enums.TimeEstimate.GmosSouthFpu, past, present)(_.fpu),
@@ -76,7 +76,7 @@ object ConfigChangeEstimator {
       }
 
 
-    private def gcal[D](past: TimeEstimateCalculator.State[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
+    private def gcal[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(
         enums.TimeEstimate.ScienceFold.toConfigChange
       )
@@ -100,7 +100,7 @@ object ConfigChangeEstimator {
       (scienceFold :: gcal).flattenOption
     }
 
-    private def offset[D](past: TimeEstimateCalculator.State[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
+    private def offset[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
       val prevOffset = past.science.fold(Offset.Zero)(_.offset)
       present.stepConfig match {
         case StepConfig.Science(curOffset, _) =>
