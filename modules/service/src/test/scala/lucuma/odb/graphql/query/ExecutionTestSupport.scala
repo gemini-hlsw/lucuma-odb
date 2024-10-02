@@ -451,6 +451,15 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   }
 
   /**
+   * What time is it now, as a Timestamp.
+   */
+  def timestampNow: IO[Timestamp] =
+    Clock[IO]
+      .realTimeInstant
+      .map(Timestamp.fromInstantTruncated)
+      .flatMap(t => IO.fromOption(t)(new RuntimeException("oddly, timestamp of now is out of range")))
+
+  /**
    * Generates the sequence for the given observation.
    *
    * @param limit the future limit, which must be in the range [0, 100]
@@ -502,7 +511,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     time: TimeSpan
   ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
     for {
-      now  <- Clock[IO].realTimeInstant.map(Timestamp.fromInstantTruncated).map(_.get)
+      now  <- timestampNow
       when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
       res  <- generate(pid, oid, when = when.some)
     } yield res

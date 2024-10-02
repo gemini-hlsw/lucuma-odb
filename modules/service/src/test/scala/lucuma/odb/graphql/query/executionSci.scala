@@ -23,11 +23,17 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
+import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.gmos.longslit.Science
+import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.step_id
+import skunk.*
+import skunk.implicits.*
 
 class executionSci extends ExecutionTestSupport {
 
@@ -188,12 +194,55 @@ class executionSci extends ExecutionTestSupport {
     }
   }
 
-  test("execute arc, flat, one science, then delay") {
+  test("arc, flat, <1.5 hours>") {
     val setup: IO[InstrumentExecutionConfig] =
       for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+        ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
+      } yield ic
+
+    import lucuma.odb.testsyntax.execution.*
+
+    setup.map(_.gmosNorthScience).map { gn =>
+      // We did no science from (0nm, 0") but we're out of time.  The next
+      // atom should be for a (5nm, 15") block.
+      assertEquals(gn.nextAtom.description.get, adjustment(5, 15).description)
+
+      // The last two atoms will be (0nm, 0").
+
+      // The next to last atom should be full.
+      val penultimateAtom = gn.possibleFuture.init.last
+      assertEquals(penultimateAtom.description.get, adjustment(0, 0).description)
+
+      val penultimateCounts = penultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(penultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(penultimateCounts.get(StepType.Science), 3.some)
+
+      // The last atom will have one left.
+      val ultimateAtom    = gn.possibleFuture.last
+      assertEquals(ultimateAtom.description.get, adjustment(0, 0).description)
+
+      val ultimateCounts = ultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(ultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(ultimateCounts.get(StepType.Science), 1.some)
+    }
+  }
+
+  test("arc, flat, science, <1.5 hours>") {
+    val setup: IO[InstrumentExecutionConfig] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
@@ -218,9 +267,173 @@ class executionSci extends ExecutionTestSupport {
       assertEquals(lastAtom.description.get, adjustment(0, 0).description)
 
       // and it now has 3 science steps left
-      val counts = lastAtom.steps.map(_.stepConfig.stepType).groupMapReduce(identity)(_ => 1)
+      val counts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(counts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(counts.get(StepType.Science), 3.some)
+    }
+  }
+
+  // Adjust the timestamp of step records precisely
+  def adjustStepTime(s: Step.Id, t: Timestamp): IO[Unit] =
+    val query: Command[(Step.Id, Timestamp)] =
+      sql"""
+        UPDATE t_step_record
+           SET c_created = $core_timestamp
+         WHERE c_step_id = $step_id
+      """.command.contramap { (s, t) => (t, s) }
+
+    withSession: session =>
+      session.execute(query)(s, t).void
+
+  test("arc, flat, <1.5 hours>, science") {
+    val setup: IO[InstrumentExecutionConfig] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        nw <- timestampNow
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+        _  <- adjustStepTime(s0, nw)
+
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+
+        longDelay = Science.CalValidityPeriod +| 2.microsecondTimeSpan
+        timestamp = nw.plusMicrosOption(longDelay.toMicroseconds).get
+
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+        _  <- adjustStepTime(s2, timestamp)
+
+        ic <- generateOrFail(p, o, when = timestamp.plusMicrosOption(1))
+      } yield ic
+
+    import lucuma.odb.testsyntax.execution.*
+
+    setup.map(_.gmosNorthScience).map { gn =>
+      // We only did one step of (0nm, 0") but we're out of time.  There is a
+      // science dataset that doesn't have valid calibrations, but could be
+      // salvaged if we repeated calibrations.
+      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(nextCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(nextCounts.get(StepType.Science), none) // no time for more sci
+
+      // The last atom will also be (0nm, 0")
+      val lastAtom = gn.possibleFuture.last
+      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+
+      // and it now has 3 science steps left
+      val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(lastCounts.get(StepType.Science), 3.some)
+    }
+  }
+
+  // About how long it takes to move the science fold into position
+  val ScienceFoldTime: TimeSpan = 15.secondTimeSpan
+
+  // Rough flat or arc time estimate
+  val CalTime: TimeSpan = 60.secondTimeSpan
+
+  // About how long it takes to do a science dataset w/ 20 min exposure time
+  val ScienceTime: TimeSpan = 1300.secondTimeSpan
+
+  // leave time for just one science
+  test("arc, flat, <1.5 hours - 1*science>") {
+    val setup: IO[InstrumentExecutionConfig] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        nw <- timestampNow
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+        _  <- adjustStepTime(s0, nw)
+
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+
+        longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime
+        timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
+
+        ic <- generateOrFail(p, o, when = timestamp)
+      } yield ic
+
+    import lucuma.odb.testsyntax.execution.*
+
+    setup.map(_.gmosNorthScience).map { gn =>
+      // There's only time left for one science step
+      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(nextCounts.get(StepType.Gcal), none) // cals still valid
+      assertEquals(nextCounts.get(StepType.Science), 1.some)
+
+      // The last atom will also be (0nm, 0")
+      val lastAtom = gn.possibleFuture.last
+      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+
+      // and it now has 3 science steps left
+      val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(lastCounts.get(StepType.Science), 3.some)
+    }
+  }
+
+  // leave time for two science
+  test("arc, flat, <1.5 hours - 2*science>") {
+    val setup: IO[InstrumentExecutionConfig] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        nw <- timestampNow
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+        _  <- adjustStepTime(s0, nw)
+
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+        _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
+
+        longDelay = Science.CalValidityPeriod -| ScienceFoldTime -| ScienceTime -| ScienceTime
+        timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
+
+        ic <- generateOrFail(p, o, when = timestamp)
+      } yield ic
+
+    import lucuma.odb.testsyntax.execution.*
+
+    setup.map(_.gmosNorthScience).map { gn =>
+      // There's only time left for two science steps
+      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(nextCounts.get(StepType.Gcal), none) // cals still valid
+      assertEquals(nextCounts.get(StepType.Science), 2.some)
+
+      // The last atom will also be (0nm, 0")
+      val lastAtom = gn.possibleFuture.last
+      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+
+      // and it now has 2 science steps left
+      val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
+      assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
+      assertEquals(lastCounts.get(StepType.Science), 2.some)
     }
   }
 
