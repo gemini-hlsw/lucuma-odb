@@ -721,7 +721,7 @@ object Science:
     ): F[Either[String, SequenceGenerator[D]]] =
       // If exposure time is longer than the science period, there will never be
       // time enough to do any science steps.
-      val expTimeLimit  = Either.cond(time.exposureTime < SciencePeriod, (), s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
+      val expTimeLimit  = Either.cond(time.exposureTime <= SciencePeriod, (), s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
 
       // Adjust the config and integration time according to the calibration role.
       val configAndTime = calRole match
