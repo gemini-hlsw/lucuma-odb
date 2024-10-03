@@ -16,6 +16,11 @@ import lucuma.odb.sequence.data.ProtoStep
 
 import java.util.UUID
 
+/**
+ * AtomBuilder encapsulates the complicated task of creating Atom from a list
+ * of proto-steps.  This requires calculating the atom an step ids from indices
+ * and estimating the step cost.
+ */
 trait AtomBuilder[D]:
 
   def build(

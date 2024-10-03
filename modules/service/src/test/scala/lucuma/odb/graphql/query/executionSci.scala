@@ -24,6 +24,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -58,7 +59,7 @@ class executionSci extends ExecutionTestSupport {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -86,8 +87,6 @@ class executionSci extends ExecutionTestSupport {
             )
           ).asRight
       )
-    }
-
   }
 
   test("simple generation - unlimited future") {
@@ -98,7 +97,7 @@ class executionSci extends ExecutionTestSupport {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -131,7 +130,6 @@ class executionSci extends ExecutionTestSupport {
             )
           ).asRight
       )
-    }
   }
 
   private val ExpectedAfterCalsAndOneScience: Json =
@@ -178,7 +176,7 @@ class executionSci extends ExecutionTestSupport {
 
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -191,7 +189,6 @@ class executionSci extends ExecutionTestSupport {
            """,
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-    }
   }
 
   test("arc, flat, <1.5 hours>") {
@@ -212,7 +209,7 @@ class executionSci extends ExecutionTestSupport {
 
     import lucuma.odb.testsyntax.execution.*
 
-    setup.map(_.gmosNorthScience).map { gn =>
+    setup.map(_.gmosNorthScience).map: gn =>
       // We did no science from (0nm, 0") but we're out of time.  The next
       // atom should be for a (5nm, 15") block.
       assertEquals(gn.nextAtom.description.get, adjustment(5, 15).description)
@@ -234,7 +231,6 @@ class executionSci extends ExecutionTestSupport {
       val ultimateCounts = ultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(ultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(ultimateCounts.get(StepType.Science), 1.some)
-    }
   }
 
   test("arc, flat, science, <1.5 hours>") {
@@ -257,7 +253,7 @@ class executionSci extends ExecutionTestSupport {
 
     import lucuma.odb.testsyntax.execution.*
 
-    setup.map(_.gmosNorthScience).map { gn =>
+    setup.map(_.gmosNorthScience).map: gn =>
       // We only did one step of (0nm, 0") but we're out of time.  The next
       // atom should be for a (5nm, 15") block.
       assertEquals(gn.nextAtom.description.get, adjustment(5, 15).description)
@@ -270,7 +266,6 @@ class executionSci extends ExecutionTestSupport {
       val counts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(counts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(counts.get(StepType.Science), 3.some)
-    }
   }
 
   // Adjust the timestamp of step records precisely
@@ -316,7 +311,7 @@ class executionSci extends ExecutionTestSupport {
 
     import lucuma.odb.testsyntax.execution.*
 
-    setup.map(_.gmosNorthScience).map { gn =>
+    setup.map(_.gmosNorthScience).map: gn =>
       // We only did one step of (0nm, 0") but we're out of time.  There is a
       // science dataset that doesn't have valid calibrations, but could be
       // salvaged if we repeated calibrations.
@@ -333,7 +328,6 @@ class executionSci extends ExecutionTestSupport {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 3.some)
-    }
   }
 
   // About how long it takes to move the science fold into position
@@ -373,7 +367,7 @@ class executionSci extends ExecutionTestSupport {
 
     import lucuma.odb.testsyntax.execution.*
 
-    setup.map(_.gmosNorthScience).map { gn =>
+    setup.map(_.gmosNorthScience).map: gn =>
       // There's only time left for one science step
       assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
       val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -388,7 +382,6 @@ class executionSci extends ExecutionTestSupport {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 3.some)
-    }
   }
 
   // leave time for two science
@@ -419,7 +412,7 @@ class executionSci extends ExecutionTestSupport {
 
     import lucuma.odb.testsyntax.execution.*
 
-    setup.map(_.gmosNorthScience).map { gn =>
+    setup.map(_.gmosNorthScience).map: gn =>
       // There's only time left for two science steps
       assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
       val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -434,7 +427,58 @@ class executionSci extends ExecutionTestSupport {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 2.some)
-    }
+  }
+
+  test("we can start anywhere") {
+    val setup: IO[InstrumentExecutionConfig] =
+      for {
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+
+        // We'll add steps for the second block (5 nm, 15")
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s0)
+
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, ObserveClass.PartnerCal)
+        _  <- addEndStepEvent(s1)
+
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), scienceStep(0, 15), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+
+        ic <- generateOrFail(p, o)
+      } yield ic
+
+    import lucuma.odb.testsyntax.execution.*
+
+    setup.map(_.gmosNorthScience).map: gn =>
+
+      // Now we expect these adjustments (and science step counts)
+      // (5,   15) - 2   (next atom)
+      // (-5, -15) - 3   (head of pending)
+      // (0,    0) - 3
+      // (0,    0) - 1
+
+      assertEquals(
+        gn.nextAtom.description.get :: gn.possibleFuture.map(_.description.get),
+        List(
+          adjustment(5, 15).description,
+          adjustment(-5, -15).description,
+          adjustment(0, 0).description,
+          adjustment(0, 0).description
+        )
+      )
+
+      def scienceCount(a: Atom[DynamicConfig.GmosNorth]): Int =
+        (a.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)).get(StepType.Science).get
+
+      assertEquals(
+        scienceCount(gn.nextAtom) :: gn.possibleFuture.map(scienceCount),
+        List(2, 3, 3, 1)
+      )
   }
 
   test("order doesn't matter") {
@@ -456,7 +500,7 @@ class executionSci extends ExecutionTestSupport {
 
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -469,7 +513,6 @@ class executionSci extends ExecutionTestSupport {
            """,
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-    }
   }
 
   test("irrelevant steps may be inserted") {
@@ -502,7 +545,7 @@ class executionSci extends ExecutionTestSupport {
 
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -515,7 +558,6 @@ class executionSci extends ExecutionTestSupport {
            """,
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-    }
   }
 
   test("execute arc, flat, one science, fail the flat") {
@@ -542,7 +584,7 @@ class executionSci extends ExecutionTestSupport {
     // since the atom is still in progress, finish out the science datasets to
     // avoid moving the science fold.  then add the failed flat
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -582,7 +624,6 @@ class executionSci extends ExecutionTestSupport {
             )
           ).asRight
       )
-    }
   }
 
   test("execute the first atom, a step of the second, then fail a science dataset from the first") {
@@ -621,7 +662,7 @@ class executionSci extends ExecutionTestSupport {
 
     // since the atom is done, redo the failed step at the end
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -659,7 +700,6 @@ class executionSci extends ExecutionTestSupport {
             )
           ).asRight
       )
-    }
   }
 
   def nextAtomId(p: Program.Id, o: Observation.Id): IO[Atom.Id] =
@@ -774,7 +814,7 @@ class executionSci extends ExecutionTestSupport {
         }
       """
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -862,7 +902,6 @@ class executionSci extends ExecutionTestSupport {
             }
           """.asRight
       )
-    }
   }
 
   test("explicit wavelength dithers") {
@@ -911,7 +950,7 @@ class executionSci extends ExecutionTestSupport {
         }
       """
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -971,7 +1010,6 @@ class executionSci extends ExecutionTestSupport {
             }
           """.asRight
       )
-    }
   }
 
   test("select min x-binning") {
@@ -1008,7 +1046,7 @@ class executionSci extends ExecutionTestSupport {
         }
       """
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -1055,7 +1093,6 @@ class executionSci extends ExecutionTestSupport {
             }
           """.asRight
       )
-    }
   }
 
   test("duplicate offsets and dithers") {
@@ -1132,7 +1169,7 @@ class executionSci extends ExecutionTestSupport {
         }
       """
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -1202,6 +1239,4 @@ class executionSci extends ExecutionTestSupport {
           """.asRight
       )
     }
-  }
-
 }

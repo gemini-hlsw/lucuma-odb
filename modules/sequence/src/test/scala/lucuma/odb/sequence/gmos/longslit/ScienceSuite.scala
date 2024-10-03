@@ -5,7 +5,9 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
+import cats.data.NonEmptyList
 import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
@@ -41,7 +43,7 @@ class ScienceSuite extends ScalaCheckSuite {
 
   private def goals(goal: List[(Int, Int)]): List[Goal] =
     adjs.zip(goal).map { case (adj, (perBlock, total)) =>
-      Goal(adj, perBlock, total)
+      Goal(adj, NonNegInt.unsafeFrom(perBlock), NonNegInt.unsafeFrom(total))
     }
 
   case class Case(goal: Int*):
@@ -55,7 +57,7 @@ class ScienceSuite extends ScalaCheckSuite {
     cases.toList.zipWithIndex.foreach { case (c, idx) =>
       assertEquals(
         Science.Goal.compute(Δλs, Δqs, integrationTime(timeSpan, idx+1)),
-        c.expected(timeSpan),
+        NonEmptyList.fromListUnsafe(c.expected(timeSpan)),
         s"""Failure: ${TimeSpan.format(timeSpan)}' x ${idx+1}"""
       )
     }
