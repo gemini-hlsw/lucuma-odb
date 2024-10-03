@@ -16,6 +16,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
@@ -210,6 +211,14 @@ object ObservationService {
   case class CloneIds(
     originalId: Observation.Id,
     cloneId:    Observation.Id
+  )
+
+  case class ObservationValidationInfo(
+    instrument: Option[Instrument],
+    ra:         Option[RightAscension],
+    dec:        Option[Declination],
+    forReview:  Boolean,
+    role:       Option[CalibrationRole]
   )
 
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
@@ -672,18 +681,17 @@ object ObservationService {
           }
         }
 
-        val obsInfo: F[(Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
+        val obsInfo: F[ObservationValidationInfo] =
           session.unique(Statements.ObservationValidationInfo)(oid)
 
-        val cfpValidations: F[ObservationValidationMap] = {
+        def cfpValidations(info: ObservationValidationInfo): F[ObservationValidationMap] = {
           optCfpId.flatMap(
             _.fold(ObservationValidationMap.empty.pure){ cid =>
               for {
-                (oinstr, ora, odec, act) <- obsInfo
-                valInstr            <- validateInstrument(cid, oinstr)
-                explicitBase     = (ora, odec).tupled
-                valRaDec            <- validateRaDec(cid, oinstr, explicitBase)
-                valForactivation  = Option.when(act)(ObservationValidation.configuration(ConfigurationForReviewMsg))
+                valInstr        <- validateInstrument(cid, info.instrument)
+                explicitBase     = (info.ra, info.dec).tupled
+                valRaDec        <- validateRaDec(cid, info.instrument, explicitBase)
+                valForactivation = Option.when(info.forReview)(ObservationValidation.configuration(ConfigurationForReviewMsg))
               } yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
              }
           )
@@ -713,21 +721,24 @@ object ObservationService {
               case Some(lst) if lst.forall(_.status === ConfigurationRequest.Status.Denied) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Denied))
               case _ => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Pending))
 
-        val initialMap = 
-          for {
-            (genVals, op) <- generatorValidations
-            cfpVals       <- cfpValidations
-            itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
-            bandVals      <- validateScienceBand
-          } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
+        obsInfo.flatMap: info =>
+          if (info.role.isDefined) List.empty.pure // it's a calibration
+          else 
+            val initialMap = 
+              for {
+                (genVals, op) <- generatorValidations
+                cfpVals       <- cfpValidations(info)
+                itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
+                bandVals      <- validateScienceBand
+              } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
 
-        // only compute configuration request status is everything else is ok
-        val secondMap =
-          initialMap.flatMap: m =>
-            if m.isEmpty then validateConfiguration
-            else m.pure[F]          
+            // only compute configuration request status if everything else is ok
+            val secondMap =
+              initialMap.flatMap: m =>
+                if m.isEmpty then validateConfiguration
+                else m.pure[F]          
 
-        secondMap.map(_.toList)
+            secondMap.map(_.toList)
 
       }
 
@@ -1253,16 +1264,19 @@ object ObservationService {
       """.query(cfp_id.opt)
 
     val ObservationValidationInfo:
-      Query[Observation.Id, (Option[Instrument], Option[RightAscension], Option[Declination], Boolean)] =
+      Query[Observation.Id, ObservationValidationInfo] =
       sql"""
         SELECT
           c_instrument,
           c_explicit_ra,
           c_explicit_dec,
-          c_for_review
+          c_for_review,
+          c_calibration_role
         FROM t_observation
         WHERE c_observation_id = $observation_id
-      """.query(instrument.opt *: right_ascension.opt *: declination.opt *: bool)
+      """
+      .query(instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt)
+      .to[ObservationValidationInfo]
 
     def cfpInformation(
       site: Site
