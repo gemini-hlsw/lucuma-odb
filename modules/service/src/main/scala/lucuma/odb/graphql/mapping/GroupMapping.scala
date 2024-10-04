@@ -26,7 +26,7 @@ import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 
@@ -39,7 +39,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val GroupMapping =
     ObjectMapping(GroupType)(

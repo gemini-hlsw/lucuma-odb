@@ -488,7 +488,7 @@ class guideEnvironments extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t), offsetArcsec = List(0, 15).some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid, aug2023), expected = guideEnvironmentResults.asRight)

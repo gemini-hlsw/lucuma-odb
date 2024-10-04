@@ -8,6 +8,7 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import fs2.Stream
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.Instrument
@@ -18,6 +19,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -28,7 +30,11 @@ trait VisitService[F[_]] {
 
   def select(
     visitId: Visit.Id
-  ): F[Option[VisitService.VisitRecord]]
+  ): F[Option[VisitRecord]]
+
+  def selectAll(
+    observationId: Observation.Id
+  ): Stream[F, VisitRecord]
 
   def insertGmosNorth(
     observationId: Observation.Id,
@@ -44,20 +50,18 @@ trait VisitService[F[_]] {
 
 object VisitService {
 
-  case class VisitRecord(
-    visitId:       Visit.Id,
-    observationId: Observation.Id,
-    instrument:    Instrument,
-    created:       Timestamp
-  )
-
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F] {
 
       override def select(
         visitId: Visit.Id
-      ): F[Option[VisitService.VisitRecord]] =
+      ): F[Option[VisitRecord]] =
         session.option(Statements.SelectVisit)(visitId)
+
+      def selectAll(
+        observationId: Observation.Id
+      ): Stream[F, VisitRecord] =
+        session.stream(VisitService.Statements.SelectAllVisit)(observationId, 1024)
 
       private def insert(
         observationId: Observation.Id,
@@ -110,6 +114,17 @@ object VisitService {
           c_created
         FROM t_visit
         WHERE c_visit_id = $visit_id
+      """.query(visit_record)
+
+    val SelectAllVisit: Query[Observation.Id, VisitRecord] =
+      sql"""
+        SELECT
+          c_visit_id,
+          c_observation_id,
+          c_instrument,
+          c_created
+        FROM t_visit
+        WHERE c_observation_id = $observation_id
       """.query(visit_record)
 
     val InsertVisit: Query[(Observation.Id, Instrument), Visit.Id] =

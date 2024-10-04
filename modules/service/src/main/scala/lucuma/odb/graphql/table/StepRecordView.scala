@@ -7,6 +7,7 @@ import lucuma.odb.graphql.BaseMapping
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.dataset_qa_state
 import lucuma.odb.util.Codecs.gcal_continuum
 import lucuma.odb.util.Codecs.gcal_diffuser
 import lucuma.odb.util.Codecs.gcal_filter
@@ -36,6 +37,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
     val Completed: ColumnRef      = col("c_completed",       core_timestamp.opt)
     val ExecutionState: ColumnRef = col("c_execution_state", step_execution_state)
     val GeneratedId: ColumnRef    = col("c_generated_id",    step_id.opt)
+    val QaState: ColumnRef        = col("c_qa_state",        dataset_qa_state.opt)
 
     object Gcal {
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)

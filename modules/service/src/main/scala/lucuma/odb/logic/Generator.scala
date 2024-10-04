@@ -3,6 +3,7 @@
 
 package lucuma.odb.logic
 
+import cats.Eq
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
@@ -12,13 +13,12 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
+import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -31,32 +31,31 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
+import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.sequence.data.Completion
+import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.IdBase
-import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoExecutionConfig
-import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.gmos.longslit.LongSlit
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.NoTransaction
-import lucuma.odb.service.SequenceService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import skunk.Transaction
+import skunk.*
+import skunk.codec.temporal.timestamptz
+import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.util.UUID
@@ -71,10 +70,15 @@ sealed trait Generator[F[_]] {
    * the cache. If not in the cache, it performs the calculation and caches the
    * results. If the observation is not completely defined (e.g., if missing the
    * observing mode), an Error is produced.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def digest(
     programId:     Program.Id,
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
   /**
@@ -82,10 +86,15 @@ sealed trait Generator[F[_]] {
    * to determine if the digest needed to be recalculated. This is useful in things
    * like the guide star availability calculations which depend on the digest and are
    * also cached.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def digestWithParamsAndHash(
     programId:     Program.Id,
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
@@ -93,22 +102,35 @@ sealed trait Generator[F[_]] {
    * along with the GeneratorParams. This method always performs the calculation
    * and does not attempt to use cached results nor call the ITC.  It will
    * cache the calculation once performed.
+   *
+   * Because the sequences that are generated may differ depending on when
+   * requested, a 'when' parameter option is provided.  By default this will be
+   * "now".
    */
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
     asterismResult: ItcService.AsterismResults,
-    params:         GeneratorParams
+    params:         GeneratorParams,
+    when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
 
   /**
    * Generates the execution config if the observation is found and defined
-   * well enough to perform the calculation.
+   * well enough to perform the calculation.  Because the sequences that are
+   * generated may differ depending on when requested, a 'when' parameter option
+   * is provided.  By default this will be "now".
+   *
+   * @param futureLimit cap to place on the number of atoms that map appear in
+   *                    the possibleFuture
+   * @param when perform the generation as if requested at this time (by default
+   *             the sequence is requested generated at the current time)
    */
   def generate(
     programId:     Program.Id,
     observationId: Observation.Id,
-    futureLimit:   FutureLimit = FutureLimit.Default
+    futureLimit:   FutureLimit = FutureLimit.Default,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
 }
@@ -157,9 +179,9 @@ object Generator {
         s"Could not generate a sequence from the observation $observationId: $message"
     }
 
-    case class MissingSmartGcalDef(key: String) extends Error {
+    case class MissingDefinition(msg: String) extends Error {
       def format: String =
-        s"Could not generate a sequence, missing Smart GCAL mapping: $key"
+        s"Could not generate a sequence: $msg"
     }
 
     case object SequenceTooLong extends Error {
@@ -167,29 +189,14 @@ object Generator {
         s"The generated sequence is too long (more than $SequenceAtomLimit atoms)."
     }
 
-    case class NotImplemented(
-      instrument:      Instrument,
-      calibrationRole: Option[CalibrationRole]
-    ) extends Error {
-      def format: String =
-        s"${instrument.longName} ${calibrationRole.fold("science")(_.tag)} observation sequence generation not supported."
-    }
-
     val sequenceTooLong: Error = SequenceTooLong
 
-    def missingSmartGcalDef(key: String): Error =
-      MissingSmartGcalDef(key)
-
-    def notImplemented(instrument: Instrument, calibrationRole: Option[CalibrationRole]): Error =
-      NotImplemented(instrument, calibrationRole)
   }
-
-  private type EstimatedAtom[D] = ProtoAtom[ProtoStep[(D, StepEstimate)]]
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    calculator:   TimeEstimateCalculator.ForInstrumentMode,
+    calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): Generator[F] =
     new Generator[F] {
 
@@ -271,18 +278,20 @@ object Generator {
       }
 
       override def digest(
-        programId:     Program.Id,
-        observationId: Observation.Id
+        pid:  Program.Id,
+        oid:  Observation.Id,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        digestWithParamsAndHash(programId, observationId).map(_.map(_._1))
+        digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
       override def digestWithParamsAndHash(
-        pid: Program.Id,
-        oid: Observation.Id
+        pid:  Program.Id,
+        oid:  Observation.Id,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
         (for {
           c <- Context.lookup(pid, oid)
-          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c))(EitherT.pure(_)))
+          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c, when))(EitherT.pure(_)))
           r  = (d, c.params, c.hash)
         } yield r).value
 
@@ -290,191 +299,168 @@ object Generator {
         pid:             Program.Id,
         oid:             Observation.Id,
         asterismResults: ItcService.AsterismResults,
-        params:          GeneratorParams
+        params:          GeneratorParams,
+        when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
-        calcDigestThenCache(Context(pid, oid, asterismResults, params)).value
+        calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
       private def calcDigestThenCache(
-        ctx: Context
+        ctx:  Context,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
-        calcDigestFromContext(ctx).flatTap(ctx.cache)
+        calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
-      type ExpandedAndEstimatedProtoExecutionConfig[F[_], S, D] =
-        ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]]
+      private val tz: Codec[Timestamp] =
+        timestamptz.eimap(
+          odt => Timestamp.fromInstantTruncated(odt.toInstant).toRight(s"Invalid Timestamp: $odt"))(
+          ts  => java.time.OffsetDateTime.ofInstant(ts.toInstant, java.time.ZoneOffset.UTC)
+        )
 
-      type GmosNorth[F[_]] =
-        ExpandedAndEstimatedProtoExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]
+      val CurrentTimestamp: Query[Void, Timestamp] =
+        sql"select current_timestamp".query(tz)
 
-      type GmosSouth[F[_]] =
-        ExpandedAndEstimatedProtoExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]
+      type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
+      type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
       private def protoExecutionConfig[S, D](
-        gen:  lucuma.odb.sequence.Generator[F, S, D],
-        ctx:  Context,
-        calc: TimeEstimateCalculator[S, D]
-      )(
-        comp: Transaction[F] ?=> SequenceService[F] => F[Completion.Matcher[D]]
-      ): EitherT[F, Error, (ExpandedAndEstimatedProtoExecutionConfig[F, S, D], IdBase.Acq, IdBase.Sci)] =
-        EitherT.liftF(services.transactionally { comp(sequenceService) }).map { m =>
-          val p = gen.generate(ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, m)
-          (
-            p.mapBothSequences(calc.estimateSequence(p.static)),
-            IdBase.Acq(m.acq.idBase),
-            IdBase.Sci(m.sci.idBase)
-          )
-        }
+        oid:   Observation.Id,
+        gen:   ExecutionConfigGenerator[S, D],
+        steps: Stream[F, StepRecord[D]],
+        when:  Option[Timestamp]
+      )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, Atom[D]]] =
+        val visits = services.visitService.selectAll(oid)
+        EitherT.liftF(services.transactionally {
+          for {
+            t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
+            p <- gen.executionConfig(visits, steps, t)
+          } yield p
+        })
 
       private def gmosNorthLongSlit(
         ctx:    Context,
-        config: gmos.longslit.Config.GmosNorth,
-        role:   Option[CalibrationRole]
-      ): EitherT[F, Error, (GmosNorth[F], IdBase.Acq, IdBase.Sci)] =
-        val gen = gmos.longslit.LongSlit.gmosNorth(config, exp.gmosNorth, role)
-                      .toRight(Error.notImplemented(Instrument.GmosNorth, role))
+        config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
+      ): EitherT[F, Error, ProtoGmosNorth] =
+        val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
-          g <- EitherT.fromEither(gen)
-          t <- protoExecutionConfig(g, ctx, calculator.gmosNorth)(_.selectGmosNorthCompletionState(ctx.oid))
-        } yield t
+          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          p <- protoExecutionConfig(ctx.oid, g, srs, when)
+        } yield p
 
       private def gmosSouthLongSlit(
         ctx:    Context,
-        config: gmos.longslit.Config.GmosSouth,
-        role:   Option[CalibrationRole]
-      ): EitherT[F, Error, (GmosSouth[F], IdBase.Acq, IdBase.Sci)] =
-        val gen = gmos.longslit.LongSlit.gmosSouth(config, exp.gmosSouth, role)
-                      .toRight(Error.notImplemented(Instrument.GmosSouth, role))
+        config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
+      ): EitherT[F, Error, ProtoGmosSouth] =
+        val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
-          g <- EitherT.fromEither(gen)
-          t <- protoExecutionConfig(g, ctx, calculator.gmosSouth)(_.selectGmosSouthCompletionState(ctx.oid))
-        } yield t
+          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          p <- protoExecutionConfig(ctx.oid, g, srs, when)
+        } yield p
 
       private def calcDigestFromContext(
-        ctx: Context
+        ctx:  Context,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.exposureCount.value <= SequenceAtomLimit) *>
         (ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role).flatMap { (p, _, _) => executionDigest(p, calculator.gmosNorth.estimateSetup) }
+            gmosNorthLongSlit(ctx, config, role, when).flatMap { p =>
+              EitherT.fromEither[F](executionDigest(p, calculator.gmosNorth.estimateSetup))
+            }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role).flatMap { (p, _, _) => executionDigest(p, calculator.gmosSouth.estimateSetup) }
+            gmosSouthLongSlit(ctx, config, role, when).flatMap { p =>
+              EitherT.fromEither[F](executionDigest(p, calculator.gmosSouth.estimateSetup))
+            }
         })
 
       override def generate(
         pid: Program.Id,
         oid: Observation.Id,
-        lim: FutureLimit = FutureLimit.Default
+        lim: FutureLimit = FutureLimit.Default,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfigFromContext(c, lim)
+          x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
       private def calcExecutionConfigFromContext(
         ctx: Context,
-        lim: FutureLimit
+        lim: FutureLimit,
+        when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            for {
-              (p, a, s) <- gmosNorthLongSlit(ctx, config, role)
-              r         <- executionConfig(p, ctx.namespace, a, s, lim)
-            } yield InstrumentExecutionConfig.GmosNorth(r)
+            gmosNorthLongSlit(ctx, config, role, when).map { p =>
+              InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
+            }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            for {
-              (p, a, s) <- gmosSouthLongSlit(ctx, config, role)
-              r         <- executionConfig(p, ctx.namespace, a, s, lim)
-            } yield InstrumentExecutionConfig.GmosSouth(r)
+            gmosSouthLongSlit(ctx, config, role, when).map { p =>
+              InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
+            }
         }
 
       private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
 
       private def executionDigest[S, D](
-        proto:     ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
+        proto:     ProtoExecutionConfig[S, Atom[D]],
         setupTime: SetupTime
-      ): EitherT[F, Error, ExecutionDigest] = {
+      ): Either[Error, ExecutionDigest] = {
 
-        // Compute the sequence digest from the stream by folding over the steps
-        // if possible. Missing smart gcal definitions may prevent it.
-        def sequenceDigest(
-          s: Stream[F, Either[String, EstimatedAtom[D]]]
-        ): F[Either[Error, SequenceDigest]] =
-          s.fold(SequenceDigest.Zero.asRight[Error]) { (eDigest, eAtom) =>
+        // Compute the sequence digest from the stream by folding over the steps.
+        def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
+          s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap { digest =>
               digest
                 .incrementAtomCount
                 .filter(_.atomCount.value <= SequenceAtomLimit)
                 .toRight(SequenceTooLong)
-                .flatMap { incDigest =>
-                  eAtom.bimap(
-                    missingSmartGcalDef,
-                    _.steps.foldLeft(incDigest) { (d, s) =>
-                      val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.value._2))
-                      offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
-                    }
-                  )
+                .map { incDigest =>
+                  atom.steps.foldLeft(incDigest) { case (d, s) =>
+                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.estimate))
+                    offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
+                  }
                 }
             }
-          }.compile.onlyOrError
+          }.toList.head
 
         for {
-          // Compute the SequenceDigests.  We don't need the atom indices for
-          // this so we drop them, keeping only the EstimatedAtom.  For the
-          // acquisition sequence (which is infinite) we assume only the next
-          // step will be executed.
-          a <- EitherT(sequenceDigest(proto.acquisition.take(1).map(_.map(_._1))))
-          s <- EitherT(sequenceDigest(proto.science.map(_.map(_._1))))
+          // Compute the SequenceDigests.
+          a <- sequenceDigest(proto.acquisition)
+          s <- sequenceDigest(proto.science)
         } yield ExecutionDigest(setupTime, a, s)
 
       }
 
       private def executionConfig[S, D](
-        proto:       ProtoExecutionConfig[F, S, Either[String, (EstimatedAtom[D], Long)]],
-        namespace:   UUID,
-        acqBase:     IdBase.Acq,
-        sciBase:     IdBase.Sci,
+        proto:       ProtoExecutionConfig[S, Atom[D]],
         futureLimit: FutureLimit
-      ): EitherT[F, Error, ExecutionConfig[S, D]] = {
+      ): ExecutionConfig[S, D] =
+        def executionSequence(s: Stream[Pure, Atom[D]], t: SequenceType): Option[ExecutionSequence[D]] =
+          val atoms: List[(Atom[D], Boolean)] =
+            s.zipWithNext
+             .map(_.map(_.isDefined))
+             .take(1 + futureLimit.value) // 1 (nextAtom) + futureLimit (possibleFuture)
+             .toList
 
-        def executionSequence(
-          s: Stream[F, Either[String, (EstimatedAtom[D], Long)]],
-          t: SequenceType,
-          c: Int
-        ): F[Either[Error, Option[ExecutionSequence[D]]]] =
-          s.map(_.map(_.map(SequenceIds.atomId(namespace, t, c, _)))) // turn the Long into an AtomId
-           .map {
-             _.bimap(
-               missingSmartGcalDef,
-               atomI =>
-                 val (atom, atomId) = atomI
-                 val steps = atom.steps.zipWithIndex.map { case (ProtoStep((d, e), sc, oc, bp), j) =>
-                   Step(SequenceIds.stepId(namespace, t, atomId, j), d, sc, e, oc, bp)
-                 }
-                 Atom(atomId, atom.description, steps)
-             )
-           }
-           .zipWithNext
-           .map { case (e, n) => e.tupleRight(n.isDefined) } // Either[Error, (atom, has more)]
-           .take(1 + futureLimit.value) // 1 (nextAtom) + futureLimit (possibleFuture)
-           .compile
-           .toList
-           .map(_.sequence.map { atoms =>
-              atoms.headOption.map { case (head, _) =>
-                val future  = atoms.tail.map(_._1)
-                val hasMore = atoms.last._2
-                ExecutionSequence(head, future, hasMore)
-              }
-           })
+          atoms.headOption.map { case (head, _) =>
+            ExecutionSequence(head, atoms.tail.map(_._1), atoms.last._2)
+          }
 
-        for {
-          // For acquisitions, take only the first step of the infinite sequence.
-          // We always assume we only need one more step.
-          a <- EitherT(executionSequence(proto.acquisition.take(1), SequenceType.Acquisition, acqBase.value))
-          s <- EitherT(executionSequence(proto.science, SequenceType.Science, sciBase.value))
-        } yield ExecutionConfig(proto.static, a, s)
-      }
+        ExecutionConfig(
+          proto.static,
+          executionSequence(proto.acquisition, SequenceType.Acquisition),
+          executionSequence(proto.science,     SequenceType.Science)
+        )
+
   }
 }

@@ -54,7 +54,7 @@ import lucuma.odb.FMain
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
@@ -170,10 +170,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
-  def fakeItcResult: IntegrationTime =
+  def fakeItcImagingResult: IntegrationTime =
     FakeItcResult
 
-  private def itcClient: ItcClient[IO] =
+  def fakeItcSpectroscopyResult: IntegrationTime =
+    FakeItcResult
+
+  protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
@@ -183,7 +186,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBand).asRight
                 )
               )
             ).get
@@ -199,7 +202,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBand).asRight
                 )
               )
             ).get
@@ -300,7 +303,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
+      ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 
