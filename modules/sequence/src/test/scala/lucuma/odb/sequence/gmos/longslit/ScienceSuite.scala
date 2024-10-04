@@ -5,87 +5,173 @@ package lucuma.odb.sequence
 package gmos
 package longslit
 
-import fs2.Pure
-import fs2.Stream
+import cats.data.NonEmptyList
+import cats.syntax.functor.*
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.Offset
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
-import lucuma.core.util.arb.ArbEnumerated
-import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.data.SciExposureTime
-import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import munit.Location
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.*
 
-import java.time.Duration
-
 class ScienceSuite extends ScalaCheckSuite {
 
-  import ArbEnumerated.*
-  import ArbGmosLongSlitConfig.given
+  private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
+    IntegrationTime(time, PosInt.unsafeFrom(exposures), SignalToNoise.Min)
 
-  val tenMin: SciExposureTime =
-    SciExposureTime.fromDuration(Duration.ofMinutes(10)).get
+  import Science.Adjustment
+  import Science.Goal
 
-  def northSequence(
-    ls: Config.GmosNorth,
-  ): Stream[Pure, ScienceAtom[GmosNorth]] =
-    Science.GmosNorth.stream(ls, tenMin)
+  private val Δλs = List(
+    WavelengthDither.Zero,
+    WavelengthDither.intPicometers.get(5000),
+    WavelengthDither.intPicometers.get(-5000)
+  )
 
-  def sequencesEqual[A](
-    obtained: Stream[Pure, A],
-    expected: Stream[Pure, A]
-  )(implicit loc: Location): Unit = {
-    val sz = 20
-    assertEquals(obtained.take(sz).toList, expected.take(sz).toList)
-  }
+  private val Δqs = List(
+    Offset.Q.Zero,
+    Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("15.0")),
+    Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("-15.0"))
+  )
 
-  property("prefers explicitly set parameters") {
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
+  private val adjs = Δλs.zip(Δqs).map(Adjustment(_, _))
 
-      sequencesEqual(
-        as.map(a => DynamicOptics.North.yBin.get(a.science.value)),
-        Stream(ls.explicitYBin.getOrElse(ls.defaultYBin)).repeat
+  private def goals(goal: List[(Int, Int)]): List[Goal] =
+    adjs.zip(goal).map { case (adj, (perBlock, total)) =>
+      Goal(adj, NonNegInt.unsafeFrom(perBlock), NonNegInt.unsafeFrom(total))
+    }
+
+  case class Case(goal: Int*):
+    def expected(timeSpan: TimeSpan): List[Goal] =
+      goals(goal.toList.fproductLeft { total =>
+        val perBlock = (Science.SciencePeriod.toMicroseconds / timeSpan.toMicroseconds).toInt
+        perBlock min total
+      })
+
+  def execCases(timeSpan: TimeSpan, cases: Case*): Unit =
+    cases.toList.zipWithIndex.foreach { case (c, idx) =>
+      assertEquals(
+        Science.Goal.compute(Δλs, Δqs, integrationTime(timeSpan, idx+1)),
+        NonEmptyList.fromListUnsafe(c.expected(timeSpan)),
+        s"""Failure: ${TimeSpan.format(timeSpan)}' x ${idx+1}"""
       )
     }
+
+  test("30 min tests") {
+    execCases(
+      30.minTimeSpan,
+      Case(1, 0, 0),
+      Case(1, 1, 0),
+      Case(1, 1, 1),
+      Case(2, 1, 1),
+      Case(2, 2, 1),
+      Case(2, 2, 2),
+      Case(3, 2, 2),
+      Case(4, 2, 2), // <-
+      Case(4, 3, 2),
+      Case(4, 4, 2),
+    )
   }
 
-  property("cycles through wavelength dithers") {
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
-
-      sequencesEqual(
-        as.map(a => DynamicOptics.North.wavelength.getOption(a.science.value).get),
-        (ls.wavelengthDithers match {
-          case Nil => Stream(WavelengthDither.Zero).repeat
-          case ds  => Stream.emits(ds).repeat
-        }).map { d => ls.centralWavelength.offset(d).getOrElse(ls.centralWavelength) }
-      )
-    }
+  test("20 min tests") {
+    execCases(
+      20.minTimeSpan,
+      Case(1, 0, 0),
+      Case(1, 1, 0),
+      Case(1, 1, 1),
+      Case(2, 1, 1),
+      Case(2, 2, 1),
+      Case(2, 2, 2),
+      Case(3, 2, 2),
+      Case(3, 3, 2),
+      Case(3, 3, 3),
+      Case(4, 3, 3),
+      Case(5, 3, 3), // <-
+      Case(6, 3, 3),
+      Case(6, 4, 3),
+      Case(6, 5, 3),
+      Case(6, 6, 3),
+      Case(6, 6, 4),
+      Case(6, 6, 5),
+      Case(6, 6, 6),
+      Case(7, 6, 6)
+    )
   }
 
-  property("cycles through spatial offsets") {
-    val offset =
-      ProtoStep
-        .stepConfig[GmosNorth]
-        .andThen(StepConfig.science)
-        .andThen(StepConfig.Science.offset)
-        .andThen(Offset.q)
-        .andThen(Offset.Component.angle)
+  test("11 min tests") {
+    execCases(
+      11.minTimeSpan,
+      Case(1, 0, 0),
+      Case(1, 1, 0),
+      Case(1, 1, 1),
+      Case(2, 1, 1),
+      Case(2, 2, 1),
+      Case(2, 2, 2),
+      Case(3, 2, 2),
+      Case(3, 3, 2),
+      Case(3, 3, 3),
+      Case(4, 3, 3),
+      Case(4, 4, 3),
+      Case(4, 4, 4),
+      Case(5, 4, 4),
+      Case(5, 5, 4),
+      Case(5, 5, 5),
+      Case(6, 5, 5),
+      Case(7, 5, 5), // <-
+      Case(8, 5, 5),
+      Case(9, 5, 5),
+      Case(10, 5, 5),
+      Case(10, 6, 5),
+    )
+  }
 
-    forAll { (ls: Config.GmosNorth) =>
-      val as = northSequence(ls)
+  test("15 min tests") {
+    execCases(
+      15.minTimeSpan,
+      Case(1, 0, 0),
+      Case(1, 1, 0),
+      Case(1, 1, 1),
+      Case(2, 1, 1),
+      Case(2, 2, 1),
+      Case(2, 2, 2),
+      Case(3, 2, 2),
+      Case(3, 3, 2),
+      Case(3, 3, 3),
+      Case(4, 3, 3),
+      Case(4, 4, 3),
+      Case(4, 4, 4),
+      Case(5, 4, 4),
+      Case(6, 4, 4), // <-
+      Case(7, 4, 4),
+      Case(8, 4, 4),
+      Case(8, 5, 4)
+    )
+  }
 
-      sequencesEqual(
-        as.map(_.science).flatMap(s => Stream.fromOption(offset.getOption(s))),
-        (ls.spatialOffsets match {
-          case Nil => Stream(Offset.Q.Zero).repeat
-          case qs  => Stream.emits(qs).repeat
-        }).map(_.toAngle)
-      )
-    }
+  test("45 min tests") {
+    execCases(
+      45.minTimeSpan,
+      Case(1, 0, 0),
+      Case(1, 1, 0),
+      Case(1, 1, 1),
+      Case(2, 1, 1),
+      Case(2, 2, 1),
+      Case(2, 2, 2),
+      Case(3, 2, 2),
+      Case(3, 3, 2),
+      Case(3, 3, 3),
+      Case(4, 3, 3),
+      Case(4, 4, 3),
+      Case(4, 4, 4),
+      Case(5, 4, 4),
+      Case(5, 5, 4),
+      Case(5, 5, 5),
+      Case(6, 5, 5)
+    )
   }
 }

@@ -9,7 +9,6 @@ import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import fs2.Pipe
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -39,9 +38,6 @@ object SmartGcalImplementation {
     select:    (K, SmartGcalType) => F[List[(D => D, Gcal)]]
   ) extends SmartGcalExpander[F, D] {
 
-    override val expandSequence: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]] =
-      _.evalMapAccumulate(emptyCache[K, D])(expandAtomWithCache).map(_._2)
-
     private def expandAtomWithCache(
       cache: Cache[K, D],
       atom:  ProtoAtom[ProtoStep[D]]
@@ -67,7 +63,7 @@ object SmartGcalImplementation {
           cache.get((key, sgt)).fold(
             select(key, sgt).map {
               case Nil    =>
-                val error = formatKey(key)
+                val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
                 (cache.updated((key, sgt), error.asLeft), error.asLeft)
               case h :: t =>
                (

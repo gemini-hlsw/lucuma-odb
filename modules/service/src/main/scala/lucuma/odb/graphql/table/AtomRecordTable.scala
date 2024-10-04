@@ -8,7 +8,6 @@ import lucuma.odb.util.Codecs.atom_execution_state
 import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.instrument
-import lucuma.odb.util.Codecs.int2_nonneg
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.sequence_type
 import lucuma.odb.util.Codecs.visit_id
@@ -20,7 +19,6 @@ trait AtomRecordTable[F[_]] extends BaseMapping[F] {
     val Instrument: ColumnRef     = col("c_instrument",      instrument)
     val VisitId: ColumnRef        = col("c_visit_id",        visit_id)
     val ObservationId: ColumnRef  = col("c_observation_id",  observation_id)
-    val StepCount: ColumnRef      = col("c_step_count",      int2_nonneg)
     val SequenceType: ColumnRef   = col("c_sequence_type",   sequence_type)
     val Created: ColumnRef        = col("c_created",         core_timestamp)
     val ExecutionState: ColumnRef = col("c_execution_state", atom_execution_state)

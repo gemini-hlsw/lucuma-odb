@@ -17,7 +17,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
-import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -66,10 +65,6 @@ sealed trait DatasetService[F[_]] {
   def selectDatasetsWithQaFailures(
     visitId: Visit.Id
   )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]]
-
-  def selectStepQaState(
-    stepId: Step.Id
-  )(using Transaction[F]): F[Option[DatasetQaState]]
 }
 
 object DatasetService {
@@ -138,12 +133,6 @@ object DatasetService {
         session.execute(Statements.SelectQaFailures)(visitId).map {
           _.groupBy(_._1).view.mapValues(_.unzip._2).toList
         }
-
-      override def selectStepQaState(
-        stepId: Step.Id
-      )(using Transaction[F]): F[Option[DatasetQaState]] =
-        session.unique(Statements.SelectStepQaState)(stepId)
-
   }
 
   object Statements {
@@ -232,12 +221,5 @@ object DatasetService {
          WHERE (d.c_qa_state = 'Fail' OR d.c_qa_state = 'Usable')
            AND d.c_visit_id = $visit_id
       """.query(atom_id *: dataset_id)
-
-    val SelectStepQaState: Query[Step.Id, Option[DatasetQaState]] =
-      sql"""
-        SELECT MAX(c_qa_state)
-          FROM t_dataset
-         WHERE c_step_id = $step_id
-      """.query(dataset_qa_state.opt)
   }
 }

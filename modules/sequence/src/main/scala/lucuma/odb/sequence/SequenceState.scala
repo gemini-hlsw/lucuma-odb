@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 
 import cats.data.State
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SmartGcalType.Arc
 import lucuma.core.enums.SmartGcalType.Flat
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.math.Angle
@@ -62,5 +63,11 @@ trait SequenceState[D] {
    */
   def flatStep(c: ObserveClass): State[D, ProtoStep[D]] =
     step(ProtoStep(_, SmartGcal(Flat), c))
+
+  /**
+   * Generates a GCAL arc based on the current instrument configuration.
+   */
+  def arcStep(c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Arc), c))
 
 }

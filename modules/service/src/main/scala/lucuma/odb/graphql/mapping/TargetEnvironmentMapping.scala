@@ -28,7 +28,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.coordinates.query.given
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
@@ -48,7 +48,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def httpClient: Client[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   private val ObsTimeParam           = "observationTime"
   private val AvailabilityStartParam = "start"

@@ -31,13 +31,11 @@ object SequenceIds {
   def atomId(
     namespace:    UUID,
     sequenceType: SequenceType,
-    cycle:        Int,
     index:        Long
   ): Atom.Id =
     Uid[Atom.Id].isoUuid.reverseGet(
       toUuid { s =>
         writeNamespace[Atom.Id](namespace, sequenceType, s)
-        s.writeInt(cycle)
         s.writeLong(index)
       }
     )

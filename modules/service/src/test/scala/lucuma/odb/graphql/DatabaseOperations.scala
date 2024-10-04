@@ -1053,7 +1053,7 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
-  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] =
+  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science): IO[Atom.Id] =
     query(
       user = user,
       query =
@@ -1062,8 +1062,7 @@ trait DatabaseOperations { this: OdbSuite =>
             recordAtom(input: {
               visitId: ${vid.asJson},
               instrument: ${instrument.tag.toScreamingSnakeCase},
-              sequenceType: ${sequenceType.tag.toScreamingSnakeCase},
-              stepCount: ${stepCount.asJson}
+              sequenceType: ${sequenceType.tag.toScreamingSnakeCase}
             }) {
               atomRecord {
                 id

@@ -5,13 +5,14 @@ package lucuma.odb.graphql
 package query
 
 import cats.data.NonEmptySet
+import cats.effect.Clock
 import cats.effect.IO
-import cats.syntax.foldable.*
-import cats.syntax.option.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.GcalArc
@@ -31,17 +32,17 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
+import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -50,8 +51,11 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.sequence.data.Completion
+import lucuma.odb.logic.Generator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
@@ -63,10 +67,10 @@ import skunk.Session
 
 trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
-  val pi: User   = TestUsers.Standard.pi(1, 30)
-  val pi2: User  = TestUsers.Standard.pi(2, 32)
+  val pi: User          = TestUsers.Standard.pi(1, 30)
+  val pi2: User         = TestUsers.Standard.pi(2, 32)
   val serviceUser: User = TestUsers.service(3)
-  val staff: User = TestUsers.Standard.staff(4, 33)
+  val staff: User       = TestUsers.Standard.staff(4, 33)
 
   override val validUsers: List[User] =
     List(pi, pi2, serviceUser, staff)
@@ -74,80 +78,80 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(pi, "Sequence Testing")
 
+  val key_0_50: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    TableKey(
+      GratingConfigKey(
+        GmosNorthGrating.R831_G5302,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosNorthFilter.RPrime.some,
+      GmosNorthFpu.LongSlit_0_50.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  // NB: 2x4, no filter
+  val key_1_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    TableKey(
+      GratingConfigKey(
+        GmosNorthGrating.R831_G5302,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      none,
+      GmosNorthFpu.LongSlit_1_00.some,
+      GmosXBinning.Two,
+      GmosYBinning.Four,
+      GmosAmpGain.Low
+    )
+
+  val key_5_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    TableKey(
+      GratingConfigKey(
+        GmosNorthGrating.R831_G5302,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosNorthFilter.RPrime.some,
+      GmosNorthFpu.LongSlit_5_00.some,
+      GmosXBinning.One,
+      GmosYBinning.Two,
+      GmosAmpGain.Low
+    )
+
+  val flat =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
+        GcalFilter.Gmos,
+        GcalDiffuser.Ir,
+        GcalShutter.Open
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(1_000_000L)
+      )
+    )
+
+  val arc =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
+        GcalFilter.None,
+        GcalDiffuser.Visible,
+        GcalShutter.Closed
+      ),
+      GcalBaselineType.Day,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(1_000_000L)
+      )
+    )
+
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val key_0_50: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-      TableKey(
-        GratingConfigKey(
-          GmosNorthGrating.R831_G5302,
-          GmosGratingOrder.One,
-          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-        ).some,
-        GmosNorthFilter.RPrime.some,
-        GmosNorthFpu.LongSlit_0_50.some,
-        GmosXBinning.One,
-        GmosYBinning.Two,
-        GmosAmpGain.Low
-      )
-
-    // NB: 2x4, no filter
-    val key_1_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-      TableKey(
-        GratingConfigKey(
-          GmosNorthGrating.R831_G5302,
-          GmosGratingOrder.One,
-          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-        ).some,
-        none,
-        GmosNorthFpu.LongSlit_1_00.some,
-        GmosXBinning.Two,
-        GmosYBinning.Four,
-        GmosAmpGain.Low
-      )
-
-    val key_5_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-      TableKey(
-        GratingConfigKey(
-          GmosNorthGrating.R831_G5302,
-          GmosGratingOrder.One,
-          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
-        ).some,
-        GmosNorthFilter.RPrime.some,
-        GmosNorthFpu.LongSlit_5_00.some,
-        GmosXBinning.One,
-        GmosYBinning.Two,
-        GmosAmpGain.Low
-      )
-
-    val flat =
-      SmartGcalValue(
-        Gcal(
-          Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
-          GcalFilter.Gmos,
-          GcalDiffuser.Ir,
-          GcalShutter.Open
-        ),
-        GcalBaselineType.Night,
-        PosInt.unsafeFrom(1),
-        LegacyInstrumentConfig(
-          TimeSpan.unsafeFromMicroseconds(1_000_000L)
-        )
-      )
-
-    val arc =
-      SmartGcalValue(
-        Gcal(
-          Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
-          GcalFilter.None,
-          GcalDiffuser.Visible,
-          GcalShutter.Closed
-        ),
-        GcalBaselineType.Day,
-        PosInt.unsafeFrom(1),
-        LegacyInstrumentConfig(
-          TimeSpan.unsafeFromMicroseconds(1_000_000L)
-        )
-      )
-
     val tableRows: List[TableRow.North] =
       List(
         TableRow(PosLong.unsafeFrom(1), key_0_50, flat),
@@ -168,57 +172,226 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  val GmosInstrumentConfigQuery: String =
+  val GmosAtomQuery: String =
     s"""
-      instrumentConfig {
-        exposure {
-          seconds
-        }
-        exposure {
-          seconds
-        }
-        readout {
-          xBin
-          yBin
-          ampCount
-          ampGain
-          ampReadMode
-        }
-        dtax
-        roi
-        gratingConfig {
-          grating
-          order
-          wavelength {
-            nanometers
-          }
-        }
-        filter
-        fpu {
-          builtin
-        }
-      }
-    """
-
-  val StepConfigScienceQuery: String =
-    s"""
-      stepConfig {
-        ... on Science {
-          offset {
-            p { arcseconds }
-            q { arcseconds }
-          }
-        }
-      }
-    """
-
-  val GmosScienceAtomQuery: String =
-    s"""
+      description
+      observeClass
       steps {
-        $GmosInstrumentConfigQuery
-        $StepConfigScienceQuery
+        instrumentConfig {
+          exposure { seconds }
+          readout {
+            xBin
+            yBin
+          }
+          roi
+          gratingConfig {
+            grating
+            wavelength { nanometers }
+          }
+          filter
+          fpu { builtin }
+        }
+        stepConfig {
+          ... on Gcal {
+            continuum
+            arcs
+          }
+          ... on Science {
+            offset {
+              p { arcseconds }
+              q { arcseconds }
+            }
+            guiding
+          }
+        }
+        observeClass
       }
     """
+
+  def excutionConfigQuery(inst: String, sequenceType: String, atomQuery: String, futureLimit: Option[Int]): String =
+    s"""
+      execution {
+        config${futureLimit.fold("")(lim => s"(futureLimit: $lim)")} {
+          $inst {
+            $sequenceType {
+              nextAtom {
+                $atomQuery
+              }
+              possibleFuture {
+                $atomQuery
+              }
+              hasMore
+            }
+          }
+        }
+      }
+    """
+
+  def gmosNorthAcquisitionQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
+
+  def gmosNorthScienceQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("gmosNorth", "science", GmosAtomQuery, futureLimit)
+
+  val ObsWavelength: Wavelength =
+    Wavelength.decimalNanometers.unsafeGet(BigDecimal("500.0"))
+
+  def obsWavelengthAt(ditherNm: Int): Wavelength =
+    ObsWavelength.unsafeOffset(
+      WavelengthDither.decimalNanometers.unsafeGet(BigDecimal(ditherNm))
+    )
+
+  def gmosNorthScience(ditherNm: Int): GmosNorth =
+    GmosNorth(
+      fakeItcSpectroscopyResult.exposureTime,
+      GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
+      GmosDtax.Zero,
+      GmosRoi.FullFrame,
+      GmosGratingConfig.North(GmosNorthGrating.R831_G5302, GmosGratingOrder.One, obsWavelengthAt(ditherNm)).some,
+      GmosNorthFilter.RPrime.some,
+      GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
+    )
+
+  def gmosNorthArc(ditherNm: Int): GmosNorth =
+    gmosNorthScience(ditherNm).copy(exposure = arc.instrumentConfig.exposureTime)
+
+  def gmosNorthFlat(ditherNm: Int): GmosNorth =
+    gmosNorthScience(ditherNm).copy(exposure = flat.instrumentConfig.exposureTime)
+
+  val GmosNorthAcq0: GmosNorth =
+    gmosNorthScience(0).copy(
+      exposure      = fakeItcImagingResult.exposureTime,
+      readout       = GmosCcdMode(GmosXBinning.Two, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
+      roi           = GmosRoi.Ccd2,
+      gratingConfig = none,
+      filter        = GmosNorthFilter.GPrime.some,
+      fpu           = none
+    )
+
+  val GmosNorthAcq1: GmosNorth =
+    GmosNorthAcq0.copy(
+      exposure = GmosNorthAcq0.exposure *| 2,
+      readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
+      roi      = GmosRoi.CentralStamp,
+      fpu      = gmosNorthScience(0).fpu
+    )
+
+  val GmosNorthAcq2: GmosNorth =
+    GmosNorthAcq1.copy(
+      exposure = GmosNorthAcq0.exposure *| 3
+    )
+
+  def gmosNorthAcq(step: Int): GmosNorth =
+    step match
+      case 0 => GmosNorthAcq0
+      case 1 => GmosNorthAcq1
+      case 2 => GmosNorthAcq2
+      case _ => sys.error("Only 3 steps in a GMOS North Acq")
+
+  val FlatStep: StepConfig.Gcal =
+    StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
+
+  val ArcStep: StepConfig.Gcal  =
+    StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
+
+  def scienceStep(p: Int, q: Int): StepConfig.Science =
+    StepConfig.Science(
+      Offset(
+        Offset.P.signedDecimalArcseconds.reverseGet(BigDecimal(p)),
+        Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
+      ),
+      StepGuideState.Enabled
+    )
+
+  protected def expectedScienceStep(s: StepConfig.Science): Json =
+    json"""
+      {
+        "offset": {
+          "p": { "arcseconds": ${Angle.signedDecimalArcseconds.get(s.offset.p.toAngle)} },
+          "q": { "arcseconds": ${Angle.signedDecimalArcseconds.get(s.offset.q.toAngle)} }
+        },
+        "guiding": ${s.guiding}
+      }
+    """
+
+  protected def gmosNorthExpectedInstrumentConfig(gn: GmosNorth): Json =
+    json"""
+      {
+        "exposure": { "seconds": ${gn.exposure.toSeconds} },
+        "readout": {
+          "xBin": ${gn.readout.xBin},
+          "yBin": ${gn.readout.yBin}
+        },
+        "roi": ${gn.roi},
+        "gratingConfig": ${gn.gratingConfig.fold(Json.Null) { gc =>
+          json"""
+            {
+              "grating": ${gc.grating},
+              "wavelength": {
+                "nanometers": ${gc.wavelength.toNanometers.value.value}
+              }
+            }
+          """
+        }},
+        "filter": ${gn.filter},
+        "fpu": ${gn.fpu.fold(Json.Null) { fpu =>
+          json"""{ "builtin": ${fpu.builtin.map(_.value)} }"""
+        }}
+      }
+    """
+
+  protected def gmosNorthExpectedArc(ditherNm: Int): Json =
+    json"""
+      {
+        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthArc(ditherNm))},
+        "stepConfig" : {
+          "continuum" : null,
+          "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
+        },
+        "observeClass" : "PARTNER_CAL"
+      }
+    """
+
+  protected def gmosNorthExpectedFlat(ditherNm: Int): Json =
+    json"""
+      {
+        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthFlat(ditherNm))},
+        "stepConfig" : {
+          "continuum" : ${flat.gcalConfig.lamp.continuum},
+          "arcs" : []
+        },
+        "observeClass" : "PARTNER_CAL"
+      }
+    """
+
+  protected def gmosNorthExpectedScience(ditherNm: Int, p: Int, q: Int): Json =
+    json"""
+      {
+        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthScience(ditherNm))},
+        "stepConfig" : ${expectedScienceStep(scienceStep(p, q))},
+        "observeClass" : "SCIENCE"
+      }
+    """
+
+  protected def gmosNorthExpectedAcq(step: Int, p: Int): Json =
+    json"""
+      {
+        "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step))},
+        "stepConfig" : ${expectedScienceStep(scienceStep(p, 0))},
+        "observeClass" : "ACQUISITION"
+      }
+    """
+
+  protected def gmosNorthExpectedScienceAtom(ditherNm: Int, p: Int, q: Int, exposures: Int): Json =
+    val steps = List(
+      gmosNorthExpectedArc(ditherNm), gmosNorthExpectedFlat(ditherNm)
+    ) ++ List.fill(exposures)(gmosNorthExpectedScience(ditherNm, p, q))
+
+    Json.obj(
+      "description" -> s"$ditherNm.000 nm, $q.000000″".asJson,
+      "observeClass" -> "SCIENCE".asJson,
+      "steps" -> steps.asJson
+    )
 
   def addEndStepEvent(sid: Step.Id): IO[Unit] = {
     val q = s"""
@@ -277,187 +450,85 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     query(serviceUser, q).void
   }
 
-  val Seconds01 = TimeSpan.unsafeFromMicroseconds( 1_000_000L)
-  val Seconds10 = TimeSpan.unsafeFromMicroseconds(10_000_000L)
-  val Seconds20 = TimeSpan.unsafeFromMicroseconds(20_000_000L)
-  val Seconds30 = TimeSpan.unsafeFromMicroseconds(30_000_000L)
+  /**
+   * What time is it now, as a Timestamp.
+   */
+  def timestampNow: IO[Timestamp] =
+    Clock[IO]
+      .realTimeInstant
+      .map(Timestamp.fromInstantTruncated)
+      .flatMap(t => IO.fromOption(t)(new RuntimeException("oddly, timestamp of now is out of range")))
 
-  val GmosNorthAcq0: GmosNorth =
-    GmosNorth(
-      Seconds10,
-      GmosCcdMode(GmosXBinning.Two, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      GmosDtax.Zero,
-      GmosRoi.Ccd2,
-      none,
-      GmosNorthFilter.GPrime.some,
-      none
-    )
+  /**
+   * Generates the sequence for the given observation.
+   *
+   * @param limit the future limit, which must be in the range [0, 100]
+   * @param when the timestamp to pass the generator. in other words generate as
+   *             if asked at this time
+   */
+  def generate(
+    pid:   Program.Id,
+    oid:   Observation.Id,
+    limit: Option[Int]       = None,  // [0, 100]
+    when:  Option[Timestamp] = None
+  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+    withSession: session =>
+      for
+        future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
+        enums  <- Enums.load(session)
+        tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
+        srv     = Services.forUser(serviceUser, enums, None)(session)
+        gen     = srv.generator(CommitHash.Zero, itcClient, tec)
+        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+      yield res
 
-  val GmosNorthAcq0Json: Json =
-    json"""
-      {
-        "instrumentConfig": {
-          "exposure": { "seconds": 10.000000 },
-          "readout": {
-            "xBin": "TWO",
-            "yBin": "TWO",
-            "ampCount": "TWELVE",
-            "ampGain": "LOW",
-            "ampReadMode": "FAST"
-          },
-          "dtax": "ZERO",
-          "roi": "CCD2",
-          "gratingConfig": null,
-          "filter": "G_PRIME",
-          "fpu": null
-        }
-      }
-    """
+  /**
+   * Generates the sequence but fails if it produces an error.
+   *
+   * @param limit the future limit, which must be in the range [0, 100]
+   * @param when the timestamp to pass the generator. in other words generate as
+   *             if asked at this time
+   */
+  def generateOrFail(
+    pid:   Program.Id,
+    oid:   Observation.Id,
+    limit: Option[Int]       = None,  // [0, 100]
+    when:  Option[Timestamp] = None
+  ): IO[InstrumentExecutionConfig] =
+    generate(pid, oid, limit, when).flatMap: res =>
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
 
-  val GmosNorthAcq1: GmosNorth =
-    GmosNorth(
-      Seconds20,
-      GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      GmosDtax.Zero,
-      GmosRoi.CentralStamp,
-      none,
-      GmosNorthFilter.GPrime.some,
-      GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
-    )
+  /**
+   * Generates the sequence as if requested after the specified amount of time
+   * has passed.
+   *
+   * @param time amount of time (from now) to use as a timestamp for sequence
+   *             generation; does not delay the computation in any way
+   */
+  def generateAfter(
+    pid:  Program.Id,
+    oid:  Observation.Id,
+    time: TimeSpan
+  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+    for {
+      now  <- timestampNow
+      when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
+      res  <- generate(pid, oid, when = when.some)
+    } yield res
 
-  val GmosNorthAcq1Json: Json =
-    json"""
-      {
-        "instrumentConfig": {
-          "exposure": { "seconds": 20.000000 },
-          "readout": {
-            "xBin": "ONE",
-            "yBin": "ONE",
-            "ampCount": "TWELVE",
-            "ampGain": "LOW",
-            "ampReadMode": "FAST"
-          },
-          "dtax": "ZERO",
-          "roi": "CENTRAL_STAMP",
-          "gratingConfig": null,
-          "filter": "G_PRIME",
-          "fpu": { "builtin": "LONG_SLIT_0_50" }
-        }
-      }
-    """
-
-  val GmosNorthAcq2: GmosNorth =
-    GmosNorth(
-      Seconds30,
-      GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
-      GmosDtax.Zero,
-      GmosRoi.CentralStamp,
-      none,
-      GmosNorthFilter.GPrime.some,
-      GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
-    )
-
-  val GmosNorthAcq2Json: Json =
-    json"""
-      {
-        "instrumentConfig": {
-          "exposure": { "seconds": 30.000000 },
-          "readout": {
-            "xBin": "ONE",
-            "yBin": "ONE",
-            "ampCount": "TWELVE",
-            "ampGain": "LOW",
-            "ampReadMode": "FAST"
-          },
-          "dtax": "ZERO",
-          "roi": "CENTRAL_STAMP",
-          "gratingConfig": null,
-          "filter": "G_PRIME",
-          "fpu": { "builtin": "LONG_SLIT_0_50" }
-        }
-      }
-    """
-
-  val GmosNorthScience0: GmosNorth =
-    GmosNorth(
-      Seconds10,
-      GmosCcdMode(GmosXBinning.One, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
-      GmosDtax.Zero,
-      GmosRoi.FullFrame,
-      GmosGratingConfig.North(GmosNorthGrating.R831_G5302, GmosGratingOrder.One, Wavelength.decimalNanometers.unsafeGet(BigDecimal("500.0"))).some,
-      GmosNorthFilter.RPrime.some,
-      GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_50).some
-    )
-
-  val GmosNorthScience5: GmosNorth =
-    GmosNorthScience0.copy(
-      gratingConfig = GmosNorthScience0.gratingConfig.map(_.copy(
-        wavelength = Wavelength.decimalNanometers.unsafeGet(BigDecimal("505.0"))
-      ))
-    )
-
-  val GmosNorthArc0  = GmosNorthScience0.copy(exposure = Seconds01)
-  val GmosNorthFlat0 = GmosNorthScience0.copy(exposure = Seconds01)
-  val GmosNorthArc5  = GmosNorthScience5.copy(exposure = Seconds01)
-  val GmosNorthFlat5 = GmosNorthScience5.copy(exposure = Seconds01)
-
-  val P00Q00 = Offset.Zero
-  val P10Q00 = Offset.microarcseconds.reverseGet((10_000_000L, 0L))
-  val P00Q15 = Offset.microarcseconds.reverseGet((0L, 15_000_000L))
-
-  val ScienceP00Q00 = StepConfig.Science(P00Q00, StepGuideState.Enabled)
-  val ScienceP10Q00 = StepConfig.Science(P10Q00, StepGuideState.Enabled)
-  val ScienceP00Q15 = StepConfig.Science(P00Q15, StepGuideState.Enabled)
-  val Flat          = StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open)
-  val Arc           = StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
-
-  def stepConfigScienceJson(o: Offset): Json =
-    json"""
-      {
-        "stepConfig": {
-          "offset": {
-            "p": { "arcseconds": ${Angle.signedDecimalArcseconds.get(o.p.toAngle)} },
-            "q": { "arcseconds": ${Angle.signedDecimalArcseconds.get(o.q.toAngle)} }
-          }
-        }
-      }
-    """
-
-  val StepConfigScienceP00Q00Json = stepConfigScienceJson(P00Q00)
-  val StepConfigScienceP10Q00Json = stepConfigScienceJson(P10Q00)
-  val StepConfigScienceP00Q15Json = stepConfigScienceJson(P00Q15)
-
-  def atomMap1[D](steps: Completion.StepMatch[D]*): Completion.AtomMap[D] =
-    Completion.AtomMap.from(steps.toList -> PosInt.unsafeFrom(1))
-
-  def genGmosNorthSequence(oid: Observation.Id, seqType: SequenceType, futureLimit: Int): IO[List[Atom.Id]] =
-    query(
-      user = pi,
-      query = s"""
-        query {
-          observation(observationId: "$oid") {
-            execution {
-              config(futureLimit: $futureLimit) {
-                gmosNorth {
-                  ${seqType.tag} {
-                    nextAtom {
-                      id
-                    }
-                    possibleFuture {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map { json =>
-      val sci = json.hcursor.downFields("observation", "execution", "config", "gmosNorth", seqType.tag)
-      val n   = sci.downFields("nextAtom", "id").require[Atom.Id]
-      val fs  = sci.downFields("possibleFuture").values.toList.flatMap(_.toList.map(_.hcursor.downField("id").require[Atom.Id]))
-      n :: fs
-    }
+  /**
+   * Generates the sequence as if requested after the specified amount of time
+   * has passed, fails if the sequence cannot be generated.
+   *
+   * @param time amount of time (from now) to use as a timestamp for sequence
+   *             generation; does not delay the computation in any way
+   */
+  def generateAfterOrFail(
+    pid:  Program.Id,
+    oid:  Observation.Id,
+    time: TimeSpan
+  ): IO[InstrumentExecutionConfig] =
+    generateAfter(pid, oid, time).flatMap: res =>
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
 
 }

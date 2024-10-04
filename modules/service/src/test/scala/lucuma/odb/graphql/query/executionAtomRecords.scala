@@ -555,47 +555,11 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Acquisition)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition, stepCount = 2)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), scienceStep(0, 0))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Acquisition)
     } yield assertEquals(ga0, ga1)
-  }
-
-  test("acquisition steps change over visits") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
-    } yield assertNotEquals(ga0, ga1)
-  }
-
-  test("science steps change over visits") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      ga0 <- generatedNextAtomId(pi, oid, Science)
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      ga1 <- generatedNextAtomId(pi, oid, Science)
-    } yield assertNotEquals(ga0, ga1)
-  }
-
-  test("steps change after switch to science") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
-      ga0 <- generatedNextAtomId(pi, oid, Acquisition)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Science, stepCount = 2)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
-      _   <- addEndStepEvent(sid)
-      ga1 <- generatedNextAtomId(pi, oid, Acquisition)
-    } yield assertNotEquals(ga0, ga1)
   }
 
   test("science steps do not change after switch to acquisition") {
@@ -605,8 +569,8 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Science)
-      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition, stepCount = 2)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, GmosNorthScience0, ScienceP00Q00)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), scienceStep(0, 0))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Science)
     } yield assertEquals(ga0, ga1)
