@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.query
 
-import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -16,6 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
 
 class executionFailures extends ExecutionTestSupport {
 
@@ -51,7 +51,7 @@ class executionFailures extends ExecutionTestSupport {
       } yield o
 
     setup.flatMap { oid =>
-      expect(
+      expectOdbError(
         user  = pi,
         query =
           s"""
@@ -71,7 +71,9 @@ class executionFailures extends ExecutionTestSupport {
                }
              }
            """,
-          expected = List(s"ITC returned errors: Asterism: Artifical exception for test cases.").asLeft
+          expected = {
+            case OdbError.ItcError(Some("ITC returned errors: Asterism: Artifical exception for test cases.")) => // ok
+          }
       )
     }
 
@@ -86,7 +88,7 @@ class executionFailures extends ExecutionTestSupport {
       } yield o
 
     setup.flatMap { oid =>
-      expectIor(
+      expectOdbError(
         user  = pi,
         query =
           s"""
@@ -104,18 +106,9 @@ class executionFailures extends ExecutionTestSupport {
                }
              }
            """,
-        expected = Ior.both(
-          List(s"Could not generate a sequence from the observation $oid: observing mode"),
-          json"""
-            {
-              "observation": {
-                "execution": {
-                  "config": null
-                }
-              }
-            }
-          """
-        )
+        expected = {
+          case OdbError.SequenceUnavailable(Some("Could not generate a sequence from the observation o-101: observing mode")) => //ok
+        }
       )
     }
   }
