@@ -114,7 +114,7 @@ class executionFailures extends ExecutionTestSupport {
     }
   }
 
-/*
+/**
   In this test case, the query requests both the observation `execution` field
   and the `itc` field.  Neither query should be successful because there is no
   observing mode.  We expect two errors, one for `execution` and one for `itc`
@@ -155,7 +155,7 @@ class executionFailures extends ExecutionTestSupport {
            """,
         expected = Set(
           OdbError.SequenceUnavailable(s"Could not generate a sequence from the observation $oid: observing mode".some),
-          OdbError.ItcError("ITC cannot be queried until the following parameters are defined: observing mode.".some)
+          OdbError.InvalidObservation(oid, "ITC cannot be queried until the following parameters are defined: observing mode.".some)
         )
       )
     }
