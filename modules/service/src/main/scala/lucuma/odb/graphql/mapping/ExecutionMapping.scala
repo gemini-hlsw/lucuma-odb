@@ -7,6 +7,7 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import grackle.Env
 import grackle.Query
@@ -103,7 +104,12 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      OdbError.SequenceUnavailable(Some(e.format)).asWarning(Json.Null)
+      val odbError =
+        e match
+          case Generator.Error.ItcError(e) => OdbError.ItcError(e.format.some)
+          case _                           => OdbError.SequenceUnavailable(e.format.some)
+
+      odbError.asWarning(Json.Null)
   }
 
   private lazy val configHandler: EffectHandler[F] = {

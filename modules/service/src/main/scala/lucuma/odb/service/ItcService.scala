@@ -150,7 +150,7 @@ object ItcService {
 
     case object TargetMismatch extends Error {
       def format: String =
-        s"ITC provide conflicting results"
+        s"ITC provided conflicting results"
     }
   }
 
