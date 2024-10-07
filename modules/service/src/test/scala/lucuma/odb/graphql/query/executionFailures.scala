@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.query
+package lucuma.odb.graphql
+package query
 
 import cats.effect.IO
 import cats.syntax.either.*
@@ -112,6 +113,54 @@ class executionFailures extends ExecutionTestSupport {
       )
     }
   }
+
+/*
+  In this test case, the query requests both the observation `execution` field
+  and the `itc` field.  Neither query should be successful because there is no
+  observing mode.  We expect two errors, one for `execution` and one for `itc`
+  and often actually get them.  Sometimes though only the `itc` error is
+  returned.
+
+  test("cannot generate, missing mode + failed itc query") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithNoModeAs(pi, p, t)
+      } yield o
+
+    setup.flatMap { oid =>
+      expectOdbErrors(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 itc {
+                   science {
+                     selected { signalToNoise }
+                   }
+                 }
+                 execution {
+                   config {
+                     gmosNorth {
+                       static {
+                         stageMode
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Set(
+          OdbError.SequenceUnavailable(s"Could not generate a sequence from the observation $oid: observing mode".some),
+          OdbError.ItcError("ITC cannot be queried until the following parameters are defined: observing mode.".some)
+        )
+      )
+    }
+  }
+*/
 
   test("simple generation - too many future atoms") {
     val setup: IO[(Program.Id, Observation.Id)] =
