@@ -3,8 +3,13 @@
 
 package lucuma.odb.sequence
 
+import cats.Applicative
 import cats.data.NonEmptyList
-import fs2.Pipe
+import cats.syntax.applicative.*
+import cats.syntax.either.*
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SmartGcalType
+import lucuma.core.model.sequence.StepConfig
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -14,7 +19,7 @@ import lucuma.odb.sequence.data.ProtoStep
  *
  * @tparam D dynamic instrument configuration
  */
-trait SmartGcalExpander[F[_], D] {
+trait SmartGcalExpander[F[_], D]:
 
   /**
    * Expands a single step. If `step` is a smart gcal step it is replaced with
@@ -33,12 +38,28 @@ trait SmartGcalExpander[F[_], D] {
     atom: ProtoAtom[ProtoStep[D]]
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
-  /**
-   * Expands the given sequence, attempting to replace smart gcal steps with
-   * normal gcal steps.  For each atom in the Stream, if successful, the
-   * expanded atom without smart gcal steps is emitted in a `Right`.  When
-   * unsuccessful, the missing mapping is formatted and wrapped with a `Left`.
-   */
-  def expandSequence: Pipe[F, ProtoAtom[ProtoStep[D]], Either[String, ProtoAtom[ProtoStep[D]]]]
 
-}
+object SmartGcalExpander:
+
+  /** A simple implementation for testing. */
+  def pure[F[_], D](
+    lookup: (SmartGcalType, D) => (D, StepConfig.Gcal, ObserveClass)
+  )(using Applicative[F]): SmartGcalExpander[F, D] =
+    new SmartGcalExpander[F, D]:
+      private def expand(step: ProtoStep[D]): ProtoStep[D] =
+        step.stepConfig match
+          case StepConfig.SmartGcal(t) =>
+            val (d, g, c) = lookup(t, step.value)
+            ProtoStep(d, g, c)
+          case _                       =>
+            step
+
+      override def expandStep(
+        step: ProtoStep[D]
+      ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+        NonEmptyList.one(expand(step)).asRight.pure[F]
+
+      override def expandAtom(
+        atom: ProtoAtom[ProtoStep[D]]
+      ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
+        ProtoAtom(atom.description, atom.steps.map(expand)).asRight.pure[F]

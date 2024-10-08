@@ -55,7 +55,7 @@ import lucuma.odb.FMain
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
@@ -171,10 +171,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
-  def fakeItcResult: IntegrationTime =
+  def fakeItcImagingResult: IntegrationTime =
     FakeItcResult
 
-  private def itcClient: ItcClient[IO] =
+  def fakeItcSpectroscopyResult: IntegrationTime =
+    FakeItcResult
+
+  protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
@@ -184,7 +187,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBand).asRight
                 )
               )
             ).get
@@ -200,7 +203,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBand).asRight
                 )
               )
             ).get
@@ -301,7 +304,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
-      ptc <- db.evalMap(TimeEstimateCalculator.fromSession(_, enm))
+      ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 
@@ -453,6 +456,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               expected.lift(e) match
                 case None => fail(s"Unexpected ODB error: $e")
                 case Some(_) => () // ok
+
+  def expectOdbErrors(
+    user:      User,
+    query:     String,
+    expected:  Set[OdbError],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Default
+  ): IO[Unit] =
+    this.query(user, query, variables, client)
+      .intercept[ResponseException[Any]]
+      .map: e =>
+        assertEquals(e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList).toSet, expected)
 
   def expectSuccessOrOdbError(
     user:      User,

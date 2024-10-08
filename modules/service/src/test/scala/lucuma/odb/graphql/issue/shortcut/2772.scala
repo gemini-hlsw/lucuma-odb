@@ -5,17 +5,29 @@ package lucuma.odb.graphql
 package issue.shortcut
 
 import cats.effect.IO
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class ShortCut_2772 extends ExecutionTestSupport {
+
+  // specify 2 exposures per atom (30 min x 2 fills a 1 hour block)
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      30.minTimeSpan,
+      PosInt.unsafeFrom(10),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
 
   val user: User = serviceUser
 
@@ -148,6 +160,9 @@ class ShortCut_2772 extends ExecutionTestSupport {
                        science {
                          nextAtom {
                            steps {
+                             stepConfig {
+                               stepType
+                             }
                              instrumentConfig {
                                readout {
                                  xBin
@@ -174,6 +189,9 @@ class ShortCut_2772 extends ExecutionTestSupport {
                         "nextAtom": {
                           "steps": [
                             {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              },
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",
@@ -182,6 +200,31 @@ class ShortCut_2772 extends ExecutionTestSupport {
                               }
                             },
                             {
+                              "stepConfig": {
+                                "stepType": "GCAL"
+                              },
+                              "instrumentConfig": {
+                                "readout": {
+                                  "xBin": "TWO",
+                                  "yBin": "FOUR"
+                                }
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE"
+                              },
+                              "instrumentConfig": {
+                                "readout": {
+                                  "xBin": "TWO",
+                                  "yBin": "FOUR"
+                                }
+                              }
+                            },
+                            {
+                              "stepConfig": {
+                                "stepType": "SCIENCE"
+                              },
                               "instrumentConfig": {
                                 "readout": {
                                   "xBin": "TWO",

@@ -10,8 +10,12 @@ import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.UserInvitation
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 
 import scala.concurrent.duration.*
 
@@ -437,7 +441,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
-    test("edit event should show up for updating an invitation's email status") {
+  test("edit event should show up for updating an invitation's email status") {
     import Group2.pi
     subscriptionExpect(
       user = pi,
@@ -479,4 +483,71 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     )
   }
 
+  test("edit event should show up for setting allocations") {
+    import Group2.pi
+    import Group2.service
+    import lucuma.odb.graphql.input.AllocationInput
+
+    val allocs = List(
+      AllocationInput(TimeAccountingCategory.AR, ScienceBand.Band1, 1.hrTimeSpan),
+      AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, 30.minTimeSpan)
+    )
+
+    val allocsJson =
+    json"""
+      [
+        {
+          "category": "AR",
+          "scienceBand": "BAND1",
+          "duration": {
+            "minutes": 60.000000
+          }
+        },
+        {
+          "category": "BR",
+          "scienceBand": "BAND2",
+          "duration": {
+            "minutes": 30.000000
+          }
+        }
+      ]
+    """
+
+    subscriptionExpect(
+      user = pi,
+      query =
+        """
+          subscription {
+            programEdit {
+              editType
+              value {
+                name
+                allocations {
+                  category
+                  scienceBand
+                  duration {
+                    minutes
+                  }
+                }
+              }
+            }
+          }
+        """,
+      mutations =
+        Right(
+          for {
+            p <- createProgram(pi, "foo")
+            _ <- IO.sleep(1.second)
+            _ <- setAllocationsAs(service, p, allocs)
+            _ <- IO.sleep(1.second)
+          } yield ()
+        ),
+      expected =
+        List(
+          json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "allocations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "allocations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "allocations": $allocsJson } } }""",
+        )
+    )
+  }
 }

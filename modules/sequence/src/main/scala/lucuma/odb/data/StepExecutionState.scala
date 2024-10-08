@@ -29,3 +29,11 @@ enum StepExecutionState(val tag: String) derives Enumerated:
 
   /** An ongoing step was abandonded. */
   case Abandoned   extends StepExecutionState("abandoned")
+
+  def fold[A](incomplete: => A, completedFailure: => A, completedSuccess: => A): A =
+    this match
+      case NotStarted | Ongoing          => incomplete
+      case Aborted | Stopped | Abandoned => completedFailure
+      case Completed                     => completedSuccess
+
+end StepExecutionState

@@ -19,7 +19,7 @@ import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
@@ -60,7 +60,7 @@ object GraphQLRoutes {
     ttl:         FiniteDuration,
     userSvc:     UserService[F],
     enums:       Enums,
-    ptc:         TimeEstimateCalculator.ForInstrumentMode,
+    ptc:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     emailConfig: Config.Email
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =

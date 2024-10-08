@@ -7,6 +7,7 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import grackle.Env
 import grackle.Query
@@ -36,7 +37,7 @@ import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -51,7 +52,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
-  def timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val ExecutionMapping: ObjectMapping =
     ObjectMapping(ExecutionType)(
@@ -103,7 +104,12 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   extension (e: Generator.Error) {
     def toResult: Result[Json] =
-      OdbError.SequenceUnavailable(Some(e.format)).asWarning(Json.Null)
+      val odbError =
+        e match
+          case Generator.Error.ItcError(e) => OdbError.ItcError(e.format.some)
+          case _                           => OdbError.SequenceUnavailable(e.format.some)
+
+      odbError.asWarning(Json.Null)
   }
 
   private lazy val configHandler: EffectHandler[F] = {

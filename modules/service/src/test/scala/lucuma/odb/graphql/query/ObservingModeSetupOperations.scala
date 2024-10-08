@@ -19,26 +19,31 @@ import ObservingModeSetupOperations.*
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
+  private def formatExplicitOffsetsInput(arcsecs: List[Int]): String =
+    arcsecs.map(a => s"{ arcseconds: $a }").mkString("explicitSpatialOffsets: [", ", ", "]")
+
   def createGmosNorthLongSlitObservationAs(
     user:         User,
     pid:          Program.Id,
     tids:         List[Target.Id],
-    status:       ObsStatus       = ObsStatus.Approved,
-    activeStatus: ObsActiveStatus = ObsActiveStatus.Active
+    status:       ObsStatus         = ObsStatus.Approved,
+    activeStatus: ObsActiveStatus   = ObsActiveStatus.Active,
+    offsetArcsec: Option[List[Int]] = None
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,
       pid,
       tids,
-      """
+      s"""
         gmosNorthLongSlit: {
-          grating: R831_G5302,
-          filter: R_PRIME,
-          fpu: LONG_SLIT_0_50,
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: LONG_SLIT_0_50
           centralWavelength: {
             nanometers: 500
-          },
+          }
           explicitYBin: TWO
+          ${offsetArcsec.fold("")(formatExplicitOffsetsInput)}
         }
       """,
       status,
