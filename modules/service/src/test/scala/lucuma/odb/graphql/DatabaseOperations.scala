@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -312,7 +313,7 @@ trait DatabaseOperations { this: OdbSuite =>
     """).void
 
   def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
-    query(user,  s"""
+    queryIor(user,  s"""
         mutation {
           setProposalStatus(
             input: {
@@ -327,12 +328,20 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }
       """
-    ).flatMap { js =>
-      val programCursor = js.hcursor.downFields("setProposalStatus", "program")
-      (for {
-        prog <- programCursor.downFields("reference", "label").success.traverse(_.as[ProgramReference])
-        prop <- programCursor.downFields("proposal", "reference", "label").success.traverse(_.as[ProposalReference])
-      } yield (prog, prop)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+    ).flatMap {  ior =>
+
+      def handle(js: Json) =
+        val programCursor = js.hcursor.downFields("setProposalStatus", "program")
+        (for {
+          prog <- programCursor.downFields("reference", "label").success.traverse(_.as[ProgramReference])
+          prop <- programCursor.downFields("proposal", "reference", "label").success.traverse(_.as[ProposalReference])
+        } yield (prog, prop)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+      ior match
+        case Ior.Left(a) => IO.raiseError(new RuntimeException(a.toList.mkString))
+        case Ior.Right(b) => handle(b)
+        case Ior.Both(a, b) => handle(b)
+
     }
 
   def submitProposal(user: User, pid: Program.Id): IO[ProposalReference] =
