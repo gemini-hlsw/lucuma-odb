@@ -267,6 +267,21 @@ type AtomRecordSelectResult {
 }
 
 """
+CategorizedTime grouped with a ScienceBand.  A program may contain multiple
+observations in distinct bands.  Time accounting at the program level must
+distinguish time spent in observations of each of these bands.
+"""
+type BandedTime {
+
+  "ScienceBand associated with the time, if any."
+  band: ScienceBand
+
+  "Time distributed across the program, partner, and non-charged categories."
+  time: CategorizedTime!
+
+}
+
+"""
 Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
 """
 input BandBrightnessIntegratedInput {
@@ -8884,7 +8899,7 @@ type Program {
   """
   Program-wide time charge, summing all corrected observation time charges.
   """
-  timeCharge: CategorizedTime!
+  timeCharge: [BandedTime!]!
 
   """
   All user invitations associated with this program.
