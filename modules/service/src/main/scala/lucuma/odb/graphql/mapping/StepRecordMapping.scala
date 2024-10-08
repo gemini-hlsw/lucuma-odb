@@ -10,7 +10,6 @@ import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.DatasetIdBinding
@@ -48,7 +47,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlObject("stepConfig"),
       SqlField("observeClass",   StepRecordView.ObserveClass),
       SqlObject("estimate"),
-      EffectField("qaState",     qaStateHandler, List("id")),
+      SqlField("qaState",        StepRecordView.QaState),
       SqlObject("datasets"),
       SqlObject("events"),
       SqlField("generatedId",    StepRecordView.GeneratedId),
@@ -74,12 +73,4 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
-
-  private lazy val qaStateHandler: EffectHandler[F] =
-    keyValueEffectHandler[Step.Id,Option[DatasetQaState]]("id") { sid =>
-      services.useTransactionally {
-        datasetService.selectStepQaState(sid)
-      }
-    }
-
 }

@@ -64,6 +64,7 @@ import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.partnerlink.given
 import lucuma.odb.json.stepconfig.given
+import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -1061,7 +1062,7 @@ trait DatabaseOperations { this: OdbSuite =>
     }
   }
 
-  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science, stepCount: Int = 1): IO[Atom.Id] =
+  def recordAtomAs(user: User, instrument: Instrument, vid: Visit.Id, sequenceType: SequenceType = SequenceType.Science): IO[Atom.Id] =
     query(
       user = user,
       query =
@@ -1070,8 +1071,7 @@ trait DatabaseOperations { this: OdbSuite =>
             recordAtom(input: {
               visitId: ${vid.asJson},
               instrument: ${instrument.tag.toScreamingSnakeCase},
-              sequenceType: ${sequenceType.tag.toScreamingSnakeCase},
-              stepCount: ${stepCount.asJson}
+              sequenceType: ${sequenceType.tag.toScreamingSnakeCase}
             }) {
               atomRecord {
                 id
@@ -1491,6 +1491,11 @@ trait DatabaseOperations { this: OdbSuite =>
     val command = sql"update t_target set c_calibration_role = $calibration_role where c_target_id = $target_id".command
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(role, tid).void))
+  }
+
+  def setObservationCalibratioRole(oid: Observation.Id, role: Option[CalibrationRole]): IO[Unit] = {
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(CalibrationsService.Statements.SetCalibrationRole).use(_.execute(oid, role).void))
   }
 
   def cloneGroupAs(user: User, gid: Group.Id): IO[Group.Id] =

@@ -19,20 +19,20 @@ import lucuma.odb.logic.Generator.SequenceAtomLimit
 
 class ShortCut_2887 extends ExecutionTestSupport {
 
-  val atomCount: Ref[IO, Int] =
+  lazy val atomCount: Ref[IO, Int] =
     Ref.unsafe(0)
 
-  override def fakeItcResult: IntegrationTime =
+  override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
-      1.secTimeSpan,
-      PosInt.unsafeFrom(atomCount.get.unsafeRunSync()),
+      1.hrTimeSpan,
+      PosInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   test("forever sequence") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit - 1) // 2 more for the arcs puts it over
+        _ <- atomCount.set(SequenceAtomLimit + 1)
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
@@ -62,7 +62,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
   test("on the edge of forever") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit - 2)
+        _ <- atomCount.set(SequenceAtomLimit - 1)
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))

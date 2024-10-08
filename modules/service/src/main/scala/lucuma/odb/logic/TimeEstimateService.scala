@@ -87,7 +87,7 @@ object TimeEstimateService {
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
-    calculator:   TimeEstimateCalculator.ForInstrumentMode,
+    calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
   )(using Services[F]): TimeEstimateService[F] =
     new TimeEstimateService[F] {
 

@@ -65,7 +65,7 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
-import lucuma.odb.logic.TimeEstimateCalculator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
@@ -288,7 +288,7 @@ object GuideService {
     httpClient:             Client[F],
     itcClient:              ItcClient[F],
     commitHash:             CommitHash,
-    timeEstimateCalculator: TimeEstimateCalculator.ForInstrumentMode
+    timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 

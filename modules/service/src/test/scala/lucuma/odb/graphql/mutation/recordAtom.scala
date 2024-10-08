@@ -55,15 +55,13 @@ class recordAtom extends OdbSuite {
           recordAtom(input: {
             visitId: ${vid.asJson},
             instrument: GMOS_NORTH,
-            sequenceType: ACQUISITION,
-            stepCount: 3
+            sequenceType: ACQUISITION
           }) {
             atomRecord {
               visit {
                 id
               }
               sequenceType
-              stepCount
               steps {
                 matches {
                   id
@@ -81,7 +79,6 @@ class recordAtom extends OdbSuite {
                 "id": ${vid.asJson}
               },
               "sequenceType": "ACQUISITION",
-              "stepCount": 3,
               "steps": {
                 "matches": []
               }
@@ -101,15 +98,13 @@ class recordAtom extends OdbSuite {
           recordAtom(input: {
             visitId: ${vid.asJson},
             instrument: GMOS_SOUTH,
-            sequenceType: ACQUISITION,
-            stepCount: 3
+            sequenceType: ACQUISITION
           }) {
             atomRecord {
               visit {
                 id
               }
               sequenceType
-              stepCount
               steps {
                 matches {
                   id
@@ -127,7 +122,6 @@ class recordAtom extends OdbSuite {
                 "id": ${vid.asJson}
               },
               "sequenceType": "ACQUISITION",
-              "stepCount": 3,
               "steps": {
                 "matches": []
               }
@@ -147,8 +141,7 @@ class recordAtom extends OdbSuite {
           recordAtom(input: {
             visitId: ${vid.asJson},
             instrument: GMOS_SOUTH,
-            sequenceType: ACQUISITION,
-            stepCount: 3
+            sequenceType: ACQUISITION
           }) {
             atomRecord {
               visit {
@@ -175,7 +168,6 @@ class recordAtom extends OdbSuite {
             visitId: ${vid.asJson},
             instrument: GMOS_NORTH,
             sequenceType: ACQUISITION,
-            stepCount: 3,
             generatedId: ${gen.asJson}
           }) {
             atomRecord {

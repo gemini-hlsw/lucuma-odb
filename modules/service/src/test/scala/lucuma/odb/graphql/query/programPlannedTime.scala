@@ -7,19 +7,35 @@ package query
 import cats.effect.IO
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObsActiveStatus.Inactive
 import lucuma.core.enums.ObsStatus.Approved
 import lucuma.core.enums.ObsStatus.New
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.itc.IntegrationTime
+
 
 class programPlannedTime extends ExecutionTestSupport {
+
+  extension (s: String)
+    def sec: BigDecimal =
+      BigDecimal(s).setScale(6)
+
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(10),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
 
   val user: User = serviceUser
 
@@ -60,8 +76,13 @@ class programPlannedTime extends ExecutionTestSupport {
       """
     )
 
-  val ShortTime = BigDecimal("1843.400000")
-  val LongTime  = BigDecimal("1850.462500")
+  //              full setup + arcs            + flats            + sci w/ config chg  + science w/o config change
+  val ShortTime = "960".sec + ("67.1".sec * 4) + ("57.1".sec * 4) + ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
+
+  // This observation will have 12 goals (lcm(3 dithers, 4 offsets)) but only
+  // 10 datasets.  We spread out the 10 datasets as evenly as possible (1 per
+  // goal for the first 10 goals).
+  val LongTime  = "960".sec + ("67.1".sec * 10) + ("57.1".sec * 10) + ("1266.1".sec * 10)
 
   test("program level: single complete observation") {
     val setup: IO[Program.Id] =

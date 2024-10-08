@@ -13,6 +13,9 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
@@ -616,11 +619,14 @@ class guideEnvironment extends ExecutionTestSupport {
       }
     }
 
+  private def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+    createGmosNorthLongSlitObservationAs(user, pid, tids, offsetArcsec = List(0, 15).some)
+
   test("no science targets") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List.empty)
+        o <- createObservationAs(pi, p, List.empty)
         _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -636,7 +642,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaEmpty.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -668,7 +674,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
         _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
@@ -685,7 +691,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -698,7 +704,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -711,7 +717,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
         _ <- setGuideTargetName(pi, o, defaultTargetName.some)
       } yield o
@@ -725,7 +731,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
         _ <- setGuideTargetName(pi, o, otherTargetName.some)
       } yield o
