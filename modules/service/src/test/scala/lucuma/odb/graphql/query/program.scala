@@ -291,10 +291,12 @@ class program extends OdbSuite {
             query {
               program(programId: "$pid") {
                 timeCharge {
-                  program { seconds }
-                  partner { seconds }
-                  nonCharged { seconds }
-                  total { seconds }
+                  time {
+                    program { seconds }
+                    partner { seconds }
+                    nonCharged { seconds }
+                    total { seconds }
+                  }
                 }
               }
             }
@@ -303,22 +305,8 @@ class program extends OdbSuite {
             json"""
               {
                 "program": {
-                  "timeCharge": {
-                    "program": {
-                      "seconds": 0.000000
-                    },
-                    "partner": {
-                      "seconds": 0.000000
-                    },
-                    "nonCharged": {
-                      "seconds": 0.000000
-                    },
-                    "total": {
-                      "seconds": 0.000000
-                    }
-                  }
+                  "timeCharge": []
                 }
-
               }
             """
           )
