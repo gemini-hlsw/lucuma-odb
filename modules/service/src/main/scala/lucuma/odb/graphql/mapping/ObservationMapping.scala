@@ -7,6 +7,7 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
@@ -112,14 +113,17 @@ trait ObservationMapping[F[_]]
   def itcQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
+    import ItcService.Error.ObservationDefinitionError
+
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResults]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService(itcClient)
            .lookup(pid, oid)
            .map {
-             case Left(e)  => OdbError.ItcError(Some(e.format)).asFailure
-             case Right(s) => s.success
+             case Left(e@ObservationDefinitionError(_)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
+             case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
+             case Right(s)                              => s.success
            }
         }
 

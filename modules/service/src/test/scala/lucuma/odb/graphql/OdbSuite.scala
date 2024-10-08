@@ -451,6 +451,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             IO(expected.applyOrElse(odbe, e => fail(s"OdbError predicate failed on $e")))
           case _ => IO.raiseError(e)
 
+  def expectOdbErrors(
+    user:      User,
+    query:     String,
+    expected:  Set[OdbError],
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Default
+  ): IO[Unit] =
+    this.query(user, query, variables, client)
+      .intercept[ResponseException[Any]]
+      .map: e =>
+        assertEquals(e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList).toSet, expected)
+
   def expectSuccessOrOdbError(
     user:      User,
     query:     String,
