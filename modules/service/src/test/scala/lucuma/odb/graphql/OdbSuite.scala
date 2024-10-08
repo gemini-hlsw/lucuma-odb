@@ -19,6 +19,7 @@ import clue.http4s.Http4sHttpBackend
 import clue.http4s.Http4sHttpClient
 import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
+import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
@@ -442,11 +443,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   ): IO[Unit] =
     this.query(user, query, variables, client)
       .intercept[ResponseException[Any]]
-      .flatMap: e =>
-        e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList) match
-          case List(odbe) =>
-            IO(expected.applyOrElse(odbe, e => fail(s"OdbError predicate failed on $e")))
-          case _ => IO.raiseError(e)
+      .map: er =>
+        er.errors
+          .toList
+          .map(OdbError.fromGraphQLError(_)) // List[Option[OdbError]]
+          .foreach:
+            case None    => fail("Received a non-odb error.")
+            case Some(e) => 
+              expected.lift(e) match
+                case None => fail(s"Unexpected ODB error: $e")
+                case Some(_) => () // ok
 
   def expectSuccessOrOdbError(
     user:      User,
@@ -506,6 +512,20 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
                 case Some(_) => IO.unit
                 case None => IO.println(s"🐙 Not an OdbError: $e")
           case _ => IO.unit
+      }
+
+  def queryIor(
+    user:      User,
+    query:     String,
+    variables: Option[JsonObject] = None,
+    client:    ClientOption = ClientOption.Default
+  ): IO[Ior[GraphQLErrors, Json]] =
+    Resource.eval(IO(serverFixture()))
+      .flatMap(client.connection(user))
+      .use { conn =>
+        val req = conn.request(Operation(query))(ErrorPolicy.ReturnAlways)
+        val op  = variables.fold(req.apply)(req.withInput)
+        op.map(_.result)
       }
 
   def subscription(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], variables: Option[JsonObject] = None): IO[List[Json]] =

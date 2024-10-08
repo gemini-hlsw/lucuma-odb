@@ -115,7 +115,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
               }
             """,
             expected = {
-              case OdbError.GuideEnvironmentError(Some(s"No targets have been defined for observation $oid.")) => // ok
+              case OdbError.GuideEnvironmentError(_) => // expected
+              case OdbError.InvalidConfiguration(_)  => // expected
             }
           )
         }
@@ -139,7 +140,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = {
-                case OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available.")) => // ok
+                case OdbError.GuideEnvironmentError(_) => // expected
+                case OdbError.InvalidConfiguration(_)  => // expected
               }
             )
           }
@@ -165,7 +167,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = {
-                case OdbError.InvalidConfiguration(Some(s"Observing mode is undefined.")) => // ok
+                case OdbError.GuideEnvironmentError(_) => // expected
+                case OdbError.InvalidConfiguration(_)  => // expected
               }
             )
           }

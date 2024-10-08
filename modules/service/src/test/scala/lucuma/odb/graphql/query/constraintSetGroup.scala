@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
@@ -134,7 +135,7 @@ class constraintSetGroup extends OdbSuite {
            addDemoScienceProposal(user, pid, cid)
           } *>
           submitProposal(user, pid) *>
-          expect(
+          expectIor(
             user = user,
             query =
               s"""
@@ -154,7 +155,7 @@ class constraintSetGroup extends OdbSuite {
                 }
               }
               """,
-            expected = Right(
+            expected = Ior.right(
               // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
               json"""
                 {

@@ -3,21 +3,25 @@
 
 package lucuma.odb.service
 
+import cats.Monoid
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
 import io.circe.ACursor
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.odb.data.Configuration
 import lucuma.odb.data.Configuration.Conditions
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.OdbErrorExtensions.asWarning
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Query
@@ -25,10 +29,6 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import io.circe.Json
-import lucuma.core.model.Program
-import cats.Monoid
-import lucuma.odb.data.OdbErrorExtensions.asWarning
 
 trait ConfigurationService[F[_]] {
 
@@ -79,7 +79,7 @@ object ConfigurationService {
           result.flatMap: map =>
             map.get(oid) match
               case Some(config) => Result(config)          
-              case None => OdbError.InvalidConfiguration(Some("Invalid observation or incomplete configuration.")).asFailure
+              case None => OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asFailure
 
     // A monoid specifically for the fold below, which concatenates maps
     private given Monoid[Result[Map[Observation.Id, Configuration]]] =
@@ -108,7 +108,7 @@ object ConfigurationService {
         selectConfigurationsImpl(Queries.selectConfigurations(oids)).map: res =>
           oids.foldLeft(res): (res, oid) =>
             if res.toOption.exists(_.contains(oid)) then res
-            else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is not present or is inaccessible for current user.")).asWarning(Map.empty)
+            else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asWarning(Map.empty)
 
     private def selectConfigurations(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
       ResultT(selectConfigurationsImpl(Queries.selectConfigurations(pid)))
