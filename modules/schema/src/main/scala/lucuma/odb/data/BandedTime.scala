@@ -3,7 +3,7 @@
 
 package lucuma.odb.data
 
-import cats.Eq
+import cats.Order
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.sequence.CategorizedTime
 
@@ -15,5 +15,5 @@ case class BandedTime(
 object BandedTime:
   val Empty: BandedTime = BandedTime(None, CategorizedTime.Zero)
 
-  given Eq[BandedTime] =
-    Eq.by(a => (a.band, a.time))
+  given Order[BandedTime] =
+    Order.by(a => (a.band, a.time))
