@@ -18,9 +18,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
 
-class setProposalStatus extends OdbSuite {
+class setProposalStatus extends OdbSuite 
+  with ObservingModeSetupOperations {
 
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
@@ -539,6 +541,119 @@ class setProposalStatus extends OdbSuite {
       expected =
         Left(List(OdbError.InvalidProgram(badPid).message))
     )
+  }
+
+  test("ensure that configuration requests are created when the proposal is submitted") {
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <-
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  configurationRequests {
+                    matches {
+                      status
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "configurationRequests" : {
+                      "matches" : [
+                        {
+                          "status" : "REQUESTED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+    yield ()
+
+  }
+
+  test("ensure that configuration requests are deleted when the proposal is withdrawn") {
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <-
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                }
+              }
+            }
+          """
+        )
+      _ <- expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: NOT_SUBMITTED
+                }
+              ) {
+                program {
+                  configurationRequests {
+                    matches {
+                      status
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "configurationRequests" : {
+                      "matches" : []
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
+    yield ()
+
   }
 
 }

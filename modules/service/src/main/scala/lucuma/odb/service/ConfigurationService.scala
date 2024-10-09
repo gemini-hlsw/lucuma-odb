@@ -3,20 +3,25 @@
 
 package lucuma.odb.service
 
+import cats.Monoid
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
 import io.circe.ACursor
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.odb.data.Configuration
 import lucuma.odb.data.Configuration.Conditions
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.OdbErrorExtensions.asWarning
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Query
@@ -30,8 +35,14 @@ trait ConfigurationService[F[_]] {
   /** Selects all configuration requests that subsume this observation's configuration. */
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
 
-  /* Inserts a new `ConfigurationRequest` based on the configuration of `oid`. */
-  def insertRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
+  /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
+  def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
+
+  /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each observation in `pid`. */
+  def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]]
+
+  /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
+  def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
 
 }
 
@@ -47,25 +58,62 @@ object ConfigurationService {
       override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]] =
         impl.selectRequests(oid).value
 
-      override def insertRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
-        impl.insertRequest(oid).value
+      override def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
+        impl.canonicalizeRequest(oid).value
+
+      override def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]] =
+        impl.canonicalizeAll(pid).value
+
+      override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
+        session.prepareR(Statements.DeleteRequests).use: pq =>
+          pq.stream(pid, 1024).compile.toList.map(Result(_))
 
     }
 
   /** An implementation with unwrapped parameters and results in more natural types. */
   private class Impl[F[_]: Concurrent](using Services[F]) {
 
-    def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
+    private def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
       ResultT:
-        services.runGraphQLQuery(Queries.selectConfiguration(oid)).map: r =>
-          r.flatMap: json =>
-            json.hcursor.downField("observation").downField("configuration").as[Configuration] match
-              case Right(conf) => Result(conf)
-              case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some("Reference coordinates are not available.")).asFailure
-              case Left(Configuration.DecodingFailures.NoObservingMode) => OdbError.InvalidConfiguration(Some("Observing mode is undefined.")).asFailure
-              case Left(other)  => Result.failure(other.getMessage) // TODO: this probably isn't good enough
+        selectConfigurations(List(oid)).value.map: result =>
+          result.flatMap: map =>
+            map.get(oid) match
+              case Some(config) => Result(config)          
+              case None => OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asFailure
 
-    def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
+    // A monoid specifically for the fold below, which concatenates maps
+    private given Monoid[Result[Map[Observation.Id, Configuration]]] =
+      Monoid.instance(Result(Map.empty), (a, b) => (a, b).mapN(_ ++ _))
+
+    /** Select the configurations for many observations, warning for any that are invalid. */
+    private def selectConfigurationsImpl(graphQLQuery: String)(using Transaction[F]): F[Result[Map[Observation.Id, Configuration]]] =
+      services.runGraphQLQuery(graphQLQuery).map: r =>
+        r.flatMap: json =>
+          json.hcursor.downField("observations").downField("matches").as[List[Json]] match
+            case Left(error)  => Result.failure(error.getMessage) // Should never happen
+            case Right(jsons) =>
+              jsons.foldMap: json =>
+                val hc = json.hcursor
+                hc.downField("id").as[Observation.Id] match
+                  case Left(value) => Result.internalError(value.getMessage) 
+                  case Right(obsid) =>                       
+                    hc.downField("configuration").as[Configuration] match
+                      case Right(cfg) => Result(Map(obsid -> cfg))
+                      case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
+                      case Left(Configuration.DecodingFailures.NoObservingMode)        => OdbError.InvalidConfiguration(Some(s"Observing mode is undefined for observation $obsid.")).asWarning(Map.empty)
+                      case Left(other) => Result.internalError(other.getMessage)
+
+    private def selectConfigurations(oids: List[Observation.Id])(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
+      ResultT:
+        selectConfigurationsImpl(Queries.selectConfigurations(oids)).map: res =>
+          oids.foldLeft(res): (res, oid) =>
+            if res.toOption.exists(_.contains(oid)) then res
+            else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asWarning(Map.empty)
+
+    private def selectConfigurations(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
+      ResultT(selectConfigurationsImpl(Queries.selectConfigurations(pid)))
+
+    private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
           r.flatMap: json =>
@@ -73,51 +121,91 @@ object ConfigurationService {
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
 
+    private def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+      ResultT.liftF:
+        session.prepareR(Statements.InsertRequest).use: pq =>
+          pq.option(oid, cfg).flatMap:
+            case Some(req) => req.pure[F]
+            case None      =>
+              session.prepareR(Statements.SelectRequest).use: pq =>
+                pq.unique(oid, cfg)
+
     def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       selectAllRequestsForProgram(oid).flatMap: crs =>
         if crs.isEmpty then Nil.pure[ResultT[F, *]] // in this case we can avoid the call to `selectConfiguration`
         else selectConfiguration(oid).map: cfg =>
           crs.filter(_.configuration.subsumes(cfg))
 
-    def insertRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
-      selectConfiguration(oid).flatMap(insertRequest(oid, _))
+    def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
+      selectConfiguration(oid).flatMap(canonicalizeRequest(oid, _))
 
-    def insertRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
-      ResultT.liftF:
-        session.prepareR(Statements.InsertRequest).use: pq =>
-          pq.unique(oid, cfg)
+    def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
+      selectConfigurations(pid).flatMap: map =>
+        map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
 
   } 
 
   private object Queries {
 
-    def selectConfiguration(oid: Observation.Id) =
+    def selectConfigurations(oids: List[Observation.Id]): String =
+      selectConfigurations(whereOidsIn(oids))
+
+    def selectConfigurations(pid: Program.Id): String =
+      selectConfigurations(wherePid(pid))
+
+    private def whereOidsIn(oids: List[Observation.Id]) =
+      s"""
+        WHERE: {
+          id: {
+            IN: ${oids.asJson}
+          }
+        }
+      """
+
+    private def wherePid(pid: Program.Id) =
+      s"""
+        WHERE: {
+          program: {
+            id: {
+              EQ: ${pid.asJson}
+            }
+          }
+        }
+      """
+
+    private def selectConfigurations(where: String): String =
       s"""
         query {
-          observation(observationId: "$oid") {
-            configuration {
-              conditions {
-                imageQuality
-                cloudExtinction
-                skyBackground
-                waterVapor
-              }
-              referenceCoordinates {
-                ra { 
-                  hms 
+          observations(           
+            $where
+            LIMIT: 1000 # TODO: we need unlimited in this case
+          ) {
+            matches {
+              id
+              configuration {
+                conditions {
+                  imageQuality
+                  cloudExtinction
+                  skyBackground
+                  waterVapor
                 }
-                dec { 
-                  dms 
+                referenceCoordinates {
+                  ra { 
+                    hms 
+                  }
+                  dec { 
+                    dms 
+                  }
                 }
-              }
-              observingMode {
-                instrument
-                mode
-                gmosNorthLongSlit {
-                  grating
-                }
-                gmosSouthLongSlit {
-                  grating
+                observingMode {
+                  instrument
+                  mode
+                  gmosNorthLongSlit {
+                    grating
+                  }
+                  gmosSouthLongSlit {
+                    grating
+                  }
                 }
               }
             }
@@ -166,10 +254,113 @@ object ConfigurationService {
           }
         }
       """
+
   }
 
   private object Statements {
 
+    // select matching row, if any
+    val SelectRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
+      sql"""
+        SELECT
+          c_configuration_request_id,
+          c_status,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_reference_ra,
+          c_reference_dec,
+          c_observing_mode_type,
+          c_gmos_north_longslit_grating,
+          c_gmos_south_longslit_grating
+        FROM t_configuration_request
+        WHERE (
+          c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
+          c_cloud_extinction = $cloud_extinction AND
+          c_image_quality = $image_quality AND
+          c_sky_background = $sky_background AND
+          c_water_vapor = $water_vapor AND
+          c_reference_ra = $right_ascension AND
+          c_reference_dec = $declination AND
+          c_observing_mode_type = $observing_mode_type AND
+          c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
+          c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt}
+        ) 
+      """.query(
+        (
+          configuration_request_id *:
+          configuration_request_status *:
+          cloud_extinction         *:
+          image_quality            *:
+          sky_background           *:
+          water_vapor              *:
+          right_ascension          *:
+          declination              *:
+          observing_mode_type      *:
+          gmos_north_grating.opt   *:
+          gmos_south_grating.opt
+        ).emap:       
+          { case 
+            id                       *:
+            status                   *:
+            cloudExtinction          *:
+            imageQuality             *:
+            skyBackground            *:
+            waterVapor               *:
+            rightAscension           *:
+            declination              *:
+            observingModeType        *:
+            gmosNorthLongSlitGrating *:
+            gmosSouthLongSlitGrating *:
+            EmptyTuple =>
+
+              val mode: Either[String, Configuration.ObservingMode] = 
+                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+
+                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                    Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
+                  
+                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                    Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
+                  
+                  case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
+
+              mode.map: m =>
+                ConfigurationRequest(
+                  id, 
+                  status,
+                  Configuration(
+                    Conditions(
+                      cloudExtinction,
+                      imageQuality,
+                      skyBackground,
+                      waterVapor
+                    ),
+                    Coordinates(
+                      rightAscension,
+                      declination
+                    ),
+                    m
+                  )
+                )
+
+          }
+      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
+        oid                                                         *:
+        cfg.conditions.cloudExtinction                              *:
+        cfg.conditions.imageQuality                                 *:
+        cfg.conditions.skyBackground                                *:
+        cfg.conditions.waterVapor                                   *:
+        cfg.refererenceCoordinates.ra                               *:
+        cfg.refererenceCoordinates.dec                              *:
+        cfg.observingMode.tpe                                       *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
+        EmptyTuple
+      }
+
+    // insert and return row, or return nothing if a matching row exists
     val InsertRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
       sql"""
         INSERT INTO t_configuration_request (
@@ -194,7 +385,9 @@ object ConfigurationService {
           $observing_mode_type,
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt}
-        ) RETURNING
+        ) 
+        ON CONFLICT DO NOTHING
+        RETURNING
           c_configuration_request_id,
           c_status,
           c_cloud_extinction,
@@ -278,6 +471,14 @@ object ConfigurationService {
         cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
         EmptyTuple
       }
+
+    val DeleteRequests: Query[Program.Id, ConfigurationRequest.Id] =
+      // todo: access control
+      sql"""
+        delete from t_configuration_request
+        where c_program_id = $program_id
+        returning c_configuration_request_id
+      """.query(configuration_request_id)
 
   }
 
