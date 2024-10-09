@@ -402,8 +402,10 @@ object ProposalService {
           newStatus <- ResultT.fromResult(input.status.toProposalStatus)
           _         <- ResultT.fromResult(validate(pid, info, oldStatus, newStatus))
           _         <- ResultT.liftF(update(pid, input.status))
+          _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
+          _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
         } yield pid).value
-      }
+      }                
     }
 
   private object Statements {

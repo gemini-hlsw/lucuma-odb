@@ -52,7 +52,7 @@ class program_configurationRequests extends OdbSuite with ObservingModeSetupOper
       tid   <- createTargetWithProfileAs(pi, pid)
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
-      _     <- select(pi, pid, ids)
+      _     <- select(pi, pid, ids.distinct)
     yield ()
 
   }
