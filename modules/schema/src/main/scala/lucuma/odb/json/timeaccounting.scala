@@ -15,6 +15,7 @@ import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
@@ -26,6 +27,7 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.BandedTime
 import lucuma.sso.client.codec.user.*
 
 trait TimeAccountingCodec {
@@ -168,6 +170,22 @@ trait TimeAccountingCodec {
         "partner"    -> a(ChargeClass.Partner).asJson,
         "nonCharged" -> a(ChargeClass.NonCharged).asJson,
         "total"      -> a.sum.asJson
+      )
+    }
+
+  given Decoder[BandedTime] =
+    Decoder.instance { c =>
+      for {
+        b <- c.downField("band").as[Option[ScienceBand]]
+        t <- c.downField("time").as[CategorizedTime]
+      } yield BandedTime(b, t)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[BandedTime] =
+    Encoder.instance { (a: BandedTime) =>
+      Json.obj(
+        "band" -> a.band.asJson,
+        "time" -> a.time.asJson
       )
     }
 
