@@ -29,6 +29,9 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import skunk.AppliedFragment
+
+import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
 
 trait ConfigurationService[F[_]] {
 
@@ -43,6 +46,8 @@ trait ConfigurationService[F[_]] {
 
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
+
+  def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] = ???
 
 }
 

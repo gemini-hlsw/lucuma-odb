@@ -318,6 +318,7 @@ trait BaseMapping[F[_]]
   lazy val UnlinkUserResultType                    = schema.ref("UnlinkUserResult")
   lazy val UpdateAsterismsResultType               = schema.ref("UpdateAsterismsResult")
   lazy val UpdateCallsForProposalsResultType       = schema.ref("UpdateCallsForProposalsResult")
+  lazy val UpdateConfigurationRequestsResultType   = schema.ref("UpdateConfigurationRequestsResult")
   lazy val UpdateDatasetsResultType                = schema.ref("UpdateDatasetsResult")
   lazy val UpdateGroupsResultType                  = schema.ref("UpdateGroupsResult")
   lazy val UpdateObsAttachmentsResultType          = schema.ref("UpdateObsAttachmentsResult")
