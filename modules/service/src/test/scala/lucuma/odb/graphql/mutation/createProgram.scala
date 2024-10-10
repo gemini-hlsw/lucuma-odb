@@ -87,6 +87,87 @@ class createProgram extends OdbSuite {
     )
   }
 
+  test("proprietaryMonths defaults to 0") {
+    expect(
+      user = pi,
+      query =
+        """
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  name: "Foo"
+                }
+              }
+            ) {
+              program {
+                name
+                proprietaryMonths
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram" : {
+              "program": {
+                "name" : "Foo",
+                "proprietaryMonths": 0
+              }
+            }
+          }
+        """.asRight
+    )
+  }
+
+  val CreateWithProprietaryMonths =
+    """
+      mutation {
+        createProgram(
+          input: {
+            SET: {
+              name: "Foo",
+              proprietaryMonths: 42
+            }
+          }
+        ) {
+          program {
+            name
+            proprietaryMonths
+          }
+        }
+      }
+    """
+
+  test("proprietaryMonths may be specified as staff") {
+    expect(
+      user     = staff,
+      query    = CreateWithProprietaryMonths,
+      expected =
+        json"""
+          {
+            "createProgram" : {
+              "program": {
+                "name" : "Foo",
+                "proprietaryMonths": 42
+              }
+            }
+          }
+        """.asRight
+    )
+  }
+
+  test("proprietaryMonths may not be specified as pi") {
+    expect(
+      user     = pi,
+      query    = CreateWithProprietaryMonths,
+      expected = List(
+        "Only staff may set the proprietary months."
+      ).asLeft
+    )
+  }
+
   test("guest + standard/pi,ngo,staff,admin user becomes the PI") {
     List(guest, pi, ngo, staff, admin).traverse { u =>
       val name = s"${u.displayName}'s Science Program"
@@ -173,7 +254,8 @@ class createProgram extends OdbSuite {
                 s.programService
                   .insertCalibrationProgram(
                     ProgramPropertiesInput.Create(
-                      NonEmptyString.from(name).toOption
+                      NonEmptyString.from(name).toOption,
+                      None,
                     ).some,
                     CalibrationRole.Photometric,
                     Description.unsafeFrom("PHOTO"))(using xa)

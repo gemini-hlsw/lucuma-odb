@@ -74,7 +74,9 @@ class updateCallsForProposals extends OdbSuite {
     }
 
   test("type") {
-    createCall.flatMap { id =>
+    // changing the type should work, but it doesn't go back and silently set
+    // the proprietaryMonths to match.
+    createCall.flatMap: id =>
       expect(
         staff,
         s"""
@@ -89,6 +91,7 @@ class updateCallsForProposals extends OdbSuite {
             }) {
               callsForProposals {
                 type
+                proprietaryMonths
               }
             }
           }
@@ -98,14 +101,14 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "type": "DEMO_SCIENCE"
+                  "type": "DEMO_SCIENCE",
+                  "proprietaryMonths": 12
                 }
               ]
             }
           }
         """.asRight
       )
-    }
   }
 
   test("semester") {
@@ -920,5 +923,39 @@ class updateCallsForProposals extends OdbSuite {
         """.asRight
       )
     } yield ()
+  }
+
+  test("proprietaryMonths") {
+    createCall.flatMap: id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                proprietaryMonths: 36
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                proprietaryMonths
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "proprietaryMonths": 36
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
   }
 }
