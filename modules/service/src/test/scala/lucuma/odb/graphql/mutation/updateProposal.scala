@@ -7,6 +7,7 @@ package mutation
 
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.Program
@@ -174,7 +175,8 @@ class updateProposal extends OdbSuite {
             }
           }
         """.asRight
-      )
+      ) *>
+      assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(0).some)
     }
   }
 
@@ -228,7 +230,8 @@ class updateProposal extends OdbSuite {
             }
           }
         """.asRight
-      )
+      ) *>
+      assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(0).some)
     }
   }
 
@@ -528,7 +531,8 @@ class updateProposal extends OdbSuite {
               }
             }
           """.asRight
-        )
+        ) *>
+        assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(12).some)
       }
     }
   }
@@ -599,6 +603,7 @@ class updateProposal extends OdbSuite {
             }
           """
         ) *>
+        assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(12).some) *>
         createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
           expect(
             user = pi,
@@ -633,7 +638,7 @@ class updateProposal extends OdbSuite {
                 }
               }
             """.asRight
-          )
+          ) *> assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(3).some)
         }
       }
     }

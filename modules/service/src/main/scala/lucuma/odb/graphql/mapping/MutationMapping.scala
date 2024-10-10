@@ -385,9 +385,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       services.useTransactionally {
-        programService.insertProgram(input.SET).map { id =>
-          Result(Unique(Filter(Predicates.program.id.eql(id), child)))
-        }
+        programService.insertProgram(input.SET).nestMap: id =>
+          Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
 

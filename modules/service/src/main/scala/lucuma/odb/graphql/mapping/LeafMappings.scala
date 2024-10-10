@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -137,6 +138,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
+      LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),

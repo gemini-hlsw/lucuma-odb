@@ -16,6 +16,8 @@ trait ProgramTable[F[_]] extends BaseMapping[F] {
     val Name            = col("c_name", text_nonempty.opt)
     val ProposalStatus  = col("c_proposal_status", tag)
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
+    val Proprietary     = col("c_proprietary", int4_nonneg)
+
     object PlannedTime {
       val Pi        = col("c_pts_pi", time_span)
       val Uncharged = col("c_pts_uncharged", time_span)

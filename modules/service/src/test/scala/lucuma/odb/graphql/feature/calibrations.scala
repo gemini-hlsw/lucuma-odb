@@ -468,7 +468,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 s.session.transaction.use { xa =>
                   s.programService
                     .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create(None).some,
+                      ProgramPropertiesInput.Create.Empty.some,
                       CalibrationRole.SpectroPhotometric,
                       Description.unsafeFrom("SPECTROTEST"))(using xa)
                 }
