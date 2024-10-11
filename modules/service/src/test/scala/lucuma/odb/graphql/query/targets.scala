@@ -183,7 +183,7 @@ class targets extends OdbSuite {
               s.session.transaction.use { xa =>
                 s.programService
                   .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create(None).some,
+                    ProgramPropertiesInput.Create.Empty.some,
                     CalibrationRole.Telluric,
                     Description.unsafeFrom("TELLURIC1"))(using xa)
               }
@@ -233,7 +233,7 @@ class targets extends OdbSuite {
               s.session.transaction.use { xa =>
                 s.programService
                   .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create(None).some,
+                    ProgramPropertiesInput.Create.Empty.some,
                     CalibrationRole.Photometric,
                     Description.unsafeFrom("PHOTO"))(using xa)
               }
@@ -284,7 +284,7 @@ class targets extends OdbSuite {
                 s.session.transaction.use { xa =>
                   s.programService
                     .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create(None).some,
+                      ProgramPropertiesInput.Create.Empty.some,
                       CalibrationRole.Telluric,
                       Description.unsafeFrom("TELLURIC2"))(using xa)
                 }

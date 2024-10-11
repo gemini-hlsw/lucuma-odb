@@ -13,11 +13,13 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Semester
 import lucuma.odb.data.Nullable
@@ -26,12 +28,9 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
+import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
-import skunk.AppliedFragment
-import skunk.Command
-import skunk.Query
-import skunk.SqlState
-import skunk.Transaction
+import skunk.*
 import skunk.codec.temporal.date
 import skunk.implicits.*
 
@@ -39,9 +38,9 @@ import Services.Syntax.*
 
 trait CallForProposalsService[F[_]] {
 
-  def typeAndSemesterOf(
+  def selectProperties(
     cid: CallForProposals.Id
-  )(using Transaction[F]): F[Option[(CallForProposalsType, Semester)]]
+  )(using Transaction[F]): F[Option[CallForProposalsService.CfpProperties]]
 
   def createCallForProposals(
     input: CreateCallForProposalsInput
@@ -56,13 +55,30 @@ trait CallForProposalsService[F[_]] {
 
 object CallForProposalsService {
 
+  case class CfpProperties(
+    cid:         CallForProposals.Id,
+    callType:    CallForProposalsType,
+    semester:    Semester,
+    proprietary: NonNegInt
+  ):
+    def validateSubtype(sub: ScienceSubtype): Result[Unit] =
+      CfpProperties.mismatchedCfp(cid, callType, sub)
+        .asFailure
+        .unlessA(sub.isCompatibleWith(callType))
+
+  object CfpProperties:
+    def mismatchedCfp(cid:  CallForProposals.Id, cfpType: CallForProposalsType, sub:  ScienceSubtype): OdbError =
+      OdbError.InvalidArgument(
+        s"The Call for Proposals $cid is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".some
+      )
+
   def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): CallForProposalsService[F] =
     new CallForProposalsService[F] {
 
-      override def typeAndSemesterOf(
+      override def selectProperties(
         cid: CallForProposals.Id
-      )(using Transaction[F]): F[Option[(CallForProposalsType, Semester)]] =
-        session.option(Statements.SelectTypeAndSemester)(cid)
+      )(using Transaction[F]): F[Option[CfpProperties]] =
+        session.option(Statements.SelectProperties)(cid)
 
       override def createCallForProposals(
         input: CreateCallForProposalsInput
@@ -166,12 +182,15 @@ object CallForProposalsService {
 
   object Statements {
 
-    val SelectTypeAndSemester: Query[CallForProposals.Id, (CallForProposalsType, Semester)] =
+    val cfp_properties: Codec[CfpProperties] =
+      (cfp_id *: cfp_type *: semester *: int4_nonneg).to[CfpProperties]
+
+    val SelectProperties: Query[CallForProposals.Id, CfpProperties] =
       sql"""
-        SELECT c_type, c_semester
+        SELECT c_cfp_id, c_type, c_semester, c_proprietary
           FROM t_cfp
          WHERE c_cfp_id = $cfp_id AND c_existence = 'present'::e_existence
-      """.query(cfp_type *: semester)
+      """.query(cfp_properties)
 
     val InsertCallForProposals: Query[CallForProposalsPropertiesInput.Create, CallForProposals.Id] =
       sql"""
@@ -189,6 +208,7 @@ object CallForProposalsService {
           c_deadline_default,
           c_active_start,
           c_active_end,
+          c_proprietary,
           c_existence
         )
         SELECT
@@ -205,6 +225,7 @@ object CallForProposalsService {
           ${core_timestamp.opt},
           $date,
           $date,
+          COALESCE(${int4_nonneg.opt}, (SELECT c_proprietary FROM t_cfp_type WHERE c_type = $cfp_type)),
           $existence
         RETURNING
           c_cfp_id
@@ -222,6 +243,8 @@ object CallForProposalsService {
         input.deadline,
         input.active.start,
         input.active.end,
+        input.proprietary,
+        input.cfpType,
         input.existence
       )}
 
@@ -300,6 +323,7 @@ object CallForProposalsService {
       val gsDecEnd    = sql"c_south_dec_end   = $declination"
       val activeStart = sql"c_active_start    = $date"
       val activeEnd   = sql"c_active_end      = $date"
+      val proprietary = sql"c_proprietary     = $int4_nonneg"
 
       val upExistence = sql"c_existence = $existence"
       val upSemester  = sql"c_semester  = $semester"
@@ -320,6 +344,7 @@ object CallForProposalsService {
           SET.active.flatMap(_.toOption).map(activeEnd),
           SET.existence.map(upExistence),
           SET.semester.map(upSemester),
+          SET.proprietary.map(proprietary),
           SET.cfpType.map(upType)
         ).flatten)
 

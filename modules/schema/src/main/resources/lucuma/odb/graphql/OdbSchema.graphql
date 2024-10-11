@@ -429,6 +429,11 @@ type CallForProposals {
   instruments: [Instrument!]!
 
   """
+  Default proprietary period to use for propograms linked to this Call.
+  """
+  proprietaryMonths: NonNegInt!
+
+  """
   Whether this Call is PRESENT or has been DELETED.
   """
   existence: Existence!
@@ -495,6 +500,12 @@ input CallForProposalsPropertiesInput {
   supply the entire list of instruments to set.  Nullable on edit.
   """
   instruments: [Instrument!]
+
+  """
+  The default proprietary period for proposals linked to this call.  If not
+  specified, the default period for the call type will be used.
+  """
+  proprietaryMonths: NonNegInt
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
@@ -3427,6 +3438,15 @@ input ProgramPropertiesInput {
   The program name, which is both optional and nullable
   """
   name: NonEmptyString
+
+  """
+  Set the proprietaryMonths for this program.  This property is only applicable
+  to normal science programs (i.e., not CAL, ENG, MON programs etc.). It is
+  automatically set (or reset) when/if the program's Call For Proposals is
+  assigned.  Otherwise it defaults to 0 months but may be changed via this
+  input.
+  """
+  proprietaryMonths: NonNegInt
 
   """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
@@ -8880,6 +8900,13 @@ type Program {
   Calibration role of the program
   """
   calibrationRole: CalibrationRole
+
+  """
+  How many months to withhold public access to the data.  This property is
+  applicable to science programs, defaults to the proprietary period associated
+  with the Call for Proposals if any; 0 months otherwise.
+  """
+  proprietaryMonths: NonNegInt!
 
 }
 

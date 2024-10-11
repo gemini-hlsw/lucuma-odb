@@ -8,6 +8,7 @@ import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
@@ -70,7 +71,7 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id]
+  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Insert a new calibration program, PI is left empty.
@@ -221,24 +222,40 @@ object ProgramService {
             } yield r).value
       }
 
-      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
+      def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => period.isEmpty
+          )
+
+
+      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]] =
         Trace[F].span("insertProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
 
-          session
-            .prepareR(Statements.InsertProgram)
-            .use(_.unique(SETʹ.name))
-            .flatTap { pid =>
-              user match {
-                case ServiceUser(_, _) =>
-                  Concurrent[F].unit
-                case nonServiceUser    =>
-                  // Link the PI to the program.
-                  session.executeCommand(
-                    Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
-                  ).void
-              }
-            }
+          val create =
+            session
+              .prepareR(Statements.InsertProgram)
+              .use(_.unique(SETʹ.name, SETʹ.proprietaryMonths.getOrElse(NonNegInt.unsafeFrom(0))))
+              .flatTap: pid =>
+                user match
+                  case ServiceUser(_, _) =>
+                    Concurrent[F].unit
+                  case nonServiceUser    =>
+                    // Link the PI to the program.
+                    session.executeCommand(
+                      Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
+                    ).void
+              .map(_.success)
+
+          (for {
+            _ <- ResultT.fromResult(validateProprietaryPeriod(SETʹ.proprietaryMonths))
+            p <- ResultT(create)
+          } yield p).value
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -327,8 +344,10 @@ object ProgramService {
             case Some(R.SupportPrimary | R.SupportSecondary)  => requireStaffAccess(unlinkUnconditionally(input))
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
-        F[Result[List[Program.Id]]] = {
+      def updatePrograms(
+        SET:   ProgramPropertiesInput.Edit,
+        where: AppliedFragment
+      )(using Transaction[F]): F[Result[List[Program.Id]]] = {
 
         // Create the temp table with the programs we're updating. We will join with this
         // several times later on in the transaction.
@@ -349,7 +368,8 @@ object ProgramService {
           }
 
         (for {
-          _   <- ResultT(setup.map(Result.apply))
+          _   <- ResultT.liftF(setup)
+          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.proprietaryMonths))
           ids <- ResultT(updatePrograms)
         } yield ids).value
 
@@ -487,7 +507,8 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.map(sql"c_name = $text_nonempty")
+          SET.name.map(sql"c_name = $text_nonempty"),
+          SET.proprietaryMonths.map(sql"c_proprietary = $int4_nonneg")
         ).flatten
       )
 
@@ -649,10 +670,10 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[Option[NonEmptyString], Program.Id] =
+    val InsertProgram: Query[(Option[NonEmptyString], NonNegInt), Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name)
-        VALUES (${text_nonempty.opt})
+        INSERT INTO t_program (c_name, c_proprietary)
+        VALUES (${text_nonempty.opt}, $int4_nonneg)
         RETURNING c_program_id
       """.query(program_id)
 

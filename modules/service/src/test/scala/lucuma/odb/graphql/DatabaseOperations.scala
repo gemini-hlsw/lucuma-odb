@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
@@ -279,6 +280,24 @@ trait DatabaseOperations { this: OdbSuite =>
           )
         ).asRight
     )
+
+  def getProprietaryMonths(
+    user: User,
+    pid:  Program.Id
+  ): IO[Option[NonNegInt]] =
+    query(user, s"""
+      query {
+        program(programId: "$pid") {
+          proprietaryMonths
+        }
+      }
+    """).flatMap: js =>
+      js.hcursor
+        .downFields("program", "proprietaryMonths")
+        .success
+        .traverse(_.as[Int].map(NonNegInt.unsafeFrom))
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
 
   def addPartnerSplits(
     user: User,
