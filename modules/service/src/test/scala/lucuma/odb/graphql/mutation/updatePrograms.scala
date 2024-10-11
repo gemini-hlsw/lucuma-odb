@@ -212,4 +212,58 @@ class updatePrograms extends OdbSuite {
     }
   }
 
+  def editProprietaryMonthsQuery(pid: Program.Id): String =
+    s"""
+      mutation {
+        updatePrograms(
+          input: {
+            SET: {
+              proprietaryMonths: 42
+            }
+            WHERE: {
+              id: {
+                EQ: "$pid"
+              }
+            }
+          }
+        ) {
+          programs {
+            id
+            proprietaryMonths
+          }
+        }
+      }
+    """
+
+  test("can edit proprietaryMonths as staff") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query = editProprietaryMonthsQuery(pid),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "proprietaryMonths": 42
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("cannot edit proprietaryMonths as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = editProprietaryMonthsQuery(pid),
+        expected = List(
+          "Only staff may set the proprietary months."
+        ).asLeft
+      )
+  }
 }
