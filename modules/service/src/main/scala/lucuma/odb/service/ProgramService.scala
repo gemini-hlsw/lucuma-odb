@@ -8,7 +8,6 @@ import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
@@ -230,7 +229,7 @@ object ProgramService {
           .unlessA(
             user.role.access match
               case Access.Admin | Access.Service | Access.Staff => true
-              case _ => period.forall(_ === NonNegInt.unsafeFrom(0))
+              case _                                            => period.isEmpty
           )
 
 
