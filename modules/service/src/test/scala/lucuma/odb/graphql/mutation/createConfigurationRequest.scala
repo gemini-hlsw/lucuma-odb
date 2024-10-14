@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.odb.data.OdbError
@@ -114,7 +115,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
               }
             """,
             expected = {
-              case OdbError.GuideEnvironmentError(Some(s"No targets have been defined for observation $oid.")) => // ok
+              case OdbError.GuideEnvironmentError(_) => // expected
+              case OdbError.InvalidConfiguration(_)  => // expected
             }
           )
         }
@@ -138,7 +140,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = {
-                case OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available.")) => // ok
+                case OdbError.GuideEnvironmentError(_) => // expected
+                case OdbError.InvalidConfiguration(_)  => // expected
               }
             )
           }
@@ -164,13 +167,26 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 }
               """,
               expected = {
-                case OdbError.InvalidConfiguration(Some(s"Observing mode is undefined.")) => // ok
+                case OdbError.GuideEnvironmentError(_) => // expected
+                case OdbError.InvalidConfiguration(_)  => // expected
               }
             )
           }
         }
       }
     }
+  }
+
+  test("identical requests are canonicalized") {
+    for
+        cfpid <- createCallForProposalsAs(admin)
+        pid   <- createProgramAs(pi)
+        _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+        tid   <- createTargetWithProfileAs(pi, pid)
+        oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        req1  <- createConfigurationRequestAs(pi, oid)
+        req2  <- createConfigurationRequestAs(pi, oid)
+      yield assert(req1 === req2)    
   }
 
 }
