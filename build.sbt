@@ -1,6 +1,7 @@
 val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.9"
+val circeVersion               = "0.14.10"
+val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.6.0"
 val clueVersion                = "0.40.0"
 val declineVersion             = "2.4.1"
@@ -16,10 +17,10 @@ val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.7"
 val log4catsVersion            = "2.7.0"
 val lucumaCatalogVersion       = "0.48.3"
-val lucumaItcVersion           = "0.22.3"
-val lucumaCoreVersion          = "0.105.0"
+val lucumaItcVersion           = "0.22.4"
+val lucumaCoreVersion          = "0.105.1"
 val lucumaGraphQLRoutesVersion = "0.8.14"
-val lucumaSsoVersion           = "0.6.24"
+val lucumaSsoVersion           = "0.6.25"
 val munitVersion               = "0.7.29" // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
@@ -57,7 +58,7 @@ lazy val schema =
       libraryDependencies ++= Seq(
         "io.circe"       %%% "circe-parser"                    % circeVersion,
         "io.circe"       %%% "circe-literal"                   % circeVersion,
-        "io.circe"       %%% "circe-refined"                   % circeVersion,
+        "io.circe"       %%% "circe-refined"                   % circeRefinedVersion,
         "io.circe"       %%% "circe-testing"                   % circeVersion               % Test,
         "edu.gemini"     %%% "lucuma-core"                     % lucumaCoreVersion,
         "edu.gemini"     %%% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,
