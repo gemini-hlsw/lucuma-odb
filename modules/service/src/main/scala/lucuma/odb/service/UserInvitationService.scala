@@ -55,11 +55,6 @@ trait UserInvitationService[F[_]]:
 
 object UserInvitationService:
 
-  // temporary
-  extension (self: OdbError.InvitationError.type)
-    def apply(id: UserInvitation.Id, detail: Option[String]): OdbError.InvitationError =
-      OdbError.InvitationError(UserInvitation.Id.fromString.reverseGet(id), detail)
-
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
 
