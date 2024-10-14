@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import grackle.Cursor
 import grackle.Predicate
@@ -19,6 +18,7 @@ import grackle.Result
 import grackle.Type
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
@@ -42,7 +42,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   private lazy val proposalTypeDiscriminator: SqlDiscriminator =
     new SqlDiscriminator {
       override def discriminate(c:  Cursor): Result[Type] =
-        c.fieldAs[ScienceSubtype]("scienceSubtype").flatMap {
+        c.fieldAs[ScienceSubtype]("scienceSubtype").flatMap:
           case ScienceSubtype.Classical          => Result(ClassicalType)
           case ScienceSubtype.DemoScience        => Result(DemoScienceType)
           case ScienceSubtype.DirectorsTime      => Result(DirectorsTimeType)
@@ -51,13 +51,12 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case ScienceSubtype.PoorWeather        => Result(PoorWeatherType)
           case ScienceSubtype.Queue              => Result(QueueType)
           case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
-        }
 
-      private def mkPredicate(tpe: ScienceSubtype): Option[Predicate] =
-        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).some
+      private def mkPredicate(tpe: ScienceSubtype): Result[Predicate] =
+        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).success
 
-      override def narrowPredicate(tpe:  Type): Option[Predicate] =
-        tpe match {
+      override def narrowPredicate(tpe:  Type): Result[Predicate] =
+        tpe match
           case ClassicalType          => mkPredicate(ScienceSubtype.Classical)
           case DemoScienceType        => mkPredicate(ScienceSubtype.DemoScience)
           case DirectorsTimeType      => mkPredicate(ScienceSubtype.DirectorsTime)
@@ -66,8 +65,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case PoorWeatherType        => mkPredicate(ScienceSubtype.PoorWeather)
           case QueueType              => mkPredicate(ScienceSubtype.Queue)
           case SystemVerificationType => mkPredicate(ScienceSubtype.SystemVerification)
-          case _                      => none
-        }
+          case _                      => Result.internalError(s"Invalid discriminator: $tpe")
     }
 
   lazy val ClassicalMapping: ObjectMapping =

@@ -9,6 +9,7 @@ import grackle.Cursor
 import grackle.Predicate
 import grackle.Result
 import grackle.Type
+import grackle.syntax.*
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.graphql.table.TimingWindowView
 
@@ -37,25 +38,20 @@ trait TimingWindowMappings[F[_]] extends TimingWindowView[F] {
       discriminator = endDiscriminator
     )
 
-  object endDiscriminator extends SqlDiscriminator {
-    def discriminate(c: Cursor): Result[Type] = {
-      c.fieldAs[TimingWindowEndTypeEnum]("endType").map {
-        case TimingWindowEndTypeEnum.At => TimingWindowEndAtType
+  object endDiscriminator extends SqlDiscriminator:
+    def discriminate(c: Cursor): Result[Type] =
+      c.fieldAs[TimingWindowEndTypeEnum]("endType").map:
+        case TimingWindowEndTypeEnum.At    => TimingWindowEndAtType
         case TimingWindowEndTypeEnum.After => TimingWindowEndAfterType
-      }
-    }
 
-    def narrowPredicate(subtpe: Type): Option[Predicate] = {
-      def mkPredicate(tpe: TimingWindowEndTypeEnum): Option[Predicate] =
-        Some(Eql(TimingWindowEndType / "endType", Const(tpe)))
+    def narrowPredicate(subtpe: Type): Result[Predicate] =
+      def mkPredicate(tpe: TimingWindowEndTypeEnum): Result[Predicate] =
+        Eql(TimingWindowEndType / "endType", Const(tpe)).success
 
-      subtpe match {
-        case TimingWindowEndAtType => mkPredicate(TimingWindowEndTypeEnum.At)
+      subtpe match
+        case TimingWindowEndAtType    => mkPredicate(TimingWindowEndTypeEnum.At)
         case TimingWindowEndAfterType => mkPredicate(TimingWindowEndTypeEnum.After)
-        case _ => None
-      }
-    }
-  }
+        case _                        => Result.internalError(s"Invalid discriminator: $subtpe")
 
   // TimingWindowEntAt
   lazy val TimingWindowEndAtMapping =
