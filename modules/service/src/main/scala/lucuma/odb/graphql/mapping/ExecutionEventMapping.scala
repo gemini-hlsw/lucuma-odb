@@ -4,13 +4,13 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.option.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
+import grackle.syntax.*
 
 import table.AtomRecordTable
 import table.DatasetTable
@@ -53,26 +53,24 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       import lucuma.odb.data.ExecutionEventType.*
 
       override def discriminate(c: Cursor): Result[Type] =
-        c.fieldAs[lucuma.odb.data.ExecutionEventType]("eventType").map {
+        c.fieldAs[lucuma.odb.data.ExecutionEventType]("eventType").map:
           case Sequence => SequenceEventType
           case Slew     => SlewEventType
           case Atom     => AtomEventType
           case Step     => StepEventType
           case Dataset  => DatasetEventType
-        }
 
-      private def mkPredicate(eventType: lucuma.odb.data.ExecutionEventType): Option[Predicate] =
-        Eql(ExecutionEventType / "eventType", Const(eventType)).some
+      private def mkPredicate(eventType: lucuma.odb.data.ExecutionEventType): Result[Predicate] =
+        Eql(ExecutionEventType / "eventType", Const(eventType)).success
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
-        tpe match {
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
+        tpe match
           case SequenceEventType => mkPredicate(Sequence)
           case SlewEventType     => mkPredicate(Slew)
           case AtomEventType     => mkPredicate(Atom)
           case StepEventType     => mkPredicate(Step)
           case DatasetEventType  => mkPredicate(Dataset)
-          case _                 => none
-        }
+          case _                 => Result.internalError(s"Invalid discriminator: $tpe")
     }
 
   lazy val SequenceEventMapping: ObjectMapping =
