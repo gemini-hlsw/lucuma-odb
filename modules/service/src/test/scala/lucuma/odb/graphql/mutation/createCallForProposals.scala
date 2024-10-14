@@ -122,6 +122,7 @@ class createCallForProposals extends OdbSuite {
                 submissionDeadline
               }
               instruments
+              proprietaryMonths
               existence
             }
           }
@@ -183,8 +184,9 @@ class createCallForProposals extends OdbSuite {
                   "submissionDeadline": null
                 }
               ],
-              "instruments":   [],
-              "existence":     "PRESENT"
+              "instruments":       [],
+              "proprietaryMonths": 12,
+              "existence":         "PRESENT"
             }
           }
         }
@@ -581,6 +583,7 @@ class createCallForProposals extends OdbSuite {
               type
               allowsNonPartnerPi
               nonPartnerDeadline
+              proprietaryMonths
             }
           }
         }
@@ -592,7 +595,8 @@ class createCallForProposals extends OdbSuite {
               "id":   "c-106",
               "type": "DIRECTORS_TIME",
               "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31 10:00:02"
+              "nonPartnerDeadline": "2025-07-31 10:00:02",
+              "proprietaryMonths": 6
             }
           }
         }
@@ -623,6 +627,7 @@ class createCallForProposals extends OdbSuite {
               type
               allowsNonPartnerPi
               nonPartnerDeadline
+              proprietaryMonths
             }
           }
         }
@@ -634,7 +639,8 @@ class createCallForProposals extends OdbSuite {
               "id":   "c-107",
               "type": "DEMO_SCIENCE",
               "allowsNonPartnerPi": false,
-              "nonPartnerDeadline": null
+              "nonPartnerDeadline": null,
+              "proprietaryMonths": 3
             }
           }
         }
@@ -689,6 +695,40 @@ class createCallForProposals extends OdbSuite {
                   "raEnd": { "hms": "10:00:00.000000" }
                 }
               }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("success - explicit proprietaryMonths") {
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:              REGULAR_SEMESTER
+                semester:          "2024B"
+                activeStart:       "2024-07-31"
+                activeEnd:         "2025-02-01"
+                proprietaryMonths: 36
+              }
+            }
+          ) {
+            callForProposals {
+              proprietaryMonths
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "proprietaryMonths": 36
             }
           }
         }

@@ -7,6 +7,7 @@ package input
 import cats.Traverse
 import cats.data.Ior
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.CallForProposalsType
@@ -46,6 +47,7 @@ object CallForProposalsPropertiesInput {
     deadline:    Option[Timestamp],
     partners:    Option[List[CallForProposalsPartnerInput]],
     instruments: List[Instrument],
+    proprietary: Option[NonNegInt],
     existence:   Existence
   )
 
@@ -62,6 +64,7 @@ object CallForProposalsPropertiesInput {
           TimestampBinding.Option("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Option("partners", rPartners),
           InstrumentBinding.List.Option("instruments", rInstruments),
+          NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
           // Check that active start comes before end.
@@ -84,8 +87,9 @@ object CallForProposalsPropertiesInput {
             rDeadline,
             rPartnersʹ,
             rInstrumentsʹ,
+            rProprietary,
             rExistence.map(_.getOrElse(Existence.Present))
-          ).parMapN { (cfpType, semester, limits, active, deadline, partners, instruments, exist) =>
+          ).parMapN { (cfpType, semester, limits, active, deadline, partners, instruments, proprietary, exist) =>
             val coords = limits.fold(SiteCoordinateLimitsInput.Create.default(active))(f => f(active))
             Create(
               cfpType,
@@ -98,6 +102,7 @@ object CallForProposalsPropertiesInput {
               deadline,
               partners,
               instruments,
+              proprietary,
               exist
             )
           }
@@ -117,6 +122,7 @@ object CallForProposalsPropertiesInput {
     deadline:    Nullable[Timestamp],
     partners:    Nullable[List[CallForProposalsPartnerInput]],
     instruments: Nullable[List[Instrument]],
+    proprietary: Option[NonNegInt],
     existence:   Option[Existence]
   )
 
@@ -133,6 +139,7 @@ object CallForProposalsPropertiesInput {
           TimestampBinding.Nullable("submissionDeadlineDefault", rDeadline),
           CallForProposalsPartnerInput.Binding.List.Nullable("partners", rPartners),
           InstrumentBinding.List.Nullable("instruments", rInstruments),
+          NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           ExistenceBinding.NonNullable("existence", rExistence)
         ) => {
           val rLimNorth = rLimits.map(_.flatMap(_.north))
@@ -158,6 +165,7 @@ object CallForProposalsPropertiesInput {
             rDeadline,
             rPartnersʹ,
             rInstrumentsʹ,
+            rProprietary,
             rExistence
           ).parMapN(Edit.apply)
         }

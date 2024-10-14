@@ -10,6 +10,8 @@ import grackle.Cursor
 import grackle.Query
 import grackle.Query.EffectHandler
 import grackle.Result
+import grackle.Result.Failure
+import grackle.Result.Warning
 import grackle.ResultT
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
@@ -86,7 +88,9 @@ trait ConfigurationMapping[F[_]]
             services.use { implicit s =>
               s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
                 .getObjectTracking(pid, oid)
-                .map(_.map(_.at(refTime.toInstant).map(_.value)))
+                .map:
+                  case Failure(problems) => Warning(problems, None) // turn failure into a warning
+                  case other => other.map(_.at(refTime.toInstant).map(_.value))
             }
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =

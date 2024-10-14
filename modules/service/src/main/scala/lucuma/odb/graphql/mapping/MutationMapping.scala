@@ -363,7 +363,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("createConfigurationRequest", CreateConfigurationRequestInput.Binding) { (input, child) =>
       services.useTransactionally {
         requirePiAccess {
-          configurationService.insertRequest(input).nestMap { req =>
+          configurationService.canonicalizeRequest(input).nestMap { req =>
             Unique(Filter(Predicates.configurationRequest.id.eql(req.id), child))
           }
         }
@@ -385,9 +385,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       services.useTransactionally {
-        programService.insertProgram(input.SET).map { id =>
-          Result(Unique(Filter(Predicates.program.id.eql(id), child)))
-        }
+        programService.insertProgram(input.SET).nestMap: id =>
+          Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
 

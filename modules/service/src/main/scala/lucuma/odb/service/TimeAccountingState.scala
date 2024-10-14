@@ -246,7 +246,7 @@ object TimeAccountingState {
   def eventStreamPipe[F[_]](
     chargeClass: ChargeClass,
     visitId: Visit.Id
-  ): Pipe[F, TimeAccounting.Event, TimeAccountingState] = {
+  ): Pipe[F, TimeAccounting.Event, TimeAccountingState] = { in =>
 
     import TimeAccounting.AtomContext
     import TimeAccounting.Context
@@ -302,7 +302,7 @@ object TimeAccountingState {
        }
 
 
-    _.through(cleanEvents)
+    in.through(cleanEvents)
      .through(makeEntries)
      .filter { case (interval, _) => interval.nonEmpty }
      .fold(Empty.toMap) { case (state, (interval, ctx)) =>

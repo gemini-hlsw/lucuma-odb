@@ -6,6 +6,8 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
@@ -255,6 +257,32 @@ class createProposal extends OdbSuite with DatabaseOperations  {
       pid <- createProgramAs(pi)
       _   <- go(cid, pid)
     } yield ()
+  }
+
+  test("✓ assign proprietary period") { // proprietary months match the call
+    val months = for {
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
+      pid <- createProgramAs(pi)
+      _   <- addDemoScienceProposal(pi, pid, cid)
+      m   <- getProprietaryMonths(pi, pid)
+    } yield m
+    assertIO(months, NonNegInt.unsafeFrom(3).some)
+  }
+
+  test("✓ don't assign proprietary period") { // no call, no assignment
+    val months = for {
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, none,
+               """
+                 demoScience: {
+                   toOActivation: NONE
+                   minPercentTime: 0
+                 }
+               """.some
+             )
+      m   <- getProprietaryMonths(pi, pid)
+    } yield m
+    assertIO(months, NonNegInt.unsafeFrom(0).some)
   }
 
   test("✓ classical") {

@@ -1,6 +1,7 @@
 val catsParseVersion           = "1.0.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.9"
+val circeVersion               = "0.14.10"
+val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.6.0"
 val clueVersion                = "0.40.0"
 val declineVersion             = "2.4.1"
@@ -13,13 +14,13 @@ val http4sBlazeVersion         = "0.23.16"
 val http4sEmberVersion         = "0.23.27"
 val http4sJdkHttpClientVersion = "0.9.1"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.5.7"
+val logbackVersion             = "1.5.10"
 val log4catsVersion            = "2.7.0"
 val lucumaCatalogVersion       = "0.48.4"
-val lucumaItcVersion           = "0.22.3"
-val lucumaCoreVersion          = "0.105.0"
+val lucumaItcVersion           = "0.22.4"
+val lucumaCoreVersion          = "0.105.1"
 val lucumaGraphQLRoutesVersion = "0.8.14"
-val lucumaSsoVersion           = "0.6.24"
+val lucumaSsoVersion           = "0.6.25"
 val munitVersion               = "0.7.29" // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"  // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"  // check test output if you attempt to update this
@@ -32,8 +33,8 @@ val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.13"
-ThisBuild / scalaVersion       := "3.5.0"
-ThisBuild / crossScalaVersions := Seq("3.5.0")
+ThisBuild / scalaVersion       := "3.5.1"
+ThisBuild / crossScalaVersions := Seq("3.5.1")
 
 ThisBuild / Test / fork := false
 ThisBuild / Test / parallelExecution := false
@@ -57,7 +58,7 @@ lazy val schema =
       libraryDependencies ++= Seq(
         "io.circe"       %%% "circe-parser"                    % circeVersion,
         "io.circe"       %%% "circe-literal"                   % circeVersion,
-        "io.circe"       %%% "circe-refined"                   % circeVersion,
+        "io.circe"       %%% "circe-refined"                   % circeRefinedVersion,
         "io.circe"       %%% "circe-testing"                   % circeVersion               % Test,
         "edu.gemini"     %%% "lucuma-core"                     % lucumaCoreVersion,
         "edu.gemini"     %%% "lucuma-core-testkit"             % lucumaCoreVersion          % Test,

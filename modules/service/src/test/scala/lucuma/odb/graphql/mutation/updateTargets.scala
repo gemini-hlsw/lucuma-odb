@@ -132,7 +132,7 @@ class updateTargets extends OdbSuite {
                 s.session.transaction.use { xa =>
                   s.programService
                     .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create(None).some,
+                      ProgramPropertiesInput.Create.Empty.some,
                       CalibrationRole.Photometric,
                       Description.unsafeFrom("PHOTO"))(using xa)
                 }
