@@ -89,10 +89,10 @@ object Science:
 
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
-      t.plusMicrosOption(CalValidityPeriod.toMicroseconds).getOrElse(Timestamp.Max)
+      t +| CalValidityPeriod
 
     def minusCalValidityPeriod: Timestamp =
-      t.plusMicrosOption(- CalValidityPeriod.toMicroseconds).getOrElse(Timestamp.Min)
+      t -| CalValidityPeriod
 
   private val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
 
