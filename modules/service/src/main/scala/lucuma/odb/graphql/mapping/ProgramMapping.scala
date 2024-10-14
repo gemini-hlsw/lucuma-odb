@@ -22,9 +22,9 @@ import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.BandedTime
 import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates

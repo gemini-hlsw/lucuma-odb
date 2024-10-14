@@ -32,6 +32,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
@@ -41,7 +42,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.BandedTime
 import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.AllocationInput
