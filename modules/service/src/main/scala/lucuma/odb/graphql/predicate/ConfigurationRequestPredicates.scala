@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.odb.data.ConfigurationRequest
+import lucuma.core.model.ConfigurationRequest
 
 class ConfigurationRequestPredicates(path: Path) {
   val id = LeafPredicates[ConfigurationRequest.Id](path / "id")

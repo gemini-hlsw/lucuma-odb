@@ -10,13 +10,13 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
-import lucuma.odb.data.ObservingModeType
 
 class recordDataset extends OdbSuite {
 

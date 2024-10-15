@@ -18,12 +18,14 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
@@ -37,6 +39,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.Group
@@ -53,12 +56,10 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
@@ -717,8 +718,8 @@ object ObservationService {
             r.toOption match
               case None => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Unavailable))
               case Some(Nil) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.NotRequested))
-              case Some(lst) if lst.exists(_.status === ConfigurationRequest.Status.Approved) => m
-              case Some(lst) if lst.forall(_.status === ConfigurationRequest.Status.Denied) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Denied))
+              case Some(lst) if lst.exists(_.status === ConfigurationRequestStatus.Approved) => m
+              case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Denied))
               case _ => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Pending))
 
         obsInfo.flatMap: info =>
