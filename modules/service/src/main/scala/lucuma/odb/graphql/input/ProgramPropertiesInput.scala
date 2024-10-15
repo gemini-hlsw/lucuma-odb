@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.odb.data.Existence
@@ -15,37 +14,42 @@ import lucuma.odb.graphql.binding.*
 object ProgramPropertiesInput:
 
   case class Create(
-    name:              Option[NonEmptyString],
-    proprietaryMonths: Option[NonNegInt]
+    name:      Option[NonEmptyString],
+    goa:       GoaPropertiesInput.Create,
+    existence: Existence
   )
 
   object Create:
-    val Empty: Create = Create(None, None)
+    val Default: Create =
+      Create(None, GoaPropertiesInput.Create.Default, Existence.Present)
+
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          NonEmptyStringBinding.Option("name", rName),
+          GoaPropertiesInput.Create.Binding.Option("goa", rGoa),
+          ExistenceBinding.Option("existence", rExistence)
+        ) => (rName, rGoa, rExistence).parMapN: (name, goa, existence) =>
+          Create(
+            name,
+            goa.getOrElse(GoaPropertiesInput.Create.Default),
+            existence.getOrElse(Existence.Present)
+          )
 
   case class Edit(
-    name:              Option[NonEmptyString],
-    proprietaryMonths: Option[NonNegInt],
-    existence:         Option[Existence]
+    name:       Option[NonEmptyString],
+    goa:        Option[GoaPropertiesInput.Edit],
+    existence:  Option[Existence]
   )
 
   object Edit:
-    val Empty: Edit = Edit(None, None, None)
+    val Default: Edit =
+      Edit(None, None, None)
 
-  private val data: Matcher[(
-    Option[NonEmptyString],
-    Option[NonNegInt],
-    Option[Existence]
-  )] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        NonEmptyStringBinding.Option("name", rName),
-        NonNegIntBinding.Option("proprietaryMonths", rProprietary),
-        ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rProprietary, rExistence).parTupled
-    }
-
-  val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
-    data.map((n, p, _) => Create(n, p))
-
-  val EditBinding: Matcher[Edit] =
-    data.map(Edit.apply)
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          NonEmptyStringBinding.Option("name", rName),
+          GoaPropertiesInput.Edit.Binding.Option("goa", rGoa),
+          ExistenceBinding.Option("existence", rExistence)
+        ) => (rName, rGoa, rExistence).parMapN(Edit.apply)

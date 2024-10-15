@@ -7,33 +7,33 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
+import skunk.codec.boolean.bool
 
-trait ProgramTable[F[_]] extends BaseMapping[F] {
+trait ProgramTable[F[_]] extends BaseMapping[F]:
 
-  object ProgramTable extends TableDef("t_program") {
+  object ProgramTable extends TableDef("t_program"):
     val Id              = col("c_program_id", program_id)
     val Existence       = col("c_existence", existence)
     val Name            = col("c_name", text_nonempty.opt)
     val ProposalStatus  = col("c_proposal_status", tag)
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
-    val Proprietary     = col("c_proprietary", int4_nonneg)
 
-    object PlannedTime {
+    object Goa:
+      val Proprietary   = col("c_goa_proprietary", int4_nonneg)
+      val ShouldNotify  = col("c_goa_should_notify", bool)
+      val PrivateHeader = col("c_goa_private_header", bool)
+
+    object PlannedTime:
       val Pi        = col("c_pts_pi", time_span)
       val Uncharged = col("c_pts_uncharged", time_span)
       val Execution = col("c_pts_execution", time_span)
-    }
 
     val ProgramType    = col("c_program_type", program_type)
 
-    object Reference {
+    object Reference:
       val Instrument        = col("c_instrument",         instrument.opt)
       val ProgramReference  = col("c_program_reference",  program_reference.opt)
       val ProposalReference = col("c_proposal_reference", proposal_reference.opt)
       val ScienceSubtype    = col("c_science_subtype",    science_subtype.opt)
       val Semester          = col("c_semester",           semester.opt)
       val SemesterIndex     = col("c_semester_index",     int4_pos.opt)
-    }
-  }
-
-}

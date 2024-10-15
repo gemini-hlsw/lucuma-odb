@@ -87,7 +87,7 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("proprietaryMonths defaults to 0") {
+  test("GOA properties default") {
     expect(
       user = pi,
       query =
@@ -102,7 +102,11 @@ class createProgram extends OdbSuite {
             ) {
               program {
                 name
-                proprietaryMonths
+                goa {
+                  proprietaryMonths
+                  shouldNotify
+                  privateHeader
+                }
               }
             }
           }
@@ -113,7 +117,11 @@ class createProgram extends OdbSuite {
             "createProgram" : {
               "program": {
                 "name" : "Foo",
-                "proprietaryMonths": 0
+                "goa": {
+                  "proprietaryMonths": 0,
+                  "shouldNotify": true,
+                  "privateHeader": false
+                }
               }
             }
           }
@@ -128,13 +136,13 @@ class createProgram extends OdbSuite {
           input: {
             SET: {
               name: "Foo",
-              proprietaryMonths: 42
+              goa: { proprietaryMonths: 42 }
             }
           }
         ) {
           program {
             name
-            proprietaryMonths
+            goa { proprietaryMonths }
           }
         }
       }
@@ -150,7 +158,7 @@ class createProgram extends OdbSuite {
             "createProgram" : {
               "program": {
                 "name" : "Foo",
-                "proprietaryMonths": 42
+                "goa": { "proprietaryMonths": 42 }
               }
             }
           }
@@ -165,6 +173,49 @@ class createProgram extends OdbSuite {
       expected = List(
         "Only staff may set the proprietary months."
       ).asLeft
+    )
+  }
+
+  test("pi can set other GOA properties") {
+    expect(
+      user     = pi,
+      query    = """
+        mutation {
+          createProgram(
+            input: {
+              SET: {
+                name: "Foo",
+                goa: {
+                  shouldNotify: false,
+                  privateHeader: true
+                }
+              }
+            }
+          ) {
+            program {
+              name
+              goa {
+                shouldNotify
+                privateHeader
+              }
+            }
+          }
+        }
+      """,
+      expected =
+        json"""
+          {
+            "createProgram" : {
+              "program": {
+                "name" : "Foo",
+                "goa": {
+                  "shouldNotify": false,
+                  "privateHeader": true
+                }
+              }
+            }
+          }
+        """.asRight
     )
   }
 
@@ -253,9 +304,8 @@ class createProgram extends OdbSuite {
               s.session.transaction.use { xa =>
                 s.programService
                   .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create(
-                      NonEmptyString.from(name).toOption,
-                      None,
+                    ProgramPropertiesInput.Create.Default.copy(
+                      name = NonEmptyString.from(name).toOption
                     ).some,
                     CalibrationRole.Photometric,
                     Description.unsafeFrom("PHOTO"))(using xa)
