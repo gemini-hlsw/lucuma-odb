@@ -21,6 +21,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObsStatus
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -37,7 +38,6 @@ import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
 import lucuma.itc.client.TargetInput
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorAsterismParams

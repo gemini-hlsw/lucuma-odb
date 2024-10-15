@@ -9,10 +9,10 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 
 

@@ -10,9 +10,9 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 
 class observation_configurationRequests 

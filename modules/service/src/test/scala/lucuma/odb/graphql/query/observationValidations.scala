@@ -17,6 +17,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Target
@@ -24,7 +25,6 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.service.ObservationService 
