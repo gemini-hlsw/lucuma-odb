@@ -288,12 +288,12 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user, s"""
       query {
         program(programId: "$pid") {
-          proprietaryMonths
+          goa { proprietaryMonths }
         }
       }
     """).flatMap: js =>
       js.hcursor
-        .downFields("program", "proprietaryMonths")
+        .downFields("program", "goa", "proprietaryMonths")
         .success
         .traverse(_.as[Int].map(NonNegInt.unsafeFrom))
         .leftMap(f => new RuntimeException(f.message))

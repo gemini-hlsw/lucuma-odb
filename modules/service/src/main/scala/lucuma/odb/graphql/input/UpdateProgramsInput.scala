@@ -24,7 +24,7 @@ object UpdateProgramsInput {
     val WhereProgramBinding = WhereProgram.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramPropertiesInput.EditBinding("SET", rSET),
+        ProgramPropertiesInput.Edit.Binding("SET", rSET),
         WhereProgramBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)

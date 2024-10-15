@@ -148,6 +148,7 @@ object OdbMapping {
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
+          with GoaPropertiesMapping[F]
           with GroupMapping[F]
           with GroupEditMapping[F]
           with GroupElementMapping[F]
@@ -336,6 +337,7 @@ object OdbMapping {
                 GmosNorthStaticMapping,
                 GmosSouthLongSlitMapping,
                 GmosSouthStaticMapping,
+                GoaPropertiesMapping,
                 GroupMapping,
                 GroupEditMapping,
                 GroupElementMapping,
