@@ -8,9 +8,9 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
-import lucuma.odb.data.ObservingModeType
 
 class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
 

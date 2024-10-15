@@ -18,6 +18,7 @@ import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
@@ -42,7 +43,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput

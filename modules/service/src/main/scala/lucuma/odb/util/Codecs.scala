@@ -21,6 +21,7 @@ import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
@@ -36,6 +37,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.PartnerLink
@@ -55,14 +57,12 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
@@ -341,7 +341,7 @@ trait Codecs {
   val configuration_request_id: Codec[ConfigurationRequest.Id] =
     gid[ConfigurationRequest.Id]
 
-  val configuration_request_status: Codec[ConfigurationRequest.Status] =
+  val configuration_request_status: Codec[ConfigurationRequestStatus] =
     enumerated(Type("e_configuration_request_status"))
 
   val observing_mode_type: Codec[ObservingModeType] =

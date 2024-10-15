@@ -13,12 +13,12 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.ObservingModeType
 
 
 class addDatasetEvent extends OdbSuite {

@@ -27,6 +27,7 @@ object all {
        with radialvelocity.QueryCodec
        with parallax.QueryCodec
        with target.QueryCodec
+       with configurationrequest.QueryCodec
        with UniversalCodecs
 
   object transport
