@@ -10,12 +10,12 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.StepExecutionState
 
 

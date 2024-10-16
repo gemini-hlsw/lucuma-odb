@@ -9,10 +9,10 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.odb.data.ObservingModeType
 
 class addSlewEvent extends OdbSuite {
 

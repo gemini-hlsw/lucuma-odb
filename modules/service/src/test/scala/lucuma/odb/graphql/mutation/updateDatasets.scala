@@ -7,9 +7,9 @@ package mutation
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 
 class updateDatasets extends OdbSuite with query.DatasetSetupOperations {

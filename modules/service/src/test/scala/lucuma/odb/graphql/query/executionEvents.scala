@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
@@ -23,7 +24,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.ObservingModeType
 
 class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
 

@@ -218,7 +218,7 @@ class updatePrograms extends OdbSuite {
         updatePrograms(
           input: {
             SET: {
-              proprietaryMonths: 42
+              goa: { proprietaryMonths: 42 }
             }
             WHERE: {
               id: {
@@ -229,7 +229,7 @@ class updatePrograms extends OdbSuite {
         ) {
           programs {
             id
-            proprietaryMonths
+            goa { proprietaryMonths }
           }
         }
       }
@@ -247,7 +247,57 @@ class updatePrograms extends OdbSuite {
               "programs": [
                 {
                   "id": $pid,
-                  "proprietaryMonths": 42
+                  "goa": { "proprietaryMonths": 42 }
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("can edit other GOA properties as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  goa: {
+                    shouldNotify: false,
+                    privateHeader: true
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                goa {
+                  shouldNotify
+                  privateHeader
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "goa": {
+                    "shouldNotify": false,
+                    "privateHeader": true
+                  }
                 }
               ]
             }

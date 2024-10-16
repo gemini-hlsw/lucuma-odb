@@ -486,8 +486,8 @@ object ProposalService {
                                      WHEN ${semester.opt} IS NULL THEN c_semester
                                      ELSE ${semester.opt}
                                    END,
-               c_proprietary     = CASE
-                                     WHEN ${int4_nonneg.opt} is NULL THEN c_proprietary
+               c_goa_proprietary = CASE
+                                     WHEN ${int4_nonneg.opt} is NULL THEN c_goa_proprietary
                                      ELSE ${int4_nonneg.opt}
                                    END
          WHERE c_program_id = $program_id
@@ -502,7 +502,7 @@ object ProposalService {
           prog.c_semester,
           prog.c_science_subtype,
           COALESCE((SELECT SUM(c_percent) FROM t_partner_split WHERE c_program_id = prog.c_program_id), 0) AS c_splits_sum,
-          prog.c_proprietary,
+          prog.c_goa_proprietary,
           cfp.c_cfp_id,
           cfp.c_type,
           cfp.c_semester,

@@ -17,6 +17,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -29,7 +30,6 @@ import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.service.CalibrationsService
@@ -468,7 +468,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 s.session.transaction.use { xa =>
                   s.programService
                     .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Empty.some,
+                      ProgramPropertiesInput.Create.Default.some,
                       CalibrationRole.SpectroPhotometric,
                       Description.unsafeFrom("SPECTROTEST"))(using xa)
                 }
