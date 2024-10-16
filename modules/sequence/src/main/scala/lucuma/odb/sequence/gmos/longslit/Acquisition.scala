@@ -17,6 +17,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -284,19 +285,31 @@ object Acquisition:
 
     end ExpectSlit
 
+
   end AcquisitionState
 
+  private def instantiate[D](
+    calRole: Option[CalibrationRole],
+    standardAcquisition: => SequenceGenerator[D]
+  ): SequenceGenerator[D] =
+    calRole match
+      case Some(CalibrationRole.Twilight) => SequenceGenerator.empty
+      case _                              => standardAcquisition
 
   def gmosNorth(
     estimator:    TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
     static:       StaticConfig.GmosNorth,
     namespace:    UUID,
     config:       Config.GmosNorth,
-    exposureTime: TimeSpan
+    exposureTime: TimeSpan,
+    calRole:      Option[CalibrationRole]
   ): SequenceGenerator[GmosNorth] =
-    AcquisitionState.Init(
-      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      StepComputer.North.compute(GmosNorthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
+    instantiate(
+      calRole,
+      AcquisitionState.Init(
+        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
+        StepComputer.North.compute(GmosNorthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
+      )
     )
 
   def gmosSouth(
@@ -304,11 +317,15 @@ object Acquisition:
     static:       StaticConfig.GmosSouth,
     namespace:    UUID,
     config:       Config.GmosSouth,
-    exposureTime: TimeSpan
+    exposureTime: TimeSpan,
+    calRole:      Option[CalibrationRole]
   ): SequenceGenerator[GmosSouth] =
-    AcquisitionState.Init(
-      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      StepComputer.South.compute(GmosSouthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
+    instantiate(
+      calRole,
+      AcquisitionState.Init(
+        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
+        StepComputer.South.compute(GmosSouthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
+      )
     )
 
 end Acquisition
