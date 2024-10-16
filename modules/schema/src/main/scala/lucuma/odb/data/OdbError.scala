@@ -18,6 +18,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -38,7 +39,7 @@ enum OdbError:
   case InvalidArgument(detail: Option[String] = None)      
   case NoAction(detail: Option[String] = None)          
   case NotAuthorized(userId: User.Id, detail: Option[String] = None)        
-  case InvitationError(invitationId: String, detail: Option[String] = None) // TODO: UserInvitation -> core, then we can have UserInvitation.Id here
+  case InvitationError(invitationId: UserInvitation.Id, detail: Option[String] = None)
   case InvalidProgram(programId: Program.Id, detail: Option[String] = None)       
   case InvalidObservation(observationId: Observation.Id, detail: Option[String] = None)   
   case InvalidObservationList(observationIds: NonEmptyList[Observation.Id], detail: Option[String] = None)
@@ -173,7 +174,7 @@ object OdbError:
       case Tag.InvalidArgument        => InvalidArgument(detail).asRight
       case Tag.NoAction               => NoAction(detail).asRight
       case Tag.NotAuthorized          => c.downField("userId").as[User.Id].map(NotAuthorized(_, detail))
-      case Tag.InvitationError        => c.downField("invitationId").as[String].map(InvitationError(_, detail))
+      case Tag.InvitationError        => c.downField("invitationId").as[UserInvitation.Id].map(InvitationError(_, detail))
       case Tag.InvalidProgram         => c.downField("programId").as[Program.Id].map(InvalidProgram(_, detail))
       case Tag.InvalidObservation     => c.downField("observationId").as[Observation.Id].map(InvalidObservation(_, detail))
       case Tag.InvalidObservationList => c.downField("observationIds").as[NonEmptyList[Observation.Id]].map(InvalidObservationList(_, detail))
