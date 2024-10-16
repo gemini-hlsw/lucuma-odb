@@ -55,7 +55,7 @@ object LongSlit:
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
       GmosNorthStatic,
-      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc.exposureTime),
+      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc.exposureTime, calRole),
       Science.gmosNorth(estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
@@ -70,7 +70,7 @@ object LongSlit:
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(
       GmosSouthStatic,
-      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc.exposureTime),
+      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc.exposureTime, calRole),
       Science.gmosSouth(estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
