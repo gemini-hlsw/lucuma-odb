@@ -39,3 +39,18 @@ trait SequenceGenerator[D]:
    * Records a visit and returns an updated generator.
    */
   def recordVisit(visit: VisitRecord): SequenceGenerator[D]
+
+object SequenceGenerator:
+
+  /** A degenerate implementation that produces no atoms. */
+  def empty[D]: SequenceGenerator[D] =
+    new SequenceGenerator[D]:
+
+      override def generate(when:  Timestamp): Stream[Pure, Atom[D]] =
+        Stream.empty
+
+      override def recordStep(step:  StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+        this
+
+      override def recordVisit(visit:  VisitRecord): SequenceGenerator[D] =
+        this

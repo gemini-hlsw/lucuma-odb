@@ -286,10 +286,10 @@ object Science:
        *                    calibrations do not have arcs)
        */
       def compute[F[_]: Monad](
-        expander:    SmartGcalExpander[F, D],
-        config:      Config[G, L, U],
-        time:        IntegrationTime,
-        includeArcs: Boolean
+        expander: SmartGcalExpander[F, D],
+        config:   Config[G, L, U],
+        time:     IntegrationTime,
+        calRole:  Option[CalibrationRole]
       ): F[Either[String, NonEmptyList[BlockDefinition[D]]]] =
         Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
           val λ = config.centralWavelength
@@ -303,8 +303,11 @@ object Science:
             } yield (a, f, s)
           }
 
+          val includeFlats = !calRole.contains(CalibrationRole.Twilight)
+          val includeArcs  = calRole.isEmpty
+
           (for {
-            fs <- EitherT(expander.expandStep(smartFlat)).map(_.toList)
+            fs <- if includeFlats then EitherT(expander.expandStep(smartFlat)).map(_.toList) else EitherT.pure(List.empty)
             as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
           } yield BlockDefinition(g, as.toList, fs, science)).value
         }.map(_.sequence)
@@ -704,10 +707,16 @@ object Science:
 
   private object ScienceGenerator:
 
-    private def specPhotDithers[G, L, U](c: Config[G, L, U]): List[WavelengthDither] =
-      val limit = c.coverage.toPicometers.value.value / 10.0
-      if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
-      else List(WavelengthDither.Zero)
+    private def calibrationObservationConfig[G, L, U](
+      c: Config[G, L, U]
+    ): Config[G, L, U] =
+      val limit   = c.coverage.toPicometers.value.value / 10.0
+      val dithers = if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
+                    else List(WavelengthDither.Zero)
+      (for {
+        _ <- Config.explicitWavelengthDithers := dithers.some
+        _ <- Config.explicitSpatialOffsets    := List(Offset.Q.Zero).some
+      } yield ()).runS(c).value
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
       estimator: TimeEstimateCalculator[S, D],
@@ -729,12 +738,13 @@ object Science:
           (config, time).asRight[String]
 
         case Some(CalibrationRole.SpectroPhotometric) =>
-          val dithers = specPhotDithers(config)
-          val configʹ = (for {
-            _ <- Config.explicitWavelengthDithers := dithers.some
-            _ <- Config.explicitSpatialOffsets    := List(Offset.Q.Zero).some
-          } yield ()).runS(config).value
-          val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(dithers.length))
+          val configʹ = calibrationObservationConfig(config)
+          val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length))
+          (configʹ, timeʹ).asRight[String]
+
+        case Some(CalibrationRole.Twilight)           =>
+          val configʹ = calibrationObservationConfig(config)
+          val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length), exposureTime = 30.secondTimeSpan)
           (configʹ, timeʹ).asRight[String]
 
         case Some(c)                                  =>
@@ -744,7 +754,7 @@ object Science:
       val result = for
         _                <- EitherT.fromEither[F](expTimeLimit)
         (configʹ, timeʹ) <- EitherT.fromEither[F](configAndTime)
-        defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, includeArcs = calRole.isEmpty))
+        defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, calRole))
       yield ScienceGenerator(
         estimator,
         static,
