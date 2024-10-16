@@ -7,7 +7,7 @@ package input
 
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import lucuma.odb.data.ObservingModeType
+import lucuma.core.enums.ObservingModeType
 import lucuma.odb.graphql.binding.*
 
 object ObservingModeInput {

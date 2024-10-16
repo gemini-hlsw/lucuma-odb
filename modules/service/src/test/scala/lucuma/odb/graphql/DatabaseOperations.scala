@@ -21,6 +21,7 @@ import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
@@ -30,6 +31,7 @@ import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
 import lucuma.core.model.ExecutionEvent.DatasetEvent
@@ -56,10 +58,8 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
@@ -288,12 +288,12 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user, s"""
       query {
         program(programId: "$pid") {
-          proprietaryMonths
+          goa { proprietaryMonths }
         }
       }
     """).flatMap: js =>
       js.hcursor
-        .downFields("program", "proprietaryMonths")
+        .downFields("program", "goa", "proprietaryMonths")
         .success
         .traverse(_.as[Int].map(NonNegInt.unsafeFrom))
         .leftMap(f => new RuntimeException(f.message))

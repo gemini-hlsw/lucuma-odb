@@ -16,16 +16,17 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
+import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
@@ -119,12 +120,12 @@ trait ObservationMapping[F[_]]
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService(itcClient)
-           .lookup(pid, oid)
-           .map {
-             case Left(e@ObservationDefinitionError(_)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
-             case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
-             case Right(s)                              => s.success
-           }
+            .lookup(pid, oid)
+            .map {
+              case Left(e@ObservationDefinitionError(_)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
+              case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
+              case Right(s)                              => s.success
+            }
         }
 
     effectHandler(readEnv, calculate)
@@ -137,8 +138,8 @@ trait ObservationMapping[F[_]]
       (pid, oid, _) =>
         services.useTransactionally {
           observationService
-           .observationValidations(pid, oid, itcClient)
-           .map(_.success)
+            .observationValidations(pid, oid, itcClient)
+            .map(_.success)
         }
 
     effectHandler(readEnv, calculate)
