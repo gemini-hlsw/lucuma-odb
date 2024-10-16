@@ -607,6 +607,88 @@ enum CallForProposalsType {
   SYSTEM_VERIFICATION
 }
 
+interface CoreInstrumentConfig {
+  summary:           NonEmptyString!
+  instrument:        Instrument!
+  gratingName:       NonEmptyString
+  fpuName:           NonEmptyString
+  filterName:        NonEmptyString
+  centralWavelength: Wavelength!
+  binningDesc:       NonEmptyString!
+}
+
+type CoreInstrumentConfigGroup {
+
+  """
+  Observations associated with the common value
+  """
+  observations(
+    """
+    Set to true to include deleted values
+    """
+    includeDeleted: Boolean! = false
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ObservationId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+  ): ObservationSelectResult!
+
+  """
+  Commonly held value across the observations
+  """
+  coreInstrumentConfig: CoreInstrumentConfig!
+
+  """
+  Link back to program.
+  """
+  program: Program!
+}
+
+type CoreInstrumentConfigGroupSelectResult {
+
+}
+
+type GmosNorthCoreInstrumentConfig implements CoreInstrumentConfig {
+  summary:           NonEmptyString!
+  instrument:        Instrument!
+  gratingName:       NonEmptyString
+  fpuName:           NonEmptyString
+  filterName:        NonEmptyString
+  centralWavelength: Wavelength!
+  binningDesc:       NonEmptyString!
+
+  gmosNorthGrating:  GmosNorthGrating
+  gmosNorthFpu:      GmosNorthFpu
+  gmosNorthFilter:   GmosNorthFilter
+
+  gmosXBinning:      GmosXBinning!
+  gmosYBinning:      GmosYBinning!
+}
+
+type GmosSouthCoreInstrumentConfig implements CoreInstrumentConfig {
+  summary:           NonEmptyString!
+  instrument:        Instrument!
+  gratingName:       NonEmptyString
+  fpuName:           NonEmptyString
+  filterName:        NonEmptyString
+  centralWavelength: Wavelength!
+  binningDesc:       NonEmptyString!
+
+  gmosSouthGrating:  GmosSouthGrating
+  gmosSouthFpu:      GmosSouthFpu
+  gmosSouthFilter:   GmosSouthFilter
+
+  gmosXBinning:      GmosXBinning!
+  gmosYBinning:      GmosYBinning!
+}
+
+
 """
 Catalog id consisting of catalog name, string identifier and an optional object type
 """
@@ -9425,6 +9507,32 @@ type Query {
     includeDeleted: Boolean! = false
   ): ConstraintSetGroupSelectResult!
 
+  coreInstrumentConfigGroup(
+
+    "Program ID"
+    programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReferenceLabel
+
+    "Program reference"
+    programReference: ProgramReferenceLabel
+
+    """
+    Filters the selection of observations.
+    """
+    WHERE: WhereObservation
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+
+    """
+    Set to true to include deleted values
+    """
+    includeDeleted: Boolean! = false
+  ): CoreInstrumentConfigGroupSelectResult!
 
   """
   Returns the dataset with the given id or reference, if any.  Identify the
