@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.option.*
 import grackle.Cursor
 import grackle.NamedType
 import grackle.Predicate
@@ -12,6 +11,7 @@ import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
+import grackle.syntax.*
 
 import table.ProgramReferenceView
 
@@ -43,7 +43,7 @@ trait ProgramReferenceMapping[F[_]]
       import lucuma.core.enums.{ProgramType => PT}
 
       override def discriminate(c: Cursor): Result[Type] =
-        c.fieldAs[PT]("type").flatMap {
+        c.fieldAs[PT]("type").flatMap:
           case PT.Calibration   => Result(CalibrationProgramReferenceType)
           case PT.Commissioning => Result(CommissioningProgramReferenceType)
           case PT.Engineering   => Result(EngineeringProgramReferenceType)
@@ -52,13 +52,12 @@ trait ProgramReferenceMapping[F[_]]
           case PT.Monitoring    => Result(MonitoringProgramReferenceType)
           case PT.Science       => Result(ScienceProgramReferenceType)
           case PT.System        => Result(SystemProgramReferenceType)
-        }
 
-      private def mkPredicate(tpe: PT): Option[Predicate] =
-        Eql(ProgramReferenceType / "type", Const(tpe)).some
+      private def mkPredicate(tpe: PT): Result[Predicate] =
+        Eql(ProgramReferenceType / "type", Const(tpe)).success
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
-        tpe match {
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
+        tpe match
           case CalibrationProgramReferenceType   => mkPredicate(PT.Calibration)
           case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)
           case EngineeringProgramReferenceType   => mkPredicate(PT.Engineering)
@@ -67,8 +66,7 @@ trait ProgramReferenceMapping[F[_]]
           case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
           case ScienceProgramReferenceType       => mkPredicate(PT.Science)
           case SystemProgramReferenceType        => mkPredicate(PT.System)
-          case _                                 => none
-        }
+          case _                                 => Result.internalError(s"Invalid discriminator: $tpe")
     }
 
   private def semesterInstrumentReferenceMapping(tpe: NamedType): ObjectMapping =
