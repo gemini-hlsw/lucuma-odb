@@ -11,43 +11,45 @@ import grackle.Result
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
 
-object ProgramPropertiesInput {
+object ProgramPropertiesInput:
 
   case class Create(
-    name: Option[NonEmptyString]
+    name:      Option[NonEmptyString],
+    goa:       GoaPropertiesInput.Create,
+    existence: Existence
   )
 
-  object Create {
-    val Empty: Create =
-      Create(None)
-  }
+  object Create:
+    val Default: Create =
+      Create(None, GoaPropertiesInput.Create.Default, Existence.Present)
+
+    val Binding: Matcher[Create] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          NonEmptyStringBinding.Option("name", rName),
+          GoaPropertiesInput.Create.Binding.Option("goa", rGoa),
+          ExistenceBinding.Option("existence", rExistence)
+        ) => (rName, rGoa, rExistence).parMapN: (name, goa, existence) =>
+          Create(
+            name,
+            goa.getOrElse(GoaPropertiesInput.Create.Default),
+            existence.getOrElse(Existence.Present)
+          )
 
   case class Edit(
-    name:           Option[NonEmptyString],
-    existence:      Option[Existence]
+    name:       Option[NonEmptyString],
+    goa:        Option[GoaPropertiesInput.Edit],
+    existence:  Option[Existence]
   )
 
-  object Edit {
-    val Empty: Edit =
-      Edit(None, None)
-  }
+  object Edit:
+    val Default: Edit =
+      Edit(None, None, None)
 
-  private val data: Matcher[(
-    Option[NonEmptyString],
-    Option[Existence]
-  )] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        NonEmptyStringBinding.Option("name", rName),
-        ExistenceBinding.Option("existence", rExistence),
-      ) =>
-        (rName, rExistence).parTupled
-    }
-
-  val CreateBinding: Matcher[ProgramPropertiesInput.Create] =
-    data.map((n, _) => Create(n))
-
-  val EditBinding: Matcher[Edit] =
-    data.map(Edit.apply)
-
-}
+    val Binding: Matcher[Edit] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          NonEmptyStringBinding.Option("name", rName),
+          GoaPropertiesInput.Edit.Binding.Option("goa", rGoa),
+          ExistenceBinding.Option("existence", rExistence)
+        ) => (rName, rGoa, rExistence).parMapN(Edit.apply)

@@ -6,7 +6,7 @@ package lucuma.odb.sequence
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
-import lucuma.odb.data.ObservingModeType
+import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 import lucuma.odb.sequence.util.HashBytes

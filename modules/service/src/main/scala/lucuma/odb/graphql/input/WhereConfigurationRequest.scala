@@ -9,14 +9,15 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.data.ConfigurationRequest
 
 object WhereConfigurationRequest {
 
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderConfigurationRequestId = WhereOrder.binding(path / "id", ConfigurationRequestIdBinding)
-    val WhereStatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ConfigurationRequest.Status])
+    val WhereStatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ConfigurationRequestStatus])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
 
     lazy val WhereObservationBinding = binding(path) // lazy self-reference

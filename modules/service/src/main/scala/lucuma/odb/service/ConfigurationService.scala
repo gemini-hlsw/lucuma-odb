@@ -11,28 +11,29 @@ import grackle.ResultT
 import io.circe.ACursor
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Coordinates
+import lucuma.core.model.Configuration
+import lucuma.core.model.Configuration.Conditions
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.odb.data.Configuration
-import lucuma.odb.data.Configuration.Conditions
-import lucuma.odb.data.ConfigurationRequest
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
+import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
+import lucuma.odb.json.configurationrequest.query.DecodingFailures
+import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import skunk.AppliedFragment
-
-import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
-import lucuma.odb.data.ConfigurationRequest.Status
 
 trait ConfigurationService[F[_]] {
 
@@ -77,11 +78,11 @@ object ConfigurationService {
       override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
         val doUpdate = impl.updateRequests(SET, where).value
         SET.status match
-          case None                   | 
-               Some(Status.Requested) | 
-               Some(Status.Withdrawn) => requirePiAccess(doUpdate)
-          case Some(Status.Approved)  |
-               Some(Status.Denied)    => requireStaffAccess(doUpdate)                  
+          case None                                       | 
+               Some(ConfigurationRequestStatus.Requested) | 
+               Some(ConfigurationRequestStatus.Withdrawn) => requirePiAccess(doUpdate)
+          case Some(ConfigurationRequestStatus.Approved)  |
+               Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)                  
 
     }
 
@@ -114,8 +115,8 @@ object ConfigurationService {
                   case Right(obsid) =>                       
                     hc.downField("configuration").as[Configuration] match
                       case Right(cfg) => Result(Map(obsid -> cfg))
-                      case Left(Configuration.DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
-                      case Left(Configuration.DecodingFailures.NoObservingMode)        => OdbError.InvalidConfiguration(Some(s"Observing mode is undefined for observation $obsid.")).asWarning(Map.empty)
+                      case Left(DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
+                      case Left(DecodingFailures.NoObservingMode)        => OdbError.InvalidConfiguration(Some(s"Observing mode is undefined for observation $obsid.")).asWarning(Map.empty)
                       case Left(other) => Result.internalError(other.getMessage)
 
     private def selectConfigurations(oids: List[Observation.Id])(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =

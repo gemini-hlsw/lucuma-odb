@@ -5,17 +5,17 @@ package lucuma.odb.graphql
 
 package input
 
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.data.ConfigurationRequest
 
 case class ConfigurationRequestPropertiesInput(
-  status: Option[ConfigurationRequest.Status]
+  status: Option[ConfigurationRequestStatus]
 )
 
 object ConfigurationRequestPropertiesInput {
 
   val Binding: Matcher[ConfigurationRequestPropertiesInput] =
-    val StatusBinding = enumeratedBinding[ConfigurationRequest.Status]
+    val StatusBinding = enumeratedBinding[ConfigurationRequestStatus]
     ObjectFieldsBinding.rmap:
       case List(
         (StatusBinding.Option("status", rStatus))

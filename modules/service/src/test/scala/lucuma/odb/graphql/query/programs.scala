@@ -106,7 +106,7 @@ class programs extends OdbSuite {
                 s.session.transaction.use { xa =>
                   s.programService
                     .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create(None).some,
+                      ProgramPropertiesInput.Create.Default.some,
                       CalibrationRole.Telluric,
                       Description.unsafeFrom("TELLURIC2"))(using xa)
                 }

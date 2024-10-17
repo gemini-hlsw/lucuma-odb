@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -18,7 +19,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.toScreamingSnakeCase
-import lucuma.odb.data.ObservingModeType
 import org.scalacheck.Arbitrary.arbitrary
 
 class recordStep extends OdbSuite {

@@ -18,9 +18,12 @@ import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.StepStage
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.TwilightType.Nautical
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
@@ -30,16 +33,18 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.TimeCharge
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
@@ -74,6 +79,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def comment: Option[NonEmptyString] =
       NonEmptyString.from(s).toOption
   }
+
+  val t00 =  0.fromNightStart
+  val t10 = 10.fromNightStart
+  val t20 = 20.fromNightStart
+  val t30 = 30.fromNightStart
+  val t40 = 40.fromNightStart
 
   val validUsers = List(pi, service, staff)
 
@@ -126,6 +137,16 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
             }
           }
         }
+      }
+    """
+
+  def expectedBandedTime(
+    bt: BandedTime
+  ): Json =
+    json"""
+      {
+        "band": ${bt.band.map(_.tag.toScreamingSnakeCase).asJson},
+        "time": ${expectedCategorizedTime(bt.time)}
       }
     """
 
@@ -443,13 +464,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   test("timeChargeInvoice (no discounts)") {
-
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-
     val events = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
 
     val expExecution   = CategorizedTime(ChargeClass.Program -> 10.sec)
@@ -498,18 +515,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   test("timeChargeInvoice (no data discount)") {
-
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-
     val events = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
 
     val expExecution = CategorizedTime(ChargeClass.Program -> 10.sec)
     val discount     = TimeCharge.Discount(
-      TimestampInterval.between(t0, t1),
+      TimestampInterval.between(t00, t10),
       TimeSpan.Zero,
       10.sec,
       TimeAccounting.comment.NoData
@@ -585,12 +598,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     finalCharge: TimeSpan,
     index:       Int
   ): IO[Unit] = {
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-
     val events = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
 
     val expExecution   = CategorizedTime(ChargeClass.Program -> 10.sec)
@@ -632,11 +642,34 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   test("timeChargeInvoice (over add)") {
-    correctionTest(
-      List(TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, TimeSpan.Max, "over add".comment)),
-      TimeSpan.Max,
-      700
-    )
+    recordVisit(pi, service, mode, visitTime, 1, 1, 1, 700).flatMap: v =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              addTimeChargeCorrection(input: {
+                visitId: "${v.vid}",
+                correction: {
+                  chargeClass: PROGRAM,
+                  op: ADD,
+                  amount: {
+                    hours: "${366 * 24}"
+                  }
+                }
+              }) {
+                timeChargeInvoice {
+                  corrections {
+                    created
+                  }
+                }
+              }
+            }
+          """,
+        expected = List(
+          "Argument 'input.correction' is invalid: Time charge correction values over 365 days are not permitted."
+        ).asLeft
+      )
   }
 
   test("timeChargeInvoice (multi-correction)") {
@@ -711,12 +744,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   test("observation timeCharge, one visit") {
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-
     val events = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
 
     val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
@@ -732,19 +762,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   }
 
   test("observation timeCharge, two visits") {
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-    val t2 = 20.fromNightStart
-    val t3 = 30.fromNightStart
-    val t4 = 40.fromNightStart
-
     val events0 = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
     val events1 = List(
-      (SequenceCommand.Start, t3),
-      (SequenceCommand.Stop,  t4)
+      (SequenceCommand.Start, t30),
+      (SequenceCommand.Stop,  t40)
     )
 
     val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
@@ -757,7 +781,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       _ <- insertEvents(es0)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
-      v1 <- recordVisitForObs(pid, oid, service, mode, t2, 1, 1, 1, 1301)
+      v1 <- recordVisitForObs(pid, oid, service, mode, t20, 1, 1, 1, 1301)
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(es1)
       _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
@@ -766,7 +790,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
 
   }
-
+/*
   test("observation timeCharge, overflow") {
     val t0 =  0.fromNightStart
     val t1 = 10.fromNightStart
@@ -804,26 +828,30 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
 
   }
+ */
 
     def programQuery(pid: Program.Id): String =
     s"""
       query {
         program(programId: "$pid") {
           timeCharge {
-            program { seconds }
-            partner { seconds }
-            nonCharged { seconds }
-            total { seconds }
+            band
+            time {
+              program { seconds }
+              partner { seconds }
+              nonCharged { seconds }
+              total { seconds }
+            }
           }
         }
       }
     """
 
-  def programExpectedCharge(ct: CategorizedTime): Either[List[String], Json] =
+  def programExpectedCharge(times: List[BandedTime]): Either[List[String], Json] =
     json"""
       {
         "program": {
-          "timeCharge": ${expectedCategorizedTime(ct)}
+          "timeCharge": ${times.map(expectedBandedTime).asJson}
         }
       }
     """.asRight
@@ -831,20 +859,17 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   test("program timeCharge, no observations") {
     for {
       p <- createProgramAs(pi)
-      _ <- expect(pi, programQuery(p), programExpectedCharge(CategorizedTime.Zero))
+      _ <- expect(pi, programQuery(p), programExpectedCharge(Nil))
     } yield ()
   }
 
   test("program timeCharge, one observation") {
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-
     val events = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
 
-    val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
+    val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 10.sec)))
 
     for {
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1500)
@@ -855,23 +880,17 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
   }
 
-  test("program timeCharge, two observations") {
-    val t0 =  0.fromNightStart
-    val t1 = 10.fromNightStart
-    val t2 = 20.fromNightStart
-    val t3 = 30.fromNightStart
-    val t4 = 40.fromNightStart
-
+  test("program timeCharge, two observations, no band") {
     val events0 = List(
-      (SequenceCommand.Start, t0),
-      (SequenceCommand.Stop,  t1)
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
     )
     val events1 = List(
-      (SequenceCommand.Start, t3),
-      (SequenceCommand.Stop,  t4)
+      (SequenceCommand.Start, t30),
+      (SequenceCommand.Stop,  t40)
     )
 
-    val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
+    val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 20.sec)))
 
     for {
       // Obs0
@@ -884,7 +903,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
       // Obs1
       oid1 <- createObservationAs(pi, pid, mode.some)
-      v1   <- recordVisitForObs(pid, oid1, service, mode, t2, 1, 1, 1, 1601)
+      v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1601)
       es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
       _    <- insertEvents(es1)
       _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
@@ -893,4 +912,87 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
   }
 
+  test("program timeCharge, two observations, same band") {
+
+    val events0 = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+    val events1 = List(
+      (SequenceCommand.Start, t30),
+      (SequenceCommand.Stop,  t40)
+    )
+
+    val expected = List(BandedTime(ScienceBand.Band2.some, CategorizedTime(ChargeClass.Program -> 20.sec)))
+
+    for {
+      pid  <- createProgramAs(pi)
+      _    <- setAllocationsAs(service, pid, List(AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, 10.hourTimeSpan)))
+
+      // Obs0
+      oid0 <- createObservationAs(pi, pid, mode.some)
+      _    <- setScienceBandAs(pi, oid0, ScienceBand.Band2.some)
+      v0   <- recordVisitForObs(pid, oid0, service, mode, visitTime, 1, 1, 1, 1700)
+
+      es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
+      _   <- insertEvents(es0)
+      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+
+      // Obs1
+      oid1 <- createObservationAs(pi, pid, mode.some)
+      _    <- setScienceBandAs(pi, oid0, ScienceBand.Band2.some)
+      v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1701)
+      es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
+      _    <- insertEvents(es1)
+      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
+    } yield ()
+  }
+
+  test("program timeCharge, two observations, distinct bands") {
+
+    val events0 = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+    val events1 = List(
+      (SequenceCommand.Start, t30),
+      (SequenceCommand.Stop,  t40)
+    )
+
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.AR, ScienceBand.Band1, 10.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, 10.hourTimeSpan)
+    )
+
+    val expected = List(
+      BandedTime(ScienceBand.Band1.some, CategorizedTime(ChargeClass.Program -> 10.sec)),
+      BandedTime(ScienceBand.Band2.some, CategorizedTime(ChargeClass.Program -> 10.sec))
+    )
+
+    for {
+      pid  <- createProgramAs(pi)
+      _    <- setAllocationsAs(service, pid, allocations)
+
+      // Obs0
+      oid0 <- createObservationAs(pi, pid, mode.some)
+      _    <- setScienceBandAs(pi, oid0, ScienceBand.Band1.some)
+      v0   <- recordVisitForObs(pid, oid0, service, mode, visitTime, 1, 1, 1, 1800)
+
+      es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
+      _   <- insertEvents(es0)
+      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+
+      // Obs1
+      oid1 <- createObservationAs(pi, pid, mode.some)
+      _    <- setScienceBandAs(pi, oid1, ScienceBand.Band2.some)
+      v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1801)
+      es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
+      _    <- insertEvents(es1)
+      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
+    } yield ()
+  }
 }

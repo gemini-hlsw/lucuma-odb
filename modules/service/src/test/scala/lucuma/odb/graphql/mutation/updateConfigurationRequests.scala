@@ -4,13 +4,14 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
-import cats.effect.IO
-import lucuma.odb.data.ConfigurationRequest
+import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperations {
 
@@ -19,7 +20,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   val validUsers = List(pi, admin).toList
 
-  def updateConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequest.Status): IO[Unit] =
+  def updateConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
     expect(
       user = admin,
       query = s"""
@@ -61,7 +62,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
       rid <- createConfigurationRequestAs(pi, oid)
     yield rid
 
-  ConfigurationRequest.Status.values.foreach: status =>
+  ConfigurationRequestStatus.values.foreach: status =>
     test(s"Admin should be able to set status to $status."):
       setup.flatMap(updateConfigurationRequestStatusAs(admin, _, status))
 

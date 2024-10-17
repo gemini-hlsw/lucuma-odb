@@ -212,4 +212,108 @@ class updatePrograms extends OdbSuite {
     }
   }
 
+  def editProprietaryMonthsQuery(pid: Program.Id): String =
+    s"""
+      mutation {
+        updatePrograms(
+          input: {
+            SET: {
+              goa: { proprietaryMonths: 42 }
+            }
+            WHERE: {
+              id: {
+                EQ: "$pid"
+              }
+            }
+          }
+        ) {
+          programs {
+            id
+            goa { proprietaryMonths }
+          }
+        }
+      }
+    """
+
+  test("can edit proprietaryMonths as staff") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query = editProprietaryMonthsQuery(pid),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "goa": { "proprietaryMonths": 42 }
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("can edit other GOA properties as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  goa: {
+                    shouldNotify: false,
+                    privateHeader: true
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              programs {
+                id
+                goa {
+                  shouldNotify
+                  privateHeader
+                }
+              }
+            }
+          }
+        """,
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "goa": {
+                    "shouldNotify": false,
+                    "privateHeader": true
+                  }
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("cannot edit proprietaryMonths as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = editProprietaryMonthsQuery(pid),
+        expected = List(
+          "Only staff may set the proprietary months."
+        ).asLeft
+      )
+  }
 }

@@ -17,15 +17,15 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
@@ -84,6 +84,7 @@ trait ProgramMapping[F[_]]
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
       SqlField("calibrationRole", ProgramTable.CalibrationRole),
+      SqlObject("goa")
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -205,7 +206,7 @@ trait ProgramMapping[F[_]]
     }
 
   private val timeChargeHandler: EffectHandler[F] =
-    keyValueEffectHandler[Program.Id, CategorizedTime]("id") { pid =>
+    keyValueEffectHandler[Program.Id, List[BandedTime]]("id") { pid =>
       services.useTransactionally {
         timeAccountingService.selectProgram(pid)
       }

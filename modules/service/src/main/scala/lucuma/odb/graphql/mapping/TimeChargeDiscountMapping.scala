@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.option.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
@@ -12,6 +11,7 @@ import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
 import grackle.TypeRef
+import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -61,15 +61,15 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
           case d                              => Result.internalError(s"No TimeChargeDiscount implementation for ${d.dbTag}")
         }
 
-      private def mkPredicate(discountType: DiscountDiscriminator): Option[Predicate] =
-        Eql(TimeChargeDiscountType / "type", Const(discountType)).some
+      private def mkPredicate(discountType: DiscountDiscriminator): Result[Predicate] =
+        Eql(TimeChargeDiscountType / "type", Const(discountType)).success
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
         tpe match {
           case TimeChargeDaylightDiscountType => mkPredicate(DiscountDiscriminator.Daylight)
           case TimeChargeNoDataDiscountType   => mkPredicate(DiscountDiscriminator.NoData)
           case TimeChargeQaDiscountType       => mkPredicate(DiscountDiscriminator.Qa)
-          case _                              => none
+          case _                              => Result.internalError(s"Invalid discriminator: $tpe")
         }
     }
 
