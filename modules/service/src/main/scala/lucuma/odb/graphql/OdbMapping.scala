@@ -220,6 +220,7 @@ object OdbMapping {
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateCallsForProposalsResultMapping[F]
+          with UpdateConfigurationRequestsResultMapping[F]
           with UpdateDatasetsResultMapping[F]
           with UpdateGroupsResultMapping[F]
           with UpdateObsAttachmentsResultMapping[F]
@@ -429,6 +430,7 @@ object OdbMapping {
                 TimingWindowRepeatMapping,
                 UpdateAsterismsResultMapping,
                 UpdateCallsForProposalsResultMapping,
+                UpdateConfigurationRequestsResultMapping,
                 UpdateDatasetsResultMapping,
                 UpdateGroupsResultMapping,
                 UpdateObsAttachmentsResultMapping,
