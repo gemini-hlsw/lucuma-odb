@@ -148,6 +148,36 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
+  def createCoordsAs(
+    user:     User,
+    pid:      Program.Id
+  ): IO[Target.Id] =
+    query(
+      user  = user,
+      query =
+      s"""
+         mutation {
+           createTarget(input: {
+             programId: ${pid.asJson},
+             SET: {
+               name: "Twilight"
+               sidereal: {
+                 ra: { hms: "00:00:01.234" },
+                 dec: { dms: "00:00:05.67" },
+                 epoch: "J2000.0"
+               }
+             }
+           }) {
+             target {
+               id
+             }
+           }
+         }
+      """
+    ).map(
+      _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
+    )
+
   def createTargetWithProfileAs(
     user:     User,
     pid:      Program.Id

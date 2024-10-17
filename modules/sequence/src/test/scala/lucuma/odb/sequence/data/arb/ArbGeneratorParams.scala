@@ -6,6 +6,7 @@ package data
 package arb
 
 import cats.data.NonEmptyList
+import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbEnumerated
@@ -22,8 +23,7 @@ import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-trait ArbGeneratorParams {
-
+trait ArbGeneratorParams:
   import ArbEnumerated.given
   import ArbGid.given
   import ArbGmosLongSlitConfig.given
@@ -31,39 +31,35 @@ trait ArbGeneratorParams {
   import ArbInstrumentMode.given
   import ArbTargetInput.given
 
-  private def genObsParams(mo: InstrumentMode): Gen[GeneratorAsterismParams] =
-    for {
+  private def genObsParams(mo: InstrumentMode): Gen[ItcInput.Defined] =
+    for
       im <- arbitrary[ImagingIntegrationTimeParameters]
       sm <- arbitrary[SpectroscopyIntegrationTimeParameters]
       s  <- Gen.choose(1, 4)
       t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput)]).map(NonEmptyList.fromListUnsafe)
-    } yield GeneratorAsterismParams(im.copy(mode = mo), sm.copy(mode = mo), t)
+    yield ItcInput.Defined(im.copy(mode = mo), sm.copy(mode = mo), t)
 
-  val genGmosNorthLongSlit: Gen[GeneratorParams] = {
-    for {
+  val genGmosNorthLongSlit: Gen[GeneratorParams] =
+    for
       mo  <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
       itc <- genObsParams(mo)
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
-    } yield GeneratorParams(itc, cfg, rol)
-  }
+    yield GeneratorParams(Either.right(itc), cfg, rol)
 
-  val genGmosSouthLongSlit: Gen[GeneratorParams] = {
-    for {
+  val genGmosSouthLongSlit: Gen[GeneratorParams] =
+    for
       mo  <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
       itc <- genObsParams(mo)
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
-    } yield GeneratorParams(itc, cfg, rol)
-  }
+    yield GeneratorParams(Either.right(itc), cfg, rol)
 
   given Arbitrary[GeneratorParams] =
-    Arbitrary {
+    Arbitrary:
       Gen.oneOf(
         genGmosNorthLongSlit,
         genGmosSouthLongSlit
       )
-    }
-}
 
 object ArbGeneratorParams extends ArbGeneratorParams

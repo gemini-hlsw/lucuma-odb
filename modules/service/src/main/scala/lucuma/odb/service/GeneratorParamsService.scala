@@ -40,8 +40,8 @@ import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
-import lucuma.odb.sequence.data.GeneratorAsterismParams
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -208,43 +208,36 @@ object GeneratorParamsService {
         obsParams: ObsParams,
         config:    Option[SourceProfile => ObservingMode]
       ): EitherNel[Error, GeneratorParams] =
-        observingMode(obsParams.targets, config).flatMap {
+        observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
-            itcObsParams(
-              obsParams,
-              InstrumentMode.GmosNorthSpectroscopy(
-                g,
-                f,
-                GmosFpu.North.builtin(u),
-                gn.ccdMode.some,
-                gn.roi.some),
-              λ)
-          .map(GeneratorParams(_, gn, obsParams.calibrationRole))
-          .toEither
+            val mode = InstrumentMode.GmosNorthSpectroscopy(
+              g,
+              f,
+              GmosFpu.North.builtin(u),
+              gn.ccdMode.some,
+              gn.roi.some
+            )
+            GeneratorParams(itcObsParams(obsParams, mode, λ), gn, obsParams.calibrationRole)
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
-            itcObsParams(
-              obsParams,
-              InstrumentMode.GmosSouthSpectroscopy(
-                g,
-                f,
-                GmosFpu.South.builtin(u),
-                gs.ccdMode.some,
-                gs.roi.some),
-              λ)
-            .map(GeneratorParams(_, gs, obsParams.calibrationRole))
-            .toEither
-        }
+            val mode = InstrumentMode.GmosSouthSpectroscopy(
+              g,
+              f,
+              GmosFpu.South.builtin(u),
+              gs.ccdMode.some,
+              gs.roi.some
+            )
+            GeneratorParams(itcObsParams(obsParams, mode, λ), gs, obsParams.calibrationRole)
 
       private def itcObsParams(
         obsParams:  ObsParams,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): ValidatedNel[Error, GeneratorAsterismParams] = {
-        (obsParams.signalToNoise.toValidNel(Error.missing("signal to noise")),
-         obsParams.signalToNoiseAt.toValidNel(Error.missing("signal to noise at wavelength")),
+      ): Either[ItcInput.Missing, ItcInput.Defined] =
+        (obsParams.signalToNoise.toValidNel(ItcInput.missingObsParam("signal to noise")),
+         obsParams.signalToNoiseAt.toValidNel(ItcInput.missingObsParam("signal to noise at wavelength")),
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (s2n, s2nA, targets) =>
-          GeneratorAsterismParams(
+          ItcInput.Defined(
             ImagingIntegrationTimeParameters(
               wavelength,
               Acquisition.AcquisitionSN,
@@ -261,18 +254,19 @@ object GeneratorParamsService {
             targets
           )
         }
-      }
+        .leftMap(ItcInput.Missing.fromParams)
+        .toEither
 
-      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[Error, (Target.Id, TargetInput)] = {
+      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[ItcInput.Param, (Target.Id, TargetInput)] = {
         val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
         val brightnesses = 
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
 
-        targetParams.targetId.toValidNel(Error.missing("target")).andThen: tid =>
-          (sourceProf.toValidNel(Error.targetMissing(tid, "source profile")),
-           Validated.condNel(brightnesses.exists(_.nonEmpty), (), Error.targetMissing(tid, "brightness measure")),
-           targetParams.radialVelocity.toValidNel(Error.targetMissing(tid, "radial velocity"))
+        targetParams.targetId.toValidNel(ItcInput.missingObsParam("target")).andThen: tid =>
+          (sourceProf.toValidNel(ItcInput.missingTargetParam(tid, "source profile")),
+           Validated.condNel(brightnesses.exists(_.nonEmpty), (), ItcInput.missingTargetParam(tid, "brightness measure")),
+           targetParams.radialVelocity.toValidNel(ItcInput.missingTargetParam(tid, "radial velocity"))
           ).mapN: (sp, _, rv) =>
             tid -> TargetInput(sp, rv)
       }
