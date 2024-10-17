@@ -32,6 +32,7 @@ import Services.Syntax.*
 import skunk.AppliedFragment
 
 import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
+import lucuma.odb.data.ConfigurationRequest.Status
 
 trait ConfigurationService[F[_]] {
 
@@ -73,8 +74,14 @@ object ConfigurationService {
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
 
-      override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
-        impl.updateRequests(SET, where).value
+      override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
+        val doUpdate = impl.updateRequests(SET, where).value
+        SET.status match
+          case None                   | 
+               Some(Status.Requested) | 
+               Some(Status.Withdrawn) => requirePiAccess(doUpdate)
+          case Some(Status.Approved)  |
+               Some(Status.Denied)    => requireStaffAccess(doUpdate)                  
 
     }
 
@@ -152,7 +159,11 @@ object ConfigurationService {
         map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
 
     def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
-      ???
+      // access level has been checked already
+      ResultT.liftF:
+        val af = Statements.updateRequests(SET, where)
+        session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList
 
   } 
 
@@ -491,6 +502,16 @@ object ConfigurationService {
         returning c_configuration_request_id
       """.query(configuration_request_id)
 
+    // applied fragment yielding a stream of ConfigurationRequest.Id
+    def updateRequests(SET: ConfigurationRequestPropertiesInput, which: AppliedFragment): AppliedFragment =
+      // TODO: check program ownership
+      val statusExpr: AppliedFragment = SET.status.fold(void"c_status")(sql"$configuration_request_status".apply)
+      void"""
+        update t_configuration_request
+        set c_status = """ |+| statusExpr |+| 
+      void" where c_configuration_request_id in (" |+| which |+| void""")
+        returning c_configuration_request_id
+      """
   }
 
 }

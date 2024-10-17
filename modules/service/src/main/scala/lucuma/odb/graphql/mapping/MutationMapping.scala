@@ -699,7 +699,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val UpdateConfigurationRequests: MutationField =
-    import ConfigurationRequest.Status.*
     MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
       services.useTransactionally {
 
