@@ -19,7 +19,7 @@ case class ConfigurationRequest(
 object ConfigurationRequest extends WithGid('x'.refined) {
 
   enum Status derives Enumerated:
-    case Requested, Approved, Denied
+    case Requested, Approved, Denied, Withdrawn
     def tag = toString.toLowerCase // ???
 
   given Decoder[ConfigurationRequest] = hc =>

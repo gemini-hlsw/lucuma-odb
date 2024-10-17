@@ -29,6 +29,9 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import skunk.AppliedFragment
+
+import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
 
 trait ConfigurationService[F[_]] {
 
@@ -43,6 +46,8 @@ trait ConfigurationService[F[_]] {
 
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
+
+  def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]]
 
 }
 
@@ -67,6 +72,9 @@ object ConfigurationService {
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
+
+      override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
+        impl.updateRequests(SET, where).value
 
     }
 
@@ -142,6 +150,9 @@ object ConfigurationService {
     def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
       selectConfigurations(pid).flatMap: map =>
         map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
+
+    def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
+      ???
 
   } 
 
