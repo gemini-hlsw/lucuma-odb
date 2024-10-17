@@ -798,7 +798,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
       }
     }
-  
+
   private lazy val UpdateObservationsTimes: MutationField =
     MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))) { (input, child) =>
       services.useTransactionally {
