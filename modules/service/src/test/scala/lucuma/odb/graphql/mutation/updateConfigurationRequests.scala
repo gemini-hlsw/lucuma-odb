@@ -10,6 +10,7 @@ import io.circe.syntax.*
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import cats.effect.IO
 import lucuma.odb.data.ConfigurationRequest
+import lucuma.core.model.User
 
 class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperations {
 
@@ -18,40 +19,50 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   val validUsers = List(pi, admin).toList
 
-  test("create and update a configuration request") {
-    val setup: IO[ConfigurationRequest.Id] =
-      for     
-        cid <- createCallForProposalsAs(admin)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cid), None, "Foo")
-        tid <- createTargetWithProfileAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        rid <- createConfigurationRequestAs(pi, oid)
-      yield rid
-
-    setup.flatMap: rid =>
-      expect(
-        user = admin,
-        query = s"""
-          mutation {
-            updateConfigurationRequests(input: {
-              SET: { status: APPROVED }
-              WHERE: { id: { EQ: ${rid.asJson} } }
-            }) {
-              requests {
-                id
-                status
-              }
-              hasMore
+  def updateConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequest.Status): IO[Unit] =
+    expect(
+      user = admin,
+      query = s"""
+        mutation {
+          updateConfigurationRequests(input: {
+            SET: { status: ${status.tag.toUpperCase} }
+            WHERE: { id: { EQ: ${rid.asJson} } }
+          }) {
+            requests {
+              id
+              status
             }
+            hasMore
           }
-        """,
-        expected = Right(json"""
-          {
-          }
-        """)
-      )
-  }
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateConfigurationRequests" : {
+            "requests" : [
+              {
+                "id" : $rid,
+                "status" : $status
+              }
+            ],
+            "hasMore" : false
+          }          
+        }
+      """)
+    )
 
+  val setup: IO[ConfigurationRequest.Id] =
+    for     
+      cid <- createCallForProposalsAs(admin)
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, Some(cid), None, "Foo")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      rid <- createConfigurationRequestAs(pi, oid)
+    yield rid
+
+  ConfigurationRequest.Status.values.foreach: status =>
+    test(s"Admin should be able to set status to $status."):
+      setup.flatMap(updateConfigurationRequestStatusAs(admin, _, status))
 
 }
