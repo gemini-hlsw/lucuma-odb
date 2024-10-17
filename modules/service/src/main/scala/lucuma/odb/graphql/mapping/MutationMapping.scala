@@ -81,6 +81,7 @@ import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
+import lucuma.odb.graphql.input.UpdateConfigurationRequestsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
@@ -104,6 +105,7 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import lucuma.odb.data.ConfigurationRequest
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -144,6 +146,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UnlinkUser,
       UpdateAsterisms,
       UpdateCallsForProposals,
+      UpdateConfigurationRequests,
       UpdateDatasets,
       UpdateGroups,
       UpdateObsAttachments,
@@ -228,6 +231,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order           = OrderSelection[CallForProposals.Id](CallForProposalsType / "id"),
       limit           = limit,
       collectionField = "callsForProposals",
+      child
+    )
+
+  def configurationRequestResultSubquery(ids: List[ConfigurationRequest.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate       = Predicates.configurationRequest.id.in(ids),
+      order           = OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id"),
+      limit           = limit,
+      collectionField = "requests",
       child
     )
 
@@ -686,11 +698,34 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       }
     }
 
+  private lazy val UpdateConfigurationRequests: MutationField =
+    import ConfigurationRequest.Status.*
+    MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
+      services.useTransactionally {
+
+        // Our predicate for selecting datasets to update
+        val filterPredicate = and(List(
+          Predicates.dataset.observation.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("requests"), List("requests"), List(ConfigurationRequestType))).flatMap(_.fragment)
+
+        idSelect.flatTraverse { which =>
+          configurationService
+            .updateRequests(input.SET, which)
+            .map(_.flatMap(configurationRequestResultSubquery(_, input.LIMIT, child)))
+        }
+
+      }
+    }
+
   private lazy val UpdateDatasets: MutationField =
     MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
       services.useTransactionally {
         requireStaffAccess {
-          // Our predicate for selecting datasets to update
+          // Our predicate for selecting requests to update
           val filterPredicate = and(List(
             Predicates.dataset.observation.program.isWritableBy(user),
             input.WHERE.getOrElse(True)
@@ -765,7 +800,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
       }
     }
-
+  
   private lazy val UpdateObservationsTimes: MutationField =
     MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))) { (input, child) =>
       services.useTransactionally {
