@@ -11,8 +11,8 @@ import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperations {
 
