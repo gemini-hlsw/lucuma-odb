@@ -122,9 +122,9 @@ trait ObservationMapping[F[_]]
           itcService(itcClient)
             .lookup(pid, oid)
             .map {
-              case Left(e@ObservationDefinitionError(_)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
-              case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
-              case Right(s)                              => s.success
+              case Left(e@ObservationDefinitionError(_, _)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
+              case Left(e)                                  => OdbError.ItcError(e.format.some).asFailure
+              case Right(s)                                 => s.success
             }
         }
 

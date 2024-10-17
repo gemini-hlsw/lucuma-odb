@@ -8,6 +8,7 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.apply.*
+import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -126,7 +127,7 @@ object TimeEstimateService {
               // Calculate time estimate using provided ITC result and params.
               asterismResults.flatMapF { ar =>
                 generator(commitHash, itcClient, calculator)
-                  .calculateDigest(pid, oid, ar, data.generatorParams)
+                  .calculateDigest(pid, oid, Either.right(ar), data.generatorParams)
                   .map(_.toOption.map(_.fullTimeEstimate))
               }
             }
