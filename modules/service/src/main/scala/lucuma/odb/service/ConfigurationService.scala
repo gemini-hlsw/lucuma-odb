@@ -49,6 +49,10 @@ trait ConfigurationService[F[_]] {
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
 
+  /** 
+   * Updates the requests specified by `where`, which is an `AppliedFragment` that should return a stream
+   * of request ids filtered to those where the caller has write access.
+   */
   def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]]
 
 }
@@ -505,7 +509,6 @@ object ConfigurationService {
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput, which: AppliedFragment): AppliedFragment =
-      // TODO: check program ownership
       val statusExpr: AppliedFragment = SET.status.fold(void"c_status")(sql"$configuration_request_status".apply)
       void"""
         update t_configuration_request

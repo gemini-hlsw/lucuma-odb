@@ -703,7 +703,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
         // Our predicate for selecting datasets to update
         val filterPredicate = and(List(
-          Predicates.dataset.observation.program.isWritableBy(user),
+          Predicates.configurationRequest.program.isWritableBy(user),
           input.WHERE.getOrElse(True)
         ))
 

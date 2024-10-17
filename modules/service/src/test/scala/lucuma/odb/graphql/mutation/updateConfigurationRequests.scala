@@ -12,18 +12,20 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.data.OdbError
 
 class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperations {
 
   val pi      = TestUsers.Standard.pi(1, 30)
+  val pi2     = TestUsers.Standard.pi(3, 34)
   val admin   = TestUsers.Standard.admin(2, 32)
 
-  val validUsers = List(pi, admin).toList
+  val validUsers = List(pi, pi2, admin).toList
 
-  def updateConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
-    expect(
-      user = admin,
-      query = s"""
+  object updateConfigurationRequestStatusAs {
+
+    def query(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): String =
+      s"""
         mutation {
           updateConfigurationRequests(input: {
             SET: { status: ${status.tag.toUpperCase} }
@@ -36,21 +38,28 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
             hasMore
           }
         }
-      """,
-      expected = Right(json"""
-        {
-          "updateConfigurationRequests" : {
-            "requests" : [
-              {
-                "id" : $rid,
-                "status" : $status
-              }
-            ],
-            "hasMore" : false
-          }          
-        }
-      """)
-    )
+      """
+
+    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+      expect(
+        user = user,
+        query = query(user, rid, status),
+        expected = Right(json"""
+          {
+            "updateConfigurationRequests" : {
+              "requests" : [
+                {
+                  "id" : $rid,
+                  "status" : $status
+                }
+              ],
+              "hasMore" : false
+            }          
+          }
+        """)
+      )
+
+  }
 
   val setup: IO[ConfigurationRequest.Id] =
     for     
@@ -65,5 +74,29 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
   ConfigurationRequestStatus.values.foreach: status =>
     test(s"Admin should be able to set status to $status."):
       setup.flatMap(updateConfigurationRequestStatusAs(admin, _, status))
+
+  List(ConfigurationRequestStatus.Requested, ConfigurationRequestStatus.Withdrawn).foreach: status =>
+    test(s"PI should be able to set status to $status."):
+      setup.flatMap(updateConfigurationRequestStatusAs(pi, _, status))
+
+  List(ConfigurationRequestStatus.Approved, ConfigurationRequestStatus.Denied).foreach: status =>
+    test(s"PI should *not* be able to set status to $status."):
+      interceptOdbError(setup.flatMap(updateConfigurationRequestStatusAs(pi, _, status))):
+        case OdbError.NotAuthorized(_, _) => () // expected
+
+  test(s"PI can't set status on another user's request (update affects no rows)"):
+    setup.flatMap: rid =>
+      expect(
+        user = pi2,
+        query = updateConfigurationRequestStatusAs.query(pi2, rid, ConfigurationRequestStatus.Withdrawn),
+        expected = Right(json"""
+          {
+            "updateConfigurationRequests" : {
+              "requests" : [],
+              "hasMore" : false
+            }
+          }
+        """)
+      )
 
 }
