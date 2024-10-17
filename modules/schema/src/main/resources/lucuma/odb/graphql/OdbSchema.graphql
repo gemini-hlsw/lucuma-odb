@@ -267,6 +267,21 @@ type AtomRecordSelectResult {
 }
 
 """
+CategorizedTime grouped with a ScienceBand.  A program may contain multiple
+observations in distinct bands.  Time accounting at the program level must
+distinguish time spent in observations of each of these bands.
+"""
+type BandedTime {
+
+  "ScienceBand associated with the time, if any."
+  band: ScienceBand
+
+  "Time distributed across the program, partner, and non-charged categories."
+  time: CategorizedTime!
+
+}
+
+"""
 Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
 """
 input BandBrightnessIntegratedInput {
@@ -429,6 +444,11 @@ type CallForProposals {
   instruments: [Instrument!]!
 
   """
+  Default proprietary period to use for propograms linked to this Call.
+  """
+  proprietaryMonths: NonNegInt!
+
+  """
   Whether this Call is PRESENT or has been DELETED.
   """
   existence: Existence!
@@ -495,6 +515,12 @@ input CallForProposalsPropertiesInput {
   supply the entire list of instruments to set.  Nullable on edit.
   """
   instruments: [Instrument!]
+
+  """
+  The default proprietary period for proposals linked to this call.  If not
+  specified, the default period for the call type will be used.
+  """
+  proprietaryMonths: NonNegInt
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
@@ -3443,6 +3469,12 @@ input ProgramPropertiesInput {
   The program name, which is both optional and nullable
   """
   name: NonEmptyString
+
+  """
+  Sets the GOA properties for this program.  If not specified on create,
+  default values are used.
+  """
+  goa: GoaPropertiesInput
 
   """
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
@@ -7668,6 +7700,57 @@ enum GmosYBinning {
   FOUR
 }
 
+"Gemini Observatory Archive properties for a particular program."
+type GoaProperties {
+
+  """
+  How many months to withhold public access to the data.  This property is
+  applicable to science programs, defaults to the proprietary period associated
+  with the Call for Proposals if any; 0 months otherwise.
+  """
+  proprietaryMonths: NonNegInt!
+
+  """
+  Whether the PI wishes to be notified when new data are received. This property
+  is applicable to science programs and defaults to true.
+  """
+  shouldNotify: Boolean!
+
+  """
+  Whether the header (as well as the data itself) should remain private.  This
+  property is applicable to science programs and defaults to false.
+  """
+  privateHeader: Boolean!
+
+}
+
+"""
+Gemini Observatory Archive properties creation and editing input for a
+particular program.
+"""
+input GoaPropertiesInput {
+
+  """
+  How many months to withhold public access to the data.  This property is
+  applicable to science programs, defaults to the proprietary period associated
+  with the Call for Proposals if any; 0 months otherwise.
+  """
+  proprietaryMonths: NonNegInt
+
+  """
+  Whether the PI wishes to be notified when new data are received. This property
+  is applicable to science programs and defaults to true.
+  """
+  shouldNotify: Boolean
+
+  """
+  Whether the header (as well as the data itself) should remain private.  This
+  property is applicable to science programs and defaults to false.
+  """
+  privateHeader: Boolean
+
+}
+
 "A group of observations and other groups."
 type Group {
 
@@ -8921,7 +9004,7 @@ type Program {
   """
   Program-wide time charge, summing all corrected observation time charges.
   """
-  timeCharge: CategorizedTime!
+  timeCharge: [BandedTime!]!
 
   """
   All user invitations associated with this program.
@@ -8937,6 +9020,11 @@ type Program {
   Calibration role of the program
   """
   calibrationRole: CalibrationRole
+
+  """
+  Observatory archive properties related to this program.
+  """
+  goa: GoaProperties!
 
 }
 

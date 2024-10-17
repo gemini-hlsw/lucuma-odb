@@ -14,7 +14,7 @@ object CreateProgramInput {
   val Binding: Matcher[CreateProgramInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramPropertiesInput.CreateBinding.Option("SET", rInput)
+        ProgramPropertiesInput.Create.Binding.Option("SET", rInput)
       ) => rInput.map(apply)
     }
 }

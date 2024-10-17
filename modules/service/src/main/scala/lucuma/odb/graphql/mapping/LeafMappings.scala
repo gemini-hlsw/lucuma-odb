@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -17,7 +18,9 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
@@ -25,6 +28,7 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
@@ -46,12 +50,10 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
@@ -82,7 +84,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[CloudExtinction](CloudExtinctionType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
-      LeafMapping[ConfigurationRequest.Status](ConfigurationRequestStatusType),
+      LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
@@ -137,6 +139,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
+      LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
       LeafMapping[ObsActiveStatus](ObsActiveStatusType),
       LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),

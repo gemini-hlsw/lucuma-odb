@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.functorFilter.*
-import cats.syntax.option.*
 import grackle.Cursor
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Result
 import grackle.Type
+import grackle.syntax.*
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.StepType
 
@@ -30,26 +30,24 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
       import StepType.*
 
       override def discriminate(c: Cursor): Result[Type] =
-        c.fieldAs[StepType]("stepType").map {
+        c.fieldAs[StepType]("stepType").map:
           case Bias      => BiasType
           case Dark      => DarkType
           case Gcal      => GcalType
           case Science   => ScienceType
           case SmartGcal => SmartGcalType
-        }
 
-      private def mkPredicate(stepType: StepType): Option[Predicate] =
-        Eql(StepConfigType / "stepType", Const(stepType)).some
+      private def mkPredicate(stepType: StepType): Result[Predicate] =
+        Eql(StepConfigType / "stepType", Const(stepType)).success
 
-      override def narrowPredicate(tpe: Type): Option[Predicate] =
-        tpe match {
+      override def narrowPredicate(tpe: Type): Result[Predicate] =
+        tpe match
           case BiasType      => mkPredicate(Bias)
           case DarkType      => mkPredicate(Dark)
           case GcalType      => mkPredicate(Gcal)
           case ScienceType   => mkPredicate(Science)
           case SmartGcalType => mkPredicate(SmartGcal)
-          case _             => none
-        }
+          case _             => Result.internalError(s"Invalid discriminator: $tpe")
     }
 
   lazy val StepConfigBiasMapping: ObjectMapping =

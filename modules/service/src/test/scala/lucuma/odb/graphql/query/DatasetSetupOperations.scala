@@ -8,11 +8,11 @@ import cats.effect.IO
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
-import lucuma.odb.data.ObservingModeType
 
 trait DatasetSetupOperations extends DatabaseOperations { this: OdbSuite =>
 

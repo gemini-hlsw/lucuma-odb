@@ -11,6 +11,7 @@ import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.declination
 import lucuma.odb.util.Codecs.existence
 import lucuma.odb.util.Codecs.instrument
+import lucuma.odb.util.Codecs.int4_nonneg
 import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.right_ascension
 import lucuma.odb.util.Codecs.semester
@@ -21,10 +22,11 @@ import skunk.codec.temporal.date
 trait CallForProposalsView[F[_]] extends BaseMapping[F] {
 
   object CallForProposalsView extends TableDef("v_cfp") {
-    val Id       = col("c_cfp_id",     cfp_id)
-    val Title    = col("c_title",      text_nonempty)
-    val Type     = col("c_type",       cfp_type)
-    val Semester = col("c_semester",   semester)
+    val Id          = col("c_cfp_id",      cfp_id)
+    val Title       = col("c_title",       text_nonempty)
+    val Type        = col("c_type",        cfp_type)
+    val Semester    = col("c_semester",    semester)
+    val Proprietary = col("c_proprietary", int4_nonneg)
 
     object coordinateLimits {
 

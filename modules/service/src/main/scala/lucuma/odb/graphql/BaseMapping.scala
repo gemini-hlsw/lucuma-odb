@@ -159,6 +159,7 @@ trait BaseMapping[F[_]]
   lazy val GmosSouthStepType                       = schema.ref("GmosSouthStep")
   lazy val GmosXBinningType                        = schema.ref("GmosXBinning")
   lazy val GmosYBinningType                        = schema.ref("GmosYBinning")
+  lazy val GoaPropertiesType                       = schema.ref("GoaProperties")
   lazy val GroupType                               = schema.ref("Group")
   lazy val GroupIdType                             = schema.ref("GroupId")
   lazy val GroupEditType                           = schema.ref("GroupEdit")

@@ -19,11 +19,11 @@ object FileReader {
     val error:      Parser.Error
   ) extends RuntimeException(s"$fileName, line $lineNumber: ${error.show}")
 
-  def entryLines[F[_]]: Pipe[F, Byte, (PosLong, String)] = {
+  def entryLines[F[_]]: Pipe[F, Byte, (PosLong, String)] = { in =>
     def skip(s: String): Boolean =
       s.startsWith("#") || s.startsWith(",") || s.isEmpty
 
-    _.through(text.utf8.decode)
+    in.through(text.utf8.decode)
      .through(text.lines)
      .map(_.trim)
      .zipWithIndex

@@ -30,6 +30,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -79,9 +80,9 @@ import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
+import lucuma.odb.graphql.input.UpdateConfigurationRequestsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
-import lucuma.odb.graphql.input.UpdateConfigurationRequestsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
@@ -105,7 +106,6 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.odb.data.ConfigurationRequest
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -397,9 +397,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       services.useTransactionally {
-        programService.insertProgram(input.SET).map { id =>
-          Result(Unique(Filter(Predicates.program.id.eql(id), child)))
-        }
+        programService.insertProgram(input.SET).nestMap: id =>
+          Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
 

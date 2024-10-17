@@ -43,6 +43,7 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       SqlField("allowsNonPartnerPi", CallForProposalsView.AllowsNonPartner),
       SqlField("nonPartnerDeadline", CallForProposalsView.NonPartnerDeadline),
       SqlField("instruments",        CallForProposalsView.Instruments),
+      SqlField("proprietaryMonths",  CallForProposalsView.Proprietary),
       SqlField("existence",          CallForProposalsView.Existence),
       SqlField("_isOpen",            CallForProposalsView.IsOpen, hidden = true)
     )

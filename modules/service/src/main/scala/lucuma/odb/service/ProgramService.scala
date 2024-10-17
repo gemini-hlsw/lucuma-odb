@@ -8,6 +8,8 @@ import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
@@ -32,6 +34,7 @@ import lucuma.core.model.StandardRole.Ngo
 import lucuma.core.model.StandardRole.Pi
 import lucuma.core.model.User
 import lucuma.odb.data.*
+import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
@@ -70,7 +73,7 @@ trait ProgramService[F[_]] {
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id]
+  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Insert a new calibration program, PI is left empty.
@@ -221,24 +224,43 @@ object ProgramService {
             } yield r).value
       }
 
-      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Program.Id] =
-        Trace[F].span("insertProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
+      def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => period.isEmpty
+          )
 
-          session
-            .prepareR(Statements.InsertProgram)
-            .use(_.unique(SETʹ.name))
-            .flatTap { pid =>
-              user match {
-                case ServiceUser(_, _) =>
-                  Concurrent[F].unit
-                case nonServiceUser    =>
-                  // Link the PI to the program.
-                  session.executeCommand(
-                    Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
-                  ).void
-              }
-            }
+
+      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]] =
+        Trace[F].span("insertProgram") {
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
+
+          val create =
+            session
+              .prepareR(Statements.InsertProgram)
+              .use(_.unique(SETʹ))
+              .flatTap: pid =>
+                user match
+                  case ServiceUser(_, _) =>
+                    Concurrent[F].unit
+                  case nonServiceUser    =>
+                    // Link the PI to the program.
+                    session.executeCommand(
+                      Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
+                    ).void
+              .map(_.success)
+
+          val proprietaryMonths =
+            SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
+
+          (for {
+            _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
+            p <- ResultT(create)
+          } yield p).value
         }
 
       def linkUserImpl(req: ProgramService.LinkUserRequest)(using Transaction[F]): F[LinkUserResponse] = {
@@ -266,7 +288,7 @@ object ProgramService {
 
       def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id] =
         Trace[F].span("insertCalibrationProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Empty)
+          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
           session.prepareR(Statements.InsertCalibrationProgram).use(_.unique(SETʹ.name, calibrationRole, description.value))
         }
@@ -327,8 +349,10 @@ object ProgramService {
             case Some(R.SupportPrimary | R.SupportSecondary)  => requireStaffAccess(unlinkUnconditionally(input))
       }
 
-      def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]):
-        F[Result[List[Program.Id]]] = {
+      def updatePrograms(
+        SET:   ProgramPropertiesInput.Edit,
+        where: AppliedFragment
+      )(using Transaction[F]): F[Result[List[Program.Id]]] = {
 
         // Create the temp table with the programs we're updating. We will join with this
         // several times later on in the transaction.
@@ -349,7 +373,8 @@ object ProgramService {
           }
 
         (for {
-          _   <- ResultT(setup.map(Result.apply))
+          _   <- ResultT.liftF(setup)
+          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
           ids <- ResultT(updatePrograms)
         } yield ids).value
 
@@ -487,7 +512,10 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.map(sql"c_name = $text_nonempty")
+          SET.name.map(sql"c_name = $text_nonempty"),
+          SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
+          SET.goa.flatMap(_.shouldNotify).map(sql"c_goa_should_notify = $bool"),
+          SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool")
         ).flatten
       )
 
@@ -649,12 +677,30 @@ object ProgramService {
       }
 
     /** Insert a program, making the passed user PI if it's a non-service user. */
-    val InsertProgram: Query[Option[NonEmptyString], Program.Id] =
+    val InsertProgram: Query[ProgramPropertiesInput.Create, Program.Id] =
       sql"""
-        INSERT INTO t_program (c_name)
-        VALUES (${text_nonempty.opt})
+        INSERT INTO t_program (
+          c_name,
+          c_goa_proprietary,
+          c_goa_should_notify,
+          c_goa_private_header,
+          c_existence
+        )
+        VALUES (
+          ${text_nonempty.opt},
+          $int4_nonneg,
+          $bool,
+          $bool,
+          $existence
+        )
         RETURNING c_program_id
-      """.query(program_id)
+      """.query(program_id).contramap { c => (
+        c.name,
+        c.goa.proprietaryMonths,
+        c.goa.shouldNotify,
+        c.goa.privateHeader,
+        c.existence
+      )}
 
     /** Insert a calibration program, without a user for a staff program */
     val InsertCalibrationProgram: Query[(Option[NonEmptyString], CalibrationRole, String), Program.Id] =

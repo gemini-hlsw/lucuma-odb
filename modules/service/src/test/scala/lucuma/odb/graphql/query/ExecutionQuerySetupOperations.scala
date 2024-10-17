@@ -10,6 +10,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.StepStage
 import lucuma.core.model.ExecutionEvent
@@ -20,7 +21,6 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.*
-import lucuma.odb.data.ObservingModeType
 
 trait ExecutionQuerySetupOperations extends DatabaseOperations { this: OdbSuite =>
 

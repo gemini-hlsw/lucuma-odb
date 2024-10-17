@@ -12,6 +12,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SequenceType.Acquisition
 import lucuma.core.enums.SequenceType.Science
@@ -22,7 +23,6 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
-import lucuma.odb.data.ObservingModeType
 import lucuma.odb.json.gmos.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.transport.given

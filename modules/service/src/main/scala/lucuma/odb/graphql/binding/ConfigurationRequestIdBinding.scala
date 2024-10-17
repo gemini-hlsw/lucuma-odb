@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.ConfigurationRequest
+import lucuma.core.model.ConfigurationRequest
 
 val ConfigurationRequestIdBinding: Matcher[ConfigurationRequest.Id] =
   gidBinding("configurationRequest")
