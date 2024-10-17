@@ -701,7 +701,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
       services.useTransactionally {
 
-        // Our predicate for selecting datasets to update
+        // Our predicate for selecting requests to update
         val filterPredicate = and(List(
           Predicates.configurationRequest.program.isWritableBy(user),
           input.WHERE.getOrElse(True)
@@ -723,7 +723,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
       services.useTransactionally {
         requireStaffAccess {
-          // Our predicate for selecting requests to update
+          // Our predicate for selecting datasets to update
           val filterPredicate = and(List(
             Predicates.dataset.observation.program.isWritableBy(user),
             input.WHERE.getOrElse(True)
