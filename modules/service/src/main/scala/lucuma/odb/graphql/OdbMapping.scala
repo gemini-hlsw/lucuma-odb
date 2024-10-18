@@ -21,6 +21,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
+import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -45,6 +46,7 @@ object OdbMapping {
     observation: Topic[F, ObservationTopic.Element],
     target:      Topic[F, TargetTopic.Element],
     group:       Topic[F, GroupTopic.Element],
+    configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
   )
 
   object Topics {
@@ -56,7 +58,8 @@ object OdbMapping {
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar, grp)
+        cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, tar, grp, cr)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -115,6 +118,7 @@ object OdbMapping {
           with ConfigurationGmosLongSlitMappings[F]
           with ConfigurationMapping[F]
           with ConfigurationRequestMapping[F]
+          with ConfigurationRequestEditMapping[F]
           with ConfigurationRequestSelectResultMapping[F]
           with ConfigurationObservingModeMappings[F]
           with ConstraintSetGroupMapping[F]
@@ -310,6 +314,7 @@ object OdbMapping {
                 ConditionsIntuitionMapping,
                 ConditionsMeasurementMapping,
                 ConfigurationRequestMapping,
+                ConfigurationRequestEditMapping,
                 ConfigurationRequestSelectResultMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,

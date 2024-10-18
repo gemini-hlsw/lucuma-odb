@@ -3144,6 +3144,28 @@ type ObservationEdit { #implements Event {
 
 }
 
+"""
+Event sent when a configuration request is created or updated
+"""
+type ConfigurationRequestEdit {
+
+  """
+  Type of edit
+  """
+  editType: EditType!
+
+  """
+  The id of the edited configuration request
+  """
+  configurationRequestId: ConfigurationRequestId!
+
+  """
+  Edited configuration request, can be null if the value was deleted
+  """
+  configurationRequest: ConfigurationRequest
+
+}
+
 
 """
 Configuration request properties.
@@ -4694,6 +4716,9 @@ type Subscription {
     input: GroupEditInput
   ): GroupEdit!
 
+  configurationRequestEdit(
+    input: ConfigurationRequestEditInput
+  ): ConfigurationRequestEdit!
 }
 
 input TargetEditInput {
@@ -4715,6 +4740,15 @@ input GroupEditInput {
     """
     groupId: GroupId
 
+    """
+    Program ID
+    """
+    programId: ProgramId
+
+}
+
+input ConfigurationRequestEditInput {
+  
     """
     Program ID
     """
