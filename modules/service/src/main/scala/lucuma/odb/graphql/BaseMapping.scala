@@ -66,6 +66,7 @@ trait BaseMapping[F[_]]
   lazy val ConfigurationObservingModeType          = schema.ref("ConfigurationObservingMode")
   lazy val ConfigurationType                       = schema.ref("Configuration")
   lazy val ConfigurationRequestType                = schema.ref("ConfigurationRequest")
+  lazy val ConfigurationRequestEditType            = schema.ref("ConfigurationRequestEdit")
   lazy val ConfigurationRequestIdType              = schema.ref("ConfigurationRequestId")
   lazy val ConfigurationRequestStatusType          = schema.ref("ConfigurationRequestStatus")
   lazy val ConstraintSetType                       = schema.ref("ConstraintSet")
