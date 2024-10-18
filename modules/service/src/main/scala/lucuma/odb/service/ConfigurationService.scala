@@ -11,6 +11,7 @@ import grackle.ResultT
 import io.circe.ACursor
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Coordinates
@@ -22,10 +23,12 @@ import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
+import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
 import lucuma.odb.json.configurationrequest.query.DecodingFailures
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
@@ -45,6 +48,12 @@ trait ConfigurationService[F[_]] {
 
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
+
+  /** 
+   * Updates the requests specified by `where`, which is an `AppliedFragment` that should return a stream
+   * of request ids filtered to those where the caller has write access.
+   */
+  def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]]
 
 }
 
@@ -69,6 +78,15 @@ object ConfigurationService {
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
+
+      override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
+        val doUpdate = impl.updateRequests(SET, where).value
+        SET.status match
+          case None                                       | 
+               Some(ConfigurationRequestStatus.Requested) | 
+               Some(ConfigurationRequestStatus.Withdrawn) => requirePiAccess(doUpdate)
+          case Some(ConfigurationRequestStatus.Approved)  |
+               Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)                  
 
     }
 
@@ -144,6 +162,13 @@ object ConfigurationService {
     def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
       selectConfigurations(pid).flatMap: map =>
         map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
+
+    def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
+      // access level has been checked already
+      ResultT.liftF:
+        val af = Statements.updateRequests(SET, where)
+        session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList
 
   } 
 
@@ -482,6 +507,15 @@ object ConfigurationService {
         returning c_configuration_request_id
       """.query(configuration_request_id)
 
+    // applied fragment yielding a stream of ConfigurationRequest.Id
+    def updateRequests(SET: ConfigurationRequestPropertiesInput, which: AppliedFragment): AppliedFragment =
+      val statusExpr: AppliedFragment = SET.status.fold(void"c_status")(sql"$configuration_request_status".apply)
+      void"""
+        update t_configuration_request
+        set c_status = """ |+| statusExpr |+| 
+      void" where c_configuration_request_id in (" |+| which |+| void""")
+        returning c_configuration_request_id
+      """
   }
 
 }
