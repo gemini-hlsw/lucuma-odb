@@ -8,4 +8,5 @@ import lucuma.core.model.ConfigurationRequest
 
 class ConfigurationRequestPredicates(path: Path) {
   val id = LeafPredicates[ConfigurationRequest.Id](path / "id")
+  val program = ProgramPredicates(path / "program")
 }

@@ -30,6 +30,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -79,6 +80,7 @@ import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
+import lucuma.odb.graphql.input.UpdateConfigurationRequestsInput
 import lucuma.odb.graphql.input.UpdateDatasetsInput
 import lucuma.odb.graphql.input.UpdateGroupsInput
 import lucuma.odb.graphql.input.UpdateObsAttachmentsInput
@@ -144,6 +146,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       UnlinkUser,
       UpdateAsterisms,
       UpdateCallsForProposals,
+      UpdateConfigurationRequests,
       UpdateDatasets,
       UpdateGroups,
       UpdateObsAttachments,
@@ -228,6 +231,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       order           = OrderSelection[CallForProposals.Id](CallForProposalsType / "id"),
       limit           = limit,
       collectionField = "callsForProposals",
+      child
+    )
+
+  def configurationRequestResultSubquery(ids: List[ConfigurationRequest.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
+    mutationResultSubquery(
+      predicate       = Predicates.configurationRequest.id.in(ids),
+      order           = OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id"),
+      limit           = limit,
+      collectionField = "requests",
       child
     )
 
@@ -682,6 +694,28 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               .map(_.flatMap(callForProposalsResultSubquery(_, input.LIMIT, child)))
           }
         }
+      }
+    }
+
+  private lazy val UpdateConfigurationRequests: MutationField =
+    MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
+      services.useTransactionally {
+
+        // Our predicate for selecting requests to update
+        val filterPredicate = and(List(
+          Predicates.configurationRequest.program.isWritableBy(user),
+          input.WHERE.getOrElse(True)
+        ))
+
+        val idSelect: Result[AppliedFragment] =
+          MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("requests"), List("requests"), List(ConfigurationRequestType))).flatMap(_.fragment)
+
+        idSelect.flatTraverse { which =>
+          configurationService
+            .updateRequests(input.SET, which)
+            .map(_.flatMap(configurationRequestResultSubquery(_, input.LIMIT, child)))
+        }
+
       }
     }
 
