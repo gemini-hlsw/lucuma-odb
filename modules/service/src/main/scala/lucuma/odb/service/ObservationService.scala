@@ -620,7 +620,7 @@ object ObservationService {
             case Left(errors)                          =>
               ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
             case Right(GeneratorParams(Left(m), _, _)) =>
-              //
+              // Problems with the ITC inputs should generate validation flags.
               ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft
             case Right(ps)                             =>
               ps.asRight
