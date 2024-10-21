@@ -42,6 +42,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
@@ -110,7 +111,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: ItcService.AsterismResults,
+    asterismResult: Either[ItcInput.Missing, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
@@ -207,18 +208,18 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: ItcService.AsterismResults,
+        itcRes: Either[ItcInput.Missing, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: IntegrationTime =
-          itcRes.acquisitionResult.focus.value
+        val acquisitionIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+          itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: IntegrationTime =
-          itcRes.scienceResult.focus.value
+        val scienceIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+          itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
           val md5 = MessageDigest.getInstance("MD5")
@@ -227,9 +228,9 @@ object Generator {
           md5.update(params.observingMode.hashBytes)
 
           // Integration Time
-          List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ing =>
-            md5.update(ing.exposureTime.hashBytes)
-            md5.update(ing.exposureCount.hashBytes)
+          List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ving =>
+            ving.fold(_ => Array.emptyByteArray, ing => md5.update(ing.exposureTime.hashBytes))
+            ving.fold(_ => Array.emptyByteArray, ing => md5.update(ing.exposureCount.hashBytes))
           }
 
           // Commit Hash
@@ -275,7 +276,15 @@ object Generator {
           for {
             pc <- EitherT(opc)
             (params, cached) = pc
-            as <- cached.fold(callItc(params))(EitherT.pure(_))
+            // This will be confusing, but the idea here is that if the observation
+            // definition is missing target information we just record that in the
+            // Context.  On the other hand if there is an error calling the ITC then
+            // we cannot create the Context.
+            // EitherT[F, Error, Either[ItcInput.Missing, ItcService.AsterismResults]]
+            as <- params.itcInput.fold(
+              m => EitherT.pure(Either.left[ItcInput.Missing, ItcService.AsterismResults](m)),
+              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(Either.right[ItcInput.Missing, ItcService.AsterismResults](_))
+            )
           } yield Context(pid, oid, as, params)
 
         }
@@ -302,7 +311,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: ItcService.AsterismResults,
+        asterismResults: Either[ItcInput.Missing, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
@@ -372,7 +381,7 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
-          .unlessA(ctx.scienceIntegrationTime.exposureCount.value <= SequenceAtomLimit) *>
+          .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap { p =>

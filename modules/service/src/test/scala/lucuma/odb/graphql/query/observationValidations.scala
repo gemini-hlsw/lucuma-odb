@@ -210,14 +210,13 @@ class observationValidations
         tid <- createTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
-    setup.flatMap { (tid, oid) =>
+    setup.flatMap { (_, oid) =>
       expect(
         pi,
         validationQuery(oid),
         expected = queryResult(
           ObservationValidation.configuration(
-            ObservationService.MissingDataMsg(tid.some, "brightness measure"),
-            ObservationService.MissingDataMsg(tid.some, "radial velocity")
+            "target t-195 is missing: { brightness measure, radial velocity }"
           )
         ).asRight
       )
@@ -287,14 +286,13 @@ class observationValidations
         tid <- createTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
-    setup.flatMap { (tid, oid) =>
+    setup.flatMap { (_, oid) =>
       expect(
         pi,
         validationQuery(oid),
         expected = queryResult(
           ObservationValidation.configuration(
-            ObservationService.MissingDataMsg(tid.some, "brightness measure"),
-            ObservationService.MissingDataMsg(tid.some, "radial velocity")
+            "target t-198 is missing: { brightness measure, radial velocity }"
           ),
           ObservationValidation.callForProposals(
             ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)

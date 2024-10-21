@@ -38,6 +38,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.Atom
@@ -53,6 +54,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
@@ -87,6 +89,20 @@ object Science:
   val CalValidityPeriod: TimeSpan =
     90.minuteTimeSpan
 
+  /**
+   * The nominal amount of time to spend at one (wavelength dither, spatial
+   * offset) pair.  This will help determine how many exposures we hope to
+   * obtain while processing a single "wavelength block".
+   */
+  val SciencePeriod: TimeSpan =
+    1.hourTimeSpan
+
+  /**
+   * Exposure time for a twilight flat observation.
+   */
+  val TwilightExposureTime: TimeSpan =
+    30.secondTimeSpan
+
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
       t +| CalValidityPeriod
@@ -95,14 +111,6 @@ object Science:
       t -| CalValidityPeriod
 
   private val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
-
-  /**
-   * The nominal amount of time to spend at one (wavelength dither, spatial
-   * offset) pair.  This will help determine how many exposures we hope to
-   * obtain while processing a single "wavelength block".
-   */
-  val SciencePeriod: TimeSpan =
-    1.hourTimeSpan
 
   /**
    * Captures an adjustment to the fixed instrument and telescope position that
@@ -725,35 +733,42 @@ object Science:
       expander:  SmartGcalExpander[F, D],
       blockDef:  BlockDefinition.Computer[D, G, L, U],
       config:    Config[G, L, U],
-      time:      IntegrationTime,
+      time:      Either[ItcInput.Missing, IntegrationTime],
       calRole:   Option[CalibrationRole]
     ): F[Either[String, SequenceGenerator[D]]] =
-      // If exposure time is longer than the science period, there will never be
-      // time enough to do any science steps.
-      val expTimeLimit  = Either.cond(time.exposureTime <= SciencePeriod, (), s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
+
+      def extractTime: Either[String, IntegrationTime] =
+        time.leftMap(m => s"GMOS Long Slit requires a valid target: ${m.format}")
 
       // Adjust the config and integration time according to the calibration role.
       val configAndTime = calRole match
         case None                                     =>
-          (config, time).asRight[String]
+          extractTime.tupleLeft(config)
 
         case Some(CalibrationRole.SpectroPhotometric) =>
           val configʹ = calibrationObservationConfig(config)
-          val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length))
-          (configʹ, timeʹ).asRight[String]
+          extractTime
+            .map(_.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length)))
+            .tupleLeft(configʹ)
 
         case Some(CalibrationRole.Twilight)           =>
           val configʹ = calibrationObservationConfig(config)
-          val timeʹ   = time.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length), exposureTime = 30.secondTimeSpan)
+          val timeʹ   = IntegrationTime(TwilightExposureTime, PosInt.unsafeFrom(configʹ.wavelengthDithers.length), SignalToNoise.Min)
           (configʹ, timeʹ).asRight[String]
 
         case Some(c)                                  =>
           s"GMOS Long Slit ${c.tag} not implemented".asLeft
 
+      // If exposure time is longer than the science period, there will never be
+      // time enough to do any science steps.
+      val configAndTimeʹ = configAndTime.filterOrElse(
+        _._2.exposureTime <= SciencePeriod,
+        s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported."
+      )
+
       // Compute the generator
       val result = for
-        _                <- EitherT.fromEither[F](expTimeLimit)
-        (configʹ, timeʹ) <- EitherT.fromEither[F](configAndTime)
+        (configʹ, timeʹ) <- EitherT.fromEither[F](configAndTimeʹ)
         defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, calRole))
       yield ScienceGenerator(
         estimator,
@@ -777,7 +792,7 @@ object Science:
     namespace: UUID,
     expander:  SmartGcalExpander[F, GmosNorth],
     config:    Config.GmosNorth,
-    time:      IntegrationTime,
+    time:      Either[ItcInput.Missing, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosNorth]]] =
     ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
@@ -788,7 +803,7 @@ object Science:
     namespace: UUID,
     expander:  SmartGcalExpander[F, GmosSouth],
     config:    Config.GmosSouth,
-    time:      IntegrationTime,
+    time:      Either[ItcInput.Missing, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosSouth]]] =
     ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
