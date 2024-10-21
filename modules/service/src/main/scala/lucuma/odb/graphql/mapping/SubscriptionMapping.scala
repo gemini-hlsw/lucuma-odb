@@ -22,6 +22,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
+import lucuma.odb.graphql.input.ConfigurationRequestEditInput
 import lucuma.odb.graphql.input.GroupEditInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
@@ -46,6 +47,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
       ObservationEdit,
       ProgramEdit,
       TargetEdit,
+      ConfigurationRequestEdit
     )
 
   lazy val SubscriptionMapping =
@@ -122,6 +124,42 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                         if e.editType === EditType.DeletedCal
                         then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.observation.id.eql(e.observationId),
+                        c
+                      )
+                    )
+              )
+            )
+          )
+        }
+    }
+
+  private val ConfigurationRequestEdit =
+    SubscriptionField("configurationRequestEdit", ConfigurationRequestEditInput.Binding.Option) { (input, child) =>
+      topics
+        .configurationRequest
+        .subscribe(1024)
+        .filter { e =>
+          e.canRead(user) && ((
+            input.flatMap(_.programId).forall(_ === e.programId)
+          ))
+        }
+        .map { e =>
+          Result(
+            Environment(
+              Env(
+                "editType" -> e.editType,
+                "configurationRequestId" -> e.configurationRequestId,
+              ),
+              Filter(
+                Predicates.observationEdit.programId.eql(e.programId),
+                Query.mapSomeFields(child):
+                  case Select("value", a, c) =>
+                    Select("value", a,
+                      // This predicate needs to be down here
+                      Filter(
+                        if e.editType === EditType.DeletedCal
+                        then Predicates.configurationRequest.id.isNull(true) // always false; Predicate.False doesn't work
+                        else Predicates.configurationRequest.id.eql(e.configurationRequestId),
                         c
                       )
                     )
