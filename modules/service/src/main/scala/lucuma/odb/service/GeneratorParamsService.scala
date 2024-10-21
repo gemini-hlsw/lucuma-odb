@@ -41,6 +41,7 @@ import lucuma.itc.client.TargetInput
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ParamName
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.util.Codecs.*
@@ -78,42 +79,35 @@ trait GeneratorParamsService[F[_]] {
 
 object GeneratorParamsService {
 
-  sealed trait Error extends Product with Serializable {
+  sealed trait Error extends Product with Serializable:
     def format: String
-  }
 
-  object Error {
-    case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error {
+  object Error:
+    case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error:
       def format: String =
         s"Observation '$observationId' in program '$programId' not found."
-    }
 
-    case class MissingData(targetId: Option[Target.Id], paramName: String) extends Error {
+    case class MissingData(paramName: ParamName) extends Error:
       def format: String =
-        s"${targetId.map(tid => s"(target $tid) ").orEmpty}$paramName"
-    }
+        s"Missing ${paramName.format}"
 
-    case object ConflictingData extends Error {
+    case object ConflictingData extends Error:
       def format: String =
         "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
-    }
 
-    def missing(paramName: String): Error =
-      MissingData(none, paramName)
+    def missingObsParam(paramName: String): Error =
+      MissingData(ParamName.forObservation(paramName))
 
-    def targetMissing(tid: Target.Id, paramName: String): Error =
-      MissingData(tid.some, paramName)
+    def missingTargetParam(tid: Target.Id, paramName: String): Error =
+      MissingData(ParamName.forTarget(tid, paramName))
 
-    given Eq[Error] with {
+    given Eq[Error] with
       def eqv(x: Error, y: Error): Boolean =
-        (x, y) match {
-          case (MissingData(t0, p0), MissingData(t1, p1)) => (t0 === t1) && (p0 === p1)
-          case (ConflictingData, ConflictingData)         => true
-          case _                                          => false
-        }
-    }
-
-  }
+        (x, y) match
+          case (MissingObservation(p0, o0), MissingObservation(p1, o1)) => (p0 === p1) && (o0 === o1)
+          case (MissingData(p0), MissingData(p1))                       => p0 === p1
+          case (ConflictingData, ConflictingData)                       => true
+          case _                                                        => false
 
   extension (mode: InstrumentMode)
     def asImaging(λ: Wavelength): InstrumentMode =
@@ -190,9 +184,9 @@ object GeneratorParamsService {
         val configs: EitherNel[Error, NonEmptyList[ObservingMode]] =
           params.traverse { p =>
             for {
-              t <- p.targetId.toRightNel(Error.missing("target"))
-              s <- p.sourceProfile.toRightNel(Error.MissingData(t.some, "source profile"))
-              f <- config.toRightNel(Error.missing("observing mode"))
+              t <- p.targetId.toRightNel(Error.missingObsParam("target"))
+              s <- p.sourceProfile.toRightNel(Error.missingTargetParam(t, "source profile"))
+              f <- config.toRightNel(Error.missingObsParam("observing mode"))
             } yield f(s)
           }
 
@@ -232,12 +226,12 @@ object GeneratorParamsService {
         obsParams:  ObsParams,
         mode:       InstrumentMode,
         wavelength: Wavelength
-      ): Either[ItcInput.Missing, ItcInput.Defined] =
-        (obsParams.signalToNoise.toValidNel(ItcInput.missingObsParam("signal to noise")),
-         obsParams.signalToNoiseAt.toValidNel(ItcInput.missingObsParam("signal to noise at wavelength")),
+      ): Either[ParamName.Missing, ItcInput] =
+        (obsParams.signalToNoise.toValidNel(ParamName.forObservation("signal to noise")),
+         obsParams.signalToNoiseAt.toValidNel(ParamName.forObservation("signal to noise at wavelength")),
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (s2n, s2nA, targets) =>
-          ItcInput.Defined(
+          ItcInput(
             ImagingIntegrationTimeParameters(
               wavelength,
               Acquisition.AcquisitionSN,
@@ -254,19 +248,19 @@ object GeneratorParamsService {
             targets
           )
         }
-        .leftMap(ItcInput.Missing.fromParams)
+        .leftMap(ParamName.Missing.fromParams)
         .toEither
 
-      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[ItcInput.Param, (Target.Id, TargetInput)] = {
+      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[ParamName, (Target.Id, TargetInput)] = {
         val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
         val brightnesses = 
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
 
-        targetParams.targetId.toValidNel(ItcInput.missingObsParam("target")).andThen: tid =>
-          (sourceProf.toValidNel(ItcInput.missingTargetParam(tid, "source profile")),
-           Validated.condNel(brightnesses.exists(_.nonEmpty), (), ItcInput.missingTargetParam(tid, "brightness measure")),
-           targetParams.radialVelocity.toValidNel(ItcInput.missingTargetParam(tid, "radial velocity"))
+        targetParams.targetId.toValidNel(ParamName.forObservation("target")).andThen: tid =>
+          (sourceProf.toValidNel(ParamName.forTarget(tid, "source profile")),
+           Validated.condNel(brightnesses.exists(_.nonEmpty), (), ParamName.forTarget(tid, "brightness measure")),
+           targetParams.radialVelocity.toValidNel(ParamName.forTarget(tid, "radial velocity"))
           ).mapN: (sp, _, rv) =>
             tid -> TargetInput(sp, rv)
       }
