@@ -79,7 +79,6 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
@@ -611,9 +610,7 @@ object ObservationService {
           decStart <= dec && dec <= decEnd
 
       extension (ge: GeneratorParamsService.Error)
-        def toObsValidation: ObservationValidation = ge match
-          case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(MissingDataMsg(otid, paramName))
-          case _                                           => ObservationValidation.configuration(ge.format)
+        def toObsValidation: ObservationValidation = ObservationValidation.configuration(ge.format)
 
       override def observationValidations(
         pid: Program.Id,

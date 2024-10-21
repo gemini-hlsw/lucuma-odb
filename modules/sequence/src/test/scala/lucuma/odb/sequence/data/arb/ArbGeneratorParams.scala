@@ -31,18 +31,18 @@ trait ArbGeneratorParams:
   import ArbInstrumentMode.given
   import ArbTargetInput.given
 
-  private def genObsParams(mo: InstrumentMode): Gen[ItcInput.Defined] =
+  private def genItcInput(mo: InstrumentMode): Gen[ItcInput] =
     for
       im <- arbitrary[ImagingIntegrationTimeParameters]
       sm <- arbitrary[SpectroscopyIntegrationTimeParameters]
       s  <- Gen.choose(1, 4)
       t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput)]).map(NonEmptyList.fromListUnsafe)
-    yield ItcInput.Defined(im.copy(mode = mo), sm.copy(mode = mo), t)
+    yield ItcInput(im.copy(mode = mo), sm.copy(mode = mo), t)
 
   val genGmosNorthLongSlit: Gen[GeneratorParams] =
     for
       mo  <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
-      itc <- genObsParams(mo)
+      itc <- genItcInput(mo)
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
     yield GeneratorParams(Either.right(itc), cfg, rol)
@@ -50,7 +50,7 @@ trait ArbGeneratorParams:
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
       mo  <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
-      itc <- genObsParams(mo)
+      itc <- genItcInput(mo)
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
     yield GeneratorParams(Either.right(itc), cfg, rol)

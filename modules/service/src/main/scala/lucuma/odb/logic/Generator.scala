@@ -42,7 +42,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.ParamName
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
@@ -111,7 +111,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[ItcInput.Missing, ItcService.AsterismResults],
+    asterismResult: Either[ParamName.Missing, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
@@ -208,17 +208,17 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[ItcInput.Missing, ItcService.AsterismResults],
+        itcRes: Either[ParamName.Missing, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+        val acquisitionIntegrationTime: Either[ParamName.Missing, IntegrationTime] =
           itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+        val scienceIntegrationTime: Either[ParamName.Missing, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
@@ -282,8 +282,8 @@ object Generator {
             // we cannot create the Context.
             // EitherT[F, Error, Either[ItcInput.Missing, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(Either.left[ItcInput.Missing, ItcService.AsterismResults](m)),
-              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(Either.right[ItcInput.Missing, ItcService.AsterismResults](_))
+              m => EitherT.pure(Either.left[ParamName.Missing, ItcService.AsterismResults](m)),
+              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(Either.right[ParamName.Missing, ItcService.AsterismResults](_))
             )
           } yield Context(pid, oid, as, params)
 
@@ -311,7 +311,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[ItcInput.Missing, ItcService.AsterismResults],
+        asterismResults: Either[ParamName.Missing, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
