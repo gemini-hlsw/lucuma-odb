@@ -17,6 +17,8 @@ import lucuma.core.model.User
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
+import scala.concurrent.duration.*
+
 class configurationRequestEdit extends OdbSuite with SubscriptionUtils with ObservingModeSetupOperations {
 
   val pi      = TestUsers.Standard.pi(1, 30)
@@ -145,6 +147,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
           for
             (pid, oid) <- setup
             rid        <- createConfigurationRequestAs(pi, oid)
+            _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
             _          <- updateConfigurationRequestStatusAs(pi, rid, ConfigurationRequestStatus.Withdrawn)
           yield ()
         ),
@@ -165,6 +168,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
           for
             (pid, oid) <- setup
             _          <- setProposalStatus(pi, pid, "SUBMITTED")
+            _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
             _          <- setProposalStatus(pi, pid, "NOT_SUBMITTED")
           yield ()
         ),
