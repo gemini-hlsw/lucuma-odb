@@ -13,6 +13,7 @@ import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.GcalArc
@@ -40,6 +41,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.InstrumentExecutionConfig
@@ -50,6 +52,7 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.enums.Enums
@@ -171,6 +174,66 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     }
   }
+
+  def calibrationProgram(role: CalibrationRole): IO[Program.Id] =
+    query(
+      user = staff,
+      query = s"""
+        query {
+          programs(
+            WHERE: {
+              calibrationRole: {
+                EQ: ${role.tag.toScreamingSnakeCase}
+              }
+            }
+          ) {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor
+        .downFields("programs", "matches")
+        .values.toList.flatMap(_.toList).head // grab the first / only match
+        .hcursor
+        .downField("id").as[Program.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+
+  def twilightProgram: IO[Program.Id] =
+    calibrationProgram(CalibrationRole.Twilight)
+
+  def calibrationTargets(role: CalibrationRole): IO[List[Target.Id]] =
+    calibrationProgram(role).flatMap: pid =>
+      query(
+        user = staff,
+        query = s"""
+          query {
+            targets(
+              WHERE: {
+                program: {
+                  id: { EQ: "$pid" }
+                }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """
+      ).flatMap: js =>
+        js.hcursor
+          .downFields("targets", "matches")
+          .values.toList.flatMap(_.toList)
+          .traverse(_.hcursor.downField("id").as[Target.Id])
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+  def twilightTargets: IO[List[Target.Id]] =
+    calibrationTargets(CalibrationRole.Twilight)
 
   val GmosAtomQuery: String =
     s"""

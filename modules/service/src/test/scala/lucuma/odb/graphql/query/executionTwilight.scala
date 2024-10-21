@@ -4,8 +4,7 @@
 package lucuma.odb.graphql.query
 
 import cats.effect.IO
-import cats.syntax.either.*
-import cats.syntax.option.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -26,10 +25,16 @@ class executionTwilight extends ExecutionTestSupport {
 
   val setup: IO[Observation.Id] =
     for
-      p <- createProgram
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _ <- withServices(serviceUser) { services =>
+      p  <- createProgram
+      t  <- twilightTargets.map(_.head)
+      tʹ <- withServices(staff) { services =>
+        services.session.transaction.use: xa =>
+          services.targetService.cloneTargetInto(t, p)(using xa)
+            .flatMap(_.toOption.liftTo[IO](new RuntimeException("cloneInto failure")))
+            .map(_._2)
+      }
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(tʹ))
+      _  <- withServices(serviceUser) { services =>
              services.session.transaction.use: xa =>
                services.calibrationsService.setCalibrationRole(o, CalibrationRole.Twilight.some)(using xa)
            }

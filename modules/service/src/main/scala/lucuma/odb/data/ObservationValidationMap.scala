@@ -15,6 +15,9 @@ import scala.collection.immutable.SortedMap
 object ObservationValidationMap extends NewType[SortedMap[ObservationValidationCode, NonEmptyChain[String]]]:
   def empty: ObservationValidationMap = ObservationValidationMap(SortedMap.empty[ObservationValidationCode, NonEmptyChain[String]])
 
+  def singleton(v: ObservationValidation): ObservationValidationMap =
+    empty.add(v)
+
   def fromList(l: List[ObservationValidation]) =
     l.foldLeft(empty){ _.add(_)}
 

@@ -9,6 +9,7 @@ import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -45,6 +46,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
@@ -288,44 +290,60 @@ object Acquisition:
 
   end AcquisitionState
 
-  private def instantiate[D](
-    calRole: Option[CalibrationRole],
-    standardAcquisition: => SequenceGenerator[D]
-  ): SequenceGenerator[D] =
+  private def instantiate[D, G, L, U](
+    stepComp:    StepComputer[D, G, L, U],
+    time:        Either[ItcInput.Missing, IntegrationTime],
+    calRole:     Option[CalibrationRole],
+    atomBuilder: AtomBuilder[D],
+    acqFilters:  NonEmptyList[L],
+    fpu:         U,
+    λ:           Wavelength
+  ): Either[String, SequenceGenerator[D]] =
     calRole match
-      case Some(CalibrationRole.Twilight) => SequenceGenerator.empty
-      case _                              => standardAcquisition
+      case Some(CalibrationRole.Twilight) =>
+        SequenceGenerator.empty.asRight
+
+      case _                              =>
+        time
+          .bimap(
+            m => s"GMOS Long Slit acquisition requires a valid target: ${m.format}",
+            t => AcquisitionState.Init(atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
+          )
 
   def gmosNorth(
-    estimator:    TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
-    static:       StaticConfig.GmosNorth,
-    namespace:    UUID,
-    config:       Config.GmosNorth,
-    exposureTime: TimeSpan,
-    calRole:      Option[CalibrationRole]
-  ): SequenceGenerator[GmosNorth] =
+    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:    StaticConfig.GmosNorth,
+    namespace: UUID,
+    config:    Config.GmosNorth,
+    time:      Either[ItcInput.Missing, IntegrationTime],
+    calRole:   Option[CalibrationRole]
+  ): Either[String, SequenceGenerator[GmosNorth]] =
     instantiate(
+      StepComputer.North,
+      time,
       calRole,
-      AcquisitionState.Init(
-        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-        StepComputer.North.compute(GmosNorthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
-      )
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
+      GmosNorthFilter.acquisition,
+      config.fpu,
+      config.centralWavelength
     )
 
   def gmosSouth(
-    estimator:    TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
-    static:       StaticConfig.GmosSouth,
-    namespace:    UUID,
-    config:       Config.GmosSouth,
-    exposureTime: TimeSpan,
-    calRole:      Option[CalibrationRole]
-  ): SequenceGenerator[GmosSouth] =
+    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:    StaticConfig.GmosSouth,
+    namespace: UUID,
+    config:    Config.GmosSouth,
+    time:      Either[ItcInput.Missing, IntegrationTime],
+    calRole:   Option[CalibrationRole]
+  ): Either[String, SequenceGenerator[GmosSouth]] =
     instantiate(
+      StepComputer.South,
+      time,
       calRole,
-      AcquisitionState.Init(
-        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-        StepComputer.South.compute(GmosSouthFilter.acquisition, config.fpu, exposureTime, config.centralWavelength)
-      )
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
+      GmosSouthFilter.acquisition,
+      config.fpu,
+      config.centralWavelength
     )
 
 end Acquisition
