@@ -29,6 +29,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.ConfigForCalibrations.*
 import lucuma.odb.service.Services.Syntax.*
@@ -145,10 +146,12 @@ object CalibrationsService extends CalibrationObservations {
         } else none.pure[F]
 
       private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)])] =
-        services.generatorParamsService.selectAll(pid, selection = selection)
-          .map(_.toList.map(_.map(_.map(_.observingMode))).collect {
-            case (oid, Right(mode: Config.GmosNorth)) => (oid, mode)
-            case (oid, Right(mode: Config.GmosSouth)) => (oid, mode)
+        services
+          .generatorParamsService
+          .selectAll(pid, selection = selection)
+          .map(_.toList.collect {
+            case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
+            case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
           })
 
       private def uniqueConfiguration(all: List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)]): List[(Observation.Id, ConfigForCalibrations)] = {

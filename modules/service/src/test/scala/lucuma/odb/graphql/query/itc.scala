@@ -403,7 +403,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             }
           """,
         expected = Left(List(
-          s"ITC cannot be queried until the following parameters are defined: (target $t) brightness measure, (target $t) radial velocity."
+          s"ITC cannot be queried until the following parameters are defined: target t-198 is missing: { brightness measure, radial velocity }"
         ))
       )
     } yield r

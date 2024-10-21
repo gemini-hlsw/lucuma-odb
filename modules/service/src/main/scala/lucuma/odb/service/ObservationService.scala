@@ -615,10 +615,15 @@ object ObservationService {
         itcClient: ItcClient[F]
       )(using Transaction[F]): F[List[ObservationValidation]] = {
 
-        val generatorValidations: F[(ObservationValidationMap, Option[GeneratorParams])] =
+        val generatorParams: F[Either[ObservationValidationMap, GeneratorParams]] =
           generatorParamsService.selectOne(pid, oid).map {
-            case Right(ps) => (ObservationValidationMap.empty, ps.some)
-            case Left(errors) => (ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList), none)
+            case Left(errors)                          =>
+              ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
+            case Right(GeneratorParams(Left(m), _, _)) =>
+              //
+              ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft
+            case Right(ps)                             =>
+              ps.asRight
           }
 
         val optCfpId: F[Option[CallForProposals.Id]] =
@@ -727,10 +732,11 @@ object ObservationService {
           else 
             val initialMap = 
               for {
-                (genVals, op) <- generatorValidations
-                cfpVals       <- cfpValidations(info)
-                itcVals       <- op.filter(_ => cfpVals.isEmpty).foldMapM(itcValidations) // only compute this if cfp and gen are ok
-                bandVals      <- validateScienceBand
+                gen      <- generatorParams
+                genVals   = gen.swap.getOrElse(ObservationValidationMap.empty)
+                cfpVals  <- cfpValidations(info)
+                itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations) // only compute this if cfp and gen are ok
+                bandVals <- validateScienceBand
               } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
 
             // only compute configuration request status if everything else is ok
