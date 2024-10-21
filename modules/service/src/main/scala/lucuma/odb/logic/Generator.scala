@@ -268,9 +268,9 @@ object Generator {
 
           def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResults] =
             EitherT(itc.callRemote(pid, oid, p)).leftMap {
-              case e@ItcService.Error.ObservationDefinitionError(_, _) => MissingDefinition(e.format)
-              case e@ItcService.Error.RemoteServiceErrors(_)           => ItcError(e)
-              case e@ItcService.Error.TargetMismatch                   => ItcError(e)
+              case e@ItcService.Error.ObservationDefinitionError(_) => MissingDefinition(e.format)
+              case e@ItcService.Error.RemoteServiceErrors(_)        => ItcError(e)
+              case e@ItcService.Error.TargetMismatch                => ItcError(e)
             }
 
           for {

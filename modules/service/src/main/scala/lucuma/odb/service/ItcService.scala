@@ -114,17 +114,16 @@ object ItcService {
 
   object Error {
 
-    case class ObservationDefinitionError(
-      missingParams: List[String],
-      otherErrors:   List[String]
-    ) extends Error:
-      def format: String =
-        ((missingParams match
-          case Nil    => ""
-          case params => s"ITC cannot be queried until the following parameters are defined: ${params.sorted.intercalate(", ")}."
-        ) :: otherErrors).intercalate("\n")
+    case class ObservationDefinitionError(msg: String) extends Error:
+      def format: String = msg
 
     object ObservationDefinitionError:
+      val MissingPrefix: String =
+        "ITC cannot be queried until the following parameters are defined"
+
+      def fromMissingParams(m: ItcInput.Missing): ObservationDefinitionError =
+        ObservationDefinitionError(s"$MissingPrefix: ${m.format}")
+
       def fromServiceErrors(nel: NonEmptyList[GeneratorParamsService.Error]): ObservationDefinitionError =
         val (missingParams, others) =
           nel.foldLeft((List.empty[String], List.empty[String])) { case ((missingParams, others), e) =>
@@ -132,7 +131,12 @@ object ItcService {
               case GeneratorParamsService.Error.MissingData(_, _) => (e.format :: missingParams, others)
               case _                                              => (missingParams, e.format :: others)
           }
-        ObservationDefinitionError(missingParams, others)
+        def format: String =
+          ((missingParams match
+            case Nil    => ""
+            case params => s"$MissingPrefix: ${params.sorted.intercalate(", ")}."
+          ) :: others).intercalate("\n")
+        ObservationDefinitionError(format)
 
     case class RemoteServiceErrors(
       problems: NonEmptyList[(Option[Target.Id], String)]
@@ -265,7 +269,7 @@ object ItcService {
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => ObservationDefinitionError(m.params.toList.map(_.format), Nil)))
+          p <- EitherT.fromEither(params.itcInput.leftMap(ObservationDefinitionError.fromMissingParams))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
