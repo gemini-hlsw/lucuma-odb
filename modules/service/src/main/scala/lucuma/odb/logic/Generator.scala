@@ -5,13 +5,11 @@ package lucuma.odb.logic
 
 import cats.Eq
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -42,7 +40,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ParamName
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
@@ -111,7 +109,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[ParamName.Missing, ItcService.AsterismResults],
+    asterismResult: Either[MissingParamSet, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
@@ -208,17 +206,17 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[ParamName.Missing, ItcService.AsterismResults],
+        itcRes: Either[MissingParamSet, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[ParamName.Missing, IntegrationTime] =
+        val acquisitionIntegrationTime: Either[MissingParamSet, IntegrationTime] =
           itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: Either[ParamName.Missing, IntegrationTime] =
+        val scienceIntegrationTime: Either[MissingParamSet, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
@@ -261,7 +259,7 @@ object Generator {
           val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResults])]] =
             services.transactionally {
               (for {
-                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(es => InvalidData(oid, es.map(_.format).intercalate(", ")))))
+                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => InvalidData(oid, e.format))))
                 c <- EitherT.liftF(itc.selectOne(pid, oid, p))
               } yield (p, c)).value
             }
@@ -280,10 +278,10 @@ object Generator {
             // definition is missing target information we just record that in the
             // Context.  On the other hand if there is an error calling the ITC then
             // we cannot create the Context.
-            // EitherT[F, Error, Either[ItcInput.Missing, ItcService.AsterismResults]]
+            // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(Either.left[ParamName.Missing, ItcService.AsterismResults](m)),
-              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(Either.right[ParamName.Missing, ItcService.AsterismResults](_))
+              m => EitherT.pure(m.asLeft),
+              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
             )
           } yield Context(pid, oid, as, params)
 
@@ -311,7 +309,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[ParamName.Missing, ItcService.AsterismResults],
+        asterismResults: Either[MissingParamSet, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
