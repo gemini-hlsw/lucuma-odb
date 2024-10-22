@@ -150,8 +150,8 @@ object CalibrationsService extends CalibrationObservations {
           .generatorParamsService
           .selectAll(pid, selection = selection)
           .map(_.toList.collect {
-            case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
-            case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
+            case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
+            case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
           })
 
       private def uniqueConfiguration(all: List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)]): List[(Observation.Id, ConfigForCalibrations)] = {
