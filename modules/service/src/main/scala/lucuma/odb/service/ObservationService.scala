@@ -54,6 +54,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
+import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Existence
@@ -63,6 +64,7 @@ import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
@@ -136,7 +138,7 @@ sealed trait ObservationService[F[_]] {
     pid: Program.Id,
     oid: Observation.Id,
     itcClient: ItcClient[F],
-  )(using Transaction[F]): F[List[ObservationValidation]]
+  )(using Transaction[F]): F[Result[List[ObservationValidation]]]
 
 }
 
@@ -219,11 +221,15 @@ object ObservationService {
     ra:         Option[RightAscension],
     dec:        Option[Declination],
     forReview:  Boolean,
-    role:       Option[CalibrationRole]
+    role:       Option[CalibrationRole],
+    proposalStatus: Tag,
   )
 
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
+
+      // A stable identifier (ie. a `val`) is needed for the enums.
+      val enumsVal = enums
 
       val resolver = new IdResolver("observation", Statements.selectOid, _.label)
 
@@ -613,7 +619,7 @@ object ObservationService {
         pid: Program.Id,
         oid: Observation.Id,
         itcClient: ItcClient[F]
-      )(using Transaction[F]): F[List[ObservationValidation]] = {
+      )(using Transaction[F]): F[Result[List[ObservationValidation]]] = {
 
         val generatorParams: F[Either[ObservationValidationMap, GeneratorParams]] =
           generatorParamsService.selectOne(pid, oid).map {
@@ -728,7 +734,7 @@ object ObservationService {
               case _ => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Pending))
 
         obsInfo.flatMap: info =>
-          if (info.role.isDefined) List.empty.pure // it's a calibration
+          if (info.role.isDefined) Result(List.empty).pure // it's a calibration
           else 
             val initialMap = 
               for {
@@ -739,13 +745,21 @@ object ObservationService {
                 bandVals <- validateScienceBand
               } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
 
-            // only compute configuration request status if everything else is ok
-            val secondMap =
-              initialMap.flatMap: m =>
-                if m.isEmpty then validateConfiguration
-                else m.pure[F]          
+            // Our actual proposal status
+            val proposalStatus: Result[enumsVal.ProposalStatus] =
+              Result.fromOption(
+                Enumerated[enumsVal.ProposalStatus].fromTag(info.proposalStatus.value),
+                s"Unexpected enum value for ProposalStatus: ${info.proposalStatus.value}"
+              )
 
-            secondMap.map(_.toList)
+            // only compute configuration request status if everything else is ok and the proposal has been accepted
+            val secondMap =
+              proposalStatus.traverse: status =>
+                initialMap.flatMap: m =>
+                  if m.isEmpty && status === enumsVal.ProposalStatus.Accepted then validateConfiguration
+                  else m.pure[F]          
+
+            secondMap.map(_.map(_.toList))
 
       }
 
@@ -1274,15 +1288,17 @@ object ObservationService {
       Query[Observation.Id, ObservationValidationInfo] =
       sql"""
         SELECT
-          c_instrument,
-          c_explicit_ra,
-          c_explicit_dec,
-          c_for_review,
-          c_calibration_role
-        FROM t_observation
+          o.c_instrument,
+          o.c_explicit_ra,
+          o.c_explicit_dec,
+          o.c_for_review,
+          o.c_calibration_role,
+          p.c_proposal_status
+        FROM t_observation o
+        JOIN t_program p on p.c_program_id = o.c_program_id
         WHERE c_observation_id = $observation_id
       """
-      .query(instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt)
+      .query(instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt *: tag)
       .to[ObservationValidationInfo]
 
     def cfpInformation(
