@@ -19,6 +19,10 @@ import lucuma.odb.sequence.util.HashBytes
 
 import scala.collection.mutable.ArrayBuilder
 
+/**
+ * Parameters required for producing ITC inputs.  These are extracted from an
+ * observation when everything necessary is present and defined.
+ */
 case class ItcInput(
   imaging:      ImagingIntegrationTimeParameters,
   spectroscopy: SpectroscopyIntegrationTimeParameters,
