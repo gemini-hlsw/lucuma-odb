@@ -620,8 +620,8 @@ object ObservationService {
 
         val generatorParams: F[Either[ObservationValidationMap, GeneratorParams]] =
           generatorParamsService.selectOne(pid, oid).map {
-            case Left(errors)                          =>
-              ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
+            case Left(error)                           =>
+              ObservationValidationMap.singleton(error.toObsValidation).asLeft
             case Right(GeneratorParams(Left(m), _, _)) =>
               // Problems with the ITC inputs should generate validation flags.
               ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft

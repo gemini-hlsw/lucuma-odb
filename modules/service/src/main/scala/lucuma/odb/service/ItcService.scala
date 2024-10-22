@@ -47,7 +47,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.ParamName
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
@@ -109,53 +109,32 @@ sealed trait ItcService[F[_]] {
 
 object ItcService {
 
-  sealed trait Error {
+  sealed trait Error:
     def format: String
-  }
 
-  object Error {
-
-    case class ObservationDefinitionError(msg: String) extends Error:
-      def format: String = msg
-
-    object ObservationDefinitionError:
-      val MissingPrefix: String =
-        "ITC cannot be queried until the following parameters are defined"
-
-      def fromMissingParams(m: ParamName.Missing): ObservationDefinitionError =
-        ObservationDefinitionError(s"$MissingPrefix: ${m.format}")
-
-      def fromServiceErrors(nel: NonEmptyList[GeneratorParamsService.Error]): ObservationDefinitionError =
-        val (missingParams, others) =
-          nel.foldLeft((List.empty[String], List.empty[String])) { case ((missingParams, others), e) =>
-            e match
-              case GeneratorParamsService.Error.MissingData(_) => (e.format :: missingParams, others)
-              case _                                           => (missingParams, e.format :: others)
-          }
-        def format: String =
-          ((missingParams match
-            case Nil    => ""
-            case params => s"$MissingPrefix: ${params.sorted.intercalate(", ")}."
-          ) :: others).intercalate("\n")
-        ObservationDefinitionError(format)
+  object Error:
+    case class ObservationDefinitionError(error: GeneratorParamsService.Error) extends Error:
+      def format: String =
+        error match
+          case GeneratorParamsService.Error.MissingData(p) =>
+            s"ITC cannot be queried until the following parameters are defined: ${p.format}"
+          case _                                           =>
+            error.format
 
     case class RemoteServiceErrors(
       problems: NonEmptyList[(Option[Target.Id], String)]
-    ) extends Error {
-      def format: String = {
+    ) extends Error:
+      def format: String =
         val ps = problems.map { 
           case (None, msg)      => s"Asterism: $msg"
           case (Some(tid), msg) => s"Target '$tid': $msg"
         }
         s"ITC returned errors: ${ps.intercalate(", ")}"
-      }
-    }
 
-    case object TargetMismatch extends Error {
+    case object TargetMismatch extends Error:
       def format: String =
         s"ITC provided conflicting results"
-    }
-  }
+  end Error
 
   case class TargetResult(targetId: Target.Id, value: IntegrationTime) {
     def totalTime: Option[TimeSpan] = {
@@ -270,7 +249,7 @@ object ItcService {
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(ObservationDefinitionError.fromMissingParams))
+          p <- EitherT.fromEither(params.itcInput.leftMap(m => ObservationDefinitionError(GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
@@ -282,7 +261,7 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
-            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError.fromServiceErrors)))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
