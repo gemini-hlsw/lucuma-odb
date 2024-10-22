@@ -117,7 +117,7 @@ object ItcService {
       def format: String =
         error match
           case GeneratorParamsService.Error.MissingData(p) =>
-            s"ITC cannot be queried until the following parameters are defined: ${p.format}"
+            s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
           case _                                           =>
             error.format
 
