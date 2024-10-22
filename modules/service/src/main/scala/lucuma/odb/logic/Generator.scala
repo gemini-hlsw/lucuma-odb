@@ -175,12 +175,7 @@ object Generator {
       message:       String
     ) extends Error {
       def format: String =
-        s"Could not generate a sequence from the observation $observationId: $message"
-    }
-
-    case class MissingDefinition(msg: String) extends Error {
-      def format: String =
-        s"Could not generate a sequence: $msg"
+        s"Could not generate a sequence for the observation $observationId: $message"
     }
 
     case object SequenceTooLong extends Error {
@@ -266,7 +261,7 @@ object Generator {
 
           def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResults] =
             EitherT(itc.callRemote(pid, oid, p)).leftMap {
-              case e@ItcService.Error.ObservationDefinitionError(_) => MissingDefinition(e.format)
+              case e@ItcService.Error.ObservationDefinitionError(_) => InvalidData(oid, e.format)
               case e@ItcService.Error.RemoteServiceErrors(_)        => ItcError(e)
               case e@ItcService.Error.TargetMismatch                => ItcError(e)
             }
@@ -356,7 +351,7 @@ object Generator {
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
@@ -369,7 +364,7 @@ object Generator {
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
