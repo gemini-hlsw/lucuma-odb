@@ -146,18 +146,23 @@ object CalibrationsService extends CalibrationObservations {
           }
         } else none.pure[F]
 
-      private def allValidObservations(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+      // Filters observations for the supported config types with a valid ITC result
+      private def filterSupportedWithITC(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
         obs.toList.collect {
           case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
           case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
         }
 
-      private def allCalibObservations(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+      // Filters observations for the supported config types with or withot a valid ITC result
+      private def filterSupported(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
         obs.toList.collect {
           case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
           case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
         }
 
+      /**
+       * Requests calibrations params for a program id and selection (either science or calibration)
+       */
       private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]] =
         services
           .generatorParamsService
@@ -289,21 +294,21 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] =
+
         for {
-          tgts          <- calibrationTargets(CalibrationTypes, referenceInstant)
-          gsTgt         = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
-          gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
-          uniqueSci     <- allObservations(pid, ObservationSelection.Science)
-                              .map(allValidObservations)
-                              .map(uniqueConfiguration)
-          calibObs      <- allObservations(pid, ObservationSelection.Calibration)
-          allCalibs     = allValidObservations(calibObs)
-          uniqueCalibs  = uniqueConfiguration(allCalibs)
-          calibs        = toCalibConfig(allCalibs)
-          calibsForDeletion        = toCalibConfig(allCalibObservations(calibObs))
-          configs       = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
-          addedOids     <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
-          removedOids   <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibsForDeletion)
+          tgts              <- calibrationTargets(CalibrationTypes, referenceInstant)
+          gsTgt             = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
+          gnTgt             = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
+          uniqueSci         <- allObservations(pid, ObservationSelection.Science)
+                                .map(filterSupportedWithITC)
+                                .map(uniqueConfiguration)
+          calibObs          <- allObservations(pid, ObservationSelection.Calibration)
+          allCalibs         = filterSupported(calibObs)
+          uniqueCalibs      = uniqueConfiguration(allCalibs)
+          calibs            = toCalibConfig(allCalibs)
+          configs           = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
+          addedOids         <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
+          removedOids       <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
         } yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
