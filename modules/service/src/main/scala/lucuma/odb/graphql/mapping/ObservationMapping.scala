@@ -139,7 +139,6 @@ trait ObservationMapping[F[_]]
         services.useTransactionally {
           observationService
             .observationValidations(pid, oid, itcClient)
-            .map(_.success)
         }
 
     effectHandler(readEnv, calculate)

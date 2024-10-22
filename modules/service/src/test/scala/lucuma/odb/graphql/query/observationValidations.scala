@@ -532,12 +532,33 @@ class observationValidations
     }
   }
 
+  test("no configuration request checks if proposal is not approved") {
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResult(oid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        validationQuery(oid),
+        expected = queryResult().asRight // no warnings!
+      )
+    }
+  }
+
   test("no configuration request") {
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
         _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- computeItcResult(oid)
@@ -561,6 +582,8 @@ class observationValidations
         cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
         _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid)
@@ -585,6 +608,8 @@ class observationValidations
         cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
         _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(denyConfigurationRequestHack)
