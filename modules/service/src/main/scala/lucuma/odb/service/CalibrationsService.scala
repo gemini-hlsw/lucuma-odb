@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.data.Nested
 import cats.data.NonEmptyList
+import cats.data.EitherNel
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -145,14 +146,22 @@ object CalibrationsService extends CalibrationObservations {
           }
         } else none.pure[F]
 
-      private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[(List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)])] =
+      private def allValidObservations(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+        obs.toList.collect {
+          case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
+          case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
+        }
+
+      private def allCalibObservations(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+        obs.toList.collect {
+          case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
+          case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
+        }
+
+      private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]] =
         services
           .generatorParamsService
           .selectAll(pid, selection = selection)
-          .map(_.toList.collect {
-            case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
-            case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
-          })
 
       private def uniqueConfiguration(all: List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)]): List[(Observation.Id, ConfigForCalibrations)] = {
         val gnLSDiff =
@@ -279,21 +288,23 @@ object CalibrationsService extends CalibrationObservations {
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] = {
-
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] =
         for {
           tgts          <- calibrationTargets(CalibrationTypes, referenceInstant)
           gsTgt         = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
           gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
-          uniqueSci     <- allObservations(pid, ObservationSelection.Science).map(uniqueConfiguration)
-          allCalibs     <- allObservations(pid, ObservationSelection.Calibration)
+          uniqueSci     <- allObservations(pid, ObservationSelection.Science)
+                              .map(allValidObservations)
+                              .map(uniqueConfiguration)
+          calibObs      <- allObservations(pid, ObservationSelection.Calibration)
+          allCalibs     = allValidObservations(calibObs)
           uniqueCalibs  = uniqueConfiguration(allCalibs)
           calibs        = toCalibConfig(allCalibs)
+          calibsForDeletion        = toCalibConfig(allCalibObservations(calibObs))
           configs       = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
           addedOids     <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
-          removedOids   <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
-        } yield (addedOids, List.empty)
-      }
+          removedOids   <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibsForDeletion)
+        } yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
