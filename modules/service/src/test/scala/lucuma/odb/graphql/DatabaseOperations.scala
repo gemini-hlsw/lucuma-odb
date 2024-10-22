@@ -574,7 +574,13 @@ trait DatabaseOperations { this: OdbSuite =>
               sed: {
                 stellarLibrary: B5_III
               }
-              brightnesses: []
+              brightnesses: [
+                {
+                  band: R
+                  value: 15.0
+                  units: VEGA_MAGNITUDE
+                }
+              ]
             }
           }
         }
@@ -593,6 +599,9 @@ trait DatabaseOperations { this: OdbSuite =>
                   ra: { hours: "0.0" }
                   dec: { degrees: "0.0" }
                   epoch: "J2000.000"
+                  radialVelocity: {
+                    kilometersPerSecond: 0.0
+                  }
                 }
                 $sourceProfile
               }
