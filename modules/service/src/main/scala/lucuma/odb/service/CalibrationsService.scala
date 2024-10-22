@@ -3,9 +3,9 @@
 
 package lucuma.odb.service
 
+import cats.data.EitherNel
 import cats.data.Nested
 import cats.data.NonEmptyList
-import cats.data.EitherNel
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
