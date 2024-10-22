@@ -12,6 +12,9 @@ import lucuma.odb.sequence.util.HashBytes
 
 import MissingParam.*
 
+/**
+ * A collection of MissingParam
+ */
 opaque type MissingParamSet = NonEmptyList[MissingParam]
 
 object MissingParamSet:
@@ -22,6 +25,11 @@ object MissingParamSet:
     def params: NonEmptyList[MissingParam] =
       m
 
+    /**
+     * Formats a collection of missing parameters, grouping those for the
+     * observation as a whole, and those for particular targets and producing
+     * a descriptive message.
+     */
     def format: String =
       val grouped = m.groupMapReduceWith {
         case MissingObservationParam(_) => none[Target.Id]

@@ -7,6 +7,10 @@ import cats.Eq
 import cats.syntax.eq.*
 import lucuma.core.model.Target
 
+/**
+ * When the generator cannot find an observation or target parameter that it
+ * needs, a MissingParam is created to record it.
+ */
 sealed trait MissingParam:
   def name: String
   def format: String
