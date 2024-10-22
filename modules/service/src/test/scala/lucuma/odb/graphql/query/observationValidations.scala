@@ -20,7 +20,6 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
@@ -169,47 +168,6 @@ class observationValidations
       """
     ).void
 
-  def createIncompleteTarget(pid: Program.Id): IO[Target.Id] =
-    query(
-      pi,
-      s"""
-        mutation {
-          createTarget(
-            input: {
-              programId: ${pid.asJson}
-              SET: {
-                name: "No Name"
-                sidereal: {
-                  ra: { hours: "0.0" }
-                  dec: { degrees: "0.0" }
-                  epoch: "J2000.000"
-                }
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: {
-                        stellarLibrary: B5_III
-                      }
-                      brightnesses: []
-                    }
-                  }
-                }
-              }
-            }
-          ) {
-            target { id }
-          }
-        }
-      """
-    ).flatMap: js =>
-      js.hcursor
-        .downField("createTarget")
-        .downField("target")
-        .downField("id")
-        .as[Target.Id]
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-
   test("no target") {
     val setup: IO[Observation.Id] =
       for {
@@ -249,7 +207,7 @@ class observationValidations
     val setup: IO[(Target.Id, Observation.Id)] =
       for {
         pid <- createProgramAs(pi)
-        tid <- createIncompleteTarget(pid)
+        tid <- createIncompleteTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
     setup.flatMap { (_, oid) =>
@@ -325,7 +283,7 @@ class observationValidations
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosSouth))
         _   <- addProposal(pi, pid, cid.some)
-        tid <- createIncompleteTarget(pid)
+        tid <- createIncompleteTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
     setup.flatMap { (_, oid) =>

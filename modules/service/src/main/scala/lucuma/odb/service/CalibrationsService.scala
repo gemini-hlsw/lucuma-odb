@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.data.EitherNel
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -147,14 +146,14 @@ object CalibrationsService extends CalibrationObservations {
         } else none.pure[F]
 
       // Filters observations for the supported config types with a valid ITC result
-      private def filterSupportedWithITC(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+      private def filterSupportedWithITC(obs: Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
         obs.toList.collect {
           case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
           case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
         }
 
       // Filters observations for the supported config types with or withot a valid ITC result
-      private def filterSupported(obs: Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
+      private def filterSupported(obs: Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
         obs.toList.collect {
           case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
           case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
@@ -163,7 +162,7 @@ object CalibrationsService extends CalibrationObservations {
       /**
        * Requests calibrations params for a program id and selection (either science or calibration)
        */
-      private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[Map[Observation.Id, EitherNel[GeneratorParamsService.Error, GeneratorParams]]] =
+      private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]] =
         services
           .generatorParamsService
           .selectAll(pid, selection = selection)

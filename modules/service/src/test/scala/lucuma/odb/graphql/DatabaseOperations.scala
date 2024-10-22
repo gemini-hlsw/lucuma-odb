@@ -621,6 +621,47 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def createIncompleteTargetAs(user: User, pid: Program.Id, name: String = "No Name"): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                sidereal: {
+                  ra: { hours: "0.0" }
+                  dec: { degrees: "0.0" }
+                  epoch: "J2000.000"
+                }
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: B5_III
+                      }
+                      brightnesses: []
+                    }
+                  }
+                }
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor
+        .downField("createTarget")
+        .downField("target")
+        .downField("id")
+        .as[Target.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+
   def readAllocations(
     topLevelField: String,
     json:          Json

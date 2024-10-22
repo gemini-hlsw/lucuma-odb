@@ -383,8 +383,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   test("add calibrations for each LongSlit mode ignoring ones without conf") {
     for {
       pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      tid2 <- createTargetAs(pi, pid, "Two")
+      tid1 <- createIncompleteTargetAs(pi, pid, "One")
+      tid2 <- createIncompleteTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
               // No target for oid2 -> no conf
@@ -534,8 +534,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   test("add calibrations is idempotent when an obs has no conf") {
     for {
       pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      tid2 <- createTargetAs(pi, pid, "Two")
+      tid1 <- createIncompleteTargetAs(pi, pid, "One")
+      tid2 <- createIncompleteTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
