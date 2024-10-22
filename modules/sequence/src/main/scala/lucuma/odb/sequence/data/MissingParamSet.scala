@@ -32,9 +32,9 @@ object MissingParamSet:
       } { (p0, p1) =>
         s"$p0, $p1"
       }
-      val o = grouped.get(none).map(ps => s"observation is missing: { $ps }")
+      val o = grouped.get(none).map(ps => s"observation is missing $ps")
       val t = grouped.toList.collect {
-        case (Some(t), ps) => s"target $t is missing: { $ps }"
+        case (Some(t), ps) => s"target $t is missing $ps"
       }
       o.fold(t.intercalate(", ")) { s =>
         t match
