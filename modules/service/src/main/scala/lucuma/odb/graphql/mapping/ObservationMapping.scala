@@ -138,8 +138,7 @@ trait ObservationMapping[F[_]]
       (pid, oid, _) =>
         services.useTransactionally {
           observationWorkflowService
-            .observationValidations(pid, oid, itcClient)
-            .map(_.map(_._2))
+            .observationValidations(oid, itcClient)
         }
 
     effectHandler(readEnv, calculate)

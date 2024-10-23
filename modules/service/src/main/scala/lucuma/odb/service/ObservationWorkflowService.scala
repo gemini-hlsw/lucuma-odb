@@ -47,23 +47,56 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
+import lucuma.odb.data.ObservationWorkflow
+import lucuma.odb.graphql.enums.Enums
 
 sealed trait ObservationWorkflowService[F[_]] {
 
   def observationValidations(
-    pid: Program.Id,
     oid: Observation.Id,
     itcClient: ItcClient[F],
-  )(using Transaction[F]): F[Result[(ObservationWorkflowState, List[ObservationValidation])]]
+  )(using Transaction[F]): F[Result[List[ObservationValidation]]]
+
+  def getWorkflow(
+    oid: Observation.Id, 
+    itcClient: ItcClient[F]
+  )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
 }
+
+/* Validation Info Record */
+case class ObservationValidationInfo(
+  pid: Program.Id,
+  oid: Observation.Id,
+  instrument: Option[Instrument],
+  ra: Option[RightAscension],
+  dec: Option[Declination],
+  forReview: Boolean,
+  role: Option[CalibrationRole],
+  proposalStatus: Tag,
+  activeStatus: ObsActiveStatus,
+  cfpid: Option[CallForProposals.Id],
+) {
+  
+  def isMarkedReady: Boolean = 
+    false // TODO
+
+  /* Has the proposal been accepted? */
+  def isAccepted(using enums: Enums): Result[Boolean] =
+    Result.fromOption(
+      Enumerated[enums.ProposalStatus].fromTag(proposalStatus.value).map(_ === enums.ProposalStatus.Accepted),
+      s"Unexpected enum value for ProposalStatus: ${proposalStatus.value}"
+    )
+  
+}
+
 
 object ObservationWorkflowService {
 
   /* Validation Messages */
   object Messages:
     
-    val AsterismOutOfRange = "Asterism out of Call for Proposals limits."
+    val AsterismOutOfRange     = "Asterism out of Call for Proposals limits."
     val ExplicitBaseOutOfRange = "Explicit base out of Call for Proposals limits."
     val ConfigurationForReview = "Observation must be reviewed prior to execution."
 
@@ -82,19 +115,6 @@ object ObservationWorkflowService {
       val Denied       = "Configuration is unapproved (request was denied)."
       val Pending      = "Configuration is unapproved (request is pending)."
     
-  /* Validation Info Record */
-  case class ObservationValidationInfo(
-    instrument: Option[Instrument],
-    ra:         Option[RightAscension],
-    dec:        Option[Declination],
-    forReview:  Boolean,
-    role:       Option[CalibrationRole],
-    proposalStatus: Tag,
-    activeStatus: ObsActiveStatus
-  ) {
-    def isMarkedReady: Boolean = false // TODO
-  }
-
   /* Some Syntax. */
   extension (ra: RightAscension)
     private def isInInterval(raStart: RightAscension, raEnd: RightAscension): Boolean =
@@ -114,16 +134,12 @@ object ObservationWorkflowService {
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
-      // A stable identifier (ie. a `val`) is needed for the enums.
-      val enumsVal = enums
-
-      /** Retrieve the CFP id for the specified program, if any */
-      private def optCfpId(pid: Program.Id): F[Option[CallForProposals.Id]] =
-        session.option(Statements.ProgramCfpId)(pid).map(_.flatten)
+      // Make the enums available in a stable and implicit way
+      given Enums = enums
 
       /** Retrieve the generator params, or report an error. */
-      private def generatorParams(pid: Program.Id, oid: Observation.Id)(using Transaction[F]): F[Either[ObservationValidationMap, GeneratorParams]] =
-        generatorParamsService.selectOne(pid, oid).map {
+      private def generatorParams(info: ObservationValidationInfo)(using Transaction[F]): F[Either[ObservationValidationMap, GeneratorParams]] =
+        generatorParamsService.selectOne(info.pid, info.oid).map {
           case Left(errors)                          => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
           case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft
           case Right(ps)                             => ps.asRight
@@ -131,8 +147,7 @@ object ObservationWorkflowService {
 
       /** Validate that the asterism is within the specified range. */
       private def validateAsterismRaDec(
-        pid: Program.Id, 
-        oid: Observation.Id,
+        info: ObservationValidationInfo,
         raStart: RightAscension,
         raEnd: RightAscension,
         decStart: Declination,
@@ -140,7 +155,7 @@ object ObservationWorkflowService {
         site: Site,
         active: DateInterval
       ): F[Option[ObservationValidation]] =
-        asterismService.getAsterism(pid,oid)
+        asterismService.getAsterism(info.pid, info.oid)
           .map { l =>
             val targets = l.map(_._2)
             // The lack of a target will get reported in the generator errors
@@ -162,41 +177,31 @@ object ObservationWorkflowService {
 
       /** Validate that an observation's asteriem is compatible with the specified CFP. */
       private def validateRaDec(
-        pid: Program.Id, 
-        oid: Observation.Id,
+        info: ObservationValidationInfo,
         cid: CallForProposals.Id,
-        inst: Option[Instrument],
         explicitBase: Option[(RightAscension, Declination)]
       ): F[Option[ObservationValidation]] =
         (for {
-          site <- OptionT.fromOption(inst.map(_.site.toList).collect {
+          site <- OptionT.fromOption(info.instrument.map(_.site.toList).collect {
             case List(Site.GN) => Site.GN
             case List(Site.GS) => Site.GS
           })
           (raStart, raEnd, decStart, decEnd, active) <- OptionT.liftF(session.unique(Statements.cfpInformation(site))(cid))
           // if the observation has explicit base declared, use that
-          validation <- explicitBase.fold(OptionT(validateAsterismRaDec(pid, oid, raStart, raEnd, decStart, decEnd, site, active))) { (ra, dec) =>
+          validation <- explicitBase.fold(OptionT(validateAsterismRaDec(info, raStart, raEnd, decStart, decEnd, site, active))) { (ra, dec) =>
             OptionT.fromOption(Option.unless(ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd))(ObservationValidation.callForProposals(Messages.ExplicitBaseOutOfRange)))
           }
         } yield validation).value
 
       /* Validate that an observation is compatible with its program's CFP. */
-      private def cfpValidations(
-        pid: Program.Id, 
-        oid: Observation.Id,
-        info: ObservationValidationInfo
-      ): F[ObservationValidationMap] = {
-        optCfpId(pid).flatMap(
-          _.fold(ObservationValidationMap.empty.pure){ cid =>
-            for {
-              valInstr        <- validateInstrument(cid, info.instrument)
-              explicitBase     = (info.ra, info.dec).tupled
-              valRaDec        <- validateRaDec(pid, oid, cid, info.instrument, explicitBase)
-              valForactivation = Option.when(info.forReview)(ObservationValidation.configuration(Messages.ConfigurationForReview))
-            } yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
-            }
-        )
-      }
+      private def cfpValidations(info: ObservationValidationInfo): F[ObservationValidationMap] =
+        info.cfpid.fold(ObservationValidationMap.empty.pure): cid =>
+          for
+            valInstr        <- validateInstrument(cid, info.instrument)
+            explicitBase     = (info.ra, info.dec).tupled
+            valRaDec        <- validateRaDec(info, cid, explicitBase)
+            valForactivation = Option.when(info.forReview)(ObservationValidation.configuration(Messages.ConfigurationForReview))
+          yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
 
       private def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
         // If there is no instrument in the observation, that will get caught with the generatorValidations
@@ -215,15 +220,14 @@ object ObservationWorkflowService {
         session.unique(Statements.ObservationValidationInfo)(oid)
 
       private def itcValidations(
-        pid: Program.Id, 
-        oid: Observation.Id,
+        info: ObservationValidationInfo,
         itcClient: ItcClient[F], 
         params: GeneratorParams
       )(using Transaction[F]): F[ObservationValidationMap] =
-        itcService(itcClient).selectOne(pid, oid, params).map:
+        itcService(itcClient).selectOne(info.pid, info.oid, params).map:
           // N.B. there will soon be more cases here
           case Some(_) => ObservationValidationMap.empty
-          case None => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
+          case None    => ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
       private def validateScienceBand(oid: Observation.Id): F[ObservationValidationMap] =
         session
@@ -243,49 +247,55 @@ object ObservationWorkflowService {
             case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Denied))
             case _ => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Pending))
 
-
       // Construct some finer-grained types to make it harder to do something dumb in the status computation.
       import ObservationWorkflowState.*
-      type UserStatus       = Inactive.type  | Ready.type
-      type ExecutionStatus  = Ongoing.type   | Completed.type
-      type ValidationStatus = Undefined.type | Unapproved.type | Defined.type
+      type UserState       = Inactive.type  | Ready.type
+      type ExecutionState  = Ongoing.type   | Completed.type
+      type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
-      private def computeExecutionStatus(oid: Observation.Id): ResultT[F, Option[ExecutionStatus]] =
+      private def executionState(oid: Observation.Id): ResultT[F, Option[ExecutionState]] =
         ResultT.pure(oid).as(None)
         
       // Compute the observation status, as well as a list of legal transitions,
-      private def computeObservationStatus(
-        oid: Observation.Id, 
-        info: ObservationValidationInfo, 
-        isAccepted: Boolean, 
-        codes: Set[ObservationValidationCode]
-      ): ResultT[F, ObservationWorkflowState] =
-        computeExecutionStatus(oid).map { executionStatus =>
+      private def workflowStateAndTransitions(
+        info: ObservationValidationInfo,
+        executionState: Option[ExecutionState], 
+        codes: List[ObservationValidationCode]
+      )(using Enums): Result[(ObservationWorkflowState, List[ObservationWorkflowState])] =
+        info.isAccepted.map { isAccepted =>
 
-          val validationStatus: ValidationStatus = 
-            codes.maxOption match
+          // A special ordering where codes are ordered as they would occur in a typical lifecycle.
+          given Ordering[ObservationValidationCode] =
+            Ordering.by:
+              case ObservationValidationCode.CallForProposalsError => 1
+              case ObservationValidationCode.ItcError              => 2
+              case ObservationValidationCode.ConfigurationError    => 3
+
+          val validationStatus: ValidationState = 
+            codes.minOption match
               case None                                                  => Defined
+              // ... => Unapproved
               case Some(ObservationValidationCode.ConfigurationError)    => Undefined
               case Some(ObservationValidationCode.CallForProposalsError) => Undefined
               case Some(ObservationValidationCode.ItcError)              => Undefined                                    
 
-          def userStatus(validationStatus: ValidationStatus): Option[UserStatus] =
+          def userStatus(validationStatus: ValidationState): Option[UserState] =
             info.activeStatus match
               case ObsActiveStatus.Inactive => Some(Inactive)
               case ObsActiveStatus.Active   => Option.when(info.isMarkedReady && validationStatus == Defined)(Ready)
 
-          // Our final status is the execution status (if any), else the user status (if any), else the validation status,
-          // with the one exception that user status Inactive overrides execution status Ongoing
-          val status: ObservationWorkflowState =
-            (executionStatus, userStatus(validationStatus)) match
+          // Our final state is the execution state (if any), else the user state (if any), else the validation state,
+          // with the one exception that user state Inactive overrides execution state Ongoing
+          val state: ObservationWorkflowState =
+            (executionState, userStatus(validationStatus)) match
               case (None, None)     => validationStatus
               case (None, Some(us)) => us              
               case (Some(es), None) => es              
               case (Some(Ongoing), Some(Inactive)) => Inactive
               case (Some(es), _)    => es
-                     
+                    
           val allowedTransitions: List[ObservationWorkflowState] =
-            status match
+            state match
               case Inactive         => List(validationStatus)
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
@@ -294,80 +304,91 @@ object ObservationWorkflowService {
               case Ongoing     => List(Inactive)
               case Completed   => Nil
 
-          (status, allowedTransitions)._1
+          (state, allowedTransitions)
 
         }
 
+      private def observationValidationsImpl(
+        info: ObservationValidationInfo,
+        itcClient: ItcClient[F],
+      )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
+        if info.role.isDefined then Result(List.empty).pure // don't warn for calibrations
+        else {
+
+          /* Partial computation of validation errors, excluding configuration checking. */
+          val partialMap = 
+            for {
+              gen      <- generatorParams(info)
+              genVals   = gen.swap.getOrElse(ObservationValidationMap.empty)
+              cfpVals  <- cfpValidations(info)
+              itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations(info, itcClient, _)) // only compute this if cfp and gen are ok
+              bandVals <- validateScienceBand(info.oid)
+            } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
+
+
+          // Only compute configuration request status if everything else is ok and the proposal has been accepted
+          def fullMap(isAccepted: Boolean): F[ObservationValidationMap] =
+            partialMap.flatMap: m =>
+              if m.isEmpty && isAccepted then validateConfiguration(info.oid)
+              else m.pure[F]          
+
+          val result: ResultT[F, List[ObservationValidation]] =
+            for
+              accepted <- ResultT(info.isAccepted.pure[F])
+              warnings <- ResultT.liftF(fullMap(accepted))
+            yield warnings.toList
+
+          result.value
+          
+        }
+
       override def observationValidations(
-        pid: Program.Id,
         oid: Observation.Id,
         itcClient: ItcClient[F]
-      )(using Transaction[F]): F[Result[(ObservationWorkflowState, List[ObservationValidation])]] =
-        obsInfo(oid).flatMap: info =>
-          if (info.role.isDefined) Result((ObservationWorkflowState.Ready, List.empty)).pure // it's a calibration. always ready?
-          else {
+      )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
+        obsInfo(oid).flatMap(observationValidationsImpl(_, itcClient))
 
-            /* Partial computation of validation errors, excluding configuration checking. */
-            val partialMap = 
-              for {
-                gen      <- generatorParams(pid, oid)
-                genVals   = gen.swap.getOrElse(ObservationValidationMap.empty)
-                cfpVals  <- cfpValidations(pid, oid, info)
-                itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations(pid, oid, itcClient, _)) // only compute this if cfp and gen are ok
-                bandVals <- validateScienceBand(oid)
-              } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
+      private def getWorkflowImpl(
+        oid: Observation.Id, 
+        itcClient: ItcClient[F]
+      )(using Transaction[F]): ResultT[F, ObservationWorkflow] =
+        for
+          info <- ResultT.liftF(obsInfo(oid))
+          errs <- ResultT(observationValidationsImpl(info, itcClient))
+          ex   <- executionState(oid)
+          pair <- ResultT(workflowStateAndTransitions(info,ex, errs.map(_.code)).pure[F])
+        yield ObservationWorkflow(pair._1, pair._2, errs)
 
-            /* Has the proposal been accepted? */
-            val isAccepted: Result[Boolean] =
-              Result.fromOption(
-                Enumerated[enumsVal.ProposalStatus].fromTag(info.proposalStatus.value).map(_ === enumsVal.ProposalStatus.Accepted),
-                s"Unexpected enum value for ProposalStatus: ${info.proposalStatus.value}"
-              )
-
-            // Only compute configuration request status if everything else is ok and the proposal has been accepted
-            def fullMap(isAccepted: Boolean): F[ObservationValidationMap] =
-              partialMap.flatMap: m =>
-                if m.isEmpty && isAccepted then validateConfiguration(oid)
-                else m.pure[F]          
-
-            val result: ResultT[F, (ObservationWorkflowState, List[ObservationValidation])] =
-              for
-                accepted <- ResultT(isAccepted.pure[F])
-                warnings <- ResultT.liftF(fullMap(accepted))
-                status   <- computeObservationStatus(oid, info, accepted, warnings.toMap.keySet)
-              yield (status, warnings.toList)
-
-            result.value
-            
-          }
+      override def getWorkflow(
+        oid: Observation.Id, 
+        itcClient: ItcClient[F]
+      )(using Transaction[F]): F[Result[ObservationWorkflow]] =
+        getWorkflowImpl(oid, itcClient).value
 
   }
 
   object Statements {
 
-    val ProgramCfpId: Query[Program.Id, Option[CallForProposals.Id]] =
-      sql"""
-        SELECT c_cfp_id
-        FROM t_proposal
-        WHERE c_program_id = $program_id
-      """.query(cfp_id.opt)
-
     val ObservationValidationInfo:
       Query[Observation.Id, ObservationValidationInfo] =
       sql"""
         SELECT
+          o.c_program_id,
+          o.c_observation_id,
           o.c_instrument,
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_for_review,
           o.c_calibration_role,
           p.c_proposal_status,
-          o.c_active_status
+          o.c_active_status,
+          x.c_cfp_id
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
+        LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
         WHERE c_observation_id = $observation_id
       """
-      .query(instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt *: tag *: obs_active_status)
+      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt *: tag *: obs_active_status *: cfp_id.opt)
       .to[ObservationValidationInfo]
 
 
