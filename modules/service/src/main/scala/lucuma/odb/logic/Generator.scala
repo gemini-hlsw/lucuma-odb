@@ -38,6 +38,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -133,13 +134,13 @@ sealed trait Generator[F[_]] {
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
   /**
-   * Determines whether the given observation is complete (i.e., has no more
-   * science steps left to execute).
+   * Determines the execution state of the given observation by looking at the
+   * remaining science steps (if any) and past visits.
    */
-  def isComplete(
+  def executionState(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Boolean]
+  )(using NoTransaction[F]): F[ObservationExecutionState]
 
 }
 
@@ -477,16 +478,28 @@ object Generator {
           executionSequence(proto.science,     SequenceType.Science)
         )
 
-      def isComplete(
+      def executionState(
         programId:     Program.Id,
         observationId: Observation.Id
-      )(using NoTransaction[F]): F[Boolean] =
-        generate(programId, observationId, FutureLimit.Min)
-          .map(_.toOption.exists {
-            // TODO: fold this into InstrumentExecutionConfig in core
-            case InstrumentExecutionConfig.GmosNorth(s) => s.science.isEmpty
-            case InstrumentExecutionConfig.GmosSouth(s) => s.science.isEmpty
-          })
+      )(using NoTransaction[F]): F[ObservationExecutionState] =
+        import ObservationExecutionState.*
 
+        def definedStatus(isComplete: Boolean): F[ObservationExecutionState] =
+          if isComplete then Completed.pure[F]
+          else services.transactionally {
+            visitService.selectAll(observationId).head.compile.last
+              .map(_.fold(NotStarted)(_ => Ongoing))
+          }
+
+        generate(programId, observationId, FutureLimit.Min)
+          .flatMap(_.fold(
+            _ => NotDefined.pure[F],
+            {
+              // TODO: fold this into InstrumentExecutionConfig in core
+              case InstrumentExecutionConfig.GmosNorth(s) => definedStatus(s.science.isEmpty)
+              case InstrumentExecutionConfig.GmosSouth(s) => definedStatus(s.science.isEmpty)
+            }
+          )
+        )
   }
 }
