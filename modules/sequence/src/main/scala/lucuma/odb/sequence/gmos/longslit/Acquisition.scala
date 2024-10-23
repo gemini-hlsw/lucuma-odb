@@ -46,7 +46,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
-import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
@@ -292,7 +292,7 @@ object Acquisition:
 
   private def instantiate[D, G, L, U](
     stepComp:    StepComputer[D, G, L, U],
-    time:        Either[ItcInput.Missing, IntegrationTime],
+    time:        Either[MissingParamSet, IntegrationTime],
     calRole:     Option[CalibrationRole],
     atomBuilder: AtomBuilder[D],
     acqFilters:  NonEmptyList[L],
@@ -315,7 +315,7 @@ object Acquisition:
     static:    StaticConfig.GmosNorth,
     namespace: UUID,
     config:    Config.GmosNorth,
-    time:      Either[ItcInput.Missing, IntegrationTime],
+    time:      Either[MissingParamSet, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): Either[String, SequenceGenerator[GmosNorth]] =
     instantiate(
@@ -333,7 +333,7 @@ object Acquisition:
     static:    StaticConfig.GmosSouth,
     namespace: UUID,
     config:    Config.GmosSouth,
-    time:      Either[ItcInput.Missing, IntegrationTime],
+    time:      Either[MissingParamSet, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): Either[String, SequenceGenerator[GmosSouth]] =
     instantiate(

@@ -14,7 +14,7 @@ import lucuma.odb.sequence.util.HashBytes
 import java.nio.charset.StandardCharsets.UTF_8
 
 case class GeneratorParams(
-  itcInput:        Either[ItcInput.Missing, ItcInput.Defined],
+  itcInput:        Either[MissingParamSet, ItcInput],
   observingMode:   ObservingMode,
   calibrationRole: Option[CalibrationRole]
 )

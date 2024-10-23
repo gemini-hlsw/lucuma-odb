@@ -5,13 +5,11 @@ package lucuma.odb.logic
 
 import cats.Eq
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -42,7 +40,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.gmos
@@ -111,7 +109,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[ItcInput.Missing, ItcService.AsterismResults],
+    asterismResult: Either[MissingParamSet, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
@@ -177,12 +175,7 @@ object Generator {
       message:       String
     ) extends Error {
       def format: String =
-        s"Could not generate a sequence from the observation $observationId: $message"
-    }
-
-    case class MissingDefinition(msg: String) extends Error {
-      def format: String =
-        s"Could not generate a sequence: $msg"
+        s"Could not generate a sequence for the observation $observationId: $message"
     }
 
     case object SequenceTooLong extends Error {
@@ -208,17 +201,17 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[ItcInput.Missing, ItcService.AsterismResults],
+        itcRes: Either[MissingParamSet, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+        val acquisitionIntegrationTime: Either[MissingParamSet, IntegrationTime] =
           itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: Either[ItcInput.Missing, IntegrationTime] =
+        val scienceIntegrationTime: Either[MissingParamSet, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
@@ -261,14 +254,14 @@ object Generator {
           val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResults])]] =
             services.transactionally {
               (for {
-                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(es => InvalidData(oid, es.map(_.format).intercalate(", ")))))
+                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => InvalidData(oid, e.format))))
                 c <- EitherT.liftF(itc.selectOne(pid, oid, p))
               } yield (p, c)).value
             }
 
           def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResults] =
             EitherT(itc.callRemote(pid, oid, p)).leftMap {
-              case e@ItcService.Error.ObservationDefinitionError(_) => MissingDefinition(e.format)
+              case e@ItcService.Error.ObservationDefinitionError(_) => InvalidData(oid, e.format)
               case e@ItcService.Error.RemoteServiceErrors(_)        => ItcError(e)
               case e@ItcService.Error.TargetMismatch                => ItcError(e)
             }
@@ -280,10 +273,10 @@ object Generator {
             // definition is missing target information we just record that in the
             // Context.  On the other hand if there is an error calling the ITC then
             // we cannot create the Context.
-            // EitherT[F, Error, Either[ItcInput.Missing, ItcService.AsterismResults]]
+            // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(Either.left[ItcInput.Missing, ItcService.AsterismResults](m)),
-              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(Either.right[ItcInput.Missing, ItcService.AsterismResults](_))
+              m => EitherT.pure(m.asLeft),
+              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
             )
           } yield Context(pid, oid, as, params)
 
@@ -311,7 +304,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[ItcInput.Missing, ItcService.AsterismResults],
+        asterismResults: Either[MissingParamSet, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
@@ -358,7 +351,7 @@ object Generator {
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
@@ -371,7 +364,7 @@ object Generator {
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.MissingDefinition(m))
+          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx.oid, g, srs, when)
         } yield p
 
