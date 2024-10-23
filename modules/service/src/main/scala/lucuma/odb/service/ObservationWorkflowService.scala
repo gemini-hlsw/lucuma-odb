@@ -109,12 +109,6 @@ object ObservationWorkflowService {
 
     def invalidScienceBand(b: ScienceBand): String = 
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
-
-    object ConfigurationRequest:
-      val Unavailable  = "Configuration approval status could not be determined."
-      val NotRequested = "Configuration is unapproved (approval has not been requested)."
-      val Denied       = "Configuration is unapproved (request was denied)."
-      val Pending      = "Configuration is unapproved (request is pending)."
     
   /* Some Syntax. */
   extension (ra: RightAscension)
@@ -245,11 +239,11 @@ object ObservationWorkflowService {
         configurationService.selectRequests(oid).map: r =>
           val m = ObservationValidationMap.empty
           r.toOption match
-            case None => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Unavailable))
-            case Some(Nil) => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.NotRequested))
+            case None => m.add(ObservationValidation.configurationRequestUnavailable)
+            case Some(Nil) => m.add(ObservationValidation.configurationRequestNotRequested)
             case Some(lst) if lst.exists(_.status === ConfigurationRequestStatus.Approved) => m
-            case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Denied))
-            case _ => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Pending))
+            case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configurationRequestDenied)
+            case _ => m.add(ObservationValidation.configurationRequestPending)
 
       // Construct some finer-grained types to make it harder to do something dumb in the status computation.
       import ObservationWorkflowState.*

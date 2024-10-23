@@ -568,9 +568,7 @@ class observationValidations
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.configuration(
-            ObservationService.ConfigurationRequestMsg.NotRequested
-          )
+          ObservationValidation.configurationRequestNotRequested
         ).asRight
       )
     }
@@ -594,9 +592,7 @@ class observationValidations
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.configuration(
-            ObservationService.ConfigurationRequestMsg.Pending
-          )
+          ObservationValidation.configurationRequestPending
         ).asRight
       )
     }
@@ -620,9 +616,7 @@ class observationValidations
         pi,
         validationQuery(oid),
         expected = queryResult(
-          ObservationValidation.configuration(
-            ObservationService.ConfigurationRequestMsg.Denied
-          )
+          ObservationValidation.configurationRequestDenied
         ).asRight
       )
     }
