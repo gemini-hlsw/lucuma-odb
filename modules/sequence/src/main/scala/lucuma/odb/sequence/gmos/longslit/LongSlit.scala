@@ -16,7 +16,7 @@ import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.MissingParamSet
 
 import java.util.UUID
 
@@ -53,8 +53,8 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
-    acquisitionItc: Either[ItcInput.Missing, IntegrationTime],
-    scienceItc:     Either[ItcInput.Missing, IntegrationTime],
+    acquisitionItc: Either[MissingParamSet, IntegrationTime],
+    scienceItc:     Either[MissingParamSet, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
@@ -68,8 +68,8 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
-    acquisitionItc: Either[ItcInput.Missing, IntegrationTime],
-    scienceItc:     Either[ItcInput.Missing, IntegrationTime],
+    acquisitionItc: Either[MissingParamSet, IntegrationTime],
+    scienceItc:     Either[MissingParamSet, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(

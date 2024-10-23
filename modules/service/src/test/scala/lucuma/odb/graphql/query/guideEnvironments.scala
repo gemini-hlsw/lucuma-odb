@@ -528,7 +528,7 @@ class guideEnvironments extends ExecutionTestSupport {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid, aug3000),
-      expected = List(s"Could not generate a sequence from the observation $oid: observing mode").asLeft)
+      expected = List(s"Could not generate a sequence for the observation $oid: observation is missing observing mode").asLeft)
     }
   }
 }

@@ -196,6 +196,7 @@ trait BaseMapping[F[_]]
   lazy val ObsAttachmentTypeMetaType               = schema.ref("ObsAttachmentTypeMeta")
   lazy val ObsAttachmentTypeType                   = schema.ref("ObsAttachmentType")
   lazy val ObservationEditType                     = schema.ref("ObservationEdit")
+  lazy val ObservationExecutionStateType           = schema.ref("ObservationExecutionState")
   lazy val ObservationIdType                       = schema.ref("ObservationId")
   lazy val ObservationType                         = schema.ref("Observation")
   lazy val ObservingModeType                       = schema.ref("ObservingMode")

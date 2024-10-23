@@ -383,8 +383,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   test("add calibrations for each LongSlit mode ignoring ones without conf") {
     for {
       pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      tid2 <- createTargetAs(pi, pid, "Two")
+      tid1 <- createIncompleteTargetAs(pi, pid, "One")
+      tid2 <- createIncompleteTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
               // No target for oid2 -> no conf
@@ -534,8 +534,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   test("add calibrations is idempotent when an obs has no conf") {
     for {
       pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      tid2 <- createTargetAs(pi, pid, "Two")
+      tid1 <- createIncompleteTargetAs(pi, pid, "One")
+      tid2 <- createIncompleteTargetAs(pi, pid, "Two")
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
@@ -746,7 +746,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     } yield ()
   }
 
-  test("unnecessary calibrations are removed".ignore) {
+  test("unnecessary calibrations are removed") {
     for {
       pid  <- createProgramAs(pi)
       tid1 <- createTargetAs(pi, pid, "One")
@@ -774,7 +774,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
         case _                          => false
       }
       // Only two calibration as we removed a config
-      assertEquals(cCount, 4) // FIXME
+      assertEquals(cCount, 2)
       assertEquals(oids.size, 1)
     }
   }
@@ -865,7 +865,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     } yield ()
   }
 
-  test("events for deleting a calibration observation".ignore) {
+  test("events for deleting a calibration observation") {
     val expectedTargets = List("Feige  34", "Twilight")
 
     for {
@@ -875,9 +875,13 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
       oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
-      _    <- recalculateCalibrations(pid)
+              // This will add four calibrations
+      (ad, _) <- recalculateCalibrations(pid)
+              // This should delete two
       _    <- deleteObservation(pi, oid2)
       a    <- Ref.of[IO, List[Observation.Id]](Nil) // Removed observation
+      // The third twilight
+      rd = ad.get(2).get
       _    <- subscriptionExpectF(
                 user      = pi,
                 query     = deletedSubscription(pid),
@@ -896,8 +900,22 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                         }
                       }
                     """,
-                    )}),
-                  a.get.map(_.zip(expectedTargets).flatMap {case (cid, tn) => List(
+                    )}).map {
+                      // A twligiht observation is updated, we'll hardcode this
+                      case List(a, b) => a :: json"""{
+                                                      "observationEdit" : {
+                                                        "observationId" : $rd,
+                                                        "editType" : "UPDATED",
+                                                        "value" : {
+                                                          "id" : $rd,
+                                                          "title": "Twilight"
+                                                        }
+                                                      }
+                                                    }
+                                                  """ :: b :: Nil
+                      case l => l
+                    },
+                  a.get.map(_.reverse.zip(expectedTargets).flatMap {case (cid, tn) => List(
                     json"""
                       {
                         "observationEdit" : {

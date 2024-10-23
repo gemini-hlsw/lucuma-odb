@@ -1,7 +1,8 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.query
+package lucuma.odb.graphql
+package query
 
 import cats.effect.IO
 import cats.syntax.all.*
@@ -11,10 +12,17 @@ import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 
+import java.time.Instant
+
 class executionTwilight extends ExecutionTestSupport {
+
+  // Need a timestamp to call the calibrations service
+  val when: Instant =
+    Instant.ofEpochMilli(1729596890131L)
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -23,22 +31,45 @@ class executionTwilight extends ExecutionTestSupport {
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
+  // Picks the expected twilight observation out of the program's observations
+  def twilight(pid: Program.Id): IO[Observation.Id] =
+    query(
+      pi,
+      s"""
+         query {
+          observations(WHERE: { program: { id: { EQ: "$pid" } } }) {
+            matches {
+              id
+              calibrationRole
+            }
+          }
+        }
+      """
+    ).flatMap: json =>
+      json.hcursor.downFields("observations", "matches").values.toList.flatten.traverse: json =>
+        val c = json.hcursor
+        for
+          id <- c.downField("id").as[Observation.Id]
+          ro <- c.downField("calibrationRole").as[Option[CalibrationRole]]
+        yield (id, ro)
+      .leftMap(f => new RuntimeException(f.message))
+      .map(_.collect { case (id, Some(CalibrationRole.Twilight)) => id }.head)
+      .liftTo[IO]
+
   val setup: IO[Observation.Id] =
     for
-      p  <- createProgram
-      t  <- twilightTargets.map(_.head)
-      tʹ <- withServices(staff) { services =>
+      p <- createProgram
+      t <- createTargetAs(pi, p, "real target")
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- withServices(staff) { services =>
         services.session.transaction.use: xa =>
-          services.targetService.cloneTargetInto(t, p)(using xa)
-            .flatMap(_.toOption.liftTo[IO](new RuntimeException("cloneInto failure")))
-            .map(_._2)
+          services
+            .calibrationsService
+            .recalculateCalibrations(p, when)(using xa)
+            .map(_._1)
       }
-      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(tʹ))
-      _  <- withServices(serviceUser) { services =>
-             services.session.transaction.use: xa =>
-               services.calibrationsService.setCalibrationRole(o, CalibrationRole.Twilight.some)(using xa)
-           }
-    yield o
+      oʹ <- twilight(p)
+    yield oʹ
 
   def query(sequenceType: String, oid: Observation.Id): String =
     s"""
@@ -135,7 +166,7 @@ class executionTwilight extends ExecutionTestSupport {
                                   "ampReadMode": "SLOW"
                                 },
                                 "dtax": "ZERO",
-                                "roi": "FULL_FRAME",
+                                "roi": "CENTRAL_SPECTRUM",
                                 "gratingConfig": {
                                   "grating": "R831_G5302",
                                   "order": "ONE",
