@@ -3,22 +3,16 @@
 
 package lucuma.odb.data
 
-sealed trait ObservationWorkflowState
+import lucuma.core.util.Enumerated
 
-sealed trait UserStatus extends ObservationWorkflowState
-object UserStatus:
-  case object Inactive extends UserStatus         // User can set status back to computed state, or to Ready if computed state is Defined.
-  case object Ready extends UserStatus            // User can set status to Inactive or back to Defined.                 
+enum ObservationWorkflowState(val tag: String) derives Enumerated:
+  case Inactive   extends ObservationWorkflowState("inactive")
+  case Undefined  extends ObservationWorkflowState("undefined")
+  case Unapproved extends ObservationWorkflowState("unapproved")
+  case Defined    extends ObservationWorkflowState("defined")
+  case Ready      extends ObservationWorkflowState("ready")
+  case Ongoing    extends ObservationWorkflowState("ongoing")
+  case Completed  extends ObservationWorkflowState("completed")
 
-sealed trait ExecutionStatus extends ObservationWorkflowState
-object ExecutionStatus:
-  case object Ongoing   extends ExecutionStatus  // User can set status to Inactive.                                                     
-  case object Completed extends ExecutionStatus  // No transitions allowed.                                               
-
-sealed trait ValidationStatus extends ObservationWorkflowState
-object ValidationStatus:
-  case object Undefined  extends ValidationStatus // User can set status to Inactive.                                                     
-  case object Unapproved extends ValidationStatus // User can set status to Inactive.                                                     
-  case object Defined    extends ValidationStatus // User can set status to Inactive, or Ready if proposal has been accepted.                                            
 
 

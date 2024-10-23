@@ -13,8 +13,6 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsActiveStatus.Active
-import lucuma.core.enums.ObsActiveStatus.Inactive
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -34,12 +32,9 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ExecutionStatus
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.ObservationWorkflowState
 import lucuma.odb.data.Tag
-import lucuma.odb.data.UserStatus
-import lucuma.odb.data.ValidationStatus
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
@@ -248,6 +243,13 @@ object ObservationWorkflowService {
             case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Denied))
             case _ => m.add(ObservationValidation.configuration(Messages.ConfigurationRequest.Pending))
 
+
+      // Construct some finer-grained types to make it harder to do something dumb in the status computation.
+      import ObservationWorkflowState.*
+      type UserStatus       = Inactive.type  | Ready.type
+      type ExecutionStatus  = Ongoing.type   | Completed.type
+      type ValidationStatus = Undefined.type | Unapproved.type | Defined.type
+
       private def computeExecutionStatus(oid: Observation.Id): ResultT[F, Option[ExecutionStatus]] =
         ResultT.pure(oid).as(None)
         
@@ -262,15 +264,15 @@ object ObservationWorkflowService {
 
           val validationStatus: ValidationStatus = 
             codes.maxOption match
-              case None                                                  => ValidationStatus.Defined
-              case Some(ObservationValidationCode.ConfigurationError)    => ValidationStatus.Undefined
-              case Some(ObservationValidationCode.CallForProposalsError) => ValidationStatus.Undefined
-              case Some(ObservationValidationCode.ItcError)              => ValidationStatus.Undefined                                    
+              case None                                                  => Defined
+              case Some(ObservationValidationCode.ConfigurationError)    => Undefined
+              case Some(ObservationValidationCode.CallForProposalsError) => Undefined
+              case Some(ObservationValidationCode.ItcError)              => Undefined                                    
 
           def userStatus(validationStatus: ValidationStatus): Option[UserStatus] =
             info.activeStatus match
-              case Inactive => Some(UserStatus.Inactive)
-              case Active   => Option.when(info.isMarkedReady && validationStatus == ValidationStatus.Defined)(UserStatus.Ready)
+              case ObsActiveStatus.Inactive => Some(Inactive)
+              case ObsActiveStatus.Active   => Option.when(info.isMarkedReady && validationStatus == Defined)(Ready)
 
           // Our final status is the execution status (if any), else the user status (if any), else the validation status,
           // with the one exception that user status Inactive overrides execution status Ongoing
@@ -279,23 +281,22 @@ object ObservationWorkflowService {
               case (None, None)     => validationStatus
               case (None, Some(us)) => us              
               case (Some(es), None) => es              
-              case (Some(ExecutionStatus.Ongoing), Some(UserStatus.Inactive)) => UserStatus.Inactive
+              case (Some(Ongoing), Some(Inactive)) => Inactive
               case (Some(es), _)    => es
                      
           val allowedTransitions: List[ObservationWorkflowState] =
             status match
-              case UserStatus.Inactive         => List(validationStatus)
-              case ValidationStatus.Undefined  => List(UserStatus.Inactive)
-              case ValidationStatus.Unapproved => List(UserStatus.Inactive)
-              case ValidationStatus.Defined    => List(UserStatus.Inactive) ++ Option.when(isAccepted)(UserStatus.Ready)
-              case UserStatus.Ready            => List(UserStatus.Inactive, validationStatus)
-              case ExecutionStatus.Ongoing     => List(UserStatus.Inactive)
-              case ExecutionStatus.Completed   => Nil
+              case Inactive         => List(validationStatus)
+              case Undefined  => List(Inactive)
+              case Unapproved => List(Inactive)
+              case Defined    => List(Inactive) ++ Option.when(isAccepted)(Ready)
+              case Ready            => List(Inactive, validationStatus)
+              case Ongoing     => List(Inactive)
+              case Completed   => Nil
 
           (status, allowedTransitions)._1
 
         }
-
 
       override def observationValidations(
         pid: Program.Id,
@@ -303,7 +304,7 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F]
       )(using Transaction[F]): F[Result[(ObservationWorkflowState, List[ObservationValidation])]] =
         obsInfo(oid).flatMap: info =>
-          if (info.role.isDefined) Result((UserStatus.Ready, List.empty)).pure // it's a calibration. always ready?
+          if (info.role.isDefined) Result((ObservationWorkflowState.Ready, List.empty)).pure // it's a calibration. always ready?
           else {
 
             /* Partial computation of validation errors, excluding configuration checking. */
