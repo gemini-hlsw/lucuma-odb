@@ -7,6 +7,7 @@ package query
 import cats.data.NonEmptySet
 import cats.data.State
 import cats.effect.IO
+import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -756,7 +757,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         )
       } yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = user,
         query =
@@ -777,9 +778,10 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                }
              }
            """,
-        expected = Left(List("Could not generate a sequence: missing Smart GCAL mapping: GmosNorth { grating: (R600_G5304, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"))
+        expected = List(
+          "Could not generate a sequence for the observation o-104: missing Smart GCAL mapping: GmosNorth { grating: (R600_G5304, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
+        ).asLeft
       )
-    }
   }
 
 }

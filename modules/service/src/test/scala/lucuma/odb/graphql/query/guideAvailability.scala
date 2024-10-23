@@ -300,7 +300,7 @@ class guideAvailability extends ExecutionTestSupport {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024),
-      expected = List(s"Could not generate a sequence from the observation $oid: target").asLeft)
+      expected = List(s"Could not generate a sequence for the observation $oid: observation is missing target").asLeft)
     }
   }
 
@@ -329,7 +329,7 @@ class guideAvailability extends ExecutionTestSupport {
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024),
-      expected = List(s"Could not generate a sequence from the observation $oid: observing mode").asLeft)
+      expected = List(s"Could not generate a sequence for the observation $oid: observation is missing observing mode").asLeft)
     }
   }
 

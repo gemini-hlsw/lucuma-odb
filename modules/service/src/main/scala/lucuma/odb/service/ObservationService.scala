@@ -79,7 +79,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
@@ -610,10 +610,17 @@ object ObservationService {
         def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
           decStart <= dec && dec <= decEnd
 
+      extension (mp: MissingParamSet)
+        def toObsValidation: ObservationValidation =
+          ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
+
       extension (ge: GeneratorParamsService.Error)
-        def toObsValidation: ObservationValidation = ge match
-          case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(MissingDataMsg(otid, paramName))
-          case _                                           => ObservationValidation.configuration(ge.format)
+        def toObsValidation: ObservationValidation =
+          ge match
+            case GeneratorParamsService.Error.MissingData(p) =>
+              p.toObsValidation
+            case _                                           =>
+              ObservationValidation.configuration(ge.format)
 
       override def observationValidations(
         pid: Program.Id,
@@ -623,11 +630,11 @@ object ObservationService {
 
         val generatorParams: F[Either[ObservationValidationMap, GeneratorParams]] =
           generatorParamsService.selectOne(pid, oid).map {
-            case Left(errors)                          =>
-              ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
+            case Left(error)                           =>
+              ObservationValidationMap.singleton(error.toObsValidation).asLeft
             case Right(GeneratorParams(Left(m), _, _)) =>
               // Problems with the ITC inputs should generate validation flags.
-              ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft
+              ObservationValidationMap.singleton(m.toObsValidation).asLeft
             case Right(ps)                             =>
               ps.asRight
           }
@@ -713,7 +720,7 @@ object ObservationService {
           itcService(itcClient).selectOne(pid, oid, params).map:
             // N.B. there will soon be more cases here
             case Some(_) => ObservationValidationMap.empty
-            case None => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
+            case None    => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
 
         def validateScienceBand: F[ObservationValidationMap] =
           session
