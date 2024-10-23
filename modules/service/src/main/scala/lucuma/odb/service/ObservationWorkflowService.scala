@@ -27,7 +27,6 @@ import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
-import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
@@ -107,9 +106,6 @@ object ObservationWorkflowService {
 
     def invalidInstrument(instr: Instrument): String = 
       s"Instrument $instr not part of Call for Proposals."
-
-    def missingData(otid: Option[Target.Id], paramName: String): String = 
-      otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
 
     def invalidScienceBand(b: ScienceBand): String = 
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
