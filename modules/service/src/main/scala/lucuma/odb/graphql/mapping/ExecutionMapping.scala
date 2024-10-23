@@ -58,8 +58,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     ObjectMapping(ExecutionType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
-      EffectField("digest", digestHandler, List("id", "programId")),
-      EffectField("config", configHandler, List("id", "programId")),
+      EffectField("digest",     digestHandler,     List("id", "programId")),
+      EffectField("config",     configHandler,     List("id", "programId")),
+      EffectField("isComplete", isCompleteHandler, List("id", "programId")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),
       SqlObject("events"),
@@ -127,6 +128,17 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
     effectHandler(readEnv, calculate)
   }
+
+  private lazy val isCompleteHandler: EffectHandler[F] =
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
+      (pid, oid, limit) => {
+        services.use: s =>
+          s.generator(commitHash, itcClient, timeEstimateCalculator)
+           .isComplete(pid, oid)
+           .map(_.asJson.success)
+      }
+
+    effectHandler(_ => ().success, calculate)
 
   private lazy val digestHandler: EffectHandler[F] = {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
