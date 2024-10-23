@@ -32,10 +32,16 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.data.ObservationWorkflow
 import lucuma.odb.data.ObservationWorkflowState
 import lucuma.odb.data.Tag
+import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
@@ -47,9 +53,6 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
-import lucuma.odb.data.ObservationWorkflow
-import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.sequence.data.MissingParamSet
 
 sealed trait ObservationWorkflowService[F[_]] {
 
@@ -60,6 +63,7 @@ sealed trait ObservationWorkflowService[F[_]] {
 
   def getWorkflow(
     oid: Observation.Id, 
+    commitHash: CommitHash, 
     itcClient: ItcClient[F]
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
@@ -257,8 +261,13 @@ object ObservationWorkflowService {
       type ExecutionState  = Ongoing.type   | Completed.type
       type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
-      private def executionState(oid: Observation.Id): ResultT[F, Option[ExecutionState]] =
-        ResultT.pure(oid).as(None)
+      private def executionState(info: ObservationValidationInfo, commitHash: CommitHash, itcClient: ItcClient[F])(using Enums): F[Option[ExecutionState]] =
+        TimeEstimateCalculatorImplementation.fromSession(session, summon).flatMap: ptc =>
+          generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
+            case ObservationExecutionState.NotDefined => None
+            case ObservationExecutionState.NotStarted => None
+            case ObservationExecutionState.Ongoing    => Some(Ongoing)
+            case ObservationExecutionState.Completed  => Some(Completed)
         
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
@@ -315,58 +324,61 @@ object ObservationWorkflowService {
       private def observationValidationsImpl(
         info: ObservationValidationInfo,
         itcClient: ItcClient[F],
-      )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
-        if info.role.isDefined then Result(List.empty).pure // don't warn for calibrations
+      )(using Transaction[F]): ResultT[F, (Option[GeneratorParams], List[ObservationValidation])] =
+        if info.role.isDefined then ResultT.pure((None, List.empty)) // don't warn for calibrations
         else {
 
           /* Partial computation of validation errors, excluding configuration checking. */
-          val partialMap = 
+          val partialMap: F[(Option[GeneratorParams], ObservationValidationMap)] = 
             for {
               gen      <- generatorParams(info)
               genVals   = gen.swap.getOrElse(ObservationValidationMap.empty)
               cfpVals  <- cfpValidations(info)
               itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations(info, itcClient, _)) // only compute this if cfp and gen are ok
               bandVals <- validateScienceBand(info.oid)
-            } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
+            } yield (gen.toOption, genVals |+| itcVals |+| cfpVals |+| bandVals)
 
           // Only compute configuration request status if everything else is ok and the proposal has been accepted
-          def fullMap(isAccepted: Boolean): F[ObservationValidationMap] =
-            partialMap.flatMap: m =>
-              if m.isEmpty && isAccepted then validateConfiguration(info.oid)
-              else m.pure[F]          
+          def fullMap(isAccepted: Boolean): F[(Option[GeneratorParams], ObservationValidationMap)] =
+            partialMap.flatMap: (gen, m) =>
+              if m.isEmpty && isAccepted then validateConfiguration(info.oid).tupleLeft(gen)
+              else (gen, m).pure[F]          
 
-          val result: ResultT[F, List[ObservationValidation]] =
-            for
-              accepted <- ResultT(info.isAccepted.pure[F])
-              warnings <- ResultT.liftF(fullMap(accepted))
-            yield warnings.toList
+          // Put it together
+          for
+            accepted <- ResultT(info.isAccepted.pure[F])
+            pair     <- ResultT.liftF(fullMap(accepted))
+            (gp, warnings) = pair
+          yield (gp, warnings.toList)
 
-          result.value
-          
         }
 
       override def observationValidations(
         oid: Observation.Id,
         itcClient: ItcClient[F]
       )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
-        obsInfo(oid).flatMap(observationValidationsImpl(_, itcClient))
+        ResultT.liftF(obsInfo(oid)).flatMap(observationValidationsImpl(_, itcClient)).map(_._2).value
 
       private def getWorkflowImpl(
         oid: Observation.Id, 
+        commitHash: CommitHash,
         itcClient: ItcClient[F]
       )(using Transaction[F]): ResultT[F, ObservationWorkflow] =
         for
           info <- ResultT.liftF(obsInfo(oid))
-          errs <- ResultT(observationValidationsImpl(info, itcClient))
-          ex   <- executionState(oid)
-          pair <- ResultT(workflowStateAndTransitions(info,ex, errs.map(_.code)).pure[F])
-        yield ObservationWorkflow(pair._1, pair._2, errs)
+          pair <- observationValidationsImpl(info, itcClient)
+          (gp, errs) = pair
+          ex   <- ResultT.liftF(executionState(info, commitHash, itcClient))
+          pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
+          (s, ss) = pair
+        yield ObservationWorkflow(s, ss, errs)
 
       override def getWorkflow(
-        oid: Observation.Id, 
+        oid: Observation.Id,
+        commitHash: CommitHash, 
         itcClient: ItcClient[F]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
-        getWorkflowImpl(oid, itcClient).value
+        getWorkflowImpl(oid, commitHash, itcClient).value
 
   }
 
