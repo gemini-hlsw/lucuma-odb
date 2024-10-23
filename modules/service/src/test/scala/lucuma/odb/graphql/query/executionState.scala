@@ -13,13 +13,14 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.json.all.transport.given
-import skunk.implicits.*
 
-class executionIsComplete extends ExecutionTestSupport {
+class executionState extends ExecutionTestSupport {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -28,29 +29,31 @@ class executionIsComplete extends ExecutionTestSupport {
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
-  def isCompleteQuery(o: Observation.Id): String =
+  def stateQuery(o: Observation.Id): String =
     s"""
        query {
          observation(observationId: "$o") {
            execution {
-             isComplete
+             state
            }
          }
        }
      """
 
-  def isCompleteResult(b: Boolean): Json =
+  def stateResult(s: ObservationExecutionState): Json =
     json"""
       {
         "observation": {
           "execution": {
-            "isComplete": $b
+            "state": ${s.tag.toScreamingSnakeCase}
           }
         }
       }
     """
 
-  test("isComplete - 0/2") {
+  import ObservationExecutionState.*
+
+  test("isComplete - NOT_STARTED") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -61,12 +64,12 @@ class executionIsComplete extends ExecutionTestSupport {
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = isCompleteQuery(oid),
-        expected = isCompleteResult(false).asRight
+        query    = stateQuery(oid),
+        expected = stateResult(NotStarted).asRight
       )
   }
 
-  test("isComplete - 1/2") {
+  test("isComplete - ONGOING") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -86,12 +89,12 @@ class executionIsComplete extends ExecutionTestSupport {
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = isCompleteQuery(oid),
-        expected = isCompleteResult(false).asRight
+        query    = stateQuery(oid),
+        expected = stateResult(Ongoing).asRight
       )
   }
 
-  test("isComplete - 2/2") {
+  test("isComplete - COMPLETED") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -113,24 +116,24 @@ class executionIsComplete extends ExecutionTestSupport {
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = isCompleteQuery(oid),
-        expected = isCompleteResult(true).asRight
+        query    = stateQuery(oid),
+        expected = stateResult(Completed).asRight
       )
   }
 
-  test("isComplete - missing data") {
+  test("isComplete - NOT_DEFINED") {
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
-        t <- createTargetAs(pi, p) // missing data radial velocity & source profile
+        t <- createIncompleteTargetAs(pi, p) // missing data radial velocity & source profile
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       yield o
 
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = isCompleteQuery(oid),
-        expected = isCompleteResult(false).asRight
+        query    = stateQuery(oid),
+        expected = stateResult(NotDefined).asRight
       )
   }
 }

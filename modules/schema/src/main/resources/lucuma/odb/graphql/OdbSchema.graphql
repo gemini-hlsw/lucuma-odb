@@ -6392,10 +6392,9 @@ type Execution {
   ): ExecutionConfig
 
   """
-  Determines whether the observation is complete.  In other words, whether there
-  are no remaining science steps left to execute.
+  Determines the execution state as a whole of this observation.
   """
-  isComplete: Boolean!
+  state: ObservationExecutionState!
 
   "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
@@ -8626,6 +8625,29 @@ type Observation {
   forReview: Boolean!
 
 }
+
+enum ObservationExecutionState {
+
+  """
+  The observation isn't sufficiently defined, or there is a problem that
+  must first be resolved.
+  """
+  NOT_DEFINED
+
+  "No execution visit has been recorded for this observation."
+  NOT_STARTED
+
+  """
+  At least one visit was made for this observation, but it is not yet complete.
+  """
+  ONGOING
+
+  "No more science data is expected for this observation."
+  COMPLETED
+
+}
+
+
 type Configuration {
   conditions: ConfigurationConditions!
   referenceCoordinates: Coordinates # may not be available
