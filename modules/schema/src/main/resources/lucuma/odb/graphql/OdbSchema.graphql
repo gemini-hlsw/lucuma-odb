@@ -6391,6 +6391,12 @@ type Execution {
 
   ): ExecutionConfig
 
+  """
+  Determines whether the observation is complete.  In other words, whether there
+  are no remaining science steps left to execute.
+  """
+  isComplete: Boolean!
+
   "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
     "Starts the result set at the given atom creation time."

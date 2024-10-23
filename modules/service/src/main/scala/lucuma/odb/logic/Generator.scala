@@ -132,6 +132,15 @@ sealed trait Generator[F[_]] {
     when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
+  /**
+   * Determines whether the given observation is complete (i.e., has no more
+   * science steps left to execute).
+   */
+  def isComplete(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using NoTransaction[F]): F[Boolean]
+
 }
 
 object Generator {
@@ -467,6 +476,17 @@ object Generator {
           executionSequence(proto.acquisition, SequenceType.Acquisition),
           executionSequence(proto.science,     SequenceType.Science)
         )
+
+      def isComplete(
+        programId:     Program.Id,
+        observationId: Observation.Id
+      )(using NoTransaction[F]): F[Boolean] =
+        generate(programId, observationId, FutureLimit.Min)
+          .map(_.toOption.exists {
+            // TODO: fold this into InstrumentExecutionConfig in core
+            case InstrumentExecutionConfig.GmosNorth(s) => s.science.isEmpty
+            case InstrumentExecutionConfig.GmosSouth(s) => s.science.isEmpty
+          })
 
   }
 }
