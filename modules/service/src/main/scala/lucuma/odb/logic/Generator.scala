@@ -38,6 +38,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -131,6 +132,15 @@ sealed trait Generator[F[_]] {
     futureLimit:   FutureLimit = FutureLimit.Default,
     when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
+
+  /**
+   * Determines the execution state of the given observation by looking at the
+   * remaining science steps (if any) and past visits.
+   */
+  def executionState(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using NoTransaction[F]): F[ObservationExecutionState]
 
 }
 
@@ -468,5 +478,28 @@ object Generator {
           executionSequence(proto.science,     SequenceType.Science)
         )
 
+      def executionState(
+        programId:     Program.Id,
+        observationId: Observation.Id
+      )(using NoTransaction[F]): F[ObservationExecutionState] =
+        import ObservationExecutionState.*
+
+        def definedStatus(isComplete: Boolean): F[ObservationExecutionState] =
+          if isComplete then Completed.pure[F]
+          else services.transactionally {
+            visitService.selectAll(observationId).head.compile.last
+              .map(_.fold(NotStarted)(_ => Ongoing))
+          }
+
+        generate(programId, observationId, FutureLimit.Min)
+          .flatMap(_.fold(
+            _ => NotDefined.pure[F],
+            {
+              // TODO: fold this into InstrumentExecutionConfig in core
+              case InstrumentExecutionConfig.GmosNorth(s) => definedStatus(s.science.isEmpty)
+              case InstrumentExecutionConfig.GmosSouth(s) => definedStatus(s.science.isEmpty)
+            }
+          )
+        )
   }
 }
