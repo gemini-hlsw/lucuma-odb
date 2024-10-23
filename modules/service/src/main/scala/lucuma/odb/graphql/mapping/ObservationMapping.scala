@@ -137,8 +137,9 @@ trait ObservationMapping[F[_]]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ObservationValidation]]] =
       (pid, oid, _) =>
         services.useTransactionally {
-          observationService
+          observationWorkflowService
             .observationValidations(pid, oid, itcClient)
+            .map(_.map(_._2))
         }
 
     effectHandler(readEnv, calculate)

@@ -132,6 +132,9 @@ trait Services[F[_]]:
   /** The `ObservationService`. */
   def observationService: ObservationService[F]
 
+  /** The `ObservationService`. */
+  def observationWorkflowService: ObservationWorkflowService[F]
+
   /** The `ObservingModeServices`. */
   def observingModeServices: ObservingModeServices[F]
 
@@ -254,6 +257,7 @@ object Services:
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
+      lazy val observationWorkflowService = ObservationWorkflowService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programService = ProgramService.instantiate
@@ -304,6 +308,7 @@ object Services:
     def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
     def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
+    def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
