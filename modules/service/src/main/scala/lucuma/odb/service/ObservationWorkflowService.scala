@@ -281,17 +281,23 @@ object ObservationWorkflowService {
           given Ordering[ObservationValidationCode] =
             Ordering.by:
               case ObservationValidationCode.CallForProposalsError => 1
-              case ObservationValidationCode.ItcError              => 2
-              case ObservationValidationCode.ConfigurationError    => 3
+              case ObservationValidationCode.ConfigurationError => 2
+              case ObservationValidationCode.ItcError => 3
+              case ObservationValidationCode.ConfigurationRequestUnavailable => 4
+              case ObservationValidationCode.ConfigurationRequestNotRequested => 5
+              case ObservationValidationCode.ConfigurationRequestDenied => 6
+              case ObservationValidationCode.ConfigurationRequestPending => 7
 
           val validationStatus: ValidationState = 
-            codes.minOption match
-              case None                                                  => Defined
-              // ... => Unapproved
-              case Some(ObservationValidationCode.ConfigurationError)    => Undefined
-              case Some(ObservationValidationCode.CallForProposalsError) => Undefined
-              case Some(ObservationValidationCode.ItcError)              => Undefined                                    
-
+            codes.minOption.fold(Defined):
+              case ObservationValidationCode.CallForProposalsError            |
+                   ObservationValidationCode.ConfigurationError               |
+                   ObservationValidationCode.ItcError                         => Undefined
+              case ObservationValidationCode.ConfigurationRequestUnavailable  |
+                   ObservationValidationCode.ConfigurationRequestNotRequested |
+                   ObservationValidationCode.ConfigurationRequestDenied       |
+                   ObservationValidationCode.ConfigurationRequestPending      => Unapproved
+              
           def userStatus(validationStatus: ValidationState): Option[UserState] =
             info.activeStatus match
               case ObsActiveStatus.Inactive => Some(Inactive)
@@ -309,13 +315,13 @@ object ObservationWorkflowService {
                     
           val allowedTransitions: List[ObservationWorkflowState] =
             state match
-              case Inactive         => List(validationStatus)
+              case Inactive   => List(validationStatus)
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
               case Defined    => List(Inactive) ++ Option.when(isAccepted)(Ready)
-              case Ready            => List(Inactive, validationStatus)
-              case Ongoing     => List(Inactive)
-              case Completed   => Nil
+              case Ready      => List(Inactive, validationStatus)
+              case Ongoing    => List(Inactive)
+              case Completed  => Nil
 
           (state, allowedTransitions)
 
