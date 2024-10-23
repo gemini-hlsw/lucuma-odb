@@ -49,6 +49,7 @@ import java.time.Duration
 import Services.Syntax.*
 import lucuma.odb.data.ObservationWorkflow
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.sequence.data.MissingParamSet
 
 sealed trait ObservationWorkflowService[F[_]] {
 
@@ -125,10 +126,14 @@ object ObservationWorkflowService {
     private def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
       decStart <= dec && dec <= decEnd
 
+  extension (mp: MissingParamSet)
+    def toObsValidation: ObservationValidation =
+      ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
+
   extension (ge: GeneratorParamsService.Error)
     private def toObsValidation: ObservationValidation = ge match
-      case GenParamsError.MissingData(otid, paramName) => ObservationValidation.configuration(Messages.missingData(otid, paramName))
-      case _                                           => ObservationValidation.configuration(ge.format)
+      case GenParamsError.MissingData(p) => p.toObsValidation
+      case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationWorkflowService[F] =
@@ -138,12 +143,11 @@ object ObservationWorkflowService {
       given Enums = enums
 
       /** Retrieve the generator params, or report an error. */
-      private def generatorParams(info: ObservationValidationInfo)(using Transaction[F]): F[Either[ObservationValidationMap, GeneratorParams]] =
-        generatorParamsService.selectOne(info.pid, info.oid).map {
-          case Left(errors)                          => ObservationValidationMap.fromList(errors.map(_.toObsValidation).toList).asLeft
-          case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(ObservationValidation.configuration(m.format)).asLeft
+      def generatorParams(info: ObservationValidationInfo)(using Transaction[F]): F[Either[ObservationValidationMap, GeneratorParams]] =
+        generatorParamsService.selectOne(info.pid, info.oid).map:
+          case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
+          case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
           case Right(ps)                             => ps.asRight
-        }
 
       /** Validate that the asterism is within the specified range. */
       private def validateAsterismRaDec(
@@ -324,7 +328,6 @@ object ObservationWorkflowService {
               itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations(info, itcClient, _)) // only compute this if cfp and gen are ok
               bandVals <- validateScienceBand(info.oid)
             } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
-
 
           // Only compute configuration request status if everything else is ok and the proposal has been accepted
           def fullMap(isAccepted: Boolean): F[ObservationValidationMap] =

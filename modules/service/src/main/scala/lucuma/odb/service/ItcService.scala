@@ -47,6 +47,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
@@ -108,53 +109,32 @@ sealed trait ItcService[F[_]] {
 
 object ItcService {
 
-  sealed trait Error {
+  sealed trait Error:
     def format: String
-  }
 
-  object Error {
-
-    case class ObservationDefinitionError(msg: String) extends Error:
-      def format: String = msg
-
-    object ObservationDefinitionError:
-      val MissingPrefix: String =
-        "ITC cannot be queried until the following parameters are defined"
-
-      def fromMissingParams(m: ItcInput.Missing): ObservationDefinitionError =
-        ObservationDefinitionError(s"$MissingPrefix: ${m.format}")
-
-      def fromServiceErrors(nel: NonEmptyList[GeneratorParamsService.Error]): ObservationDefinitionError =
-        val (missingParams, others) =
-          nel.foldLeft((List.empty[String], List.empty[String])) { case ((missingParams, others), e) =>
-            e match
-              case GeneratorParamsService.Error.MissingData(_, _) => (e.format :: missingParams, others)
-              case _                                              => (missingParams, e.format :: others)
-          }
-        def format: String =
-          ((missingParams match
-            case Nil    => ""
-            case params => s"$MissingPrefix: ${params.sorted.intercalate(", ")}."
-          ) :: others).intercalate("\n")
-        ObservationDefinitionError(format)
+  object Error:
+    case class ObservationDefinitionError(error: GeneratorParamsService.Error) extends Error:
+      def format: String =
+        error match
+          case GeneratorParamsService.Error.MissingData(p) =>
+            s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
+          case _                                           =>
+            error.format
 
     case class RemoteServiceErrors(
       problems: NonEmptyList[(Option[Target.Id], String)]
-    ) extends Error {
-      def format: String = {
+    ) extends Error:
+      def format: String =
         val ps = problems.map { 
           case (None, msg)      => s"Asterism: $msg"
           case (Some(tid), msg) => s"Target '$tid': $msg"
         }
         s"ITC returned errors: ${ps.intercalate(", ")}"
-      }
-    }
 
-    case object TargetMismatch extends Error {
+    case object TargetMismatch extends Error:
       def format: String =
         s"ITC provided conflicting results"
-    }
-  }
+  end Error
 
   case class TargetResult(targetId: Target.Id, value: IntegrationTime) {
     def totalTime: Option[TimeSpan] = {
@@ -269,7 +249,7 @@ object ItcService {
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(ObservationDefinitionError.fromMissingParams))
+          p <- EitherT.fromEither(params.itcInput.leftMap(m => ObservationDefinitionError(GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
@@ -281,7 +261,7 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
-            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError.fromServiceErrors)))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
@@ -312,12 +292,12 @@ object ItcService {
             .flattenOption
             .toMap
 
-      private def convertRemoteErrors(targets: ItcInput.Defined)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error =
+      private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error =
         RemoteServiceErrors(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(targets: ItcInput.Defined): F[Either[Error, AsterismIntegrationTimes]] =
+      private def safeAcquisitionCall(targets: ItcInput): F[Either[Error, AsterismIntegrationTimes]] =
         client
           .imaging(targets.imagingInput, useCache = false)
           .map:
@@ -335,7 +315,7 @@ object ItcService {
             .leftMap(convertRemoteErrors(targets))
           
       private def callRemoteItc(
-        targets: ItcInput.Defined
+        targets: ItcInput
       )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
           case (imgResult, IntegrationTimeResult(_, specOutcomes)) =>
@@ -363,7 +343,7 @@ object ItcService {
       private def insertOrUpdate(
         pid:     Program.Id,
         oid:     Observation.Id,
-        input:   ItcInput.Defined,
+        input:   ItcInput,
         results: AsterismResults
       )(using Transaction[F]): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)

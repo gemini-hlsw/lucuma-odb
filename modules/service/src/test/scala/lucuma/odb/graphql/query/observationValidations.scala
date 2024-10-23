@@ -207,7 +207,7 @@ class observationValidations
     val setup: IO[(Target.Id, Observation.Id)] =
       for {
         pid <- createProgramAs(pi)
-        tid <- createTargetAs(pi, pid)
+        tid <- createIncompleteTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
     setup.flatMap { (_, oid) =>
@@ -216,7 +216,7 @@ class observationValidations
         validationQuery(oid),
         expected = queryResult(
           ObservationValidation.configuration(
-            "target t-195 is missing: { brightness measure, radial velocity }"
+            "Missing brightness measure, radial velocity"
           )
         ).asRight
       )
@@ -283,7 +283,7 @@ class observationValidations
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosSouth))
         _   <- addProposal(pi, pid, cid.some)
-        tid <- createTargetAs(pi, pid)
+        tid <- createIncompleteTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       } yield (tid, oid)
     setup.flatMap { (_, oid) =>
@@ -292,7 +292,7 @@ class observationValidations
         validationQuery(oid),
         expected = queryResult(
           ObservationValidation.configuration(
-            "target t-198 is missing: { brightness measure, radial velocity }"
+            "Missing brightness measure, radial velocity"
           ),
           ObservationValidation.callForProposals(
             ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)
