@@ -8499,12 +8499,12 @@ type Observation {
   """
   Observation status
   """
-  status: ObsStatus!
+  status: ObsStatus! @deprecated
 
   """
   Observation operational status
   """
-  activeStatus: ObsActiveStatus!
+  activeStatus: ObsActiveStatus! @deprecated
 
   """
   Observations are associated with a science band once time has been allocated
@@ -8586,7 +8586,7 @@ type Observation {
   """
   A list of observation validation problems
   """
-  validations: [ObservationValidation!]!
+  validations: [ObservationValidation!]! @deprecated
 
   """
   Enclosing group, if any.
@@ -8622,7 +8622,7 @@ type Observation {
   This flag is set to true prior to Phase II, and must be reset to false by the PI prior to observation. The
   intent is to prompt PIs to review their accepted observations.
   """
-  forReview: Boolean!
+  forReview: Boolean! @deprecated
 
 
   workflow: ObservationWorkflow!
