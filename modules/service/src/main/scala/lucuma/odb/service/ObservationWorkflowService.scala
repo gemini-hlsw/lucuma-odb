@@ -13,6 +13,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
+import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -31,7 +32,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.ObservationWorkflow
 import lucuma.odb.data.ObservationWorkflowState
