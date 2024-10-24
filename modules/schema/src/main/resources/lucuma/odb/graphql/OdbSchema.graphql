@@ -14644,7 +14644,7 @@ enum ObservationWorkflowState {
 
 type ObservationWorkflow {
   state: ObservationWorkflowState!
-  validTransitions: [ObservationWorkflow!]!
+  validTransitions: [ObservationWorkflowState!]!
   validationErrors: [ObservationValidation!]!
 }
 
