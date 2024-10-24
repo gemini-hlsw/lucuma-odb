@@ -17,6 +17,7 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -38,7 +39,6 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
-import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -493,13 +493,8 @@ object Generator {
 
         generate(programId, observationId, FutureLimit.Min)
           .flatMap(_.fold(
-            _ => NotDefined.pure[F],
-            {
-              // TODO: fold this into InstrumentExecutionConfig in core
-              case InstrumentExecutionConfig.GmosNorth(s) => definedStatus(s.science.isEmpty)
-              case InstrumentExecutionConfig.GmosSouth(s) => definedStatus(s.science.isEmpty)
-            }
-          )
-        )
+            _   => NotDefined.pure[F],
+            iec => definedStatus(iec.isComplete)
+          ))
   }
 }

@@ -20,6 +20,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
@@ -54,7 +55,6 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
