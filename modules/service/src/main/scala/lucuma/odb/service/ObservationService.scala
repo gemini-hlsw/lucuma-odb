@@ -5,9 +5,8 @@ package lucuma.odb.service
 
 import cats.Applicative
 import cats.data.NonEmptyList
-import cats.data.OptionT
 import cats.effect.Concurrent
-import cats.syntax.all.*
+import cats.implicits.*
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -18,17 +17,14 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
-import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObsStatus
-import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.Site
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.WaterVapor
@@ -38,29 +34,20 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
-import lucuma.core.model.CallForProposals
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.Group
-import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
-import lucuma.core.model.ObservationValidation
-import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
-import lucuma.core.util.DateInterval
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
-import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
-import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
@@ -78,9 +65,6 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
-import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
@@ -89,8 +73,6 @@ import skunk.*
 import skunk.codec.boolean.bool
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
-
-import java.time.Duration
 
 import Services.Syntax.*
 
@@ -133,12 +115,6 @@ sealed trait ObservationService[F[_]] {
   def deleteCalibrationObservations(
     oids: NonEmptyList[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
-
-  def observationValidations(
-    pid: Program.Id,
-    oid: Observation.Id,
-    itcClient: ItcClient[F],
-  )(using Transaction[F]): F[Result[List[ObservationValidation]]]
 
 }
 
@@ -223,7 +199,10 @@ object ObservationService {
     forReview:  Boolean,
     role:       Option[CalibrationRole],
     proposalStatus: Tag,
-  )
+    activeStatus: ObsActiveStatus
+  ) {
+    def isMarkedReady: Boolean = false // TODO
+  }
 
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
@@ -594,181 +573,6 @@ object ObservationService {
           (pid, newOid) <- ResultT(cloneObservationImpl(origOid, input.SET))
           _             <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), input.asterism))
         yield CloneIds(origOid, newOid)).value
-
-      // ***********************
-      // All about the validations
-      // ***********************
-      def cfpError(msg: String): ObservationValidation =
-        ObservationValidation.callForProposals(msg)
-
-      extension (ra: RightAscension)
-        def isInInterval(raStart: RightAscension, raEnd: RightAscension): Boolean =
-          if (raStart > raEnd) raStart <= ra || ra <= raEnd
-          else raStart <= ra && ra <= raEnd
-
-      extension (dec: Declination)
-        def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
-          decStart <= dec && dec <= decEnd
-
-      extension (mp: MissingParamSet)
-        def toObsValidation: ObservationValidation =
-          ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
-
-      extension (ge: GeneratorParamsService.Error)
-        def toObsValidation: ObservationValidation =
-          ge match
-            case GeneratorParamsService.Error.MissingData(p) =>
-              p.toObsValidation
-            case _                                           =>
-              ObservationValidation.configuration(ge.format)
-
-      override def observationValidations(
-        pid: Program.Id,
-        oid: Observation.Id,
-        itcClient: ItcClient[F]
-      )(using Transaction[F]): F[Result[List[ObservationValidation]]] = {
-
-        val generatorParams: F[Either[ObservationValidationMap, GeneratorParams]] =
-          generatorParamsService.selectOne(pid, oid).map {
-            case Left(error)                           =>
-              ObservationValidationMap.singleton(error.toObsValidation).asLeft
-            case Right(GeneratorParams(Left(m), _, _)) =>
-              // Problems with the ITC inputs should generate validation flags.
-              ObservationValidationMap.singleton(m.toObsValidation).asLeft
-            case Right(ps)                             =>
-              ps.asRight
-          }
-
-        val optCfpId: F[Option[CallForProposals.Id]] =
-          session.option(Statements.ProgramCfpId)(pid).map(_.flatten)
-
-        def validateAsterismRaDec(
-          raStart: RightAscension,
-          raEnd: RightAscension,
-          decStart: Declination,
-          decEnd: Declination,
-          site: Site,
-          active: DateInterval
-        ): F[Option[ObservationValidation]] =
-          asterismService.getAsterism(pid,oid)
-            .map { l =>
-              val targets = l.map(_._2)
-              // The lack of a target will get reported in the generator errors
-              val start    = ObservingNight.fromSiteAndLocalDate(site, active.start).start
-              val end      = ObservingNight.fromSiteAndLocalDate(site, active.end).end
-              val duration = Duration.between(start, end)
-              val center   = start.plus(duration.dividedBy(2L))
-
-              (for {
-                asterism <- NonEmptyList.fromList(targets)
-                tracking  = ObjectTracking.fromAsterism(asterism)
-                coordsAt <- tracking.at(center)
-                coords    = coordsAt.value
-              } yield {
-                if (coords.ra.isInInterval(raStart, raEnd) && coords.dec.isInInterval(decStart, decEnd)) none
-                else cfpError(AsterismOutOfRangeMsg).some
-              }).flatten
-            }
-
-        def validateRaDec(
-          cid: CallForProposals.Id,
-          inst: Option[Instrument],
-          explicitBase: Option[(RightAscension, Declination)]
-        ): F[Option[ObservationValidation]] =
-          (for {
-            site <- OptionT.fromOption(inst.map(_.site.toList).collect {
-              case List(Site.GN) => Site.GN
-              case List(Site.GS) => Site.GS
-            })
-            (raStart, raEnd, decStart, decEnd, active) <- OptionT.liftF(session.unique(Statements.cfpInformation(site))(cid))
-            // if the observation has explicit base declared, use that
-            validation <- explicitBase.fold(OptionT(validateAsterismRaDec(raStart, raEnd, decStart, decEnd, site, active))) { (ra, dec) =>
-              OptionT.fromOption(Option.unless(ra.isInInterval(raStart, raEnd) && dec.isInInterval(decStart, decEnd))(cfpError(ExplicitBaseOutOfRangeMsg)))
-            }
-          } yield validation).value
-
-        def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
-          // If there is no instrument in the observation, that will get caught with the generatorValidations
-          optInstr.fold(none.pure){ instr =>
-            session.stream(Statements.CfpInstruments)(cid, chunkSize = 1024)
-              .compile
-              .toList
-              .map(l =>
-                if(l.isEmpty || l.contains(instr)) none
-                else cfpError(InvalidInstrumentMsg(instr)).some
-              )
-          }
-        }
-
-        val obsInfo: F[ObservationValidationInfo] =
-          session.unique(Statements.ObservationValidationInfo)(oid)
-
-        def cfpValidations(info: ObservationValidationInfo): F[ObservationValidationMap] = {
-          optCfpId.flatMap(
-            _.fold(ObservationValidationMap.empty.pure){ cid =>
-              for {
-                valInstr        <- validateInstrument(cid, info.instrument)
-                explicitBase     = (info.ra, info.dec).tupled
-                valRaDec        <- validateRaDec(cid, info.instrument, explicitBase)
-                valForactivation = Option.when(info.forReview)(ObservationValidation.configuration(ConfigurationForReviewMsg))
-              } yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
-             }
-          )
-        }
-
-        def itcValidations(params: GeneratorParams): F[ObservationValidationMap] =
-          itcService(itcClient).selectOne(pid, oid, params).map:
-            // N.B. there will soon be more cases here
-            case Some(_) => ObservationValidationMap.empty
-            case None    => ObservationValidationMap.empty.add(ObservationValidation.itc("ITC results are not present."))
-
-        def validateScienceBand: F[ObservationValidationMap] =
-          session
-            .option(Statements.SelectInvalidBand)(oid)
-            .map { invalidBand =>
-              val m = ObservationValidationMap.empty
-              invalidBand.fold(m)(b => m.add(ObservationValidation.configuration(InvalidScienceBandMsg(b))))
-            }
-
-        def validateConfiguration: F[ObservationValidationMap] =
-          configurationService.selectRequests(oid).map: r =>
-            val m = ObservationValidationMap.empty
-            r.toOption match
-              case None => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Unavailable))
-              case Some(Nil) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.NotRequested))
-              case Some(lst) if lst.exists(_.status === ConfigurationRequestStatus.Approved) => m
-              case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Denied))
-              case _ => m.add(ObservationValidation.configuration(ConfigurationRequestMsg.Pending))
-
-        obsInfo.flatMap: info =>
-          if (info.role.isDefined) Result(List.empty).pure // it's a calibration
-          else 
-            val initialMap = 
-              for {
-                gen      <- generatorParams
-                genVals   = gen.swap.getOrElse(ObservationValidationMap.empty)
-                cfpVals  <- cfpValidations(info)
-                itcVals  <- Option.when(cfpVals.isEmpty)(gen.toOption).flatten.foldMapM(itcValidations) // only compute this if cfp and gen are ok
-                bandVals <- validateScienceBand
-              } yield (genVals |+| itcVals |+| cfpVals |+| bandVals)
-
-            // Our actual proposal status
-            val proposalStatus: Result[enumsVal.ProposalStatus] =
-              Result.fromOption(
-                Enumerated[enumsVal.ProposalStatus].fromTag(info.proposalStatus.value),
-                s"Unexpected enum value for ProposalStatus: ${info.proposalStatus.value}"
-              )
-
-            // only compute configuration request status if everything else is ok and the proposal has been accepted
-            val secondMap =
-              proposalStatus.traverse: status =>
-                initialMap.flatMap: m =>
-                  if m.isEmpty && status === enumsVal.ProposalStatus.Accepted then validateConfiguration
-                  else m.pure[F]          
-
-            secondMap.map(_.map(_.toList))
-
-      }
 
     }
 
@@ -1283,73 +1087,6 @@ object ObservationService {
         FROM t_observation
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
-
-    val ProgramCfpId: Query[Program.Id, Option[CallForProposals.Id]] =
-      sql"""
-        SELECT c_cfp_id
-        FROM t_proposal
-        WHERE c_program_id = $program_id
-      """.query(cfp_id.opt)
-
-    val ObservationValidationInfo:
-      Query[Observation.Id, ObservationValidationInfo] =
-      sql"""
-        SELECT
-          o.c_instrument,
-          o.c_explicit_ra,
-          o.c_explicit_dec,
-          o.c_for_review,
-          o.c_calibration_role,
-          p.c_proposal_status
-        FROM t_observation o
-        JOIN t_program p on p.c_program_id = o.c_program_id
-        WHERE c_observation_id = $observation_id
-      """
-      .query(instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt *: tag)
-      .to[ObservationValidationInfo]
-
-    def cfpInformation(
-      site: Site
-    ): Query[CallForProposals.Id, (RightAscension, RightAscension, Declination, Declination, DateInterval)] =
-      val ns = site match {
-        case Site.GN => "north"
-        case Site.GS => "south"
-      }
-      sql"""
-        SELECT
-          c_#${ns}_ra_start,
-          c_#${ns}_ra_end,
-          c_#${ns}_dec_start,
-          c_#${ns}_dec_end,
-          c_active_start,
-          c_active_end
-        FROM t_cfp
-        WHERE c_cfp_id = $cfp_id
-      """.query(right_ascension *: right_ascension *: declination *: declination *: date_interval)
-
-    val CfpInstruments: Query[CallForProposals.Id, Instrument] =
-      sql"""
-        SELECT c_instrument
-        FROM t_cfp_instrument
-        WHERE c_cfp_id = $cfp_id
-      """.query(instrument)
-
-    // Select the science band of an observation if it is not NULL and there is
-    // no corresponding time allocation for it.
-    val SelectInvalidBand: Query[Observation.Id, ScienceBand] =
-      sql"""
-        SELECT c_science_band
-        FROM t_observation o
-        WHERE o.c_observation_id = $observation_id
-          AND (
-            o.c_science_band IS NOT NULL AND
-            o.c_science_band NOT IN (
-              SELECT DISTINCT c_science_band
-              FROM t_allocation a
-              WHERE a.c_program_id = o.c_program_id
-            )
-          )
-      """.query(science_band)
 
     // Brute force statements to delete a calibration observations
     def linkedTargets(oids: NonEmptyList[Observation.Id]): Query[List[Observation.Id], Target.Id] =
