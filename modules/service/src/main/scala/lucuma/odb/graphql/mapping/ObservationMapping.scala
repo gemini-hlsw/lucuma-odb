@@ -20,9 +20,9 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.ObservationWorkflow
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
