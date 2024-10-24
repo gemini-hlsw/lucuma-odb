@@ -22,6 +22,7 @@ object ObservationValidationMap extends NewType[SortedMap[ObservationValidationC
     l.foldLeft(empty){ _.add(_)}
 
   extension (m: ObservationValidationMap.Type)
+    def toMap: SortedMap[ObservationValidationCode, NonEmptyChain[String]] = m.value
     def add(validation: ObservationValidation): ObservationValidationMap = 
       addMessages(validation.code, validation.messages)
     def addMessages(code: ObservationValidationCode, msgs: NonEmptyChain[String]): ObservationValidationMap =
