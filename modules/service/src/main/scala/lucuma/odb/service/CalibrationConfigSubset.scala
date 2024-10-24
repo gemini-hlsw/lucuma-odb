@@ -6,6 +6,8 @@ package lucuma.odb.service
 import cats.Eq
 import cats.derived.*
 import cats.syntax.option.*
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -32,14 +34,16 @@ object CalibrationConfigSubset:
     def centralWavelength: Wavelength
     def xBin:              GmosXBinning
     def yBin:              GmosYBinning
+    def ampReadMode:       GmosAmpReadMode
+    def ampGain:           GmosAmpGain
 
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
         centralWavelength      = centralWavelength,
         explicitXBin           = xBin.some,
         explicitYBin           = yBin.some,
-        explicitAmpReadMode    = none,
-        explicitAmpGain        = none,
+        explicitAmpReadMode    = ampReadMode.some,
+        explicitAmpGain        = ampGain.some,
         explicitRoi            = GmosRoi.CentralSpectrum.some,
         explicitλDithers       = none,
         explicitSpatialOffsets = none
@@ -53,7 +57,9 @@ object CalibrationConfigSubset:
     fpu:               GmosNorthFpu,
     centralWavelength: Wavelength,
     xBin:              GmosXBinning,
-    yBin:              GmosYBinning
+    yBin:              GmosYBinning,
+    ampReadMode:       GmosAmpReadMode,
+    ampGain:           GmosAmpGain
   ) extends Gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     def toLongSlitInput: ObservingModeInput.Create =
@@ -68,7 +74,9 @@ object CalibrationConfigSubset:
     fpu:               GmosSouthFpu,
     centralWavelength: Wavelength,
     xBin:              GmosXBinning,
-    yBin:              GmosYBinning
+    yBin:              GmosYBinning,
+    ampReadMode:       GmosAmpReadMode,
+    ampGain:           GmosAmpGain
   ) extends Gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     def toLongSlitInput: ObservingModeInput.Create =
@@ -87,7 +95,9 @@ object CalibrationConfigSubset:
             gn.fpu,
             gn.centralWavelength,
             gn.xBin,
-            gn.yBin
+            gn.yBin,
+            gn.ampReadMode,
+            gn.ampGain
           )
         case gs: Config.GmosSouth =>
           GmosSConfigs(
@@ -96,5 +106,7 @@ object CalibrationConfigSubset:
             gs.fpu,
             gs.centralWavelength,
             gs.xBin,
-            gs.yBin
+            gs.yBin,
+            gs.ampReadMode,
+            gs.ampGain
           )
