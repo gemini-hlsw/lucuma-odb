@@ -9,6 +9,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
@@ -17,7 +18,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.ObservationExecutionState
 import lucuma.odb.json.all.transport.given
 
 class executionState extends ExecutionTestSupport {
