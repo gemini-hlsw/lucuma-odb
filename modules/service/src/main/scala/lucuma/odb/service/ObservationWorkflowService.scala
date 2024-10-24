@@ -15,6 +15,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -25,6 +26,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
@@ -33,8 +35,6 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.odb.data.ObservationWorkflow
-import lucuma.odb.data.ObservationWorkflowState
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -64,7 +64,7 @@ sealed trait ObservationWorkflowService[F[_]] {
     oid: Observation.Id, 
     commitHash: CommitHash, 
     itcClient: ItcClient[F]
-  )(using Transaction[F]): F[Result[ObservationWorkflow]]
+  )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
 }
 
@@ -214,7 +214,7 @@ object ObservationWorkflowService {
         }
       }
 
-      private def obsInfo(oid: Observation.Id): F[ObservationValidationInfo] =
+      private def obsInfo(oid: Observation.Id)(using Transaction[F]): F[ObservationValidationInfo] =
         session.unique(Statements.ObservationValidationInfo)(oid)
 
       private def itcValidations(
@@ -251,7 +251,11 @@ object ObservationWorkflowService {
       type ExecutionState  = Ongoing.type   | Completed.type
       type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
-      private def executionState(info: ObservationValidationInfo, commitHash: CommitHash, itcClient: ItcClient[F])(using Enums): F[Option[ExecutionState]] =
+      private def executionState(
+        info: ObservationValidationInfo, 
+        commitHash: CommitHash, 
+        itcClient: ItcClient[F]
+      )(using Enums, NoTransaction[F]): F[Option[ExecutionState]] =
         TimeEstimateCalculatorImplementation.fromSession(session, summon).flatMap: ptc =>
           generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
             case ObservationExecutionState.NotDefined => None
@@ -291,7 +295,9 @@ object ObservationWorkflowService {
           def userStatus(validationStatus: ValidationState): Option[UserState] =
             info.activeStatus match
               case ObsActiveStatus.Inactive => Some(Inactive)
-              case ObsActiveStatus.Active   => Option.when(info.isMarkedReady && validationStatus == Defined)(Ready)
+              case ObsActiveStatus.Active   => 
+                val ready = info.isMarkedReady || info.role.isDefined // calibrations are always ready
+                Option.when(ready && validationStatus == Defined)(Ready)
 
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
@@ -304,7 +310,8 @@ object ObservationWorkflowService {
               case (Some(es), _)    => es
                     
           val allowedTransitions: List[ObservationWorkflowState] =
-            state match
+            if info.role.isDefined then Nil // User can't set the state for calibrations
+            else state match
               case Inactive   => List(validationStatus)
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
@@ -320,8 +327,8 @@ object ObservationWorkflowService {
       private def observationValidationsImpl(
         info: ObservationValidationInfo,
         itcClient: ItcClient[F],
-      )(using Transaction[F]): ResultT[F, (Option[GeneratorParams], List[ObservationValidation])] =
-        if info.role.isDefined then ResultT.pure((None, List.empty)) // don't warn for calibrations
+      )(using Transaction[F]): ResultT[F, List[ObservationValidation]] =
+        if info.role.isDefined then ResultT.pure(List.empty) // don't warn for calibrations
         else {
 
           /* Partial computation of validation errors, excluding configuration checking. */
@@ -345,7 +352,7 @@ object ObservationWorkflowService {
             accepted <- ResultT(info.isAccepted.pure[F])
             pair     <- ResultT.liftF(fullMap(accepted))
             (gp, warnings) = pair
-          yield (gp, warnings.toList)
+          yield warnings.toList
 
         }
 
@@ -353,27 +360,39 @@ object ObservationWorkflowService {
         oid: Observation.Id,
         itcClient: ItcClient[F]
       )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
-        ResultT.liftF(obsInfo(oid)).flatMap(observationValidationsImpl(_, itcClient)).map(_._2).value
+        ResultT.liftF(obsInfo(oid)).flatMap(observationValidationsImpl(_, itcClient)).value
+
+      // split this off because it can be done togther in one transaction
+      private def getObsInfoAndOtherStuff(
+        oid: Observation.Id,
+        itcClient: ItcClient[F]
+      )(using NoTransaction[F]): ResultT[F, (ObservationValidationInfo, List[ObservationValidation])] =
+        ResultT:
+          services.transactionally {
+            for
+              info <- obsInfo(oid)
+              res  <- observationValidationsImpl(info, itcClient).value
+            yield (info, res)
+          } .map: (info, res) =>
+            res.map(errs => (info, errs))
 
       private def getWorkflowImpl(
         oid: Observation.Id, 
         commitHash: CommitHash,
         itcClient: ItcClient[F]
-      )(using Transaction[F]): ResultT[F, ObservationWorkflow] =
-        for
-          info <- ResultT.liftF(obsInfo(oid))
-          pair <- observationValidationsImpl(info, itcClient)
-          (gp, errs) = pair
-          ex   <- ResultT.liftF(executionState(info, commitHash, itcClient))
-          pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
-          (s, ss) = pair
-        yield ObservationWorkflow(s, ss, errs)
+      )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
+        getObsInfoAndOtherStuff(oid, itcClient).flatMap: (info, errs) =>
+          for
+            ex   <- ResultT.liftF(executionState(info, commitHash, itcClient))
+            pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
+            (s, ss) = pair
+          yield ObservationWorkflow(s, ss, errs)
 
       override def getWorkflow(
         oid: Observation.Id,
         commitHash: CommitHash, 
         itcClient: ItcClient[F]
-      )(using Transaction[F]): F[Result[ObservationWorkflow]] =
+      )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         getWorkflowImpl(oid, commitHash, itcClient).value
 
   }

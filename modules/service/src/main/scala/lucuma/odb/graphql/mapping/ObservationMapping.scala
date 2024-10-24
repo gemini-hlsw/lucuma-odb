@@ -20,6 +20,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
@@ -27,6 +28,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.configurationrequest.query.given
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
 
@@ -46,6 +48,7 @@ trait ObservationMapping[F[_]]
 
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
+  def commitHash: CommitHash
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(ObservationType)(
@@ -81,6 +84,7 @@ trait ObservationMapping[F[_]]
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
+      EffectField("workflow", workflowQueryHandler, List("id", "programId")),
       SqlField("forReview", ObservationView.ForReview),
     )
 
@@ -152,6 +156,19 @@ trait ObservationMapping[F[_]]
         services.useTransactionally {
           configurationService
             .selectRequests(oid)
+        }
+
+    effectHandler(readEnv, calculate)
+  }
+
+  lazy val workflowQueryHandler: EffectHandler[F] = {
+    val readEnv: Env => Result[Unit] = _ => ().success
+
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ObservationWorkflow]] =
+      (_, oid, _) =>
+        services.use { s =>
+          s.observationWorkflowService
+            .getWorkflow(oid, commitHash, itcClient)
         }
 
     effectHandler(readEnv, calculate)
