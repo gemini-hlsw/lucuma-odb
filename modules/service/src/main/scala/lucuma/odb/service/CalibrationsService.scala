@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -29,9 +30,9 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
+import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.gmos.longslit.Config
-import lucuma.odb.service.ConfigForCalibrations.*
+import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
@@ -145,89 +146,49 @@ object CalibrationsService extends CalibrationObservations {
           }
         } else none.pure[F]
 
-      // Filters observations for the supported config types with a valid ITC result
-      private def filterSupportedWithITC(obs: Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
-        obs.toList.collect {
-          case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosNorth, _))) => (oid, mode)
-          case (oid, Right(GeneratorParams(Right(_), mode: Config.GmosSouth, _))) => (oid, mode)
-        }
-
-      // Filters observations for the supported config types with or withot a valid ITC result
-      private def filterSupported(obs: Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]): List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)] =
-        obs.toList.collect {
-          case (oid, Right(GeneratorParams(_, mode: Config.GmosNorth, _))) => (oid, mode)
-          case (oid, Right(GeneratorParams(_, mode: Config.GmosSouth, _))) => (oid, mode)
+      private def collectValid(
+        requiresItcInputs: Boolean
+      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), (Observation.Id, ObservingMode)] =
+        {
+          case (oid, Right(GeneratorParams(itc, mode, _))) if itc.isRight || !requiresItcInputs => (oid, mode)
         }
 
       /**
        * Requests calibrations params for a program id and selection (either science or calibration)
        */
-      private def allObservations(pid: Program.Id, selection: ObservationSelection)(using Transaction[F]): F[Map[Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]]] =
+      private def allObservations(
+        pid:       Program.Id,
+        selection: ObservationSelection
+      )(using Transaction[F]): F[List[(Observation.Id, ObservingMode)]] =
         services
           .generatorParamsService
           .selectAll(pid, selection = selection)
+          .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
 
-      private def uniqueConfiguration(all: List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)]): List[(Observation.Id, ConfigForCalibrations)] = {
-        val gnLSDiff =
-          all.collect {
-            case (oid, mode: Config.GmosNorth) => (oid, mode)
-          }.distinctBy((_, m) =>
-              (m.grating,
-              m.filter,
-              m.fpu,
-              m.centralWavelength,
-              m.xBin,
-              m.yBin
-          )).map {
-            case (oid, c @ Config.GmosNorth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
-              (oid, GmosNConfigs(g, of, f, w, c.xBin, c.yBin))
-          }
+      private def toCalibConfig(all: List[(Observation.Id, ObservingMode)]): List[(Observation.Id, CalibrationConfigSubset)] =
+        all.map(_.map(_.toConfigSubset))
 
-        val gsLSDiff =
-          all.collect {
-            case (oid, mode: Config.GmosSouth) => (oid, mode)
-          }.distinctBy((_, m) =>
-              (m.grating,
-              m.filter,
-              m.fpu,
-              m.centralWavelength,
-              m.xBin,
-              m.yBin
-          )).map {
-            case (oid, c @ Config.GmosSouth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
-              (oid, GmosSConfigs(g, of, f, w, c.xBin, c.yBin))
-          }
+      private def uniqueConfiguration(all: List[(Observation.Id, ObservingMode)]): List[(Observation.Id, CalibrationConfigSubset)] =
+        toCalibConfig(all).distinctBy(_._2)
 
-        gnLSDiff ::: gsLSDiff
-      }
-
-      private def toCalibConfig(all: List[(Observation.Id, Config.GmosNorth | Config.GmosSouth)]): List[(Observation.Id, ConfigForCalibrations)] =
-        all.collect {
-          case (oid, c @ Config.GmosNorth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
-            (oid, GmosNConfigs(g, of, f, w, c.xBin, c.yBin))
-          case (oid, c @ Config.GmosSouth(g, of, f, w, _, _, _, _, _, _, _, _, _)) =>
-            (oid, GmosSConfigs(g, of, f, w, c.xBin, c.yBin))
-        }
-
-      private def calibObservation(calibRole: CalibrationRole, site: Site, pid: Program.Id, gid: Group.Id, configs: List[ConfigForCalibrations], tid: Target.Id)(using Transaction[F]): F[List[Observation.Id]] =
+      private def calibObservation(calibRole: CalibrationRole, site: Site, pid: Program.Id, gid: Group.Id, configs: List[CalibrationConfigSubset], tid: Target.Id)(using Transaction[F]): F[List[Observation.Id]] =
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN  => gnLSSpecPhotoObs(pid, gid, configs.collect { case c: GmosNConfigs => c }, tid)
-              case Site.GS  => gsLSSpecPhotoObs(pid, gid, configs.collect { case c: GmosSConfigs => c }, tid)
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
-            site match {
-              case Site.GN  => gnLSTwilightObs(pid, gid, configs.collect { case c: GmosNConfigs => c }, tid)
-              case Site.GS  => gsLSTwilightObs(pid, gid, configs.collect { case c: GmosSConfigs => c }, tid)
-            }
+            site match
+              case Site.GN => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitTwilightObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
           case _ => List.empty.pure[F]
         }
 
       private def gmosCalibrations(
         pid: Program.Id,
         gid: Group.Id,
-        configs: List[ConfigForCalibrations],
+        configs: List[CalibrationConfigSubset],
         gnCalc: CalibrationIdealTargets,
         gsCalc: CalibrationIdealTargets
       )(using Transaction[F]): F[List[(CalibrationRole, Observation.Id)]] = {
@@ -257,7 +218,7 @@ object CalibrationsService extends CalibrationObservations {
 
       private def generateGMOSLSCalibrations(
         pid: Program.Id,
-        configs: List[ConfigForCalibrations],
+        configs: List[CalibrationConfigSubset],
         gnTgt: CalibrationIdealTargets,
         gsTgt: CalibrationIdealTargets
       )(using Transaction[F]): F[List[Observation.Id]] = {
@@ -277,14 +238,15 @@ object CalibrationsService extends CalibrationObservations {
       }
 
       private def removeUnnecessaryCalibrations(
-        scienceConfigs: List[ConfigForCalibrations],
-        calibrations: List[(Observation.Id, ConfigForCalibrations)]
+        scienceConfigs: List[CalibrationConfigSubset],
+        calibrations:   List[(Observation.Id, CalibrationConfigSubset)]
       )(using Transaction[F]): F[List[Observation.Id]] = {
-        val os = calibrations.collect { case (oid, c) if (!scienceConfigs.exists(_ === c)) => oid }
-        val oids = NonEmptyList.fromList(os)
-        oids
-          .map(oids => observationService.deleteCalibrationObservations(oids).as(oids.toList))
-          .getOrElse(List.empty.pure[F])
+        val oids = NonEmptyList.fromList(
+          calibrations
+            .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
+            .sorted
+        )
+        oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
       }
 
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
@@ -293,22 +255,18 @@ object CalibrationsService extends CalibrationObservations {
             .map(targetCoordinates(referenceInstant))
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] =
-
-        for {
-          tgts              <- calibrationTargets(CalibrationTypes, referenceInstant)
-          gsTgt             = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
-          gnTgt             = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
-          uniqueSci         <- allObservations(pid, ObservationSelection.Science)
-                                .map(filterSupportedWithITC)
-                                .map(uniqueConfiguration)
-          calibObs          <- allObservations(pid, ObservationSelection.Calibration)
-          allCalibs         = filterSupported(calibObs)
-          uniqueCalibs      = uniqueConfiguration(allCalibs)
-          calibs            = toCalibConfig(allCalibs)
-          configs           = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
-          addedOids         <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
-          removedOids       <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
-        } yield (addedOids, removedOids)
+        for
+          tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
+          gsTgt         = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
+          gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
+          uniqueSci    <- allObservations(pid, ObservationSelection.Science).map(uniqueConfiguration)
+          allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
+          uniqueCalibs  = uniqueConfiguration(allCalibs)
+          calibs        = toCalibConfig(allCalibs)
+          configs       = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
+          addedOids    <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
+        yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
       def recalculateCalibrationTarget(
@@ -398,6 +356,4 @@ object CalibrationsService extends CalibrationObservations {
           """.query(observation_id *: calibration_role *: core_timestamp.opt *: observing_mode_type.opt)
 
   }
-
 }
-

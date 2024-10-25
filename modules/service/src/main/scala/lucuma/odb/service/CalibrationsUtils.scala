@@ -7,7 +7,6 @@ import cats.MonadThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -25,14 +24,12 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.CreateObservationInput
-import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
-import lucuma.odb.service.ConfigForCalibrations.*
 import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
@@ -124,47 +121,13 @@ case class CalibrationIdealTargets(
 }
 
 trait CalibrationObservations {
-  def gnLSSpecPhotoObs[F[_]: MonadThrow: Services: Transaction](pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], tid: Target.Id) =
-    gnls.traverse { case GmosNConfigs(g, of, f, w, xb, yb) =>
-      val conf =
-        GmosLongSlitInput.Create.North(
-          grating = g,
-          filter = of,
-          fpu = f,
-          common = GmosLongSlitInput.Create.Common(
-            centralWavelength = w,
-            explicitXBin = xb.some,
-            explicitYBin = yb.some,
-            explicitAmpReadMode = none,
-            explicitAmpGain = none,
-            explicitRoi = GmosRoi.CentralSpectrum.some,
-            explicitλDithers = none,
-            explicitSpatialOffsets = none
-          ))
-
-      specPhotoObservation(pid, gid, tid, w, ObservingModeInput.Create(conf.some, none))
-    }
-
-  def gsLSSpecPhotoObs[F[_]: MonadThrow: Services: Transaction](pid: Program.Id, gid: Group.Id, gsls: List[GmosSConfigs], tid: Target.Id) =
-    gsls.traverse { case GmosSConfigs(g, of, f, w, xb, yb) =>
-      val conf =
-        GmosLongSlitInput.Create.South(
-          grating = g,
-          filter = of,
-          fpu = f,
-          common = GmosLongSlitInput.Create.Common(
-            centralWavelength = w,
-            explicitXBin = xb.some,
-            explicitYBin = yb.some,
-            explicitAmpReadMode = none,
-            explicitAmpGain = none,
-            explicitRoi = GmosRoi.CentralSpectrum.some,
-            explicitλDithers = none,
-            explicitSpatialOffsets = none
-          ))
-
-      specPhotoObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
-    }
+  def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
+    pid:     Program.Id,
+    gid:     Group.Id,
+    tid:     Target.Id,
+    configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
+  ): F[List[Observation.Id]] =
+    configs.traverse(c => specPhotoObservation(pid, gid, tid, c.centralWavelength, c.toLongSlitInput))
 
   def roleConstraints(role: CalibrationRole) =
     role match {
@@ -209,50 +172,15 @@ trait CalibrationObservations {
         )
       ).orError
 
-  def gsLSTwilightObs[F[_]: MonadThrow: Services: Transaction](pid: Program.Id, gid: Group.Id, gsls: List[GmosSConfigs], tid: Target.Id) =
-    gsls.traverse { case GmosSConfigs(g, of, f, w, xb, yb) =>
-      val conf =
-        GmosLongSlitInput.Create.South(
-          grating = g,
-          filter = of,
-          fpu = f,
-          common = GmosLongSlitInput.Create.Common(
-            centralWavelength = w,
-            explicitXBin = xb.some,
-            explicitYBin = yb.some,
-            explicitAmpReadMode = none,
-            explicitAmpGain = none,
-            explicitRoi = GmosRoi.CentralSpectrum.some,
-            explicitλDithers = none,
-            explicitSpatialOffsets = none
-          ))
-
-      twilightObservation(pid, gid, tid, w, ObservingModeInput.Create(none, conf.some))
-    }
-
-  def gnLSTwilightObs[F[_]: MonadThrow: Services: Transaction](pid: Program.Id, gid: Group.Id, gnls: List[GmosNConfigs], tid: Target.Id) =
-    gnls.traverse { case GmosNConfigs(g, of, f, w, xb, yb) =>
-      val conf =
-        GmosLongSlitInput.Create.North(
-          grating = g,
-          filter = of,
-          fpu = f,
-          common = GmosLongSlitInput.Create.Common(
-            centralWavelength = w,
-            explicitXBin = xb.some,
-            explicitYBin = yb.some,
-            explicitAmpReadMode = none,
-            explicitAmpGain = none,
-            explicitRoi = GmosRoi.CentralSpectrum.some,
-            explicitλDithers = none,
-            explicitSpatialOffsets = none
-          ))
-
-      twilightObservation(pid, gid, tid, w, ObservingModeInput.Create(conf.some, none))
-    }
+  def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
+    pid:     Program.Id,
+    gid:     Group.Id,
+    tid:     Target.Id,
+    configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
+  ): F[List[Observation.Id]] =
+    configs.traverse(c => twilightObservation(pid, gid, tid, c.centralWavelength, c.toLongSlitInput))
 
   private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
-
       observationService.createObservation(
         CreateObservationInput(
           programId = pid.some,
