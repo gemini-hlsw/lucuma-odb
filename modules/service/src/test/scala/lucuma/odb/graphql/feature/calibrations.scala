@@ -17,6 +17,8 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -29,6 +31,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
@@ -318,6 +321,78 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
     }
+  }
+
+  test("distinguish read mode") {
+    def update(oid: Observation.Id, readMode: GmosAmpReadMode, gain: GmosAmpGain): IO[Unit] =
+      query(
+        user  = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  gmosNorthLongSlit: {
+                    explicitAmpReadMode: ${readMode.tag.toScreamingSnakeCase}
+                    explicitAmpGain: ${gain.tag.toScreamingSnakeCase}
+                  }
+                }
+              },
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }) {
+              observations {
+                instrument
+              }
+            }
+          }
+        """
+      ).void
+
+    for
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- update(oid1, GmosAmpReadMode.Fast, GmosAmpGain.High)
+
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      _    <- update(oid2, GmosAmpReadMode.Fast, GmosAmpGain.High)
+
+      oid3 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _    <- update(oid3, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+
+      oid4 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid2)
+      _    <- update(oid4, GmosAmpReadMode.Slow, GmosAmpGain.Low)
+
+      _    <- prepareObservation(pi, oid1, tid1) *>
+              prepareObservation(pi, oid2, tid1) *>
+              prepareObservation(pi, oid3, tid2) *>
+              prepareObservation(pi, oid4, tid2)
+
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    yield
+      val oids = gr1.collect { case Right(oid) => oid }
+      val cgid = gr1.collect { case Left(gid) => gid }.headOption
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), _, _) => true
+        case _                             => false
+      }
+      // calibs belong to the calib group
+      val obsGids = ob.collect {
+        case CalibObs(_, Some(gid), _, _, _) => gid
+      }
+      assert(obsGids.forall(g => cgid.exists(_ == g)))
+      assertEquals(cCount, 4)  // one group of 2 for each of (oid1, oid2) and (oid3, oid4)
+      assertEquals(oids.size, 4)
   }
 
   test("specphoto cloud extinction") {
@@ -866,8 +941,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   }
 
   test("events for deleting a calibration observation") {
-    val expectedTargets = List("Feige  34", "Twilight")
-
     for {
       pid  <- createProgram(pi, "foo")
       tid1 <- createTargetAs(pi, pid, "One")
@@ -889,8 +962,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                   Right(recalculateCalibrations(pid).flatMap { case (_, cids) =>
                     a.set(cids)
                   }),
-                expectedF =
-                  (a.get.map(_.zip(expectedTargets).flatMap {case (cid, tn) => List(
+                expectedF = (
+                  a.get.map(_.map: cid =>
                     json"""
                       {
                         "observationEdit" : {
@@ -899,23 +972,27 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                           "value" : null
                         }
                       }
-                    """,
-                    )}).map {
-                      // A twligiht observation is updated, we'll hardcode this
-                      case List(a, b) => a :: json"""{
-                                                      "observationEdit" : {
-                                                        "observationId" : $rd,
-                                                        "editType" : "UPDATED",
-                                                        "value" : {
-                                                          "id" : $rd,
-                                                          "title": "Twilight"
-                                                        }
-                                                      }
-                                                    }
-                                                  """ :: b :: Nil
-                      case l => l
-                    },
-                  a.get.map(_.reverse.zip(expectedTargets).flatMap {case (cid, tn) => List(
+                    """
+                  ).map {
+                     // A twligiht observation is updated, we'll hardcode this
+                     case List(a, b) => a :: json"""{
+                                                     "observationEdit" : {
+                                                       "observationId" : $rd,
+                                                       "editType" : "UPDATED",
+                                                       "value" : {
+                                                         "id" : $rd,
+                                                         "title": "Twilight"
+                                                       }
+                                                     }
+                                                   }
+                                                 """ :: b :: Nil
+                     case l => l
+                  },
+                  // N.B. for the deletion events the order isn't guaranteed
+                  // because, I think, the DELETE FROM t_observation WHERE c_observation_id IN (...)
+                  // can delete the calibrations in any order.  Unfortunately
+                  // we expect the events in a particular order though.
+                  a.get.map(_.map: cid =>
                     json"""
                       {
                         "observationEdit" : {
@@ -924,8 +1001,9 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                           "value" : null
                         }
                       }
-                    """,
-                  )})).mapN(_ ::: _)
+                    """
+                  )
+                ).mapN(_ ::: _)
               )
     } yield ()
   }
