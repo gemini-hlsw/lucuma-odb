@@ -10,8 +10,6 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.ObsAttachment
@@ -38,8 +36,6 @@ object ObservationPropertiesInput {
 
   final case class Create(
     subtitle:            Option[NonEmptyString],
-    status:              Option[ObsStatus],
-    activeStatus:        Option[ObsActiveStatus],
     scienceBand:         Option[ScienceBand],
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Create],
@@ -52,7 +48,6 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
-    forReview:           Option[Boolean],
   ) extends AsterismInput
 
   object Create {
@@ -63,8 +58,6 @@ object ObservationPropertiesInput {
     val Default: Create =
       Create(
         subtitle            = Option.empty,
-        status              = ObsStatus.New.some,
-        activeStatus        = ObsActiveStatus.Active.some,
         scienceBand         = None,
         posAngleConstraint  = None,
         targetEnvironment   = None,
@@ -77,15 +70,12 @@ object ObservationPropertiesInput {
         group               = None,
         groupIndex          = None,
         observerNotes       = None,
-        forReview           = None,
       )
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
           NonEmptyStringBinding.Option("subtitle", rSubtitle),
-          ObsStatusBinding.Option("status", rObsStatus),
-          ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           ScienceBandBinding.Option("scienceBand", rScienceBand),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
           TargetEnvironmentInput.Create.Binding.Option("targetEnvironment", rTargetEnvironment),
@@ -98,11 +88,8 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
-          BooleanBinding.Option("forReview", rForReview)
         ) =>
           (rSubtitle,
-            rObsStatus,
-            rObsActiveStatus,
             rScienceBand,
             rPosAngleConstraint,
             rTargetEnvironment,
@@ -115,7 +102,6 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
-            rForReview,
           ).parMapN(Create.apply)
       }
 
@@ -123,8 +109,6 @@ object ObservationPropertiesInput {
 
   final case class Edit(
     subtitle:            Nullable[NonEmptyString],
-    status:              Option[ObsStatus],
-    activeStatus:        Option[ObsActiveStatus],
     scienceBand:         Nullable[ScienceBand],
     posAngleConstraint:  Option[PosAngleConstraintInput],
     targetEnvironment:   Option[TargetEnvironmentInput.Edit],
@@ -137,7 +121,6 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
-    forReview:           Option[Boolean],
   ) extends AsterismInput
 
   object Edit {
@@ -145,8 +128,6 @@ object ObservationPropertiesInput {
     val Empty: Edit =
       Edit(
         subtitle =           Nullable.Absent,
-        status =             None,
-        activeStatus =       None,
         scienceBand =        Nullable.Absent,
         posAngleConstraint = None,
         targetEnvironment =  None,
@@ -159,15 +140,12 @@ object ObservationPropertiesInput {
         group =              Nullable.Absent,
         groupIndex =         None,
         observerNotes =      Nullable.Absent,
-        forReview =          None,
       )
 
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
         case List(
           NonEmptyStringBinding.Nullable("subtitle", rSubtitle),
-          ObsStatusBinding.Option("status", rObsStatus),
-          ObsActiveStatusBinding.Option("activeStatus", rObsActiveStatus),
           ScienceBandBinding.Nullable("scienceBand", rScienceBand),
           PosAngleConstraintInput.Binding.Option("posAngleConstraint", rPosAngleConstraint),
           TargetEnvironmentInput.Edit.Binding.Option("targetEnvironment", rTargetEnvironment),
@@ -180,11 +158,8 @@ object ObservationPropertiesInput {
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
-          BooleanBinding.Option("forReview", rForReview)
         ) =>
           (rSubtitle,
-            rObsStatus,
-            rObsActiveStatus,
             rScienceBand,
             rPosAngleConstraint,
             rTargetEnvironment,
@@ -197,7 +172,6 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
-            rForReview,
           ).parMapN(apply)
       }
   }

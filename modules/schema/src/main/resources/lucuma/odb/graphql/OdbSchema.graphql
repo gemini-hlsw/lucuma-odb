@@ -3184,16 +3184,6 @@ input ObservationPropertiesInput {
   subtitle: NonEmptyString
 
   """
-  The observation status will default to New if not specified when an observation is created and may be edited but not deleted
-  """
-  status: ObsStatus
-
-  """
-  The observation active status will default to Active if not specified when an observation is created and may be edited but not deleted
-  """
-  activeStatus: ObsActiveStatus
-
-  """
   The science band to assign to this observation.  Set to `null` to remove the
   science band.
   """
@@ -3253,11 +3243,6 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
-
-  """
-  Sets the "for review" bit.
-  """
-  forReview: Boolean
   
 }
 
@@ -8497,16 +8482,6 @@ type Observation {
   subtitle: NonEmptyString
 
   """
-  Observation status
-  """
-  status: ObsStatus! @deprecated
-
-  """
-  Observation operational status
-  """
-  activeStatus: ObsActiveStatus! @deprecated
-
-  """
   Observations are associated with a science band once time has been allocated
   to a program.
   """
@@ -8584,11 +8559,6 @@ type Observation {
   itc: Itc!
 
   """
-  A list of observation validation problems
-  """
-  validations: [ObservationValidation!]! @deprecated
-
-  """
   Enclosing group, if any.
   """
   groupId: GroupId
@@ -8617,12 +8587,6 @@ type Observation {
   Program configuration requests applicable to this observation.
   """
   configurationRequests: [ConfigurationRequest!]!
-
-  """
-  This flag is set to true prior to Phase II, and must be reset to false by the PI prior to observation. The
-  intent is to prompt PIs to review their accepted observations.
-  """
-  forReview: Boolean! @deprecated
 
 
   workflow: ObservationWorkflow!
@@ -12554,24 +12518,9 @@ input WhereObservation {
   subtitle: WhereOptionString
 
   """
-  Matches the observation status.
-  """
-  status: WhereOrderObsStatus
-
-  """
-  Matches the observation active status.
-  """
-  activeStatus: WhereOrderObsActiveStatus
-
-  """
   Matches the observation science band.
   """
   scienceBand: WhereOptionOrderScienceBand
-
-  """
-  Matches the "for review" bit.
-  """
-  forReview: WhereBoolean
 
 }
 
@@ -13396,101 +13345,6 @@ input WhereOrderLong {
   Matches if the Long is ordered before or equal (<=) the supplied value.
   """
   LTE: Long
-}
-
-"""
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
-"""
-input WhereOrderObsActiveStatus {
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: ObsActiveStatus
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: ObsActiveStatus
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [ObsActiveStatus!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [ObsActiveStatus!]
-
-  """
-  Matches if the property is ordered after (>) the supplied value.
-  """
-  GT: ObsActiveStatus
-
-  """
-  Matches if the property is ordered before (<) the supplied value.
-  """
-  LT: ObsActiveStatus
-
-  """
-  Matches if the property is ordered after or equal (>=) the supplied value.
-  """
-  GTE: ObsActiveStatus
-
-  """
-  Matches if the property is ordered before or equal (<=) the supplied value.
-  """
-  LTE: ObsActiveStatus
-}
-
-"""
-Filters on equality or order comparisons of the property.  All supplied
-criteria must match, but usually only one is selected.  E.g., 'GT = 2'
-for an integer property will match when the value is 3 or more.
-
-"""
-input WhereOrderObsStatus {
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: ObsStatus
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: ObsStatus
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [ObsStatus!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [ObsStatus!]
-
-  """
-  Matches if the property is ordered after (>) the supplied value.
-  """
-  GT: ObsStatus
-
-  """
-  Matches if the property is ordered before (<) the supplied value.
-  """
-  LT: ObsStatus
-
-  """
-  Matches if the property is ordered after or equal (>=) the supplied value.
-  """
-  GTE: ObsStatus
-
-  """
-  Matches if the property is ordered before or equal (<=) the supplied value.
-  """
-  LTE: ObsStatus
 }
 
 """

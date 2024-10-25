@@ -11,9 +11,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.ObsActiveStatus.Inactive
-import lucuma.core.enums.ObsStatus.Approved
-import lucuma.core.enums.ObsStatus.New
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -131,99 +128,99 @@ class programPlannedTime extends ExecutionTestSupport {
 
   }
 
-  test("program level: single complete, but 'New' observation") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = New)
-      } yield p
+  // test("program level: single complete, but 'New' observation") {
+  //   val setup: IO[Program.Id] =
+  //     for {
+  //       p <- createProgram
+  //       t <- createTargetWithProfileAs(user, p)
+  //       _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = New)
+  //     } yield p
 
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
+  //   setup.flatMap { pid =>
+  //     expect(
+  //       user  = user,
+  //       query =
+  //         s"""
+  //            query {
+  //              program(programId: "$pid") {
+  //                timeEstimateRange {
+  //                  minimum { total { seconds } }
+  //                  maximum { total { seconds } }
+  //                }
+  //              }
+  //            }
+  //          """,
+  //       expected = Right(
+  //         json"""
+  //           {
+  //             "program": {
+  //               "timeEstimateRange": {
+  //                 "minimum": {
+  //                   "total" : {
+  //                       "seconds" : 0.000000
+  //                   }
+  //                 },
+  //                 "maximum": {
+  //                   "total" : {
+  //                       "seconds" : 0.000000
+  //                   }
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         """
+  //       )
+  //     )
+  //   }
 
-  }
+  // }
 
-  test("program level: single complete, but 'Inactive' observation") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = Approved, activeStatus = Inactive)
-      } yield p
+  // test("program level: single complete, but 'Inactive' observation") {
+  //   val setup: IO[Program.Id] =
+  //     for {
+  //       p <- createProgram
+  //       t <- createTargetWithProfileAs(user, p)
+  //       _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = Approved, activeStatus = Inactive)
+  //     } yield p
 
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
+  //   setup.flatMap { pid =>
+  //     expect(
+  //       user  = user,
+  //       query =
+  //         s"""
+  //            query {
+  //              program(programId: "$pid") {
+  //                timeEstimateRange {
+  //                  minimum { total { seconds } }
+  //                  maximum { total { seconds } }
+  //                }
+  //              }
+  //            }
+  //          """,
+  //       expected = Right(
+  //         json"""
+  //           {
+  //             "program": {
+  //               "timeEstimateRange": {
+  //                 "minimum": {
+  //                   "total" : {
+  //                       "seconds" : 0.000000
+  //                   }
+  //                 },
+  //                 "maximum": {
+  //                   "total" : {
+  //                       "seconds" : 0.000000
+  //                   }
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         """
+  //       )
+  //     )
+  //   }
 
-  }
+  // }
 
   test("program level: two complete observations") {
     val setup: IO[Program.Id] =

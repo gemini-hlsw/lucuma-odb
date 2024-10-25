@@ -9,8 +9,6 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.*
@@ -22,10 +20,7 @@ object WhereObservation {
     val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "id", ObservationIdBinding)
     val WhereReferenceBinding = WhereObservationReference.binding(path / "reference")
     val WhereProgramBinding = WhereProgram.binding(path / "program")
-    val StatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ObsStatus])
-    val ActiveStatusBinding = WhereOrder.binding(path / "activeStatus", enumeratedBinding[ObsActiveStatus])
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
-    val ForReviewBinding = WhereOptionBoolean.binding(path / "forReview", BooleanBinding)
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -37,13 +32,10 @@ object WhereObservation {
         WhereReferenceBinding.Option("reference", rRef),
         WhereProgramBinding.Option("program", rProgram),
         SubtitleBinding.Option("subtitle", rSubtitle),
-        StatusBinding.Option("status", rStatus),
-        ActiveStatusBinding.Option("activeStatus", rActiveStatus),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
-        ForReviewBinding.Option("forReview", rForReview),
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rStatus, rActiveStatus, rScienceBand, rForReview).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, status, activeStatus, scienceBand, forReview) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -52,10 +44,7 @@ object WhereObservation {
               ref,
               program,
               subtitle,
-              status,
-              activeStatus,
               scienceBand,
-              forReview
             ).flatten)
         }
     }

@@ -124,9 +124,7 @@ class ShortCut_2772 extends ExecutionTestSupport {
                      nanometers: 500
                    }
                  }
-               },
-               status: APPROVED,
-               activeStatus: ACTIVE
+               }
              }
            }) {
              observation {

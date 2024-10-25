@@ -323,17 +323,11 @@ trait Codecs {
       b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
     )(_.toBoolean)
 
-  val obs_active_status: Codec[ObsActiveStatus] =
-    enumerated(Type("e_obs_active_status"))
-
   val obs_attachment_id: Codec[ObsAttachment.Id] =
     gid[ObsAttachment.Id]
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
-
-  val obs_status: Codec[ObsStatus] =
-    enumerated(Type("e_obs_status"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]

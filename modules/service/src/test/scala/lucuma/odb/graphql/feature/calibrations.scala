@@ -915,7 +915,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                                                   """ :: b :: Nil
                       case l => l
                     },
-                  a.get.map(_.reverse.zip(expectedTargets).flatMap {case (cid, tn) => List(
+                  a.get.map(_.zip(expectedTargets).flatMap {case (cid, tn) => List(
                     json"""
                       {
                         "observationEdit" : {
