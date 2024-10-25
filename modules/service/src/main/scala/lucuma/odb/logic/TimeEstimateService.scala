@@ -15,7 +15,6 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
-import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -76,7 +75,7 @@ object TimeEstimateService {
       itcClient: ItcClient[F]
     )(using Services[F], Transaction[F]): F[Map[Observation.Id, ObservationData]] =
       for {
-        p <- generatorParamsService.selectAll(pid, ObsStatus.Included)
+        p <- generatorParamsService.selectAll(pid /*, ObsStatus.Included*/)
         pʹ = p.collect { case (oid, Right(gp)) => (oid, gp) }
         i <- itcService(itcClient).selectAll(pid, pʹ)
         d <- executionDigestService.selectAll(pid)

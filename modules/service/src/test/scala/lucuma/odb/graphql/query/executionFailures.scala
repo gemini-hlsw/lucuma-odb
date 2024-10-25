@@ -10,8 +10,6 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -39,9 +37,7 @@ class executionFailures extends ExecutionTestSupport {
             fpu: LONG_SLIT_0_50,
             centralWavelength: { nanometers: 666 }
           }
-        """,
-        ObsStatus.Approved,
-        ObsActiveStatus.Active
+        """
       )
 
     val setup: IO[Observation.Id] =
