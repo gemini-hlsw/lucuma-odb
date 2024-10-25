@@ -941,8 +941,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   }
 
   test("events for deleting a calibration observation") {
-    val expectedTargets = List("Feige  34", "Twilight")
-
     for {
       pid  <- createProgram(pi, "foo")
       tid1 <- createTargetAs(pi, pid, "One")
@@ -964,8 +962,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                   Right(recalculateCalibrations(pid).flatMap { case (_, cids) =>
                     a.set(cids)
                   }),
-                expectedF =
-                  (a.get.map(_.zip(expectedTargets).flatMap {case (cid, tn) => List(
+                expectedF = (
+                  a.get.map(_.map: cid =>
                     json"""
                       {
                         "observationEdit" : {
@@ -974,23 +972,27 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                           "value" : null
                         }
                       }
-                    """,
-                    )}).map {
-                      // A twligiht observation is updated, we'll hardcode this
-                      case List(a, b) => a :: json"""{
-                                                      "observationEdit" : {
-                                                        "observationId" : $rd,
-                                                        "editType" : "UPDATED",
-                                                        "value" : {
-                                                          "id" : $rd,
-                                                          "title": "Twilight"
-                                                        }
-                                                      }
-                                                    }
-                                                  """ :: b :: Nil
-                      case l => l
-                    },
-                  a.get.map(_.map { cid =>
+                    """
+                  ).map {
+                     // A twligiht observation is updated, we'll hardcode this
+                     case List(a, b) => a :: json"""{
+                                                     "observationEdit" : {
+                                                       "observationId" : $rd,
+                                                       "editType" : "UPDATED",
+                                                       "value" : {
+                                                         "id" : $rd,
+                                                         "title": "Twilight"
+                                                       }
+                                                     }
+                                                   }
+                                                 """ :: b :: Nil
+                     case l => l
+                  },
+                  // N.B. for the deletion events the order isn't guaranteed
+                  // because, I think, the DELETE FROM t_observation WHERE c_observation_id IN (...)
+                  // can delete the calibrations in any order.  Unfortunately
+                  // we expect the events in a particular order though.
+                  a.get.map(_.map: cid =>
                     json"""
                       {
                         "observationEdit" : {
@@ -1000,7 +1002,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                         }
                       }
                     """
-                  })).mapN(_ ::: _)
+                  )
+                ).mapN(_ ::: _)
               )
     } yield ()
   }

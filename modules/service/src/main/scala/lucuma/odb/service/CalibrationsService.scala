@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
@@ -238,13 +239,14 @@ object CalibrationsService extends CalibrationObservations {
 
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
-        calibrations: List[(Observation.Id, CalibrationConfigSubset)]
+        calibrations:   List[(Observation.Id, CalibrationConfigSubset)]
       )(using Transaction[F]): F[List[Observation.Id]] = {
-        val os = calibrations.collect { case (oid, c) if (!scienceConfigs.exists(_ === c)) => oid }
-        val oids = NonEmptyList.fromList(os)
-        oids
-          .map(oids => observationService.deleteCalibrationObservations(oids).as(oids.toList))
-          .getOrElse(List.empty.pure[F])
+        val oids = NonEmptyList.fromList(
+          calibrations
+            .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
+            .sorted
+        )
+        oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
       }
 
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
