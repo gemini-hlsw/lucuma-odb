@@ -22,7 +22,6 @@ import cats.syntax.option.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
@@ -74,7 +73,7 @@ trait GeneratorParamsService[F[_]] {
 
   def selectAll(
     programId: Program.Id,
-    minStatus: ObsStatus = ObsStatus.New,
+    // minStatus: ObsStatus = ObsStatus.New,
     selection: ObservationSelection = ObservationSelection.All
   )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
@@ -134,10 +133,10 @@ object GeneratorParamsService {
 
       override def selectAll(
         pid:       Program.Id,
-        minStatus: ObsStatus,
+        // minStatus: ObsStatus,
         selection: ObservationSelection
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
-        doSelect(selectAllParams(pid, minStatus, selection))
+        doSelect(selectAllParams(pid, /*minStatus,*/ selection))
 
       private def doSelect(
         params: F[List[ParamsRow]]
@@ -163,10 +162,10 @@ object GeneratorParamsService {
 
       private def selectAllParams(
         pid:       Program.Id,
-        minStatus: ObsStatus,
+        // minStatus: ObsStatus,
         selection: ObservationSelection
       ): F[List[ParamsRow]] =
-        executeSelect(Statements.selectAllParams(user, pid, minStatus, selection))
+        executeSelect(Statements.selectAllParams(user, pid, /*minStatus,*/ selection))
 
       private def executeSelect(af: AppliedFragment): F[List[ParamsRow]] =
         session
@@ -369,7 +368,7 @@ object GeneratorParamsService {
     def selectAllParams(
       user:      User,
       programId: Program.Id,
-      minStatus: ObsStatus,
+      // minStatus: ObsStatus,
       selection: ObservationSelection
     ): AppliedFragment = {
       val selector = selection match
@@ -386,8 +385,8 @@ object GeneratorParamsService {
       """(Void) |+|
         sql"""gp.c_program_id = $program_id""".apply(programId)    |+|
         void""" AND ob.c_existence = 'present' """                 |+|
-        sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
-        void""" AND ob.c_active_status = 'active' """              |+|
+        // sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
+        // void""" AND ob.c_active_status = 'active' """              |+|
         selector                                                   |+|
         existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }

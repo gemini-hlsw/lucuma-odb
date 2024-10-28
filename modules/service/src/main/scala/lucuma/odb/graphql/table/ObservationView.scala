@@ -19,8 +19,6 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val Title: ColumnRef               = col("c_title",                text_nonempty)
       val Subtitle: ColumnRef            = col("c_subtitle",             text_nonempty.opt)
       val Instrument: ColumnRef          = col("c_instrument",           instrument.opt)
-      val Status: ColumnRef              = col("c_status",               obs_status)
-      val ActiveStatus: ColumnRef        = col("c_active_status",        obs_active_status)
       val ScienceBand: ColumnRef         = col("c_science_band",         science_band.opt)
       val ObservationTime: ColumnRef     = col("c_observation_time",     core_timestamp.opt)
       val AsterismGroup: ColumnRef       = col("c_asterism_group",       jsonb)
@@ -28,8 +26,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val GroupIndex: ColumnRef          = col("c_group_index",          int2_nonneg)
       val CalibrationRole: ColumnRef     = col("c_calibration_role",     calibration_role.opt)
       val ObserverNotes: ColumnRef       = col("c_observer_notes",       text_nonempty.opt)
-      val ReferenceTime: ColumnRef       = col("c_reference_time",     core_timestamp.opt)
-      val ForReview: ColumnRef           = col("c_for_review",           bool)
+      val ReferenceTime: ColumnRef       = col("c_reference_time",       core_timestamp.opt)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)

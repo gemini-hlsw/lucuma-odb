@@ -19,7 +19,6 @@ import grackle.syntax.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
-import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
@@ -59,8 +58,6 @@ trait ObservationMapping[F[_]]
       SqlField("index", ObservationView.ObservationIndex),
       SqlField("title", ObservationView.Title),
       SqlField("subtitle", ObservationView.Subtitle),
-      SqlField("status", ObservationView.Status),
-      SqlField("activeStatus", ObservationView.ActiveStatus),
       SqlField("scienceBand", ObservationView.ScienceBand),
       SqlField("observationTime", ObservationView.ObservationTime),
       SqlObject("observationDuration"),
@@ -76,7 +73,6 @@ trait ObservationMapping[F[_]]
       SqlField("instrument", ObservationView.Instrument),
       SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
       EffectField("itc", itcQueryHandler, List("id", "programId")),
-      EffectField("validations", validationsQueryHandler, List("id", "programId")),
       SqlObject("execution"),
       SqlField("groupId", ObservationView.GroupId),
       SqlField("groupIndex", ObservationView.GroupIndex),
@@ -85,7 +81,6 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       EffectField("workflow", workflowQueryHandler, List("id", "programId")),
-      SqlField("forReview", ObservationView.ForReview),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -130,19 +125,6 @@ trait ObservationMapping[F[_]]
               case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
               case Right(s)                              => s.success
             }
-        }
-
-    effectHandler(readEnv, calculate)
-  }
-
-  def validationsQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
-
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ObservationValidation]]] =
-      (pid, oid, _) =>
-        services.useTransactionally {
-          observationWorkflowService
-            .observationValidations(oid, itcClient)
         }
 
     effectHandler(readEnv, calculate)

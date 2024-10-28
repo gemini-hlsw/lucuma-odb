@@ -12,7 +12,6 @@ import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObsActiveStatus
 import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
@@ -46,7 +45,6 @@ import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import java.time.Duration
@@ -54,11 +52,6 @@ import java.time.Duration
 import Services.Syntax.*
 
 sealed trait ObservationWorkflowService[F[_]] {
-
-  def observationValidations(
-    oid: Observation.Id,
-    itcClient: ItcClient[F],
-  )(using Transaction[F]): F[Result[List[ObservationValidation]]]
 
   def getWorkflow(
     oid: Observation.Id, 
@@ -75,16 +68,11 @@ case class ObservationValidationInfo(
   instrument: Option[Instrument],
   ra: Option[RightAscension],
   dec: Option[Declination],
-  forReview: Boolean,
   role: Option[CalibrationRole],
   proposalStatus: Tag,
-  activeStatus: ObsActiveStatus,
   cfpid: Option[CallForProposals.Id],
 ) {
   
-  def isMarkedReady: Boolean = 
-    false // TODO
-
   /* Has the proposal been accepted? */
   def isAccepted(using enums: Enums): Result[Boolean] =
     Result.fromOption(
@@ -102,7 +90,6 @@ object ObservationWorkflowService {
     
     val AsterismOutOfRange     = "Asterism out of Call for Proposals limits."
     val ExplicitBaseOutOfRange = "Explicit base out of Call for Proposals limits."
-    val ConfigurationForReview = "Observation must be reviewed prior to execution."
 
     def invalidInstrument(instr: Instrument): String = 
       s"Instrument $instr not part of Call for Proposals."
@@ -198,8 +185,7 @@ object ObservationWorkflowService {
             valInstr        <- validateInstrument(cid, info.instrument)
             explicitBase     = (info.ra, info.dec).tupled
             valRaDec        <- validateRaDec(info, cid, explicitBase)
-            valForactivation = Option.when(info.forReview)(ObservationValidation.configuration(Messages.ConfigurationForReview))
-          yield ObservationValidationMap.fromList(List(valInstr, valRaDec, valForactivation).flatten)
+          yield ObservationValidationMap.fromList(List(valInstr, valRaDec).flatten)
 
       private def validateInstrument(cid: CallForProposals.Id, optInstr: Option[Instrument]): F[Option[ObservationValidation]] = {
         // If there is no instrument in the observation, that will get caught with the generatorValidations
@@ -293,12 +279,9 @@ object ObservationWorkflowService {
                    ObservationValidationCode.ConfigurationRequestPending      => Unapproved
               
           def userStatus(validationStatus: ValidationState): Option[UserState] =
-            info.activeStatus match
-              case ObsActiveStatus.Inactive => Some(Inactive)
-              case ObsActiveStatus.Active   => 
-                val ready = info.isMarkedReady || info.role.isDefined // calibrations are always ready
-                Option.when(ready && validationStatus == Defined)(Ready)
-
+            if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
+            else None // TODO
+ 
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
           val state: ObservationWorkflowState =
@@ -356,12 +339,6 @@ object ObservationWorkflowService {
 
         }
 
-      override def observationValidations(
-        oid: Observation.Id,
-        itcClient: ItcClient[F]
-      )(using Transaction[F]): F[Result[List[ObservationValidation]]] =
-        ResultT.liftF(obsInfo(oid)).flatMap(observationValidationsImpl(_, itcClient)).value
-
       // split this off because it can be done togther in one transaction
       private def getObsInfoAndOtherStuff(
         oid: Observation.Id,
@@ -408,17 +385,15 @@ object ObservationWorkflowService {
           o.c_instrument,
           o.c_explicit_ra,
           o.c_explicit_dec,
-          o.c_for_review,
           o.c_calibration_role,
           p.c_proposal_status,
-          o.c_active_status,
           x.c_cfp_id
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
         LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
         WHERE c_observation_id = $observation_id
       """
-      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: bool *: calibration_role.opt *: tag *: obs_active_status *: cfp_id.opt)
+      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: tag *: cfp_id.opt)
       .to[ObservationValidationInfo]
 
 
