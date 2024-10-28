@@ -4,10 +4,12 @@
 package lucuma.odb.service
 
 import cats.Eq
+import cats.Order
 import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.Validated
 import cats.data.ValidatedNel
+import cats.derived.*
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
@@ -52,7 +54,7 @@ import skunk.implicits.*
 import GeneratorParamsService.Error
 import Services.Syntax.*
 
-enum ObservationSelection:
+enum ObservationSelection derives Order:
   case All
   case Science
   case Calibration
