@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import lucuma.core.math.Offset
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -37,26 +38,26 @@ object TimeEstimateCalculator:
    * take requires information about what has happened in previous steps.
    *
    * @param gcal    last GCAL configuration, if any
-   * @param science last science step configuration, if any
    * @param step    last step in general, if any
-   *
+    *
    * @tparam D instrument dynamic configuration type
    */
   final case class Last[D](
     gcal:    Option[StepConfig.Gcal],
-    science: Option[StepConfig.Science],
     step:    Option[ProtoStep[D]]
   ):
 
+    def offset: Offset =
+      step.map(_.telescopeConfig.offset).getOrElse(Offset.Zero)
+
     def next(step: ProtoStep[D]): Last[D] =
       step.stepConfig match
-        case g@StepConfig.Gcal(_, _, _, _) => Last(g.some, science, step.some)
-        case s@StepConfig.Science(_, _)    => Last(gcal, s.some, step.some)
+        case g@StepConfig.Gcal(_, _, _, _) => Last(g.some, step.some)
         case _                             => copy(step = step.some)
 
   object Last:
     def empty[D]: Last[D] =
-      Last(none, none, none)
+      Last(none, none)
 
   def estimateTimeSpan[S, D](
     calc:   TimeEstimateCalculator[S, D],

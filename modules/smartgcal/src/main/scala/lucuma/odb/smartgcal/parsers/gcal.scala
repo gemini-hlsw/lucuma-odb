@@ -13,8 +13,7 @@ import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.model.sequence.StepConfig.Gcal
 
-
-trait GcalParsers {
+trait GcalParsers:
 
   import common.columnSep
   import util.*
@@ -78,9 +77,5 @@ trait GcalParsers {
     ).map { case (((filter, diffuser), lamp), shutter) =>
       Gcal(lamp, filter, diffuser, shutter)
     }
-
-
-
-}
 
 object gcal extends GcalParsers

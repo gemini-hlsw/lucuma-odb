@@ -14,6 +14,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.sequence.syntax.qastate.*
@@ -24,6 +25,7 @@ case class StepRecord[D](
   visitId:          Visit.Id,
   index:            PosInt,
   stepConfig:       StepConfig,
+  telescopeConfig:  TelescopeConfig,
   instrument:       Instrument,
   instrumentConfig: D,
   created:          Timestamp,
@@ -44,7 +46,7 @@ case class StepRecord[D](
       executionState.fold(false, false, true)
 
   def protoStep: ProtoStep[D] =
-    ProtoStep(instrumentConfig, stepConfig, observeClass)
+    ProtoStep(instrumentConfig, stepConfig, telescopeConfig, observeClass)
 
   def isGcal: Boolean =
     stepConfig.stepType === StepType.Gcal

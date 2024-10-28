@@ -217,6 +217,7 @@ object OdbMapping {
           with TargetGroupMapping[F]
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
+          with TelescopeConfigMapping[F]
           with TimeChargeCorrectionMapping[F]
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
@@ -422,6 +423,7 @@ object OdbMapping {
                 TargetGroupSelectResultMapping,
                 TargetMapping,
                 TargetSelectResultMapping,
+                TelescopeConfigMapping,
                 TimeChargeCorrectionMapping,
                 TimeChargeDaylightDiscountMapping,
                 TimeChargeNoDataDiscountMapping,

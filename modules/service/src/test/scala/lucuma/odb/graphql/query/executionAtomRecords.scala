@@ -21,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.json.gmos.given
@@ -556,7 +557,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Acquisition)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), scienceStep(0, 0))
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Acquisition)
     } yield assertEquals(ga0, ga1)
@@ -570,7 +571,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Science)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), scienceStep(0, 0))
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Science)
     } yield assertEquals(ga0, ga1)
