@@ -49,6 +49,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 
 import scala.collection.immutable.SortedMap
+import lucuma.core.enums.ObservationWorkflowState
 
 class createObservation extends OdbSuite {
 
@@ -449,64 +450,6 @@ class createObservation extends OdbSuite {
       }
   }
 
-  // test("[general] created ready observation must have a science band") {
-  //   createProgramAs(pi)
-  //     .flatTap(pid => setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))
-  //     .flatMap { pid =>
-  //       query(pi,
-  //         s"""
-  //           mutation {
-  //             createObservation(input: {
-  //               programId: ${pid.asJson}
-  //               SET: {
-  //                 scienceBand: BAND2
-  //                 status: READY
-  //               }
-  //             }) {
-  //               observation {
-  //                 scienceBand
-  //                 status
-  //               }
-  //             }
-  //           }
-  //           """).flatMap { js =>
-  //         val get = js.hcursor
-  //           .downField("createObservation")
-  //           .downField("observation")
-  //           .downField("scienceBand")
-  //           .as[Option[ScienceBand]]
-  //           .leftMap(f => new RuntimeException(f.message))
-  //           .liftTo[IO]
-  //         assertIO(get, ScienceBand.Band2.some)
-  //       }
-  //     }
-  // }
-
-  // test("[general] created ready observation must fail without a science band") {
-  //   createProgramAs(pi)
-  //     .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan), AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 1.hourTimeSpan))))
-  //     .flatMap { pid =>
-  //       expect(pi,
-  //         s"""
-  //           mutation {
-  //             createObservation(input: {
-  //               programId: ${pid.asJson}
-  //               SET: {
-  //                 status: READY
-  //               }
-  //             }) {
-  //               observation {
-  //                 scienceBand
-  //                 status
-  //               }
-  //             }
-  //           }
-  //         """,
-  //         List(ObservationService.MissingScienceBandConstraint.message).asLeft
-  //       )
-  //     }
-  // }
-
   test("[general] create observation with a single science band allocation") {
     createProgramAs(pi)
       .flatTap(pid => setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan))))
@@ -571,34 +514,34 @@ class createObservation extends OdbSuite {
       }
   }
 
-  // test("[general] created observation should have specified active status") {
-  //   createProgramAs(pi).flatMap { pid =>
-  //     query(pi,
-  //       s"""
-  //         mutation {
-  //           createObservation(input: {
-  //             programId: ${pid.asJson}
-  //             SET: {
-  //               activeStatus: INACTIVE
-  //             }
-  //           }) {
-  //             observation {
-  //               activeStatus
-  //             }
-  //           }
-  //         }
-  //         """).flatMap { js =>
-  //       val get = js.hcursor
-  //         .downField("createObservation")
-  //         .downField("observation")
-  //         .downField("activeStatus")
-  //         .as[ObsActiveStatus]
-  //         .leftMap(f => new RuntimeException(f.message))
-  //         .liftTo[IO]
-  //       assertIO(get, ObsActiveStatus.Inactive)
-  //     }
-  //   }
-  // }
+  test("[general] new observation without definition should be UNDEFINED") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                workflow {
+                  state
+                }
+              }
+            }
+          }
+          """).flatMap { js =>
+        val get = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("workflow")
+          .downField("state")
+          .as[ObservationWorkflowState]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(get, ObservationWorkflowState.Undefined)
+      }
+    }
+  }
 
   test("[general] created observation has no explicit base by default") {
     createProgramAs(pi).flatMap { pid =>
