@@ -1778,62 +1778,6 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 
-  // test("constraint set: ready but no science band") {
-  //   oneUpdateTest(
-  //     user   = pi,
-  //     update = """
-  //       status: READY
-  //     """,
-  //     query = """
-  //       observations {
-  //         status
-  //       }
-  //     """,
-  //     expected = ObservationService.MissingScienceBandConstraint.message.asLeft
-  //   )
-  // }
-
-  // test("constraint set: science band / ready set together") {
-  //   for
-  //     pid <- createProgramAs(pi)
-  //     _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan)
-  //     oid <- createObservationAs(pi, pid)
-  //     _   <- expect(
-  //       user   = pi,
-  //       query = s"""
-  //         mutation {
-  //           updateObservations(input: {
-  //             SET: {
-  //               status: READY
-  //               scienceBand: BAND1
-  //             },
-  //             WHERE: {
-  //               id: { EQ: "$oid" }
-  //             }
-  //           }) {
-  //             observations {
-  //               status
-  //               scienceBand
-  //             }
-  //           }
-  //         }
-  //       """,
-  //       expected = json"""
-  //         {
-  //           "updateObservations": {
-  //             "observations": [
-  //               {
-  //                 "status": "READY",
-  //                 "scienceBand": "BAND1"
-  //               }
-  //             ]
-  //           }
-  //         }
-  //       """.asRight
-  //     )
-  //   yield ()
-  // }
-
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
