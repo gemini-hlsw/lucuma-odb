@@ -23,9 +23,9 @@ import lucuma.odb.util.Codecs.step_type
 import lucuma.odb.util.Codecs.time_span
 import skunk.codec.boolean.bool
 
-trait StepRecordView[F[_]] extends BaseMapping[F] {
+trait StepRecordView[F[_]] extends BaseMapping[F]:
 
-  object StepRecordView extends TableDef("v_step_record") {
+  object StepRecordView extends TableDef("v_step_record"):
     val Id: ColumnRef             = col("c_step_id",         step_id)
     val StepIndex: ColumnRef      = col("c_step_index",      int4_pos)
     val Instrument: ColumnRef     = col("c_instrument",      instrument)
@@ -39,7 +39,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
     val GeneratedId: ColumnRef    = col("c_generated_id",    step_id.opt)
     val QaState: ColumnRef        = col("c_qa_state",        dataset_qa_state.opt)
 
-    object Gcal {
+    object Gcal:
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)
       val ArArc: ColumnRef     = col("c_gcal_ar_arc",    bool)
       val CuarArc: ColumnRef   = col("c_gcal_cuar_arc",  bool)
@@ -49,18 +49,10 @@ trait StepRecordView[F[_]] extends BaseMapping[F] {
       val Filter: ColumnRef    = col("c_gcal_filter",    gcal_filter)
       val Diffuser: ColumnRef  = col("c_gcal_diffuser",  gcal_diffuser)
       val Shutter: ColumnRef   = col("c_gcal_shutter",   gcal_shutter)
-    }
 
-    object Science {
-      val OffsetP: ColumnRef    = col("c_offset_p",    angle_µas)
-      val OffsetQ: ColumnRef    = col("c_offset_q",    angle_µas)
-      val GuideState: ColumnRef = col("c_guide_state", guide_state)
-    }
-
-    object SmartGcal {
+    object SmartGcal:
       val Type: ColumnRef = col("c_smart_gcal_type", smart_gcal_type)
-    }
 
-  }
-
-}
+    val OffsetP: ColumnRef    = col("c_offset_p",    angle_µas)
+    val OffsetQ: ColumnRef    = col("c_offset_q",    angle_µas)
+    val GuideState: ColumnRef = col("c_guide_state", guide_state)

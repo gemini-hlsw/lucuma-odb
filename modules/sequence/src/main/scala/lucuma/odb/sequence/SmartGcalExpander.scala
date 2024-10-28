@@ -48,9 +48,9 @@ object SmartGcalExpander:
     new SmartGcalExpander[F, D]:
       private def expand(step: ProtoStep[D]): ProtoStep[D] =
         step.stepConfig match
-          case StepConfig.SmartGcal(t) =>
-            val (d, g, c) = lookup(t, step.value)
-            ProtoStep(d, g, c)
+          case StepConfig.SmartGcal(s) =>
+            val (d, g, c) = lookup(s, step.value)
+            ProtoStep(d, g, step.telescopeConfig, c)
           case _                       =>
             step
 

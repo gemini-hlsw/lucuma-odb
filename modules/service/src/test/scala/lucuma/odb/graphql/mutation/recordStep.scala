@@ -59,7 +59,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -166,7 +167,8 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -257,7 +259,8 @@ class recordStep extends OdbSuite {
           recordGmosSouthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosSouth)},
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -304,7 +307,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -368,7 +372,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -434,7 +439,8 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             $instrumentNoGrating,
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
@@ -624,23 +630,21 @@ class recordStep extends OdbSuite {
           recordGmosNorthStep(input: {
             atomId: ${aid.asJson},
             ${dynamicConfig(Instrument.GmosNorth)},
-            $stepConfigScience,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
             observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              stepConfig {
-                stepType
-                ... on Science {
-                  offset {
-                    p {
-                      arcseconds
-                    }
-                    q {
-                      arcseconds
-                    }
+              telescopeConfig {
+                offset {
+                  p {
+                    arcseconds
                   }
-                  guiding
+                  q {
+                    arcseconds
+                  }
                 }
+                guiding
               }
             }
           }
@@ -650,8 +654,7 @@ class recordStep extends OdbSuite {
         {
           "recordGmosNorthStep": {
             "stepRecord": {
-              "stepConfig": {
-                "stepType": "SCIENCE",
+              "telescopeConfig": {
                 "offset": {
                   "p": {
                     "arcseconds": 0
@@ -725,8 +728,8 @@ class recordStep extends OdbSuite {
       oid  <- createObservationAs(service, pid, mode.some)
       vid  <- recordVisitAs(service, mode.instrument, oid)
       aid  <- recordAtomAs(service, mode.instrument, vid)
-      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
-      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScience)
+      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScienceInput, telescopeConfigInput)
+      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScienceInput, telescopeConfigInput)
       _    <- expect(service,
         s"""
           query {
@@ -806,9 +809,9 @@ class recordStep extends OdbSuite {
       oid  <- createObservationAs(service, pid, mode.some)
       vid  <- recordVisitAs(service, mode.instrument, oid)
       aid  <- recordAtomAs(service, mode.instrument, vid)
-      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
-      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScience)
-      sid2 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScience)
+      sid0 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScienceInput, telescopeConfigInput)
+      sid1 <- recordStepAs(service, aid, mode.instrument, cfg1, stepConfigScienceInput, telescopeConfigInput)
+      sid2 <- recordStepAs(service, aid, mode.instrument, cfg0, stepConfigScienceInput, telescopeConfigInput)
       _    <- expect(service,
         s"""
           query {

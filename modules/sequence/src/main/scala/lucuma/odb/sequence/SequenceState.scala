@@ -12,6 +12,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.SmartGcal
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
@@ -46,7 +47,7 @@ trait SequenceState[D] {
    * state and the given telescope configuration.
    */
   def scienceStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, StepConfig.Science(o, Enabled), c))
+    step(ProtoStep(_, StepConfig.Science, TelescopeConfig(o, Enabled), c))
 
   /**
    * Produces a "science" step based upon the current instrument configuration
@@ -61,13 +62,13 @@ trait SequenceState[D] {
   /**
    * Generates a GCAL flat based on the current instrument configuration.
    */
-  def flatStep(c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, SmartGcal(Flat), c))
+  def flatStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Flat), TelescopeConfig(o, Enabled), c))
 
   /**
    * Generates a GCAL arc based on the current instrument configuration.
    */
-  def arcStep(c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, SmartGcal(Arc), c))
+  def arcStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Arc), TelescopeConfig(o, Enabled), c))
 
 }
