@@ -27,6 +27,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
@@ -49,7 +50,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 
 import scala.collection.immutable.SortedMap
-import lucuma.core.enums.ObservationWorkflowState
 
 class createObservation extends OdbSuite {
 
