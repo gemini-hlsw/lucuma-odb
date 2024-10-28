@@ -703,7 +703,7 @@ class observation_workflow
     }
   }
 
-  test("calibrations are not validated") {
+  test("calibrations are not validated and are immediately Ready") {
     val setup: IO[Observation.Id] =
       for {
         pid <- createProgramAs(pi)

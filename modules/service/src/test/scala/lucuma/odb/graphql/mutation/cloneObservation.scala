@@ -10,16 +10,10 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
-import lucuma.core.syntax.timespan.*
-import lucuma.odb.data.Existence
 
 class cloneObservation extends OdbSuite {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
@@ -218,97 +212,6 @@ class cloneObservation extends OdbSuite {
                       "id" : $tid
                     }
                   ]
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-
-  }
-
-  test("cloned observation should always be present/new/active") {
-
-    def updateFields(oid: Observation.Id): IO[Unit] =
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            updateObservations(input: {
-              SET: {
-                scienceBand: ${ScienceBand.Band1.tag.toUpperCase}
-                existence: ${Existence.Deleted.tag.toUpperCase}
-                status: ${ObsStatus.Observed.tag.toUpperCase}
-                activeStatus: ${ObsActiveStatus.Inactive.tag.toUpperCase}
-              },
-              WHERE: {
-                id: { EQ: ${oid.asJson} }
-              }
-            }) {
-              observations {
-                id
-                scienceBand
-                existence
-                status
-                activeStatus
-              }
-            }
-          }
-        """,
-        expected = Right(
-          json"""
-            {
-              "updateObservations" : {
-                "observations" : [
-                  {
-                    "id" : $oid,
-                    "scienceBand": "BAND1",
-                    "existence" : "DELETED",
-                    "status" : "OBSERVED",
-                    "activeStatus" : "INACTIVE"
-                  }
-                ]
-              }
-            }
-          """        
-        )
-      )
-
-    val setup =
-      for
-        pid <- createProgramAs(pi)
-        _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan)
-        oid <- createObservationAs(pi, pid)
-        _   <- updateFields(oid)
-      yield oid
-
-    setup.flatMap { oid =>
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            cloneObservation(input: {
-              observationId: "$oid"
-            }) {
-              newObservation {
-                scienceBand
-                existence
-                status
-                activeStatus
-              }
-            }
-          }
-        """,
-        expected = Right(
-          json"""
-            {
-              "cloneObservation" : {
-                "newObservation" : {
-                  "scienceBand": "BAND1",
-                  "existence" : "PRESENT",
-                  "status" : "NEW",
-                  "activeStatus" : "ACTIVE"
                 }
               }
             }

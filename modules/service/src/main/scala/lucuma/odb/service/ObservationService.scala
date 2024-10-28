@@ -20,8 +20,6 @@ import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObsActiveStatus
-import lucuma.core.enums.ObsStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
@@ -70,7 +68,6 @@ import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -199,7 +196,6 @@ object ObservationService {
     forReview:  Boolean,
     role:       Option[CalibrationRole],
     proposalStatus: Tag,
-    activeStatus: ObsActiveStatus
   ) {
     def isMarkedReady: Boolean = false // TODO
   }
@@ -276,8 +272,6 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Unit]] = {
         val existenceOff = ObservationPropertiesInput.Edit(
           Nullable.Absent,
-          None,
-          None,
           Nullable.Absent,
           None,
           None,
@@ -290,7 +284,6 @@ object ObservationService {
           Nullable.Null,
           None,
           Nullable.Absent,
-          None
         )
 
         // delete targets, asterisms and observations
@@ -601,8 +594,6 @@ object ObservationService {
           groupIndex,
           SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
-          SET.status.getOrElse(ObsStatus.New),
-          SET.activeStatus.getOrElse(ObsActiveStatus.Active),
           SET.scienceBand,
           SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
@@ -622,8 +613,6 @@ object ObservationService {
       groupIndex:          NonNegShort,
       subtitle:            Option[NonEmptyString],
       existence:           Existence,
-      status:              ObsStatus,
-      activeState:         ObsActiveStatus,
       scienceBand:         Option[ScienceBand],
       posAngleConsMode:    PosAngleConstraintMode,
       posAngle:            Angle,
@@ -645,8 +634,6 @@ object ObservationService {
            groupIndex  ,
            subtitle    ,
            existence   ,
-           status      ,
-           activeState ,
            scienceBand ,
            posAngleConsMode              ,
            posAngle                      ,
@@ -689,8 +676,6 @@ object ObservationService {
       NonNegShort                      ,
       Option[NonEmptyString]           ,
       Existence                        ,
-      ObsStatus                        ,
-      ObsActiveStatus                  ,
       Option[ScienceBand]              ,
       PosAngleConstraintMode           ,
       Angle                            ,
@@ -724,8 +709,6 @@ object ObservationService {
           c_group_index,
           c_subtitle,
           c_existence,
-          c_status,
-          c_active_status,
           c_science_band,
           c_pac_mode,
           c_pac_angle,
@@ -758,8 +741,6 @@ object ObservationService {
           $int2_nonneg,
           ${text_nonempty.opt},
           $existence,
-          $obs_status,
-          $obs_active_status,
           ${science_band.opt},
           $pac_mode,
           $angle_µas,
@@ -899,21 +880,15 @@ object ObservationService {
     def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
-      val upStatus            = sql"c_status = $obs_status"
-      val upActive            = sql"c_active_status = $obs_active_status"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
-      val upForReview         = sql"c_for_review = $bool"
 
       val ups: List[AppliedFragment] =
         List(
           SET.existence.map(upExistence),
           SET.subtitle.foldPresent(upSubtitle),
-          SET.status.map(upStatus),
-          SET.activeStatus.map(upActive),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
-          SET.forReview.map(upForReview),
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1007,8 +982,6 @@ object ObservationService {
           c_title,
           c_subtitle,
           c_instrument,
-          c_status,
-          c_active_status,
           c_science_band,
           c_observation_time,
           c_pts_pi,
@@ -1044,8 +1017,6 @@ object ObservationService {
           c_title,
           c_subtitle,
           c_instrument,
-          'new',
-          'active',
           c_science_band,
           c_observation_time,
           c_pts_pi,
