@@ -5,20 +5,21 @@ package lucuma.odb.graphql
 package mapping
 
 
-import grackle.Result
+import lucuma.core.model.Target
 import lucuma.odb.data.EditType
+import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.TargetView
 
 
-trait TargetEditMapping[F[_]] extends TargetView[F] {
+trait TargetEditMapping[F[_]] extends TargetView[F] with ProgramTable[F] {
 
   // N.B. env is populated by the subscription elaborator
   lazy val TargetEditMapping: ObjectMapping =
     ObjectMapping(TargetEditType)(
-      SqlField("synthetic-id", TargetView.TargetId, key = true, hidden = true),
-      CursorField("id", _ => Result(0L), List("synthetic-id")),
+      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
-      SqlObject("value")
+      CursorField("targetId", _.envR[Target.Id]("targetId"), List("synthetic-id")),
+      SqlObject("value", Join(ProgramTable.Id, TargetView.ProgramId))
     )
 
 }

@@ -182,8 +182,24 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map { e =>
           Result(
             Environment(
-              Env("editType" -> e.editType),
-              Unique(Filter(Predicates.targetEdit.value.id.eql(e.targetId), child))
+              Env(
+                "editType" -> e.editType,
+                "targetId" -> e.targetId,
+              ),
+              Filter(
+                Predicates.targetEdit.programId.eql(e.programId),
+                Query.mapSomeFields(child):
+                  case Select("value", a, c) =>
+                    Select("value", a,
+                      // This predicate needs to be down here
+                      Filter(
+                        if e.editType === EditType.DeletedCal
+                        then Predicates.target.id.isNull(true) // always false; Predicate.False doesn't work
+                        else Predicates.target.id.eql(e.targetId),
+                        c
+                      )
+                    )
+              )
             )
           )
         }
