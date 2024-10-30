@@ -16,6 +16,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SequenceType.Acquisition
 import lucuma.core.enums.SequenceType.Science
+import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
@@ -557,7 +558,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Acquisition)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0))
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Acquisition)
     } yield assertEquals(ga0, ga1)
@@ -571,7 +572,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       vid <- recordVisitAs(serviceUser, mode.instrument, oid)
       ga0 <- generatedNextAtomId(pi, oid, Science)
       aid <- recordAtomAs(serviceUser, mode.instrument, vid, sequenceType = Acquisition)
-      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0))
+      sid <- recordStepAs(serviceUser, aid, mode.instrument, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
       _   <- addEndStepEvent(sid)
       ga1 <- generatedNextAtomId(pi, oid, Science)
     } yield assertEquals(ga0, ga1)

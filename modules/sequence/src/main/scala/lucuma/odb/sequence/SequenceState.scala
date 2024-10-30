@@ -46,8 +46,8 @@ trait SequenceState[D] {
    * Produces a "science" step based upon the current instrument configuration
    * state and the given telescope configuration.
    */
-  def scienceStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, StepConfig.Science, TelescopeConfig(o, Enabled), c))
+  def scienceStep(t: TelescopeConfig, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, StepConfig.Science, t, c))
 
   /**
    * Produces a "science" step based upon the current instrument configuration
@@ -57,18 +57,18 @@ trait SequenceState[D] {
    * @param q offset in q
    */
   def scienceStep(p: Angle, q: Angle, c: ObserveClass): State[D, ProtoStep[D]] =
-    scienceStep(Offset(Offset.P(p), Offset.Q(q)), c)
+    scienceStep(TelescopeConfig(Offset(Offset.P(p), Offset.Q(q)), Enabled), c)
 
   /**
    * Generates a GCAL flat based on the current instrument configuration.
    */
-  def flatStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, SmartGcal(Flat), TelescopeConfig(o, Enabled), c))
+  def flatStep(t: TelescopeConfig, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Flat), t, c))
 
   /**
    * Generates a GCAL arc based on the current instrument configuration.
    */
-  def arcStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
-    step(ProtoStep(_, SmartGcal(Arc), TelescopeConfig(o, Enabled), c))
+  def arcStep(t: TelescopeConfig, c: ObserveClass): State[D, ProtoStep[D]] =
+    step(ProtoStep(_, SmartGcal(Arc), t, c))
 
 }
