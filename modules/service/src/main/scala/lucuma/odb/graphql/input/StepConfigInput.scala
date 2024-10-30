@@ -17,16 +17,16 @@ object StepConfigInput {
         BooleanBinding.Option("bias", rBias),
         BooleanBinding.Option("dark", rDark),
         StepConfigGcalInput.Binding.Option("gcal", rGcal),
-        StepConfigScienceInput.Binding.Option("science", rScience),
+        BooleanBinding.Option("science", rScience),
         StepConfigSmartGcalInput.Binding.Option("smartGcal", rSmartGcal)
       ) => (rBias, rDark, rGcal, rScience, rSmartGcal).parTupled.flatMap {
          case (bias, dark, gcal, science, smartGcal) =>
            oneOrFail(
-             bias.ifM(StepConfig.Bias.some, none) -> "bias",
-             dark.ifM(StepConfig.Dark.some, none) -> "dark",
-             gcal                                 -> "gcal",
-             science                              -> "science",
-             smartGcal                            -> "smartGcal"
+             bias.ifM(StepConfig.Bias.some, none)       -> "bias",
+             dark.ifM(StepConfig.Dark.some, none)       -> "dark",
+             gcal                                       -> "gcal",
+             science.ifM(StepConfig.Science.some, none) -> "science",
+             smartGcal                                  -> "smartGcal"
            )
 
       }

@@ -75,6 +75,7 @@ object AtomBuilder:
                 SequenceIds.stepId(namespace, sequenceType, atomId, six + stepIndex),
                 protoStep.value,
                 protoStep.stepConfig,
+                protoStep.telescopeConfig,
                 estimate,
                 protoStep.observeClass
               )

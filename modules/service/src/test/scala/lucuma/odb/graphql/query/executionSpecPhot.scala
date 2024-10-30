@@ -79,12 +79,10 @@ class executionSpecPhot extends ExecutionTestSupport {
                                  customMask { slitWidth }
                                }
                              }
-                             stepConfig {
-                               ... on Science {
-                                 offset {
-                                   p { arcseconds }
-                                   q { arcseconds }
-                                 }
+                             telescopeConfig {
+                               offset {
+                                 p { arcseconds }
+                                 q { arcseconds }
                                }
                              }
                            }
@@ -144,7 +142,15 @@ class executionSpecPhot extends ExecutionTestSupport {
                                   "customMask": null
                                 }
                               },
-                              "stepConfig": {
+                              "telescopeConfig": {
+                                "offset": {
+                                  "p": {
+                                    "arcseconds": 0.000000
+                                  },
+                                  "q": {
+                                    "arcseconds": 0.000000
+                                  }
+                                }
                               }
                             },
                             {
@@ -175,7 +181,7 @@ class executionSpecPhot extends ExecutionTestSupport {
                                   "customMask": null
                                 }
                               },
-                              "stepConfig": {
+                              "telescopeConfig": {
                                 "offset": {
                                   "p": {
                                     "arcseconds": 0.000000

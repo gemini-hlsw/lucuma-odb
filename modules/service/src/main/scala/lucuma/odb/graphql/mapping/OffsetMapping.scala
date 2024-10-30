@@ -30,14 +30,14 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
     valueColumn: ColumnRef
   ): List[TypeMapping] =
     List(
-      offsetComponentMappingAtPath(StepRecordType / "stepConfig" % ScienceType / "offset" / name, idColumn, valueColumn)
+      offsetComponentMappingAtPath(StepRecordType / "telescopeConfig" / "offset" / name, idColumn, valueColumn)
     )
 
   lazy val OffsetPMappings: List[TypeMapping] =
-    offsetComponentSwitchMapping("p", StepRecordView.Id, StepRecordView.Science.OffsetP)
+    offsetComponentSwitchMapping("p", StepRecordView.Id, StepRecordView.OffsetP)
 
   lazy val OffsetQMappings: List[TypeMapping] =
-    offsetComponentSwitchMapping("q", StepRecordView.Id, StepRecordView.Science.OffsetQ)
+    offsetComponentSwitchMapping("q", StepRecordView.Id, StepRecordView.OffsetQ)
 
   private def offsetMappingAtPath(
     path: Path,
@@ -51,7 +51,7 @@ trait OffsetMapping[F[_]] extends StepRecordView[F] {
 
   lazy val OffsetMappings: List[TypeMapping] =
     List(
-      offsetMappingAtPath(StepRecordType / "stepConfig" % ScienceType / "offset", StepRecordView.Id)
+      offsetMappingAtPath(StepRecordType / "telescopeConfig" / "offset", StepRecordView.Id)
     )
 
 }
