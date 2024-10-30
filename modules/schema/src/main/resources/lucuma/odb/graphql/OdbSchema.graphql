@@ -4745,11 +4745,12 @@ type TargetEdit {
   """
   editType: EditType!
 
+  targetId: TargetId!
+
   """
   Edited object
   """
-  value: Target!
-  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
+  value: Target
 }
 
 """
