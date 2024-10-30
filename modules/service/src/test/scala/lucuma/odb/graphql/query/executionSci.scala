@@ -14,6 +14,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -25,6 +26,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -38,6 +40,12 @@ import skunk.*
 import skunk.implicits.*
 
 class executionSci extends ExecutionTestSupport {
+
+  def gcalTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Disabled)
+
+  def sciTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Enabled)
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -168,11 +176,11 @@ class executionSci extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
       } yield o
@@ -201,9 +209,9 @@ class executionSci extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
         ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
       } yield ic
@@ -243,11 +251,11 @@ class executionSci extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
         ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
       } yield ic
@@ -292,18 +300,18 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
         _  <- adjustStepTime(s0, nw)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
         _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
 
         longDelay = Science.CalValidityPeriod +| 2.microsecondTimeSpan
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds).get
 
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
         _  <- adjustStepTime(s2, timestamp)
 
@@ -352,11 +360,11 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
         _  <- adjustStepTime(s0, nw)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
         _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
 
@@ -397,11 +405,11 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
         _  <- adjustStepTime(s0, nw)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
         _  <- adjustStepTime(s1, nw.plusMicrosOption(1).get)
 
@@ -441,13 +449,13 @@ class executionSci extends ExecutionTestSupport {
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
         // We'll add steps for the second block (5 nm, 15")
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 15), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(15), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 15), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(15), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
 
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 15), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
         ic <- generateOrFail(p, o)
@@ -492,11 +500,11 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s2)
 
       } yield o
@@ -526,22 +534,22 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
 
-        x0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(8), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        x0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(8), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(x0)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s1)
 
-        x1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(8), StepConfig.Science, telescopeConfig(10, 10), ObserveClass.Science)
+        x1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(8), StepConfig.Science, sciTelescopeConfig(10), ObserveClass.Science)
         _  <- addEndStepEvent(x1)
 
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s2)
 
-        x2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(8), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        x2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(8), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(x2)
 
       } yield o
@@ -570,11 +578,11 @@ class executionSci extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
         d  <- recordDatasetAs(serviceUser, s1, "N20240905S1000.fits")
@@ -637,23 +645,23 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 15), ObserveClass.PartnerCal)
+        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(15), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s5)
-        s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 15), ObserveClass.PartnerCal)
+        s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(15), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s6)
-        s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 15), ObserveClass.Science)
+        s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s7)
 
         d  <- recordDatasetAs(serviceUser, s2, "N20240905S1001.fits")
@@ -719,33 +727,33 @@ class executionSci extends ExecutionTestSupport {
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
 
         x1 <- nextAtomId(p, o)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
 
         x2 <- nextAtomId(p, o)
 
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
         x3 <- nextAtomId(p, o)
 
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
         x4 <- nextAtomId(p, o)
 
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         x5 <- nextAtomId(p, o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s5)
 
         x6 <- nextAtomId(p, o)
@@ -1135,13 +1143,13 @@ class executionSci extends ExecutionTestSupport {
 
         a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, telescopeConfig(0, 0), ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
 
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, telescopeConfig(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
       } yield o

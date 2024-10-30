@@ -35,6 +35,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -43,6 +44,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -306,9 +308,9 @@ object Science:
               _ <- setup(config, time)
               _ <- optics.wavelength := λ.offset(g.adjustment.Δλ).getOrElse(λ)
               o  = Offset(Offset.P.Zero, g.adjustment.q)
-              a <- arcStep(o, ObserveClass.PartnerCal)
-              f <- flatStep(o, ObserveClass.PartnerCal)
-              s <- scienceStep(o, ObserveClass.Science)
+              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
+              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
+              s <- scienceStep(TelescopeConfig(o, StepGuideState.Enabled), ObserveClass.Science)
             } yield (a, f, s)
           }
 

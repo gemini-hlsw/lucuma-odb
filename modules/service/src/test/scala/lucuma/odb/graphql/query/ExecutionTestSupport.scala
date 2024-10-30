@@ -359,17 +359,17 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val ArcStep: StepConfig.Gcal  =
     StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
 
-  def telescopeConfig(p: Int, q: Int): TelescopeConfig =
+  def telescopeConfig(p: Int, q: Int, g: StepGuideState): TelescopeConfig =
     TelescopeConfig(
       Offset(
         Offset.P.signedDecimalArcseconds.reverseGet(BigDecimal(p)),
         Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
       ),
-      StepGuideState.Enabled
+      g
     )
 
-  protected def expectedTelescopeConfig(p: Int, q: Int): Json =
-    expectedTelescopeConfig(telescopeConfig(p, q))
+  protected def expectedTelescopeConfig(p: Int, q: Int, g: StepGuideState): Json =
+    expectedTelescopeConfig(telescopeConfig(p, q, g))
 
   protected def expectedTelescopeConfig(t: TelescopeConfig): Json =
     json"""
@@ -417,7 +417,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "continuum" : null,
           "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
-        "telescopeConfig": ${expectedTelescopeConfig(p, q)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "PARTNER_CAL"
       }
     """
@@ -431,7 +431,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "continuum" : ${flat.gcalConfig.lamp.continuum},
           "arcs" : []
         },
-        "telescopeConfig": ${expectedTelescopeConfig(p, q)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "PARTNER_CAL"
       }
     """
@@ -441,7 +441,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthScience(ditherNm))},
         "stepConfig" : { "stepType": "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, q)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
         "observeClass" : "SCIENCE"
       }
     """
@@ -451,7 +451,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step))},
         "stepConfig" : { "stepType":  "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, 0)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION"
       }
     """
