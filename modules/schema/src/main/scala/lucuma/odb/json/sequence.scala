@@ -31,11 +31,10 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
-
-// (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength])
 
 trait SequenceCodec {
 
@@ -57,10 +56,11 @@ trait SequenceCodec {
         i <- c.downField("id").as[Step.Id]
         d <- c.downField("instrumentConfig").as[D]
         n <- c.downField("stepConfig").as[StepConfig]
+        t <- c.downField("telescopeConfig").as[TelescopeConfig]
         e <- c.downField("estimate").as[StepEstimate]
         o <- c.downField("observeClass").as[ObserveClass]
         b <- c.downField("breakpoint").as[Breakpoint]
-      } yield Step(i, d, n, e, o, b)
+      } yield Step(i, d, n, t, e, o, b)
     }
 
   given [D: Encoder](using Encoder[Offset], Encoder[TimeSpan]): Encoder[Step[D]] =
@@ -69,6 +69,7 @@ trait SequenceCodec {
         "id"               -> a.id.asJson,
         "instrumentConfig" -> a.instrumentConfig.asJson,
         "stepConfig"       -> a.stepConfig.asJson,
+        "telescopeConfig"  -> a.telescopeConfig.asJson,
         "estimate"         -> a.estimate.asJson,
         "observeClass"     -> a.observeClass.asJson,
         "breakpoint"       -> a.breakpoint.asJson

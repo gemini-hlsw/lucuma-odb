@@ -25,10 +25,7 @@ class GitHub_1060 extends OdbSuite with ExecutionQuerySetupOperations {
 
   val validUsers = List(pi, service).toList
 
-  override def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigGcal)
-
-  val stepConfigGcal: String =
+  val stepConfigGcalInput: String =
     """
       stepConfig: {
         gcal: {
@@ -39,6 +36,9 @@ class GitHub_1060 extends OdbSuite with ExecutionQuerySetupOperations {
         }
       }
     """
+
+  override def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
+    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigGcalInput, telescopeConfigInput)
 
   test("GitHub_1060") {
     recordAll(pi, service, mode, offset = 0, datasetCount = 2).flatMap { on =>

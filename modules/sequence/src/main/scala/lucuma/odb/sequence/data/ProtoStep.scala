@@ -13,25 +13,29 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import monocle.Focus
 import monocle.Lens
 
 case class ProtoStep[A](
-  value:        A,
-  stepConfig:   StepConfig,
-  observeClass: ObserveClass,
-  breakpoint:   Breakpoint = Breakpoint.Disabled
+  value:           A,
+  stepConfig:      StepConfig,
+  telescopeConfig: TelescopeConfig,
+  observeClass:    ObserveClass,
+  breakpoint:      Breakpoint = Breakpoint.Disabled
 ):
   def matches(step: StepRecord[A])(using Eq[A]): Boolean =
-    stepConfig === step.stepConfig && value === step.instrumentConfig
+    value           === step.instrumentConfig &&
+    stepConfig      === step.stepConfig       &&
+    telescopeConfig === step.telescopeConfig
 
 object ProtoStep:
 
-  def smartGcal[A](a: A, t: SmartGcalType): ProtoStep[A] =
-    ProtoStep(a, StepConfig.SmartGcal(t), ObserveClass.PartnerCal)
+  def smartGcal[A](a: A, s: SmartGcalType, t: TelescopeConfig): ProtoStep[A] =
+    ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.PartnerCal)
 
-  def smartArc[A](a: A): ProtoStep[A]  = smartGcal(a, SmartGcalType.Arc)
-  def smartFlat[A](a: A): ProtoStep[A] = smartGcal(a, SmartGcalType.Flat)
+  def smartArc[A](a: A, t: TelescopeConfig): ProtoStep[A]  = smartGcal(a, SmartGcalType.Arc, t)
+  def smartFlat[A](a: A, t: TelescopeConfig): ProtoStep[A] = smartGcal(a, SmartGcalType.Flat, t)
 
   /** @group Optics */
   def value[A]: Lens[ProtoStep[A], A] =
@@ -40,6 +44,10 @@ object ProtoStep:
   /** @group Optics */
   def stepConfig[A]: Lens[ProtoStep[A], StepConfig] =
     Focus[ProtoStep[A]](_.stepConfig)
+
+  /** @group Optics */
+  def telescopeConfig[A]: Lens[ProtoStep[A], TelescopeConfig] =
+    Focus[ProtoStep[A]](_.telescopeConfig)
 
   /** @group Optics */
   def observeClass[A]: Lens[ProtoStep[A], ObserveClass] =
@@ -59,7 +67,7 @@ object ProtoStep:
 
   given Traverse[ProtoStep] with {
     override def traverse[G[_]: Applicative, A, B](fa: ProtoStep[A])(f: A => G[B]): G[ProtoStep[B]] =
-      f(fa.value).map(ProtoStep(_, fa.stepConfig, fa.observeClass, fa.breakpoint))
+      f(fa.value).map(ProtoStep(_, fa.stepConfig, fa.telescopeConfig, fa.observeClass, fa.breakpoint))
 
     override def foldLeft[A, B](fa:  ProtoStep[A], b:  B)(f:  (B, A) => B): B =
       f(b, fa.value)

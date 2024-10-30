@@ -13,12 +13,14 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepStage
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -386,7 +388,7 @@ class executionDigest extends ExecutionTestSupport {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
-        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0))
+        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
       } yield (p, o, s)
     }
 

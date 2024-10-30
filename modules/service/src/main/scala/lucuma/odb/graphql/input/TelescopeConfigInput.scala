@@ -6,19 +6,20 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.StepGuideState.Enabled
-import lucuma.core.model.sequence.StepConfig.Science
+import lucuma.core.math.Offset.Zero
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.graphql.binding.*
 
-object StepConfigScienceInput {
+object TelescopeConfigInput:
 
-  val Binding: Matcher[Science] =
+  val Binding: Matcher[TelescopeConfig] =
     ObjectFieldsBinding.rmap {
       case List(
-        OffsetInput.Binding("offset", rOffset),
+        OffsetInput.Binding.Option("offset", rOffset),
         StepGuideStateBinding.Option("guiding", rGuiding)
       ) => (rOffset, rGuiding).parMapN { (o, g) =>
-         Science(o, g.getOrElse(Enabled))
+        TelescopeConfig(o.getOrElse(Zero), g.getOrElse(Enabled))
       }
     }
 
-}
+

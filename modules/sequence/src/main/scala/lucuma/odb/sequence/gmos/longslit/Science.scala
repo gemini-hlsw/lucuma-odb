@@ -35,6 +35,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -43,6 +44,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -305,9 +307,10 @@ object Science:
             for {
               _ <- setup(config, time)
               _ <- optics.wavelength := λ.offset(g.adjustment.Δλ).getOrElse(λ)
-              a <- arcStep(ObserveClass.PartnerCal)
-              f <- flatStep(ObserveClass.PartnerCal)
-              s <- scienceStep(Offset(Offset.P.Zero, g.adjustment.q), ObserveClass.Science)
+              o  = Offset(Offset.P.Zero, g.adjustment.q)
+              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
+              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
+              s <- scienceStep(TelescopeConfig(o, StepGuideState.Enabled), ObserveClass.Science)
             } yield (a, f, s)
           }
 
@@ -559,7 +562,7 @@ object Science:
       val maxRemaining = block.remainingInBlock(currentCount)
 
       // How long do we have left to fill with science?  Adjust lastSteps as
-      // though one or more science steps have just happen.
+      // though one or more science steps have just happened.
       val lastStepsʹ    = lastSteps.next(block.definition.science)
       val calTime       = TimeEstimateCalculator.estimateTimeSpan(estimator, static, lastStepsʹ, missingCals)
       val remainingTime = remainingTimeAt(timestamp) -| calTime
@@ -690,11 +693,7 @@ object Science:
             // GMOS Longslit doesn't use biases or darks, and smart gcal has
             // been expanded so ignore these.
             recordsʹ
-          case StepType.Gcal                                      =>
-            // We don't know which spatial offset this is associated with so
-            // record it everywhere
-            recordsʹ.map(_.record(step))
-          case StepType.Science                                   =>
+          case StepType.Gcal | StepType.Science                   =>
             // Record the step at the current index, settle all others
             recordsʹ.zipWithIndex.map: (rec, idx) =>
               if posʹ === idx then rec.record(step) else rec.settle

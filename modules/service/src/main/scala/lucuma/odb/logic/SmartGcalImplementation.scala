@@ -52,12 +52,12 @@ object SmartGcalImplementation {
       step:  ProtoStep[D]
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
       step match {
-        case ProtoStep(d, StepConfig.SmartGcal(sgt), o, b) =>
+        case ProtoStep(d, StepConfig.SmartGcal(sgt), t, o, b) =>
           val key = toKey(d)
 
           def toStep(tup: (D => D, Gcal)): ProtoStep[D] = {
             val (update, gcal) = tup
-            ProtoStep(update(d), gcal, o, b)
+            ProtoStep(update(d), gcal, t, o, b)
           }
 
           cache.get((key, sgt)).fold(
@@ -73,7 +73,7 @@ object SmartGcalImplementation {
             }
           ) { e => (cache, e.map(_.map(toStep))).pure[F] }
 
-        case ps@ProtoStep(_, _, _, _) =>
+        case ps@ProtoStep(_, _, _, _, _) =>
           (cache, NonEmptyList.one(ps).asRight).pure[F]
       }
 

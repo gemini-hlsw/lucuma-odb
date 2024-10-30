@@ -332,4 +332,56 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
     } yield es
     assertIO(res, StepExecutionState.Stopped)
   }
+
+  test("telescopeConfig mapping works") {
+    for
+      on <- recordAll(pi, service, mode, offset = 500)
+      _  <- expect(
+              pi,
+              s"""
+                query {
+                  observation(observationId: "${on.id}") {
+                    execution {
+                      atomRecords {
+                        matches {
+                          steps {
+                            matches {
+                              telescopeConfig {
+                                offset { q { arcseconds } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              json"""
+                {
+                  "observation": {
+                    "execution": {
+                      "atomRecords": {
+                        "matches": [
+                          {
+                            "steps": {
+                              "matches": [
+                                {
+                                  "telescopeConfig": {
+                                    "offset": { "q": { "arcseconds": 10 } }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              """.asRight
+            )
+    yield ()
+  }
+
 }
