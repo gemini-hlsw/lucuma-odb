@@ -179,7 +179,7 @@ class updateTargets extends OdbSuite {
     for {
       pid  <-  createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
-      _    <- setTargetCalibratioRole(tid, CalibrationRole.Photometric)
+      _    <- setTargetCalibrationRole(tid, CalibrationRole.Photometric)
       _    <- withServices(service) { s =>
                 s.session.transaction.use { xa =>
                   s.targetService.deleteOrphanCalibrationTargets(pid)(using xa)
