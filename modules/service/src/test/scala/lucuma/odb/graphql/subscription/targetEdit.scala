@@ -5,9 +5,11 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
+import cats.effect.kernel.Ref
 import cats.syntax.show.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -18,8 +20,9 @@ import scala.concurrent.duration.*
 class targetEdit extends OdbSuite {
 
   val pi = TestUsers.Standard.pi(11, 110)
+  val service  = TestUsers.service(3)
 
-  override def validUsers = List(pi)
+  override def validUsers = List(pi, service)
 
   val pause = IO.sleep(300.milli)
 
@@ -76,6 +79,7 @@ class targetEdit extends OdbSuite {
       subscription {
         targetEdit$args {
           editType
+          targetId
           value {
             name
           }
@@ -86,95 +90,116 @@ class targetEdit extends OdbSuite {
 
   def targetEdit(
     editType: EditType,
-    name: String
+    name: String,
+    tid: Target.Id
   ): Json =
     Json.obj(
       "targetEdit" -> Json.obj(
         "editType" -> Json.fromString(editType.tag.toUpperCase),
+        "targetId" -> Json.fromString(tid.show),
         "value"    -> Json.obj(
           "name" -> Json.fromString(name)
         )
       )
     )
 
-  def created(name: String): Json =
-    targetEdit(EditType.Created, name)
+  def created(name: String, tid: Target.Id): Json =
+    targetEdit(EditType.Created, name, tid)
 
-  def updated(name: String): Json =
-    targetEdit(EditType.Updated, name)
+  def updated(name: String, tid: Target.Id): Json =
+    targetEdit(EditType.Updated, name, tid)
 
   test("trigger for a new target in any program") {
-    subscriptionExpect(
-      user      = pi,
-      query     = nameSubscription(None, None),
-      mutations =
-        Right(
-          createProgramAs(pi).flatMap(createTarget(pi, _, "target 1")) >>
-          createProgramAs(pi).flatMap(createTarget(pi, _, "target 2"))
-        ),
-      expected = List(created("target 1"), created("target 2"))
-    )
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = nameSubscription(None, None),
+        mutations =
+          Right(
+            createProgramAs(pi).flatMap(createTarget(pi, _, "target 1")
+              .flatTap(i => ref.update(i :: _))) >>
+            createProgramAs(pi).flatMap(createTarget(pi, _, "target 2")
+              .flatTap(i => ref.update(i :: _)))
+          ),
+        expectedF = ref.get.map(l => List(created("target 1", l(1)), created("target 2", l(0))))
+      )
+    }
   }
 
   test("trigger for an updated target in any program") {
-    subscriptionExpect(
-      user      = pi,
-      query     = nameSubscription(None, None),
-      mutations =
-        Right(
-          for {
-            pid <- createProgramAs(pi)
-            tid <- createTarget(pi, pid, "old name")
-            _   <- updateTarget(pi, tid, "new name")
-          } yield ()
-        ),
-      expected = List(created("old name"), updated("new name"))
-    )
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = nameSubscription(None, None),
+        mutations =
+          Right(
+            for {
+              pid <- createProgramAs(pi)
+              tid <- createTarget(pi, pid, "old name").flatTap(i => ref.set(List(i)))
+              _   <- updateTarget(pi, tid, "new name")
+            } yield ()
+          ),
+        expectedF = ref.get.map(l => List(created("old name", l(0)), updated("new name", l(0))))
+      )
+    }
   }
 
   test("trigger for a new target in [only] a specific program") {
-    createProgramAs(pi).flatMap { pid =>
-      subscriptionExpect(
-        user      = pi,
-        query     = nameSubscription(Some(pid), None),
-        mutations =
-          Right(
-            createTarget(pi, pid, "should see this") >>
-            createProgramAs(pi).flatMap(createTarget(pi, _, "should not see this"))
-          ),
-        expected = List(created("should see this"))
-      )
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      createProgramAs(pi).flatMap { pid =>
+        subscriptionExpectF(
+          user      = pi,
+          query     = nameSubscription(Some(pid), None),
+          mutations =
+            Right(
+              createTarget(pi, pid, "should see this").flatTap(i => ref.set(List(i))) >>
+              createProgramAs(pi).flatMap(createTarget(pi, _, "should not see this"))
+            ),
+          expectedF = ref.get.map(l => List(created("should see this", l(0))))
+        )
+      }
     }
   }
 
   test("trigger for an updated target in [only] a specific program") {
-    createProgramAs(pi).flatMap { pid =>
-      subscriptionExpect(
-        user      = pi,
-        query     = nameSubscription(Some(pid), None),
-        mutations =
-          Right(
-            createTarget(pi, pid, "should see this").flatMap(updateTarget(pi, _, "and this")) >>
-            createProgramAs(pi).flatMap(createTarget(pi, _, "should not see this").flatMap(updateTarget(pi, _, "or this")))
-          ),
-        expected = List(created("should see this"), updated("and this"))
-      )
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      createProgramAs(pi).flatMap { pid =>
+        subscriptionExpectF(
+          user      = pi,
+          query     = nameSubscription(Some(pid), None),
+          mutations =
+            Right(
+              createTarget(pi, pid, "should see this")
+                .flatTap(i => ref.update(i :: _))
+                .flatMap(updateTarget(pi, _, "and this")) >>
+              createProgramAs(pi).flatMap(
+                createTarget(pi, _, "should not see this")
+                  .flatTap(i => ref.update(i :: _))
+                  .flatMap(updateTarget(pi, _, "or this")))
+            ),
+          expectedF = ref.get.map(l => List(created("should see this", l(1)), updated("and this", l(1))))
+        )
+      }
     }
   }
 
   test("trigger for [only] a specific updated target") {
-    createProgramAs(pi).flatMap { pid =>
-      createTarget(pi, pid, "old name").flatMap { tid =>
-        subscriptionExpect(
-          user      = pi,
-          query     = nameSubscription(None, Some(tid)),
-          mutations =
-            Right(
-              updateTarget(pi, tid, "new name") >>
-              createTarget(pi, pid, "should not see this").flatMap(updateTarget(pi, _, "or this"))
-            ),
-          expected = List(updated("new name"))
-        )
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      createProgramAs(pi).flatMap { pid =>
+        createTarget(pi, pid, "old name")
+          .flatTap(i => ref.set(List(i)))
+          .flatMap { tid =>
+            subscriptionExpectF(
+              user      = pi,
+              query     = nameSubscription(None, Some(tid)),
+              mutations =
+                Right(
+                  updateTarget(pi, tid, "new name") >>
+                  createTarget(pi, pid, "should not see this").flatMap(updateTarget(pi, _, "or this"))
+                ),
+              expectedF = ref.get.map(l => List(updated("new name", l(0))))
+            )
+        }
       }
     }
   }
@@ -186,7 +211,6 @@ class targetEdit extends OdbSuite {
         subscription {
           targetEdit {
             editType
-            id
           }
         }
       """,
@@ -194,9 +218,69 @@ class targetEdit extends OdbSuite {
         Right(
           createProgramAs(pi).flatMap(createTarget(pi, _, "t")).replicateA(2)
         ),
-      expected = List.fill(2)(json"""{"targetEdit":{"editType":"CREATED","id":0}}""")
+      expected = List.fill(2)(json"""{"targetEdit":{"editType":"CREATED"}}""")
     )
   }
 
-
+  test("event for target deletion") {
+    Ref.of[IO, List[Target.Id]](List.empty[Target.Id]).flatMap { ref =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = s"""
+          subscription {
+            targetEdit {
+              editType
+              targetId
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            createProgramAs(pi)
+              .flatTap(
+                createTarget(pi, _, "t")
+                  .flatTap(i => ref.set(List(i)))
+                  .flatMap(setTargetCalibrationRole(_, CalibrationRole.Twilight))
+              )
+              .flatMap(pid => withServices(service) {services =>
+                services.session.transaction.use { xa =>
+                  services.targetService.deleteOrphanCalibrationTargets(pid)(using xa)
+                }.onError(r => IO(r.printStackTrace()))
+              })
+          ),
+        expectedF = ref.get.map(i =>
+              List(
+                json"""{
+                    "targetEdit": {
+                      "editType":"CREATED",
+                      "targetId":${i.head.show},
+                      "value": {
+                        "id":${i.head.show}
+                      }
+                    }
+                  }""",
+                json"""{
+                    "targetEdit": {
+                      "editType":"UPDATED",
+                      "targetId":${i.head.show},
+                      "value": {
+                        "id":${i.head.show}
+                      }
+                    }
+                  }""",
+                json"""{
+                    "targetEdit": {
+                      "editType":"DELETED_CAL",
+                      "targetId":${i.head.show},
+                      "value": null
+                    }
+                  }"""
+             )
+            )
+      )
+    }
+  }
 }

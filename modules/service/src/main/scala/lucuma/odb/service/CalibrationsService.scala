@@ -266,6 +266,7 @@ object CalibrationsService extends CalibrationObservations {
           configs       = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
           addedOids    <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
           removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
+          _            <- targetService.deleteOrphanCalibrationTargets(pid)
         yield (addedOids, removedOids)
 
       // Recalcula the target of a calibration observation
