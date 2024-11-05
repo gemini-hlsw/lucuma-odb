@@ -75,6 +75,7 @@ import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
@@ -141,6 +142,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       RevokeUserInvitation,
       SetAllocations,
       SetGuideTargetName,
+      SetObservationWorkflowState,
       SetProgramReference,
       SetProposalStatus,
       UnlinkUser,
@@ -210,6 +212,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Elab.liftR(rInput).flatMap: i =>
               Elab.env("input" -> i)
       }
+
+    def encodable[I: ClassTag: TypeName, A: io.circe.Encoder](fieldName: String, inputBinding: Matcher[I])(f: I => F[Result[A]]) =
+      json(fieldName, inputBinding)(i => f(i).map(_.map(_.asJson)))
 
   }
 
@@ -602,6 +607,11 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(input)
           .nestMap: oid =>
             Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+
+  private lazy val SetObservationWorkflowState =
+    MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
+      services.useNonTransactionally:
+        observationWorkflowService.setWorkflowState(input.observationId, input.state, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

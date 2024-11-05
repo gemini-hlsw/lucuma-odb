@@ -27,6 +27,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.json.configurationrequest.query.given
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
@@ -48,6 +49,7 @@ trait ObservationMapping[F[_]]
   def itcClient: ItcClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val ObservationMapping: ObjectMapping =
     ObjectMapping(ObservationType)(
@@ -150,7 +152,7 @@ trait ObservationMapping[F[_]]
       (_, oid, _) =>
         services.use { s =>
           s.observationWorkflowService
-            .getWorkflow(oid, commitHash, itcClient)
+            .getWorkflow(oid, commitHash, itcClient, timeEstimateCalculator)
         }
 
     effectHandler(readEnv, calculate)
