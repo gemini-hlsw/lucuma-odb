@@ -28,6 +28,7 @@ import org.scalacheck.cats.implicits.*
 
 import java.time.LocalDate
 import java.util.UUID
+import lucuma.core.enums.ObservationWorkflowState
 
 class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
 
@@ -67,28 +68,29 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
     Arbitrary:
       (arbitrary[OdbError.Tag], arbitrary[Option[String]]).tupled.flatMap: (tag, detail) =>
         tag match
-          case Tag.InvalidArgument        => OdbError.InvalidArgument(detail).pure[Gen]
-          case Tag.NoAction               => OdbError.NoAction(detail).pure[Gen]
-          case Tag.NotAuthorized          => arbitrary[User.Id].map(OdbError.NotAuthorized(_, detail))
-          case Tag.InvitationError        => arbitrary[UserInvitation.Id].map(OdbError.InvitationError(_, detail))
-          case Tag.InvalidProgram         => arbitrary[Program.Id].map(OdbError.InvalidProgram(_, detail))
-          case Tag.InvalidObservation     => arbitrary[Observation.Id].map(OdbError.InvalidObservation(_, detail))
-          case Tag.InvalidObservationList => arbitrary[NonEmptyList[Observation.Id]].map(OdbError.InvalidObservationList(_, detail))
-          case Tag.SequenceUnavailable    => OdbError.SequenceUnavailable(detail).pure[Gen]
-          case Tag.InvalidTarget          => arbitrary[Target.Id].map(OdbError.InvalidTarget(_, detail))
-          case Tag.InvalidTargetList      => (arbitrary[Program.Id], arbitrary[NonEmptyList[Target.Id]]).mapN(OdbError.InvalidTargetList(_, _, detail))
-          case Tag.InvalidVisit           => arbitrary[Visit.Id].map(OdbError.InvalidVisit(_, detail))
-          case Tag.InvalidStep            => arbitrary[Step.Id].map(OdbError.InvalidStep(_, detail))
-          case Tag.InvalidFilename        => arbitrary[Filename].map(OdbError.InvalidFilename(_, detail))
-          case Tag.InvalidAtom            => arbitrary[Atom.Id].map(OdbError.InvalidAtom(_, detail))
-          case Tag.InvalidDataset         => arbitrary[Dataset.Id].map(OdbError.InvalidDataset(_, detail))
-          case Tag.InvalidUser            => arbitrary[User.Id].map(OdbError.InvalidUser(_, detail))
-          case Tag.UpdateFailed           => OdbError.UpdateFailed(detail).pure[Gen]
-          case Tag.ItcError               => OdbError.ItcError(detail).pure[Gen]
-          case Tag.GuideEnvironmentError  => OdbError.GuideEnvironmentError(detail).pure[Gen]
-          case Tag.EmailSendError         => OdbError.EmailSendError(detail).pure[Gen]
-          case Tag.InconsistentGroup      => OdbError.InconsistentGroupError(detail).pure[Gen]
-          case Tag.InvalidConfiguration   => OdbError.InvalidConfiguration(detail).pure[Gen]
+          case Tag.InvalidArgument           => OdbError.InvalidArgument(detail).pure[Gen]
+          case Tag.NoAction                  => OdbError.NoAction(detail).pure[Gen]
+          case Tag.NotAuthorized             => arbitrary[User.Id].map(OdbError.NotAuthorized(_, detail))
+          case Tag.InvitationError           => arbitrary[UserInvitation.Id].map(OdbError.InvitationError(_, detail))
+          case Tag.InvalidProgram            => arbitrary[Program.Id].map(OdbError.InvalidProgram(_, detail))
+          case Tag.InvalidObservation        => arbitrary[Observation.Id].map(OdbError.InvalidObservation(_, detail))
+          case Tag.InvalidObservationList    => arbitrary[NonEmptyList[Observation.Id]].map(OdbError.InvalidObservationList(_, detail))
+          case Tag.SequenceUnavailable       => OdbError.SequenceUnavailable(detail).pure[Gen]
+          case Tag.InvalidTarget             => arbitrary[Target.Id].map(OdbError.InvalidTarget(_, detail))
+          case Tag.InvalidTargetList         => (arbitrary[Program.Id], arbitrary[NonEmptyList[Target.Id]]).mapN(OdbError.InvalidTargetList(_, _, detail))
+          case Tag.InvalidVisit              => arbitrary[Visit.Id].map(OdbError.InvalidVisit(_, detail))
+          case Tag.InvalidStep               => arbitrary[Step.Id].map(OdbError.InvalidStep(_, detail))
+          case Tag.InvalidFilename           => arbitrary[Filename].map(OdbError.InvalidFilename(_, detail))
+          case Tag.InvalidAtom               => arbitrary[Atom.Id].map(OdbError.InvalidAtom(_, detail))
+          case Tag.InvalidDataset            => arbitrary[Dataset.Id].map(OdbError.InvalidDataset(_, detail))
+          case Tag.InvalidUser               => arbitrary[User.Id].map(OdbError.InvalidUser(_, detail))
+          case Tag.UpdateFailed              => OdbError.UpdateFailed(detail).pure[Gen]
+          case Tag.ItcError                  => OdbError.ItcError(detail).pure[Gen]
+          case Tag.GuideEnvironmentError     => OdbError.GuideEnvironmentError(detail).pure[Gen]
+          case Tag.EmailSendError            => OdbError.EmailSendError(detail).pure[Gen]
+          case Tag.InconsistentGroup         => OdbError.InconsistentGroupError(detail).pure[Gen]
+          case Tag.InvalidConfiguration      => OdbError.InvalidConfiguration(detail).pure[Gen]
+          case Tag.InvalidWorkflowTransition => (arbitrary[ObservationWorkflowState], arbitrary[ObservationWorkflowState]).mapN(OdbError.InvalidWorkflowTransition(_, _, detail))
                       
   checkAll("OdbErrorCodec", CodecTests[OdbError].codec)
 

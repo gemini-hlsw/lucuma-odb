@@ -3101,6 +3101,19 @@ type Mutation {
     input: CreateConfigurationRequestInput!
   ): ConfigurationRequest!
 
+  """
+  Sets the workflow state for the specified observation. The transition must be valid
+  according to the current workflow. Returns the updated workflow.
+  """
+  setObservationWorkflowState(
+    input: SetObservationWorkflowStateInput!
+  ): ObservationWorkflow
+
+}
+
+input SetObservationWorkflowStateInput {
+  observationId: ObservationId!
+  state: ObservationWorkflowState!
 }
 
 """
