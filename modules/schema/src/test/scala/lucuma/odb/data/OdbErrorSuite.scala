@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Site
 import lucuma.core.model.*
 import lucuma.core.model.arb.ArbUserInvitation.given
@@ -28,7 +29,6 @@ import org.scalacheck.cats.implicits.*
 
 import java.time.LocalDate
 import java.util.UUID
-import lucuma.core.enums.ObservationWorkflowState
 
 class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
 

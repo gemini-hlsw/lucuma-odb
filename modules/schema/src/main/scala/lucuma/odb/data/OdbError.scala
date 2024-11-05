@@ -14,6 +14,7 @@ import io.circe.HCursor
 import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -25,7 +26,6 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Dataset.Filename
 import lucuma.core.model.sequence.Step
 import lucuma.odb.json.sequence.given
-import lucuma.core.enums.ObservationWorkflowState
 
 /** Errors returned from the ODB in the GraphQL response extension. */
 enum OdbError:
