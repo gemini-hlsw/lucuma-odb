@@ -19,7 +19,6 @@ import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.SequenceType
-import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
@@ -30,7 +29,6 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -425,37 +423,32 @@ object Generator {
             }
         }
 
-      private val offset = StepConfig.science.andThen(StepConfig.Science.offset)
-
       private def executionDigest[S, D](
         proto:     ProtoExecutionConfig[S, Atom[D]],
         setupTime: SetupTime
-      ): Either[Error, ExecutionDigest] = {
+      ): Either[Error, ExecutionDigest] =
 
         // Compute the sequence digest from the stream by folding over the steps.
         def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
           s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, atom) =>
-            eDigest.flatMap { digest =>
+            eDigest.flatMap: digest =>
               digest
                 .incrementAtomCount
                 .filter(_.atomCount.value <= SequenceAtomLimit)
                 .toRight(SequenceTooLong)
-                .map { incDigest =>
+                .map: incDigest =>
                   atom.steps.foldLeft(incDigest) { case (d, s) =>
-                    val dʹ = d.add(s.observeClass).add(CategorizedTime.fromStep(s.observeClass, s.estimate))
-                    offset.getOption(s.stepConfig).fold(dʹ)(dʹ.add)
+                    d.add(s.observeClass)
+                     .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
+                     .add(s.telescopeConfig.offset)
                   }
-                }
-            }
           }.toList.head
 
-        for {
-          // Compute the SequenceDigests.
+        // Compute the SequenceDigests.
+        for
           a <- sequenceDigest(proto.acquisition)
           s <- sequenceDigest(proto.science)
-        } yield ExecutionDigest(setupTime, a, s)
-
-      }
+        yield ExecutionDigest(setupTime, a, s)
 
       private def executionConfig[S, D](
         proto:       ProtoExecutionConfig[S, Atom[D]],

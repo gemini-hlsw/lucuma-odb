@@ -48,6 +48,7 @@ import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -255,17 +256,18 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           fpu { builtin }
         }
         stepConfig {
+          stepType
           ... on Gcal {
             continuum
             arcs
           }
-          ... on Science {
-            offset {
-              p { arcseconds }
-              q { arcseconds }
-            }
-            guiding
+        }
+        telescopeConfig {
+          offset {
+            p { arcseconds }
+            q { arcseconds }
           }
+          guiding
         }
         observeClass
       }
@@ -357,23 +359,26 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val ArcStep: StepConfig.Gcal  =
     StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
 
-  def scienceStep(p: Int, q: Int): StepConfig.Science =
-    StepConfig.Science(
+  def telescopeConfig(p: Int, q: Int, g: StepGuideState): TelescopeConfig =
+    TelescopeConfig(
       Offset(
         Offset.P.signedDecimalArcseconds.reverseGet(BigDecimal(p)),
         Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
       ),
-      StepGuideState.Enabled
+      g
     )
 
-  protected def expectedScienceStep(s: StepConfig.Science): Json =
+  protected def expectedTelescopeConfig(p: Int, q: Int, g: StepGuideState): Json =
+    expectedTelescopeConfig(telescopeConfig(p, q, g))
+
+  protected def expectedTelescopeConfig(t: TelescopeConfig): Json =
     json"""
       {
         "offset": {
-          "p": { "arcseconds": ${Angle.signedDecimalArcseconds.get(s.offset.p.toAngle)} },
-          "q": { "arcseconds": ${Angle.signedDecimalArcseconds.get(s.offset.q.toAngle)} }
+          "p": { "arcseconds": ${Angle.signedDecimalArcseconds.get(t.offset.p.toAngle)} },
+          "q": { "arcseconds": ${Angle.signedDecimalArcseconds.get(t.offset.q.toAngle)} }
         },
-        "guiding": ${s.guiding}
+        "guiding": ${t.guiding}
       }
     """
 
@@ -403,26 +408,30 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-  protected def gmosNorthExpectedArc(ditherNm: Int): Json =
+  protected def gmosNorthExpectedArc(ditherNm: Int, p: Int, q: Int): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthArc(ditherNm))},
         "stepConfig" : {
+          "stepType": "GCAL",
           "continuum" : null,
           "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "PARTNER_CAL"
       }
     """
 
-  protected def gmosNorthExpectedFlat(ditherNm: Int): Json =
+  protected def gmosNorthExpectedFlat(ditherNm: Int, p: Int, q: Int): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthFlat(ditherNm))},
         "stepConfig" : {
+          "stepType": "GCAL",
           "continuum" : ${flat.gcalConfig.lamp.continuum},
           "arcs" : []
         },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "PARTNER_CAL"
       }
     """
@@ -431,7 +440,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthScience(ditherNm))},
-        "stepConfig" : ${expectedScienceStep(scienceStep(p, q))},
+        "stepConfig" : { "stepType": "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
         "observeClass" : "SCIENCE"
       }
     """
@@ -440,14 +450,15 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step))},
-        "stepConfig" : ${expectedScienceStep(scienceStep(p, 0))},
+        "stepConfig" : { "stepType":  "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION"
       }
     """
 
   protected def gmosNorthExpectedScienceAtom(ditherNm: Int, p: Int, q: Int, exposures: Int): Json =
     val steps = List(
-      gmosNorthExpectedArc(ditherNm), gmosNorthExpectedFlat(ditherNm)
+      gmosNorthExpectedArc(ditherNm, p, q), gmosNorthExpectedFlat(ditherNm, p, q)
     ) ++ List.fill(exposures)(gmosNorthExpectedScience(ditherNm, p, q))
 
     Json.obj(

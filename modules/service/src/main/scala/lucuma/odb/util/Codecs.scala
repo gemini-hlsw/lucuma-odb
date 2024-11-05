@@ -48,6 +48,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
@@ -650,11 +651,11 @@ trait Codecs {
       )
     }
 
-  val step_config_science: Codec[StepConfig.Science] =
-    (offset *: guide_state).to[StepConfig.Science]
-
   val step_config_smart_gcal: Codec[StepConfig.SmartGcal] =
     smart_gcal_type.to[StepConfig.SmartGcal]
+
+  val telescope_config: Codec[TelescopeConfig] =
+    (offset *: guide_state).to[TelescopeConfig]
 
   val timestamp_interval: Codec[TimestampInterval] =
     (core_timestamp *: core_timestamp).imap { case (min, max) =>

@@ -30,6 +30,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -96,6 +97,7 @@ trait SequenceService[F[_]] {
     atomId:         Atom.Id,
     instrument:     GmosNorth,
     step:           StepConfig,
+    telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
     timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
@@ -105,6 +107,7 @@ trait SequenceService[F[_]] {
     atomId:         Atom.Id,
     instrument:     GmosSouth,
     step:           StepConfig,
+    telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
@@ -169,19 +172,17 @@ object SequenceService {
         staticConfig:  Visit.Id => F[Option[S]],
         dynamicConfig: Step.Id => F[Option[D]]
       )(using Transaction[F]): F[Option[(S, TimeEstimateCalculator.Last[D])]] =
-        for {
+        for
           vid     <- session.option(Statements.SelectLastVisit)(observationId)
           static  <- vid.flatTraverse(staticConfig)
           gcal    <- session.option(Statements.SelectLastGcalConfig)(observationId)
-          science <- session.option(Statements.SelectLastScienceConfig)(observationId)
           step    <- session.option(Statements.SelectLastStepConfig)(observationId)
-          dynamic <- step.flatTraverse { case (id, _, _) => dynamicConfig(id) }
-        } yield static.tupleRight(
+          dynamic <- step.flatTraverse { case (id, _, _, _) => dynamicConfig(id) }
+        yield static.tupleRight(
           TimeEstimateCalculator.Last(
             gcal,
-            science,
-            (step, dynamic).mapN { case ((_, stepConfig, observeClass), d) =>
-              ProtoStep(d, stepConfig, observeClass)
+            (step, dynamic).mapN { case ((_, stepConfig, telescopeConfig, observeClass), d) =>
+              ProtoStep(d, stepConfig, telescopeConfig, observeClass)
             }
           )
         )
@@ -287,16 +288,16 @@ object SequenceService {
         stepConfig: StepConfig
       ): F[Unit] =
         stepConfig match {
-          case StepConfig.Bias | StepConfig.Dark => Applicative[F].unit
-          case s @ StepConfig.Gcal(_, _, _, _)   => session.execute(Statements.InsertStepConfigGcal)(stepId, s).void
-          case s @ StepConfig.Science(_, _)      => session.execute(Statements.InsertStepConfigScience)(stepId, s).void
-          case s @ StepConfig.SmartGcal(_)       => session.execute(Statements.InsertStepConfigSmartGcal)(stepId, s).void
+          case StepConfig.Bias | StepConfig.Dark | StepConfig.Science => Applicative[F].unit
+          case s @ StepConfig.Gcal(_, _, _, _) => session.execute(Statements.InsertStepConfigGcal)(stepId, s).void
+          case s @ StepConfig.SmartGcal(_)     => session.execute(Statements.InsertStepConfigSmartGcal)(stepId, s).void
         }
 
       private def insertStepRecord[S, D](
         atomId:              Atom.Id,
         instrument:          Instrument,
         stepConfig:          StepConfig,
+        telescopeConfig:     TelescopeConfig,
         observeClass:        ObserveClass,
         generatedId:         Option[Step.Id],
         timeEstimate:        (S, TimeEstimateCalculator.Last[D]) => StepEstimate,
@@ -309,7 +310,7 @@ object SequenceService {
           sid <- EitherT.right(UUIDGen[F].randomUUID.map(Step.Id.fromUuid))
           es  <- EitherT.fromOptionF(fos, AtomNotFound(atomId, instrument))
           _   <- EitherT.right(session.execute(Statements.InsertStep)(
-                   sid, atomId, instrument, stepConfig.stepType, observeClass, generatedId, timeEstimate.tupled(es).total
+                   sid, atomId, instrument, stepConfig.stepType, telescopeConfig, observeClass, generatedId, timeEstimate.tupled(es).total
                  )).void
           _   <- EitherT.right(insertStepConfig(sid, stepConfig))
           _   <- EitherT.right(insertDynamicConfig(sid))
@@ -318,39 +319,43 @@ object SequenceService {
           case Success(sid)                  => Result(sid)
 
       override def insertGmosNorthStepRecord(
-        atomId:         Atom.Id,
-        dynamicConfig:  GmosNorth,
-        stepConfig:     StepConfig,
-        observeClass:   ObserveClass,
-        generatedId:    Option[Step.Id],
-        timeCalculator: TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
+        atomId:          Atom.Id,
+        dynamicConfig:   GmosNorth,
+        stepConfig:      StepConfig,
+        telescopeConfig: TelescopeConfig,
+        observeClass:    ObserveClass,
+        generatedId:     Option[Step.Id],
+        timeCalculator:  TimeEstimateCalculator[GmosNorthStatic, GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosNorth,
           stepConfig,
+          telescopeConfig,
           observeClass,
           generatedId,
-          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
+          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
           selectGmosNorthEstimatorState,
           sid => gmosSequenceService.insertGmosNorthDynamic(sid, dynamicConfig)
         )
 
       override def insertGmosSouthStepRecord(
-        atomId:         Atom.Id,
-        dynamicConfig:  GmosSouth,
-        stepConfig:     StepConfig,
-        observeClass:   ObserveClass,
-        generatedId:    Option[Step.Id],
-        timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
+        atomId:          Atom.Id,
+        dynamicConfig:   GmosSouth,
+        stepConfig:      StepConfig,
+        telescopeConfig: TelescopeConfig,
+        observeClass:    ObserveClass,
+        generatedId:     Option[Step.Id],
+        timeCalculator:  TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,
           Instrument.GmosSouth,
           stepConfig,
+          telescopeConfig,
           observeClass,
           generatedId,
-          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, observeClass)),
+          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
           selectGmosSouthEstimatorState,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
         )
@@ -395,6 +400,7 @@ object SequenceService {
       Atom.Id,
       Instrument,
       StepType,
+      TelescopeConfig,
       ObserveClass,
       Option[Step.Id],
       TimeSpan,
@@ -406,6 +412,9 @@ object SequenceService {
           c_atom_id,
           c_instrument,
           c_step_type,
+          c_offset_p,
+          c_offset_q,
+          c_guide_state,
           c_observe_class,
           c_generated_id,
           c_time_estimate
@@ -422,10 +431,11 @@ object SequenceService {
           $atom_id,
           $instrument,
           $step_type,
+          $telescope_config,
           $obs_class,
           ${step_id.opt},
           $time_span
-      """.command.contramap { (s, a, i, t, c, g, d) => (s, a, a, i, t, c, g, d) }
+      """.command.contramap { (s, a, i, st, tc, oc, g, d) => (s, a, a, i, st, tc, oc, g, d) }
 
     def encodeColumns(prefix: Option[String], columns: List[String]): String =
       columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
@@ -457,20 +467,6 @@ object SequenceService {
           $step_config_gcal
       """.command
 
-    private val StepConfigScienceColumns: List[String] =
-      List(
-        "c_offset_p",
-        "c_offset_q",
-        "c_guide_state"
-      )
-
-    val InsertStepConfigScience: Command[(Step.Id, StepConfig.Science)] =
-      sql"""
-        ${insertStepConfigFragment("t_step_config_science", StepConfigScienceColumns)} SELECT
-          $step_id,
-          $step_config_science
-      """.command
-
     private val StepConfigSmartGcalColumns: List[String] =
       List(
         "c_smart_gcal_type"
@@ -487,20 +483,18 @@ object SequenceService {
       (
         step_type               *:
         step_config_gcal.opt    *:
-        step_config_science.opt *:
         step_config_smart_gcal.opt
-      ).eimap { case (stepType, oGcal, oScience, oSmart) =>
+      ).eimap { case (stepType, oGcal, oSmart) =>
         stepType match {
           case StepType.Bias      => StepConfig.Bias.asRight
           case StepType.Dark      => StepConfig.Dark.asRight
           case StepType.Gcal      => oGcal.toRight("Missing gcal step config definition")
-          case StepType.Science   => oScience.toRight("Missing science step config definition")
+          case StepType.Science   => StepConfig.Science.asRight
           case StepType.SmartGcal => oSmart.toRight("Missing smart gcal step config definition")
         }
       } { stepConfig =>
         (stepConfig.stepType,
          StepConfig.gcal.getOption(stepConfig),
-         StepConfig.science.getOption(stepConfig),
          StepConfig.smartGcal.getOption(stepConfig)
         )
       }
@@ -511,7 +505,6 @@ object SequenceService {
           v.c_step_id,
           v.c_step_type,
           #${encodeColumns("v".some, StepConfigGcalColumns)},
-          #${encodeColumns("v".some, StepConfigScienceColumns)},
           #${encodeColumns("v".some, StepConfigSmartGcalColumns)}
         FROM v_step_record v
         INNER JOIN t_atom_record a ON a.c_atom_id = v.c_atom_id
@@ -525,6 +518,7 @@ object SequenceService {
         visit_id             *:
         int4_pos             *:
         step_config          *:
+        telescope_config     *:
         instrument           *:
         dynamic_config       *:
         core_timestamp       *:
@@ -548,8 +542,10 @@ object SequenceService {
           v.c_step_index,
           v.c_step_type,
           #${encodeColumns("v".some, StepConfigGcalColumns)},
-          #${encodeColumns("v".some, StepConfigScienceColumns)},
           #${encodeColumns("v".some, StepConfigSmartGcalColumns)},
+          v.c_offset_p,
+          v.c_offset_q,
+          v.c_guide_state,
           v.c_instrument,
           #${encodeColumns(instAlias.some, instColumns)},
           v.c_created,
@@ -659,27 +655,16 @@ object SequenceService {
         LIMIT 1
       """.query(step_config_gcal)
 
-    val SelectLastScienceConfig: Query[Observation.Id, StepConfig.Science] =
-      sql"""
-        SELECT
-          #${encodeColumns("s".some, StepConfigScienceColumns)}
-        FROM v_step_record s
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
-        WHERE
-          a.c_observation_id = $observation_id AND
-          s.c_step_type      = 'science'
-        ORDER BY s.c_created DESC
-        LIMIT 1
-      """.query(step_config_science)
-
-    val SelectLastStepConfig: Query[Observation.Id, (Step.Id, StepConfig, ObserveClass)] =
+    val SelectLastStepConfig: Query[Observation.Id, (Step.Id, StepConfig, TelescopeConfig, ObserveClass)] =
       sql"""
         SELECT
           s.c_step_id,
           s.c_step_type,
           #${encodeColumns("s".some, StepConfigGcalColumns)},
-          #${encodeColumns("s".some, StepConfigScienceColumns)},
           #${encodeColumns("s".some, StepConfigSmartGcalColumns)},
+          s.c_offset_p,
+          s.c_offset_q,
+          s.c_guide_state,
           s.c_observe_class
         FROM v_step_record s
         INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
@@ -687,7 +672,7 @@ object SequenceService {
           a.c_observation_id = $observation_id
         ORDER BY s.c_created DESC
         LIMIT 1
-      """.query(step_id *: step_config *: obs_class)
+      """.query(step_id *: step_config *: telescope_config *: obs_class)
 
   }
 }

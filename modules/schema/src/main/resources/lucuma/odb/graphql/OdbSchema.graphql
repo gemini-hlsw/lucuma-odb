@@ -2105,6 +2105,9 @@ type GmosNorthStep {
   """
   stepConfig: StepConfig!
 
+  "The telescope configuration at this step."
+  telescopeConfig: TelescopeConfig!
+
   """
   Time estimate for this step's execution
   """
@@ -2508,6 +2511,9 @@ type GmosSouthStep {
   The sequence step itself
   """
   stepConfig: StepConfig!
+
+  "The telescope configuration at this step."
+  telescopeConfig: TelescopeConfig!
 
   """
   Time estimate for this step's execution
@@ -4080,11 +4086,12 @@ type RecordDatasetResult {
 
 "Input parameters for creating a new GmosNorth StepRecord"
 input RecordGmosNorthStepInput {
-  atomId:       AtomId!
-  gmosNorth:    GmosNorthDynamicInput!
-  stepConfig:   StepConfigInput!
-  observeClass: ObserveClass!
-  generatedId:  StepId
+  atomId:          AtomId!
+  gmosNorth:       GmosNorthDynamicInput!
+  stepConfig:      StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass:    ObserveClass!
+  generatedId:     StepId
 }
 
 """
@@ -4119,11 +4126,12 @@ type RecordGmosNorthVisitResult {
 Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
-  atomId:       AtomId!
-  gmosSouth:    GmosSouthDynamicInput!
-  stepConfig:   StepConfigInput!
-  observeClass: ObserveClass!
-  generatedId:  StepId
+  atomId:          AtomId!
+  gmosSouth:       GmosSouthDynamicInput!
+  stepConfig:      StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass:    ObserveClass!
+  generatedId:     StepId
 }
 
 """
@@ -4169,15 +4177,6 @@ input RightAscensionInput {
 Science step
 """
 type Science implements StepConfig {
-  """
-  Offset
-  """
-  offset: Offset!
-
-  """
-  Guide State (whether guiding is enabled for this step)
-  """
-  guiding: GuideState!
 
   """
   Step type is always SCIENCE.
@@ -4562,7 +4561,7 @@ input StepConfigInput {
   """
   Science step creation option
   """
-  science: StepConfigScienceInput
+  science: Boolean
 
   """
   Smart gcal creation option
@@ -4584,24 +4583,10 @@ input StepConfigGcalInput {
 }
 
 """
-Science step creation input
-"""
-input StepConfigScienceInput {
-  """
-  offset position
-  """
-  offset: OffsetInput!
-
-  """
-  Whether guiding is enabled for this step (defaults to 'ENABLED').
-  """
-  guiding: GuideState
-}
-
-"""
 SmartGcal step creation input
 """
 input StepConfigSmartGcalInput {
+
   """
   Smart Gcal type
   """
@@ -4773,11 +4758,12 @@ type TargetEdit {
   """
   editType: EditType!
 
+  targetId: TargetId!
+
   """
   Edited object
   """
-  value: Target!
-  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
+  value: Target
 }
 
 """
@@ -4819,6 +4805,33 @@ input TargetPropertiesInput {
   nonsidereal: NonsiderealInput
   sourceProfile: SourceProfileInput
   existence: Existence
+}
+
+type TelescopeConfig {
+  """
+  Offset
+  """
+  offset: Offset!
+
+  """
+  Guide State (whether guiding is enabled for this step)
+  """
+  guiding: GuideState!
+}
+
+"""
+Science step creation input
+"""
+input TelescopeConfigInput {
+  """
+  Offset position, which defaults to (0, 0) arcsec.
+  """
+  offset: OffsetInput
+
+  """
+  Whether guiding is enabled for this step (defaults to 'ENABLED').
+  """
+  guiding: GuideState
 }
 
 """
@@ -10849,6 +10862,9 @@ type StepRecord {
   instrument-specific 'StepRecord' implementation.
   """
   stepConfig: StepConfig!
+
+  "The telescope configuration for this step."
+  telescopeConfig: TelescopeConfig!
 
   "The observe class of this step."
   observeClass: ObserveClass!
