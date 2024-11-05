@@ -54,6 +54,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -1002,20 +1003,25 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-  val stepConfigScience: String =
+  val stepConfigScienceInput: String =
     """
       stepConfig: {
-        science: {
-          offset: {
-             p: {
-               arcseconds: 0
-             },
-             q: {
-               arcseconds: 10
-             }
-          },
-          guiding: ENABLED
-        }
+        science: true
+      }
+    """
+
+  val telescopeConfigInput: String =
+    """
+      telescopeConfig: {
+        offset: {
+           p: {
+             arcseconds: 0
+           },
+           q: {
+             arcseconds: 10
+           }
+        },
+        guiding: ENABLED
       }
     """
 
@@ -1153,14 +1159,15 @@ trait DatabaseOperations { this: OdbSuite =>
     }
 
   def recordStepAs(user: User, instrument: Instrument, aid: Atom.Id): IO[Step.Id] =
-    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScience)
+    recordStepAs(user, aid, instrument, dynamicConfig(instrument), stepConfigScienceInput, telescopeConfigInput)
 
   def recordStepAs(
-    user:            User,
-    aid:             Atom.Id,
-    instrument:      Instrument,
-    instrumentInput: String,
-    stepConfigInput: String
+    user:                 User,
+    aid:                  Atom.Id,
+    instrument:           Instrument,
+    instrumentInput:      String,
+    stepConfigInput:      String,
+    telescopeConfigInput: String
   ): IO[Step.Id] = {
 
     val name = s"record${instrument.tag}Step"
@@ -1171,6 +1178,7 @@ trait DatabaseOperations { this: OdbSuite =>
           atomId: ${aid.asJson},
           $instrumentInput,
           $stepConfigInput,
+          $telescopeConfigInput,
           observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
         }) {
           stepRecord {
@@ -1195,6 +1203,7 @@ trait DatabaseOperations { this: OdbSuite =>
     instrument:      Instrument,
     instrumentInput: D,
     stepConfig:      StepConfig,
+    telescopeConfig: TelescopeConfig,
     observeClass:    ObserveClass = ObserveClass.Science
   ): IO[Step.Id] = {
 
@@ -1207,12 +1216,13 @@ trait DatabaseOperations { this: OdbSuite =>
         "atomId" -> aid.asJson,
         instrument.fieldName -> instrumentInput.asJson,
         "stepConfig" -> (stepConfig match {
-          case StepConfig.Bias          => Json.obj("bias" -> "true".asJson)
-          case StepConfig.Dark          => Json.obj("dark" -> "true".asJson)
-          case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal" -> step)
-          case StepConfig.Science(_,_)  => Json.obj("science" -> step)
+          case StepConfig.Bias          => Json.obj("bias"      -> true.asJson)
+          case StepConfig.Dark          => Json.obj("dark"      -> true.asJson)
+          case StepConfig.Gcal(_,_,_,_) => Json.obj("gcal"      -> step)
+          case StepConfig.Science       => Json.obj("science"   -> true.asJson)
           case StepConfig.SmartGcal(_)  => Json.obj("smartGcal" -> step)
         }),
+        "telescopeConfig" -> telescopeConfig.asJson,
         "observeClass" -> observeClass.asJson
       )
     )
@@ -1556,7 +1566,7 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(command).use(_.execute(system, id).void))
   }
 
-  def setTargetCalibratioRole(tid: Target.Id, role: CalibrationRole): IO[Unit] = {
+  def setTargetCalibrationRole(tid: Target.Id, role: CalibrationRole): IO[Unit] = {
     val command = sql"update t_target set c_calibration_role = $calibration_role where c_target_id = $target_id".command
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(command).use(_.execute(role, tid).void))

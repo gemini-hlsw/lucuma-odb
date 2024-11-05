@@ -109,12 +109,10 @@ class executionTwilight extends ExecutionTestSupport {
                            customMask { slitWidth }
                          }
                        }
-                       stepConfig {
-                         ... on Science {
-                           offset {
-                             p { arcseconds }
-                             q { arcseconds }
-                           }
+                       telescopeConfig {
+                         offset {
+                           p { arcseconds }
+                           q { arcseconds }
                          }
                        }
                      }
@@ -180,7 +178,7 @@ class executionTwilight extends ExecutionTestSupport {
                                   "customMask": null
                                 }
                               },
-                              "stepConfig": {
+                              "telescopeConfig": {
                                 "offset": {
                                   "p": {
                                     "arcseconds": 0.000000

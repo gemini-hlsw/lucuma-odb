@@ -12,8 +12,10 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -78,11 +80,11 @@ class executionState extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
       yield o
 
@@ -103,13 +105,13 @@ class executionState extends ExecutionTestSupport {
 
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-        s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
       yield o
 

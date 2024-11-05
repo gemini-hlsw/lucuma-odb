@@ -45,6 +45,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlField("executionState", StepRecordView.ExecutionState),
       EffectField("interval",    intervalHandler, List("id")),
       SqlObject("stepConfig"),
+      SqlObject("telescopeConfig"),
       SqlField("observeClass",   StepRecordView.ObserveClass),
       SqlObject("estimate"),
       SqlField("qaState",        StepRecordView.QaState),

@@ -21,17 +21,13 @@ import lucuma.odb.sequence.data.ProtoStep
  *
  * @tparam D instrument dynamic configuration type
  */
-trait ConfigChangeEstimator[D] {
-
+trait ConfigChangeEstimator[D]:
   def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate]
 
-}
-
-object ConfigChangeEstimator {
+object ConfigChangeEstimator:
 
   def using(e: Enums): Applied =
     new Applied(e)
-
 
   class Applied private[ConfigChangeEstimator] (private val enums: Enums) {
 
@@ -40,8 +36,7 @@ object ConfigChangeEstimator {
         ConfigChangeEstimate(tc.name, tc.description, tc.time)
     }
 
-    private abstract class ForInstrument[D] extends ConfigChangeEstimator[D] {
-
+    private abstract class ForInstrument[D] extends ConfigChangeEstimator[D]:
       def check[A: Eq](estimate: enums.TimeEstimate, past: TimeEstimateCalculator.Last[D], present: ProtoStep[D])(f: D => A): Option[ConfigChangeEstimate] =
         Option.when(past.step.map(s => f(s.value)).exists(_ =!= f(present.value)))(
           estimate.toConfigChange
@@ -52,36 +47,30 @@ object ConfigChangeEstimator {
       def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
         instrumentChecks(past, present).flattenOption ++ gcal(past, present) ++ offset(past, present)
 
-    }
-
     lazy val gmosNorth: ConfigChangeEstimator[DynamicConfig.GmosNorth] =
-      new ForInstrument[DynamicConfig.GmosNorth] {
+      new ForInstrument[DynamicConfig.GmosNorth]:
         override def instrumentChecks(past: TimeEstimateCalculator.Last[DynamicConfig.GmosNorth], present: ProtoStep[DynamicConfig.GmosNorth]): List[Option[ConfigChangeEstimate]] =
           List(
             check(enums.TimeEstimate.GmosNorthFilter, past, present)(_.filter),
             check(enums.TimeEstimate.GmosNorthFpu, past, present)(_.fpu),
             check(enums.TimeEstimate.GmosNorthDisperser, past, present)(_.gratingConfig.map(_.grating))
           )
-      }
-
 
     lazy val gmosSouth: ConfigChangeEstimator[DynamicConfig.GmosSouth] =
-      new ForInstrument[DynamicConfig.GmosSouth] {
+      new ForInstrument[DynamicConfig.GmosSouth]:
         override def instrumentChecks(past: TimeEstimateCalculator.Last[DynamicConfig.GmosSouth], present: ProtoStep[DynamicConfig.GmosSouth]): List[Option[ConfigChangeEstimate]] =
           List(
             check(enums.TimeEstimate.GmosSouthFilter, past, present)(_.filter),
             check(enums.TimeEstimate.GmosSouthFpu, past, present)(_.fpu),
             check(enums.TimeEstimate.GmosSouthDisperser, past, present)(_.gratingConfig.map(_.grating))
           )
-      }
 
-
-    private def gcal[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
+    private def gcal[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(
         enums.TimeEstimate.ScienceFold.toConfigChange
       )
 
-      val gcal = (past.gcal, present.stepConfig) match {
+      val gcal = (past.gcal, present.stepConfig) match
         case (Some(p), c@StepConfig.Gcal(_, _, _, _)) =>
 
           def est[A: Eq](estimate: enums.TimeEstimate)(f: StepConfig.Gcal => A): Option[ConfigChangeEstimate] =
@@ -95,30 +84,22 @@ object ConfigChangeEstimator {
 
         case _                                        =>
           Nil
-      }
 
       (scienceFold :: gcal).flattenOption
-    }
 
-    private def offset[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] = {
-      val prevOffset = past.science.fold(Offset.Zero)(_.offset)
-      present.stepConfig match {
-        case StepConfig.Science(curOffset, _) =>
-          Option.when(prevOffset =!= curOffset) {
-            val const  = enums.TimeEstimate.OffsetConstant.time
-            val perArc = enums.TimeEstimate.OffsetDistance.time
-            val dist   = perArc *| Angle.decimalArcseconds.get(prevOffset.distance(curOffset))
-            ConfigChangeEstimate(
-              "Offset",
-              f"Offset cost, ${const.toSeconds}%.0f (constant) + ${dist.toSeconds}%.4f (distance)",
-              const +| dist
-            )
-          }.toList
-        case _                             =>
-          Nil
-      }
-    }
+    private def offset[D](past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
+      val curOffset  = present.telescopeConfig.offset
+      val prevOffset = past.offset
 
+      Option
+        .when(curOffset =!= prevOffset):
+          val const  = enums.TimeEstimate.OffsetConstant.time
+          val perArc = enums.TimeEstimate.OffsetDistance.time
+          val dist   = perArc *| Angle.decimalArcseconds.get(prevOffset.distance(curOffset))
+          ConfigChangeEstimate(
+            "Offset",
+            f"Offset cost, ${const.toSeconds}%.0f (constant) + ${dist.toSeconds}%.4f (distance)",
+            const +| dist
+          )
+        .toList
   }
-
-}

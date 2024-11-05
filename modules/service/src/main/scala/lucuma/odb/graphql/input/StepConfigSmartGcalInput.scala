@@ -6,13 +6,10 @@ package lucuma.odb.graphql.input
 import lucuma.core.model.sequence.StepConfig.SmartGcal
 import lucuma.odb.graphql.binding.*
 
-object StepConfigSmartGcalInput {
-
+object StepConfigSmartGcalInput:
   val Binding: Matcher[SmartGcal] =
     ObjectFieldsBinding.rmap {
       case List(
         SmartGcalTypeBinding("smartGcalType", rSmartGcalType)
-      ) => rSmartGcalType.map { t => SmartGcal(t) }
+      ) => rSmartGcalType.map(SmartGcal.apply)
     }
-
-}

@@ -90,9 +90,7 @@ trait StepConfigMapping[F[_]] extends StepRecordView[F] {
 
   lazy val StepConfigScienceMapping: ObjectMapping =
     ObjectMapping(StepRecordType / "stepConfig" % ScienceType)(
-      SqlField("synthetic_id", StepRecordView.Id, key = true, hidden = true),
-      SqlObject("offset"),
-      SqlField("guiding", StepRecordView.Science.GuideState)
+      SqlField("id", StepRecordView.Id, key = true, hidden = true)
     )
 
   lazy val StepConfigSmartGcalMapping: ObjectMapping =

@@ -49,8 +49,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.StepConfig
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -514,11 +512,6 @@ object GuideService {
               .handleError(e => gaiaError(e.getMessage()).asFailure)
           )
         }.value
-
-      extension [D](steps: NonEmptyList[Step[D]])
-        def offsets: List[Offset] = steps.collect { case Step(_, _, StepConfig.Science(offset, _), _, _, _) =>
-          offset
-        }
 
       extension (target: Target)
         def invalidDate(startDate: Timestamp): Timestamp =
