@@ -611,7 +611,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
       services.useNonTransactionally:
-        observationWorkflowService.setWorkflowState(input.observationId, input.state, commitHash, itcClient)
+        observationWorkflowService.setWorkflowState(input.observationId, input.state, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

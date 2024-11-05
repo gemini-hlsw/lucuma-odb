@@ -58,14 +58,16 @@ sealed trait ObservationWorkflowService[F[_]] {
   def getWorkflow(
     oid: Observation.Id, 
     commitHash: CommitHash, 
-    itcClient: ItcClient[F]
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
     oid: Observation.Id, 
     state: ObservationWorkflowState,
     commitHash: CommitHash, 
-    itcClient: ItcClient[F]
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
 }
@@ -250,14 +252,14 @@ object ObservationWorkflowService {
       private def executionState(
         info: ObservationValidationInfo, 
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
-      )(using Enums, NoTransaction[F]): F[Option[ExecutionState]] =
-        TimeEstimateCalculatorImplementation.fromSession(session, summon).flatMap: ptc =>
-          generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
-            case ObservationExecutionState.NotDefined => None
-            case ObservationExecutionState.NotStarted => None
-            case ObservationExecutionState.Ongoing    => Some(Ongoing)
-            case ObservationExecutionState.Completed  => Some(Completed)
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F]): F[Option[ExecutionState]] =
+        generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
+          case ObservationExecutionState.NotDefined => None
+          case ObservationExecutionState.NotStarted => None
+          case ObservationExecutionState.Ongoing    => Some(Ongoing)
+          case ObservationExecutionState.Completed  => Some(Completed)
         
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
@@ -305,7 +307,7 @@ object ObservationWorkflowService {
           val allowedTransitions: List[ObservationWorkflowState] =
             if info.role.isDefined then Nil // User can't set the state for calibrations
             else state match
-              case Inactive   => List(validationStatus)
+              case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
               case Defined    => List(Inactive) ++ Option.when(isAccepted)(Ready)
@@ -366,11 +368,12 @@ object ObservationWorkflowService {
       private def getWorkflowImpl(
         oid: Observation.Id, 
         commitHash: CommitHash,
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
         getObsInfoAndOtherStuff(oid, itcClient).flatMap: (info, errs) =>
           for
-            ex   <- ResultT.liftF(executionState(info, commitHash, itcClient))
+            ex   <- ResultT.liftF(executionState(info, commitHash, itcClient, ptc))
             pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
             (s, ss) = pair
           yield ObservationWorkflow(s, ss, errs)
@@ -378,9 +381,10 @@ object ObservationWorkflowService {
       override def getWorkflow(
         oid: Observation.Id,
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        getWorkflowImpl(oid, commitHash, itcClient).value
+        getWorkflowImpl(oid, commitHash, itcClient, ptc).value
 
       extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
         ws match
@@ -392,9 +396,10 @@ object ObservationWorkflowService {
         oid: Observation.Id, 
         state: ObservationWorkflowState,
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
-        getWorkflowImpl(oid, commitHash, itcClient).flatMap: w =>
+        getWorkflowImpl(oid, commitHash, itcClient, ptc).flatMap: w =>
           if w.state === state then ResultT.success(w)
           else if !w.validTransitions.contains(state) 
           then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
@@ -408,9 +413,10 @@ object ObservationWorkflowService {
         oid: Observation.Id, 
         state: ObservationWorkflowState,
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        setWorkflowStateImpl(oid, state, commitHash, itcClient).value
+        setWorkflowStateImpl(oid, state, commitHash, itcClient, ptc).value
 
   }
 

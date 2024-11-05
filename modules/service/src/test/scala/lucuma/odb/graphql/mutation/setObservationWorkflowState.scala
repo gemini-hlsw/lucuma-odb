@@ -7,161 +7,60 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
-import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.json.all.transport.given
 
 class setObservationWorkflowState 
-  extends OdbSuite
+  extends ExecutionTestSupport
      with ObservingModeSetupOperations 
      with UpdateConstraintSetOps {
 
-  val pi    = TestUsers.Standard.pi(1, 30)
-  val staff = TestUsers.Standard.staff(3, 103)
-  
-  override def validUsers: List[User] = List(pi, staff)
 
-  // ra and dec values in degrees
-  // val RaStart = 90
-  // val RaCenter = 180
-  // val RaEnd = 270
-  // val RaStartWrap =  RaEnd
-  // val RaCenterWrap = 1
-  // val RaEndWrap = RaStart
-  // val DecStart = 0
-  // val DecCenter = 25
-  // val DecEnd = 45
-  // val Limits = (RaStart, RaEnd, DecStart, DecEnd)
-  // val WrappedLimits = (RaStartWrap, RaEndWrap, DecStart, DecEnd)
+  // required in order to get the correct "complete" execution status below (see executionState.scala)
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.minTimeSpan,
+      PosInt.unsafeFrom(2),
+      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+    )
 
-  // def validationQuery(oid: Observation.Id) = 
-  //   s"""
-  //     query {
-  //       observation(observationId: "$oid") {
-  //         workflow {
-  //           state
-  //           validTransitions
-  //           validationErrors {
-  //             code
-  //             messages
-  //           }
-  //         }
-  //       }
-  //     }
-  //   """
-
-  def itcQuery(oid: Observation.Id) = 
-    s"""
-      query {
-        observation(observationId: "$oid") {
-          itc {
-            science {
-              selected {
-                targetId
+  def computeItcResult(oid: Observation.Id): IO[Unit] =
+    query(
+      pi, 
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            itc {
+              science {
+                selected {
+                  targetId
+                }
               }
             }
           }
         }
-      }
-    """
+      """
+    ).void
 
-  // Load up the cache with an ITC result
-  def computeItcResult(oid: Observation.Id): IO[Unit] =
-    query(pi, itcQuery(oid)).void
-
-  // def queryResult(state: ObservationWorkflowState, states: List[ObservationWorkflowState], errs: ObservationValidation*): Json =
-  //   json"""
-  //     {
-  //       "observation": {
-  //         "workflow": {
-  //           "state": $state,
-  //           "validTransitions": $states,
-  //           "validationErrors": $errs
-  //         }
-  //       }
-  //     }
-  //   """ 
-
-  // // only use this if you have instruments, limits or both. Otherwise use createCallForProposalsAs(...)
-  // def createCfp(
-  //   instruments: List[Instrument] = List.empty,
-  //   limits: Option[(Int, Int, Int, Int)] = none
-  // ): IO[CallForProposals.Id] =
-  //   val inStr = 
-  //     if (instruments.isEmpty) ""
-  //     else s"instruments: [${instruments.map(_.tag.toScreamingSnakeCase).mkString(",")}]\n"
-  //   val limitStr = limits.fold("") { (raStart, raEnd, decStart, decEnd) =>
-  //     s"""
-  //       coordinateLimits: {
-  //         north: {
-  //           raStart: { degrees: $raStart }
-  //           raEnd: { degrees: $raEnd }
-  //           decStart: { degrees: $decStart }
-  //           decEnd: { degrees: $decEnd }
-  //         }
-  //         south: {
-  //           raStart: { degrees: $raStart }
-  //           raEnd: { degrees: $raEnd }
-  //           decStart: { degrees: $decStart }
-  //           decEnd: { degrees: $decEnd }
-  //         }
-  //       }
-  //     """
-  //   }
-  //   createCallForProposalsAs(staff, other = (inStr + limitStr).some)
-
-  // def setTargetCoords(tid: Target.Id, raHours: Int, decHours: Int): IO[Unit] =
-  //   query(
-  //     user = pi,
-  //     query = s"""
-  //       mutation {
-  //         updateTargets(input: {
-  //           SET: {
-  //             sidereal: {
-  //               ra: { degrees: $raHours }
-  //               dec: { degrees: $decHours }
-  //             }
-  //           }
-  //           WHERE: {
-  //             id: { EQ: "$tid" }
-  //           }
-  //         }) {
-  //           targets {
-  //             id
-  //           }
-  //         }
-  //       }
-  //     """
-  //   ).void
-
-  // def setObservationExplicitBase(oid: Observation.Id, raHours: Int, decHours: Int): IO[Unit] =
-  //   query(
-  //     user = pi,
-  //     query = s"""
-  //       mutation {
-  //         updateObservations(input: {
-  //           SET: {
-  //             targetEnvironment: {
-  //               explicitBase: {
-  //                 ra: { degrees: $raHours }
-  //                 dec: { degrees: $decHours }
-  //               }
-  //             }
-  //           },
-  //           WHERE: {
-  //             id: { EQ: ${oid.asJson} }
-  //           }
-  //         }) {
-  //           observations {
-  //             id
-  //           }
-  //         }
-  //       }
-  //     """
-  //   ).void
+  def approveConfigurationRequest(req: ConfigurationRequest.Id): IO[Unit] =
+    import skunk.syntax.all.*
+    import lucuma.odb.util.Codecs.configuration_request_id
+    session.use: s =>
+      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
+        ps.execute(req).void
 
   def queryObservationWorkflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
     query(
@@ -200,6 +99,7 @@ class setObservationWorkflowState
       setObservationWorkflowState(oid, state) >>
       setObservationWorkflowState(oid, current).void
 
+  /** Test that we can change to the specified states and back, and CANNOT change to anything else. */
   def testTransitions(oid: Observation.Id, allowedTransitions: ObservationWorkflowState*): IO[Unit] =
     val legal = allowedTransitions.toList
     val illegal = ObservationWorkflowState.values.toList.filterNot(legal.contains) 
@@ -208,29 +108,19 @@ class setObservationWorkflowState
       interceptOdbError(testTransition(oid, state)):
         case OdbError.InvalidWorkflowTransition(_, `state`, _) => () // ok
 
-  // temporary, until this is doable via graphql
-  def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
-
-
-
   //
   // TESTS START HERE
   ///
 
   import ObservationWorkflowState.*
   
-  test(s"Undefined  <-> Inactive"):
+  test("Undefined  <-> Inactive"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
       _   <- assertIO(queryObservationWorkflowState(oid), Undefined)   
       _   <- testTransitions(oid, Undefined, Inactive)
-    } yield oid
+    } yield ()
 
   test("Unapproved <-> Inactive") {
     for {
@@ -244,7 +134,7 @@ class setObservationWorkflowState
       _   <- computeItcResult(oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Unapproved)   
       _   <- testTransitions(oid, Unapproved, Inactive)
-    } yield oid
+    } yield ()
   }
 
   test("Defined    <-> Inactive        (proposal not yet accepted)"):
@@ -254,11 +144,11 @@ class setObservationWorkflowState
       _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
       _   <- computeItcResult(oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)   
       _   <- testTransitions(oid, Defined, Inactive)
-    } yield oid
+    } yield ()
 
 
   test("Defined    <-> Inactive, Ready (proposal accepted)"):
@@ -270,16 +160,48 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
       _   <- computeItcResult(oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)   
       _   <- testTransitions(oid, Defined, Inactive, Ready)
-    } yield oid
+    } yield ()
 
-  test("Ongoing    <-> Inactive".ignore):
-    ()
+  // (see executionState.scala)
+  test("Ongoing    <-> Inactive"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+      _  <- addEndStepEvent(s0)
+      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+      _  <- addEndStepEvent(s1)
+      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+      _  <- addEndStepEvent(s2)
+      _   <- assertIO(queryObservationWorkflowState(o), Ongoing)   
+      _   <- testTransitions(o, Ongoing, Inactive)
+    yield ()
 
-  test("Completed  <->".ignore):
-    ()
+// (see executionState.scala)
+  test("Completed  <->"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, ObserveClass.PartnerCal)
+      _  <- addEndStepEvent(s0)
+      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, ObserveClass.PartnerCal)
+      _  <- addEndStepEvent(s1)
+      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+      _  <- addEndStepEvent(s2)
+      s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), scienceStep(0, 0), ObserveClass.Science)
+      _  <- addEndStepEvent(s3)
+      _  <- assertIO(queryObservationWorkflowState(o), Completed)   
+      _  <- testTransitions(o, Completed)
+    yield ()
 
 }
