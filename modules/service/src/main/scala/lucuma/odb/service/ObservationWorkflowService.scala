@@ -34,6 +34,8 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -50,8 +52,6 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 
 sealed trait ObservationWorkflowService[F[_]] {
 

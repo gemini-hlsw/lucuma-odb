@@ -4,9 +4,9 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
-import lucuma.odb.graphql.binding.*
-import lucuma.core.model.Observation
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.model.Observation
+import lucuma.odb.graphql.binding.*
 
 final case class SetObservationWorkflowStateInput(
   observationId: Observation.Id,
