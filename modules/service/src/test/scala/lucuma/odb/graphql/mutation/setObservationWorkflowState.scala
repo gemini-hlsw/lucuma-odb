@@ -12,9 +12,11 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
@@ -22,8 +24,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
-import lucuma.core.enums.StepGuideState
-import lucuma.core.model.sequence.StepConfig
 
 class setObservationWorkflowState 
   extends ExecutionTestSupport
