@@ -80,6 +80,7 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
+import lucuma.odb.service.ObservationWorkflowService
 
 
 // Codecs for some atomic types.
@@ -710,6 +711,18 @@ trait Codecs {
 
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
+
+  val observation_workflow_state: Codec[ObservationWorkflowState] = 
+    enumerated[ObservationWorkflowState](Type("e_workflow_user_state"))
+
+  val user_state: Codec[ObservationWorkflowService.UserState] =
+    import ObservationWorkflowService.UserState
+    import ObservationWorkflowState.*
+    observation_workflow_state.eimap[UserState] {
+      case Inactive   => Right(Inactive)
+      case Ready      => Right(Ready)
+      case s          => Left(s"Invalid user state: $s")
+    } (a => a: ObservationWorkflowState)
 
 }
 
