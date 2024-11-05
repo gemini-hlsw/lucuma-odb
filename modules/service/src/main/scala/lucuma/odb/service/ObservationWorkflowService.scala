@@ -34,6 +34,8 @@ import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -56,7 +58,16 @@ sealed trait ObservationWorkflowService[F[_]] {
   def getWorkflow(
     oid: Observation.Id, 
     commitHash: CommitHash, 
-    itcClient: ItcClient[F]
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
+
+  def setWorkflowState(
+    oid: Observation.Id, 
+    state: ObservationWorkflowState,
+    commitHash: CommitHash, 
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
 }
@@ -69,6 +80,7 @@ case class ObservationValidationInfo(
   ra: Option[RightAscension],
   dec: Option[Declination],
   role: Option[CalibrationRole],
+  userState: Option[ObservationWorkflowService.UserState],
   proposalStatus: Tag,
   cfpid: Option[CallForProposals.Id],
 ) {
@@ -84,6 +96,12 @@ case class ObservationValidationInfo(
 
 
 object ObservationWorkflowService {
+
+  // Construct some finer-grained types to make it harder to do something dumb in the status computation.
+  import ObservationWorkflowState.*
+  type UserState       = Inactive.type  | Ready.type
+  type ExecutionState  = Ongoing.type   | Completed.type
+  type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
   /* Validation Messages */
   object Messages:
@@ -231,23 +249,17 @@ object ObservationWorkflowService {
             case Some(lst) if lst.forall(_.status === ConfigurationRequestStatus.Denied) => m.add(ObservationValidation.configurationRequestDenied)
             case _ => m.add(ObservationValidation.configurationRequestPending)
 
-      // Construct some finer-grained types to make it harder to do something dumb in the status computation.
-      import ObservationWorkflowState.*
-      type UserState       = Inactive.type  | Ready.type
-      type ExecutionState  = Ongoing.type   | Completed.type
-      type ValidationState = Undefined.type | Unapproved.type | Defined.type
-
       private def executionState(
         info: ObservationValidationInfo, 
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
-      )(using Enums, NoTransaction[F]): F[Option[ExecutionState]] =
-        TimeEstimateCalculatorImplementation.fromSession(session, summon).flatMap: ptc =>
-          generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
-            case ObservationExecutionState.NotDefined => None
-            case ObservationExecutionState.NotStarted => None
-            case ObservationExecutionState.Ongoing    => Some(Ongoing)
-            case ObservationExecutionState.Completed  => Some(Completed)
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F]): F[Option[ExecutionState]] =
+        generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
+          case ObservationExecutionState.NotDefined => None
+          case ObservationExecutionState.NotStarted => None
+          case ObservationExecutionState.Ongoing    => Some(Ongoing)
+          case ObservationExecutionState.Completed  => Some(Completed)
         
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
@@ -280,7 +292,7 @@ object ObservationWorkflowService {
               
           def userStatus(validationStatus: ValidationState): Option[UserState] =
             if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
-            else None // TODO
+            else info.userState
  
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
@@ -295,7 +307,7 @@ object ObservationWorkflowService {
           val allowedTransitions: List[ObservationWorkflowState] =
             if info.role.isDefined then Nil // User can't set the state for calibrations
             else state match
-              case Inactive   => List(validationStatus)
+              case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
               case Defined    => List(Inactive) ++ Option.when(isAccepted)(Ready)
@@ -356,11 +368,12 @@ object ObservationWorkflowService {
       private def getWorkflowImpl(
         oid: Observation.Id, 
         commitHash: CommitHash,
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
         getObsInfoAndOtherStuff(oid, itcClient).flatMap: (info, errs) =>
           for
-            ex   <- ResultT.liftF(executionState(info, commitHash, itcClient))
+            ex   <- ResultT.liftF(executionState(info, commitHash, itcClient, ptc))
             pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
             (s, ss) = pair
           yield ObservationWorkflow(s, ss, errs)
@@ -368,9 +381,42 @@ object ObservationWorkflowService {
       override def getWorkflow(
         oid: Observation.Id,
         commitHash: CommitHash, 
-        itcClient: ItcClient[F]
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        getWorkflowImpl(oid, commitHash, itcClient).value
+        getWorkflowImpl(oid, commitHash, itcClient, ptc).value
+
+      extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
+        ws match
+          case Inactive => Some(Inactive)
+          case Ready    => Some(Ready)
+          case _        => None
+        
+      private def setWorkflowStateImpl(
+        oid: Observation.Id, 
+        state: ObservationWorkflowState,
+        commitHash: CommitHash, 
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
+        getWorkflowImpl(oid, commitHash, itcClient, ptc).flatMap: w =>
+          if w.state === state then ResultT.success(w)
+          else if !w.validTransitions.contains(state) 
+          then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
+          else ResultT:
+            services.transactionally:
+              session.prepareR(Statements.UpdateUserState).use: pc =>
+                pc.execute(state.asUserState, oid)
+                  .as(Result(w.copy(state = state)))
+
+      override def setWorkflowState(
+        oid: Observation.Id, 
+        state: ObservationWorkflowState,
+        commitHash: CommitHash, 
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
+        setWorkflowStateImpl(oid, state, commitHash, itcClient, ptc).value
 
   }
 
@@ -386,6 +432,7 @@ object ObservationWorkflowService {
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_calibration_role,
+          o.c_workflow_user_state,
           p.c_proposal_status,
           x.c_cfp_id
         FROM t_observation o
@@ -393,7 +440,7 @@ object ObservationWorkflowService {
         LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
         WHERE c_observation_id = $observation_id
       """
-      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: tag *: cfp_id.opt)
+      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: tag *: cfp_id.opt)
       .to[ObservationValidationInfo]
 
 
@@ -439,6 +486,13 @@ object ObservationWorkflowService {
             )
           )
       """.query(science_band)
+
+    val UpdateUserState: Command[(Option[UserState], Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+        SET c_workflow_user_state = ${user_state.opt}
+        WHERE c_observation_id = $observation_id
+      """.command
 
   }
 

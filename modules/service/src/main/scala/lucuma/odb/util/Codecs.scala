@@ -70,6 +70,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.service.ObservationWorkflowService
 import monocle.Prism
 import skunk.*
 import skunk.codec.all.*
@@ -711,6 +712,18 @@ trait Codecs {
 
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
+
+  val observation_workflow_state: Codec[ObservationWorkflowState] = 
+    enumerated[ObservationWorkflowState](Type("e_workflow_user_state"))
+
+  val user_state: Codec[ObservationWorkflowService.UserState] =
+    import ObservationWorkflowService.UserState
+    import ObservationWorkflowState.*
+    observation_workflow_state.eimap[UserState] {
+      case Inactive   => Right(Inactive)
+      case Ready      => Right(Ready)
+      case s          => Left(s"Invalid user state: $s")
+    } (a => a: ObservationWorkflowState)
 
 }
 
