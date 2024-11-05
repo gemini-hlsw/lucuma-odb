@@ -6,13 +6,13 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.data.OdbError
-import cats.syntax.all.*
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class setObservationWorkflowState 
   extends OdbSuite

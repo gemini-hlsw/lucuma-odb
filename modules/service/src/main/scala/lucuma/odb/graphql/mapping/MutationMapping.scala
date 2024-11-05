@@ -75,6 +75,7 @@ import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UnlinkUserInput
@@ -106,7 +107,6 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
