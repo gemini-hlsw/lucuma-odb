@@ -9549,6 +9549,39 @@ type Query {
   ): ObservationSelectResult!
 
   """
+  Observations grouped by commonly held observing modes. Identify the program by
+  specifying only one of programId, programReference, or proposalReference.  If
+  more than one is provided, all must match.  If none are set, nothing will
+  match.
+  """
+  observingModeGroup(
+
+    "Program ID"
+    programId: ProgramId
+
+    "Proposal Reference"
+    proposalReference: ProposalReferenceLabel
+
+    "Program reference"
+    programReference: ProgramReferenceLabel
+
+    """
+    Filters the selection of observations.
+    """
+    WHERE: WhereObservation
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+
+    """
+    Set to true to include deleted values
+    """
+    includeDeleted: Boolean! = false
+  ): ObservingModeGroupSelectResult!
+
+  """
   Returns the program with the given id or reference, if any. Identify the
   program by specifying only one of programId, programReference, or
   proposalReference. If more than one is provided, all must match.  If none are
@@ -9625,21 +9658,6 @@ type Query {
   Metadata for `enum ProposalStatus
   """
   proposalStatusMeta: [ProposalStatusMeta!]!
-
-  # Observations grouped by commonly held science mode
-  # observingModeGroup(
-  #   # Program ID
-  #   programId: ProgramId!
-
-  #   # Filters the selection of observations.
-  #   WHERE: WhereObservation
-
-  #   # Limits the result to at most this number of matches (but never more than 1000).
-  #   LIMIT: NonNegInt
-
-  #   # Set to true to include deleted values
-  #   includeDeleted: Boolean! = false
-  # ): ObservingModeGroupSelectResult!
 
   # Observations grouped by commonly held science requirements
   # scienceRequirementsGroup(

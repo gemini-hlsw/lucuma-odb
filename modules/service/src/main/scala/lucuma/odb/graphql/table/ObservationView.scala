@@ -101,6 +101,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       }
 
       object ObservingMode {
+        val Key: ColumnRef = col("c_mode_key", text)
         val SyntheticId: ColumnRef = col("c_observing_mode_id", observation_id.embedded)
         val ObservingModeType: ColumnRef = col("c_observing_mode_type", observing_mode_type.embedded)
       }
