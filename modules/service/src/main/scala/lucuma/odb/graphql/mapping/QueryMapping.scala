@@ -60,6 +60,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("obsAttachmentTypeMeta"),
       SqlObject("observation"),
       SqlObject("observations"),
+      SqlObject("observingModeGroup"),
       SqlObject("program"),
       SqlObject("programs"),
       SqlObject("programUsers"),
@@ -85,6 +86,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ObsAttachmentTypeMeta,
       Observation,
       Observations,
+      ObservingModeGroup,
       Program,
       Programs,
       ProgramUsers,
@@ -412,6 +414,36 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
+
+  private lazy val ObservingModeGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereObservationBinding = WhereObservation.binding(ObservingModeGroupType / "observations" / "matches")
+    {
+      case (QueryType, "observingModeGroup", List(
+        ProgramIdBinding.Option("programId", rPid),
+        ProposalReferenceBinding.Option("proposalReference", rProp),
+        ProgramReferenceBinding.Option("programReference", rProg),
+        WhereObservationBinding.Option("WHERE", rWHERE),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      )) =>
+        Elab.transformChild: child =>
+          (programPredicate(rPid, rProp, rProg, Predicates.observingModeGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap: (program, WHERE, LIMIT, includeDeleted) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit): q =>
+              FilterOrderByOffsetLimit(
+                pred = and(List(
+                  WHERE.getOrElse(True),
+                  program,
+                  Predicates.observingModeGroup.observations.matches.existence.includeDeleted(includeDeleted),
+                  Predicates.observingModeGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
+                  Predicates.observingModeGroup.observations.matches.program.isVisibleTo(user),
+                )).some,
+                oss    = List(OrderSelection[String](ObservingModeGroupType / "key")).some,
+                offset = none,
+                limit  = (limit + 1).some, // Select one extra row here.
+                child  = q
+              )
+      }
 
   private def programPredicate(
     rPid:  Result[Option[model.Program.Id]],

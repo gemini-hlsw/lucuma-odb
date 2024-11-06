@@ -167,8 +167,10 @@ object OdbMapping {
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
-          with ObservingModeMapping[F]
           with ObservationSelectResultMapping[F]
+          with ObservingModeGroupMapping[F]
+          with ObservingModeGroupSelectResultMapping[F]
+          with ObservingModeMapping[F]
           with OffsetMapping[F]
           with ParallaxMapping[F]
           with PartnerSplitMapping[F]
@@ -361,6 +363,8 @@ object OdbMapping {
                 ObservationEditMapping,
                 ObservationMapping,
                 ObservationReferenceMapping,
+                ObservingModeGroupMapping,
+                ObservingModeGroupSelectResultMapping,
                 ObservingModeMapping,
                 ParallaxMapping,
                 PartnerSplitMapping,
