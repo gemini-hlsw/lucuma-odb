@@ -7,8 +7,8 @@ package mapping
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Predicate
-import grackle.Predicate.and
 import grackle.Predicate.True
+import grackle.Predicate.and
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef

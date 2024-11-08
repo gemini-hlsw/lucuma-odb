@@ -9844,11 +9844,6 @@ type ObservingMode {
 
 type ObservingModeGroup {
   """
-  IDs of observations that use the same constraints
-  """
-  observationIds: [ObservationId!]!
-
-  """
   Observations associated with the common value
   """
   observations(
@@ -9872,6 +9867,11 @@ type ObservingModeGroup {
   Commonly held value across the observations
   """
   observingMode: ObservingMode
+
+  """
+  Link back to program.
+  """
+  program: Program!
 }
 
 """
