@@ -214,3 +214,60 @@ CREATE OR REPLACE VIEW v_observation AS
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id
   LEFT JOIN t_gmos_north_long_slit mode_gnls ON o.c_observation_id = mode_gnls.c_observation_id
   LEFT JOIN t_gmos_south_long_slit mode_gsls ON o.c_observation_id = mode_gsls.c_observation_id;
+
+-- Update these views to get the new default binning column
+DROP VIEW v_gmos_north_long_slit;
+
+CREATE OR REPLACE VIEW v_gmos_north_long_slit AS
+SELECT
+  m.*,
+  o.c_image_quality,
+  t.c_source_profile
+FROM
+  t_gmos_north_long_slit m
+INNER JOIN t_observation o
+  ON m.c_observation_id = o.c_observation_id
+LEFT JOIN v_asterism_single_target_for_long_slit a
+  ON m.c_observation_id = a.c_observation_id
+LEFT JOIN t_target t
+  ON a.c_target_id      = t.c_target_id;
+
+DROP VIEW v_gmos_south_long_slit;
+
+CREATE OR REPLACE VIEW v_gmos_south_long_slit AS
+SELECT
+  m.*,
+  o.c_image_quality,
+  t.c_source_profile
+FROM
+  t_gmos_south_long_slit m
+INNER JOIN t_observation o
+  ON m.c_observation_id = o.c_observation_id
+LEFT JOIN v_asterism_single_target_for_long_slit a
+  ON m.c_observation_id = a.c_observation_id
+LEFT JOIN t_target t
+  ON a.c_target_id      = t.c_target_id;
+
+CREATE OR REPLACE FUNCTION trigger_set_gmos_long_slit_default_binning()
+RETURNS TRIGGER AS $$
+BEGIN
+  CALL set_gmos_long_slit_default_binning(NEW.c_observation_id);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER gmos_north_long_slit_binning_trigger
+AFTER INSERT ON t_gmos_north_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
+
+CREATE TRIGGER gmos_south_long_slit_binning_trigger
+AFTER INSERT ON t_gmos_south_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
+
+CREATE TRIGGER asterism_target_binning_trigger
+AFTER INSERT ON t_asterism_target
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
+

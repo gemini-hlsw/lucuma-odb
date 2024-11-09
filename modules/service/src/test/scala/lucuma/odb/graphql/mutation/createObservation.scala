@@ -34,22 +34,16 @@ import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.TimeAccountingCategory
-import lucuma.core.math.Angle
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.model.sequence.gmos.binning.northSpectralBinning
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
-
-import scala.collection.immutable.SortedMap
 
 class createObservation extends OdbSuite {
 
@@ -984,6 +978,8 @@ class createObservation extends OdbSuite {
                   nanometers
                 }
                 xBin,
+                explicitXBin,
+                defaultXBin,
                 yBin,
                 explicitYBin
                 defaultYBin
@@ -1011,6 +1007,8 @@ class createObservation extends OdbSuite {
            longSlit.downIO[GmosNorthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
            longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosXBinning]("defaultXBin"),
            longSlit.downIO[GmosYBinning]("yBin"),
            longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
            longSlit.downIO[GmosYBinning]("defaultYBin"),
@@ -1023,6 +1021,8 @@ class createObservation extends OdbSuite {
            Some(GmosNorthFilter.GPrime),
            GmosNorthFpu.LongSlit_0_25,
            234.56,
+           GmosXBinning.One,
+           None,
            GmosXBinning.One,
            GmosYBinning.Two,
            Some(GmosYBinning.Two),
@@ -1068,6 +1068,8 @@ class createObservation extends OdbSuite {
               longSlit.downIO[GmosNorthFpu]("fpu"),
               longSlit.downIO[Double]("centralWavelength", "nanometers"),
               longSlit.downIO[GmosXBinning]("xBin"),
+              longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+              longSlit.downIO[GmosXBinning]("defaultXBin"),
               longSlit.downIO[GmosYBinning]("yBin"),
               longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
               longSlit.downIO[GmosYBinning]("defaultYBin"),
@@ -1080,7 +1082,9 @@ class createObservation extends OdbSuite {
               Some(GmosNorthFilter.GPrime),
               GmosNorthFpu.LongSlit_5_00,
               234.56,
-              northSpectralBinning(GmosNorthFpu.LongSlit_5_00, SourceProfile.Gaussian(Angle.fromMicroarcseconds(647200), SpectralDefinition.BandNormalized(none, SortedMap.empty)), ImageQuality.PointOne, GmosNorthGrating.B1200_G5301),
+              GmosXBinning.Two,
+              None,
+              GmosXBinning.Two,
               GmosYBinning.Two,
               Some(GmosYBinning.Two),
               GmosYBinning.Two,
@@ -1106,6 +1110,8 @@ class createObservation extends OdbSuite {
            longSlit.downIO[GmosSouthFpu]("fpu"),
            longSlit.downIO[Double]("centralWavelength", "nanometers"),
            longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosXBinning]("defaultXBin"),
            longSlit.downIO[GmosYBinning]("yBin"),
            longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
            longSlit.downIO[GmosYBinning]("defaultYBin"),
@@ -1118,6 +1124,8 @@ class createObservation extends OdbSuite {
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
            234.56,
+           GmosXBinning.One,
+           None,
            GmosXBinning.One,
            GmosYBinning.Two,
            Some(GmosYBinning.Two),

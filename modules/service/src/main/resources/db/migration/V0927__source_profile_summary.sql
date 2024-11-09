@@ -19,15 +19,12 @@ DECLARE
 BEGIN
   SELECT
     COALESCE(
-      CASE WHEN src_profile->'point'    IS NOT NULL THEN 'point'::e_source_profile_type    END,
-      CASE WHEN src_profile->'uniform'  IS NOT NULL THEN 'uniform'::e_source_profile_type  END,
-      CASE WHEN src_profile->'gaussian' IS NOT NULL THEN 'gaussian'::e_source_profile_type END
+      CASE WHEN src_profile -> 'point'    ?| array['bandNormalized', 'emissionLines']  THEN 'point'::e_source_profile_type    END,
+      CASE WHEN src_profile -> 'uniform'  ?| array['bandNormalized', 'emissionLines']  THEN 'uniform'::e_source_profile_type  END,
+      CASE WHEN src_profile -> 'gaussian' ?  'fwhm'                                    THEN 'gaussian'::e_source_profile_type END
     ),
     -- We only have a fwhm for gaussian profiles, otherwise it is null.
-    CASE WHEN src_profile->'gaussian' ? 'fwhm'
-         THEN (src_profile->'gaussian'->'fwhm'->>'microarcseconds')::d_angle_µas
-         ELSE NULL
-    END
+    (src_profile->'gaussian'->'fwhm'->>'microarcseconds')::d_angle_µas
   INTO profile_type, fwhm;
 
   IF profile_type IS NULL THEN
