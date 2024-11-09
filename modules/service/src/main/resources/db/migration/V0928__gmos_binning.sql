@@ -59,7 +59,7 @@ CREATE OR REPLACE FUNCTION calculate_gmos_long_slit_spectral_binning(
   slit_µas      d_angle_µas,
   dispersion_pm smallint,
   resolution    smallint,
-  blaze_pm      smallint,
+  blaze_nm      smallint,
   src_profile   jsonb,
   sampling      double precision
 )
@@ -73,7 +73,7 @@ DECLARE
 BEGIN
   SELECT calculate_effective_width(iq, slit_µas, src_profile) INTO eff_width_µas;
   eff_res_as := resolution::double precision / 2.0 / (eff_width_µas::double precision / 1000000.0);
-  n_pix      := (blaze_pm::double precision / 1000.0) / eff_res_as / (dispersion_pm / 1000.0);
+  n_pix      := blaze_nm::double precision / eff_res_as / (dispersion_pm::double precision / 1000.0);
 
   SELECT ARRAY(SELECT c_count FROM t_gmos_binning ORDER BY c_count DESC) INTO binning;
   FOREACH bin IN ARRAY binning
@@ -147,13 +147,13 @@ DECLARE
   slit_µas        d_angle_µas;
   dispersion_pm   smallint;
   resolution      smallint;
-  blaze_pm        smallint;
+  blaze_nm        smallint;
   src_profile     jsonb;
   profiles        jsonb[];
   current_xbin    smallint;
   current_ybin    smallint;
-  min_xbin        smallint := NULL;
-  min_ybin        smallint := NULL;
+  min_xbin        smallint := 100;
+  min_ybin        smallint := 100;
   xbin            d_tag;
   ybin            d_tag;
 BEGIN
@@ -169,7 +169,7 @@ BEGIN
       SELECT c_pixel_size FROM t_gmos_north_detector WHERE c_tag = 'HAMAMATSU' INTO pixel_scale_µas;
 
       SELECT f.c_slit_width, d.c_dispersion_pm, d.c_reference_resolution, d.c_blaze_wavelength_nm
-      INTO slit_µas, dispersion_pm, resolution, blaze_pm
+      INTO slit_µas, dispersion_pm, resolution, blaze_nm
       FROM t_gmos_north_long_slit g
       LEFT JOIN t_gmos_north_fpu       f ON g.c_fpu     = f.c_tag
       LEFT JOIN t_gmos_north_disperser d ON g.c_grating = d.c_tag
@@ -179,10 +179,10 @@ BEGIN
       SELECT c_pixel_size FROM t_gmos_south_detector WHERE c_tag = 'HAMAMATSU' INTO pixel_scale_µas;
 
       SELECT f.c_slit_width, d.c_dispersion_pm, d.c_reference_resolution, d.c_blaze_wavelength_nm
-      INTO slit_µas, dispersion_pm, resolution, blaze_pm
+      INTO slit_µas, dispersion_pm, resolution, blaze_nm
       FROM t_gmos_south_long_slit g
       LEFT JOIN t_gmos_south_fpu       f ON g.c_fpu     = f.c_tag
-      LEFT JOIN t_gmos_north_disperser d ON g.c_grating = d.c_tag
+      LEFT JOIN t_gmos_south_disperser d ON g.c_grating = d.c_tag
       WHERE g.c_observation_id = oid;
 
     ELSE
@@ -193,7 +193,7 @@ BEGIN
     SELECT t.c_source_profile
     FROM t_asterism_target a
     LEFT JOIN t_target t ON a.c_target_id = t.c_target_id
-    WHERE c_observation_id = oid
+    WHERE a.c_observation_id = oid
   ) INTO profiles;
 
   -- HERE we want to compute the spectral (xbin) and spatial (ybin) binning for
@@ -202,7 +202,7 @@ BEGIN
   LOOP
     -- Compute spectral (xbin) and spatial (ybin) binning for each profile
     current_xbin := calculate_gmos_long_slit_spectral_binning(
-      iq, slit_µas, dispersion_pm, resolution, blaze_pm, src_profile, sampling := 2.5
+      iq, slit_µas, dispersion_pm, resolution, blaze_nm, src_profile, sampling := 2.5
     );
     current_ybin := calculate_gmos_long_slit_spatial_binning(
       iq, pixel_scale_µas, src_profile, sampling := 2.5
@@ -216,9 +216,9 @@ BEGIN
   xbin := lookup_bin_tag(min_xbin);
   ybin := lookup_bin_tag(min_ybin);
 
-  RAISE NOTICE 'xbin %, ybin %', xbin, ybin;
-
-  EXECUTE format('UPDATE t_%I SET c_xbin_default = $1, c_ybin_default = $2 WHERE c_observation_id = $3', mode::text)
-  USING xbin, ybin, oid;
+  IF xbin IS NOT NULL AND ybin IS NOT NULL THEN
+    EXECUTE format('UPDATE t_%I SET c_xbin_default = $1, c_ybin_default = $2 WHERE c_observation_id = $3', mode::text)
+    USING xbin, ybin, oid;
+  END IF;
 END;
 $$ LANGUAGE plpgsql;
