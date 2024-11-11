@@ -248,26 +248,39 @@ LEFT JOIN v_asterism_single_target_for_long_slit a
 LEFT JOIN t_target t
   ON a.c_target_id      = t.c_target_id;
 
+-- Set up triggers to maintain the default binning value.
+
 CREATE OR REPLACE FUNCTION trigger_set_gmos_long_slit_default_binning()
 RETURNS TRIGGER AS $$
+DECLARE
+  oid d_observation_id;
 BEGIN
-  CALL set_gmos_long_slit_default_binning(NEW.c_observation_id);
+  SELECT COALESCE(NEW.c_observation_id, OLD.c_observation_id) INTO oid;
+  CALL set_gmos_long_slit_default_binning(oid);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER gmos_north_long_slit_binning_trigger
-AFTER INSERT ON t_gmos_north_long_slit
+AFTER INSERT OR DELETE OR UPDATE OF c_fpu, c_grating
+ON t_gmos_north_long_slit
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
 
 CREATE TRIGGER gmos_south_long_slit_binning_trigger
-AFTER INSERT ON t_gmos_south_long_slit
+AFTER INSERT OR DELETE OR UPDATE OF c_fpu, c_grating
+ON t_gmos_south_long_slit
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
 
 CREATE TRIGGER asterism_target_binning_trigger
-AFTER INSERT ON t_asterism_target
+AFTER INSERT OR DELETE
+ON t_asterism_target
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
 
+CREATE TRIGGER observation_binning_trigger
+AFTER INSERT OR UPDATE OF c_image_quality
+ON t_observation
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
