@@ -4,70 +4,124 @@
 package lucuma.odb.graphql
 package query
 
-import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ImageQuality
-import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Semester
+import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.toScreamingSnakeCase
 
-class constraintSetGroup extends OdbSuite {
+class observingModeGroup extends OdbSuite:
 
   val pi         = TestUsers.Standard.pi(nextId, nextId)
   val staff      = TestUsers.Standard.staff(nextId, nextId)
   val validUsers = List(pi, staff)
 
-  def createObservation(user: User, pid: Program.Id, iq: ImageQuality, sb: SkyBackground): IO[Observation.Id] =
+  private def siteName(site: Site): String =
+    site match
+      case Site.GN => "North"
+      case Site.GS => "South"
+
+  private def createObservation(
+    user:     User,
+    pid:      Program.Id,
+    site:     Site,
+    grating:  String,
+    fpu:      String = "LONG_SLIT_0_25",
+    xbin:     Option[GmosXBinning] = None,
+    ybin:     Option[GmosYBinning] = None,
+    iq:       ImageQuality = ImageQuality.TwoPointZero,
+    asterism: List[Target.Id] = Nil
+  ): IO[Observation.Id] =
     query(
-      user = user,
-      query =
-        s"""
-          mutation {
-            createObservation(input: {
-            programId: ${pid.asJson},
-              SET: {
-                constraintSet: {
-                  imageQuality: ${iq.tag.toUpperCase}
-                  skyBackground: ${sb.tag.toUpperCase}
+      user  = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              constraintSet: {
+                imageQuality: ${iq.tag.toUpperCase}
+              }
+              observingMode: {
+                gmos${siteName(site)}LongSlit: {
+                  grating: $grating
+                  filter: G_PRIME
+                  fpu: $fpu
+                  centralWavelength: {
+                    nanometers: 234.56
+                  }
+                  explicitXBin: ${xbin.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                  explicitYBin: ${ybin.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 }
               }
-            }) {
-              observation {
-                id
+              targetEnvironment: {
+                asterism: [ ${asterism.map(_.asJson).mkString(", ")} ]
               }
             }
+          }) {
+            observation {
+              id
+            }
           }
-        """
-    ).map { json =>
-      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  test("constraints should be correctly grouped") {
-    List(pi).traverse { user =>
-      createProgramAs(user).flatMap { pid =>
-        def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
-        (
-          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Dark)
-        ).parTupled.flatMap { (g1, g2, g3) =>
+  test("modes should be correctly grouped"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid, "Biff",
+         """
+            sourceProfile: {
+              gaussian: {
+                fwhm: {
+                  microarcseconds: 647200
+                }
+                spectralDefinition: {
+                  bandNormalized: {
+                    sed: {
+                      stellarLibrary: B5_III
+                    }
+                    brightnesses: []
+                  }
+                }
+              }
+            }
+          """
+      ).flatMap: tid =>
+        def create2(iq: ImageQuality, grating: GmosNorthGrating) =
+          createObservation(
+            pi,
+            pid,
+            Site.GN,
+            grating = grating.tag.toScreamingSnakeCase,
+            iq = iq,
+            asterism =List(tid)
+          ).replicateA(2)
+
+        (create2(ImageQuality.OnePointFive, GmosNorthGrating.B1200_G5301),
+         create2(ImageQuality.PointOne, GmosNorthGrating.R400_G5305),
+         create2(ImageQuality.PointOne, GmosNorthGrating.R831_G5302)
+        ).parTupled.flatMap: (g1, g2, g3) =>
           expect(
-            user = user,
-            query =
-              s"""
+            user = pi,
+            query = s"""
               query {
-                constraintSetGroup(programId: ${pid.asJson}) {
+                observingModeGroup(programId: ${pid.asJson}) {
                   matches {
-                    constraintSet {
-                      imageQuality
-                      skyBackground
+                    observingMode {
+                      gmosNorthLongSlit {
+                        grating
+                      }
                     }
                     observations {
                       matches {
@@ -77,35 +131,38 @@ class constraintSetGroup extends OdbSuite {
                   }
                 }
               }
-              """,
-            expected = Right(
+            """,
+            expected =
               // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
               json"""
                 {
-                  "constraintSetGroup" : {
+                  "observingModeGroup" : {
                     "matches" : [
                       {
-                        "constraintSet" : {
-                          "imageQuality" : "ONE_POINT_FIVE",
-                          "skyBackground" : "BRIGHT"
+                        "observingMode" : {
+                          "gmosNorthLongSlit": {
+                            "grating" : "B1200_G5301"
+                          }
                         },
                         "observations" : {
                           "matches" : ${g1.map { id => Json.obj("id" -> id.asJson) }.asJson }
                         }
                       },
                       {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "BRIGHT"
+                        "observingMode" : {
+                          "gmosNorthLongSlit": {
+                            "grating" : "R400_G5305"
+                          }
                         },
                         "observations" : {
                           "matches" : ${g2.map { id => Json.obj("id" -> id.asJson) }.asJson }
                         }
                       },
                       {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "DARK"
+                        "observingMode" : {
+                          "gmosNorthLongSlit": {
+                            "grating" : "R831_G5302"
+                          }
                         },
                         "observations" : {
                           "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
@@ -114,89 +171,5 @@ class constraintSetGroup extends OdbSuite {
                     ]
                   }
                 }
-              """
+              """.asRight
             )
-          )
-        }
-      }
-    }
-  }
-
-  test("should be able to use a proposal reference") {
-    List(pi).traverse { user =>
-      createProgramAs(user).flatMap { pid =>
-        def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
-        (
-          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Dark)
-        ).parTupled.flatMap { (g1, g2, g3) =>
-          createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
-           addDemoScienceProposal(user, pid, cid)
-          } *>
-          submitProposal(user, pid) *>
-          expectIor(
-            user = user,
-            query =
-              s"""
-              query {
-                constraintSetGroup(proposalReference: "G-2025A-0001") {
-                  matches {
-                    constraintSet {
-                      imageQuality
-                      skyBackground
-                    }
-                    observations {
-                      matches {
-                        id
-                      }
-                    }
-                  }
-                }
-              }
-              """,
-            expected = Ior.right(
-              // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
-              json"""
-                {
-                  "constraintSetGroup" : {
-                    "matches" : [
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "ONE_POINT_FIVE",
-                          "skyBackground" : "BRIGHT"
-                        },
-                        "observations" : {
-                          "matches" : ${g1.map { id => Json.obj("id" -> id.asJson) }.asJson }
-                        }
-                      },
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "BRIGHT"
-                        },
-                        "observations" : {
-                          "matches" : ${g2.map { id => Json.obj("id" -> id.asJson) }.asJson }
-                        }
-                      },
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "DARK"
-                        },
-                        "observations" : {
-                          "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
-                        }
-                      }
-                    ]
-                  }
-                }
-              """
-            )
-          )
-        }
-      }
-    }
-  }
-
-}
