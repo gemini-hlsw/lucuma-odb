@@ -103,7 +103,7 @@ BEGIN
     ':',
     observing_mode_type::text,
     grating::text,
-    filter::text,
+    COALESCE(filter::text, 'None'),
     fpu::text,
     central_wavelength::text,
     COALESCE(xbin, xbin_default)::text,
@@ -189,6 +189,13 @@ UNION ALL
     m.c_mode_key,
     o.c_program_id;
 
+-- Add a mode key field on t_observation
+
+ALTER TABLE t_observation
+  ADD COLUMN c_mode_key text NULL;
+
+create index on t_observation (c_mode_key);
+
 -- Replace the observation view to add an observing mode key.
 DROP VIEW v_observation;
 
@@ -203,12 +210,7 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_spec_wavelength_coverage IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_coverage_id,
   CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
-  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time,
-  COALESCE(
-    CASE WHEN o.c_observing_mode_type = 'gmos_north_long_slit' THEN mode_gnls.c_mode_key END,
-    CASE WHEN o.c_observing_mode_type = 'gmos_south_long_slit' THEN mode_gsls.c_mode_key END,
-    NULL
-  ) AS c_mode_key
+  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id
@@ -284,3 +286,37 @@ AFTER INSERT OR UPDATE OF c_image_quality
 ON t_observation
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
+
+-- Set up triggers to update the observation mode key
+
+CREATE OR REPLACE FUNCTION trigger_set_observation_mode_key()
+RETURNS TRIGGER AS $$
+DECLARE
+  oid d_observation_id;
+BEGIN
+  SELECT COALESCE(NEW.c_observation_id, OLD.c_observation_id) INTO oid;
+  UPDATE t_observation SET c_mode_key = NEW.c_mode_key WHERE c_observation_id = oid;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER observing_mode_key_trigger
+AFTER INSERT OR UPDATE OR DELETE ON t_gmos_north_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_observation_mode_key();
+
+CREATE TRIGGER observing_mode_key_trigger
+AFTER INSERT OR UPDATE OR DELETE ON t_gmos_south_long_slit
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_observation_mode_key();
+
+-- Initialize the mode key for existing observations.
+UPDATE t_observation AS o
+SET c_mode_key = g.c_mode_key
+FROM t_gmos_north_long_slit g
+WHERE o.c_observation_id = g.c_observation_id;
+
+UPDATE t_observation AS o
+SET c_mode_key = g.c_mode_key
+FROM t_gmos_south_long_slit g
+WHERE o.c_observation_id = g.c_observation_id;
