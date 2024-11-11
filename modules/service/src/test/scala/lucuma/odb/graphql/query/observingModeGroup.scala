@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
@@ -166,6 +167,85 @@ class observingModeGroup extends OdbSuite:
                         },
                         "observations" : {
                           "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """.asRight
+            )
+
+  test("default bin value matches explicit bin value"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid, "Biff",
+         """
+            sourceProfile: {
+              gaussian: {
+                fwhm: {
+                  microarcseconds: 647200
+                }
+                spectralDefinition: {
+                  bandNormalized: {
+                    sed: {
+                      stellarLibrary: B5_III
+                    }
+                    brightnesses: []
+                  }
+                }
+              }
+            }
+          """
+      ).flatMap: tid =>
+
+        def createObs(bin: Option[GmosXBinning]): IO[Observation.Id] =
+          createObservation(
+              pi,
+              pid,
+              Site.GN,
+              grating  = GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase,
+              fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
+              xbin     = bin,
+              iq       = ImageQuality.PointOne,
+              asterism = List(tid)
+          )
+
+        // Default xbin in first obs, explicit in second obs
+        List(createObs(none), createObs(GmosXBinning.Two.some)).sequence.flatMap: g =>
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observingModeGroup(programId: ${pid.asJson}) {
+                  matches {
+                    observingMode {
+                      gmosNorthLongSlit {
+                        grating
+                        xBin
+                      }
+                    }
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected =
+              json"""
+                {
+                  "observingModeGroup" : {
+                    "matches" : [
+                      {
+                        "observingMode" : {
+                          "gmosNorthLongSlit": {
+                            "grating": "B1200_G5301",
+                            "xBin": "TWO"
+                          }
+                        },
+                        "observations" : {
+                          "matches" : ${g.map { id => Json.obj("id" -> id.asJson) }.asJson }
                         }
                       }
                     ]
