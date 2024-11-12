@@ -63,6 +63,7 @@ ALTER TABLE t_gmos_south_long_slit
 --
 CREATE OR REPLACE FUNCTION format_gmos_long_slit_mode_group(
   site                  e_site,
+  program_id            d_program_id,
   observing_mode_type   e_observing_mode_type,
   grating               d_tag,
   filter                d_tag,
@@ -105,6 +106,7 @@ BEGIN
   -- defaults to 1x1 based on the source profile and image quality, etc.
   RETURN concat_ws(
     ':',
+    program_id::text,
     observing_mode_type::text,
     grating::text,
     COALESCE(filter::text, 'None'),
@@ -124,12 +126,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- Add the program id.  This is not normalizing but this will be needed for
+-- the generated observing mode key below.
+ALTER TABLE t_gmos_north_long_slit
+  ADD COLUMN c_program_id d_program_id;
+
+ALTER TABLE t_gmos_south_long_slit
+  ADD COLUMN c_program_id d_program_id;
+
+UPDATE t_gmos_north_long_slit AS g
+   SET c_program_id = o.c_program_id
+  FROM t_observation o
+ WHERE o.c_observation_id = g.c_observation_id;
+
+UPDATE t_gmos_south_long_slit AS g
+   SET c_program_id = o.c_program_id
+  FROM t_observation o
+ WHERE o.c_observation_id = g.c_observation_id;
+
+ALTER TABLE t_gmos_north_long_slit
+  ALTER COLUMN c_program_id SET NOT NULL;
+
+ALTER TABLE t_gmos_south_long_slit
+  ALTER COLUMN c_program_id SET NOT NULL;
+
 -- Add a generated "mode key" column.  We group on this value to find
 -- observations that share the same observing mode.
 ALTER TABLE t_gmos_north_long_slit
   ADD COLUMN c_mode_key text NOT NULL GENERATED ALWAYS AS (
     format_gmos_long_slit_mode_group(
      'gn',
+      c_program_id,
       c_observing_mode_type,
       c_grating,
       c_filter,
@@ -151,6 +178,7 @@ ALTER TABLE t_gmos_south_long_slit
   ADD COLUMN c_mode_key text NOT NULL GENERATED ALWAYS AS (
     format_gmos_long_slit_mode_group(
      'gs',
+      c_program_id,
       c_observing_mode_type,
       c_grating,
       c_filter,
@@ -198,7 +226,7 @@ UNION ALL
 ALTER TABLE t_observation
   ADD COLUMN c_mode_key text NULL;
 
-create index on t_observation (c_mode_key);
+CREATE index ON t_observation (c_mode_key);
 
 -- Replace the observation view to add the observing mode key.
 DROP VIEW v_observation;
