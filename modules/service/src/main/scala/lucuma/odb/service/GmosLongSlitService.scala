@@ -548,6 +548,7 @@ object GmosLongSlitService {
       sql"""
       INSERT INTO #$table (
         c_observation_id,
+        c_program_id,
         c_observing_mode_type,
         c_grating,
         c_filter,
@@ -567,25 +568,27 @@ object GmosLongSlitService {
       )
       SELECT
         $observation_id,
-        c_observing_mode_type,
-        c_grating,
-        c_filter,
-        c_fpu,
-        c_central_wavelength,
-        c_xbin,
-        c_ybin,
-        c_amp_read_mode,
-        c_amp_gain,
-        c_roi,
-        c_wavelength_dithers,
-        c_spatial_offsets,
-        c_initial_grating,
-        c_initial_filter,
-        c_initial_fpu,
-        c_initial_central_wavelength
-      FROM #$table
-      WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
+        o.c_program_id,
+        g.c_observing_mode_type,
+        g.c_grating,
+        g.c_filter,
+        g.c_fpu,
+        g.c_central_wavelength,
+        g.c_xbin,
+        g.c_ybin,
+        g.c_amp_read_mode,
+        g.c_amp_gain,
+        g.c_roi,
+        g.c_wavelength_dithers,
+        g.c_spatial_offsets,
+        g.c_initial_grating,
+        g.c_initial_filter,
+        g.c_initial_fpu,
+        g.c_initial_central_wavelength
+      FROM #$table g
+      LEFT JOIN t_observation o ON o.c_observation_id = $observation_id
+      WHERE g.c_observation_id = $observation_id
+      """.apply(newId, newId, originalId)
 
     def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       cloneGmosLongSlit("t_gmos_north_long_slit", originalId, newId)
