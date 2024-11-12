@@ -39,6 +39,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val obsAttachment                 = ObsAttachmentPredicates(Path.from(ObsAttachmentType))
     val observation                   = ObservationPredicates(Path.from(ObservationType))
     val observationEdit               = ObservationEditPredicates(Path.from(ObservationEditType))
+    val observingModeGroup            = ObservingModeGroupPredicates(Path.from(ObservingModeGroupType))
     val program                       = ProgramPredicates(Path.from(ProgramType))
     val programEdit                   = ProgramEditPredicates(Path.from(ProgramEditType))
     val programUser                   = ProgramUserPredicates(Path.from(ProgramUserType))

@@ -6,30 +6,23 @@ package mapping
 
 import cats.syntax.all.*
 import coulomb.*
-import grackle.Cursor
 import grackle.Result
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
-import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config
 
@@ -58,9 +51,11 @@ trait GmosLongSlitMapping[F[_]]
     import GmosLongSlitMapping._
 
     val xBin: FieldMapping                = explicitOrElseDefault[GmosXBinning]("xBin", "explicitXBin", "defaultXBin")
+    val defaultXBin: FieldMapping         = SqlField("defaultXBin", cc.XBinDefault)
     val explicitXBin: FieldMapping        = SqlField("explicitXBin", cc.XBin)
 
     val yBin: FieldMapping                = explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin")
+    val defaultYBin: FieldMapping         = SqlField("defaultYBin", cc.YBinDefault)
     val explicitYBin: FieldMapping        = SqlField("explicitYBin", cc.YBin)
 
     val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
@@ -141,23 +136,11 @@ trait GmosLongSlitMapping[F[_]]
       // ---------------------
 
       common.xBin,
-
-      CursorField[GmosXBinning](
-        "defaultXBin",
-        defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
-        List("fpu", "grating", "imageQuality", "sourceProfile")
-      ),
-
+      common.defaultXBin,
       common.explicitXBin,
 
       common.yBin,
-
-      CursorField[GmosYBinning](
-        "defaultYBin",
-        defaultBinning(northBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
-        List("fpu", "grating", "imageQuality", "sourceProfile")
-      ),
-
+      common.defaultYBin,
       common.explicitYBin,
 
       common.ampReadMode,
@@ -248,23 +231,11 @@ trait GmosLongSlitMapping[F[_]]
       // ---------------------
 
       common.xBin,
-
-      CursorField[GmosXBinning](
-        "defaultXBin",
-        defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._1F),
-        List("fpu", "grating", "imageQuality", "sourceProfile")
-      ),
-
+      common.defaultXBin,
       common.explicitXBin,
 
       common.yBin,
-
-      CursorField[GmosYBinning](
-        "defaultYBin",
-        defaultBinning(southBinning(_, _, _, _, sampling = DefaultSampling)).map(_._2F),
-        List("fpu", "grating", "imageQuality", "sourceProfile")
-      ),
-
+      common.defaultYBin,
       common.explicitYBin,
 
       common.ampReadMode,
@@ -337,20 +308,6 @@ trait GmosLongSlitMapping[F[_]]
 }
 
 object GmosLongSlitMapping {
-
-  private def defaultBinning[U: ClassTag, G: ClassTag](
-    f: (U, SourceProfile, ImageQuality, G) => (GmosXBinning, GmosYBinning)
-  ): Cursor => Result[(GmosXBinning, GmosYBinning)] = cursor =>
-    for {
-      fpu <- cursor.fieldAs[U]("fpu")
-      iq  <- cursor.fieldAs[ImageQuality]("imageQuality")
-      j   <- cursor.fieldAs[Option[Json]]("sourceProfile")
-      g   <- cursor.fieldAs[G]("grating")
-      sp  <- j.traverse(json => Result.fromEither(json.as[SourceProfile].leftMap(_.message)))
-    } yield
-      sp.fold((GmosXBinning.One, GmosYBinning.One)) { sourceProfile =>
-        f(fpu, sourceProfile, iq, g)
-      }
 
   private def parseCsvBigDecimals(s: String): List[BigDecimal] =
     s.split(',').toList.map(n => BigDecimal(n.trim))
