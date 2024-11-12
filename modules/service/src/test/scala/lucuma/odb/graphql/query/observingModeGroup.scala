@@ -254,7 +254,7 @@ class observingModeGroup extends OdbSuite:
               """.asRight
             )
 
-  test("distinct observing modes edited to become same".ignore):
+  test("distinct observing modes edited to become same"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid, "Biff",
          """
@@ -327,7 +327,6 @@ class observingModeGroup extends OdbSuite:
                     observations {
                       matches {
                         id
-                        program { id }
                       }
                     }
                   }
