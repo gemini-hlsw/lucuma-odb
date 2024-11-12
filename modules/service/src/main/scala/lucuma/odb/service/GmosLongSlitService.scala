@@ -281,6 +281,7 @@ object GmosLongSlitService {
       sql"""
         INSERT INTO t_gmos_north_long_slit (
           c_observation_id,
+          c_program_id,
           c_grating,
           c_filter,
           c_fpu,
@@ -299,6 +300,7 @@ object GmosLongSlitService {
         )
         SELECT
           $observation_id,
+          c_program_id,
           $gmos_north_grating,
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
@@ -314,7 +316,11 @@ object GmosLongSlitService {
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
           $wavelength_pm
-       """
+        FROM t_observation
+        WHERE c_observation_id = $observation_id
+       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
+         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
+       )}
 
     def insertGmosNorthLongSlit(
       observationId: Observation.Id,
@@ -360,6 +366,7 @@ object GmosLongSlitService {
       sql"""
         INSERT INTO t_gmos_south_long_slit (
           c_observation_id,
+          c_program_id,
           c_grating,
           c_filter,
           c_fpu,
@@ -378,6 +385,7 @@ object GmosLongSlitService {
         )
         SELECT
           $observation_id,
+          c_program_id,
           $gmos_south_grating,
           ${gmos_south_filter.opt},
           $gmos_south_fpu,
@@ -393,7 +401,11 @@ object GmosLongSlitService {
           ${gmos_south_filter.opt},
           $gmos_south_fpu,
           $wavelength_pm
-       """
+        FROM t_observation
+        WHERE c_observation_id = $observation_id
+       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
+         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
+       )}
 
     def insertGmosSouthLongSlit(
       observationId: Observation.Id,
@@ -536,6 +548,7 @@ object GmosLongSlitService {
       sql"""
       INSERT INTO #$table (
         c_observation_id,
+        c_program_id,
         c_observing_mode_type,
         c_grating,
         c_filter,
@@ -555,6 +568,7 @@ object GmosLongSlitService {
       )
       SELECT
         $observation_id,
+        (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id) AS c_program_id,
         c_observing_mode_type,
         c_grating,
         c_filter,
@@ -573,7 +587,7 @@ object GmosLongSlitService {
         c_initial_central_wavelength
       FROM #$table
       WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
+      """.apply(newId, newId, originalId)
 
     def cloneGmosNorthLongSlit(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       cloneGmosLongSlit("t_gmos_north_long_slit", originalId, newId)
