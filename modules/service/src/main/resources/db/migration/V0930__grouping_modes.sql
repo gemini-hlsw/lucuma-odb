@@ -1,4 +1,5 @@
 -- Update the grating tables to add the wavelength dither for each option.
+-- We need this to compute the default wavelength dither pattern.
 
 ALTER TABLE t_gmos_north_disperser
   ADD COLUMN c_wavelength_dither_nm smallint CHECK (c_wavelength_dither_nm > 0);
@@ -38,7 +39,8 @@ ALTER TABLE t_gmos_north_disperser
 ALTER TABLE t_gmos_south_disperser
   ALTER COLUMN c_wavelength_dither_nm SET NOT NULL;
 
--- Create a function to format the default wavelength dither
+-- Computes the default wavelength dither.
+--
 CREATE OR REPLACE FUNCTION gmos_long_slit_default_wavelength_dither(
   dither SMALLINT
 ) RETURNS TEXT AS $$
@@ -56,7 +58,9 @@ ALTER TABLE t_gmos_south_long_slit
   ADD COLUMN c_xbin_default d_tag NOT NULL DEFAULT 'One'::d_tag,
   ADD COLUMN c_ybin_default d_tag NOT NULL DEFAULT 'One'::d_tag;
 
--- A function that will format the GMOS long slit mode into a single text value
+-- Format the GMOS long slit mode into a single text value by concatenating
+-- all the fields into a single String.
+--
 CREATE OR REPLACE FUNCTION format_gmos_long_slit_mode_group(
   site                  e_site,
   observing_mode_type   e_observing_mode_type,
@@ -189,14 +193,14 @@ UNION ALL
     m.c_mode_key,
     o.c_program_id;
 
--- Add a mode key field on t_observation
-
+-- Add a mode key field on t_observation and index on it for fast joins with
+-- the mode group.
 ALTER TABLE t_observation
   ADD COLUMN c_mode_key text NULL;
 
 create index on t_observation (c_mode_key);
 
--- Replace the observation view to add an observing mode key.
+-- Replace the observation view to add the observing mode key.
 DROP VIEW v_observation;
 
 CREATE OR REPLACE VIEW v_observation AS
@@ -217,7 +221,7 @@ CREATE OR REPLACE VIEW v_observation AS
   LEFT JOIN t_gmos_north_long_slit mode_gnls ON o.c_observation_id = mode_gnls.c_observation_id
   LEFT JOIN t_gmos_south_long_slit mode_gsls ON o.c_observation_id = mode_gsls.c_observation_id;
 
--- Update these views to get the new default binning column
+-- Update the long slit views to get the new default binning column
 DROP VIEW v_gmos_north_long_slit;
 
 CREATE OR REPLACE VIEW v_gmos_north_long_slit AS
@@ -276,7 +280,7 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
 
 CREATE TRIGGER asterism_target_binning_trigger
-AFTER INSERT OR DELETE
+AFTER INSERT OR DELETE OR UPDATE
 ON t_asterism_target
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
@@ -287,7 +291,8 @@ ON t_observation
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_long_slit_default_binning();
 
--- Set up triggers to update the observation mode key
+-- Set up triggers to update the observation mode key when the underlying
+-- observing mode table calculation changes.
 
 CREATE OR REPLACE FUNCTION trigger_set_observation_mode_key()
 RETURNS TRIGGER AS $$
@@ -301,12 +306,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER observing_mode_key_trigger
-AFTER INSERT OR UPDATE OR DELETE ON t_gmos_north_long_slit
+AFTER INSERT OR DELETE OR UPDATE OF c_mode_key ON t_gmos_north_long_slit
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_observation_mode_key();
 
 CREATE TRIGGER observing_mode_key_trigger
-AFTER INSERT OR UPDATE OR DELETE ON t_gmos_south_long_slit
+AFTER INSERT OR DELETE OR UPDATE OF c_mode_key ON t_gmos_south_long_slit
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_observation_mode_key();
 

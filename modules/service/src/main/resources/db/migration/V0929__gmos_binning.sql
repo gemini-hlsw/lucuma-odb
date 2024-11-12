@@ -1,4 +1,3 @@
---
 -- Object angular size estimate based on image quality and source profile.
 --
 CREATE OR REPLACE FUNCTION calculate_object_size(
@@ -33,7 +32,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
---
 -- The effective width of the object, which is the object size estimate but
 -- limited by the slit width.
 --
@@ -51,7 +49,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
---
 -- GMOS longslit spectral binning calculation.
 --
 CREATE OR REPLACE FUNCTION calculate_gmos_long_slit_spectral_binning(
@@ -87,7 +84,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
---
 -- GMOS longslit spatial binning calculation.
 --
 CREATE OR REPLACE FUNCTION calculate_gmos_long_slit_spatial_binning(
@@ -128,15 +124,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
---
--- (xbin, ybin) tuple
---
-CREATE TYPE gmos_binning AS (
-  xbin d_tag,
-  ybin d_tag
-);
-
 -- Set the default binning.
+--
 CREATE OR REPLACE PROCEDURE set_gmos_long_slit_default_binning(
   oid d_observation_id
 ) AS $$
@@ -158,12 +147,14 @@ DECLARE
   ybin            d_tag;
 BEGIN
 
+  -- Determine the IQ and observing mode.
   SELECT q.c_value, o.c_observing_mode_type
   INTO iq, mode
   FROM t_observation o
   LEFT JOIN t_image_quality q on o.c_image_quality = q.c_tag
   WHERE o.c_observation_id = oid;
 
+  -- Lookup the slit width, dispersion, resolution and blaze wavelength.
   CASE
     WHEN mode = 'gmos_north_long_slit' THEN
       SELECT c_pixel_size FROM t_gmos_north_detector WHERE c_tag = 'HAMAMATSU' INTO pixel_scale_µas;
@@ -186,9 +177,11 @@ BEGIN
       WHERE g.c_observation_id = oid;
 
     ELSE
+      -- Only applies ot GMOS Long Slit.
       RETURN;
   END CASE;
 
+  -- Get all the source profiles in the asterism.
   SELECT ARRAY(
     SELECT t.c_source_profile
     FROM t_asterism_target a
@@ -213,9 +206,11 @@ BEGIN
     min_ybin := LEAST(COALESCE(min_ybin, current_ybin), current_ybin);
   END LOOP;
 
+  -- Turn the binning number into a d_tag, if possible.
   xbin := lookup_bin_tag(min_xbin);
   ybin := lookup_bin_tag(min_ybin);
 
+  -- Set the binning in the appropriate long slit table (north or south).
   IF xbin IS NOT NULL AND ybin IS NOT NULL THEN
     EXECUTE format('UPDATE t_%I SET c_xbin_default = $1, c_ybin_default = $2 WHERE c_observation_id = $3', mode::text)
     USING xbin, ybin, oid;

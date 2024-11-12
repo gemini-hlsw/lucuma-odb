@@ -443,7 +443,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 limit  = (limit + 1).some, // Select one extra row here.
                 child  = q
               )
-      }
+    }
 
   private def programPredicate(
     rPid:  Result[Option[model.Program.Id]],
