@@ -9866,7 +9866,7 @@ type ObservingModeGroup {
   """
   Commonly held value across the observations
   """
-  observingMode: ObservingMode
+  observingMode: ObservingMode!
 
   """
   Link back to program.

@@ -1,14 +1,21 @@
+-- Source profile type discriminator
+--
 CREATE TYPE e_source_profile_type AS ENUM(
   'point',
   'uniform',
   'gaussian'
 );
 
+-- Summary of source profile information useful for determining object size,
+-- and therefore impacting the binning calculation.
+--
 CREATE TYPE source_profile_summary AS (
   c_profile_type e_source_profile_type,
   c_fwhm         d_angle_µas
 );
 
+-- Extracts the source profile summary from the source profile JSONB.
+--
 CREATE OR REPLACE FUNCTION extract_source_profile_summary(
   src_profile  jsonb
 )

@@ -253,3 +253,105 @@ class observingModeGroup extends OdbSuite:
                 }
               """.asRight
             )
+
+  test("distinct observing modes edited to become same".ignore):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid, "Biff",
+         """
+            sourceProfile: {
+              gaussian: {
+                fwhm: {
+                  microarcseconds: 647200
+                }
+                spectralDefinition: {
+                  bandNormalized: {
+                    sed: {
+                      stellarLibrary: B5_III
+                    }
+                    brightnesses: []
+                  }
+                }
+              }
+            }
+          """
+      ).flatMap: tid =>
+
+        def createObs(grating: GmosNorthGrating): IO[Observation.Id] =
+          createObservation(
+              pi,
+              pid,
+              Site.GN,
+              grating  = grating.tag.toScreamingSnakeCase,
+              fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
+              iq       = ImageQuality.PointOne,
+              asterism = List(tid)
+          )
+
+        for {
+          o1 <- createObs(GmosNorthGrating.B1200_G5301)
+          o2 <- createObs(GmosNorthGrating.R400_G5305)
+          _  <- query(
+            user  = pi,
+            query = s"""
+              mutation {
+                updateObservations(input: {
+                  SET: {
+                    observingMode: {
+                      gmosNorthLongSlit: {
+                        grating: ${GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase}
+                      }
+                    }
+                  }
+                  WHERE: {
+                    id: { EQ: "${o2.toString}" }
+                  }
+                }) {
+                  observations {
+                    id
+                  }
+                }
+              }
+            """
+          )
+          _ <-  expect(
+            user = pi,
+            query = s"""
+              query {
+                observingModeGroup(programId: ${pid.asJson}) {
+                  matches {
+                    observingMode {
+                      gmosNorthLongSlit {
+                        grating
+                      }
+                    }
+                    observations {
+                      matches {
+                        id
+                        program { id }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected =
+              json"""
+                {
+                  "observingModeGroup" : {
+                    "matches" : [
+                      {
+                        "observingMode" : {
+                          "gmosNorthLongSlit": {
+                            "grating": "B1200_G5301"
+                          }
+                        },
+                        "observations" : {
+                          "matches" : ${List(o1, o2).map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """.asRight
+            )
+        } yield ()
