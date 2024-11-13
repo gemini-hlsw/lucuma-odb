@@ -126,6 +126,7 @@ object Config {
 
   case class Database(
     maxConnections: Int,
+    maxCalibrationConnections: Int,
     host: String,
     port: Int,
     database: String,
@@ -140,13 +141,15 @@ object Config {
 
     object Default:
       val MaxConnections = Runtime.getRuntime.availableProcessors * 2 + 1
+      val CalibrationConnections = 2
 
     // postgres://username:password@host:port/database name
-    def fromHerokuUri(maxConnections: Int, uri: URI): Option[Database] =
+    def fromHerokuUri(maxConnections: Int, maxCalibrationConnections: Int, uri: URI): Option[Database] =
       uri.getUserInfo.split(":") match {
         case Array(user, password) =>
           Some(Database(
             maxConnections = maxConnections,
+            maxCalibrationConnections = maxCalibrationConnections,
             host     = uri.getHost,
             port     = uri.getPort,
             database = uri.getPath.drop(1),
@@ -165,11 +168,12 @@ object Config {
     private given Show[URI] =
       Show.fromToString
 
-    private given ConfigDecoder[(Int, URI), Database] =
-      ConfigDecoder[(Int, URI)].mapOption("Database")(Database.fromHerokuUri)
+    private given ConfigDecoder[(Int, Int, URI), Database] =
+      ConfigDecoder[(Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] = (
       envOrProp("ODB_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
+      envOrProp("CALIBRATIONS_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
 
