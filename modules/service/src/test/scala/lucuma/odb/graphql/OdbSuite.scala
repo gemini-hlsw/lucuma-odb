@@ -247,6 +247,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def databaseConfig: Config.Database =
     Config.Database(
       maxConnections = 10,
+      maxCalibrationConnections = 10,
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),
       user     = container.username,
@@ -452,7 +453,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           .map(OdbError.fromGraphQLError(_)) // List[Option[OdbError]]
           .foreach:
             case None    => fail("Received a non-odb error.")
-            case Some(e) => 
+            case Some(e) =>
               expected.lift(e) match
                 case None => fail(s"Unexpected ODB error: $e")
                 case Some(_) => () // ok
