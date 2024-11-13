@@ -349,8 +349,7 @@ class executionTwilight extends ExecutionTestSupport {
       (p1, _, c) <- setup
       t0         <- programTimeEstimate(p0)
       t1         <- programTimeEstimate(p1)
-      c0         <- obsTimeEstimate(c.specPhot)
-      c1         <- obsTimeEstimate(c.twilight)
-    yield (t0 +| c0 +| c1) === t1)
+      cSpecPhot  <- obsTimeEstimate(c.specPhot)
+    yield (t0.programTime +| cSpecPhot.programTime) === t1.programTime)
 
 }
