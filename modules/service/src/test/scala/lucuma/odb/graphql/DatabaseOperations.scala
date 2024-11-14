@@ -20,6 +20,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
@@ -1635,7 +1636,7 @@ trait DatabaseOperations { this: OdbSuite =>
     """.asRight
     expect(user = user, query = q, expected = expected)
   }
-  
+
   def setGuideTargetName(
     user: User,
     oid: Observation.Id,
@@ -1675,5 +1676,21 @@ trait DatabaseOperations { this: OdbSuite =>
         .hcursor
         .downFields("createConfigurationRequest", "id")
         .require[ConfigurationRequest.Id]
+
+  def setObservationWorkflowState(user: User, oid: Observation.Id, wfs: ObservationWorkflowState): IO[ObservationWorkflowState] =
+    query(
+      user,
+      s"""
+        mutation {
+          setObservationWorkflowState(input: {
+            observationId: "$oid"
+            state: ${wfs.tag.toUpperCase}
+          }) {
+            state
+          }
+        }
+        """
+    ).map: json =>
+      json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
 
 }
