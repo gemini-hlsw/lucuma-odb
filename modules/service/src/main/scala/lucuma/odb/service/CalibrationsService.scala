@@ -153,6 +153,10 @@ object CalibrationsService extends CalibrationObservations {
           case (oid, Right(GeneratorParams(itc, mode, _))) if itc.isRight || !requiresItcInputs => (oid, mode)
         }
 
+      // Find all active observations in the program
+      private def activeObservations(pid: Program.Id)(using Transaction[F]): F[List[Observation.Id]] =
+        session.execute(Statements.selectActiveObservations)(pid)
+
       /**
        * Requests calibrations params for a program id and selection (either science or calibration)
        */
@@ -259,7 +263,10 @@ object CalibrationsService extends CalibrationObservations {
           tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
           gsTgt         = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
           gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
-          uniqueSci    <- allObservations(pid, ObservationSelection.Science).map(uniqueConfiguration)
+          active       <- activeObservations(pid)
+          uniqueSci    <- allObservations(pid, ObservationSelection.Science)
+                            .map(_.filter(u => active.contains(u._1)))
+                            .map(uniqueConfiguration)
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
           uniqueCalibs  = uniqueConfiguration(allCalibs)
           calibs        = toCalibConfig(allCalibs)
@@ -355,6 +362,14 @@ object CalibrationsService extends CalibrationObservations {
           FROM t_observation
           WHERE c_observation_id = $observation_id AND c_calibration_role IS NOT NULL
           """.query(observation_id *: calibration_role *: core_timestamp.opt *: observing_mode_type.opt)
+
+    val selectActiveObservations: Query[Program.Id, Observation.Id] =
+      sql"""
+        SELECT
+            c_observation_id
+          FROM t_observation
+          WHERE c_program_id = $program_id AND c_workflow_user_state IS DISTINCT FROM 'inactive'
+          """.query(observation_id)
 
   }
 }
