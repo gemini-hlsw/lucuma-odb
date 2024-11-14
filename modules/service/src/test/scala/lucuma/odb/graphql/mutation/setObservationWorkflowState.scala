@@ -25,9 +25,9 @@ import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
 
-class setObservationWorkflowState 
+class setObservationWorkflowState
   extends ExecutionTestSupport
-     with ObservingModeSetupOperations 
+     with ObservingModeSetupOperations
      with UpdateConstraintSetOps {
 
 
@@ -41,7 +41,7 @@ class setObservationWorkflowState
 
   def computeItcResult(oid: Observation.Id): IO[Unit] =
     query(
-      pi, 
+      pi,
       s"""
         query {
           observation(observationId: "$oid") {
@@ -79,32 +79,16 @@ class setObservationWorkflowState
     ).map: json =>
       json.hcursor.downFields("observation", "workflow", "state").require[ObservationWorkflowState]
 
-  def setObservationWorkflowState(oid: Observation.Id, wfs: ObservationWorkflowState): IO[ObservationWorkflowState] =
-    query(
-      pi,
-      s"""
-        mutation {
-          setObservationWorkflowState(input: {
-            observationId: "$oid"
-            state: ${wfs.tag.toUpperCase}  
-          }) {
-            state
-          }
-        }
-        """
-    ).map: json =>
-      json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
-
   /** Test that we can change to this specified state, and then back. */
   def testTransition(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     queryObservationWorkflowState(oid).flatMap: current =>
-      setObservationWorkflowState(oid, state) >>
-      setObservationWorkflowState(oid, current).void
+      setObservationWorkflowState(pi, oid, state) >>
+      setObservationWorkflowState(pi, oid, current).void
 
   /** Test that we can change to the specified states and back, and CANNOT change to anything else. */
   def testTransitions(oid: Observation.Id, allowedTransitions: ObservationWorkflowState*): IO[Unit] =
     val legal = allowedTransitions.toList
-    val illegal = ObservationWorkflowState.values.toList.filterNot(legal.contains) 
+    val illegal = ObservationWorkflowState.values.toList.filterNot(legal.contains)
     legal.traverse_(testTransition(oid, _)) >>
     illegal.traverse_ : state =>
       interceptOdbError(testTransition(oid, state)):
@@ -115,12 +99,12 @@ class setObservationWorkflowState
   ///
 
   import ObservationWorkflowState.*
-  
+
   test("Undefined  <-> Inactive"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- assertIO(queryObservationWorkflowState(oid), Undefined)   
+      _   <- assertIO(queryObservationWorkflowState(oid), Undefined)
       _   <- testTransitions(oid, Undefined, Inactive)
     } yield ()
 
@@ -134,7 +118,7 @@ class setObservationWorkflowState
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- computeItcResult(oid)
-      _   <- assertIO(queryObservationWorkflowState(oid), Unapproved)   
+      _   <- assertIO(queryObservationWorkflowState(oid), Unapproved)
       _   <- testTransitions(oid, Unapproved, Inactive)
     } yield ()
   }
@@ -148,7 +132,7 @@ class setObservationWorkflowState
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
       _   <- computeItcResult(oid)
-      _   <- assertIO(queryObservationWorkflowState(oid), Defined)   
+      _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(oid, Defined, Inactive)
     } yield ()
 
@@ -164,7 +148,7 @@ class setObservationWorkflowState
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
       _   <- computeItcResult(oid)
-      _   <- assertIO(queryObservationWorkflowState(oid), Defined)   
+      _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(oid, Defined, Inactive, Ready)
     } yield ()
 
@@ -182,7 +166,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s1)
       s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s2)
-      _   <- assertIO(queryObservationWorkflowState(o), Ongoing)   
+      _   <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _   <- testTransitions(o, Ongoing, Inactive)
     yield ()
 
@@ -202,7 +186,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s2)
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s3)
-      _  <- assertIO(queryObservationWorkflowState(o), Completed)   
+      _  <- assertIO(queryObservationWorkflowState(o), Completed)
       _  <- testTransitions(o, Completed)
     yield ()
 
