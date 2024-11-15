@@ -11,8 +11,8 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
@@ -256,10 +256,10 @@ object ObservationWorkflowService {
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Option[ExecutionState]] =
         generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map:
-          case ObservationExecutionState.NotDefined => None
-          case ObservationExecutionState.NotStarted => None
-          case ObservationExecutionState.Ongoing    => Some(Ongoing)
-          case ObservationExecutionState.Completed  => Some(Completed)
+          case ExecutionState.NotDefined => None
+          case ExecutionState.NotStarted => None
+          case ExecutionState.Ongoing    => Some(Ongoing)
+          case ExecutionState.Completed  => Some(Completed)
         
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(

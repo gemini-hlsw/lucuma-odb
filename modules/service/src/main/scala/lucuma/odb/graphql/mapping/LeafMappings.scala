@@ -20,7 +20,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.EducationalStatus
-import lucuma.core.enums.ObservationExecutionState
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
@@ -102,6 +102,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
+      LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
@@ -146,7 +147,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Tag](ObsAttachmentTypeType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
-      LeafMapping[ObservationExecutionState](ObservationExecutionStateType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[Partner](PartnerType),
