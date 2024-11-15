@@ -12,8 +12,8 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
@@ -422,7 +422,7 @@ class executionDigest extends ExecutionTestSupport {
       }
     """
 
-  def expectedExecutionState(e: ObservationExecutionState): Json =
+  def expectedExecutionState(e: ExecutionState): Json =
     json"""
       {
         "observation": {
@@ -451,7 +451,7 @@ class executionDigest extends ExecutionTestSupport {
       expect(
         user     = pi,
         query    = executionStateQuery(oid),
-        expected = expectedExecutionState(ObservationExecutionState.NotStarted).asRight
+        expected = expectedExecutionState(ExecutionState.NotStarted).asRight
       )
 
   test("executionState - ONGOING"):
@@ -467,7 +467,7 @@ class executionDigest extends ExecutionTestSupport {
       expect(
         user     = pi,
         query    = executionStateQuery(oid),
-        expected = expectedExecutionState(ObservationExecutionState.Ongoing).asRight
+        expected = expectedExecutionState(ExecutionState.Ongoing).asRight
       )
 
   def gcalTelescopeConfig(q: Int): TelescopeConfig =
@@ -504,6 +504,6 @@ class executionDigest extends ExecutionTestSupport {
       expect(
         user     = pi,
         query    = executionStateQuery(oid),
-        expected = expectedExecutionState(ObservationExecutionState.Completed).asRight
+        expected = expectedExecutionState(ExecutionState.Completed).asRight
       )
 }

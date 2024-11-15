@@ -261,7 +261,7 @@ trait Codecs {
   val execution_event_type: Codec[ExecutionEventType] =
     enumerated(Type("e_execution_event_type"))
 
-  val execution_state: Codec[ObservationExecutionState] =
+  val execution_state: Codec[ExecutionState] =
     enumerated(Type("e_execution_state"))
 
   val existence: Codec[Existence] =

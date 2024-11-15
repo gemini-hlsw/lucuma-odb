@@ -12,7 +12,7 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
-import lucuma.core.enums.ObservationExecutionState
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -214,14 +214,14 @@ object ExecutionDigestService {
       TimeSpan,
       List[Offset],
       NonNegInt,
-      ObservationExecutionState,
+      ExecutionState,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       TimeSpan,
       List[Offset],
       NonNegInt,
-      ObservationExecutionState,
+      ExecutionState,
       Md5Hash,
       TimeSpan,
       TimeSpan,
@@ -231,14 +231,14 @@ object ExecutionDigestService {
       TimeSpan,
       List[Offset],
       NonNegInt,
-      ObservationExecutionState,
+      ExecutionState,
       ObserveClass,
       TimeSpan,
       TimeSpan,
       TimeSpan,
       List[Offset],
       NonNegInt,
-      ObservationExecutionState
+      ExecutionState
     )] =
       sql"""
         INSERT INTO t_execution_digest (
