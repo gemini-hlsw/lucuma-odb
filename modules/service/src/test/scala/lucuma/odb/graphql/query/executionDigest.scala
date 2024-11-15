@@ -7,21 +7,27 @@ package query
 import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationExecutionState
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepStage
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
@@ -407,4 +413,97 @@ class executionDigest extends ExecutionTestSupport {
     assertIOBoolean(isEmpty, "The execution digest should be removed")
   }
 
+  def executionStateQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution { digest { science { executionState } } }
+        }
+      }
+    """
+
+  def expectedExecutionState(e: ObservationExecutionState): Json =
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "digest": {
+              "science" : {
+                "executionState": ${e.tag.toScreamingSnakeCase}
+              }
+            }
+          }
+        }
+      }
+    """
+
+  import lucuma.odb.json.all.transport.given
+
+  test("executionState - NOT_STARTED"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ObservationExecutionState.NotStarted).asRight
+      )
+
+  test("executionState - ONGOING"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ObservationExecutionState.Ongoing).asRight
+      )
+
+  def gcalTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Disabled)
+
+  def sciTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Enabled)
+
+  test("executionState - COMPLETED"):
+    def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
+      for
+        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        _ <- addEndStepEvent(c)
+        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        _ <- addEndStepEvent(f)
+        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(3)
+        _ <- s.traverse(addEndStepEvent)
+      yield ()
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _ <- atom(v,  0,   0, 3)
+        _ <- atom(v,  5,  15, 3)
+        _ <- atom(v, -5, -15, 3)
+        _ <- atom(v,  0,   0, 1)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ObservationExecutionState.Completed).asRight
+      )
 }
