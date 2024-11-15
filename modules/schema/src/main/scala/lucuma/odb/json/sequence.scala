@@ -16,6 +16,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -97,24 +98,24 @@ trait SequenceCodec {
     }
 
   given Decoder[SequenceDigest] =
-    Decoder.instance { c =>
-      for {
+    Decoder.instance: c =>
+      for
         o <- c.downField("observeClass").as[ObserveClass]
         t <- c.downField("timeEstimate").as[CategorizedTime]
         f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
         n <- c.downField("atomCount").as[NonNegInt]
-      } yield SequenceDigest(o, t, f, n)
-    }
+        e <- c.downField("executionState").as[ObservationExecutionState]
+      yield SequenceDigest(o, t, f, n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
-    Encoder.instance { (a: SequenceDigest) =>
+    Encoder.instance: (a: SequenceDigest) =>
       Json.obj(
-        "observeClass" -> a.observeClass.asJson,
-        "timeEstimate" -> a.timeEstimate.asJson,
-        "offsets"      -> a.offsets.toList.asJson,
-        "atomCount"    -> a.atomCount.asJson
+        "observeClass"   -> a.observeClass.asJson,
+        "timeEstimate"   -> a.timeEstimate.asJson,
+        "offsets"        -> a.offsets.toList.asJson,
+        "atomCount"      -> a.atomCount.asJson,
+        "executionState" -> a.executionState.asJson
       )
-    }
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>

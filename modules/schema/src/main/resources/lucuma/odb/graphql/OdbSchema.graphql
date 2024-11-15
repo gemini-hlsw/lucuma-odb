@@ -10053,6 +10053,13 @@ type SequenceDigest {
   and any remaining atoms not included in 'possibleFuture'.
   """
   atomCount: NonNegInt!
+
+  """
+  Execution state for the sequence. Note, acquisition sequences are never
+  'COMPLETED'.  The execution state for the observation as a whole is that of
+  the science sequence.
+  """
+  executionState: ObservationExecutionState!
 }
 
 """

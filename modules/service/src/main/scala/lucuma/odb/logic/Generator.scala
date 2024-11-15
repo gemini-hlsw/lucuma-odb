@@ -341,7 +341,7 @@ object Generator {
         gen:   ExecutionConfigGenerator[S, D],
         steps: Stream[F, StepRecord[D]],
         when:  Option[Timestamp]
-      )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, Atom[D]]] =
+      )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ObservationExecutionState)] =
         val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
@@ -355,7 +355,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, ProtoGmosNorth] =
+      ): EitherT[F, Error, (ProtoGmosNorth, ObservationExecutionState)] =
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
@@ -368,7 +368,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, ProtoGmosSouth] =
+      ): EitherT[F, Error, (ProtoGmosSouth, ObservationExecutionState)] =
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
@@ -414,23 +414,26 @@ object Generator {
         ctx.params match {
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role, when).map { p =>
-              InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
+              InstrumentExecutionConfig.GmosNorth(executionConfig(p._1, lim))
             }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
             gmosSouthLongSlit(ctx, config, role, when).map { p =>
-              InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
+              InstrumentExecutionConfig.GmosSouth(executionConfig(p._1, lim))
             }
         }
 
       private def executionDigest[S, D](
-        proto:     ProtoExecutionConfig[S, Atom[D]],
+        proto:     (ProtoExecutionConfig[S, Atom[D]], ObservationExecutionState),
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] =
 
         // Compute the sequence digest from the stream by folding over the steps.
-        def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
-          s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, atom) =>
+        def sequenceDigest(
+          s: Stream[Pure, Atom[D]],
+          e: ObservationExecutionState
+        ): Either[Error, SequenceDigest] =
+          s.fold(SequenceDigest.Zero.copy(executionState = ObservationExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap: digest =>
               digest
                 .incrementAtomCount
@@ -441,13 +444,14 @@ object Generator {
                     d.add(s.observeClass)
                      .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
                      .add(s.telescopeConfig.offset)
+                     .copy(executionState = e)
                   }
           }.toList.head
 
         // Compute the SequenceDigests.
         for
-          a <- sequenceDigest(proto.acquisition)
-          s <- sequenceDigest(proto.science)
+          a <- sequenceDigest(proto._1.acquisition, proto._2)
+          s <- sequenceDigest(proto._1.science, proto._2)
         yield ExecutionDigest(setupTime, a, s)
 
       private def executionConfig[S, D](

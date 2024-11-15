@@ -667,7 +667,7 @@ object Science:
     // from 'start' that matches the step.
     private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
       Stream
-        .iterate(start)(p => (p + 1) % length)
+        .iterate(start%length)(p => (p + 1) % length)
         .take(length)
         .dropWhile(p => !records.getUnsafe(p).block.definition.matches(step))
         .head
