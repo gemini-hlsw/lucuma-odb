@@ -137,8 +137,7 @@ sealed trait Generator[F[_]] {
    */
   def executionState(
     programId:     Program.Id,
-    observationId: Observation.Id,
-    when:          Option[Timestamp] = None
+    observationId: Observation.Id
   )(using NoTransaction[F]): F[ExecutionState]
 
 }
@@ -384,17 +383,15 @@ object Generator {
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
-        (ctx.params match {
+        (ctx.params match
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role, when).flatMap { p =>
-              EitherT.fromEither[F](executionDigest(p, calculator.gmosNorth.estimateSetup))
-            }
+            gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role, when).flatMap { p =>
-              EitherT.fromEither[F](executionDigest(p, calculator.gmosSouth.estimateSetup))
-            }
-        })
+            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
+        )
 
       override def generate(
         pid: Program.Id,
@@ -412,28 +409,23 @@ object Generator {
         lim: FutureLimit,
         when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
-        ctx.params match {
+        ctx.params match
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role, when).map { p =>
-              InstrumentExecutionConfig.GmosNorth(executionConfig(p._1, lim))
-            }
+            gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
+              InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role, when).map { p =>
-              InstrumentExecutionConfig.GmosSouth(executionConfig(p._1, lim))
-            }
-        }
+            gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
+              InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 
       private def executionDigest[S, D](
-        proto:     (ProtoExecutionConfig[S, Atom[D]], ExecutionState),
+        proto:     ProtoExecutionConfig[S, Atom[D]],
+        execState: ExecutionState,
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] =
 
         // Compute the sequence digest from the stream by folding over the steps.
-        def sequenceDigest(
-          s: Stream[Pure, Atom[D]],
-          e: ExecutionState
-        ): Either[Error, SequenceDigest] =
+        def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
           s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap: digest =>
               digest
@@ -445,14 +437,14 @@ object Generator {
                     d.add(s.observeClass)
                      .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
                      .add(s.telescopeConfig.offset)
-                     .copy(executionState = e)
+                     .copy(executionState = execState)
                   }
           }.toList.head
 
         // Compute the SequenceDigests.
         for
-          a <- sequenceDigest(proto._1.acquisition, proto._2)
-          s <- sequenceDigest(proto._1.science, proto._2)
+          a <- sequenceDigest(proto.acquisition)
+          s <- sequenceDigest(proto.science)
         yield ExecutionDigest(setupTime, a, s)
 
       private def executionConfig[S, D](
@@ -478,10 +470,9 @@ object Generator {
 
       def executionState(
         programId:     Program.Id,
-        observationId: Observation.Id,
-        when:          Option[Timestamp] = None
+        observationId: Observation.Id
       )(using NoTransaction[F]): F[ExecutionState] =
-        digest(programId, observationId, when)
+        digest(programId, observationId)
           .map(_.fold(
             _ => ExecutionState.NotDefined,
             _.science.executionState
