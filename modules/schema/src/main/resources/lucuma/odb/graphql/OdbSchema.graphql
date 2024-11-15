@@ -6405,7 +6405,7 @@ type Execution {
   """
   Determines the execution state as a whole of this observation.
   """
-  state: ObservationExecutionState!
+  executionState: ObservationExecutionState!
 
   "Executed (or at least partially executed) atom records, across all visits."
   atomRecords(
