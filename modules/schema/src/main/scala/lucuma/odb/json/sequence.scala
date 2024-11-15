@@ -15,8 +15,8 @@ import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -104,7 +104,7 @@ trait SequenceCodec {
         t <- c.downField("timeEstimate").as[CategorizedTime]
         f <- c.downField("offsets").as[List[Offset]].map(SortedSet.from)
         n <- c.downField("atomCount").as[NonNegInt]
-        e <- c.downField("executionState").as[ObservationExecutionState]
+        e <- c.downField("executionState").as[ExecutionState]
       yield SequenceDigest(o, t, f, n, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =

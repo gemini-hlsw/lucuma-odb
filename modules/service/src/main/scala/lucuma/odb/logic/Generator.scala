@@ -17,7 +17,7 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationExecutionState
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -139,7 +139,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     when:          Option[Timestamp] = None
-  )(using NoTransaction[F]): F[ObservationExecutionState]
+  )(using NoTransaction[F]): F[ExecutionState]
 
 }
 
@@ -342,7 +342,7 @@ object Generator {
         gen:   ExecutionConfigGenerator[S, D],
         steps: Stream[F, StepRecord[D]],
         when:  Option[Timestamp]
-      )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ObservationExecutionState)] =
+      )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
@@ -356,7 +356,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, (ProtoGmosNorth, ObservationExecutionState)] =
+      ): EitherT[F, Error, (ProtoGmosNorth, ExecutionState)] =
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
@@ -369,7 +369,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, (ProtoGmosSouth, ObservationExecutionState)] =
+      ): EitherT[F, Error, (ProtoGmosSouth, ExecutionState)] =
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
@@ -425,16 +425,16 @@ object Generator {
         }
 
       private def executionDigest[S, D](
-        proto:     (ProtoExecutionConfig[S, Atom[D]], ObservationExecutionState),
+        proto:     (ProtoExecutionConfig[S, Atom[D]], ExecutionState),
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] =
 
         // Compute the sequence digest from the stream by folding over the steps.
         def sequenceDigest(
           s: Stream[Pure, Atom[D]],
-          e: ObservationExecutionState
+          e: ExecutionState
         ): Either[Error, SequenceDigest] =
-          s.fold(SequenceDigest.Zero.copy(executionState = ObservationExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
+          s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap: digest =>
               digest
                 .incrementAtomCount
@@ -480,10 +480,10 @@ object Generator {
         programId:     Program.Id,
         observationId: Observation.Id,
         when:          Option[Timestamp] = None
-      )(using NoTransaction[F]): F[ObservationExecutionState] =
+      )(using NoTransaction[F]): F[ExecutionState] =
         digest(programId, observationId, when)
           .map(_.fold(
-            _ => ObservationExecutionState.NotDefined,
+            _ => ExecutionState.NotDefined,
             _.science.executionState
           ))
 
