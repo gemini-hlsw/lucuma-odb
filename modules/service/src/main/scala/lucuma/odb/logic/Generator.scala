@@ -137,7 +137,8 @@ sealed trait Generator[F[_]] {
    */
   def executionState(
     programId:     Program.Id,
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[ObservationExecutionState]
 
 }
@@ -477,21 +478,15 @@ object Generator {
 
       def executionState(
         programId:     Program.Id,
-        observationId: Observation.Id
+        observationId: Observation.Id,
+        when:          Option[Timestamp] = None
       )(using NoTransaction[F]): F[ObservationExecutionState] =
-        import ObservationExecutionState.*
-
-        def definedStatus(isComplete: Boolean): F[ObservationExecutionState] =
-          if isComplete then Completed.pure[F]
-          else services.transactionally {
-            visitService.selectAll(observationId).head.compile.last
-              .map(_.fold(NotStarted)(_ => Ongoing))
-          }
-
-        generate(programId, observationId, FutureLimit.Min)
-          .flatMap(_.fold(
-            _   => NotDefined.pure[F],
-            iec => definedStatus(iec.isComplete)
+        digest(programId, observationId, when)
+          .map(_.fold(
+            _ => ObservationExecutionState.NotDefined,
+            _.science.executionState
           ))
+
+
   }
 }

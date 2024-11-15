@@ -36,7 +36,7 @@ class executionState extends ExecutionTestSupport {
        query {
          observation(observationId: "$o") {
            execution {
-             state
+             executionState
            }
          }
        }
@@ -47,7 +47,7 @@ class executionState extends ExecutionTestSupport {
       {
         "observation": {
           "execution": {
-            "state": ${s.tag.toScreamingSnakeCase}
+            "executionState": ${s.tag.toScreamingSnakeCase}
           }
         }
       }
