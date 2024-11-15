@@ -7,6 +7,7 @@ import cats.Eq
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import fs2.Stream
+import lucuma.core.enums.ExecutionState
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.ProtoExecutionConfig
@@ -39,11 +40,11 @@ case class ExecutionConfigGenerator[S, D](
     visits: Stream[F, VisitRecord],
     steps:  Stream[F, StepRecord[D]],
     when:   Timestamp
-  )(using Eq[D]): F[ProtoExecutionConfig[S, Atom[D]]] =
+  )(using Eq[D]): F[(ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
     mergeByTimestamp(visits, steps)(_.created, _.created)
-      .fold((acquisition, science)) {
-        case ((a, s), Left(visit)) => (a.recordVisit(visit), s.recordVisit(visit))
-        case ((a, s), Right(step)) => (a.recordStep(step), s.recordStep(step))
+      .fold((acquisition, science, ExecutionState.NotStarted)) {
+        case ((a, s, _), Left(visit)) => (a.recordVisit(visit), s.recordVisit(visit), ExecutionState.Ongoing)
+        case ((a, s, _), Right(step)) => (a.recordStep(step), s.recordStep(step), ExecutionState.Ongoing)
       }
-      .compile.onlyOrError.map: (a, s) =>
-        ProtoExecutionConfig(static, a.generate(when), s.generate(when))
+      .compile.onlyOrError.map: (a, s, e) =>
+        (ProtoExecutionConfig(static, a.generate(when), s.generate(when)), e)
