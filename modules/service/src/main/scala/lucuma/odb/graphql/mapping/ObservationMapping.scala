@@ -6,17 +6,19 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import cats.syntax.functor.*
-import cats.syntax.option.*
+import cats.syntax.all.*
+import grackle.Context
+import grackle.Cursor
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
-import lucuma.core.model.ConfigurationRequest
+import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
@@ -31,6 +33,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
+import skunk.Transaction
 
 import table.ObsAttachmentAssignmentTable
 import table.ObsAttachmentTable
@@ -132,18 +135,34 @@ trait ObservationMapping[F[_]]
     effectHandler(readEnv, calculate)
   }
 
-  lazy val configurationRequestsQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
+  lazy val configurationRequestsQueryHandler: EffectHandler[F] = { pairs =>
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[List[ConfigurationRequest]]] =
-      (_, oid, _) =>
-        services.useTransactionally {
-          configurationService
-            .selectRequests(oid)
-        }
+    // Here's the ordered sequence of stuff we need to deal with: 
+    // a pid+oid pair, the parent cursor, and the child context.
+    val sequence: ResultT[F, List[((Program.Id, Observation.Id), Cursor, Context)]] =
+      ResultT.fromResult:
+        pairs.traverse: (query, cursor) =>
+          for {
+            p <- cursor.fieldAs[Program.Id]("programId")
+            o <- cursor.fieldAs[Observation.Id]("id")
+            c <- Query.childContext(cursor.context, query)
+          } yield ((p, o), cursor, c)
 
-    effectHandler(readEnv, calculate)
+    // Pass the pid+oid pars to configurationService.selectRequests to get the
+    // applicable configuration requests for each pair. Then use this information
+    // to construct our list of outgoing cursors.
+    def query(using Services[F], Transaction[F]): ResultT[F, List[Cursor]] =
+      sequence.flatMap: pairs =>
+        ResultT(configurationService.selectRequests(pairs.map(_._1))).map: reqs =>
+          pairs.map: (key, cursor, childContext) =>
+            CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+
+    // Do it!
+    services.useTransactionally:
+      query.value
+
   }
+
 
   lazy val workflowQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
