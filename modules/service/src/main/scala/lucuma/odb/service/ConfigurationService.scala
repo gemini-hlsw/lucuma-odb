@@ -4,11 +4,14 @@
 package lucuma.odb.service
 
 import cats.Monoid
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
 import io.circe.ACursor
+import io.circe.Decoder
+import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
@@ -39,6 +42,9 @@ trait ConfigurationService[F[_]] {
 
   /** Selects all configuration requests that subsume this observation's configuration. */
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
+
+ /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
+  def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -87,6 +93,9 @@ object ConfigurationService {
                Some(ConfigurationRequestStatus.Withdrawn) => requirePiAccess(doUpdate)
           case Some(ConfigurationRequestStatus.Approved)  |
                Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)                  
+
+      override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
+        impl.selectRequests(pairs).value
 
     }
 
@@ -140,7 +149,19 @@ object ConfigurationService {
             json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
-
+            
+    private def queryRequestsAndConfigurations(
+      pids: List[Program.Id], 
+      oids: List[Observation.Id]
+    ): ResultT[F, (Map[Program.Id, NonEmptyList[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
+      ResultT:
+        services.runGraphQLQuery(Queries.RequestsAndConfigurations(pids, oids)).map: r =>
+          r.flatMap: json =>            
+            import Queries.RequestsAndConfigurations.given
+            json.hcursor.as[Queries.RequestsAndConfigurations.Response] match
+              case Right(r)    => Result(r)
+              case Left(other) => Result.internalError(other.getMessage)
+                        
     private def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       ResultT.liftF:
         session.prepareR(Statements.InsertRequest).use: pq =>
@@ -170,21 +191,141 @@ object ConfigurationService {
         session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
           pq.stream(af.argument, 1024).compile.toList
 
+    def selectRequests(pairs: List[(Program.Id, Observation.Id)]): ResultT[F, Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]] =
+      queryRequestsAndConfigurations(pairs.map(_._1).distinct, pairs.map(_._2).distinct).map: (pmap, omap) =>
+        pairs
+          .fproduct: key =>
+            (omap.get(key), pmap.get(key._1))
+              .tupled
+              .foldMap: (cfg, nel) =>
+                nel.filter(_.configuration.subsumes(cfg))
+          .toMap
+                    
   } 
 
   private object Queries {
 
+    object RequestsAndConfigurations:
+      type Response = (Map[Program.Id, NonEmptyList[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])
+
+      private given Decoder[(Program.Id, NonEmptyList[ConfigurationRequest])] = hc =>
+        for
+          id  <- hc.downField("id").as[Program.Id]
+          crs <- hc.downFields("configurationRequests", "matches").as[NonEmptyList[ConfigurationRequest]]
+        yield (id, crs)
+
+      private given Decoder[((Program.Id, Observation.Id), Configuration)] = hc =>
+        for
+          pid <- hc.downFields("program", "id").as[Program.Id]
+          oid <- hc.downField("id").as[Observation.Id]
+          cfg <- hc.downField("configuration").as[Configuration]
+        yield ((pid, oid), cfg)
+
+      given Decoder[Response] = hc =>
+        for
+          m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, NonEmptyList[ConfigurationRequest])]]
+          m2 <- hc.downFields("observations", "matches").as[List[((Program.Id, Observation.Id), Configuration)]]
+        yield (m1.toMap, m2.toMap)
+
+      def apply(
+        pids: List[Program.Id], 
+        oids: List[Observation.Id]
+      ): String =
+        s"""
+          query {
+
+            observations(           
+              ${whereIdsIn(oids)}
+            ) {
+              matches {
+                id
+                program {
+                  id
+                }
+                configuration {
+                  conditions {
+                    imageQuality
+                    cloudExtinction
+                    skyBackground
+                    waterVapor
+                  }
+                  referenceCoordinates {
+                    ra { 
+                      hms 
+                    }
+                    dec { 
+                      dms 
+                    }
+                  }
+                  observingMode {
+                    instrument
+                    mode
+                    gmosNorthLongSlit {
+                      grating
+                    }
+                    gmosSouthLongSlit {
+                      grating
+                    }
+                  }
+                }
+              }
+            }
+
+            programs(
+              ${whereIdsIn(pids)}
+            ) {
+              matches {
+                id
+                configurationRequests {
+                  matches {
+                    id
+                    status
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      referenceCoordinates {
+                        ra { 
+                          hms 
+                        }
+                        dec { 
+                          dms 
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+
+          }
+        """
+
     def selectConfigurations(oids: List[Observation.Id]): String =
-      selectConfigurations(whereOidsIn(oids))
+      selectConfigurations(whereIdsIn(oids))
 
     def selectConfigurations(pid: Program.Id): String =
       selectConfigurations(wherePid(pid))
 
-    private def whereOidsIn(oids: List[Observation.Id]) =
+    private def whereIdsIn[A: Encoder](ids: List[A]) =
       s"""
         WHERE: {
           id: {
-            IN: ${oids.asJson}
+            IN: ${ids.asJson}
           }
         }
       """
@@ -199,6 +340,7 @@ object ConfigurationService {
           }
         }
       """
+
 
     private def selectConfigurations(where: String): String =
       s"""
@@ -273,6 +415,46 @@ object ConfigurationService {
                       gmosSouthLongSlit {
                         grating
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    def selectAllRequestsForProgram2(pid: Program.Id) =
+      s"""
+        query {
+          program(programId: "$pid") {
+            configurationRequests {
+              matches {
+                id
+                status
+                configuration {
+                  conditions {
+                    imageQuality
+                    cloudExtinction
+                    skyBackground
+                    waterVapor
+                  }
+                  referenceCoordinates {
+                    ra { 
+                      hms 
+                    }
+                    dec { 
+                      dms 
+                    }
+                  }
+                  observingMode {
+                    instrument
+                    mode
+                    gmosNorthLongSlit {
+                      grating
+                    }
+                    gmosSouthLongSlit {
+                      grating
                     }
                   }
                 }
