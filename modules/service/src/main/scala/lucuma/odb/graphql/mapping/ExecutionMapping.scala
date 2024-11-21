@@ -60,7 +60,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
       EffectField("config", configHandler, List("id", "programId")),
-      EffectField("state",  stateHandler, List("id", "programId")),
+      EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),
       SqlObject("events"),
@@ -129,7 +129,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     effectHandler(readEnv, calculate)
   }
 
-  private lazy val stateHandler: EffectHandler[F] =
+  private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, limit) => {
         services.use: s =>

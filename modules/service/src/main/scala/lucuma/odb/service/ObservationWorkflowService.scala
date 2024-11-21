@@ -10,8 +10,8 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
@@ -469,10 +469,10 @@ object ObservationWorkflowService {
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Option[ExecutionState]] =
         generator(commitHash, itcClient, ptc).executionState(info.pid, info.oid).map: 
-          case ObservationExecutionState.NotDefined => None
-          case ObservationExecutionState.NotStarted => None
-          case ObservationExecutionState.Ongoing    => Some(Ongoing)
-          case ObservationExecutionState.Completed  => Some(Completed)
+          case ExecutionState.NotDefined => None
+          case ExecutionState.NotStarted => None
+          case ExecutionState.Ongoing    => Some(Ongoing)
+          case ExecutionState.Completed  => Some(Completed)
 
       private def executionStates(
         infos: List[ObservationValidationInfo], 
@@ -658,12 +658,13 @@ object ObservationWorkflowService {
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
         getWorkflowsImpl(List(oid), commitHash, itcClient, ptc).map(_(oid))
-        // getObsInfoAndOtherStuff(oid, itcClient).flatMap: (info, errs) =>
-        //   for
-        //     ex   <- ResultT.liftF(executionState(info, commitHash, itcClient, ptc))
-        //     pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
-        //     (s, ss) = pair
-        //   yield ObservationWorkflow(s, ss, errs)
+
+      // getObsInfoAndOtherStuff(oid, itcClient).flatMap: (info, errs) =>
+      //   for
+      //     ex   <- ResultT.liftF(executionState(info, commitHash, itcClient, ptc))
+      //     pair <- ResultT(workflowStateAndTransitions(info, ex, errs.map(_.code)).pure[F])
+      //     (s, ss) = pair
+      //   yield ObservationWorkflow(s, ss, errs)
 
       private def getWorkflowsImpl(
         oids: List[Observation.Id], 

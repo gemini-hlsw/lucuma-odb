@@ -173,9 +173,7 @@ object ItcService {
   case class AsterismResults private (
     acquisitionResult: Zipper[TargetResult],
     scienceResult: Zipper[TargetResult]
-  ) {
-    assert(acquisitionResult.focus.targetId === scienceResult.focus.targetId)
-  }
+  )
 
   object AsterismResults {
 

@@ -302,19 +302,21 @@ object Science:
         calRole:  Option[CalibrationRole]
       ): F[Either[String, NonEmptyList[BlockDefinition[D]]]] =
         Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
+          val isTwilight = calRole.contains(CalibrationRole.Twilight)
+
           val λ = config.centralWavelength
           val (smartArc, smartFlat, science) = eval {
             for {
               _ <- setup(config, time)
               _ <- optics.wavelength := λ.offset(g.adjustment.Δλ).getOrElse(λ)
               o  = Offset(Offset.P.Zero, g.adjustment.q)
-              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
-              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), ObserveClass.PartnerCal)
-              s <- scienceStep(TelescopeConfig(o, StepGuideState.Enabled), ObserveClass.Science)
+              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.PartnerCal)
+              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.PartnerCal)
+              s <- scienceStep(TelescopeConfig(o, StepGuideState.Enabled), if isTwilight then ObserveClass.DayCal else ObserveClass.Science)
             } yield (a, f, s)
           }
 
-          val includeFlats = !calRole.contains(CalibrationRole.Twilight)
+          val includeFlats = !isTwilight
           val includeArcs  = calRole.isEmpty
 
           (for {
@@ -665,7 +667,7 @@ object Science:
     // from 'start' that matches the step.
     private def advancePos(start: Int, step: StepRecord[D])(using Eq[D]): Int =
       Stream
-        .iterate(start)(p => (p + 1) % length)
+        .iterate(start%length)(p => (p + 1) % length)
         .take(length)
         .dropWhile(p => !records.getUnsafe(p).block.definition.matches(step))
         .head
