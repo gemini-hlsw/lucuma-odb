@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.Monoid
-import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
@@ -153,7 +152,7 @@ object ConfigurationService {
     private def queryRequestsAndConfigurations(
       pids: List[Program.Id], 
       oids: List[Observation.Id]
-    ): ResultT[F, (Map[Program.Id, NonEmptyList[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
+    ): ResultT[F, (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
       ResultT:
         services.runGraphQLQuery(Queries.RequestsAndConfigurations(pids, oids)).map: r =>
           r.flatMap: json =>            
@@ -206,12 +205,12 @@ object ConfigurationService {
   private object Queries {
 
     object RequestsAndConfigurations:
-      type Response = (Map[Program.Id, NonEmptyList[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])
+      type Response = (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])
 
-      private given Decoder[(Program.Id, NonEmptyList[ConfigurationRequest])] = hc =>
+      private given Decoder[(Program.Id, List[ConfigurationRequest])] = hc =>
         for
           id  <- hc.downField("id").as[Program.Id]
-          crs <- hc.downFields("configurationRequests", "matches").as[NonEmptyList[ConfigurationRequest]]
+          crs <- hc.downFields("configurationRequests", "matches").as[List[ConfigurationRequest]]
         yield (id, crs)
 
       private given Decoder[((Program.Id, Observation.Id), Configuration)] = hc =>
@@ -223,7 +222,7 @@ object ConfigurationService {
 
       given Decoder[Response] = hc =>
         for
-          m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, NonEmptyList[ConfigurationRequest])]]
+          m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, List[ConfigurationRequest])]]
           m2 <- hc.downFields("observations", "matches").as[List[((Program.Id, Observation.Id), Configuration)]]
         yield (m1.toMap, m2.toMap)
 
