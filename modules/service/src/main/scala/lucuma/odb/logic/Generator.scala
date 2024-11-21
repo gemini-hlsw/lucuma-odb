@@ -17,7 +17,7 @@ import eu.timepit.refined.numeric.Interval
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ObservationExecutionState
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -138,7 +138,7 @@ sealed trait Generator[F[_]] {
   def executionState(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[ObservationExecutionState]
+  )(using NoTransaction[F]): F[ExecutionState]
 
 }
 
@@ -341,7 +341,7 @@ object Generator {
         gen:   ExecutionConfigGenerator[S, D],
         steps: Stream[F, StepRecord[D]],
         when:  Option[Timestamp]
-      )(using Eq[D]): EitherT[F, Error, ProtoExecutionConfig[S, Atom[D]]] =
+      )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         val visits = services.visitService.selectAll(oid)
         EitherT.liftF(services.transactionally {
           for {
@@ -355,7 +355,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, ProtoGmosNorth] =
+      ): EitherT[F, Error, (ProtoGmosNorth, ExecutionState)] =
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
@@ -368,7 +368,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, ProtoGmosSouth] =
+      ): EitherT[F, Error, (ProtoGmosSouth, ExecutionState)] =
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
@@ -383,17 +383,15 @@ object Generator {
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
-        (ctx.params match {
+        (ctx.params match
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role, when).flatMap { p =>
-              EitherT.fromEither[F](executionDigest(p, calculator.gmosNorth.estimateSetup))
-            }
+            gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role, when).flatMap { p =>
-              EitherT.fromEither[F](executionDigest(p, calculator.gmosSouth.estimateSetup))
-            }
-        })
+            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
+        )
 
       override def generate(
         pid: Program.Id,
@@ -411,26 +409,24 @@ object Generator {
         lim: FutureLimit,
         when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
-        ctx.params match {
+        ctx.params match
           case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
-            gmosNorthLongSlit(ctx, config, role, when).map { p =>
+            gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
-            }
 
           case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
-            gmosSouthLongSlit(ctx, config, role, when).map { p =>
+            gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
-            }
-        }
 
       private def executionDigest[S, D](
         proto:     ProtoExecutionConfig[S, Atom[D]],
+        execState: ExecutionState,
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] =
 
         // Compute the sequence digest from the stream by folding over the steps.
         def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
-          s.fold(SequenceDigest.Zero.asRight[Error]) { case (eDigest, atom) =>
+          s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
             eDigest.flatMap: digest =>
               digest
                 .incrementAtomCount
@@ -441,6 +437,7 @@ object Generator {
                     d.add(s.observeClass)
                      .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
                      .add(s.telescopeConfig.offset)
+                     .copy(executionState = execState)
                   }
           }.toList.head
 
@@ -474,20 +471,13 @@ object Generator {
       def executionState(
         programId:     Program.Id,
         observationId: Observation.Id
-      )(using NoTransaction[F]): F[ObservationExecutionState] =
-        import ObservationExecutionState.*
-
-        def definedStatus(isComplete: Boolean): F[ObservationExecutionState] =
-          if isComplete then Completed.pure[F]
-          else services.transactionally {
-            visitService.selectAll(observationId).head.compile.last
-              .map(_.fold(NotStarted)(_ => Ongoing))
-          }
-
-        generate(programId, observationId, FutureLimit.Min)
-          .flatMap(_.fold(
-            _   => NotDefined.pure[F],
-            iec => definedStatus(iec.isComplete)
+      )(using NoTransaction[F]): F[ExecutionState] =
+        digest(programId, observationId)
+          .map(_.fold(
+            _ => ExecutionState.NotDefined,
+            _.science.executionState
           ))
+
+
   }
 }

@@ -104,7 +104,7 @@ object CMain extends MainParams {
       password = Some(config.password),
       database = config.database,
       ssl      = SSL.Trusted.withFallback(true),
-      max      = config.maxConnections,
+      max      = config.maxCalibrationConnections,
       strategy = Strategy.SearchPath,
       // debug    = true,
     )

@@ -14,6 +14,7 @@ trait ObservationSelectResultMapping[F[_]]
      with AsterismGroupView[F]
      with ObsAttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
+     with ObservingModeGroupView[F]
      with ResultMapping[F] {
 
   lazy val ObservationSelectResultMappings: List[TypeMapping] =
@@ -21,6 +22,7 @@ trait ObservationSelectResultMapping[F[_]]
       topLevelSelectResultMappingAtPath(QueryType / "observations"),
       nestedSelectResultMappingAtPath(ProgramType / "observations", ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
       nestedSelectResultMappingAtPath(ConstraintSetGroupType / "observations", ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
+      nestedSelectResultMappingAtPath(ObservingModeGroupType / "observations", ObservingModeGroupView.ObservingModeKey, Join(ObservingModeGroupView.ObservingModeKey, ObservationView.ObservingMode.Key)),
       nestedSelectResultMappingAtPath(TargetGroupType / "observations", TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id)),
       nestedSelectResultMappingAtPath(AsterismGroupType / "observations", AsterismGroupView.AsterismGroup, Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
     )

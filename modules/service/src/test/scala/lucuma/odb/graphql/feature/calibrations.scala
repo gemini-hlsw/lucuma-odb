@@ -19,6 +19,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -1008,5 +1009,31 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     } yield ()
   }
 
+  test("Don't add calibrations if science is inactive") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid2)
+      _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
+      _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
+      _    <- withServices(service) { services =>
+                services.session.transaction.use { xa =>
+                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                }
+              }
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    } yield {
+      val oids = gr1.collect { case Right(oid) => oid }
+      val cCount = ob.count {
+        case CalibObs(_, _, Some(_), _, _) => true
+        case _                       => false
+      }
+      assertEquals(cCount, 2)
+      assertEquals(oids.size, 2)
+    }
+  }
 }
 

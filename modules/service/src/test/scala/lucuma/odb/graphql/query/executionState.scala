@@ -8,8 +8,8 @@ import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
@@ -36,24 +36,24 @@ class executionState extends ExecutionTestSupport {
        query {
          observation(observationId: "$o") {
            execution {
-             state
+             executionState
            }
          }
        }
      """
 
-  def stateResult(s: ObservationExecutionState): Json =
+  def stateResult(s: ExecutionState): Json =
     json"""
       {
         "observation": {
           "execution": {
-            "state": ${s.tag.toScreamingSnakeCase}
+            "executionState": ${s.tag.toScreamingSnakeCase}
           }
         }
       }
     """
 
-  import ObservationExecutionState.*
+  import ExecutionState.*
 
   test("isComplete - NOT_STARTED") {
     val setup: IO[Observation.Id] =

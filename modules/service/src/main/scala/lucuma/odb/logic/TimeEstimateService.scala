@@ -13,6 +13,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.model.Group
@@ -25,6 +26,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.GeneratorParamsService
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.ItcService.AsterismResults
 import lucuma.odb.service.NoTransaction
@@ -117,16 +119,21 @@ object TimeEstimateService {
               // ExecutionDigest not in the cache, we'll need to calculate it.
               // For that we need the ITC results, which may be cached.  Use the
               // cached ITC AsterismResults if available, else call remote ITC.
-              val asterismResults = OptionT.fromOption(data.asterismResults).orElseF {
-                 itcService(itcClient)
-                   .callRemote(pid, oid, data.generatorParams)
-                   .map(_.toOption)
-              }
+              val asterismResults = OptionT.fromOption(data.asterismResults).map(_.asRight).orElseF(
+                itcService(itcClient)
+                  .callRemote(pid, oid, data.generatorParams)
+                  .map {
+                    case Left(ItcService.Error.ObservationDefinitionError(GeneratorParamsService.Error.MissingData(p))) =>
+                      p.asLeft[AsterismResults].some
+                    case Left(_)   => none
+                    case Right(ar) => ar.asRight.some
+                  }
+              )
 
               // Calculate time estimate using provided ITC result and params.
               asterismResults.flatMapF { ar =>
                 generator(commitHash, itcClient, calculator)
-                  .calculateDigest(pid, oid, Either.right(ar), data.generatorParams)
+                  .calculateDigest(pid, oid, ar, data.generatorParams)
                   .map(_.toOption.map(_.fullTimeEstimate))
               }
             }

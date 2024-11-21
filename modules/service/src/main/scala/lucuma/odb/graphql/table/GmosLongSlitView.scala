@@ -18,7 +18,9 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
     val CentralWavelength: ColumnRef        = col("c_central_wavelength", wavelength_pm)
 
     val XBin: ColumnRef                     = col("c_xbin", gmos_x_binning.opt)
+    val XBinDefault: ColumnRef              = col("c_xbin_default", gmos_x_binning)
     val YBin: ColumnRef                     = col("c_ybin", gmos_y_binning.opt)
+    val YBinDefault: ColumnRef              = col("c_ybin_default", gmos_y_binning)
     val AmpReadMode: ColumnRef              = col("c_amp_read_mode", gmos_amp_read_mode.opt)
     val AmpGain: ColumnRef                  = col("c_amp_gain", gmos_amp_gain.opt)
     val Roi: ColumnRef                      = col("c_roi", gmos_roi.opt)
