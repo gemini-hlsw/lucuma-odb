@@ -29,6 +29,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.ObservationWorkflowService
 
 class observation_workflow 
   extends OdbSuite
@@ -442,7 +443,7 @@ class observation_workflow
             expected = queryResult(
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
-              ObservationValidation.callForProposals(ObservationService.ExplicitBaseOutOfRangeMsg)
+              ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
             ).asRight
           )
       }
@@ -467,7 +468,7 @@ class observation_workflow
             expected = queryResult(
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
-              ObservationValidation.callForProposals(ObservationService.ExplicitBaseOutOfRangeMsg)
+              ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
             ).asRight
           )
       }
@@ -515,7 +516,7 @@ class observation_workflow
         expected = queryResult(
           ObservationWorkflowState.Undefined,
           List(ObservationWorkflowState.Inactive),
-          ObservationValidation.callForProposals(ObservationService.AsterismOutOfRangeMsg)
+          ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
         ).asRight
       )
     }
@@ -540,7 +541,7 @@ class observation_workflow
           List(ObservationWorkflowState.Inactive),
           ObservationValidation.callForProposals(
             ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-            ObservationService.AsterismOutOfRangeMsg
+            ObservationWorkflowService.Messages.CoordinatesOutOfRange
           )
         ).asRight
       )

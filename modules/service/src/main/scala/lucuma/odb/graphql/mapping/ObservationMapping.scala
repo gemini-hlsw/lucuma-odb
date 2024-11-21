@@ -21,7 +21,6 @@ import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
-import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
@@ -164,17 +163,32 @@ trait ObservationMapping[F[_]]
   }
 
 
-  lazy val workflowQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
+  lazy val workflowQueryHandler: EffectHandler[F] = { pairs =>
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ObservationWorkflow]] =
-      (_, oid, _) =>
-        services.use { s =>
-          s.observationWorkflowService
-            .getWorkflow(oid, commitHash, itcClient, timeEstimateCalculator)
-        }
+    // Here's the ordered sequence of stuff we need to deal with: 
+    // a pid+oid pair, the parent cursor, and the child context.
+    val sequence: ResultT[F, List[(Observation.Id, Cursor, Context)]] =
+      ResultT.fromResult:
+        pairs.traverse: (query, cursor) =>
+          for {
+            o <- cursor.fieldAs[Observation.Id]("id")
+            c <- Query.childContext(cursor.context, query)
+          } yield (o, cursor, c)
 
-    effectHandler(readEnv, calculate)
+    // Pass the pid+oid pars to configurationService.selectRequests to get the
+    // applicable configuration requests for each pair. Then use this information
+    // to construct our list of outgoing cursors.
+    def query(using Services[F]): ResultT[F, List[Cursor]] =
+      sequence.flatMap: tuples =>
+        ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
+          tuples.map: (key, cursor, childContext) =>
+            CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+
+    // Do it!
+    services.use { implicit s =>
+      query.value
+    }
+    
   }
 
 }

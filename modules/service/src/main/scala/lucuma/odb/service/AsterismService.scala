@@ -89,6 +89,10 @@ trait AsterismService[F[_]] {
     programId: Program.Id,
     observationId: Observation.Id
   ): F[List[(Target.Id, Target)]]
+
+  def getAsterisms(
+    oids: List[Observation.Id]
+  ): F[Map[Observation.Id, List[(Target.Id, Target)]]]
 }
 
 object AsterismService {
@@ -189,6 +193,20 @@ object AsterismService {
         session.prepareR(af.fragment.query(Decoders.targetDecoder)).use { ps =>
           ps.stream(af.argument, chunkSize = 1024).compile.toList
         }
+
+      override def getAsterisms(
+        oids: List[Observation.Id]
+      ): F[Map[Observation.Id, List[(Target.Id, Target)]]] =
+        NonEmptyList.fromList(oids) match
+          case None      => Map.empty.pure[F]
+          case Some(nel) =>
+            val enc = observation_id.nel(nel)
+            session
+              .stream(Statements.getAsterisms(enc))(nel, 1024)
+              .compile
+              .toList
+              .map(_.groupMap(_._1)(_._2))
+              
     }
 
   object Statements {
@@ -319,6 +337,33 @@ object AsterismService {
           and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
       """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+
+    def getAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, (Target.Id, Target))] =
+      sql"""
+        select
+          a.c_observation_id,
+          t.c_target_id,
+          c_name,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_source_profile
+        from t_target t
+        inner join t_asterism_target a
+        on t.c_target_id = a.c_target_id
+          and a.c_observation_id in ($enc)
+        where t.c_existence = 'present'
+      """.query(observation_id ~ Decoders.targetDecoder)
+
   }
 
   object Decoders {
