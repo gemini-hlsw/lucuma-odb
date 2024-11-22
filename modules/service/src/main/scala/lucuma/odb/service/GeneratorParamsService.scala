@@ -107,10 +107,10 @@ object GeneratorParamsService {
   extension (mode: InstrumentMode)
     def asImaging(λ: Wavelength): InstrumentMode =
       mode match {
-        case GmosNorthSpectroscopy(_, _, _, _, _) =>
-          InstrumentMode.GmosNorthImaging(Acquisition.filter(GmosNorthFilter.acquisition, λ, _.wavelength))
-        case GmosSouthSpectroscopy(_, _, _, _, _) =>
-          InstrumentMode.GmosSouthImaging(Acquisition.filter(GmosSouthFilter.acquisition, λ, _.wavelength))
+        case GmosNorthSpectroscopy(_, _, _, _, _, _) =>
+          InstrumentMode.GmosNorthImaging(Acquisition.filter(GmosNorthFilter.acquisition, λ, _.wavelength), none)
+        case GmosSouthSpectroscopy(_, _, _, _, _, _) =>
+          InstrumentMode.GmosSouthImaging(Acquisition.filter(GmosSouthFilter.acquisition, λ, _.wavelength), none)
         case x => x
       }
 
@@ -197,45 +197,45 @@ object GeneratorParamsService {
         config:    Option[SourceProfile => ObservingMode]
       ): Either[Error, GeneratorParams] =
         observingMode(obsParams.targets, config).map:
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosNorthSpectroscopy(
+              cw,
               g,
               f,
               GmosFpu.North.builtin(u),
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode, λ), gn, obsParams.calibrationRole)
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, λ, _, _, _, _, _, _, _, _, _) =>
+            GeneratorParams(itcObsParams(obsParams, mode), gn, obsParams.calibrationRole)
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
+              cw,
               g,
               f,
               GmosFpu.South.builtin(u),
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode, λ), gs, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), gs, obsParams.calibrationRole)
 
       private def itcObsParams(
         obsParams:  ObsParams,
         mode:       InstrumentMode,
-        wavelength: Wavelength
       ): Either[MissingParamSet, ItcInput] =
         (obsParams.signalToNoise.toValidNel(MissingParam.forObservation("signal to noise")),
          obsParams.signalToNoiseAt.toValidNel(MissingParam.forObservation("signal to noise at wavelength")),
          obsParams.targets.traverse(itcTargetParams)
-        ).mapN { case (s2n, s2nA, targets) =>
+        ).mapN { case (s2n, λ, targets) =>
           ItcInput(
             ImagingIntegrationTimeParameters(
-              wavelength,
+              λ,
               Acquisition.AcquisitionSN,
               obsParams.constraints,
-              mode.asImaging(wavelength)
+              mode.asImaging(λ)
             ),
             SpectroscopyIntegrationTimeParameters(
-              wavelength,
+              λ,
               s2n,
-              s2nA.some,
               obsParams.constraints,
               mode
             ),
