@@ -81,6 +81,9 @@ trait Services[F[_]]:
    */
   def transactionally[A](fa: (Transaction[F], Services[F]) ?=> F[A])(using NoTransaction[F]): F[A]
 
+  /** Analog of `transactionally` that works in `ResultT[F,*]`. */
+  def transactionallyT[A](fa: (Transaction[F], Services[F]) ?=> ResultT[F, A])(using NoTransaction[F]): ResultT[F, A]
+
   /** The `AllocationService`. */
   def allocationService: AllocationService[F]
 
@@ -237,6 +240,12 @@ object Services:
           } >>
           fa(using xa)
         }
+
+      def transactionallyT[A](fa: (Transaction[F], Services[F]) ?=> ResultT[F, A])(
+        using NoTransaction[F]
+      ): ResultT[F, A] =
+        ResultT(transactionally { val x = fa; x.value })
+
 
       // Services as passed their "owning" `Services` (i.e., `this`) on instantiation, which is
       // circular and requires everything to be done lazily, which luckily is what we want. No point

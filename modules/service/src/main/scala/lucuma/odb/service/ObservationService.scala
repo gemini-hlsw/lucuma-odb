@@ -171,8 +171,6 @@ object ObservationService {
       .getOrElse(GenericConstraintViolationMessage(ex.message))
 
   // observation validation messages
-  val AsterismOutOfRangeMsg = "Asterism out of Call for Proposals limits."
-  val ExplicitBaseOutOfRangeMsg = "Explicit base out of Call for Proposals limits."
   def InvalidInstrumentMsg(instr: Instrument) = s"Instrument $instr not part of Call for Proposals."
   def MissingDataMsg(otid: Option[Target.Id], paramName: String) =
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
