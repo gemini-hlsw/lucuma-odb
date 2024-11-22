@@ -21,6 +21,7 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
@@ -54,30 +55,42 @@ class observation_workflow
   val Limits = (RaStart, RaEnd, DecStart, DecEnd)
   val WrappedLimits = (RaStartWrap, RaEndWrap, DecStart, DecEnd)
 
-  def validationQuery(oid: Observation.Id) = 
+  def workflowQuery(oids: Observation.Id*) = 
     s"""
       query {
-        observation(observationId: "$oid") {
-          workflow {
-            state
-            validTransitions
-            validationErrors {
-              code
-              messages
+        observations(
+          WHERE: {
+            id: { IN: ${oids.asJson} }
+          }
+        ) {
+          matches {
+            workflow {
+              state
+              validTransitions
+              validationErrors {
+                code
+                messages
+              }
             }
           }
         }
       }
     """
 
-  def itcQuery(oid: Observation.Id) = 
+  def itcQuery(oids: Observation.Id*) = 
     s"""
       query {
-        observation(observationId: "$oid") {
-          itc {
-            science {
-              selected {
-                targetId
+        observations(
+          WHERE: {
+            id: { IN: ${oids.asJson} }
+          }
+        ) {
+          matches {
+            itc {
+              science {
+                selected {
+                  targetId
+                }
               }
             }
           }
@@ -89,15 +102,22 @@ class observation_workflow
   def computeItcResult(oid: Observation.Id): IO[Unit] =
     query(pi, itcQuery(oid)).void
 
-  def queryResult(state: ObservationWorkflowState, states: List[ObservationWorkflowState], errs: ObservationValidation*): Json =
+
+  def workflowQueryResult(wfs: ObservationWorkflow*): Json =
+    val embed = wfs.map: wf =>
+      json"""
+        {
+          "workflow": {
+            "state": ${wf.state},
+            "validTransitions": ${wf.validTransitions},
+            "validationErrors": ${wf.validationErrors}
+          }
+        }
+      """ 
     json"""
       {
-        "observation": {
-          "workflow": {
-            "state": $state,
-            "validTransitions": $states,
-            "validationErrors": $errs
-          }
+        "observations": {
+          "matches": $embed
         }
       }
     """ 
@@ -189,11 +209,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "target"))
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "target")))
+          )
         ).asRight
       )
     }
@@ -209,11 +231,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode"))
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode")))
+          )
         ).asRight
       )
     }
@@ -229,12 +253,12 @@ class observation_workflow
     setup.flatMap { (_, oid) =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configuration(
-            "Missing brightness measure, radial velocity"
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configuration("Missing brightness measure, radial velocity"))
           )
         ).asRight
       )
@@ -251,11 +275,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.itc("ITC results are not present.")
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.itc("ITC results are not present."))
+          )
         ).asRight
       )
     }
@@ -290,10 +316,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Defined,
-          List(ObservationWorkflowState.Inactive),
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive),
+            Nil
+          )
         ).asRight
       )
     }
@@ -311,15 +340,15 @@ class observation_workflow
     setup.flatMap { (_, oid) =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configuration(
-            "Missing brightness measure, radial velocity"
-          ),
-          ObservationValidation.callForProposals(
-            ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(
+              ObservationValidation.configuration("Missing brightness measure, radial velocity"),
+              ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+            )
           )
         ).asRight
       )
@@ -340,10 +369,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Defined,
-          List(ObservationWorkflowState.Inactive),
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive),
+            Nil
+          )
         ).asRight
       )
     }
@@ -361,12 +393,14 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.callForProposals(
-            ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth)
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(
+              ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+            )
           )
         ).asRight
       )
@@ -389,10 +423,13 @@ class observation_workflow
         createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
           expect(
             pi,
-            validationQuery(oid),
-            expected = queryResult(
-              ObservationWorkflowState.Defined,
-              List(ObservationWorkflowState.Inactive),
+            workflowQuery(oid),
+            expected = workflowQueryResult(
+              ObservationWorkflow(          
+                ObservationWorkflowState.Defined,
+                List(ObservationWorkflowState.Inactive),
+                Nil
+              )
             ).asRight
           )
       }
@@ -415,10 +452,13 @@ class observation_workflow
           createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
           expect(
             pi,
-            validationQuery(oid),
-            expected = queryResult(
-              ObservationWorkflowState.Defined,
-              List(ObservationWorkflowState.Inactive),
+            workflowQuery(oid),
+            expected = workflowQueryResult(
+              ObservationWorkflow(          
+                ObservationWorkflowState.Defined,
+                List(ObservationWorkflowState.Inactive),
+                Nil
+              )
             ).asRight
           )
       }
@@ -439,11 +479,13 @@ class observation_workflow
         setObservationExplicitBase(oid, ra, dec) >>
           expect(
             pi,
-            validationQuery(oid),
-            expected = queryResult(
-              ObservationWorkflowState.Undefined,
-              List(ObservationWorkflowState.Inactive),
-              ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
+            workflowQuery(oid),
+            expected = workflowQueryResult(
+              ObservationWorkflow(          
+                ObservationWorkflowState.Undefined,
+                List(ObservationWorkflowState.Inactive),
+                List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+              )
             ).asRight
           )
       }
@@ -464,11 +506,13 @@ class observation_workflow
         setObservationExplicitBase(oid, ra, dec) >>
           expect(
             pi,
-            validationQuery(oid),
-            expected = queryResult(
-              ObservationWorkflowState.Undefined,
-              List(ObservationWorkflowState.Inactive),
-              ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
+            workflowQuery(oid),
+            expected = workflowQueryResult(
+              ObservationWorkflow(          
+                ObservationWorkflowState.Undefined,
+                List(ObservationWorkflowState.Inactive),
+                List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+              )
             ).asRight
           )
       }
@@ -490,10 +534,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Defined,
-          List(ObservationWorkflowState.Inactive),
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive),
+            Nil
+          )
         ).asRight
       )
     }
@@ -512,11 +559,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange)
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+          )
         ).asRight
       )
     }
@@ -535,13 +584,17 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.callForProposals(
-            ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-            ObservationWorkflowService.Messages.CoordinatesOutOfRange
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(
+              ObservationValidation.callForProposals(
+                ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
+                ObservationWorkflowService.Messages.CoordinatesOutOfRange
+              )
+            )
           )
         ).asRight
       )
@@ -568,12 +621,16 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Undefined,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configuration(
-            ObservationService.InvalidScienceBandMsg(ScienceBand.Band1)
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(
+              ObservationValidation.configuration(
+                ObservationService.InvalidScienceBandMsg(ScienceBand.Band1)
+              )
+            )
           )
         ).asRight
       )
@@ -593,10 +650,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Defined,
-          List(ObservationWorkflowState.Inactive),
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive),
+            Nil
+          )
         ).asRight // no warnings!
       )
     }
@@ -617,11 +677,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Unapproved,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configurationRequestNotRequested
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Unapproved,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configurationRequestNotRequested)
+          )
         ).asRight
       )
     }
@@ -643,11 +705,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Unapproved,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configurationRequestPending
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Unapproved,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configurationRequestPending)
+          )
         ).asRight
       )
     }
@@ -669,11 +733,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Unapproved,
-          List(ObservationWorkflowState.Inactive),
-          ObservationValidation.configurationRequestDenied
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Unapproved,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configurationRequestDenied)
+          )
         ).asRight
       )
     }
@@ -695,10 +761,13 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Defined,
-          List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
+            Nil
+          )
         ).asRight
       )
     }
@@ -714,13 +783,68 @@ class observation_workflow
     setup.flatMap { oid =>
       expect(
         pi,
-        validationQuery(oid),
-        expected = queryResult(
-          ObservationWorkflowState.Ready,
-          Nil,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Ready,
+            Nil,
+            Nil
+          )
         ).asRight
       )
     }
+  }
+
+  test("approved configuration request AND asterism outside limits") {      
+
+    val oid1: IO[Observation.Id]  =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResult(oid)
+      } yield oid
+
+    val oid2: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
+        _   <- addProposal(pi, pid, cid.some)
+        tid <- createTargetWithProfileAs(pi, pid)
+        _   <- setTargetCoords(tid, RaStart - 20, DecCenter)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+      } yield oid
+
+    (oid1, oid2).tupled.flatMap { (oid1, oid2) =>
+      expect(
+        pi,
+        workflowQuery(oid1, oid2),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
+            Nil
+          ),
+          ObservationWorkflow(          
+            ObservationWorkflowState.Undefined,
+            List(ObservationWorkflowState.Inactive),
+            List(
+              ObservationValidation.callForProposals(
+                ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
+                ObservationWorkflowService.Messages.CoordinatesOutOfRange
+              ),
+            )
+          )
+        ).asRight
+      )
+
+    }
+
   }
 
 }
