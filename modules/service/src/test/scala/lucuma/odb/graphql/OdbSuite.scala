@@ -195,7 +195,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         ).pure[IO]
 
       override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] = {
-        IO.whenA(input.atWavelength.some === lucuma.core.math.Wavelength.fromIntNanometers(666)) {
+        val signal = lucuma.core.math.Wavelength.fromIntNanometers(666).get
+        val wavelength = input.mode match
+          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _) => w
+          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(w, _, _, _, _, _) => w
+          case _                                                                        => signal
+        IO.whenA(wavelength === signal) {
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
         } *> IntegrationTimeResult(
           FakeItcVersions,
