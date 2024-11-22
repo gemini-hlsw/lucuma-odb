@@ -136,8 +136,8 @@ trait ObservationMapping[F[_]]
 
   lazy val configurationRequestsQueryHandler: EffectHandler[F] = { pairs =>
 
-    // Here's the ordered sequence of stuff we need to deal with: 
-    // a pid+oid pair, the parent cursor, and the child context.
+    // Here's the collection of stuff we need to deal with: a pid+oid pair, the parent
+    // cursor, and the child context.
     val sequence: ResultT[F, List[((Program.Id, Observation.Id), Cursor, Context)]] =
       ResultT.fromResult:
         pairs.traverse: (query, cursor) =>
@@ -147,8 +147,8 @@ trait ObservationMapping[F[_]]
             c <- Query.childContext(cursor.context, query)
           } yield ((p, o), cursor, c)
 
-    // Pass the pid+oid pars to configurationService.selectRequests to get the
-    // applicable configuration requests for each pair. Then use this information
+    // Pass the pid+oid pairs to configurationService.selectRequests to get the
+    // applicable configuration requests for each pair, then use this information
     // to construct our list of outgoing cursors.
     def query(using Services[F], Transaction[F]): ResultT[F, List[Cursor]] =
       sequence.flatMap: pairs =>
@@ -165,8 +165,8 @@ trait ObservationMapping[F[_]]
 
   lazy val workflowQueryHandler: EffectHandler[F] = { pairs =>
 
-    // Here's the ordered sequence of stuff we need to deal with: 
-    // a pid+oid pair, the parent cursor, and the child context.
+    // Here's the collection of stuff we need to deal with: an oid, the parent
+    // cursor, and the child context.
     val sequence: ResultT[F, List[(Observation.Id, Cursor, Context)]] =
       ResultT.fromResult:
         pairs.traverse: (query, cursor) =>
@@ -175,9 +175,9 @@ trait ObservationMapping[F[_]]
             c <- Query.childContext(cursor.context, query)
           } yield (o, cursor, c)
 
-    // Pass the pid+oid pars to configurationService.selectRequests to get the
-    // applicable configuration requests for each pair. Then use this information
-    // to construct our list of outgoing cursors.
+    // Pass the oids to observationWorkflowService.getWorkflows to get the
+    // applicable workflows for each, then use this information to construct
+    // our list of outgoing cursors.
     def query(using Services[F]): ResultT[F, List[Cursor]] =
       sequence.flatMap: tuples =>
         ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
@@ -185,9 +185,8 @@ trait ObservationMapping[F[_]]
             CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
 
     // Do it!
-    services.use { implicit s =>
-      query.value
-    }
+    services.use: s => 
+      query(using s).value
     
   }
 
