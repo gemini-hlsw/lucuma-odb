@@ -3,6 +3,7 @@
 
 package lucuma.odb.util
 
+import cats.data.NonEmptyList
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -89,6 +90,12 @@ trait Codecs {
 
   def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
     `enum`(ev.tag, ev.fromTag, tpe)
+
+  /** Codec for an array of an enumerated type. */
+  def _enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[List[A]] =
+    Codec
+      .array[A](ev.tag, s => ev.fromTag(s).toRight(s"${tpe.name}: no such element '$s'"), tpe)
+      .imap[List[A]](_.flattenTo(List))(Arr.fromFoldable)
 
   private def codecFromPrism[A](prism: Prism[String, A], tpe: Type): Codec[A] =
     Codec.simple(
@@ -727,6 +734,13 @@ trait Codecs {
       case Ready      => Right(Ready)
       case s          => Left(s"Invalid user state: $s")
     } (a => a: ObservationWorkflowState)
+
+  extension [A](enc: Encoder[A]) def nel(as: NonEmptyList[A]): Encoder[as.type] =
+    val lst = as.toList
+    enc.list(lst).contramap(_ => lst)
+
+  val _science_band: Codec[List[ScienceBand]] =
+    _enumerated(Type("_e_science_band"))
 
 }
 
