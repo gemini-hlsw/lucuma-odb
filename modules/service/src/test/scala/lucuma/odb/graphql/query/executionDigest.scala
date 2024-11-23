@@ -195,6 +195,61 @@ class executionDigest extends ExecutionTestSupport {
 
   }
 
+  test("digest: deleted target") {
+
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- deleteTargetAs(pi, t)
+      } yield (p, o)
+
+    setup.flatMap { (pid, oid) =>
+      expectIor(
+        user  = pi,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 observations {
+                   matches {
+                     id
+                     execution {
+                       digest {
+                         setup {
+                           full { seconds }
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Ior.both(
+          List(s"Could not generate a sequence for the observation $oid: observation is missing target"),
+          json"""
+            {
+              "program": {
+                "observations": {
+                  "matches": [
+                    {
+                      "id": $oid,
+                      "execution": {
+                        "digest": null
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
   test("digest: one bad") {
 
     val setup: IO[(Program.Id, Observation.Id)] =
