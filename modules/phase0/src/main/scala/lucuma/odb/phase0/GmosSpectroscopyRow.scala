@@ -30,14 +30,17 @@ object GmosSpectroscopyRow {
     inst: Instrument,
     g:    G => String,
     l:    L => String,
-    u:    U => String
+    u:    U => String,
+    gObs: G => Boolean,
+    lObs: L => Boolean
+
   ): Parser[List[GmosSpectroscopyRow[G, L, U]]] =
     SpectroscopyRow.rows.flatMap { rs =>
       rs.traverse { r =>
         val gn = for {
           _ <- Either.raiseWhen(r.instrument =!= inst)(s"Cannot parse a ${r.instrument.tag} as ${inst.tag}")
-          g <- Enumerated[G].all.find(a => g(a) === r.disperser).toRight(s"Cannot parse disperser: ${r.disperser}")
-          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f).toRight(s"Cannot parse filter: $f") }
+          g <- Enumerated[G].all.find(a => g(a) === r.disperser && !gObs(a)).toRight(s"Cannot parse disperser: ${r.disperser}")
+          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f && !lObs(a)).toRight(s"Cannot parse filter: $f") }
           u <- Enumerated[U].all.find(a => u(a) === r.fpu).toRight(s"Cannot parse FPU: ${r.fpu}")
         } yield GmosSpectroscopyRow(r, g, l, u)
         gn.fold(Parser.failWith, Parser.pure)
@@ -45,9 +48,9 @@ object GmosSpectroscopyRow {
     }
 
   val gmosNorth: Parser[List[GmosNorth]] =
-    gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](Instrument.GmosNorth, _.shortName, _.shortName, _.shortName)
+    gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](Instrument.GmosNorth, _.shortName, _.shortName, _.shortName, _.obsolete, _.obsolete)
 
   val gmosSouth: Parser[List[GmosSouth]] =
-    gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](Instrument.GmosSouth, _.shortName, _.shortName, _.shortName)
+    gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](Instrument.GmosSouth, _.shortName, _.shortName, _.shortName, _.obsolete, _.obsolete)
 
 }
