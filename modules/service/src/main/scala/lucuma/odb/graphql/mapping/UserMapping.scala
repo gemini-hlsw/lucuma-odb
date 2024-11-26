@@ -18,6 +18,5 @@ trait UserMapping[F[_]] extends ProgramTable[F] with UserTable[F]:
          SqlField("type", UserTable.UserType),
          SqlField("serviceName", UserTable.ServiceName),
          SqlField("orcidId", UserTable.OrcidId),
-         SqlObject("primaryProfile"),
-         SqlObject("fallbackProfile")
+         SqlObject("profile")
        )

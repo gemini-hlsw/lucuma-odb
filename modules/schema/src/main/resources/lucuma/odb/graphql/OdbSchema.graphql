@@ -11657,12 +11657,11 @@ enum UserType {
 }
 
 type User {
-  id:              UserId!
-  type:            UserType!
-  serviceName:     String,
-  orcidId:         String,
-  primaryProfile:  UserProfile!,
-  fallbackProfile: UserProfile!
+  id:          UserId!
+  type:        UserType!
+  serviceName: String,
+  orcidId:     String,
+  profile:     UserProfile!
 }
 
 type UserProfile {
@@ -14259,6 +14258,9 @@ input WhereProgramUser {
   """
   partnerLink: WherePartnerLink
 
+  """
+  Matches the fallback profile.
+  """
   fallbackProfile: WhereUserProfile
 
   """
@@ -14503,28 +14505,28 @@ input WhereUser {
   A list of nested user filters that all must match in order for the AND group
   as a whole to match.
   """
-  AND:             [WhereUser!]
+  AND: [WhereUser!]
 
   """
   A list of nested user filters that all must match in order for the OR group
   as a whole to match.
   """
-  OR:              [WhereUser!]
+  OR: [WhereUser!]
 
   """
   A nested user filter that must not match in order for the NOT itself to match.
   """
-  NOT:             WhereUser
+  NOT: WhereUser
 
   "Matches the user Id."
-  id:              WhereOrderUserId
+  id: WhereOrderUserId
 
   "Matches the user type."
-  type:            WhereEqUserType
+  type: WhereEqUserType
 
-  orcidId:         WhereOptionString
-  primaryProfile:  WhereUserProfile
-  fallbackProfile: WhereUserProfile
+  orcidId: WhereOptionString
+  profile: WhereUserProfile
+
 }
 
 input WhereUserProfile {

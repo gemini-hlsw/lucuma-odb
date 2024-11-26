@@ -14,30 +14,7 @@ import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.graphql.binding.*
 
 object WhereProgramUser {
-/*
-(AND,AbsentValue),
-(OR,AbsentValue),
-(NOT,AbsentValue),
-(program,AbsentValue),
 
-(user,
-  (AND,AbsentValue),
-  (OR,AbsentValue),
-  (NOT,AbsentValue),
-  (id,ObjectValue(List((EQ,StringValue(u-1)), (NEQ,AbsentValue), (IN,AbsentValue), (NIN,AbsentValue), (GT,AbsentValue), (LT,AbsentValue), (GTE,AbsentValue), (LTE,AbsentValue)))),
-  (type,AbsentValue),
-  (orcidId,AbsentValue),
-  (primaryProfile,AbsentValue),
-  (fallbackProfile,AbsentValue)
-),
-
-(role,AbsentValue),
-(partnerLink,AbsentValue),
-(fallbackProfile,AbsentValue),
-(educationalStatus,AbsentValue),
-(thesis,AbsentValue),
-(gender,AbsentValue)
- */
   def binding(path: Path): Matcher[Predicate] =
 
     lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")
