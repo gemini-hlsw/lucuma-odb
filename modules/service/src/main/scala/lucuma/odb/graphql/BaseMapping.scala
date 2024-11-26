@@ -337,6 +337,8 @@ trait BaseMapping[F[_]]
   lazy val UserInvitationIdType                    = schema.ref("UserInvitationId")
   lazy val UserInvitationKeyType                   = schema.ref("UserInvitationKey")
   lazy val UserInvitationStatusType                = schema.ref("UserInvitationStatus")
+  lazy val UserProfileType                         = schema.ref("UserProfile")
+  lazy val UserType                                = schema.ref("User")
   lazy val UserTypeType                            = schema.ref("UserType")
   lazy val VisitType                               = schema.ref("Visit")
   lazy val VisitIdType                             = schema.ref("VisitId")

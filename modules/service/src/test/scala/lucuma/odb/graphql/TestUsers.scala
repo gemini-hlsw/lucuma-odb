@@ -11,6 +11,7 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.core.model.UserProfile
 import lucuma.core.util.Gid
 
 object TestUsers {
@@ -43,23 +44,26 @@ object TestUsers {
   object Standard {
 
     def apply(
-      id:           Long,
-      role:         StandardRole,
-      givenName:    Option[String] = None,
-      familyName:   Option[String] = None,
-      creditName:   Option[String] = None,
-      primaryEmail: Option[String] = None
+      id:         Long,
+      role:       StandardRole,
+      givenName:  Option[String] = None,
+      familyName: Option[String] = None,
+      creditName: Option[String] = None,
+      email:      Option[String] = None
     ): StandardUser =
       StandardUser(
         id         = Gid[User.Id].fromLong.getOption(id).get,
         role       = role,
         otherRoles = Nil,
         profile    = OrcidProfile(
-          orcidId      = orcidId(id),
-          givenName    = givenName,
-          familyName   = familyName,
-          creditName   = creditName,
-          primaryEmail = primaryEmail
+          orcidId  = orcidId(id),
+          primary  = UserProfile(
+            givenName  = givenName,
+            familyName = familyName,
+            creditName = creditName,
+            email      = email
+          ),
+          fallback = UserProfile.Empty
         )
       )
 

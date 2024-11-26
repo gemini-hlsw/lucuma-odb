@@ -33,13 +33,13 @@ class updateProgramUsers extends OdbSuite {
   val piCharles = TestUsers.Standard(
     7,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
-    primaryEmail = "charles@guiteau.com".some
+    email = "charles@guiteau.com".some
   )
 
   val piLeon    = TestUsers.Standard(
     8,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
-    primaryEmail = "leon@czolgosz.edu".some
+    email = "leon@czolgosz.edu".some
   )
 
   val service = TestUsers.service(10)

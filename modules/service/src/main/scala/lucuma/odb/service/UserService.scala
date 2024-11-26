@@ -81,7 +81,11 @@ object UserService {
           c_orcid_given_name,
           c_orcid_credit_name,
           c_orcid_family_name,
-          c_orcid_email
+          c_orcid_email,
+          c_fallback_given_name,
+          c_fallback_credit_name,
+          c_fallback_family_name,
+          c_fallback_email
         ) values (
           $user_id,
           'standard',
@@ -89,16 +93,30 @@ object UserService {
           ${varchar.opt},
           ${varchar.opt},
           ${varchar.opt},
+          ${varchar.opt},
+          ${varchar.opt},
+          ${varchar.opt},
+          ${varchar.opt},
           ${varchar.opt}
         ) on conflict (c_user_id) do update
-        set c_orcid_given_name  = ${varchar.opt},
-            c_orcid_credit_name = ${varchar.opt},
-            c_orcid_family_name = ${varchar.opt},
-            c_orcid_email       = ${varchar.opt}
+        set c_orcid_given_name     = ${varchar.opt},
+            c_orcid_credit_name    = ${varchar.opt},
+            c_orcid_family_name    = ${varchar.opt},
+            c_orcid_email          = ${varchar.opt},
+            c_fallback_given_name  = ${varchar.opt},
+            c_fallback_credit_name = ${varchar.opt},
+            c_fallback_family_name = ${varchar.opt},
+            c_fallback_email       = ${varchar.opt}
       """.command.contramap { su =>
-        val p = su.profile
-        (su.id, p.orcidId, p.givenName, p.creditName, p.familyName, p.primaryEmail,
-                p.givenName, p.creditName, p.familyName, p.primaryEmail)
+        val p = su.profile.primary
+        val f = su.profile.fallback
+        (su.id,
+         su.profile.orcidId,
+         p.givenName, p.creditName, p.familyName, p.email,
+         f.givenName, f.creditName, f.familyName, f.email,
+         p.givenName, p.creditName, p.familyName, p.email,
+         f.givenName, f.creditName, f.familyName, f.email
+        )
       }
 
   }
