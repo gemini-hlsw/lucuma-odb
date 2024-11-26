@@ -35,13 +35,19 @@ object GmosSpectroscopyRow {
     lObs: L => Boolean
 
   ): Parser[List[GmosSpectroscopyRow[G, L, U]]] =
+    // NOTE: If any of the Enumerated instances for Grating (Disperser), Filter or Fpu are changed, the
+    // file probably needs to be reimported (See `R__Phase0.importForcingVersion`), or the 
+    // import file needs to modified. In particular, if a Grating or Filter is obsoleted and replaced by
+    // a new one with the same `shortName`, the file needs to be re-imported (via importForcingVersion). 
+    // If one is obsoleted and not replaced, the relevant rows need to be removed from the import file (which
+    // will automatically trigger a re-import).
     SpectroscopyRow.rows.flatMap { rs =>
       rs.traverse { r =>
         val gn = for {
           _ <- Either.raiseWhen(r.instrument =!= inst)(s"Cannot parse a ${r.instrument.tag} as ${inst.tag}")
-          g <- Enumerated[G].all.find(a => g(a) === r.disperser && !gObs(a)).toRight(s"Cannot parse disperser: ${r.disperser}")
-          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f && !lObs(a)).toRight(s"Cannot parse filter: $f") }
-          u <- Enumerated[U].all.find(a => u(a) === r.fpu).toRight(s"Cannot parse FPU: ${r.fpu}")
+          g <- Enumerated[G].all.find(a => g(a) === r.disperser && !gObs(a)).toRight(s"Cannot find disperser: ${r.disperser}. Does a non-obsolete value exist in the Enumerated?")
+          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f && !lObs(a)).toRight(s"Cannot find filter: $f. Does a non-obsolete value exist in the Enumerated?") }
+          u <- Enumerated[U].all.find(a => u(a) === r.fpu).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
         } yield GmosSpectroscopyRow(r, g, l, u)
         gn.fold(Parser.failWith, Parser.pure)
       }
