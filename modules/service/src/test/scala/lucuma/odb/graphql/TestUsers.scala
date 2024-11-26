@@ -57,13 +57,12 @@ object TestUsers {
         otherRoles = Nil,
         profile    = OrcidProfile(
           orcidId  = orcidId(id),
-          primary  = UserProfile(
+          profile  = UserProfile(
             givenName  = givenName,
             familyName = familyName,
             creditName = creditName,
             email      = email
-          ),
-          fallback = UserProfile.Empty
+          )
         )
       )
 

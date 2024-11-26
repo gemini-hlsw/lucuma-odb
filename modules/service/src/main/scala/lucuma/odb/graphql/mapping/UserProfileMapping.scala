@@ -27,7 +27,6 @@ trait UserProfileMapping[F[_]] extends UserTable[F] with ProgramUserTable[F]:
 
   lazy val UserProfileMappings: List[TypeMapping] =
     List(
-      profileMappingAt(UserType / "primaryProfile",  UserTable.Primary, UserTable.UserId),
-      profileMappingAt(UserType / "fallbackProfile", UserTable.Fallback, UserTable.UserId),
+      profileMappingAt(UserType / "profile",  UserTable.Profile, UserTable.UserId),
       profileMappingAt(ProgramUserType / "fallbackProfile", ProgramUserTable.Fallback, ProgramUserTable.UserId)
     )

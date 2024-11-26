@@ -16,11 +16,10 @@ import lucuma.odb.graphql.binding.*
 object WhereUser:
 
   def binding(path: Path): Matcher[Predicate] =
-    val WhereUserId          = WhereOrder.binding[User.Id](path / "id", UserIdBinding)
-    val WhereType            = WhereEq.binding[UserType](path / "type", UserTypeBinding)
-    val WhereOrcidId         = WhereOptionString.binding(path / "orcidId")
-    val WherePrimaryProfile  = WhereUserProfile.binding(path / "primaryProfile")
-    val WhereFallbackProfile = WhereUserProfile.binding(path / "fallbackProfile")
+    val WhereUserId  = WhereOrder.binding[User.Id](path / "id", UserIdBinding)
+    val WhereType    = WhereEq.binding[UserType](path / "type", UserTypeBinding)
+    val WhereOrcidId = WhereOptionString.binding(path / "orcidId")
+    val WhereProfile = WhereUserProfile.binding(path / "profile")
 
     lazy val WhereUserBinding = binding(path)
     ObjectFieldsBinding.rmap:
@@ -31,11 +30,10 @@ object WhereUser:
         WhereUserId.Option("id", rId),
         WhereType.Option("type", rType),
         WhereOrcidId.Option("orcidId", rOrcidId),
-        WherePrimaryProfile.Option("primaryProfile", rPrimaryProfile),
-        WhereFallbackProfile.Option("fallbackProfile", rFallbackProfile)
+        WhereProfile.Option("profile", rProfile)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rOrcidId, rPrimaryProfile, rFallbackProfile).parMapN:
-          (AND, OR, NOT, id, t, orcid, primaryProfile, fallbackProfile) =>
+        (rAND, rOR, rNOT, rId, rType, rOrcidId, rProfile).parMapN:
+          (AND, OR, NOT, id, t, orcid, profile) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -43,6 +41,5 @@ object WhereUser:
               id,
               t,
               orcid,
-              primaryProfile,
-              fallbackProfile
+              profile
             ).flatten)
