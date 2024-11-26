@@ -11641,10 +11641,22 @@ type User {
   type:            UserType!
   serviceName:     String,
   orcidId:         String,
-  orcidGivenName:  String,
-  orcidCreditName: String,
-  orcidFamilyName: String,
-  orcidEmail:      String,
+  primaryProfile:  UserProfile!,
+  fallbackProfile: UserProfile!
+}
+
+type UserProfile {
+  givenName:  String
+  familyName: String
+  creditName: String
+  email:      String
+}
+
+input UserProfileInput {
+  givenName:  String
+  familyName: String
+  creditName: String
+  email:      String
 }
 
 """
@@ -14489,10 +14501,15 @@ input WhereUser {
   type:            WhereEqUserType
 
   orcidId:         WhereOptionString
-  orcidGivenName:  WhereOptionString
-  orcidCreditName: WhereOptionString
-  orcidFamilyName: WhereOptionString
-  orcidEmail:      WhereOptionString
+  primaryProfile:  WhereUserProfile
+  fallbackProfile: WhereUserProfile
+}
+
+input WhereUserProfile {
+  givenName:  WhereOptionString
+  creditName: WhereOptionString
+  familyName: WhereOptionString
+  email:      WhereOptionString
 }
 
 input WhereWavelength {

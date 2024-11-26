@@ -236,8 +236,9 @@ object OdbMapping {
           with UpdateProgramUsersResultMapping[F]
           with UpdateProposalResultMapping[F]
           with UpdateTargetsResultMapping[F]
-          with UserMapping[F]
           with UserInvitationMapping[F]
+          with UserMapping[F]
+          with UserProfileMapping[F]
           with VisitMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
@@ -450,8 +451,8 @@ object OdbMapping {
                 UpdateProgramUsersResultMapping,
                 UpdateProposalResultMapping,
                 UpdateTargetsResultMapping,
-                UserMapping,
                 UserInvitationMapping,
+                UserMapping,
                 VisitMapping,
                 VisitSelectResultMapping,
               ) ++ List(
@@ -485,6 +486,7 @@ object OdbMapping {
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
                 TimeSpanMappings,
+                UserProfileMappings,
                 WavelengthMappings
               ).flatten
 

@@ -26,19 +26,19 @@ class programUsers extends OdbSuite {
   val piCharles = TestUsers.Standard(
     6,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(6).get),
-    primaryEmail = "charles@guiteau.com".some
+    email = "charles@guiteau.com".some
   )
 
   val piLeon    = TestUsers.Standard(
     7,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
-    primaryEmail = "leon@czolgosz.edu".some
+    email = "leon@czolgosz.edu".some
   )
 
   val piPhd    = TestUsers.Standard(
     8,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
-    primaryEmail = "leon@czolgosz.edu".some
+    email = "leon@czolgosz.edu".some
   )
 
   val pi3     = TestUsers.Standard.pi(9, 35)
@@ -93,7 +93,9 @@ class programUsers extends OdbSuite {
             programUsers(
               WHERE: {
                 user: {
-                  orcidEmail: { EQ: "charles@guiteau.com" }
+                  primaryProfile: {
+                    email: { EQ: "charles@guiteau.com" }
+                  }
                 }
               }
             ) {
