@@ -6,6 +6,7 @@ package db.migration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import fs2.Stream
 import org.flywaydb.core.api.MigrationVersion
 
 import java.io.InputStream
@@ -20,6 +21,13 @@ import scala.math.BigInt
  * @param name identifies the migration in `getDescription`
   */
 abstract class RepeatableMigration(val getDescription: String) extends IOMigration {
+
+  /**
+   * Usually the migration is triggered by a change to the import file checksum,
+   * but there are occassions where we need to re-import without any changes to the file.
+   * Increment this value to force the migration to occur.
+   */
+  val importForcingVersion: Int
 
   /**
    * Returns `null` as required by the Flyway API for repeatable migrations.
@@ -40,11 +48,12 @@ abstract class RepeatableMigration(val getDescription: String) extends IOMigrati
       definitionFiles
         .map { case (_, is) => fs2.io.readInputStream(is, ByteChunkSize, closeAfterUse = true) }
         .reduce
+        .append(Stream.evalSeq(IO.pure(BigInt(importForcingVersion).toByteArray.toList)))
         .through(fs2.compression.checksum.crc32)
         .compile
         .to(Array)
         .unsafeRunSync()
-
+    
     BigInt(bytes).intValue
   }
 
