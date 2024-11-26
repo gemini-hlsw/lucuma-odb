@@ -383,11 +383,12 @@ object GeneratorParamsService {
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
         WHERE
       """(Void) |+|
-        sql"""gp.c_program_id = $program_id""".apply(programId)    |+|
-        void""" AND ob.c_existence = 'present' """                 |+|
+        sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
+        void""" AND ob.c_existence = 'present' """                           |+|
+        void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
         // sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
         // void""" AND ob.c_active_status = 'active' """              |+|
-        selector                                                   |+|
+        selector                                                             |+|
         existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }
   }

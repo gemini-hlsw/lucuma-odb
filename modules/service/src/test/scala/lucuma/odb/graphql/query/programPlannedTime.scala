@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -175,52 +176,53 @@ class programPlannedTime extends ExecutionTestSupport {
 
   // }
 
-  // test("program level: single complete, but 'Inactive' observation") {
-  //   val setup: IO[Program.Id] =
-  //     for {
-  //       p <- createProgram
-  //       t <- createTargetWithProfileAs(user, p)
-  //       _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = Approved, activeStatus = Inactive)
-  //     } yield p
+  test("program level: single complete, but 'Inactive' observation") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+      } yield p
 
-  //   setup.flatMap { pid =>
-  //     expect(
-  //       user  = user,
-  //       query =
-  //         s"""
-  //            query {
-  //              program(programId: "$pid") {
-  //                timeEstimateRange {
-  //                  minimum { total { seconds } }
-  //                  maximum { total { seconds } }
-  //                }
-  //              }
-  //            }
-  //          """,
-  //       expected = Right(
-  //         json"""
-  //           {
-  //             "program": {
-  //               "timeEstimateRange": {
-  //                 "minimum": {
-  //                   "total" : {
-  //                       "seconds" : 0.000000
-  //                   }
-  //                 },
-  //                 "maximum": {
-  //                   "total" : {
-  //                       "seconds" : 0.000000
-  //                   }
-  //                 }
-  //               }
-  //             }
-  //           }
-  //         """
-  //       )
-  //     )
-  //   }
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : 0.000000
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
 
-  // }
+  }
 
   test("program level: two complete observations") {
     val setup: IO[Program.Id] =
@@ -258,6 +260,54 @@ class programPlannedTime extends ExecutionTestSupport {
                   "maximum": {
                     "total" : {
                         "seconds" : ${ShortTime * 2}
+                    }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+  }
+
+  test("program level: two complete observations, but one is inactive") {
+    val setup: IO[Program.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+      } yield p
+
+    setup.flatMap { pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total" : {
+                        "seconds" : $ShortTime
+                    }
+                  },
+                  "maximum": {
+                    "total" : {
+                        "seconds" : $ShortTime
                     }
                   }
                 }
