@@ -534,32 +534,27 @@ object ProgramService {
       SET:   ProgramUserPropertiesInput,
       which: AppliedFragment
     ): Option[AppliedFragment] = {
-      val alias = "o"
-      val upES = sql"c_educational_status = ${educational_status.opt}"
-      val upTh = sql"c_thesis = ${bool.opt}"
-      val upG  = sql"c_gender = ${gender.opt}"
 
-      val esUpdate =  SET.educationalStatus match {
-        case Nullable.Null => Some(upES(None))
-        case Nullable.Absent => None
-        case Nullable.NonNull(value) => Some(upES(Some(value)))
-      }
-      val thUpdate =  SET.thesis match {
-        case Nullable.Null => Some(upTh(None))
-        case Nullable.Absent => None
-        case Nullable.NonNull(value) => Some(upTh(Some(value)))
-      }
-      val genderUpdate =  SET.gender match {
-        case Nullable.Null => Some(upG(None))
-        case Nullable.Absent => None
-        case Nullable.NonNull(value) => Some(upG(Some(value)))
-      }
+      val alias = "o"
+
+      val upGivenName         = sql"c_fallback_given_name  = ${varchar.opt}"
+      val upFamilyName        = sql"c_fallback_family_name = ${varchar.opt}"
+      val upCreditName        = sql"c_fallback_credit_name = ${varchar.opt}"
+      val upEmail             = sql"c_fallback_email       = ${varchar.opt}"
+
+      val upEducationalStatus = sql"c_educational_status   = ${educational_status.opt}"
+      val upThesis            = sql"c_thesis               = ${bool.opt}"
+      val upGender            = sql"c_gender               = ${gender.opt}"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
-          thUpdate,
-          esUpdate,
-          genderUpdate
+          SET.fallbackProfile.flatMap(_.givenName).foldPresent(upGivenName),
+          SET.fallbackProfile.flatMap(_.familyName).foldPresent(upFamilyName),
+          SET.fallbackProfile.flatMap(_.creditName).foldPresent(upCreditName),
+          SET.fallbackProfile.flatMap(_.email).foldPresent(upEmail),
+          SET.educationalStatus.foldPresent(upEducationalStatus),
+          SET.thesis.foldPresent(upThesis),
+          SET.gender.foldPresent(upGender)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),
@@ -567,7 +562,7 @@ object ProgramService {
         )}
       )
 
-      ups.map { nel =>
+      ups.map: nel =>
         val up =
           sql"""
             UPDATE t_program_user AS #$alias
@@ -577,7 +572,6 @@ object ProgramService {
         (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
           up |+| void" AND " |+| exists
         }) |+| sql" RETURNING #$alias.c_program_id, #$alias.c_user_id"(Void)
-      }
     }
 
     // This is the same as `existsUserAs` but where the program is

@@ -2717,6 +2717,22 @@ enum MosPreImaging {
   IS_NOT_MOS_PRE_IMAGING
 }
 
+#  """
+#  Creates a user associated with the given orcid, using the existing fallback
+#  profile if any, or if a user with this ORCiD already exists, updates its
+#  fallback profile.  Staff access is required for this operation.
+#  """
+#  canonicalizePreAuthUser(orcidId: OrcidId!, fallbackProfile: UserProfileInput!): User!
+#
+#input CanonicalizePreAuthUserInput {
+#  orcidId:         OrcidId!
+#  fallbackProfile: UserProfileInput!
+#}
+#
+#type CanonicalizePreAuthUserResult {
+#  user: User!
+#}
+
 type Mutation {
 
   """
@@ -3516,6 +3532,8 @@ input ProgramUserPropertiesInput {
   "The user's partner."
   partnerLink: PartnerLinkInput
 
+  fallbackProfile: UserProfileInput
+
   "The user's educational status."
   educationalStatus: EducationalStatus
 
@@ -3554,6 +3572,8 @@ type ProgramUser {
   program:           Program
   user:              User
 
+  fallbackProfile:   UserProfile!
+
   """
   User educational status. PHD/Undergrad/Grad/Other
   """
@@ -3567,7 +3587,7 @@ type ProgramUser {
   """
   Flag indicating whether the user's proposal is part of a thesis.
   """
-  thesis:            Boolean
+  thesis: Boolean
 }
 
 """
@@ -14238,6 +14258,8 @@ input WhereProgramUser {
   Matches the partner.
   """
   partnerLink: WherePartnerLink
+
+  fallbackProfile: WhereUserProfile
 
   """
   Matches the educational status.

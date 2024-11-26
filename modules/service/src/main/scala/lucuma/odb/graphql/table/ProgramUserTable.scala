@@ -20,6 +20,11 @@ trait ProgramUserTable[F[_]] extends BaseMapping[F] {
     val EducationalStatus = col("c_educational_status", educational_status.opt)
     val Thesis            = col("c_thesis", bool.opt)
     val Gender            = col("c_gender", gender.opt)
-  }
+
+    object Fallback extends UserProfileTable[ColumnRef]:
+      override val GivenName  = col("c_fallback_given_name", varchar.opt)
+      override val FamilyName = col("c_fallback_family_name", varchar.opt)
+      override val CreditName = col("c_fallback_credit_name", varchar.opt)
+      override val Email      = col("c_fallback_email", varchar.opt)  }
 
 }

@@ -16,19 +16,13 @@ trait UserTable[F[_]] extends BaseMapping[F]:
     val ServiceName = col("c_service_name", varchar.opt)
     val OrcidId     = col("c_orcid_id", varchar.opt)
 
-    trait Profile:
-      def GivenName: ColumnRef
-      def FamilyName: ColumnRef
-      def CreditName: ColumnRef
-      def Email: ColumnRef
-
-    object Primary extends Profile:
+    object Primary extends UserProfileTable[ColumnRef]:
       override val GivenName  = col("c_orcid_given_name", varchar.opt)
       override val FamilyName = col("c_orcid_family_name", varchar.opt)
       override val CreditName = col("c_orcid_credit_name", varchar.opt)
       override val Email      = col("c_orcid_email", varchar.opt)
 
-    object Fallback extends Profile:
+    object Fallback extends UserProfileTable[ColumnRef]:
       override val GivenName  = col("c_fallback_given_name", varchar.opt)
       override val FamilyName = col("c_fallback_family_name", varchar.opt)
       override val CreditName = col("c_fallback_credit_name", varchar.opt)

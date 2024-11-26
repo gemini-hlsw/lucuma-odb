@@ -15,21 +15,19 @@ import lucuma.odb.graphql.binding.*
 
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
+  fallbackProfile:   Nullable[UserProfileInput],
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
-  gender:            Nullable[Gender]
+  gender:            Nullable[Gender],
 )
 
-object ProgramUserPropertiesInput {
-
+object ProgramUserPropertiesInput:
   val Binding: Matcher[ProgramUserPropertiesInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
+        UserProfileInput.Binding.Nullable("fallbackProfile", rFallbackProfile),
         EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
         BooleanBinding.Nullable("thesis", rThesis),
         GenderBinding.Nullable("gender", rGender),
-      ) => (rPartnerLink, rEducationalStatus, rThesis, rGender).parMapN(ProgramUserPropertiesInput.apply)
-    }
-
-}
+      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN(ProgramUserPropertiesInput.apply)
