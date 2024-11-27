@@ -78,7 +78,7 @@ case class Config(
       ) .map(_.map(_.user))
     }
 
-  def ssoGraphQlClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoGraphQlClient[F]] =
+  def ssoGqlClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoGraphQlClient[F]] =
     httpClientResource[F].evalMap: httpClient =>
       SsoGraphQlClient.create(
         uri        = sso.root / "graphql",
