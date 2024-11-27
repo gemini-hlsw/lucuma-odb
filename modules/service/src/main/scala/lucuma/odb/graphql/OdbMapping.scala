@@ -31,6 +31,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
+import lucuma.sso.client.SsoGraphQlClient
 import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
@@ -74,19 +75,20 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Parallel: Trace: Logger](
-    database:     Resource[F, Session[F]],
-    monitor0:     SkunkMonitor[F],
-    user0:        User,
-    topics0:      Topics[F],
-    itcClient0:   ItcClient[F],
-    commitHash0:  CommitHash,
-    enums:        Enums,
-    tec:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient0:  Client[F],
-    emailConfig0: Config.Email,
-    allowSub:     Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:      Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
-  ):  Mapping[F] =
+    database:      Resource[F, Session[F]],
+    monitor0:      SkunkMonitor[F],
+    user0:         User,
+    topics0:       Topics[F],
+    itcClient0:    ItcClient[F],
+    ssoGqlClient0: SsoGraphQlClient[F],
+    commitHash0:   CommitHash,
+    enums:         Enums,
+    tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient0:   Client[F],
+    emailConfig0:  Config.Email,
+    allowSub:      Boolean = true,       // Are submappings (recursive calls) allowed?
+    schema0:       Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+  ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddAtomEventResultMapping[F]
@@ -258,6 +260,7 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val itcClient = itcClient0
+          val ssoGqlClient = ssoGqlClient0  // TODO
           override val user: User = user0
           override val topics: Topics[F] = topics0
 
@@ -272,6 +275,7 @@ object OdbMapping {
                   user0,
                   topics0,
                   itcClient0,
+                  ssoGqlClient0,
                   commitHash0,
                   enums,
                   tec,
