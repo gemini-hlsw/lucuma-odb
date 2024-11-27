@@ -38,6 +38,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Gid
@@ -160,8 +161,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcVersions: ItcVersions =
     ItcVersions("foo", "bar".some)
 
-  val FakeBand: Band =
-    Band.B
+  val FakeBandOrLine: Either[Band, Wavelength] =
+    Band.B.asLeft
 
   val FakeItcResult: IntegrationTime =
     IntegrationTime(
@@ -187,7 +188,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine).asRight
                 )
               )
             ).get
@@ -208,7 +209,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBand).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine).asRight
                 )
               )
             ).get

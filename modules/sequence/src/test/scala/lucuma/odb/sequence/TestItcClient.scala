@@ -13,6 +13,7 @@ import eu.timepit.refined.types.numeric.*
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
@@ -39,7 +40,7 @@ object TestItcClient {
     exposureTime:  TimeSpan,
     exposureCount: Int,
     signalToNoise: BigDecimal,
-    band:          Band,
+    bandOrLine:    Either[Band, Wavelength],
     graphResult:   (NonEmptyList[ItcCcd], NonEmptyList[GraphResult])
   ): ItcClient[F] =
     withResult[F](
@@ -48,13 +49,13 @@ object TestItcClient {
         PosInt.unsafeFrom(exposureCount),
         SignalToNoise.unsafeFromBigDecimalExact(signalToNoise)
       ),
-      band,
+      bandOrLine,
       graphResult
     )
 
   def withResult[F[_]: Applicative](
     result:      IntegrationTime,
-    band:        Band,
+    bandOrLine:  Either[Band, Wavelength],
     graphResult: (NonEmptyList[ItcCcd], NonEmptyList[GraphResult])
   ): ItcClient[F] =
     new ItcClient[F] {
@@ -69,7 +70,7 @@ object TestItcClient {
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(result)), band).asRight
+                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(result)), bandOrLine).asRight
                 )
               )
             ).get
@@ -86,7 +87,7 @@ object TestItcClient {
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.of(result, result), band).asRight
+                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine).asRight
                 )
               )
             ).get
