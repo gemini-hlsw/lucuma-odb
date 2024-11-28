@@ -2717,21 +2717,16 @@ enum MosPreImaging {
   IS_NOT_MOS_PRE_IMAGING
 }
 
-#  """
-#  Creates a user associated with the given orcid, using the existing fallback
-#  profile if any, or if a user with this ORCiD already exists, updates its
-#  fallback profile.  Staff access is required for this operation.
-#  """
-#  canonicalizePreAuthUser(orcidId: OrcidId!, fallbackProfile: UserProfileInput!): User!
-#
-#input CanonicalizePreAuthUserInput {
-#  orcidId:         OrcidId!
-#  fallbackProfile: UserProfileInput!
-#}
-#
-#type CanonicalizePreAuthUserResult {
-#  user: User!
-#}
+input CreatePreAuthProgramUserInput {
+  orcidId:     String!
+  programId:   ProgramId!
+  role:        ProgramUserRole!
+  SET:         ProgramUserPropertiesInput
+}
+
+type CreatePreAuthProgramUserResult {
+  programUser: ProgramUser!
+}
 
 type Mutation {
 
@@ -2876,6 +2871,14 @@ type Mutation {
     """
     input: CreateObservationInput!
   ): CreateObservationResult!
+
+  """
+  Creates a user associated with a given ORCID id and adds it to the given
+  program.
+  """
+  createPreAuthProgramUser(
+    input: CreatePreAuthProgramUserInput!
+  ): CreatePreAuthProgramUserResult!
 
   """
   Creates a new program according to provided properties

@@ -12,6 +12,8 @@ import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
+import monocle.Focus
+import monocle.Lens
 
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
@@ -22,6 +24,19 @@ case class ProgramUserPropertiesInput(
 )
 
 object ProgramUserPropertiesInput:
+
+  val Empty: ProgramUserPropertiesInput =
+    ProgramUserPropertiesInput(
+      none,
+      Nullable.Absent,
+      Nullable.Absent,
+      Nullable.Absent,
+      Nullable.Absent
+    )
+
+  val partnerLink: Lens[ProgramUserPropertiesInput, Option[PartnerLink]] =
+    Focus[ProgramUserPropertiesInput](_.partnerLink)
+
   val Binding: Matcher[ProgramUserPropertiesInput] =
     ObjectFieldsBinding.rmap:
       case List(

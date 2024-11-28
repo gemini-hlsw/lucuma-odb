@@ -77,6 +77,7 @@ trait BaseMapping[F[_]]
   lazy val CreateCallForProposalsResultType        = schema.ref("CreateCallForProposalsResult")
   lazy val CreateGroupResultType                   = schema.ref("CreateGroupResult")
   lazy val CreateObservationResultType             = schema.ref("CreateObservationResult")
+  lazy val CreatePreAuthProgramUserResultType      = schema.ref("CreatePreAuthProgramUserResult")
   lazy val CreateProgramResultType                 = schema.ref("CreateProgramResult")
   lazy val CreateProposalResultType                = schema.ref("CreateProposalResult")
   lazy val CreateTargetResultType                  = schema.ref("CreateTargetResult")
