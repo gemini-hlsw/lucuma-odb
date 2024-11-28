@@ -211,7 +211,7 @@ object AsterismService {
 
   object Statements {
 
-    import ProgramService.Statements.{andWhereUserAccess, whereUserAccess}
+    import ProgramUserService.Statements.{andWhereUserAccess, whereUserAccess}
 
     def selectProgramId(
       observationIds: NonEmptyList[Observation.Id]

@@ -61,6 +61,7 @@ import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
+import lucuma.odb.graphql.input.CreatePreAuthProgramUserInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProposalInput
 import lucuma.odb.graphql.input.CreateTargetInput
@@ -100,6 +101,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.sso.client.SsoGraphQlClient
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
@@ -126,6 +128,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateConfigurationRequest,
       CreateGroup,
       CreateObservation,
+      CreatePreAuthProgramUser,
       CreateProgram,
       CreateProposal,
       CreateTarget,
@@ -171,6 +174,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   val httpClient: Client[F]
+  def ssoGraphQlClient: SsoGraphQlClient[F]
   val itcClient: ItcClient[F]
   def emailConfig: Config.Email
   val commitHash: CommitHash
@@ -399,6 +403,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         observationService.createObservation(input).nestMap: oid =>
           Unique(Filter(Predicates.observation.id.eql(oid), child))
 
+  private lazy val CreatePreAuthProgramUser: MutationField =
+    MutationField("createPreAuthProgramUser", CreatePreAuthProgramUserInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        programUserService.createPreAuthUser(ssoGraphQlClient, input).map: r =>
+          r.map: (pid, uid) =>
+            Unique(Filter(Predicate.And(
+              Predicates.programUser.programId.eql(pid),
+              Predicates.programUser.userId.eql(uid)
+            ), child))
+
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       services.useTransactionally {
@@ -440,7 +454,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding): (input, child) =>
       services.useTransactionally:
-        programService.linkUser(input).nestMap: (pid, uid) =>
+        programUserService.linkUser(input).nestMap: (pid, uid) =>
           Unique(Filter(And(
             Predicates.linkUserResult.programId.eql(pid),
             Predicates.linkUserResult.userId.eql(uid),
@@ -450,7 +464,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     MutationField.json("unlinkUser", UnlinkUserInput.Binding): input =>
       services.useTransactionally:
         requirePiAccess:
-          programService.unlinkUser(input).nestMap: b =>
+          programUserService.unlinkUser(input).nestMap: b =>
             Json.obj("result" -> b.asJson)
 
   private def recordDatasetResponseToResult(
@@ -850,7 +864,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           ).flatMap(_.fragment)
 
         selection.flatTraverse { which =>
-          programService
+          programUserService
             .updateProgramUsers(input.SET, which)
             .map(
               _.flatMap(programUsersResultSubquery(_, input.LIMIT, child))

@@ -131,6 +131,7 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
+          with CreatePreAuthProgramUserResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -260,7 +261,7 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val itcClient = itcClient0
-          val ssoGqlClient = ssoGqlClient0  // TODO
+          override val ssoGraphQlClient: SsoGraphQlClient[F] = ssoGqlClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
 
@@ -330,6 +331,7 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
+                CreatePreAuthProgramUserResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,

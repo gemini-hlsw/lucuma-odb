@@ -72,7 +72,7 @@ trait AttachmentFileService {
     // guest users not allowed to upload files - at least for now.
     case GuestUser(_) => MonadThrow[F].raiseError(Forbidden)
     case _            =>
-      programService
+      programUserService
         .userHasAccess(programId)
         .flatMap(MonadThrow[F].raiseError(Forbidden).unlessA)
   }

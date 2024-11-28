@@ -6,6 +6,7 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.Nullable.Absent
 import lucuma.odb.graphql.binding.*
 
 case class UserProfileInput(
@@ -16,6 +17,9 @@ case class UserProfileInput(
 )
 
 object UserProfileInput:
+  val Empty: UserProfileInput =
+    UserProfileInput(Absent, Absent, Absent, Absent)
+
   val Binding: Matcher[UserProfileInput] =
     ObjectFieldsBinding.rmap:
       case List(
