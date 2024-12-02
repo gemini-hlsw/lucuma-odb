@@ -13,22 +13,22 @@ import lucuma.core.model.Program
 import lucuma.core.syntax.string.toScreamingSnakeCase
 import lucuma.odb.graphql.binding.*
 
-case class CreatePreAuthProgramUserInput(
+case class AddProgramUserInput(
   orcidId:   OrcidId,
   programId: Program.Id,
   role:      ProgramUserRole,
   SET:       Option[ProgramUserPropertiesInput]
 )
 
-object CreatePreAuthProgramUserInput:
+object AddProgramUserInput:
   def ensuringCoi(role: ProgramUserRole): Result[ProgramUserRole] =
     role match
       case ProgramUserRole.Coi | ProgramUserRole.CoiRO =>
         role.success
       case _                                           =>
-        Result.failure(s"Only co-investigators who have not accepted an invitation may be linked via this method, not ${role.tag.toScreamingSnakeCase}")
+        Result.failure(s"Only co-investigators who have not accepted an invitation may be added via this method, not ${role.tag.toScreamingSnakeCase}")
 
-  val Binding: Matcher[CreatePreAuthProgramUserInput] =
+  val Binding: Matcher[AddProgramUserInput] =
     ObjectFieldsBinding.rmap:
       case List(
         OrcidIdBinding("orcidId", rOrcidId),
@@ -40,4 +40,4 @@ object CreatePreAuthProgramUserInput:
         rProgramId,
         rRole.flatMap(ensuringCoi),
         rProps
-      ).parMapN(CreatePreAuthProgramUserInput.apply)
+      ).parMapN(AddProgramUserInput.apply)

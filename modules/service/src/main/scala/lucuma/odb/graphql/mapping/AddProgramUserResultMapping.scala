@@ -8,10 +8,10 @@ import grackle.skunk.SkunkMapping
 
 import table.ProgramUserTable
 
-trait CreatePreAuthProgramUserResultMapping[F[_]] extends ProgramUserTable[F]:
+trait AddProgramUserResultMapping[F[_]] extends ProgramUserTable[F]:
 
-  lazy val CreatePreAuthProgramUserResultMapping: ObjectMapping =
-    ObjectMapping(CreatePreAuthProgramUserResultType)(
+  lazy val AddProgramUserResultMapping: ObjectMapping =
+    ObjectMapping(AddProgramUserResultType)(
       SqlField("programId", ProgramUserTable.ProgramId, key = true, hidden = true),
       SqlField("userId",    ProgramUserTable.UserId,    key = true, hidden = true),
       SqlObject("programUser")

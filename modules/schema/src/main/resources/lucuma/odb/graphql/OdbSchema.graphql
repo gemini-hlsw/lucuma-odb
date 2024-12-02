@@ -47,6 +47,17 @@ type AddDatasetEventResult {
 
 }
 
+input AddProgramUserInput {
+  orcidId:     String!
+  programId:   ProgramId!
+  role:        ProgramUserRole!
+  SET:         ProgramUserPropertiesInput
+}
+
+type AddProgramUserResult {
+  programUser: ProgramUser!
+}
+
 "SequenceEvent creation parameters."
 input AddSequenceEventInput {
   visitId: VisitId!
@@ -2717,17 +2728,6 @@ enum MosPreImaging {
   IS_NOT_MOS_PRE_IMAGING
 }
 
-input CreatePreAuthProgramUserInput {
-  orcidId:     String!
-  programId:   ProgramId!
-  role:        ProgramUserRole!
-  SET:         ProgramUserPropertiesInput
-}
-
-type CreatePreAuthProgramUserResult {
-  programUser: ProgramUser!
-}
-
 type Mutation {
 
   """
@@ -2767,6 +2767,15 @@ type Mutation {
     input: AddDatasetEventInput!
 
   ): AddDatasetEventResult!
+
+  """
+  Looks up or creates (if necessary) a user associated with a given ORCID id and
+  adds it to the given program.  No invitation is sent as a result of this
+  operation.
+  """
+  addProgramUser(
+    input: AddProgramUserInput!
+  ): AddProgramUserResult!
 
   """
   Adds a sequence event associated with the given visit. Multiple events
@@ -2871,14 +2880,6 @@ type Mutation {
     """
     input: CreateObservationInput!
   ): CreateObservationResult!
-
-  """
-  Creates a user associated with a given ORCID id and adds it to the given
-  program.
-  """
-  createPreAuthProgramUser(
-    input: CreatePreAuthProgramUserInput!
-  ): CreatePreAuthProgramUserResult!
 
   """
   Creates a new program according to provided properties

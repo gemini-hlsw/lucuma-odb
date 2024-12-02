@@ -131,7 +131,7 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
-          with CreatePreAuthProgramUserResultMapping[F]
+          with AddProgramUserResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -331,7 +331,7 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
-                CreatePreAuthProgramUserResultMapping,
+                AddProgramUserResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,
