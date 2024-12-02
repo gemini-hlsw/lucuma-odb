@@ -283,6 +283,7 @@ object ObservationWorkflowService {
           val enc = cfp_id.nel(nel)
           session
             .stream(Statements.CfpInfos(enc))(nel, 1024)
+            .compile
             // We get a row per instrument, so we need to group by CFP ID and fold the instruments
             .fold(Map.empty[CallForProposals.Id, CfpInfo]) {
               case (m, (cfp, oinst)) =>
@@ -291,9 +292,6 @@ object ObservationWorkflowService {
                   case Some(c) => c.addInstrument(oinst).some
                 }
             }
-            .compile
-            .last
-            .map(_.getOrElse(Map.empty))
 
       private def itcValidationss(
         params: List[(ObservationValidationInfo, GeneratorParams)],
