@@ -49,6 +49,7 @@ import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.AddAtomEventInput
 import lucuma.odb.graphql.input.AddDatasetEventInput
+import lucuma.odb.graphql.input.AddProgramUserInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
@@ -61,7 +62,6 @@ import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
-import lucuma.odb.graphql.input.CreatePreAuthProgramUserInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProposalInput
 import lucuma.odb.graphql.input.CreateTargetInput
@@ -117,6 +117,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddConditionsEntry,
       AddAtomEvent,
       AddDatasetEvent,
+      AddProgramUser,
       AddSequenceEvent,
       AddSlewEvent,
       AddStepEvent,
@@ -128,7 +129,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateConfigurationRequest,
       CreateGroup,
       CreateObservation,
-      CreatePreAuthProgramUser,
       CreateProgram,
       CreateProposal,
       CreateTarget,
@@ -332,6 +332,16 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           chronicleService.addConditionsEntry(input).nestMap: id =>
             Filter(Predicates.addConditionsEntyResult.conditionsEntry.id.eql(id), child)
 
+  private lazy val AddProgramUser: MutationField =
+    MutationField("addProgramUser", AddProgramUserInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        programUserService.addProgramUser(ssoGraphQlClient, input).map: r =>
+          r.map: (pid, uid) =>
+            Unique(Filter(Predicate.And(
+              Predicates.programUser.programId.eql(pid),
+              Predicates.programUser.userId.eql(uid)
+            ), child))
+
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding): (input, child) =>
       services.useTransactionally:
@@ -402,16 +412,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       services.useTransactionally:
         observationService.createObservation(input).nestMap: oid =>
           Unique(Filter(Predicates.observation.id.eql(oid), child))
-
-  private lazy val CreatePreAuthProgramUser: MutationField =
-    MutationField("createPreAuthProgramUser", CreatePreAuthProgramUserInput.Binding): (input, child) =>
-      services.useNonTransactionally:
-        programUserService.createPreAuthUser(ssoGraphQlClient, input).map: r =>
-          r.map: (pid, uid) =>
-            Unique(Filter(Predicate.And(
-              Predicates.programUser.programId.eql(pid),
-              Predicates.programUser.userId.eql(uid)
-            ), child))
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>

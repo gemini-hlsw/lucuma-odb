@@ -29,7 +29,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.UserType
-import lucuma.odb.graphql.input.CreatePreAuthProgramUserInput
+import lucuma.odb.graphql.input.AddProgramUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.util.Codecs.educational_status
@@ -71,9 +71,9 @@ trait ProgramUserService[F[_]]:
     which: AppliedFragment
   )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]]
 
-  def createPreAuthUser(
+  def addProgramUser(
     sso:   SsoGraphQlClient[F],
-    input: CreatePreAuthProgramUserInput
+    input: AddProgramUserInput
   )(using NoTransaction[F]): F[Result[(Program.Id, User.Id)]]
 
   /** Check to see if the user has access to the given program. */
@@ -191,9 +191,9 @@ object ProgramUserService:
           session.prepareR(af.fragment.query(program_id *: user_id)).use: pq =>
             pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
 
-      override def createPreAuthUser(
+      override def addProgramUser(
         sso:   SsoGraphQlClient[F],
-        input: CreatePreAuthProgramUserInput
+        input: AddProgramUserInput
       )(using NoTransaction[F]): F[Result[(Program.Id, User.Id)]] =
         val set0 = input.SET.getOrElse(ProgramUserPropertiesInput.Empty)
         val link = set0.partnerLink.getOrElse(PartnerLink.HasUnspecifiedPartner)

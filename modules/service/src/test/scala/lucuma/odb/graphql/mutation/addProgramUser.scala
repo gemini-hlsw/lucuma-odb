@@ -14,7 +14,7 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
 
-class createPreAuthProgramUser extends OdbSuite:
+class addProgramUser extends OdbSuite:
   val pi  = TestUsers.Standard.pi(1, 30)
   val pa0 = TestUsers.Standard.pi(100L, 100L)
   val pa1 = TestUsers.Standard.pi(101L, 101L)
@@ -23,13 +23,13 @@ class createPreAuthProgramUser extends OdbSuite:
 
   override val httpRequestHandler = invitationEmailRequestHandler
 
-  test("createPreAuthProgramUser"):
+  test("addProgramUser"):
     createProgramAs(pi).flatMap: pid =>
       expect(
         user     = pi,
         query    = s"""
           mutation {
-            createPreAuthProgramUser(
+            addProgramUser(
               input: {
                 orcidId: "${TestUsers.orcidId(100L).value}"
                 programId: "$pid"
@@ -71,7 +71,7 @@ class createPreAuthProgramUser extends OdbSuite:
         """,
         expected = json"""
           {
-            "createPreAuthProgramUser": {
+            "addProgramUser": {
               "programUser": {
                 "role": "COI",
                 "partnerLink": {
@@ -93,13 +93,13 @@ class createPreAuthProgramUser extends OdbSuite:
         """.asRight
       )
 
-  test("createPreAuthProgramUser: illegal role"):
+  test("addProgramUser: illegal role"):
     createProgramAs(pi).flatMap: pid =>
       expect(
         user     = pi,
         query    = s"""
           mutation {
-            createPreAuthProgramUser(
+            addProgramUser(
               input: {
                 orcidId: "${TestUsers.orcidId(100L).value}"
                 programId: "$pid"
@@ -113,18 +113,18 @@ class createPreAuthProgramUser extends OdbSuite:
           }
         """,
         expected = List(
-          "Argument 'input' is invalid: Only co-investigators who have not accepted an invitation may be linked via this method, not PI"
+          "Argument 'input' is invalid: Only co-investigators who have not accepted an invitation may be added via this method, not PI"
         ).asLeft
       )
 
-  test("createPreAuthProgramUser: redeem after added"):
+  test("addProgramUser: redeem after added"):
     for
       pid <- createProgramAs(pi)
       inv <- createUserInvitationAs(pi, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.CL))
       uid <- query(user = pi,
                s"""
                  mutation {
-                   createPreAuthProgramUser(
+                   addProgramUser(
                      input: {
                        orcidId: "${TestUsers.orcidId(101L).value}"
                        programId: "$pid"
@@ -141,8 +141,8 @@ class createPreAuthProgramUser extends OdbSuite:
                 }
                """
              ).map: json =>
-               json.hcursor.downFields("createPreAuthProgramUser", "programUser", "user", "id").require[User.Id]
-          // Since the user was added explicitly with createPreAuthProgramUser,
+               json.hcursor.downFields("addProgramUser", "programUser", "user", "id").require[User.Id]
+          // Since the user was added explicitly with addProgramUser,
           // when they accept the invitation there will already be a link.
       _   <- expectIor(
                user = pa1,
