@@ -93,7 +93,7 @@ class programUsers extends OdbSuite {
             programUsers(
               WHERE: {
                 user: {
-                  primaryProfile: {
+                  profile: {
                     email: { EQ: "charles@guiteau.com" }
                   }
                 }
