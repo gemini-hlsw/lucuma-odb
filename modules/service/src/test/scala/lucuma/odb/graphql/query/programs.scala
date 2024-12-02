@@ -158,7 +158,7 @@ class programs extends OdbSuite {
               WHERE: {
                 pi: {
                   user: {
-                    primaryProfile: {
+                    profile: {
                       email: { EQ: "charles@guiteau.com" }
                     }
                   }
