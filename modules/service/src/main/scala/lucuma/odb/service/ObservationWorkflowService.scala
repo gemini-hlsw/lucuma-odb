@@ -54,6 +54,7 @@ import java.time.Duration
 import java.time.Instant
 
 import Services.Syntax.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 sealed trait ObservationWorkflowService[F[_]] {
 
@@ -216,24 +217,36 @@ object ObservationWorkflowService {
       /** Retrieve the generator params/errors for many observations. */
       private def generatorParamss(
         infos: List[ObservationValidationInfo]
-      )(using Transaction[F]): F[Map[Observation.Id, Either[ObservationValidationMap, GeneratorParams]]] =
-        infos
-          .groupBy(_.pid)
-          .view
-          .mapValues(_.map(_.oid))
-          .toList
-          .traverse: (pid, oids) =>
-            generatorParamsService
-              .selectMany(pid, oids) // TODO: this still ends up going program by program … need a more general batch method here
-              .map: results =>
-                results
-                  .view
-                  .mapValues:
-                    case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
-                    case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
-                    case Right(ps)                             => ps.asRight
-                  .toList
-          .map(_.combineAll.toMap)
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[ObservationValidationMap, GeneratorParams]]] =
+        Services.asSuperUser: // TODO: 
+          generatorParamsService
+            .selectMany(infos.map(_.oid))
+            .map: results =>
+              results
+                .view
+                .mapValues:
+                  case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
+                  case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
+                  case Right(ps)                             => ps.asRight
+                .toMap
+
+        // infos
+        //   .groupBy(_.pid)
+        //   .view
+        //   .mapValues(_.map(_.oid))
+        //   .toList
+        //   .traverse: (pid, oids) =>
+        //     generatorParamsService
+        //       .selectMany(pid, oids) // TODO: this still ends up going program by program … need a more general batch method here
+        //       .map: results =>
+        //         results
+        //           .view
+        //           .mapValues:
+        //             case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
+        //             case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
+        //             case Right(ps)                             => ps.asRight
+        //           .toList
+        //   .map(_.combineAll.toMap)
 
       /* Validate that an observation is compatible with its program's CFP. */
       private def cfpValidationss(infos: List[ObservationValidationInfo])(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] = {
@@ -450,7 +463,8 @@ object ObservationWorkflowService {
           calibs.map(_.oid -> ObservationValidationMap.empty).toMap.pure[F]
 
         val generatorValidations: F[(Map[Observation.Id, ObservationValidationMap], Map[Observation.Id, GeneratorParams])] =
-          generatorParamss(science).map(_.separateValues)
+          Services.asSuperUser: // TODO
+            generatorParamss(science).map(_.separateValues)
 
         val cfpValidations: F[Map[Observation.Id, ObservationValidationMap]] =
           cfpValidationss(science)
