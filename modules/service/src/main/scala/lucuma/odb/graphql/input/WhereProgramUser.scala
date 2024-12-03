@@ -21,6 +21,7 @@ object WhereProgramUser {
     val WhereUserBinding              = WhereUser.binding(path / "user")
     val WhereRoleBinding              = WhereEq.binding(path / "role", ProgramUserRoleBinding)
     val WherePartnerLinkBinding       = WherePartnerLink.binding(path)
+    val WhereFallbackProfileBinding   = WhereUserProfile.binding(path / "fallbackProfile")
     val WhereEducationalStatusBinding = WhereOptionEq.binding(path / "educationalStatus", EducationalStatusBinding)
     val WhereThesisBinding            = WhereOptionBoolean.binding(path / "thesis", BooleanBinding)
     val WhereGenderBinding            = WhereOptionEq.binding(path / "gender", GenderBinding)
@@ -35,12 +36,13 @@ object WhereProgramUser {
         WhereUserBinding.Option("user", rUser),
         WhereRoleBinding.Option("role", rRole),
         WherePartnerLinkBinding.Option("partnerLink", rPartnerLink),
+        WhereFallbackProfileBinding.Option("fallbackProfile", rFallbackProfile),
         WhereEducationalStatusBinding.Option("educationalStatus", rEducationalStatus),
         WhereThesisBinding.Option("thesis", rThesis),
         WhereGenderBinding.Option("gender", rGender)
       ) =>
-        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rEducationalStatus, rThesis, rGender).parMapN {
-          (AND, OR, NOT, program, user, role, partnerLink, educationalStatus, thesis, gender) =>
+        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN {
+          (AND, OR, NOT, program, user, role, partnerLink, fallbackProfile, educationalStatus, thesis, gender) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -49,6 +51,7 @@ object WhereProgramUser {
               user,
               role,
               partnerLink,
+              fallbackProfile,
               educationalStatus,
               thesis,
               gender

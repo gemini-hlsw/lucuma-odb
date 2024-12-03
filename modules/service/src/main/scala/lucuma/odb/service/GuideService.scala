@@ -318,7 +318,7 @@ object GuideService {
 
       def checkProgramAccess(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
         services.transactionally(
-          programService.userHasAccess(pid).map(hasAccess =>
+          programUserService.userHasAccess(pid).map(hasAccess =>
             if (hasAccess) ().success
             else OdbError.InvalidObservation(oid).asFailure
           )
@@ -944,8 +944,8 @@ object GuideService {
     }
 
   object Statements {
-    import ProgramService.Statements.andWhereUserAccess
-    import ProgramService.Statements.whereUserAccess
+    import ProgramUserService.Statements.andWhereUserAccess
+    import ProgramUserService.Statements.whereUserAccess
 
     def getObservationInfo(oid: Observation.Id): AppliedFragment =
       sql"""

@@ -309,7 +309,7 @@ object GeneratorParamsService {
 
   object Statements {
 
-    import ProgramService.Statements.existsUserAccess
+    import ProgramUserService.Statements.existsUserAccess
 
     private val source_profile: Decoder[SourceProfile] =
       jsonb.emap { sp =>

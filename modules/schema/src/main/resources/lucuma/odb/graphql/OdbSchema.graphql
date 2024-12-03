@@ -47,6 +47,17 @@ type AddDatasetEventResult {
 
 }
 
+input AddProgramUserInput {
+  orcidId:     String!
+  programId:   ProgramId!
+  role:        ProgramUserRole!
+  SET:         ProgramUserPropertiesInput
+}
+
+type AddProgramUserResult {
+  programUser: ProgramUser!
+}
+
 "SequenceEvent creation parameters."
 input AddSequenceEventInput {
   visitId: VisitId!
@@ -2758,6 +2769,15 @@ type Mutation {
   ): AddDatasetEventResult!
 
   """
+  Looks up or creates (if necessary) a user associated with a given ORCID id and
+  adds it to the given program.  No invitation is sent as a result of this
+  operation.
+  """
+  addProgramUser(
+    input: AddProgramUserInput!
+  ): AddProgramUserResult!
+
+  """
   Adds a sequence event associated with the given visit. Multiple events
   will be produced during the execution of a sequence as it is started,
   paused, continued, etc.
@@ -3516,6 +3536,8 @@ input ProgramUserPropertiesInput {
   "The user's partner."
   partnerLink: PartnerLinkInput
 
+  fallbackProfile: UserProfileInput
+
   "The user's educational status."
   educationalStatus: EducationalStatus
 
@@ -3554,6 +3576,8 @@ type ProgramUser {
   program:           Program
   user:              User
 
+  fallbackProfile:   UserProfile!
+
   """
   User educational status. PHD/Undergrad/Grad/Other
   """
@@ -3567,7 +3591,7 @@ type ProgramUser {
   """
   Flag indicating whether the user's proposal is part of a thesis.
   """
-  thesis:            Boolean
+  thesis: Boolean
 }
 
 """
@@ -11637,14 +11661,25 @@ enum UserType {
 }
 
 type User {
-  id:              UserId!
-  type:            UserType!
-  serviceName:     String,
-  orcidId:         String,
-  orcidGivenName:  String,
-  orcidCreditName: String,
-  orcidFamilyName: String,
-  orcidEmail:      String,
+  id:          UserId!
+  type:        UserType!
+  serviceName: String,
+  orcidId:     String,
+  profile:     UserProfile!
+}
+
+type UserProfile {
+  givenName:  String
+  familyName: String
+  creditName: String
+  email:      String
+}
+
+input UserProfileInput {
+  givenName:  String
+  familyName: String
+  creditName: String
+  email:      String
 }
 
 """
@@ -14228,6 +14263,11 @@ input WhereProgramUser {
   partnerLink: WherePartnerLink
 
   """
+  Matches the fallback profile.
+  """
+  fallbackProfile: WhereUserProfile
+
+  """
   Matches the educational status.
   """
   educationalStatus: WhereOptionEqEducationalStatus
@@ -14469,30 +14509,35 @@ input WhereUser {
   A list of nested user filters that all must match in order for the AND group
   as a whole to match.
   """
-  AND:             [WhereUser!]
+  AND: [WhereUser!]
 
   """
   A list of nested user filters that all must match in order for the OR group
   as a whole to match.
   """
-  OR:              [WhereUser!]
+  OR: [WhereUser!]
 
   """
   A nested user filter that must not match in order for the NOT itself to match.
   """
-  NOT:             WhereUser
+  NOT: WhereUser
 
   "Matches the user Id."
-  id:              WhereOrderUserId
+  id: WhereOrderUserId
 
   "Matches the user type."
-  type:            WhereEqUserType
+  type: WhereEqUserType
 
-  orcidId:         WhereOptionString
-  orcidGivenName:  WhereOptionString
-  orcidCreditName: WhereOptionString
-  orcidFamilyName: WhereOptionString
-  orcidEmail:      WhereOptionString
+  orcidId: WhereOptionString
+  profile: WhereUserProfile
+
+}
+
+input WhereUserProfile {
+  givenName:  WhereOptionString
+  creditName: WhereOptionString
+  familyName: WhereOptionString
+  email:      WhereOptionString
 }
 
 input WhereWavelength {

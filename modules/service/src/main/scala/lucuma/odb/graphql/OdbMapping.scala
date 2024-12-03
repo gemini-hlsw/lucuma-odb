@@ -31,6 +31,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
+import lucuma.sso.client.SsoGraphQlClient
 import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
@@ -74,19 +75,20 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: Async: Parallel: Trace: Logger](
-    database:     Resource[F, Session[F]],
-    monitor0:     SkunkMonitor[F],
-    user0:        User,
-    topics0:      Topics[F],
-    itcClient0:   ItcClient[F],
-    commitHash0:  CommitHash,
-    enums:        Enums,
-    tec:          TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient0:  Client[F],
-    emailConfig0: Config.Email,
-    allowSub:     Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:      Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
-  ):  Mapping[F] =
+    database:      Resource[F, Session[F]],
+    monitor0:      SkunkMonitor[F],
+    user0:         User,
+    topics0:       Topics[F],
+    itcClient0:    ItcClient[F],
+    ssoGqlClient0: SsoGraphQlClient[F],
+    commitHash0:   CommitHash,
+    enums:         Enums,
+    tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient0:   Client[F],
+    emailConfig0:  Config.Email,
+    allowSub:      Boolean = true,       // Are submappings (recursive calls) allowed?
+    schema0:       Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+  ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddAtomEventResultMapping[F]
@@ -129,6 +131,7 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
+          with AddProgramUserResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -236,8 +239,9 @@ object OdbMapping {
           with UpdateProgramUsersResultMapping[F]
           with UpdateProposalResultMapping[F]
           with UpdateTargetsResultMapping[F]
-          with UserMapping[F]
           with UserInvitationMapping[F]
+          with UserMapping[F]
+          with UserProfileMapping[F]
           with VisitMapping[F]
           with VisitSelectResultMapping[F]
           with WavelengthMapping[F]
@@ -257,6 +261,7 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val itcClient = itcClient0
+          override val ssoGraphQlClient: SsoGraphQlClient[F] = ssoGqlClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
 
@@ -271,6 +276,7 @@ object OdbMapping {
                   user0,
                   topics0,
                   itcClient0,
+                  ssoGqlClient0,
                   commitHash0,
                   enums,
                   tec,
@@ -325,6 +331,7 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
+                AddProgramUserResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,
@@ -450,8 +457,8 @@ object OdbMapping {
                 UpdateProgramUsersResultMapping,
                 UpdateProposalResultMapping,
                 UpdateTargetsResultMapping,
-                UserMapping,
                 UserInvitationMapping,
+                UserMapping,
                 VisitMapping,
                 VisitSelectResultMapping,
               ) ++ List(
@@ -485,6 +492,7 @@ object OdbMapping {
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
                 TimeSpanMappings,
+                UserProfileMappings,
                 WavelengthMappings
               ).flatten
 

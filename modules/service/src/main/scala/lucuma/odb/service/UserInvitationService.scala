@@ -141,7 +141,7 @@ object UserInvitationService:
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>
                     session
-                      .prepareR(ProgramService.Statements.LinkUser.command)
+                      .prepareR(ProgramUserService.Statements.LinkUser.command)
                       .use(_.execute(pid, user.id, UserType.Standard, r, partnerLink))
                       .as(Result(input.key.id))
                       .recoverWith:
