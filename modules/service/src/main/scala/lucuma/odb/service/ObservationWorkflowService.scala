@@ -230,24 +230,6 @@ object ObservationWorkflowService {
                   case Right(ps)                             => ps.asRight
                 .toMap
 
-        // infos
-        //   .groupBy(_.pid)
-        //   .view
-        //   .mapValues(_.map(_.oid))
-        //   .toList
-        //   .traverse: (pid, oids) =>
-        //     generatorParamsService
-        //       .selectMany(pid, oids) // TODO: this still ends up going program by program … need a more general batch method here
-        //       .map: results =>
-        //         results
-        //           .view
-        //           .mapValues:
-        //             case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
-        //             case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
-        //             case Right(ps)                             => ps.asRight
-        //           .toList
-        //   .map(_.combineAll.toMap)
-
       /* Validate that an observation is compatible with its program's CFP. */
       private def cfpValidationss(infos: List[ObservationValidationInfo])(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] = {
 
@@ -307,24 +289,37 @@ object ObservationWorkflowService {
             }
 
       private def itcValidationss(
-        params: List[(ObservationValidationInfo, GeneratorParams)],
+        params: List[(Observation.Id, GeneratorParams)],
         itcClient: ItcClient[F],
-      )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] =
-          params
-            .groupMap((info, _) => info.pid)((info, params) => (info.oid, params))
-            .view
-            .mapValues(_.toMap)
-            .toList
-            .traverse: (pid, map) =>
-              itcService(itcClient).selectAll(pid, map).map(_.keySet) // TODO: generalize so we don't have to go program by program
-            .map: list =>
-              val set = list.combineAll
-              params.foldMap: (info, _) =>
-                val key = info.oid
-                val value =
-                  if set(key) then ObservationValidationMap.empty
-                  else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
-                Map(key -> value)
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservationValidationMap]] =
+        itcService(itcClient)
+          .selectAll(params.toMap)
+          .map: map =>
+            params.foldMap: (key, _) =>
+              val value =
+                if map.contains(key) then ObservationValidationMap.empty
+                else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+              Map(key -> value)
+
+      // private def itcValidationss(
+      //   params: List[(ObservationValidationInfo, GeneratorParams)],
+      //   itcClient: ItcClient[F],
+      // )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] =
+      //     params
+      //       .groupMap((info, _) => info.pid)((info, params) => (info.oid, params))
+      //       .view
+      //       .mapValues(_.toMap)
+      //       .toList
+      //       .traverse: (pid, map) =>
+      //         itcService(itcClient).selectAll(pid, map).map(_.keySet) // TODO: generalize so we don't have to go program by program
+      //       .map: list =>
+      //         val set = list.combineAll
+      //         params.foldMap: (info, _) =>
+      //           val key = info.oid
+      //           val value =
+      //             if set(key) then ObservationValidationMap.empty
+      //             else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+      //           Map(key -> value)
 
       private def programAllocations(
         pids: List[Program.Id]
@@ -473,8 +468,8 @@ object ObservationWorkflowService {
           validateScienceBands(science)
 
         def itcValidations(generatorParams: Map[Observation.Id, GeneratorParams]): F[Map[Observation.Id, ObservationValidationMap]] =
-          val params = generatorParams.toList.map((oid, ps) => (infos(oid), ps))
-          itcValidationss(params, itcClient)
+          Services.asSuperUser:
+            itcValidationss(generatorParams.toList, itcClient)
 
         val preliminaryValidations: F[Map[Observation.Id, ObservationValidationMap]] =
           for
