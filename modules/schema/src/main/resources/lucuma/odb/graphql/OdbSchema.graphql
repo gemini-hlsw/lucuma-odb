@@ -3536,6 +3536,10 @@ input ProgramUserPropertiesInput {
   "The user's partner."
   partnerLink: PartnerLinkInput
 
+  """
+  The fallback profile may used when the ORCiD user profile is not set or not
+  shared publicly.
+  """
   fallbackProfile: UserProfileInput
 
   "The user's educational status."
