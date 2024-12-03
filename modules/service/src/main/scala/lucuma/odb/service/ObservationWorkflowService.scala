@@ -44,6 +44,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -54,7 +55,6 @@ import java.time.Duration
 import java.time.Instant
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 sealed trait ObservationWorkflowService[F[_]] {
 

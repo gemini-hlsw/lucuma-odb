@@ -46,6 +46,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -53,7 +54,6 @@ import skunk.implicits.*
 
 import GeneratorParamsService.Error
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 enum ObservationSelection derives Order:
   case All
