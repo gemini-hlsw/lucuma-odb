@@ -13,6 +13,7 @@ import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
@@ -51,6 +52,7 @@ import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
@@ -104,6 +106,10 @@ sealed trait ItcService[F[_]] {
     programId: Program.Id,
     params:    Map[Observation.Id, GeneratorParams]
   )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]]
+
+  def selectAll(
+    params: Map[Observation.Id, GeneratorParams]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, AsterismResults]]
 
 }
 
@@ -290,6 +296,24 @@ object ItcService {
             .flattenOption
             .toMap
 
+      def selectAll(
+        params: Map[Observation.Id, GeneratorParams]
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, AsterismResults]] =
+        NonEmptyList.fromList(params.keys.toList).fold(Map.empty.pure[F]): nel =>
+          val enc = observation_id.nel(nel)
+          session
+            .execute(Statements.selectAllItcResults(enc))(nel)
+            .map: rows =>
+              rows
+                .flatMap: (oid, hash, results) =>
+                  for 
+                    params <- params.get(oid)
+                    input  <- params.itcInput.toOption
+                    inhash  = Md5Hash.unsafeFromByteArray(input.md5)
+                    pair   <- Option.when(hash === inhash)(oid -> results)
+                  yield pair
+                .toMap
+
       private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error =
         RemoteServiceErrors(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
@@ -385,6 +409,16 @@ object ItcService {
           c_asterism_results
         FROM t_itc_result
         WHERE c_program_id = $program_id
+      """.query(observation_id *: md5_hash *: asterism_results)
+
+    def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, AsterismResults)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_hash,
+          c_asterism_results
+        FROM t_itc_result
+        WHERE c_observation_id IN ($enc)
       """.query(observation_id *: md5_hash *: asterism_results)
 
     val InsertOrUpdateItcResult: Command[(
