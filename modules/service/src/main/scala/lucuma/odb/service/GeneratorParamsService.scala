@@ -53,6 +53,7 @@ import skunk.implicits.*
 
 import GeneratorParamsService.Error
 import Services.Syntax.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 enum ObservationSelection derives Order:
   case All
@@ -70,6 +71,10 @@ trait GeneratorParamsService[F[_]] {
     programId:      Program.Id,
     observationIds: List[Observation.Id]
   )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
+
+  def selectMany(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
   def selectAll(
     programId: Program.Id,
@@ -131,6 +136,11 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         doSelect(selectManyParams(pid, oids))
 
+      override def selectMany(
+        oids: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
+        doSelect(selectManyParams(oids))
+
       override def selectAll(
         pid:       Program.Id,
         // minStatus: ObsStatus,
@@ -158,6 +168,15 @@ object GeneratorParamsService {
           .fromList(oids)
           .fold(List.empty[ParamsRow].pure[F]) { oids =>
             executeSelect(Statements.selectManyParams(user, pid, oids))
+          }
+
+      private def selectManyParams(
+        oids: List[Observation.Id]
+      )(using SuperUserAccess): F[List[ParamsRow]] =
+        NonEmptyList
+          .fromList(oids)
+          .fold(List.empty[ParamsRow].pure[F]) { oids =>
+            executeSelect(Statements.selectManyParams(oids))
           }
 
       private def selectAllParams(
@@ -364,6 +383,19 @@ object GeneratorParamsService {
           which.map(sql"$observation_id").intercalate(void", ") |+|
         void")" |+|
         existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
+
+    def selectManyParams(
+      which: NonEmptyList[Observation.Id]
+    )(using SuperUserAccess): AppliedFragment =
+      sql"""
+        SELECT
+          #${ParamColumns("gp")}
+        FROM v_generator_params gp
+        WHERE
+      """(Void) |+|
+        void"""gp.c_observation_id IN (""" |+|
+          which.map(sql"$observation_id").intercalate(void", ") |+|
+        void")"
 
     def selectAllParams(
       user:      User,
