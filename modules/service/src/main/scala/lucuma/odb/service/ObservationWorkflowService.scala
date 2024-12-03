@@ -301,26 +301,6 @@ object ObservationWorkflowService {
                 else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
               Map(key -> value)
 
-      // private def itcValidationss(
-      //   params: List[(ObservationValidationInfo, GeneratorParams)],
-      //   itcClient: ItcClient[F],
-      // )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] =
-      //     params
-      //       .groupMap((info, _) => info.pid)((info, params) => (info.oid, params))
-      //       .view
-      //       .mapValues(_.toMap)
-      //       .toList
-      //       .traverse: (pid, map) =>
-      //         itcService(itcClient).selectAll(pid, map).map(_.keySet) // TODO: generalize so we don't have to go program by program
-      //       .map: list =>
-      //         val set = list.combineAll
-      //         params.foldMap: (info, _) =>
-      //           val key = info.oid
-      //           val value =
-      //             if set(key) then ObservationValidationMap.empty
-      //             else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
-      //           Map(key -> value)
-
       private def programAllocations(
         pids: List[Program.Id]
       )(using Transaction[F]): F[Map[Program.Id, NonEmptyList[ScienceBand]]] =
