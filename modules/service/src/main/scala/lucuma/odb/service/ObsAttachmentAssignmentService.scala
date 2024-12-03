@@ -120,7 +120,7 @@ object ObsAttachmentAssignmentService {
 
   object Statements {
 
-    import ProgramService.Statements.{andWhereUserAccess, whereUserAccess}
+    import ProgramUserService.Statements.{andWhereUserAccess, whereUserAccess}
 
     def insertLinksAs(
       user:             User,

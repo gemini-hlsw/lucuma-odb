@@ -343,7 +343,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
           $int8,
           $text_nonempty
       """.apply(programId, attachmentType, fileName, description, fileSize, remotePath) |+|
-        ProgramService.Statements.whereUserAccess(user, programId) |+|
+        ProgramUserService.Statements.whereUserAccess(user, programId) |+|
         void"""
           RETURNING c_obs_attachment_id
         """
@@ -366,7 +366,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
             c_remote_path = $text_nonempty
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(fileName, description, fileSize, remotePath, programId, attachmentId) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId) |+|
+        ProgramUserService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
     def getAttachmentRemotePath(
@@ -379,7 +379,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId)
+        ProgramUserService.Statements.andWhereUserAccess(user, programId)
 
     def checkForDuplicateName(
       programId:     Program.Id,
@@ -407,7 +407,7 @@ object ObsAttachmentFileService extends AttachmentFileService {
         DELETE FROM t_obs_attachment
         WHERE c_program_id = $program_id AND c_obs_attachment_id = $obs_attachment_id
       """.apply(programId, attachmentId) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId) |+|
+        ProgramUserService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING c_remote_path"
 
     def attachmentTypeExists(attachmentType: Tag): AppliedFragment =

@@ -347,7 +347,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
           $int8,
           $text_nonempty
       """.apply(programId, attachmentType, fileName, fileSize, remotePath) |+|
-        ProgramService.Statements.whereUserAccess(user, programId)
+        ProgramUserService.Statements.whereUserAccess(user, programId)
 
     def updateAttachment(
       user:           User,
@@ -364,7 +364,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
             c_remote_path = $text_nonempty
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
       """.apply(fileName, fileSize, remotePath, programId, attachmentType) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId) |+|
+        ProgramUserService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING true"
 
     def getAttachmentRemotePath(
@@ -377,7 +377,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         FROM t_proposal_attachment
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
       """.apply(programId, attachmentType) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId)
+        ProgramUserService.Statements.andWhereUserAccess(user, programId)
 
     // returns the UUID for the remote file id
     def deleteAttachment(
@@ -389,7 +389,7 @@ object ProposalAttachmentFileService extends AttachmentFileService {
         DELETE FROM t_proposal_attachment
         WHERE c_program_id = $program_id AND c_attachment_type = $tag
       """.apply(programId, attachmentType) |+|
-        ProgramService.Statements.andWhereUserAccess(user, programId) |+|
+        ProgramUserService.Statements.andWhereUserAccess(user, programId) |+|
         void"RETURNING c_remote_path"
 
     def checkForDuplicateName(

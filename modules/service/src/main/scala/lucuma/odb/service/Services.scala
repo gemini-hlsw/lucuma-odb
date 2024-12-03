@@ -147,6 +147,9 @@ trait Services[F[_]]:
   /** The `ProgramService`. */
   def programService: ProgramService[F]
 
+  /** The `ProgramUserService`. */
+  def programUserService: ProgramUserService[F]
+
   /** Construct a `ProposalAttachmentFileService`, given an `S3FileService`. */
   def proposalAttachmentFileService(s3: S3FileService[F]): ProposalAttachmentFileService[F]
 
@@ -270,6 +273,7 @@ object Services:
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programService = ProgramService.instantiate
+      lazy val programUserService = ProgramUserService.instantiate
       lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val sequenceService = SequenceService.instantiate
@@ -277,7 +281,6 @@ object Services:
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       lazy val visitService = VisitService.instantiate
-      def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]) = UserInvitationService.instantiate(emailConfig, httpClient)
 
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
@@ -289,6 +292,7 @@ object Services:
       def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
       def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
       def emailService(emailConfig: Config.Email, httpClient: Client[F]) = EmailService.fromConfigAndClient(emailConfig, httpClient)
+      def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]) = UserInvitationService.instantiate(emailConfig, httpClient)
 
 
   /**
@@ -321,6 +325,7 @@ object Services:
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
+    def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
     def proposalAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ProposalAttachmentFileService[F] = summon[Services[F]].proposalAttachmentFileService(s3)
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
