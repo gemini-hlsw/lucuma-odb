@@ -3,11 +3,11 @@
 
 package lucuma.odb.service
 
-import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -18,11 +18,13 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.Partner
+import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
@@ -30,18 +32,18 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.AddProgramUserInput
+import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
-import lucuma.odb.graphql.input.UnlinkUserInput
 import lucuma.odb.util.Codecs.educational_status
 import lucuma.odb.util.Codecs.gender
 import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.partner_link
 import lucuma.odb.util.Codecs.partner_link_type
 import lucuma.odb.util.Codecs.program_id
+import lucuma.odb.util.Codecs.program_user_id
 import lucuma.odb.util.Codecs.program_user_role
 import lucuma.odb.util.Codecs.user_id
 import lucuma.odb.util.Codecs.user_type
-import lucuma.sso.client.SsoGraphQlClient
 import natchez.Trace
 import skunk.*
 import skunk.codec.boolean.bool
@@ -54,27 +56,66 @@ import Services.Syntax.*
 trait ProgramUserService[F[_]]:
 
   /**
-   * Perform the requested program <-> user link, yielding the linked ids if successful, or None
-   * if the user was not authorized to perform the action.
+   * Adds a program user that is not yet linked to an actual authenticated user.
+   * @param input program, role that the user plays, and user properties
+   * @return new program user id
    */
-  def linkUser(
-    req: ProgramUserService.LinkUserRequest
-  )(using Transaction[F]): F[Result[(Program.Id, User.Id)]]
+  def addProgramUser(
+    input: AddProgramUserInput
+  )(using Transaction[F]): F[Result[ProgramUser.Id]]
 
-  /** Unlink the requested user, yielding true if the user was unlinkes, false if no such link existed. */
-  def unlinkUser(
-    input: UnlinkUserInput
-  )(using Transaction[F], Services.PiAccess): F[Result[Boolean]]
+  def deleteProgramUser(
+    id: ProgramUser.Id
+  )(using Transaction[F]): F[Result[Boolean]]
 
-  def updateProgramUsers(
+  /**
+   * Updates program user properties such as fallback profile, thesis and
+   * gender.
+   *
+   * @param SET property edits to apply
+   * @param which list of program user ids to update
+   * @return updated program user ids
+   */
+  def updateProperties(
     SET:   ProgramUserPropertiesInput,
     which: AppliedFragment
-  )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]]
+  )(using Transaction[F]): F[Result[List[ProgramUser.Id]]]
 
-  def addProgramUser(
-    sso:   SsoGraphQlClient[F],
-    input: AddProgramUserInput
-  )(using NoTransaction[F]): F[Result[(Program.Id, User.Id)]]
+  def selectLinkData(
+    id: ProgramUser.Id
+  )(using Transaction[F]): F[Result[(Program.Id, ProgramUserRole, Option[User.Id])]]
+
+  /**
+   * Sets the program user / user link, assuming it is not currently set and
+   * the current user has privileges to do so.
+   */
+  def linkUser(
+    input: LinkUserInput
+  )(using Transaction[F]): F[Result[Unit]]
+
+  /**
+   * Unlinks the user associated with the given program user, if any, and
+   * returns their user id.
+   */
+  def unlinkUser(
+    id: ProgramUser.Id
+  )(using Transaction[F]): F[Result[Option[User.Id]]]
+
+  /**
+   * Links the current user to the given program user, assuming it is not
+   * currently set.  Performs no access checking, as the assumption is that the
+   * using being linked is not yet part of the program and has no privileges.
+   */
+  def linkInvitationAccept(
+    id: ProgramUser.Id
+  )(using Transaction[F]): F[Result[Unit]]
+
+  /**
+   * Adds the current user as the PI for given program.
+   */
+  def addAndLinkPi(
+    programId: Program.Id
+  )(using Transaction[F]): F[ProgramUser.Id]
 
   /** Check to see if the user has access to the given program. */
   def userHasAccess(
@@ -82,145 +123,130 @@ trait ProgramUserService[F[_]]:
   )(using Transaction[F]): F[Boolean]
 
 object ProgramUserService:
-  sealed trait LinkUserRequest:
-    def programId: Program.Id
-    def userId: User.Id
-
-  object LinkUserRequest:
-    case class Coi(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id)   extends LinkUserRequest
-    case class CoiRo(programId: Program.Id, partnerLink: PartnerLink, userId: User.Id) extends LinkUserRequest
-    case class Support(programId: Program.Id, userId: User.Id, tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type) extends LinkUserRequest
-
-  sealed trait LinkUserResponse extends Product with Serializable:
-    def toResult: Result[(Program.Id, User.Id)] =
-      this match
-        case LinkUserResponse.NotAuthorized(user)     => OdbError.NotAuthorized(user.id).asFailure
-        case LinkUserResponse.AlreadyLinked(pid, uid) => OdbError.NoAction(Some(s"User $uid is already linked to program $pid.")).asFailure
-        case LinkUserResponse.InvalidUser(uid)        => OdbError.InvalidUser(uid, Some(s"User $uid does not exist or is of a nonstandard type.")).asFailure
-        case LinkUserResponse.Success(pid, user)      => Result((pid, user))
-
-  object LinkUserResponse:
-    case class NotAuthorized(user: User)                     extends LinkUserResponse
-    case class AlreadyLinked(pid: Program.Id, user: User.Id) extends LinkUserResponse
-    case class InvalidUser(user: User.Id)                    extends LinkUserResponse
-    case class Success(pid: Program.Id, user: User.Id)       extends LinkUserResponse
-
-
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramUserService[F] =
     new ProgramUserService[F]:
 
-      def linkUserImpl(
-        req: LinkUserRequest
-      )(using Transaction[F]): F[LinkUserResponse] =
-        val af: Option[AppliedFragment] =
-          req match
-            case LinkUserRequest.Coi(programId, partnerLink, userId) => Statements.linkCoi(programId, userId, partnerLink, user)
-            case LinkUserRequest.CoiRo(programId, partnerLink, userId) => Statements.linkCoiReadOnly(programId, userId, partnerLink, user)
-            case LinkUserRequest.Support(programId, userId, tpe) => Statements.linkSupport(programId, userId, user, tpe)
+      override def selectLinkData(
+        id: ProgramUser.Id
+      )(using Transaction[F]): F[Result[(Program.Id, ProgramUserRole, Option[User.Id])]] =
+        session
+          .option(Statements.SelectLinkData)(id)
+          .map(Result.fromOption(_, OdbError.InvalidProgramUser(id).asProblem))
 
-        af match
-          case None     => Monad[F].pure(LinkUserResponse.NotAuthorized(user))
-          case Some(af) =>
-            val stmt = sql"${af.fragment} RETURNING c_program_id, c_user_id".query(program_id ~ user_id)
-            session.prepareR(stmt).use: pq =>
-              pq.option(af.argument).map:
-                case Some(pid ~ uid) => LinkUserResponse.Success(pid, uid)
-                case None            => LinkUserResponse.NotAuthorized(user)
-              .recover:
-                case SqlState.UniqueViolation(_)     => LinkUserResponse.AlreadyLinked(req.programId, req.userId)
-                case SqlState.ForeignKeyViolation(_) => LinkUserResponse.InvalidUser(req.userId)
-
-      def linkUser(req: LinkUserRequest)(using Transaction[F]): F[Result[(Program.Id, User.Id)]] =
-        linkUserImpl(req).map(_.toResult)
-
-      // delete a link unconditionally
-      private def unlinkUnconditionally(input: UnlinkUserInput): F[Result[Boolean]] =
-        session.prepareR(Statements.UnlinkUnconditionally).use: pc =>
-          pc.execute(input.programId, input.userId).map:
-            case Completion.Delete(1) => Result(true)
-            case other                => Result.internalError(s"unlinkUnconditionally: unexpected completion: $other")
-
-      private def unlinkCoi(input: UnlinkUserInput)(using Transaction[F], Services.PiAccess): F[Result[Boolean]] =
-        user.role.access match
-          case Access.Guest   => Result.internalError("unlinkCoi: guest user seen; should be impossible").pure[F]
-          case Access.Ngo     => OdbError.NotAuthorized(user.id).asFailureF // not allowed
-          case Access.Staff   |
-               Access.Admin   |
-               Access.Service => unlinkUnconditionally(input)
-          case Access.Pi      =>
-            session.prepareR(Statements.UnlinkCoiAsPi).use: pc =>
-              pc.execute(user.id, input.programId, input.userId).map:
-                case Completion.Delete(1) => Result(true)
-                case Completion.Delete(0) => OdbError.NotAuthorized(user.id).asFailure
-                case other                => Result.internalError(s"unlinkCoi: unexpected completion: $other")
-
-      private def unlinkObserver(input: UnlinkUserInput)(using Transaction[F], Services.PiAccess): F[Result[Boolean]] =
-        user.role.access match
-          case Access.Guest   => Result.internalError("unlinkObserver: guest user seen; should be impossible").pure[F]
-          case Access.Ngo     => OdbError.NotAuthorized(user.id).asFailureF // not allowed
-          case Access.Staff   |
-               Access.Admin   |
-               Access.Service => unlinkUnconditionally(input)
-          case Access.Pi      =>
-            session.prepareR(Statements.UnlinkObserverAsPiOrCoi).use: pc =>
-              pc.execute(user.id, input.programId, input.userId).map:
-                case Completion.Delete(1) => Result(true)
-                case Completion.Delete(0) => OdbError.NotAuthorized(user.id).asFailure
-                case other                => Result.internalError(s"unlinkCoi: unexpected completion: $other")
-
-      override def unlinkUser(
-        input: UnlinkUserInput
-      )(using Transaction[F], Services.PiAccess): F[Result[Boolean]] =
-        // Figure out how the specified user is linked to the specified program, then call the appropriate
-        // unlink method (which will verify that the *calling* user is allowed to perform the unlink).
-        val R  = ProgramUserRole
-        val af = Statements.selectLinkType(user, input.programId, input.userId)
-        session.prepareR(af.fragment.query(program_user_role)).use: pq =>
-          pq.option(af.argument).flatMap:
-            case None             => Result(false).pure[F] // no such link, or not visible
-            case Some(R.Pi)       => OdbError.InvalidArgument("Cannot unlink the PI".some).asFailureF
-            case Some(R.Coi)      => unlinkCoi(input)
-            case Some(R.CoiRO)    => unlinkObserver(input)
-            case Some(R.SupportPrimary | R.SupportSecondary)  => requireStaffAccess(unlinkUnconditionally(input))
-
-      override def updateProgramUsers(
-        SET:   ProgramUserPropertiesInput,
-        which: AppliedFragment
-      )(using Transaction[F]): F[Result[List[(Program.Id, User.Id)]]] =
-        Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]): af =>
-          session.prepareR(af.fragment.query(program_id *: user_id)).use: pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+      override def addAndLinkPi(
+        programId: Program.Id
+      )(using Transaction[F]): F[ProgramUser.Id] =
+        session.unique(Statements.InsertAndLinkUnconditionally)(
+          programId, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner
+        )
 
       override def addProgramUser(
-        sso:   SsoGraphQlClient[F],
         input: AddProgramUserInput
-      )(using NoTransaction[F]): F[Result[(Program.Id, User.Id)]] =
+      )(using Transaction[F]): F[Result[ProgramUser.Id]] =
         val set0 = input.SET.getOrElse(ProgramUserPropertiesInput.Empty)
         val link = set0.partnerLink.getOrElse(PartnerLink.HasUnspecifiedPartner)
-        val set  = ProgramUserPropertiesInput.partnerLink.replace(link.some)(set0)
 
-        def linkRequest(u: User.Id): Result[LinkUserRequest] =
-          input.role match
-            case ProgramUserRole.Coi   => LinkUserRequest.Coi(input.programId, link, u).success
-            case ProgramUserRole.CoiRO => LinkUserRequest.CoiRo(input.programId, link, u).success
-            case _                     => Result.failure("Only CoI or CoI-read-only pre-auth users may be created.")
+        val insert =
+          Statements
+            .insertProgramUser(input.role, input.programId, link, user)
+            .flatTraverse: af =>
+              val stmt = sql"${af.fragment} RETURNING c_program_user_id".query(program_user_id)
+              session.prepare(stmt).flatMap: pq =>
+                pq.option(af.argument).map(_.success)
 
-        // Add the user to SSO without holding open a transaction (because it is
-        // a remote service call) and without yet validating that the PI has
-        // access to the program listed in input. All this does is create an
-        // otherwise empty user record with an orcidId. Once the user is added
-        // to SSO, we'll open the transaction and then rely upon the call to
-        // `linkRequest` to do the access checking.  If that is successful, it
-        // is also safe to update the program user attributes.
+        (for
+          o  <- ResultT(insert)
+          id <- o.fold(ResultT.fromResult(OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure))(ResultT.pure)
+          set = ProgramUserPropertiesInput.partnerLink.replace(link.some)(set0)
+          _  <- ResultT(updateProperties(set, sql"$program_user_id"(id)))
+        yield id).value
 
-        requirePiAccess:
-          sso.canonicalizePreAuthUser(input.orcidId).flatMap: u =>
-            session.transaction.use: xa =>
-              (for
-                _ <- ResultT.liftF(Services.asSuperUser(UserService.fromSession(session).canonicalizeUser(u)))
-                r <- ResultT(linkRequest(u.id).flatTraverse(r => linkUser(r)(using xa)))
-                _ <- ResultT(updateProgramUsers(set, sql"($program_id, $user_id)"(r))(using xa)).void
-              yield r).value
+      override def deleteProgramUser(
+        id: ProgramUser.Id
+      )(using Transaction[F]): F[Result[Boolean]] =
+        session
+          .prepare(Statements.SelectLinkData)
+          .flatMap(_.option(id))
+          .flatMap:
+            case None                 => false.success.pure
+            case Some((pid, role, _)) =>
+              Statements
+                .deleteProgramUser(id, role, pid, user)
+                .flatTraverse: af =>
+                  session.prepare(af.fragment.command).flatMap: pq =>
+                    pq.execute(af.argument).map:
+                      case Completion.Delete(1) => true.success
+                      case _                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+
+      override def updateProperties(
+        SET:   ProgramUserPropertiesInput,
+        which: AppliedFragment
+      )(using Transaction[F]): F[Result[List[ProgramUser.Id]]] =
+        Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]): af =>
+          session.prepareR(af.fragment.query(program_user_id)).use: pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+
+      override def linkInvitationAccept(
+        id: ProgramUser.Id
+      )(using Transaction[F]): F[Result[Unit]] =
+        linkUserImpl(id, user.id, (role, pid) => none.success)
+
+      override def linkUser(
+        input: LinkUserInput
+      )(using Transaction[F]): F[Result[Unit]] =
+        linkUserImpl(
+          input.programUserId,
+          input.userId,
+          (role, pid) => Statements.accessCheck("add", role, pid, user)
+        )
+
+      private def linkUserImpl(
+        targetProgramUserId: ProgramUser.Id,
+        targetUserId:        User.Id,
+        accessCheck:         (ProgramUserRole, Program.Id) => Result[Option[AppliedFragment]]
+      )(using Transaction[F]): F[Result[Unit]] =
+        session.prepare(Statements.SelectLinkData).flatMap(_.option(targetProgramUserId)).flatMap:
+          case None              =>
+            OdbError.InvalidProgramUser(targetProgramUserId).asFailureF
+          case Some((pid, role, Some(uid))) if uid === targetUserId =>
+            val msg =
+              if targetUserId === user.id then "You are already in the specified role; no action taken."
+              else s"The user $uid is already linked to program $pid; no action taken."
+            OdbError.NoAction(msg.some).asWarningF(())
+          case Some((pid, role, Some(uid))) =>
+            OdbError.InvalidUser(targetUserId, s"The user $uid must be unlinked before $targetUserId may be linked.".some).asFailureF
+          case Some((pid, role, None)) =>
+            accessCheck(role, pid)
+              .map(Statements.linkStandardUser(targetProgramUserId, targetUserId, _))
+              .flatTraverse: af =>
+                val stmt = sql"${af.fragment}".command
+                session.prepare(stmt).flatMap: pq =>
+                  pq.execute(af.argument)
+                    .map:
+                      case Completion.Update(1) => ().success
+                      case a                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+                    .recover:
+                      case SqlState.UniqueViolation(_)     =>
+                        OdbError.NoAction(s"User $targetUserId is already linked to program $pid.".some).asFailure
+                      case SqlState.ForeignKeyViolation(_) =>
+                        OdbError.InvalidUser(targetUserId, s"User $targetUserId does not exist or is of a nonstandard type.".some).asFailure
+
+      def unlinkUser(
+        rid: ProgramUser.Id
+      )(using Transaction[F]): F[Result[Option[User.Id]]] =
+        session.prepare(Statements.SelectLinkData).flatMap(_.option(rid)).flatMap:
+          case None                         => OdbError.InvalidProgramUser(rid).asFailureF
+          case Some((pid, role, None))      => none.success.pure
+          case Some((pid, role, Some(uid))) =>
+            Statements.accessCheck("unlink", role, pid, user)
+              .map(Statements.unlinkStandardUser(rid, _))
+              .flatTraverse: af =>
+                val stmt = sql"${af.fragment}".command
+                session.prepare(stmt).flatMap: pq =>
+                  pq.execute(af.argument)
+                    .map:
+                      case Completion.Update(1) => uid.some.success
+                      case a                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
 
       override def userHasAccess(
         programId: Program.Id
@@ -234,130 +260,170 @@ object ProgramUserService:
 
   object Statements:
 
-    def selectLinkType(user: User, pid: Program.Id, uid: User.Id): AppliedFragment =
+    val InsertAndLinkUnconditionally: Query[(Program.Id, User.Id, UserType, ProgramUserRole, PartnerLink), ProgramUser.Id] =
+      sql"""
+        INSERT INTO t_program_user (
+          c_program_id,
+          c_user_id,
+          c_user_type,
+          c_role,
+          c_partner_link,
+          c_partner
+        ) SELECT $program_id, $user_id, $user_type, $program_user_role, $partner_link
+        RETURNING c_program_user_id
+      """.query(program_user_id)
+
+    def insertProgramUser(
+      targetRole:        ProgramUserRole,
+      targetProgramId:   Program.Id,
+      targetPartnerLink: PartnerLink,
+      sourceUser:        User  // user doing the program user update
+    ): Result[AppliedFragment] =
+      accessCheck("add", targetRole, targetProgramId, sourceUser)
+        .map:
+          case None     => AppliedFragment.empty
+          case Some(ac) => void" WHERE " |+| ac
+        .map: ac =>
+          sql"""
+            INSERT INTO t_program_user(
+              c_program_id,
+              c_role,
+              c_partner_link,
+              c_partner
+            )
+            SELECT $program_id, $program_user_role, $partner_link"""(
+              targetProgramId, targetRole, targetPartnerLink
+            ) |+| ac
+
+    def deleteProgramUser(
+      pui:             ProgramUser.Id,
+      targetRole:      ProgramUserRole,
+      targetProgramId: Program.Id,
+      sourceUser:      User            // user doing the program user update
+    ): Result[AppliedFragment] =
+      accessCheck("delete", targetRole, targetProgramId, sourceUser)
+        .map:
+          case None     => AppliedFragment.empty
+          case Some(ac) => void" AND " |+| ac
+        .map: ac =>
+          sql"""
+            DELETE FROM t_program_user
+          WHERE c_program_user_id = $program_user_id
+          """(pui) |+| ac
+
+    val SelectLinkData: Query[ProgramUser.Id, (Program.Id, ProgramUserRole, Option[User.Id])] =
       sql"""
         SELECT
-          c_role
+          c_program_id,
+          c_role,
+          c_user_id
         FROM t_program_user
         WHERE
-          c_program_id = $program_id
-        AND
-          c_user_id = $user_id
-      """.apply(pid, uid) |+| existsUserAccess(user, pid).foldMap(void"AND " |+| _)
-
-    val UnlinkUnconditionally: Command[(Program.Id, User.Id)] =
-      sql"""
-        DELETE FROM
-          t_program_user
-        WHERE
-          c_program_id = $program_id
-        AND
-          c_user_id = $user_id
-      """.command
-
-    val UnlinkCoiAsPi: Command[(User.Id, Program.Id, User.Id)] =
-      sql"""
-        DELETE FROM t_program_user
-        WHERE c_program_id = $program_id
-        AND   c_user_id    = $user_id
-        AND   c_role       = 'coi'
-        AND EXISTS (
-          SELECT 1
-          FROM t_program_user u
-          WHERE u.c_program_id = $program_id
-          AND   u.c_user_id = $user_id
-          AND   u.c_role = 'pi'
-        )
-      """
-        .command
-        .contramap((caller, pid, uid) => (pid, uid, pid, caller))
-
-    val UnlinkObserverAsPiOrCoi: Command[(User.Id, Program.Id, User.Id)] =
-      sql"""
-        DELETE FROM t_program_user
-        WHERE c_program_id = $program_id
-        AND   c_user_id    = $user_id
-        AND   c_role       = 'coi_ro'
-        AND EXISTS (
-          SELECT 1
-          FROM t_program_user u
-          WHERE u.c_program_id = $program_id
-          AND   u.c_user_id    = $user_id
-          AND   (u.c_role = 'pi' OR u.c_role = 'coi')
-        )
-      """
-        .command
-        .contramap((caller, pid, uid) => (pid, uid, pid, caller))
-
-    /** Link a user to a program, without any access checking. */
-    val LinkUser: Fragment[(Program.Id, User.Id, UserType, ProgramUserRole, PartnerLink)] =
-      sql"""
-        INSERT INTO t_program_user (c_program_id, c_user_id, c_user_type, c_role, c_partner_link, c_partner)
-        SELECT $program_id, $user_id, $user_type, $program_user_role, $partner_link
-      """
+          c_program_user_id = $program_user_id
+      """.query(program_id *: program_user_role *: user_id.opt)
 
     /**
-     * Link a co-investigator to a program.
+     * Access checks for adding/updating a COI program user.
      * - Guests cannot do this.
      * - Staff, Admin, and Service users can always do this.
      * - Standard user can only do this if they're the program's PI.
      */
-    def linkCoi(
-      targetProgram: Program.Id,
-      targetUser: User.Id, // user to link
-      partnerLink: PartnerLink,
-      user: User, // current user
-    ): Option[AppliedFragment] =
-      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.Coi, partnerLink)
-      user.role match
-        case GuestRole                    => None
-        case ServiceRole(_)               => Some(up)
-        case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, partner))
-        case StandardRole.Pi(_)           => Some(up |+| void" WHERE " |+| existsUserAsPi(targetProgram, user.id))
-        case StandardRole.Staff(_)        => Some(up)
+    private def accessCheckCoi(
+      action:          String,
+      targetProgramId: Program.Id,
+      sourceUser:      User  // user doing the program user update
+    ): Result[Option[AppliedFragment]] =
+      sourceUser.role match
+        case GuestRole                    => OdbError.NotAuthorized(sourceUser.id, s"Guest users may not $action CoIs.".some).asFailure
+        case ServiceRole(_)               => none[AppliedFragment].success
+        case StandardRole.Admin(_)        => none[AppliedFragment].success
+        case StandardRole.Ngo(_, partner) => existsAllocationForPartner(targetProgramId, partner).some.success
+        case StandardRole.Pi(_)           => existsUserAsPi(targetProgramId, sourceUser.id).some.success
+        case StandardRole.Staff(_)        => none[AppliedFragment].success
 
     /**
-     * Link an observer to a program.
+     * Access checks for adding/updating a COI RO program user.
      * - Guests cannot do this.
      * - Staff, Admin, and Service users can always do this.
      * - Standard user can only do this if they're the program's PI or Coi.
      */
-    def linkCoiReadOnly(
-      targetProgram: Program.Id,
-      targetUser: User.Id, // user to link
-      partnerLink: PartnerLink,
-      user: User, // current user
-    ): Option[AppliedFragment] =
-      val up = LinkUser(targetProgram, targetUser, UserType.Standard, ProgramUserRole.CoiRO, partnerLink)
-      user.role match
-        case GuestRole                    => None
-        case ServiceRole(_)               => Some(up)
-        case StandardRole.Admin(_)        => Some(up)
-        case StandardRole.Ngo(_, partner) => Some(up |+| void" WHERE " |+| existsAllocationForPartner(targetProgram, partner))
-        case StandardRole.Staff(_)        => Some(up)
+    private def accessCheckCoiRo(
+      action:          String,
+      targetProgramId: Program.Id,
+      sourceUser:      User  // user doing the program user update
+    ): Result[Option[AppliedFragment]] =
+      sourceUser.role match
+        case GuestRole                    => OdbError.NotAuthorized(sourceUser.id, s"Guest users may not $action CoIs.".some).asFailure
+        case ServiceRole(_)               => none[AppliedFragment].success
+        case StandardRole.Admin(_)        => none[AppliedFragment].success
+        case StandardRole.Ngo(_, partner) => existsAllocationForPartner(targetProgramId, partner).some.success
+        case StandardRole.Staff(_)        => none[AppliedFragment].success
         case StandardRole.Pi(_)           =>
           Some(
-            up |+| void" WHERE " |+| existsUserAsPi(targetProgram, user.id)  |+|
-                   void" OR "    |+| existsUserAsCoi(targetProgram, user.id)
-          )
+            void"("                                         |+|
+            existsUserAsPi(targetProgramId, sourceUser.id)  |+|
+            void" OR "                                      |+|
+            existsUserAsCoi(targetProgramId, sourceUser.id) |+|
+            void")"
+          ).success
 
     /**
-     * Link staff support to a program.
+     * Access checks for adding/updating a support user.
      * - Staff, Admin, and Service users can always do this.
      * - Nobody else can do this.
      */
-    def linkSupport(
-      targetProgram: Program.Id,
-      targetUser: User.Id, // user to link
-      user: User, // current user
-      tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type
-    ): Option[AppliedFragment] =
-      import lucuma.core.model.Access._
-      val up = LinkUser(targetProgram, targetUser, UserType.Standard, tpe, PartnerLink.HasUnspecifiedPartner)
-      user.role.access match
-        case Admin | Staff | Service => Some(up) // ok
-        case _                       => None // nobody else can do this
+    private def accessCheckSupport(
+      action:     String,
+      sourceUser: User // user doing the program user update
+    ): Result[Option[AppliedFragment]] =
+      import Access.{Admin, Staff, Service}
+      sourceUser.role.access match
+        case Admin | Staff | Service => none[AppliedFragment].success // ok
+        case _                       => OdbError.NotAuthorized(sourceUser.id, s"Only admin, staff or service users may $action support users.".some).asFailure
+
+    /**
+     * Access checks for adding/updating a program user.  What the user is
+     * allowed to do will differ depending on type of program user (its role)
+     * and the role of the user attempting the update.
+     */
+    def accessCheck(
+      action:          String,
+      targetRole:      ProgramUserRole,
+      targetProgramId: Program.Id,
+      sourceUser:      User  // user doing the program user update
+    ): Result[Option[AppliedFragment]] =
+      targetRole match
+        case ProgramUserRole.Pi               => OdbError.UpdateFailed("PIs are fixed at program creation time.".some).asFailure
+        case ProgramUserRole.Coi              => accessCheckCoi(action, targetProgramId, sourceUser)
+        case ProgramUserRole.CoiRO            => accessCheckCoiRo(action, targetProgramId, sourceUser)
+        case ProgramUserRole.SupportPrimary |
+             ProgramUserRole.SupportSecondary => accessCheckSupport(action, sourceUser)
+
+    def linkStandardUser(
+      targetId:     ProgramUser.Id,
+      targetUserId: User.Id,
+      accessCheck:  Option[AppliedFragment]
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_program_user
+           SET c_user_id   = $user_id,
+               c_user_type = 'standard'::e_user_type
+         WHERE c_program_user_id = $program_user_id
+           AND c_user_id IS NULL
+      """(targetUserId, targetId) |+|
+      accessCheck.map(ac => void" AND " |+| ac).getOrElse(AppliedFragment.empty)
+
+    def unlinkStandardUser(
+      targetId:    ProgramUser.Id,
+      accessCheck: Option[AppliedFragment]
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_program_user
+           SET c_user_id   = null,
+               c_user_type = 'standard'::e_user_type
+         WHERE c_program_user_id = $program_user_id
+      """(targetId) |+|
+      accessCheck.map(ac => void" AND " |+| ac).getOrElse(AppliedFragment.empty)
 
     def existsUserAs(
       programId: Program.Id,
@@ -431,7 +497,7 @@ object ProgramUserService:
       innerAlias: String
     ): AppliedFragment =
       sql"""
-        EXISTS (SELECT 1 FROM t_allocation WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_partner and #$innerAlias.c_duration > 'PT')
+        EXISTS (SELECT 1 FROM t_allocation #$innerAlias WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_partner and #$innerAlias.c_duration > 'PT')
       """(Void)
 
     private def correlatedExistsUserAccess(
@@ -485,11 +551,11 @@ object ProgramUserService:
           sql"""
             UPDATE t_program_user AS #$alias
             SET """(Void) |+| nel.intercalate(void", ") |+| void" " |+|
-          sql"WHERE (#$alias.c_program_id, #$alias.c_user_id) IN ("(Void) |+| which |+| void")"
+          sql"WHERE #$alias.c_program_user_id IN ("(Void) |+| which |+| void")"
 
         (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
           up |+| void" AND " |+| exists
-        }) |+| sql" RETURNING #$alias.c_program_id, #$alias.c_user_id"(Void)
+        }) |+| sql" RETURNING #$alias.c_program_user_id"(Void)
 
     end updateProgramUsers
   end Statements

@@ -9,11 +9,9 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.ServiceUser
-import lucuma.core.model.UserInvitation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 
@@ -388,15 +386,17 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         """,
       mutations =
         Right(
-          createProgram(pi, "foo").flatMap { pid =>
-            IO.sleep(1.second) >> // give time to see the creation before we do an update
-            linkCoiAs(pi, pi2.id, pid, Partner.BR)
-          }
+          createProgram(pi, "foo").flatMap: pid =>
+            IO.sleep(1.second) >>
+            addProgramUserAs(pi, pid).flatMap: rid =>
+              IO.sleep(1.second) >> // give time to see the creation before we do an update
+              linkUserAs(pi, rid, pi2.id)
         ),
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "users": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "users": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "users": [ { "role": "COI" } ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "users": [ { "role": "COI" } ] } } }"""
         )
     )
@@ -426,7 +426,9 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           for {
             pid <- createProgram(pi, "foo")
             _   <- IO.sleep(1.second)
-            inv <- createUserInvitationAs(pi, pid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
+            rid <- addProgramUserAs(pi, pid)
+            _   <- IO.sleep(1.second)
+            inv <- createUserInvitationAs(pi, rid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
             _   <- IO.sleep(1.second)
             _   <- revokeUserInvitationAs(pi, inv.id)
           } yield ()
@@ -434,6 +436,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "recipientEmail": "here@there.com" } ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "REVOKED", "recipientEmail": "here@there.com" } ] } } }"""
@@ -467,7 +470,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           for {
             pid <- createProgram(pi, "foo")
             _   <- IO.sleep(1.second)
-            inv <- createUserInvitationAs(pi, pid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
+            rid <- addProgramUserAs(pi, pid)
+            inv <- createUserInvitationAs(pi, rid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
             _   <- IO.sleep(1.second)
             eid <- getEmailIdForInvitation(inv.id)
             _   <- updateEmailStatus(eid.get, EmailStatus.Accepted)
@@ -476,6 +480,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       expected =
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "userInvitations": [] } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "QUEUED"}} ] } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "userInvitations": [ { "status": "PENDING", "email": { "status": "ACCEPTED"}} ] } } }"""
@@ -550,4 +555,5 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         )
     )
   }
+
 }

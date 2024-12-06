@@ -30,7 +30,6 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
-import lucuma.sso.client.SsoGraphQlClient
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
@@ -209,7 +208,6 @@ object FMain extends MainParams {
       config.itcClient,
       config.commitHash,
       config.ssoClient,
-      config.ssoGqlClient,
       config.corsOverHttps,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
@@ -225,7 +223,6 @@ object FMain extends MainParams {
     itcClientResource:    Resource[F, ItcClient[F]],
     commitHash:           CommitHash,
     ssoClientResource:    Resource[F, SsoClient[F, User]],
-    ssoGqlClientResource: Resource[F, SsoGraphQlClient[F]],
     corsOverHttps:        Boolean,
     domain:               List[String],
     s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
@@ -236,13 +233,12 @@ object FMain extends MainParams {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
       ssoClient         <- ssoClientResource
-      ssoGqlClient      <- ssoGqlClientResource
       httpClient        <- httpClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, ssoGqlClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

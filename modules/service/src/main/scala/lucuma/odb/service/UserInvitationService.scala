@@ -8,16 +8,14 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.data.EmailAddress
+import grackle.syntax.*
 import lucuma.core.enums.InvitationStatus
-import lucuma.core.enums.Partner
-import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
 import lucuma.core.model.GuestUser
-import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
@@ -28,14 +26,12 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.CreateUserInvitationInput
 import lucuma.odb.graphql.input.RedeemUserInvitationInput
 import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import skunk.Query
-import skunk.SqlState
 import skunk.Transaction
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -48,17 +44,17 @@ trait UserInvitationService[F[_]]:
   def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]]
 
   /** Redeem an invitation. */
-  def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]]
+  def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[ProgramUser.Id]]
 
   /** Revoke an invitation. */
-  def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]]
+  def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[ProgramUser.Id]]
 
 object UserInvitationService:
 
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
 
-      def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation)(
+      def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation, pid: Program.Id)(
         using Transaction[F]): F[Result[EmailId]] = {
         val subject: NonEmptyString = NonEmptyString.unsafeFrom(
           s"Invitation to collaborate from ${user.displayName}"
@@ -74,59 +70,71 @@ object UserInvitationService:
 
         // A different message could be sent for html clients
         emailService(emailConfig, httpClient)
-          .send(input.programId, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
+          .send(pid, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
       }
 
-      def updateEmailId(invitationId: UserInvitation.Id, emailId: EmailId): F[Result[Unit]] =
+      def updateEmailId(programUserId: ProgramUser.Id, emailId: EmailId): F[Result[Unit]] =
         session
           .prepareR(Statements.updateEmailId)
           .use: pq =>
-            pq.unique(emailId, invitationId).as(Result.unit)
+            pq.unique(emailId, programUserId).as(Result.unit)
 
-      def createInvitationAsPi(pid: Program.Id, email: EmailAddress, role: ProgramUserRole.Coi.type | ProgramUserRole.CoiRO.type, partnerLink: PartnerLink): F[Result[UserInvitation]] =
+      def createInvitationAsPi(
+        input: CreateUserInvitationInput,
+        pid:   Program.Id
+      )(using Transaction[F]): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createInvitationAsPi)
           .use: pq =>
-            pq.option(user, pid, email, role, partnerLink)
-              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI or a COI.")).asProblem))
+            pq.option(user, pid, input)
+              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, "Specified program does not exist, or user is not the PI or COI.".some).asProblem))
 
-      def createInvitationAsSuperUser(input: CreateUserInvitationInput) =
+      def createInvitationAsSuperUser(
+        input: CreateUserInvitationInput,
+        pid:   Program.Id
+      )(using Transaction[F]): F[Result[UserInvitation]] =
         session
           .prepareR(Statements.createInvitationAsSuperUser)
           .use: pq =>
-            pq.option(user, input)
-              .map(Result.fromOption(_, OdbError.InvalidProgram(input.programId, Some("Specified program does not exist.")).asProblem))
+            pq.option(user, pid, input)
+              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, "Specified program does not exist.".some).asProblem))
 
-      def createUserInvitationImpl(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
+      def createUserInvitationImpl(
+        input:        CreateUserInvitationInput,
+        targetPid:    Program.Id,
+        targetRole:   ProgramUserRole
+      )(using Transaction[F]): F[Result[UserInvitation]] =
         user.role match
 
           // Guest can't create invitations
-          case GuestRole             => OdbError.NotAuthorized(user.id, Some("Guest users cannot create invitations.")).asFailureF
+          case GuestRole             => OdbError.NotAuthorized(user.id, "Guest users cannot create invitations.".some).asFailureF
 
           // Superusers can do anything
-          case ServiceRole(_)        => createInvitationAsSuperUser(input)
-          case StandardRole.Staff(_) => createInvitationAsSuperUser(input)
-          case StandardRole.Admin(_) => createInvitationAsSuperUser(input)
+          case ServiceRole(_)        => createInvitationAsSuperUser(input, targetPid)
+          case StandardRole.Staff(_) => createInvitationAsSuperUser(input, targetPid)
+          case StandardRole.Admin(_) => createInvitationAsSuperUser(input, targetPid)
 
           // NGO user can't create invitations
           case StandardRole.Ngo(_, p) =>
-            OdbError.NotAuthorized(user.id, Some("NGO users can't create invitations.")).asFailureF
+            OdbError.NotAuthorized(user.id, "NGO users can't create invitations.".some).asFailureF
 
           // Science users can only create CoI or Observer invitations, and only if they're the PI
           case StandardRole.Pi(_)     =>
-            input match
-              case CreateUserInvitationInput.Coi(pid, e, p)   => createInvitationAsPi(pid, e, ProgramUserRole.Coi, p)
-              case CreateUserInvitationInput.CoiRO(pid, e, p) => createInvitationAsPi(pid, e, ProgramUserRole.CoiRO, p)
-              case _                                          => OdbError.NotAuthorized(user.id, Some("Science users can only create co-investigator and observer invitations.")).asFailureF
+            targetRole match
+              case ProgramUserRole.Coi   => createInvitationAsPi(input, targetPid)
+              case ProgramUserRole.CoiRO => createInvitationAsPi(input, targetPid)
+              case _                     => OdbError.NotAuthorized(user.id, "Science users can only create co-investigator and observer invitations.".some).asFailureF
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
         (for {
-          invitation <- ResultT(createUserInvitationImpl(input))
-          emailId    <- ResultT(sendInvitation(input, invitation))
+          (p, r, u)  <- ResultT(programUserService.selectLinkData(input.programUserId))
+          _          <- u.fold(ResultT.unit[F])(uid => ResultT.fromResult(OdbError.InvitationError(input.programUserId, s"ProgramUser ${input.programUserId} is already associated with user $uid.".some).asFailure))
+          invitation <- ResultT(createUserInvitationImpl(input, p, r))
+          emailId    <- ResultT(sendInvitation(input, invitation, p))
           _          <- ResultT(updateEmailId(invitation.id, emailId))
         } yield invitation).value
 
-      def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
+      def redeemUserInvitation(input: RedeemUserInvitationInput)(using Transaction[F]): F[Result[ProgramUser.Id]] =
         user match
           case GuestUser(_)                      => OdbError.NotAuthorized(user.id, Some("Guest users cannot redeem user invitations.")).asFailureF
           case ServiceUser(_, _)                 => OdbError.NotAuthorized(user.id, Some("Service users cannot redeem user invitations.")).asFailureF
@@ -136,20 +144,20 @@ object UserInvitationService:
               .prepareR(Statements.redeemUserInvitation)
               .use(_.option(user, status, input.key))
               .flatMap:
-                case None => OdbError.InvitationError(input.key.id, Some("Invitation is invalid, or has already been accepted, declined, or revoked.")).asFailureF
-                case Some(r, pid, partnerLink) =>
+                case None      =>
+                  OdbError.InvitationError(input.key.id, "Invitation is invalid, or has already been accepted, declined, or revoked.".some).asFailureF
+                case Some(pid) =>
+                  // Here we need to update t_program_user to assign the user id
                   val xa = transaction
                   xa.savepoint.flatMap: sp =>
-                    session
-                      .prepareR(ProgramUserService.Statements.LinkUser.command)
-                      .use(_.execute(pid, user.id, UserType.Standard, r, partnerLink))
-                      .as(Result(input.key.id))
-                      .recoverWith:
-                        case SqlState.UniqueViolation(_) =>
-                          xa.rollback(sp).as:
-                            OdbError.NoAction(Some("You are already in the specified role; no action taken.")).asWarning(input.key.id)
+                    services
+                      .programUserService
+                      .linkInvitationAccept(input.key.id)
+                      .flatMap:
+                        case Result.Success(_) => input.key.id.success.pure
+                        case f                 => xa.rollback(sp).as(f.as(input.key.id))
 
-      def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
+      def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[ProgramUser.Id]] =
         user.role.access match
           case Access.Guest => OdbError.NotAuthorized(user.id, Some("Guest users cannot revoke invitations.")).asFailureF
           case Access.Admin | Access.Service | Access.Staff =>
@@ -163,35 +171,27 @@ object UserInvitationService:
 
   object Statements:
 
-    val createInvitationAsSuperUser: Query[(User, CreateUserInvitationInput), UserInvitation] =
+    val createInvitationAsSuperUser: Query[(User, Program.Id, CreateUserInvitationInput), UserInvitation] =
       sql"""
         select insert_invitation(
+          $program_user_id,
           $user_id,
           $program_id,
           $email_address,
-          $program_user_role,
-          ${partner_link_type},
-          ${partner.opt},
           null
         ) from t_program
         where c_program_id = $program_id
       """
         .query(user_invitation)
-        .contramap {
-          case (u, CreateUserInvitationInput.Coi(pid, e, p))   => (u.id, pid, e, ProgramUserRole.Coi, p.linkType, p.partnerOption, pid)
-          case (u, CreateUserInvitationInput.CoiRO(pid, e, p)) => (u.id, pid, e, ProgramUserRole.CoiRO, p.linkType, p.partnerOption, pid)
-          case (u, CreateUserInvitationInput.Support(pid, e, t)) => (u.id, pid, e, t, PartnerLinkType.HasUnspecifiedPartner, none, pid)
-        }
+        .contramap((u, pid, input) => (input.programUserId, u.id, pid, input.recipientEmail, pid))
 
-    val createInvitationAsPi: Query[(User, Program.Id, EmailAddress, ProgramUserRole, PartnerLink), UserInvitation] =
+    val createInvitationAsPi: Query[(User, Program.Id, CreateUserInvitationInput), UserInvitation] =
       sql"""
         select insert_invitation(
+          $program_user_id,
           $user_id,
           $program_id,
           $email_address,
-          $program_user_role,
-          $partner_link_type,
-          ${partner.opt},
           null
         ) from t_program
         where c_program_id = $program_id
@@ -204,43 +204,43 @@ object UserInvitationService:
         )
       """
         .query(user_invitation)
-        .contramap((u, pid, e, r, p) => (u.id, pid, e, r, p.linkType, p.partnerOption, pid, pid, u.id))
+        .contramap((u, pid, input) => (input.programUserId, u.id, pid, input.recipientEmail, pid, pid, u.id))
 
-    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), (ProgramUserRole, Program.Id, PartnerLink)] =
+    val redeemUserInvitation: Query[(User, InvitationStatus, UserInvitation), Program.Id] =
       sql"""
         update t_invitation
-        set c_status = $user_invitation_status, c_redeemer_id = $user_id
+        set c_status = $user_invitation_status
         where c_status = 'pending'
-        and c_invitation_id = $user_invitation_id
+        and c_program_user_id = $program_user_id
         and c_key_hash = md5($varchar)
         and c_issuer_id <> $user_id -- can't redeem your own invitation
-        returning c_role, c_program_id, c_partner_link, c_partner
-      """.query(program_user_role *: program_id *: partner_link)
-        .contramap((u, s, i) => (s, u.id, i.id, i.body, u.id))
+        returning c_program_id
+      """.query(program_id)
+        .contramap((u, s, i) => (s, i.id, i.body, u.id))
 
-    val revokeUserInvitation: Query[(UserInvitation.Id, User.Id), UserInvitation.Id] =
+    val revokeUserInvitation: Query[(ProgramUser.Id, User.Id), ProgramUser.Id] =
       sql"""
         update t_invitation
         set c_status = 'revoked'
-        where c_invitation_id = $user_invitation_id
+        where c_program_user_id = $program_user_id
         and c_status = 'pending'
         and c_issuer_id = $user_id
-        returning c_invitation_id
-      """.query(user_invitation_id)
+        returning c_program_user_id
+      """.query(program_user_id)
 
-    val revokeUserInvitationUnconditionially: Query[UserInvitation.Id, UserInvitation.Id] =
+    val revokeUserInvitationUnconditionially: Query[ProgramUser.Id, ProgramUser.Id] =
       sql"""
         update t_invitation
         set c_status = 'revoked'
-        where c_invitation_id = $user_invitation_id
+        where c_program_user_id = $program_user_id
         and c_status = 'pending'
-        returning c_invitation_id
-      """.query(user_invitation_id)
+        returning c_program_user_id
+      """.query(program_user_id)
 
-    val updateEmailId: Query[(EmailId, UserInvitation.Id), UserInvitation.Id] =
+    val updateEmailId: Query[(EmailId, ProgramUser.Id), ProgramUser.Id] =
       sql"""
         update t_invitation
         set c_email_id = $email_id
-        where c_invitation_id = $user_invitation_id
-        returning c_invitation_id
-      """.query(user_invitation_id)
+        where c_program_user_id = $program_user_id
+        returning c_program_user_id
+      """.query(program_user_id)

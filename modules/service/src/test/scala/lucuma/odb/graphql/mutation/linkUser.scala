@@ -8,18 +8,14 @@ import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
-import lucuma.core.enums.ProgramUserRole.Coi
-import lucuma.core.enums.ProgramUserRole.Pi
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
-import lucuma.core.model.PartnerLink
 import lucuma.core.model.User
-import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 
-class linkUser extends OdbSuite {
+class linkUser extends OdbSuite:
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -34,266 +30,182 @@ class linkUser extends OdbSuite {
 
   // LINKING A COI
 
-  test("[coi] guest user can't link a coi") {
+  test("[coi] guest user can't link a coi"):
     createUsers(guest, pi) >>
-    createProgramAs(guest).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-        linkCoiAs(guest, pi.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(guest).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+        interceptGraphQL(s"Guest users may not add CoIs."):
+          linkUserAs(guest, rid, pi.id)
 
-  test("[coi] pi user can link coi to program they own") {
+  test("[coi] pi user can link coi to program they own"):
     createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid, Partner.US)
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+        linkUserAs(pi, rid, pi2.id)
 
-  test("[coi] pi user can't link another coi to program where they are a coi") {
+  test("[coi] pi user can't link another coi to program where they are a coi"):
     createUsers(pi, pi2, pi3) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid, Partner.US) >>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkCoiAs(pi2, pi3.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+        linkUserAs(pi, rid, pi2.id) >>
+        interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+          addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid2 =>
+            linkUserAs(pi2, rid2, pi3.id)
 
-  test("[coi] pi user can't link coi to program they don't own") {
+  test("[coi] pi user can't link coi to program they don't own"):
     createUsers(pi, pi2, pi3) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkCoiAs(pi2, pi3.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid).flatMap: rid =>
+        interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+          linkUserAs(pi2, rid, pi3.id)
 
-  test("[coi] service, admin, and staff users can add a coi to any program") {
-    List(service, admin, staff).traverse_ { user =>
+  test("[coi] service, admin, and staff users can add a coi to any program"):
+    List(service, admin, staff).traverse_ : user =>
       createUsers(user) >>
-      createProgramAs(pi).flatMap { pid =>
-        linkCoiAs(user, pi2.id -> pid, Partner.US)
-      }
-    }
-  }
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid).flatMap: rid =>
+          linkUserAs(user, rid, pi2.id)
 
-  test("[coi] ngo user can add coi to program with time allocated by user's partner") {
+  test("[coi] ngo user can add coi to program with time allocated by user's partner"):
     createUsers(pi, pi2, ngo, admin) >>
-    createProgramAs(pi).flatMap { pid =>
-      setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-      linkCoiAs(ngo, pi2.id -> pid, Partner.US)
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid).flatMap: rid =>
+        setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+        linkUserAs(ngo, rid, pi2.id)
 
-  test("[coi] ngo user can't add coi to program without time allocated by user's partner") {
+  test("[coi] ngo user can't add coi to program without time allocated by user's partner"):
     createUsers(pi, pi2, ngo) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkCoiAs(ngo, pi2.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid).flatMap: rid =>
+        interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
+          linkUserAs(ngo, rid, pi2.id)
 
   // LINKING AN OBSERVER
 
-  test("[observer] guest user can't link an observer") {
+  test("[observer] guest user can't link an observer"):
     createUsers(guest, pi) >>
-    createProgramAs(guest).flatMap { pid =>
-      interceptOdbError {
-        linkObserverAs(guest, pi.id -> pid, Partner.US)
-      } {
-        case OdbError.NotAuthorized(guest.id, _) =>
-      }
-    }
-  }
+    createProgramAs(guest).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        interceptOdbError {
+          linkUserAs(guest, rid, pi.id)
+        } {
+          case OdbError.NotAuthorized(guest.id, _) =>
+        }
 
-  test("[observer] pi user can link observer to program they own") {
+  test("[observer] pi user can link observer to program they own"):
     createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkObserverAs(pi, pi2.id -> pid, Partner.US)
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        linkUserAs(pi, rid, pi2.id)
 
-  test("[observer] pi user can't link observer to program they don't own") {
+  test("[observer] pi user can't link observer to program they don't own"):
     createUsers(pi, pi2, pi3) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkObserverAs(pi2, pi3.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+          linkUserAs(pi2, rid, pi3.id)
 
-  test("[observer] pi user can link an observer to a program where they are a coi") {
+  test("[observer] pi user can link an observer to a program where they are a coi"):
     createUsers(pi, pi2, pi3) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid, Partner.US) >>     // pi links pi2 as coi
-      linkObserverAs(pi2, pi3.id -> pid, Partner.US)  // pi2 links pi3 as observer
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid2 =>
+        linkUserAs(pi, rid2, pi2.id) >>   // pi links pi2 as coi
+        addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid3 =>
+          linkUserAs(pi2, rid3, pi3.id)   // pi2 links pi3 as observer
 
-  test("[observer] pi user can't link an observer to a program where they are an observer") {
+  test("[observer] pi user can't link an observer to a program where they are an observer"):
     createUsers(pi, pi2, pi3) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkObserverAs(pi, pi2.id -> pid, Partner.US) >>  // pi links pi2 as observer
-      interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
-        linkObserverAs(pi2, pi3.id -> pid, Partner.US)   // pi2 tries to link pi3 as observer
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        linkUserAs(pi, rid, pi2.id)  >>   // pi links pi2 as observer
+        addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid2 =>
+          interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+            linkUserAs(pi2, rid2, pi3.id) // pi2 tries to link pi3 as observer
 
-  test("[observer] service, admin, and staff users can add an observer to any program") {
-    List(service, admin, staff).traverse_ { user =>
+  test("[observer] service, admin, and staff users can add an observer to any program"):
+    List(service, admin, staff).traverse_ : user =>
       createUsers(user) >>
-      createProgramAs(pi).flatMap { pid =>
-        linkObserverAs(user, pi2.id -> pid, Partner.US)
-      }
-    }
-  }
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+          linkUserAs(user, rid, pi2.id)
 
-  test("[observer] ngo user can add observer to program with time allocated by user's partner") {
+  test("[observer] ngo user can add observer to program with time allocated by user's partner"):
     createUsers(pi, pi2, ngo, admin) >>
-    createProgramAs(pi).flatMap { pid =>
-      setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-      linkObserverAs(ngo, pi2.id -> pid, Partner.US)
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+        linkUserAs(ngo, rid, pi2.id)
 
-  test("[observer] ngo user can't add observer to program without time allocated by user's partner") {
+  test("[observer] ngo user can't add observer to program without time allocated by user's partner"):
     createUsers(pi, pi2, ngo) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-        linkObserverAs(ngo, pi2.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+        interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
+          linkUserAs(ngo, rid, pi2.id)
 
   // LINKING SUPPORT
 
-  List[ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type](ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach { role =>
+  List[ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type](
+    ProgramUserRole.SupportPrimary,
+    ProgramUserRole.SupportSecondary
+  ).foreach: role =>
 
-    test(s"[$role] guest user can't link a staff support user") {
+    test(s"[$role] guest user can't link a staff support user"):
       createUsers(guest, pi) >>
-      createProgramAs(guest).flatMap { pid =>
-        interceptGraphQL(s"User ${guest.id} is not authorized to perform this operation.") {
-          linkSupportAs(guest, pi.id, pid, role)
-        }
-      }
-    }
+      createProgramAs(guest).flatMap: pid =>
+        addProgramUserAs(staff, pid, role).flatMap: rid =>
+          interceptGraphQL("Only admin, staff or service users may add support users."):
+            linkUserAs(guest, rid, pi.id)
 
-    test(s"[$role] pi user can't link a staff support user") {
+    test(s"[$role] pi user can't link a staff support user"):
       createUsers(pi, pi2) >>
-      createProgramAs(pi).flatMap { pid =>
-        interceptGraphQL(s"User ${pi.id} is not authorized to perform this operation.") {
-          linkSupportAs(pi, pi2.id, pid, role)
-        }
-      }
-    }
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(staff, pid, role).flatMap: rid =>
+          interceptGraphQL("Only admin, staff or service users may add support users."):
+            linkUserAs(pi, rid, pi2.id)
 
-    test(s"[$role] service, admin, and staff users can add a staff support user to any program") {
-      List(service, admin, staff).traverse_ { user =>
+    test(s"[$role] service, admin, and staff users can add a staff support user to any program"):
+      List(service, admin, staff).traverse_ : user =>
         createUsers(user) >>
-        createProgramAs(pi).flatMap { pid =>
-          linkSupportAs(user, pi2.id, pid, role)
-        }
-      }
-    }
+        createProgramAs(pi).flatMap: pid =>
+          addProgramUserAs(staff, pid, role).flatMap: rid =>
+            linkUserAs(user, rid, pi2.id)
 
-    test(s"[$role] ngo user can't add staff support to program with time allocated by user's partner") {
+    test(s"[$role] ngo user can't add staff support to program with time allocated by user's partner"):
       createUsers(pi, pi2, ngo, admin) >>
-      createProgramAs(pi).flatMap { pid =>
-        setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-        interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation.") {
-          linkSupportAs(ngo, pi2.id, pid, role)
-        }
-      }
-    }
-
-  }
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(staff, pid, role).flatMap: rid =>
+          setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+          interceptGraphQL("Only admin, staff or service users may add support users."):
+            linkUserAs(ngo, rid, pi2.id)
 
   // GENERAL RULES
 
-  test("[general] can't re-link a user") {
+  test("[general] can't re-link a user"):
     createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      linkCoiAs(pi, pi2.id -> pid, Partner.US) >>
-      interceptGraphQL(s"User ${pi2.id} is already linked to program ${pid}.") {
-        linkCoiAs(pi, pi2.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid0 =>
+        linkUserAs(pi, rid0, pi2.id) >>
+        addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid1 =>
+          interceptGraphQL(s"User ${pi2.id} is already linked to program ${pid}."):
+            linkUserAs(pi, rid1, pi2.id)
 
-  test("[general] can't link a guest user") {
+  test("[general] can't link a guest user"):
     createUsers(pi, guest) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${guest.id} does not exist or is of a nonstandard type.") {
-        linkCoiAs(pi, guest.id -> pid, Partner.US)
-      }
-    }
-  }
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+        interceptGraphQL(s"User ${guest.id} does not exist or is of a nonstandard type."):
+          linkUserAs(pi, rid, guest.id)
 
-  test("[general] can't link a PI user") {
-    createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"Argument 'input' is invalid: PIs are linked at program creation time.") {
-        linkAs(pi, pi2.id, pid, Pi, PartnerLink.HasUnspecifiedPartner)
-      }
-    }
-  }
+  test("[general] can't link a PI user"):
+    createUsers(pi) >>
+    createProgramAs(pi).flatMap: pid =>
+      interceptGraphQL(s"Argument 'input' is invalid: PIs are added at program creation time."):
+        addProgramUserAs(staff, pid, ProgramUserRole.Pi)
 
-  test("[general] can't link a service user") {
+  test("[general] can't link a service user"):
     createUsers(pi, service) >>
-    createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"User ${service.id} does not exist or is of a nonstandard type.") {
-        linkCoiAs(pi, service.id -> pid, Partner.US)
-      }
-    }
-  }
-
-  def testInvalidInput(partnerLinkInput: String): IO[Unit] =
-    createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap { pid =>
-    expect(
-      user = pi,
-      query = s"""
-        mutation {
-          linkUser(input: {
-            programId: "$pid"
-            userId: "$pi2"
-            role: ${Coi.tag.toScreamingSnakeCase}
-            partnerLink: {
-              $partnerLinkInput
-            }
-          }) {
-            user {
-              user { id }
-            }
-          }
-        }
-      """,
-      expected = List("Argument 'input.partnerLink' is invalid: Specify either 'linkType' (as `HAS_NON_PARTNER` or `HAS_UNSPECIFIED_PARTNER`) or 'partner'.").asLeft
-    )
-  }
-
-  test("[general] (empty link)") {
-    testInvalidInput("")
-  }
-
-  test("[general] (missing partner)") {
-    testInvalidInput(
-      """
-        linkType: HAS_PARTNER
-      """.stripMargin
-    )
-  }
-
-  test("[general] (conflicting)") {
-    testInvalidInput(
-      """
-        linkType: HAS_NON_PARTNER
-        partner: US
-      """.stripMargin
-    )
-  }
-
-}
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid).flatMap: rid =>
+        interceptGraphQL(s"User ${service.id} does not exist or is of a nonstandard type."):
+          linkUserAs(pi, rid, service.id)
