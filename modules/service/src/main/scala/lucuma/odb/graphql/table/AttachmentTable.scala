@@ -9,12 +9,12 @@ import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
 import skunk.codec.all.*
 
-trait ObsAttachmentTable[F[_]] extends BaseMapping[F] {
+trait AttachmentTable[F[_]] extends BaseMapping[F] {
 
-  object ObsAttachmentTable extends TableDef("t_obs_attachment") {
+  object AttachmentTable extends TableDef("t_attachment") {
     val ProgramId      = col("c_program_id", program_id)
-    val Id             = col("c_obs_attachment_id", obs_attachment_id)
-    val AttachmentType = col("c_attachment_type", tag)
+    val Id             = col("c_attachment_id", attachment_id)
+    val AttachmentType = col("c_attachment_type", attachment_type)
     val FileName       = col("c_file_name", text_nonempty)
     val Description    = col("c_description", text_nonempty.opt)
     val Checked        = col("c_checked", bool)

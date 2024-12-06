@@ -8,29 +8,31 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
-import lucuma.core.model.ObsAttachment
+import lucuma.core.enums.AttachmentType
+import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.FMain
+import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import skunk.*
 import skunk.syntax.all.*
 
-class obsAttachments extends ObsAttachmentsSuite {
+class attachments extends AttachmentsSuite {
 
   def assertAttachmentsGql(
     user:        User,
     programId:   Program.Id,
-    expectedTas: (ObsAttachment.Id, TestAttachment)*
+    expectedTas: (Attachment.Id, TestAttachment)*
   ): IO[Unit] =
     expect(
       user = user,
       query = s"""
           query {
             program(programId: "$programId") {
-              $ObsAttachmentsGraph
+              $AttachmentsGraph
             }
           }
         """,
@@ -45,42 +47,51 @@ class obsAttachments extends ObsAttachmentsSuite {
     user:        User,
     WHERE:       String,
     SET:         String,
-    expectedTas: (ObsAttachment.Id, TestAttachment)*
+    expectedTas: (Attachment.Id, TestAttachment)*
   ): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
-          updateObsAttachments(
+          updateAttachments(
             input: {
               WHERE: """ + WHERE + """
               SET: """ + SET + s"""
             }
           ) {
-            $ObsAttachmentsGraph
+            $AttachmentsGraph
           }
         }
       """,
       expected = Right(
         Json.obj(
-          "updateObsAttachments" -> expectedAttachments(expectedTas.toList)
+          "updateAttachments" -> expectedAttachments(expectedTas.toList)
         )
       )
     )
 
-  def getRemotePathFromDb(aid: ObsAttachment.Id): IO[NonEmptyString] = {
-    val query = sql"select c_remote_path from t_obs_attachment where c_obs_attachment_id = $obs_attachment_id".query(text_nonempty)
+  def getRemotePathFromDb(aid: Attachment.Id): IO[NonEmptyString] = {
+    val query = sql"select c_remote_path from t_attachment where c_attachment_id = $attachment_id".query(text_nonempty)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(aid))
     )
   }
 
+  // TODO: science, team and custom_sed file tests
   val mosMask1A         = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful")
   val mosMask1B         = TestAttachment("file1.fits", "mos_mask", None, "New contents")
   val mosMask2          = TestAttachment("file2.fits", "mos_mask", "Masked".some, "Zorro")
   val finderPNG         = TestAttachment("different.png", "finder", "Unmatching file name".some, "Something different")
   val finderJPG         = TestAttachment("finder.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging        = TestAttachment("pi.fits", "pre_imaging", none, "A pre imaging file")
+  val preImaging2       = TestAttachment("pi2.fits", "pre_imaging", none, "Another pre imaging file")
+  val science1          = TestAttachment("science1.pdf", "science", none, "A science file")
+  val science2          = TestAttachment("science2.pdf", "science", none, "A second science file")
+  val team1             = TestAttachment("team1.pdf", "team", none, "A team file")
+  val team2             = TestAttachment("team2.pdf", "team", none, "A second team file")
+  val customSedSED      = TestAttachment("sed.sed", "custom_sed", "It's custom".some, "A custom SED file")
+  val customSedTXT      = TestAttachment("sed.TXT", "custom_sed", "It's custom".some, "Another custom SED file")
+  val customSedDAT      = TestAttachment("sed.dat", "custom_sed", "It's custom".some, "A third custom SED file")
   val emptyFile         = TestAttachment("file1.fits", "mos_mask", "Thing".some, "")
   val missingType       = TestAttachment("file1.fits", "", "Whatever".some, "It'll never make it")
   val invalidType       = TestAttachment("file1.fits", "NotAType", none, "It'll never make it")
@@ -156,6 +167,63 @@ class obsAttachments extends ObsAttachmentsSuite {
     } yield ()
   }
 
+  test("can have multiple mos masks") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, mosMask1A), (aid2, mosMask2))
+    } yield ()
+  }
+
+  test("can have multiple finders") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, finderJPG).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, finderJPG), (aid2, finderPNG))
+    } yield ()
+  }
+
+  test("can have multiple pre-imaging") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, preImaging).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, preImaging2).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, preImaging), (aid2, preImaging2))
+    } yield ()
+  }
+
+  test("only one science allowed per program") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, science1).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, science1))
+      aid2 <- insertAttachment(pi, pid, science2).withExpectation(Status.BadRequest, AttachmentFileService.duplicateTypeMsg(AttachmentType.Science))
+      _    <- assertAttachmentsGql(pi, pid, (aid1, science1))
+    } yield ()
+  }
+
+  test("only one team allowed per program") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, team1).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, team1))
+      aid2 <- insertAttachment(pi, pid, team2).withExpectation(Status.BadRequest, AttachmentFileService.duplicateTypeMsg(AttachmentType.Team))
+      _    <- assertAttachmentsGql(pi, pid, (aid1, team1))
+    } yield ()
+  }
+
+  test("can have multiple custom seds") {
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, customSedDAT).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, customSedSED).toAttachmentId
+      aid3 <- insertAttachment(pi, pid, customSedTXT).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid, (aid1, customSedDAT), (aid2, customSedSED), (aid3, customSedTXT))
+    } yield ()
+  }
+
   test("update with different name is successful") {
     for {
       pid    <- createProgramAs(pi)
@@ -199,7 +267,7 @@ class obsAttachments extends ObsAttachmentsSuite {
   test("update of non-existent attachment is NotFound") {
     for {
       pid <- createProgramAs(pi)
-      aid  = ObsAttachment.Id.fromLong(100L).get
+      aid  = Attachment.Id.fromLong(100L).get
       _   <- updateAttachment(pi, pid, aid, mosMask1A).withExpectation(Status.NotFound)
     } yield ()
   }
@@ -212,7 +280,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- insertAttachment(pi, pid, mosMask1B).withExpectation(Status.BadRequest, "Duplicate file name")
+      _      <- insertAttachment(pi, pid, mosMask1B).withExpectation(Status.BadRequest, AttachmentFileService.DuplicateFileNameMsg)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
       _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
@@ -229,7 +297,7 @@ class obsAttachments extends ObsAttachmentsSuite {
       path2  <- getRemotePathFromDb(aid2)
       fk2     = awsConfig.fileKey(path2)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
-      _      <- updateAttachment(pi, pid, aid2, mosMask1B).withExpectation(Status.BadRequest, "Duplicate file name")
+      _      <- updateAttachment(pi, pid, aid2, mosMask1B).withExpectation(Status.BadRequest, AttachmentFileService.DuplicateFileNameMsg)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
       _      <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
     } yield ()
@@ -256,17 +324,17 @@ class obsAttachments extends ObsAttachmentsSuite {
     } yield ()
   }
 
-  test("invalid attachment type insert is BadRequest") {
+  test("invalid attachment type insert is NotFound") {
     for {
       pid <- createProgramAs(pi)
-      _   <- insertAttachment(pi, pid, invalidType).withExpectation(Status.BadRequest, "Invalid attachment type")
+      _   <- insertAttachment(pi, pid, invalidType).withExpectation(Status.NotFound, "Not found")
     } yield ()
   }
 
-  test("empty attachment type insert is BadRequest") {
+  test("empty attachment type insert is NotFound") {
     for {
       pid <- createProgramAs(pi)
-      _   <- insertAttachment(pi, pid, missingType).withExpectation(Status.BadRequest, "Invalid attachment type")
+      _   <- insertAttachment(pi, pid, missingType).withExpectation(Status.NotFound, "Not found")
     } yield ()
   }
 
