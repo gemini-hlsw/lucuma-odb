@@ -90,6 +90,12 @@ trait Services[F[_]]:
   /** The `AsterismService`. */
   def asterismService: AsterismService[F]
 
+  /** Construct an `AttachmentFileService`, given an `S3FileService`.  */
+  def attachmentFileService(s3: S3FileService[F]): AttachmentFileService[F]
+
+  /** The `AttachmentMetadataService`. */
+  def attachmentMetadataService: AttachmentMetadataService[F]
+
   /** The `CalibrationsService`. */
   def calibrationsService: CalibrationsService[F]
 
@@ -126,12 +132,6 @@ trait Services[F[_]]:
   /** The `ObsAttachmentAssignmentService`. */
   def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
 
-  /** Construct an `ObsAttachmentFileService`, given an `S3FileService`.  */
-  def obsAttachmentFileService(s3: S3FileService[F]): ObsAttachmentFileService[F]
-
-  /** The `ObsAttachmentMetadataService`. */
-  def obsAttachmentMetadataService: ObsAttachmentMetadataService[F]
-
   /** The `ObservationService`. */
   def observationService: ObservationService[F]
 
@@ -149,9 +149,6 @@ trait Services[F[_]]:
 
   /** The `ProgramUserService`. */
   def programUserService: ProgramUserService[F]
-
-  /** Construct a `ProposalAttachmentFileService`, given an `S3FileService`. */
-  def proposalAttachmentFileService(s3: S3FileService[F]): ProposalAttachmentFileService[F]
 
   /** The `ProposalService`. */
   def proposalService: ProposalService[F]
@@ -255,6 +252,7 @@ object Services:
       // instantiating anything we're not using.
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
+      lazy val attachmentMetadataService = AttachmentMetadataService.instantiate
       lazy val callForProposalsService = CallForProposalsService.instantiate
       lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
@@ -267,7 +265,6 @@ object Services:
       lazy val gmosSequenceService = GmosSequenceService.instantiate
       lazy val groupService = GroupService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
-      lazy val obsAttachmentMetadataService = ObsAttachmentMetadataService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
@@ -285,8 +282,7 @@ object Services:
       // A few services require additional arguments for instantiation that may not always be
       // available, so we require them here instead of demanding them before constructing a
       // `Services` instance.
-      def proposalAttachmentFileService(s3: S3FileService[F]) = ProposalAttachmentFileService.instantiate(s3)
-      def obsAttachmentFileService(s3: S3FileService[F]) = ObsAttachmentFileService.instantiate(s3)
+      def attachmentFileService(s3: S3FileService[F]) = AttachmentFileService.instantiate(s3)
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
       def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
@@ -306,6 +302,8 @@ object Services:
     def user[F[_]](using Services[F]): User = summon[Services[F]].user
     def allocationService[F[_]](using Services[F]): AllocationService[F] = summon[Services[F]].allocationService
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
+    def attachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): AttachmentFileService[F] = summon[Services[F]].attachmentFileService(s3)
+    def attachmentMetadataService[F[_]](using Services[F]): AttachmentMetadataService[F] = summon[Services[F]].attachmentMetadataService
     def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
@@ -318,15 +316,12 @@ object Services:
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
-    def obsAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ObsAttachmentFileService[F] = summon[Services[F]].obsAttachmentFileService(s3)
-    def obsAttachmentMetadataService[F[_]](using Services[F]): ObsAttachmentMetadataService[F] = summon[Services[F]].obsAttachmentMetadataService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
     def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
-    def proposalAttachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): ProposalAttachmentFileService[F] = summon[Services[F]].proposalAttachmentFileService(s3)
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService

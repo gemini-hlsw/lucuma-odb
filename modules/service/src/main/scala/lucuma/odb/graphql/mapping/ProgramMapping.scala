@@ -17,16 +17,15 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.Attachment
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Group
-import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
@@ -44,10 +43,9 @@ trait ProgramMapping[F[_]]
      with ProgramUserTable[F]
      with ProposalView[F]
      with ObservationView[F]
-     with ObsAttachmentTable[F]
+     with AttachmentTable[F]
      with Predicates[F]
      with ProgramReferenceView[F]
-     with ProposalAttachmentTable[F]
      with ResultMapping[F]
      with GroupElementView[F]
      with UserInvitationTable[F]
@@ -77,8 +75,7 @@ trait ProgramMapping[F[_]]
       SqlObject("proposal", Join(ProgramTable.Id, ProposalView.ProgramId)),
       SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
-      SqlObject("obsAttachments", Join(ProgramTable.Id, ObsAttachmentTable.ProgramId)),
-      SqlObject("proposalAttachments", Join(ProgramTable.Id, ProposalAttachmentTable.ProgramId)),
+      SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
       EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
@@ -177,14 +174,9 @@ trait ProgramMapping[F[_]]
           )
         }
 
-    case (ProgramType, "obsAttachments", Nil) =>
+    case (ProgramType, "attachments", Nil) =>
       Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
-      }
-
-    case (ProgramType, "proposalAttachments", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentType / "attachmentType"))), child)
+        OrderBy(OrderSelections(List(OrderSelection[Attachment.Id](AttachmentType / "id"))), child)
       }
 
     case (ProgramType, "allocations", Nil) =>

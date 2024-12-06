@@ -162,19 +162,6 @@ object GraphQLRoutes {
           shortName
           longName
         }
-        obsAttachmentTypeMeta {
-          tag
-          shortName
-          longName
-          fileExtensions {
-            fileExtension
-          }
-        }
-        proposalAttachmentTypeMeta {
-          tag
-          shortName
-          longName
-        }
         proposalStatusMeta {
           tag
           name
