@@ -17,12 +17,14 @@ import table.*
 trait ProgramUserMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
+     with UserInvitationTable[F]
      with ProgramUserTable[F] { this: SkunkMapping[F] =>
 
   lazy val ProgramUserMapping =
     ObjectMapping(ProgramUserType)(
-      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
-      SqlField("userId", ProgramUserTable.UserId, hidden = true, key = true),
+      SqlField("id", ProgramUserTable.ProgramUserId, key = true),
+      SqlField("programId", ProgramUserTable.ProgramId, hidden = true),
+      SqlField("userId", ProgramUserTable.UserId, hidden = true),
       SqlField("role", ProgramUserTable.Role),
       SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
       SqlField("partner", ProgramUserTable.Partner, hidden = true),
@@ -39,7 +41,8 @@ trait ProgramUserMapping[F[_]]
       ),
       SqlObject("program", Join(ProgramUserTable.ProgramId, ProgramTable.Id)),
       SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId)),
-      SqlObject("fallbackProfile")
+      SqlObject("fallbackProfile"),
+      SqlObject("invitation", Join(ProgramUserTable.ProgramUserId, UserInvitationTable.ProgramUserId))
     )
 
 }

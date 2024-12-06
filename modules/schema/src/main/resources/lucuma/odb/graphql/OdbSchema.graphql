@@ -46,10 +46,9 @@ type AddDatasetEventResult {
 }
 
 input AddProgramUserInput {
-  orcidId:     String!
-  programId:   ProgramId!
-  role:        ProgramUserRole!
-  SET:         ProgramUserPropertiesInput
+  programId: ProgramId!
+  role:      ProgramUserRole!
+  SET:       ProgramUserPropertiesInput
 }
 
 type AddProgramUserResult {
@@ -986,6 +985,17 @@ input DeclinationInput {
   microarcseconds: Long
   degrees: BigDecimal
   dms: DmsString
+}
+
+"Input for deleting a program user."
+input DeleteProgramUserInput {
+  programUserId: ProgramUserId!
+}
+
+"The result of deleting a program user."
+type DeleteProgramUserResult {
+  "`true` if a program user was deleted, `false` otherwise."
+  result: Boolean!
 }
 
 "Input for deleting a proposal."
@@ -2587,41 +2597,37 @@ input LineFluxSurfaceInput {
   units: LineFluxSurfaceUnits!
 }
 
-"Link user"
+"""
+Links a 'User' with a 'Program', filling in the 'user' field of the
+corresponding 'ProgramUser'.
+"""
 input LinkUserInput {
 
-  "The program to add a user to."
-  programId: ProgramId!
+  "The program user that will reference the user."
+  programUserId: ProgramUserId!
 
-  "The user to be added."
+  "The user to be linked."
   userId: UserId!
-
-  "The role this user will play in the program."
-  role: ProgramUserRole!
-
-  "Partner associated with this user, if any."
-  partnerLink: PartnerLinkInput
 
 }
 
+scalar ProgramUserId
 
-scalar UserInvitationId
 scalar UserInvitationKey
 
-"Create an invitation."
+"""
+Creates an invitation, if none exists for the indicated 'ProgramUser' and sets
+it to 'PENDING' status.  If an invitation exists but is still 'PENDING' it will
+be reissued.  If 'DECLINED' or 'REVOKED' the invitation will be reset to
+'PENDING' and reissued.  If already 'REDEEMED', nothing is done.
+"""
 input CreateUserInvitationInput {
 
-  "The program to add a user to."
-  programId: ProgramId!
+  "The associated program user."
+  programUserId: ProgramUserId!
 
   "The recipient to whom the invitation should be sent."
   recipientEmail: EmailAddress!
-
-  "The role this user will play in the program."
-  role: ProgramUserRole!
-
-  "Partner associated with this user, if any."
-  partnerLink: PartnerLinkInput
 
 }
 
@@ -2644,9 +2650,6 @@ enum UserInvitationStatus {
 "Invitation"
 type UserInvitation {
 
-  "Id"
-  id: UserInvitationId!
-
   "Invitation status."
   status: UserInvitationStatus!
 
@@ -2656,19 +2659,10 @@ type UserInvitation {
   "Recipient email address."
   recipientEmail: EmailAddress!
 
-  "User who redeemed the invitation, if any."
-  redeemer: User
+  "The ProgramUser associated with the invitation."
+  programUser: ProgramUser!
 
-  "The program the redeemer will be added to."
-  program: Program!
-
-  "The role the redeemer will play in the program."
-  role: ProgramUserRole!
-
-  "Redeemer's partner, if any."
-  partnerLink: PartnerLink!
-
-  "The email sent for the invitation"
+  "The email sent for the invitation."
   email: Email
 }
 
@@ -2699,7 +2693,7 @@ type RedeemUserInvitationResult {
 }
 
 input RevokeUserInvitationInput {
-  id: UserInvitationId!
+  id: ProgramUserId!
 }
 
 type RevokeUserInvitationResult {
@@ -2709,6 +2703,7 @@ type RevokeUserInvitationResult {
 
 }
 
+# TODO: user -> programUser
 type LinkUserResult {
   user: ProgramUser!
 }
@@ -2769,9 +2764,10 @@ type Mutation {
   ): AddDatasetEventResult!
 
   """
-  Looks up or creates (if necessary) a user associated with a given ORCID id and
-  adds it to the given program.  No invitation is sent as a result of this
-  operation.
+  Creates a 'ProgramUser' without a link to any existing 'User'.  No invitation
+  is sent as a result of this operation, but an invitation may be subsequently
+  sent and when accepted the 'User' field will become available and the 'User'
+  will gain appropriate access to the program.
   """
   addProgramUser(
     input: AddProgramUserInput!
@@ -2912,6 +2908,13 @@ type Mutation {
   ): CreateTargetResult!
 
   """
+  Deletes a 'ProgramUser'.
+  """
+  deleteProgramUser(
+    input: DeleteProgramUserInput!
+  ): DeleteProgramUserResult!
+
+  """
   Deletes the given program's proposal, if any.
   """
   deleteProposal(
@@ -2919,8 +2922,8 @@ type Mutation {
   ): DeleteProposalResult!
 
   """
-  Link a user to a program. Any existing link will be replaced.
-  This operation is available only to Admin and Service users.
+  Ties a specific user to an existing ProgramUser, which must not already be
+  associated with any user.
   """
   linkUser(input: LinkUserInput!): LinkUserResult!
 
@@ -2990,7 +2993,6 @@ type Mutation {
 
   """
   Unlink a user from a program.
-  This operation is available only to Admin and Service users.
   """
   unlinkUser(input: UnlinkUserInput!): UnlinkUserResult!
 
@@ -3575,27 +3577,32 @@ enum ProgramUserSupportRoleType {
 An assignment of a user to a program.
 """
 type ProgramUser {
+  id:                ProgramUserId!
+
   role:              ProgramUserRole!
-  partnerLink:       PartnerLink!
   program:           Program
   user:              User
 
+  "How the partner is associated with a partner."
+  partnerLink:       PartnerLink!
+
+  """
+  Profile information reported when the corresponding ORCiD profile is not set
+  or is not public.
+  """
   fallbackProfile:   UserProfile!
 
-  """
-  User educational status. PHD/Undergrad/Grad/Other
-  """
+  "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
 
-  """
-  Users' reported gender.
-  """
+  "Users' reported gender."
   gender: Gender
 
-  """
-  Flag indicating whether the user's proposal is part of a thesis.
-  """
+  "Flag indicating whether the user's proposal is part of a thesis."
   thesis: Boolean
+
+  "User invitation, if any, associated with this program user."
+  invitation: UserInvitation
 }
 
 """
@@ -9044,7 +9051,7 @@ type Program {
   pi: ProgramUser
 
   "Users assigned to this science program"
-  users:   [ProgramUser!]!
+  users: [ProgramUser!]!
 
   """
   All observations associated with the program.
@@ -11610,11 +11617,8 @@ enum ToOActivation {
 
 input UnlinkUserInput {
 
-  "The program to unlink the user from."
-  programId: ProgramId!
-
-  "The user to unlink."
-  userId: UserId!
+  "The program user to unlink the user from."
+  programUserId: ProgramUserId!
 
 }
 
@@ -14491,6 +14495,12 @@ input WhereTarget {
 User filter options.  All specified items must match.
 """
 input WhereUser {
+
+  """
+  When `true`, matches if the user is not defined. When `false` matches if the
+  user is defined.
+  """
+  IS_NULL: Boolean
 
   """
   A list of nested user filters that all must match in order for the AND group

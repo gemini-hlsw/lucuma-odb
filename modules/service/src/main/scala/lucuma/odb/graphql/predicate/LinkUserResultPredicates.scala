@@ -4,10 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.core.model.Program
-import lucuma.core.model.User
+import lucuma.core.model.ProgramUser
 
-class LinkUserResultPredicates(path: Path) {
-  val programId = LeafPredicates[Program.Id](path / "programId")
-  val userId = LeafPredicates[User.Id](path / "userId")
-}
+class LinkUserResultPredicates(path: Path):
+  val id = LeafPredicates[ProgramUser.Id](path / "id")
