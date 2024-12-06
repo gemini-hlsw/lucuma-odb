@@ -38,11 +38,11 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -156,6 +156,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramType](ProgramTypeType),
+      LeafMapping[ProgramUser.Id](ProgramUserIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ProgramReference](ProgramReferenceLabelType),
       LeafMapping[ProposalReference](ProposalReferenceLabelType),
@@ -189,7 +190,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](TransactionIdType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[String](UserInvitationKeyType),
-      LeafMapping[UserInvitation.Id](UserInvitationIdType),
       LeafMapping[InvitationStatus](UserInvitationStatusType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),

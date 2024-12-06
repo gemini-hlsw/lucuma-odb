@@ -10,7 +10,6 @@ import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
-import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Context
 import grackle.Env
@@ -36,6 +35,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -47,51 +47,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.AddAtomEventInput
-import lucuma.odb.graphql.input.AddDatasetEventInput
-import lucuma.odb.graphql.input.AddProgramUserInput
-import lucuma.odb.graphql.input.AddSequenceEventInput
-import lucuma.odb.graphql.input.AddSlewEventInput
-import lucuma.odb.graphql.input.AddStepEventInput
-import lucuma.odb.graphql.input.AddTimeChargeCorrectionInput
-import lucuma.odb.graphql.input.CloneGroupInput
-import lucuma.odb.graphql.input.CloneObservationInput
-import lucuma.odb.graphql.input.CloneTargetInput
-import lucuma.odb.graphql.input.ConditionsEntryInput
-import lucuma.odb.graphql.input.CreateCallForProposalsInput
-import lucuma.odb.graphql.input.CreateConfigurationRequestInput
-import lucuma.odb.graphql.input.CreateGroupInput
-import lucuma.odb.graphql.input.CreateObservationInput
-import lucuma.odb.graphql.input.CreateProgramInput
-import lucuma.odb.graphql.input.CreateProposalInput
-import lucuma.odb.graphql.input.CreateTargetInput
-import lucuma.odb.graphql.input.CreateUserInvitationInput
-import lucuma.odb.graphql.input.DeleteProposalInput
-import lucuma.odb.graphql.input.LinkUserInput
-import lucuma.odb.graphql.input.RecordAtomInput
-import lucuma.odb.graphql.input.RecordDatasetInput
-import lucuma.odb.graphql.input.RecordGmosStepInput
-import lucuma.odb.graphql.input.RecordGmosVisitInput
-import lucuma.odb.graphql.input.RedeemUserInvitationInput
-import lucuma.odb.graphql.input.RevokeUserInvitationInput
-import lucuma.odb.graphql.input.SetAllocationsInput
-import lucuma.odb.graphql.input.SetGuideTargetNameInput
-import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
-import lucuma.odb.graphql.input.SetProgramReferenceInput
-import lucuma.odb.graphql.input.SetProposalStatusInput
-import lucuma.odb.graphql.input.UnlinkUserInput
-import lucuma.odb.graphql.input.UpdateAsterismsInput
-import lucuma.odb.graphql.input.UpdateAttachmentsInput
-import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
-import lucuma.odb.graphql.input.UpdateConfigurationRequestsInput
-import lucuma.odb.graphql.input.UpdateDatasetsInput
-import lucuma.odb.graphql.input.UpdateGroupsInput
-import lucuma.odb.graphql.input.UpdateObservationsInput
-import lucuma.odb.graphql.input.UpdateObservationsTimesInput
-import lucuma.odb.graphql.input.UpdateProgramUsersInput
-import lucuma.odb.graphql.input.UpdateProgramsInput
-import lucuma.odb.graphql.input.UpdateProposalInput
-import lucuma.odb.graphql.input.UpdateTargetsInput
+import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
@@ -101,7 +57,6 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.sso.client.SsoGraphQlClient
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
@@ -133,6 +88,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       CreateProposal,
       CreateTarget,
       CreateUserInvitation,
+      DeleteProgramUser,
       DeleteProposal,
       LinkUser,
       RecordAtom,
@@ -174,7 +130,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   val httpClient: Client[F]
-  def ssoGraphQlClient: SsoGraphQlClient[F]
   val itcClient: ItcClient[F]
   def emailConfig: Config.Email
   val commitHash: CommitHash
@@ -299,8 +254,8 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       child
     )
 
-  def programUsersResultSubquery(ids: List[(Program.Id, User.Id)], limit: Option[NonNegInt], child: Query) = {
-    val pred   = Predicates.programUser.key.in(ids)
+  def programUsersResultSubquery(ids: List[ProgramUser.Id], limit: Option[NonNegInt], child: Query) =
+    val pred   = Predicates.programUser.id.in(ids)
     val order  = List(
       OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
       OrderSelection[User.Id](ProgramUserType / "user" / "id")
@@ -316,7 +271,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         child  = q
       )
     }
-  }
 
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
@@ -334,13 +288,10 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val AddProgramUser: MutationField =
     MutationField("addProgramUser", AddProgramUserInput.Binding): (input, child) =>
-      services.useNonTransactionally:
-        programUserService.addProgramUser(ssoGraphQlClient, input).map: r =>
-          r.map: (pid, uid) =>
-            Unique(Filter(Predicate.And(
-              Predicates.programUser.programId.eql(pid),
-              Predicates.programUser.userId.eql(uid)
-            ), child))
+      services.useTransactionally:
+        programUserService.addProgramUser(input).map: r =>
+          r.map: pui =>
+            Unique(Filter(Predicates.programUser.id.eql(pui) , child))
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding): (input, child) =>
@@ -444,6 +395,12 @@ trait MutationMapping[F[_]] extends Predicates[F] {
               Unique(Filter(Predicates.userInvitation.id.eql(inv.id), child))
             )
 
+  private lazy val DeleteProgramUser =
+    MutationField.json("deleteProgramUser", DeleteProgramUserInput.Binding): input =>
+      services.useTransactionally:
+        programUserService.deleteProgramUser(input.programUserId).nestMap: b =>
+            Json.obj("result" -> b.asJson)
+
   private lazy val DeleteProposal =
     MutationField.json("deleteProposal", DeleteProposalInput.Binding): input =>
       services.useTransactionally:
@@ -454,18 +411,15 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding): (input, child) =>
       services.useTransactionally:
-        programUserService.linkUser(input).nestMap: (pid, uid) =>
-          Unique(Filter(And(
-            Predicates.linkUserResult.programId.eql(pid),
-            Predicates.linkUserResult.userId.eql(uid),
-          ), child))
+        programUserService.linkUser(input).nestMap: _ =>
+          Unique(Filter(Predicates.linkUserResult.id.eql(input.programUserId), child))
 
   private lazy val UnlinkUser =
     MutationField.json("unlinkUser", UnlinkUserInput.Binding): input =>
       services.useTransactionally:
         requirePiAccess:
-          programUserService.unlinkUser(input).nestMap: b =>
-            Json.obj("result" -> b.asJson)
+          programUserService.unlinkUser(input.programUserId).nestMap: o =>
+            Json.obj("result" -> o.isDefined.asJson)
 
   private def recordDatasetResponseToResult(
     child:        Query,
@@ -847,31 +801,26 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val UpdateProgramUsers =
-    MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))) { (input, child) =>
-      services.useTransactionally {
-        val filterPredicate = and(List(
-          Predicates.programUser.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
+    MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))): (input, child) =>
+      services.useTransactionally:
+        requirePiAccess:
+          val filterPredicate = and(List(
+            Predicates.programUser.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
 
-        val selection: Result[AppliedFragment] =
-          MappedQuery(
-            Filter(filterPredicate, Query.Group(List(
-              Select("programId", None, Empty),
-              Select("userId", None, Empty)
-            ))),
-            Context(QueryType, List("programUsers"), List("programUsers"), List(ProgramUserType))
-          ).flatMap(_.fragment)
+          val selection: Result[AppliedFragment] =
+            MappedQuery(
+              Filter(filterPredicate, Query.Group(List(Select("id", None, Empty)))),
+              Context(QueryType, List("programUsers"), List("programUsers"), List(ProgramUserType))
+            ).flatMap(_.fragment)
 
-        selection.flatTraverse { which =>
-          programUserService
-            .updateProgramUsers(input.SET, which)
-            .map(
-              _.flatMap(programUsersResultSubquery(_, input.LIMIT, child))
-            )
-        }
-      }
-    }
+          selection.flatTraverse: which =>
+            programUserService
+              .updateProperties(input.SET, which)
+              .map(
+                _.flatMap(programUsersResultSubquery(_, input.LIMIT, child))
+              )
 
   private lazy val UpdatePrograms =
     MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>

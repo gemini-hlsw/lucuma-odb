@@ -13,9 +13,8 @@ trait LinkUserResultMapping[F[_]] extends ProgramUserTable[F]  {
 
   lazy val LinkUserResultMapping =
     ObjectMapping(LinkUserResultType)(
-      SqlField("programId", ProgramUserTable.ProgramId, hidden = true, key = true),
-      SqlField("userId", ProgramUserTable.UserId, key = true, hidden = true),
-      SqlObject("user"),
+      SqlField("id", ProgramUserTable.ProgramUserId, hidden = true, key = true),
+      SqlObject("user")
     )
 
 }

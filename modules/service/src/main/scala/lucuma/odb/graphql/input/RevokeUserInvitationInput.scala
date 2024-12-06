@@ -4,17 +4,15 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
-import lucuma.core.model.UserInvitation
+import lucuma.core.model.ProgramUser
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
+import lucuma.odb.graphql.binding.ProgramUserIdBinding
 
-final case class RevokeUserInvitationInput(id: UserInvitation.Id)
+final case class RevokeUserInvitationInput(id: ProgramUser.Id)
 
 object RevokeUserInvitationInput:
 
   val Binding: Matcher[RevokeUserInvitationInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        UserInvitationIdInput.Binding("id", rId),
-      ) => rId.map(RevokeUserInvitationInput.apply)
-    }
+    ObjectFieldsBinding.rmap:
+      case List(ProgramUserIdBinding("id", rId)) => rId.map(RevokeUserInvitationInput.apply)
