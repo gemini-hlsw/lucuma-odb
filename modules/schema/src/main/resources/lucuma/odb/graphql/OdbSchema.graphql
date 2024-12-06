@@ -48,10 +48,9 @@ type AddDatasetEventResult {
 }
 
 input AddProgramUserInput {
-  orcidId:     String!
-  programId:   ProgramId!
-  role:        ProgramUserRole!
-  SET:         ProgramUserPropertiesInput
+  programId: ProgramId!
+  role:      ProgramUserRole!
+  SET:       ProgramUserPropertiesInput
 }
 
 type AddProgramUserResult {
@@ -2587,41 +2586,38 @@ input LineFluxSurfaceInput {
   units: LineFluxSurfaceUnits!
 }
 
-"Link user"
+"""
+Links a 'User' with a 'Program', filling in the 'user' field of the
+corresponding 'ProgramUser'.
+"""
 input LinkUserInput {
 
-  "The program to add a user to."
-  programId: ProgramId!
+  "The program user that will reference the user."
+  programUserId: ProgramUserId!
 
-  "The user to be added."
+  "The user to be linked."
   userId: UserId!
-
-  "The role this user will play in the program."
-  role: ProgramUserRole!
-
-  "Partner associated with this user, if any."
-  partnerLink: PartnerLinkInput
 
 }
 
+scalar ProgramUserId
 
 scalar UserInvitationId
 scalar UserInvitationKey
 
-"Create an invitation."
+"""
+Creates an invitation, if none exists for the indicated 'ProgramUser' and sets
+it to 'PENDING' status.  If an invitation exists but is still 'PENDING' it will
+be reissued.  If 'DECLINED' or 'REVOKED' the invitation will be reset to
+'PENDING' and reissued.  If already 'REDEEMED', nothing is done.
+"""
 input CreateUserInvitationInput {
 
-  "The program to add a user to."
-  programId: ProgramId!
+  "The associated program user."
+  programUser: ProgramUserId!
 
   "The recipient to whom the invitation should be sent."
   recipientEmail: EmailAddress!
-
-  "The role this user will play in the program."
-  role: ProgramUserRole!
-
-  "Partner associated with this user, if any."
-  partnerLink: PartnerLinkInput
 
 }
 
@@ -2656,19 +2652,10 @@ type UserInvitation {
   "Recipient email address."
   recipientEmail: EmailAddress!
 
-  "User who redeemed the invitation, if any."
-  redeemer: User
+  "The ProgramUser associated with the invitation."
+  programUser: ProgramUser!
 
-  "The program the redeemer will be added to."
-  program: Program!
-
-  "The role the redeemer will play in the program."
-  role: ProgramUserRole!
-
-  "Redeemer's partner, if any."
-  partnerLink: PartnerLink!
-
-  "The email sent for the invitation"
+  "The email sent for the invitation."
   email: Email
 }
 
@@ -2699,7 +2686,7 @@ type RedeemUserInvitationResult {
 }
 
 input RevokeUserInvitationInput {
-  id: UserInvitationId!
+  id: ProgramUserId!
 }
 
 type RevokeUserInvitationResult {
@@ -2769,9 +2756,10 @@ type Mutation {
   ): AddDatasetEventResult!
 
   """
-  Looks up or creates (if necessary) a user associated with a given ORCID id and
-  adds it to the given program.  No invitation is sent as a result of this
-  operation.
+  Creates a 'ProgramUser' without a link to any existing 'User'.  No invitation
+  is sent as a result of this operation, but an invitation may be subsequently
+  sent and when accepted the 'User' field will become available and the 'User'
+  will gain appropriate access to the program.
   """
   addProgramUser(
     input: AddProgramUserInput!
@@ -3575,26 +3563,28 @@ enum ProgramUserSupportRoleType {
 An assignment of a user to a program.
 """
 type ProgramUser {
+  id:                ProgramUserId!
+
   role:              ProgramUserRole!
-  partnerLink:       PartnerLink!
   program:           Program
   user:              User
 
+  "How the partner is associated with a partner."
+  partnerLink:       PartnerLink!
+
+  """
+  Profile information reported when the corresponding ORCiD profile is not set
+  or is not public.
+  """
   fallbackProfile:   UserProfile!
 
-  """
-  User educational status. PHD/Undergrad/Grad/Other
-  """
+  "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
 
-  """
-  Users' reported gender.
-  """
+  "Users' reported gender."
   gender: Gender
 
-  """
-  Flag indicating whether the user's proposal is part of a thesis.
-  """
+  "Flag indicating whether the user's proposal is part of a thesis."
   thesis: Boolean
 }
 
