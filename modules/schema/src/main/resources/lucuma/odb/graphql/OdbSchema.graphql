@@ -1854,7 +1854,7 @@ type GmosNorthExecutionConfig {
   """
   GMOS North acquisition execution
   """
-  acquisition: GmosNorthExecutionSequence
+  acquisition(reset: Boolean = false): GmosNorthExecutionSequence
 
   """
   GMOS North science execution
@@ -2258,7 +2258,7 @@ type GmosSouthExecutionConfig {
   """
   GMOS South acquisition execution
   """
-  acquisition: GmosSouthExecutionSequence
+  acquisition(reset: Boolean = false): GmosSouthExecutionSequence
 
   """
   GMOS South science execution
