@@ -78,10 +78,9 @@ object AttachmentRoutes {
 
     extension[A](fe: F[Either[AttachmentException, A]])
       def toResponse(fa: A => F[Response[F]]): F[Response[F]] =
-        fe.flatMap { _ match {
+        fe.flatMap {
           case Right(a) => fa(a)
           case Left(e) => e.toErrorResponse
-        }
         }
 
     def attachmentTypeFailure(s: String): ParseFailure =
