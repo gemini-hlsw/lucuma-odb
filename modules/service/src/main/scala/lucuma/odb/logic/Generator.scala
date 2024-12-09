@@ -121,6 +121,9 @@ sealed trait Generator[F[_]] {
    *
    * @param futureLimit cap to place on the number of atoms that map appear in
    *                    the possibleFuture
+   * @param resetAcq pass `true` to force the acquisition sequence to start on
+   *                 the first step regardless of what datasets may have been
+   *                 recorded in the past
    * @param when perform the generation as if requested at this time (by default
    *             the sequence is requested generated at the current time)
    */
@@ -348,7 +351,7 @@ object Generator {
         EitherT.liftF(services.transactionally {
           for {
             t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
-            p <- gen.executionConfig(visits, steps, t, resetAcq)
+            p <- gen.executionConfig(visits, steps, resetAcq, t)
           } yield p
         })
 

@@ -147,6 +147,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
            .generate(pid, oid, params.futureLimit, params.resetAcq)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
 
+    // Scans the top-level query and its descendents for environment entries,
+    // merges them with the top-level query environment.  This is done in order
+    // to pick up the 'reset' parameter on acquisition sequence generation.
     def buildEnv(env: Env, query: Query): Env =
       Query.children(query).foldLeft(env)((e, child) => buildEnv(e.addFromQuery(child), child))
 
