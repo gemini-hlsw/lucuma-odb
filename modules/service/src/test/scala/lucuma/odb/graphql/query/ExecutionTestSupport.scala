@@ -541,10 +541,11 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             if asked at this time
    */
   def generate(
-    pid:   Program.Id,
-    oid:   Observation.Id,
-    limit: Option[Int]       = None,  // [0, 100]
-    when:  Option[Timestamp] = None
+    pid:      Program.Id,
+    oid:      Observation.Id,
+    limit:    Option[Int]       = None,  // [0, 100]
+    resetAcq: Boolean           = false,
+    when:     Option[Timestamp] = None
   ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
     withSession: session =>
       for
@@ -553,7 +554,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
         srv     = Services.forUser(serviceUser, enums, None)(session)
         gen     = srv.generator(CommitHash.Zero, itcClient, tec)
-        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), resetAcq, when)
       yield res
 
   /**
@@ -564,12 +565,13 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
    *             if asked at this time
    */
   def generateOrFail(
-    pid:   Program.Id,
-    oid:   Observation.Id,
-    limit: Option[Int]       = None,  // [0, 100]
-    when:  Option[Timestamp] = None
+    pid:      Program.Id,
+    oid:      Observation.Id,
+    limit:    Option[Int]       = None,  // [0, 100]
+    resetAcq: Boolean           = false,
+    when:     Option[Timestamp] = None
   ): IO[InstrumentExecutionConfig] =
-    generate(pid, oid, limit, when).flatMap: res =>
+    generate(pid, oid, limit, resetAcq, when).flatMap: res =>
       IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
 
   /**
