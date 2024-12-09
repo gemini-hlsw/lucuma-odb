@@ -164,9 +164,7 @@ object OdbMapping {
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonsiderealMapping[F]
-          with ObsAttachmentFileExtMapping[F]
-          with ObsAttachmentMapping[F]
-          with ObsAttachmentTypeMetaMapping[F]
+          with AttachmentMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
@@ -188,8 +186,6 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
-          with ProposalAttachmentMapping[F]
-          with ProposalAttachmentTypeMetaMapping[F]
           with ProposalReferenceMapping[F]
           with ProposalStatusMetaMapping[F]
           with ProposalTypeMapping[F]
@@ -233,7 +229,7 @@ object OdbMapping {
           with UpdateConfigurationRequestsResultMapping[F]
           with UpdateDatasetsResultMapping[F]
           with UpdateGroupsResultMapping[F]
-          with UpdateObsAttachmentsResultMapping[F]
+          with UpdateAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateProgramUsersResultMapping[F]
@@ -308,6 +304,7 @@ object OdbMapping {
                 AsterismGroupSelectResultMapping,
                 AtomEventMapping,
                 AtomRecordMapping,
+                AttachmentMapping,
                 CalibrationProgramReferenceMapping,
                 CallForProposalsMapping,
                 CallForProposalsPartnerMapping,
@@ -364,9 +361,6 @@ object OdbMapping {
                 MonitoringProgramReferenceMapping,
                 MutationMapping,
                 NonsiderealMapping,
-                ObsAttachmentMapping,
-                ObsAttachmentFileExtMapping,
-                ObsAttachmentTypeMetaMapping,
                 ObservationEditMapping,
                 ObservationMapping,
                 ObservationReferenceMapping,
@@ -386,8 +380,6 @@ object OdbMapping {
                 ProperMotionDeclinationMapping,
                 ProperMotionMapping,
                 ProperMotionRaMapping,
-                ProposalAttachmentMapping,
-                ProposalAttachmentTypeMetaMapping,
                 ProposalMapping,
                 ProposalReferenceMapping,
                 ProposalStatusMetaMapping,
@@ -447,11 +439,11 @@ object OdbMapping {
                 TimingWindowMapping,
                 TimingWindowRepeatMapping,
                 UpdateAsterismsResultMapping,
+                UpdateAttachmentsResultMapping,
                 UpdateCallsForProposalsResultMapping,
                 UpdateConfigurationRequestsResultMapping,
                 UpdateDatasetsResultMapping,
                 UpdateGroupsResultMapping,
-                UpdateObsAttachmentsResultMapping,
                 UpdateObservationsResultMapping,
                 UpdateProgramsResultMapping,
                 UpdateProgramUsersResultMapping,
@@ -565,9 +557,6 @@ object OdbMapping {
       with BaseMapping[F]
       with FilterTypeMetaMapping[F]
       with LeafMappings[F]
-      with ObsAttachmentTypeMetaMapping[F]
-      with ObsAttachmentFileExtMapping[F]
-      with ProposalAttachmentTypeMetaMapping[F]
       with ProposalStatusMetaMapping[F]
       with QueryMapping[F]
     {
@@ -584,11 +573,8 @@ object OdbMapping {
       override val typeMappings: TypeMappings =
         TypeMappings.unchecked(
           List(
-            FilterTypeMetaMapping,
-            ObsAttachmentTypeMetaMapping,
-            ObsAttachmentFileExtMapping,
-            ProposalAttachmentTypeMetaMapping,
-            ProposalStatusMetaMapping,
+          FilterTypeMetaMapping,
+          ProposalStatusMetaMapping,
             QueryMapping,
           ) ++ LeafMappings
         )

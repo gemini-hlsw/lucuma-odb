@@ -6,9 +6,7 @@
 enum ConditionsMeasurementSource { DUMMY }
 enum SeeingTrend { DUMMY }
 enum ConditionsExpectationType { DUMMY }
-enum ObsAttachmentType { DUMMY }
 enum FilterType { DUMMY }
-enum ProposalAttachmentType { DUMMY }
 enum ProposalStatus { DUMMY }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
@@ -3007,6 +3005,13 @@ type Mutation {
     input: UpdateAsterismsInput!
   ): UpdateAsterismsResult!
 
+  updateAttachments(
+    """
+    Parameters for updating existing attachments.
+    """
+    input: UpdateAttachmentsInput!
+  ): UpdateAttachmentsResult!
+
   "Update existing calls for proposals."
   updateCallsForProposals(
     "Parameters for editing existing calls for proposals."
@@ -3026,13 +3031,6 @@ type Mutation {
     """
     input: UpdateGroupsInput!
   ): UpdateGroupsResult!
-
-  updateObsAttachments(
-    """
-    Parameters for updating existing observation attachments.
-    """
-    input: UpdateObsAttachmentsInput!
-  ): UpdateObsAttachmentsResult!
 
   """
   Updates existing observations
@@ -3251,9 +3249,9 @@ input ObservationPropertiesInput {
   timingWindows: [TimingWindowInput!]
 
   """
-  The obsAttachments defaults to empty if not specified on creation, and may be edited by specifying a new whole array
+  The attachments defaults to empty if not specified on creation, and may be edited by specifying a new whole array
   """
-  obsAttachments: [ObsAttachmentId!]
+  attachments: [AttachmentId!]
 
   """
   The scienceRequirements defaults to spectroscopy if not specified on creation, and may be edited but not deleted
@@ -4998,33 +4996,33 @@ type UpdateAsterismsResult {
 }
 
 """
-Obs Attachment selection and update description.  Use `SET` to specify the changes, `WHERE` to select the obs attachments to update, and `LIMIT` to control the size of the return value.
+Attachment selection and update description.  Use `SET` to specify the changes, `WHERE` to select the attachments to update, and `LIMIT` to control the size of the return value.
 """
-input UpdateObsAttachmentsInput {
+input UpdateAttachmentsInput {
   """
-  Describes the obs attachment values to modify.
+  Describes the attachment values to modify.
   """
-  SET: ObsAttachmentPropertiesInput!
+  SET: AttachmentPropertiesInput!
 
   """
-  Filters the obs attachments to be updated according to those that match the given constraints.
+  Filters the attachments to be updated according to those that match the given constraints.
   """
-  WHERE: WhereObsAttachment
+  WHERE: WhereAttachment
 
   """
-  Caps the number of results returned to the given value (if additional obs attachments match the WHERE clause they will be updated but not returned).
+  Caps the number of results returned to the given value (if additional attachments match the WHERE clause they will be updated but not returned).
   """
   LIMIT: NonNegInt
 }
 
 """
-The result of updating the selected obs attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional obs attachments were modified and not included here.
+The result of updating the selected attachments, up to `LIMIT` or the maximum of (1000).  If `hasMore` is true, additional attachments were modified and not included here.
 """
-type UpdateObsAttachmentsResult {
+type UpdateAttachmentsResult {
   """
-  The edited obs attachments, up to the specified LIMIT or the default maximum of 1000.
+  The edited attachments, up to the specified LIMIT or the default maximum of 1000.
   """
-  obsAttachments: [ObsAttachment!]!
+  attachments: [Attachment!]!
 
   """
   `true` when there were additional edits that were not returned.
@@ -5545,16 +5543,51 @@ type AsterismGroupSelectResult {
 }
 
 """
-ObsAttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
+AttachmentId id formatted as `a-[1-9a-f][0-9a-f]*`
 """
-scalar ObsAttachmentId
+scalar AttachmentId
 
 """
-Program Observation Attachment
+Attachment Types
 """
-type ObsAttachment {
-  id:             ObsAttachmentId!
-  attachmentType: ObsAttachmentType!
+enum AttachmentType {
+  """
+  A proposal attachment for the science case & design
+  """
+  SCIENCE
+
+  """
+  A proposal attachment for team info, previous use, etc.
+  """
+  TEAM
+
+  """
+  An observation attachment for finder charts
+  """
+  FINDER
+
+  """
+  An observation attachment for MOS masks
+  """
+  MOS_MASK
+
+  """
+  An observation attachment for pre-imaging
+  """
+  PRE_IMAGING
+
+  """
+  A target attachment for custom SEDs
+  """
+  CUSTOM_SED
+}
+
+"""
+Attachment
+"""
+type Attachment {
+  id:             AttachmentId!
+  attachmentType: AttachmentType!
   fileName:       NonEmptyString!
   description:    NonEmptyString
   checked:        Boolean!
@@ -5563,7 +5596,7 @@ type ObsAttachment {
   program:        Program!
 }
 
-input ObsAttachmentPropertiesInput {
+input AttachmentPropertiesInput {
   """
   The description field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -5573,23 +5606,6 @@ input ObsAttachmentPropertiesInput {
   The checked status can be set, or ignored by skipping it altogether
   """
   checked: Boolean
-}
-
-"""
-Allowed file extension by obsAttachmentTypeMeta
-"""
-type ObsAttachmentFileExt {
-  fileExtension: NonEmptyString!
-}
-
-"""
-Metadata for `enum ObsAttachmentType`
-"""
-type ObsAttachmentTypeMeta {
-  tag:            ObsAttachmentType!
-  shortName:      String!
-  longName:       String!
-  fileExtensions: [ObsAttachmentFileExt!]!
 }
 
 """
@@ -8579,7 +8595,7 @@ type Observation {
   """
   attachments
   """
-  obsAttachments: [ObsAttachment!]!
+  attachments: [Attachment!]!
 
   """
   The top level science requirements
@@ -9064,14 +9080,9 @@ type Program {
   ): ConfigurationRequestSelectResult!
 
   """
-  ObsAttachments assocated with the program
+  Attachments assocated with the program
   """
-  obsAttachments: [ObsAttachment!]!
-
-  """
-  ProposalAttachments associated with the program
-  """
-  proposalAttachments: [ProposalAttachment!]!
+  attachments: [Attachment!]!
 
   "Top-level group elements (observations and sub-groups) in the program."
   groupElements(includeDeleted: Boolean! = false): [GroupElement!]!
@@ -9269,26 +9280,6 @@ type ProperMotionRA {
   milliarcsecondsPerYear: BigDecimal!
 }
 
-"""
-Program Proposal Attachment
-"""
-type ProposalAttachment {
-  attachmentType: ProposalAttachmentType!
-  fileName:       NonEmptyString!
-  fileSize:       Long!
-  updatedAt:      Timestamp!
-  program:        Program!
-}
-
-"""
-Metadata for `enum ProposalAttachmentType`
-"""
-type ProposalAttachmentTypeMeta {
-  tag:        ProposalAttachmentType!
-  shortName:  String!
-  longName:   String!
-}
-
 type Proposal {
 
   """
@@ -9427,11 +9418,6 @@ type Query {
     "Set to true to include deleted values"
     includeDeleted: Boolean! = false
   ): CallsForProposalsSelectResult!
-
-  """
-  Metadata for `enum ObsAttachmentType`
-  """
-  obsAttachmentTypeMeta: [ObsAttachmentTypeMeta!]!
 
   """
   Observations grouped by commonly held constraints. Identify the program by
@@ -9675,11 +9661,6 @@ type Query {
     includeDeleted: Boolean! = false
 
   ): ProgramUserSelectResult!
-
-  """
-  Metadata for `enum ProposalAttachmentType`
-  """
-  proposalAttachmentTypeMeta: [ProposalAttachmentTypeMeta!]!
 
   """
   Metadata for `enum ProposalStatus
@@ -11944,28 +11925,28 @@ input WhereCallForProposals {
 }
 
 """
-ObsAttachment filter options. All specified items must match.
+Attachment filter options. All specified items must match.
 """
-input WhereObsAttachment {
+input WhereAttachment {
   """
   A list of nested attachment filters that all must match in order for the AND group as a whole to match.
   """
-  AND: [WhereObsAttachment!]
+  AND: [WhereAttachment!]
 
   """
   A list of nested attachment filters where any one match causes the entire OR group as a whole to match.
   """
-  OR: [WhereObsAttachment!]
+  OR: [WhereAttachment!]
 
   """
   A nested attachment filter that must not match in order for the NOT itself to match.
   """
-  NOT: WhereObsAttachment
+  NOT: WhereAttachment
 
   """
   Matches the attachment ID.
   """
-  id: WhereOrderObsAttachmentId
+  id: WhereOrderAttachmentId
 
   """
   Matches the attachment file name.
@@ -11980,7 +11961,7 @@ input WhereObsAttachment {
   """
   Matches the attachment type
   """
-  attachmentType: WhereObsAttachmentType
+  attachmentType: WhereAttachmentType
 
   """
   Matches whether the attachment has been checked or not
@@ -11998,26 +11979,26 @@ Filters on equality of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'EQ: FINDER'
 
 """
-input WhereObsAttachmentType {
+input WhereAttachmentType {
   """
   Matches if the property is exactly the supplied value.
   """
-  EQ: ObsAttachmentType
+  EQ: AttachmentType
 
   """
   Matches if the property is not the supplied value.
   """
-  NEQ: ObsAttachmentType
+  NEQ: AttachmentType
 
   """
   Matches if the property value is any of the supplied options.
   """
-  IN: [ObsAttachmentType!]
+  IN: [AttachmentType!]
 
   """
   Matches if the property value is none of the supplied values.
   """
-  NIN: [ObsAttachmentType!]
+  NIN: [AttachmentType!]
 }
 
 """
@@ -12026,46 +12007,46 @@ criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
 
 """
-input WhereOrderObsAttachmentId {
+input WhereOrderAttachmentId {
   """
   Matches if the property is exactly the supplied value.
   """
-  EQ: ObsAttachmentId
+  EQ: AttachmentId
 
   """
   Matches if the property is not the supplied value.
   """
-  NEQ: ObsAttachmentId
+  NEQ: AttachmentId
 
   """
   Matches if the property value is any of the supplied options.
   """
-  IN: [ObsAttachmentId!]
+  IN: [AttachmentId!]
 
   """
   Matches if the property value is none of the supplied values.
   """
-  NIN: [ObsAttachmentId!]
+  NIN: [AttachmentId!]
 
   """
   Matches if the property is ordered after (>) the supplied value.
   """
-  GT: ObsAttachmentId
+  GT: AttachmentId
 
   """
   Matches if the property is ordered before (<) the supplied value.
   """
-  LT: ObsAttachmentId
+  LT: AttachmentId
 
   """
   Matches if the property is ordered after or equal (>=) the supplied value.
   """
-  GTE: ObsAttachmentId
+  GTE: AttachmentId
 
   """
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
-  LTE: ObsAttachmentId
+  LTE: AttachmentId
 }
 
 "Dataset filter options.  All specified items must match."

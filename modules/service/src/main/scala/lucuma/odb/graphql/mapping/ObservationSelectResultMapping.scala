@@ -12,8 +12,6 @@ trait ObservationSelectResultMapping[F[_]]
      with TargetView[F]
      with AsterismTargetTable[F]
      with AsterismGroupView[F]
-     with ObsAttachmentTable[F]
-     with ObsAttachmentAssignmentTable[F]
      with ObservingModeGroupView[F]
      with ResultMapping[F] {
 
