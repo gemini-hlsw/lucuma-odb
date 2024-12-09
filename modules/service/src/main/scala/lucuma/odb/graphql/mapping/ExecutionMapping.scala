@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.Eq
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
@@ -29,6 +30,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
@@ -46,7 +48,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with Predicates[F]
                                 with SelectSubquery {
 
-  private val FutureLimitParam   = "futureLimit"
+  private val FutureLimitParam = "futureLimit"
+  private val ResetAcqParam    = "reset"
 
   def user: User
   def itcClient: ItcClient[F]
@@ -69,6 +72,18 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     )
 
   lazy val ExecutionElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+
+    case (GmosNorthExecutionConfigType, "acquisition", List(
+      BooleanBinding.Option(ResetAcqParam, rReset)
+    )) =>
+      Elab.liftR(rReset).flatMap: reset =>
+        Elab.env(ResetAcqParam -> reset.getOrElse(false))
+
+    case (GmosSouthExecutionConfigType, "acquisition", List(
+      BooleanBinding.Option(ResetAcqParam, rReset)
+    )) =>
+      Elab.liftR(rReset).flatMap: reset =>
+        Elab.env(ResetAcqParam -> reset.getOrElse(false))
 
     case (ExecutionType, "config", List(
       Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
@@ -113,21 +128,35 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       odbError.asWarning(Json.Null)
   }
 
-  private lazy val configHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Generator.FutureLimit] =
-      _.getR[Generator.FutureLimit](FutureLimitParam)
 
-    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
-      (pid, oid, limit) => {
-        services.use { s =>
+  private lazy val configHandler: EffectHandler[F] =
+
+    case class Params(futureLimit: Generator.FutureLimit, resetAcq: Boolean)
+    given Eq[Params] = Eq.by(a => (a.futureLimit, a.resetAcq))
+
+    val readEnv: Env => Result[Params] = env =>
+      for
+        f <- env.getR[Generator.FutureLimit](FutureLimitParam)
+        r <- env.get[Boolean](ResetAcqParam).getOrElse(false).success
+      yield Params(f, r)
+
+    val calculate: (Program.Id, Observation.Id, Params) => F[Result[Json]] =
+      (pid, oid, params) =>
+        services.use: s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .generate(pid, oid, limit)
+           .generate(pid, oid, params.futureLimit, params.resetAcq)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
-        }
-      }
 
-    effectHandler(readEnv, calculate)
-  }
+    // Scans the top-level query and its descendents for environment entries,
+    // merges them with the top-level query environment.  This is done in order
+    // to pick up the 'reset' parameter on acquisition sequence generation.
+    def buildEnv(env: Env, query: Query): Env =
+      Query.children(query).foldLeft(env)((e, child) => buildEnv(e.addFromQuery(child), child))
+
+    readQueryAndCursorEffectHander(
+      (q, c) => readEnv(buildEnv(c.fullEnv, q)),
+      calculate
+    )
 
   private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
