@@ -128,7 +128,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           }
           value {
             id
-            obsAttachments {
+            attachments {
               id
             }
           }
@@ -147,7 +147,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           ),
           "value" -> Json.obj(
             "id"             -> oid.asJson,
-            "obsAttachments" -> List.empty[Json].asJson
+            "attachments" -> List.empty[Json].asJson
           )
         )
       )

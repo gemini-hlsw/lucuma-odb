@@ -11,20 +11,20 @@ import grackle.Path
 import grackle.Predicate
 import lucuma.odb.graphql.binding.*
 
-case class UpdateObsAttachmentsInput(
-  SET:       ObsAttachmentPropertiesInput.Edit,
+case class UpdateAttachmentsInput(
+  SET:       AttachmentPropertiesInput.Edit,
   WHERE:     Option[Predicate],
   LIMIT:     Option[NonNegInt]
 )
 
-object UpdateObsAttachmentsInput {
+object UpdateAttachmentsInput {
 
-  def binding(path: Path): Matcher[UpdateObsAttachmentsInput] = {
-    val WhereObsAttachmentBinding = WhereObsAttachment.binding(path)
+  def binding(path: Path): Matcher[UpdateAttachmentsInput] = {
+    val WhereAttachmentBinding = WhereAttachment.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ObsAttachmentPropertiesInput.EditBinding("SET", rSET),
-        WhereObsAttachmentBinding.Option("WHERE", rWHERE),
+        AttachmentPropertiesInput.EditBinding("SET", rSET),
+        WhereAttachmentBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ) =>
         (rSET, rWHERE, rLIMIT).parMapN(apply)

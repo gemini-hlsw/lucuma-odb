@@ -10,7 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
-object ProposalAttachmentPropertiesInput {
+object AttachmentPropertiesInput {
 
   case class Edit(
     description: Nullable[NonEmptyString],

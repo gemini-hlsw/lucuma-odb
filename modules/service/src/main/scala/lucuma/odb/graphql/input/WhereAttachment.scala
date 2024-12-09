@@ -9,25 +9,26 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import lucuma.core.model.ObsAttachment
+import lucuma.core.enums.AttachmentType
+import lucuma.core.model.Attachment
 import lucuma.odb.graphql.binding.*
 
-object WhereObsAttachment {
+object WhereAttachment {
 
   def binding(path: Path): Matcher[Predicate] = {
-    val WhereOrderObsAttachmentId = WhereOrder.binding[ObsAttachment.Id](path / "id", ObsAttachmentIdBinding)
+    val WhereOrderAttachmentId = WhereOrder.binding[Attachment.Id](path / "id", AttachmentIdBinding)
     val WhereFileNameBinding   = WhereString.binding(path / "fileName")
     val WhereDescriptionBinding   = WhereOptionString.binding(path / "description")
-    val WhereAttachmentTypeBinding = WhereUnorderedTag.binding(path / "attachmentType", TagBinding)
+    val WhereAttachmentTypeBinding = WhereUnorderedTag.binding(path / "attachmentType", enumeratedBinding[AttachmentType])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
 
-    lazy val WhereObsAttachmentBinding = binding(path)
+    lazy val WhereAttachmentBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-            WhereObsAttachmentBinding.List.Option("AND", rAND),
-            WhereObsAttachmentBinding.List.Option("OR", rOR),
-            WhereObsAttachmentBinding.Option("NOT", rNOT),
-            WhereOrderObsAttachmentId.Option("id", rId),
+            WhereAttachmentBinding.List.Option("AND", rAND),
+            WhereAttachmentBinding.List.Option("OR", rOR),
+            WhereAttachmentBinding.Option("NOT", rNOT),
+            WhereOrderAttachmentId.Option("id", rId),
             WhereFileNameBinding.Option("fileName", rFileName),
             WhereDescriptionBinding.Option("description", rDescription),
             WhereAttachmentTypeBinding.Option("attachmentType", rAttachmentType),
