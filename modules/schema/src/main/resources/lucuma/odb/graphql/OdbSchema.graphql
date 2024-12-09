@@ -1852,9 +1852,10 @@ type GmosNorthExecutionConfig {
   static: GmosNorthStatic!
 
   """
-  GMOS North acquisition execution
+  GMOS North acquisition execution sequence.  Pass `true` to (re)start
+  acquisition from the initial step.
   """
-  acquisition: GmosNorthExecutionSequence
+  acquisition(reset: Boolean = false): GmosNorthExecutionSequence
 
   """
   GMOS North science execution
@@ -2256,9 +2257,10 @@ type GmosSouthExecutionConfig {
   static: GmosSouthStatic!
 
   """
-  GMOS South acquisition execution
+  GMOS South acquisition execution sequence.  Pass `true` to (re)start
+  acquisition from the initial step.
   """
-  acquisition: GmosSouthExecutionSequence
+  acquisition(reset: Boolean = false): GmosSouthExecutionSequence
 
   """
   GMOS South science execution
