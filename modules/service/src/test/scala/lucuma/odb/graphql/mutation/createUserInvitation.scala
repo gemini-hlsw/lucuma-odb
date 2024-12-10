@@ -155,6 +155,110 @@ class createUserInvitation extends OdbSuite {
     }
   }
 
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
+    test(s"coi can invite a ${pur.toString.toLowerCase} (metadata)") {
+      val pid = for {
+        pid <- createProgramAs(pi)
+        _   <- createProgramAs(pi2) // this creates pi2
+        _   <- linkCoiAs(pi, pi2.id -> pid, Partner.US)
+      } yield pid
+
+      pid.flatMap { pid =>
+        expect(
+          user = pi2,
+          query = s"""
+          mutation {
+            createUserInvitation(
+              input: {
+                programId: "$pid"
+                recipientEmail: "$successRecipient"
+                role: ${pur.tag.toUpperCase}
+                partnerLink: {
+                  partner: US
+                }
+              }
+            ) {
+              invitation {
+                status
+                issuer { id }
+                recipientEmail
+                redeemer { id }
+                program { id }
+                role
+                email {
+                  senderEmail
+                  status
+                }
+              }
+            }
+          }
+          """,
+          expected = Right(
+            json"""
+              {
+                "createUserInvitation" : {
+                  "invitation" : {
+                    "status" : ${InvitationStatus.Pending},
+                    "issuer" : {
+                      "id" : ${pi2.id}
+                    },
+                    "recipientEmail": $successRecipient,
+                    "redeemer" : null,
+                    "program" : {
+                      "id" : $pid
+                    },
+                    "role" : ${pur: ProgramUserRole},
+                    "email": {
+                      "senderEmail": ${emailConfig.invitationFrom},
+                      "status": ${EmailStatus.Queued}
+                    }
+                  }
+                }
+              }
+            """
+          )
+        )
+      }
+    }
+  }
+
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
+    test(s"readonly coi cannot invite a ${pur.toString.toLowerCase}") {
+      val pid = for {
+        pid <- createProgramAs(pi)
+        _   <- createProgramAs(pi2) // this creates pi2
+        _   <- linkObserverAs(pi, pi2.id -> pid, Partner.US)
+      } yield pid
+
+      pid.flatMap { pid =>
+        expect(
+          user = pi2,
+          query = s"""
+          mutation {
+            createUserInvitation(
+              input: {
+                programId: "$pid"
+                recipientEmail: "$successRecipient"
+                role: ${pur.tag.toUpperCase}
+                partnerLink: {
+                  partner: US
+                }
+              }
+            ) {
+              invitation {
+                status
+              }
+            }
+          }
+          """,
+          expected = Left(
+            List("Specified program does not exist, or user is not the PI or a COI.")
+          )
+        )
+      }
+    }
+  }
+
   test("invite support (metadata)") {
     List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).traverse: role =>
       createProgramAs(pi).flatMap { pid =>
@@ -212,7 +316,6 @@ class createUserInvitation extends OdbSuite {
       }
   }
 
-
   test("can't invite a user to a non-existent program") {
     expect(
       user = pi,
@@ -233,7 +336,7 @@ class createUserInvitation extends OdbSuite {
       }
       """,
       expected = Left(
-        List(s"Specified program does not exist, or user is not the PI.")
+        List(s"Specified program does not exist, or user is not the PI or a COI.")
       )
     )
   }
@@ -260,7 +363,7 @@ class createUserInvitation extends OdbSuite {
         }
         """,
         expected = Left(
-          List(s"Specified program does not exist, or user is not the PI.")
+          List(s"Specified program does not exist, or user is not the PI or a COI.")
         )
       )
     }
