@@ -936,26 +936,26 @@ object GuideService {
     def getObservationInfo(oid: Observation.Id): AppliedFragment =
       sql"""
         select
-          obs.c_observation_id,
-          obs.c_program_id,
-          obs.c_cloud_extinction,
-          obs.c_image_quality,
-          obs.c_sky_background,
-          obs.c_water_vapor,
-          obs.c_air_mass_min,
-          obs.c_air_mass_max,
-          obs.c_hour_angle_min,
-          obs.c_hour_angle_max,
-          obs.c_pac_mode,
-          obs.c_pac_angle,
-          obs.c_explicit_ra,
-          obs.c_explicit_dec,
-          obs.c_observation_time,
-          obs.c_observation_duration,
-          obs.c_guide_target_name,
-          obs.c_guide_target_hash
-        from t_observation obs
-        where obs.c_observation_id = $observation_id
+          c_observation_id,
+          c_program_id,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_observation_time,
+          c_observation_duration,
+          c_guide_target_name,
+          c_guide_target_hash
+        from t_observation
+        where c_observation_id = $observation_id
       """.apply(oid)
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment = 
