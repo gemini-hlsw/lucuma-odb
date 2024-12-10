@@ -88,7 +88,7 @@ object UserInvitationService:
           .prepareR(Statements.createInvitationAsPi)
           .use: pq =>
             pq.option(user, pid, email, role, partnerLink)
-              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI.")).asProblem))
+              .map(Result.fromOption(_, OdbError.InvalidProgram(pid, Some("Specified program does not exist, or user is not the PI or a COI.")).asProblem))
 
       def createInvitationAsSuperUser(input: CreateUserInvitationInput) =
         session
@@ -200,7 +200,7 @@ object UserInvitationService:
           FROM t_program_user u
           WHERE u.c_program_id = $program_id
           AND   u.c_user_id    = $user_id
-          AND   u.c_role       = 'pi'
+          AND   (u.c_role = 'pi' OR u.c_role = 'coi')
         )
       """
         .query(user_invitation)
