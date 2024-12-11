@@ -8,6 +8,7 @@ import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
@@ -20,6 +21,7 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -28,10 +30,15 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
+import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ScienceRequirementsInput
+import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
@@ -46,6 +53,7 @@ import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Instant
+
 
 trait CalibrationsService[F[_]] {
   def setCalibrationRole(
@@ -148,9 +156,9 @@ object CalibrationsService extends CalibrationObservations {
 
       private def collectValid(
         requiresItcInputs: Boolean
-      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), (Observation.Id, ObservingMode)] =
+      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), (Observation.Id, Option[ItcInput], ObservingMode)] =
         {
-          case (oid, Right(GeneratorParams(itc, mode, _))) if itc.isRight || !requiresItcInputs => (oid, mode)
+          case (oid, Right(GeneratorParams(itc, mode, _))) if itc.isRight || !requiresItcInputs => (oid, itc.toOption, mode)
         }
 
       // Find all active observations in the program
@@ -158,29 +166,55 @@ object CalibrationsService extends CalibrationObservations {
         session.execute(Statements.selectActiveObservations)(pid)
 
       /**
-       * Requests calibrations params for a program id and selection (either science or calibration)
+       * Requests configuration params for a program id and selection (either science or calibration)
        */
       private def allObservations(
         pid:       Program.Id,
         selection: ObservationSelection
-      )(using Transaction[F]): F[List[(Observation.Id, ObservingMode)]] =
+      )(using Transaction[F]): F[List[(Observation.Id, Option[ItcInput], ObservingMode)]] =
         services
           .generatorParamsService
           .selectAll(pid, selection = selection)
           .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
 
-      private def toCalibConfig(all: List[(Observation.Id, ObservingMode)]): List[(Observation.Id, CalibrationConfigSubset)] =
+      private def toConfigForCalibration(all: List[(Observation.Id, Option[ItcInput], ObservingMode)]): List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)] =
         all.map(_.map(_.toConfigSubset))
 
-      private def uniqueConfiguration(all: List[(Observation.Id, ObservingMode)]): List[(Observation.Id, CalibrationConfigSubset)] =
-        toCalibConfig(all).distinctBy(_._2)
+      private def configAtWavelength(
+        calibConfigs: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)]
+      ): Map[CalibrationConfigSubset, Option[Wavelength]] =
+        val atWavelengthPerConfig =
+          calibConfigs.groupBy(_._3).map { case (k, v) =>
+            val lw = v.map(_._2.map(_.spectroscopy.atWavelength)).flattenOption
+            val meanWv = if (lw.isEmpty) None
+            else
+              // there must be a way to sum in wavelength space :/
+              val pm = lw.map(_.toPicometers.value.value).combineAll / lw.size
+              PosInt.from(pm).map(Wavelength(_)).toOption
+            k -> meanWv
+          }
+        atWavelengthPerConfig
 
-      private def calibObservation(calibRole: CalibrationRole, site: Site, pid: Program.Id, gid: Group.Id, configs: List[CalibrationConfigSubset], tid: Target.Id)(using Transaction[F]): F[List[Observation.Id]] =
+      private def uniqueConfiguration(
+        all: List[(Observation.Id, Option[ItcInput], ObservingMode)]
+      ): List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)] =
+        val calibConfigs = toConfigForCalibration(all)
+        calibConfigs.distinctBy(_._3)
+
+      private def calibObservation(
+        calibRole: CalibrationRole,
+        site: Site,
+        pid: Program.Id,
+        gid: Group.Id,
+        wvAt: Map[CalibrationConfigSubset, Option[Wavelength]],
+        configs: List[CalibrationConfigSubset],
+        tid: Target.Id
+      )(using Transaction[F]): F[List[Observation.Id]] =
         calibRole match {
           case CalibrationRole.SpectroPhotometric =>
             site match {
-              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, configs.collect { case c: GmosNConfigs => c })
-              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, configs.collect { case c: GmosSConfigs => c })
+              case Site.GN => gmosLongSlitSpecPhotObs(pid, gid, tid, wvAt, configs.collect { case c: GmosNConfigs => c })
+              case Site.GS => gmosLongSlitSpecPhotObs(pid, gid, tid, wvAt, configs.collect { case c: GmosSConfigs => c })
             }
           case CalibrationRole.Twilight =>
             site match
@@ -192,6 +226,7 @@ object CalibrationsService extends CalibrationObservations {
       private def gmosCalibrations(
         pid: Program.Id,
         gid: Group.Id,
+        wvAt: Map[CalibrationConfigSubset, Option[Wavelength]],
         configs: List[CalibrationConfigSubset],
         gnCalc: CalibrationIdealTargets,
         gsCalc: CalibrationIdealTargets
@@ -202,7 +237,7 @@ object CalibrationsService extends CalibrationObservations {
             if (configs.nonEmpty) {
               (for {
                 cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                o   <- cta.traverse(calibObservation(ct, site, pid, gid, configs, _))
+                o   <- cta.traverse(calibObservation(ct, site, pid, gid, wvAt, configs, _))
               } yield o).orError.map(_.map((ct, _)))
             } else {
               List.empty.pure[F]
@@ -222,6 +257,7 @@ object CalibrationsService extends CalibrationObservations {
 
       private def generateGMOSLSCalibrations(
         pid: Program.Id,
+        wvAt: Map[CalibrationConfigSubset, Option[Wavelength]],
         configs: List[CalibrationConfigSubset],
         gnTgt: CalibrationIdealTargets,
         gsTgt: CalibrationIdealTargets
@@ -232,7 +268,7 @@ object CalibrationsService extends CalibrationObservations {
           for {
             cg   <- calibrationsGroup(pid, configs.size)
             oids <- cg.map(g =>
-                      gmosCalibrations(pid, g, configs, gnTgt, gsTgt).flatTap { oids =>
+                      gmosCalibrations(pid, g, wvAt, configs, gnTgt, gsTgt).flatTap { oids =>
                         oids.groupBy(_._1).toList.traverse { case (role, oids) =>
                           setCalibRoleAndGroup(oids.map(_._2), role).whenA(oids.nonEmpty)
                         }
@@ -253,6 +289,36 @@ object CalibrationsService extends CalibrationObservations {
         oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
       }
 
+      private def updateWvAt(
+        calibrations: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)],
+        removed: List[Observation.Id],
+        atWavelength: Map[CalibrationConfigSubset, Option[Wavelength]],
+        role: CalibrationRole
+      )(using Transaction[F]): F[Unit] =
+        calibrations
+          .filterNot { case (oid, _, _) => removed.contains(oid) }
+          .map { case (oid, _, c) => (oid, atWavelength.get(c).flatten) }
+          .collect { case (oid, Some(w)) => (oid, w) }
+          .traverse { (oid, w) =>
+            services.observationService.updateObservations(
+              ObservationPropertiesInput.Edit.Empty.copy(
+                scienceRequirements = Some(
+                  ScienceRequirementsInput(
+                    mode = None,
+                    spectroscopy = Some(
+                      SpectroscopyScienceRequirementsInput.Default.copy(
+                        signalToNoise = Nullable.Absent,
+                        signalToNoiseAt = Nullable.NonNull(w)
+                      )
+                    )
+                  )
+                )
+              ),
+              // Only update the obs that need it or it will produce a cascade of infinite updates
+              sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
+            )
+          }.void
+
       override def calibrationTargets(roles: List[CalibrationRole], referenceInstant: Instant)
         : F[List[(Target.Id, String, CalibrationRole, Coordinates)]] =
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
@@ -260,19 +326,35 @@ object CalibrationsService extends CalibrationObservations {
 
       def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] =
         for
+          // Read calibration targets
           tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
+          // Actual target for GN and GS
           gsTgt         = CalibrationIdealTargets(Site.GS, referenceInstant, tgts)
           gnTgt         = CalibrationIdealTargets(Site.GN, referenceInstant, tgts)
+          // List of the program's active observations
           active       <- activeObservations(pid)
-          uniqueSci    <- allObservations(pid, ObservationSelection.Science)
+          // Get all the active science observations
+          allSci       <- allObservations(pid, ObservationSelection.Science)
                             .map(_.filter(u => active.contains(u._1)))
-                            .map(uniqueConfiguration)
+          // Unique science configurations
+          uniqueSci     = uniqueConfiguration(allSci)
+          // Get all the active calibration observations
           allCalibs    <- allObservations(pid, ObservationSelection.Calibration)
+          // Unique calibration configurations
           uniqueCalibs  = uniqueConfiguration(allCalibs)
-          calibs        = toCalibConfig(allCalibs)
-          configs       = uniqueSci.map(_._2).diff(uniqueCalibs.map(_._2))
-          addedOids    <- generateGMOSLSCalibrations(pid, configs, gnTgt, gsTgt)
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._2), calibs)
+          calibs        = toConfigForCalibration(allCalibs)
+          // Average s/n wavelength at each configuration
+          configWvAt    = configAtWavelength(toConfigForCalibration(allSci))
+          // Get all unique configurations
+          configs       = uniqueSci.map(_._3).diff(uniqueCalibs.map(_._3))
+          // Remove calibrations that are not needed, basically when a config is removed
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._3), calibs.map {
+                            case (oid, _, c) => (oid, c)
+                          })
+          // Generate new calibrations for each unique configuration
+          addedOids    <- generateGMOSLSCalibrations(pid, configWvAt, configs, gnTgt, gsTgt)
+          // Update wavelength at for each remaining calib
+          _            <- updateWvAt(calibs, removedOids, configWvAt, CalibrationRole.SpectroPhotometric)
           _            <- targetService.deleteOrphanCalibrationTargets(pid)
         yield (addedOids, removedOids)
 
