@@ -90,6 +90,8 @@ case class ObservationValidationInfo(
   asterism: List[Target],
   generatorParams: Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   itcResults: Option[ItcService.AsterismResults] = None,
+  cfpInfo: Option[CfpInfo] = None,
+  programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
 
   /* Has the proposal been accepted? */
@@ -216,48 +218,6 @@ object ObservationWorkflowService {
       // Make the enums available in a stable and implicit way
       given Enums = enums
 
-      // /** Retrieve the generator params/errors for many observations. */
-      // private def generatorParamss(
-      //   infos: List[ObservationValidationInfo]
-      // )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[ObservationValidationMap, GeneratorParams]]] =
-      //   Services.asSuperUser: // TODO: 
-      //     generatorParamsService
-      //       .selectMany(infos.map(_.oid))
-      //       .map: results =>
-      //         results
-      //           .view
-      //           .mapValues:
-      //             case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation).asLeft
-      //             case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation).asLeft
-      //             case Right(ps)                             => ps.asRight
-      //           .toMap
-
-      /* Validate that an observation is compatible with its program's CFP. */
-      private def cfpValidationss(infos: List[ObservationValidationInfo])(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] = {
-
-        def inst(info: ObservationValidationInfo, cfp: CfpInfo): ObservationValidationMap =
-          if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
-          else info.instrument match
-            case None       => ObservationValidationMap.empty
-            case Some(inst) =>
-              if cfp.instruments.contains(inst) then ObservationValidationMap.empty
-              else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
-
-        def radec(info: ObservationValidationInfo, cfp: CfpInfo): ObservationValidationMap =
-          info.site.headOption.foldMap: site =>
-            info.coordinatesAt(cfp.midpoint(site)).foldMap: coords =>
-              val ok = coords.ra.isInInterval(cfp.raStart(site), cfp.raEnd(site)) && coords.dec.isInInterval(cfp.decStart(site), cfp.decEnd(site))
-              if ok then ObservationValidationMap.empty
-              else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
-
-        cfpInfos(infos.flatMap(_.cfpid).distinct).map: cfpInfos =>
-          infos.foldMap: info =>
-            info.cfpid.map(cfpInfos) match
-              case None      => Map(info.oid -> ObservationValidationMap.empty)
-              case Some(cfp) => Map(info.oid -> (inst(info, cfp) |+| radec(info, cfp)))
-
-      }
-
       private def obsInfos(oids: List[Observation.Id], itcClient: ItcClient[F])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationInfo]] = {
 
         def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] = 
@@ -286,18 +246,51 @@ object ObservationWorkflowService {
                 input.map: (oid, info) =>
                   oid -> info.copy(generatorParams = results.get(oid))
 
-        def addItcResults(map: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+        def addCfpInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          NonEmptyList.fromList(input.values.flatMap(_.cfpid).toList.distinct) match
+            case None => input.pure[F]
+            case Some(nel) =>
+              val enc = cfp_id.nel(nel)
+              session
+                .stream(Statements.CfpInfos(enc))(nel, 1024)
+                .compile
+                .fold(Map.empty[CallForProposals.Id, CfpInfo]):
+                  case (m, (cfp, oinst)) =>
+                    m.updatedWith(cfp.cfpid):
+                      case None    => cfp.addInstrument(oinst).some
+                      case Some(c) => c.addInstrument(oinst).some
+                .map: results =>
+                  input.map: (oid, info) =>
+                    oid -> info.copy(cfpInfo = info.cfpid.flatMap(results.get))
+
+        def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
+            case None => input.pure[F]
+            case Some(nel) =>
+              val enc = program_id.nel(nel)
+              session
+                .stream(Statements.ProgramAllocations(enc))(nel, 1024)
+                .compile
+                .toList
+                .map: list =>
+                  list.foldMap: (pid, band) =>
+                    Map(pid -> NonEmptyList.one(band))
+                .map: result =>
+                  input.map: (oid, info) =>
+                    oid -> info.copy(programAllocations = result.get(info.pid))
+
+        def addItcResults(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
           Services.asSuperUser: // TODO: 
             itcService(itcClient)
               .selectAll:
-                map
+                input
                   .view
                   .mapValues(_.generatorParams)
                   .collect:
                     case (id, Some(Right(params))) => id -> params
                   .toMap
               .map: results =>
-                map.map: (oid, info) =>
+                input.map: (oid, info) =>
                   oid -> info.copy(itcResults = results.get(oid))
 
         ResultT.liftF:
@@ -307,64 +300,11 @@ object ObservationWorkflowService {
               partialObsInfos(nel)
                 .flatMap(addAsterisms)
                 .flatMap(addGeneratorParams)
+                .flatMap(addCfpInfos)
+                .flatMap(addProgramAllocations)
                 .flatMap(addItcResults)
 
       }
-
-      private def cfpInfos(ids: List[CallForProposals.Id])(using Transaction[F]): F[Map[CallForProposals.Id, CfpInfo]] =
-        NonEmptyList.fromList(ids).fold(Map.empty.pure[F]): nel =>
-          val enc = cfp_id.nel(nel)
-          session
-            .stream(Statements.CfpInfos(enc))(nel, 1024)
-            .compile
-            // We get a row per instrument, so we need to group by CFP ID and fold the instruments
-            .fold(Map.empty[CallForProposals.Id, CfpInfo]) {
-              case (m, (cfp, oinst)) =>
-                m.updatedWith(cfp.cfpid) {
-                  case None    => cfp.addInstrument(oinst).some
-                  case Some(c) => c.addInstrument(oinst).some
-                }
-            }
-
-      // private def itcValidationss(
-      //   params: List[(Observation.Id, GeneratorParams)],
-      //   itcClient: ItcClient[F],
-      // )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservationValidationMap]] =
-      //   itcService(itcClient)
-      //     .selectAll(params.toMap)
-      //     .map: map =>
-      //       params.foldMap: (key, _) =>
-      //         val value =
-      //           if map.contains(key) then ObservationValidationMap.empty
-      //           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
-      //         Map(key -> value)
-
-      private def programAllocations(
-        pids: List[Program.Id]
-      )(using Transaction[F]): F[Map[Program.Id, NonEmptyList[ScienceBand]]] =
-        NonEmptyList.fromList(pids) match
-          case None => Map.empty.pure[F]
-          case Some(nel) =>
-            val enc = program_id.nel(nel)
-            session
-              .stream(Statements.ProgramAllocations(enc))(nel, 1024)
-              .compile
-              .toList
-              .map: list =>
-                list.foldMap: (pid, band) =>
-                  Map(pid -> NonEmptyList.one(band))
-
-      private def validateScienceBands(
-        infos: List[ObservationValidationInfo]
-      )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationMap]] =
-        programAllocations(infos.map(_.pid).distinct).map: allocs =>
-          infos.foldMap: info =>
-            val key = info.oid
-            val value: ObservationValidationMap =
-              (info.scienceBand, allocs.get(info.pid)).tupled.foldMap: (b, bs) =>
-                if bs.toList.contains(b) then ObservationValidationMap.empty
-                else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
-            Map(key -> value)
 
       private def validateConfigurations(infos: List[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
         ResultT(configurationService.selectRequests(infos.map(i => (i.pid, i.oid)))).map: rs =>
@@ -466,72 +406,90 @@ object ObservationWorkflowService {
 
         }
 
-      private def observationValidationsImpls(
+      private def observationValidationsImpl(
         infos: Map[Observation.Id, ObservationValidationInfo],
       )(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
 
-        val (calibs, science) = infos.partition(_._2.role.isDefined)
+        type Validator = ObservationValidationInfo => ObservationValidationMap
 
-        val calibrationValidations: Map[Observation.Id, ObservationValidationMap] =
-          calibs
-            .view
-            .mapValues(_ => ObservationValidationMap.empty)
-            .toMap
+        val (cals, science) = infos.partition(_._2.role.isDefined)
 
-        val generatorValidations: Map[Observation.Id, ObservationValidationMap] =
+        // Here are our simple validators
+
+        val generatorValidator: Validator = info =>
+          info.generatorParams.foldMap:
+            case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                             => ObservationValidationMap.empty
+        
+        val cfpInstrumentValidator: Validator = info =>
+          info.cfpInfo.foldMap: cfp =>
+            if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
+            else info.instrument.foldMap: inst =>
+              if cfp.instruments.contains(inst) then ObservationValidationMap.empty
+              else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
+
+        val cfpRaDecValidator: Validator = info =>
+          info.cfpInfo.foldMap: cfp =>
+            info.site.headOption.foldMap: site =>
+              info.coordinatesAt(cfp.midpoint(site)).foldMap: coords =>
+                val ok = coords.ra.isInInterval(cfp.raStart(site), cfp.raEnd(site)) && coords.dec.isInInterval(cfp.decStart(site), cfp.decEnd(site))
+                if ok then ObservationValidationMap.empty
+                else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
+
+        val bandValidator: Validator = info =>
+          (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
+            if bs.toList.contains(b) then ObservationValidationMap.empty
+            else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
+
+        val itcValidator: Validator = info =>
+          info.itcResults match
+            case Some(_) => ObservationValidationMap.empty
+            case None    => ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+
+        // Here are our composed validators
+
+        val calibrationValidator: Validator = info =>
+          ObservationValidationMap.empty
+
+        val scienceValidator1: Validator =
+          generatorValidator     |+|
+          cfpInstrumentValidator |+|
+          cfpRaDecValidator      |+|
+          bandValidator
+
+        val scienceValidator2: Validator =
+          itcValidator
+
+        // And our validation results
+
+        val calibrationResults: Map[Observation.Id, ObservationValidationMap] =
+          cals.view.mapValues(calibrationValidator).toMap
+
+        val scienceResults1: Map[Observation.Id, ObservationValidationMap] =
+          science.view.mapValues(scienceValidator1).toMap
+
+        val scienceResults2: Map[Observation.Id, ObservationValidationMap] =
           science
             .view
-            .mapValues: info =>
-              info.generatorParams match
-                case None => ObservationValidationMap.empty
-                case Some(e) =>
-                  e match
-                    case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation)
-                    case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-                    case Right(ps)                             => ObservationValidationMap.empty
-            .toMap
-        
-        val cfpValidations: F[Map[Observation.Id, ObservationValidationMap]] =
-          cfpValidationss(science.values.toList)
-
-        val bandValidations: F[Map[Observation.Id, ObservationValidationMap]] =
-          validateScienceBands(science.values.toList)
-
-        def itcValidations(which: Map[Observation.Id, ObservationValidationInfo]): Map[Observation.Id, ObservationValidationMap] =
-          which
-            .view
-            .mapValues: info =>
-              info.itcResults match
-                case Some(_) => ObservationValidationMap.empty
-                case None    => ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+            .filterKeys(k => scienceResults1.get(k).forall(_.isEmpty)) // ensure there are no warnigs in stage 1
+            .mapValues(scienceValidator2)
             .toMap
 
-        val preliminaryValidations: F[Map[Observation.Id, ObservationValidationMap]] =
-          val calV = calibrationValidations
-          val genV = generatorValidations
-          for
-            cfpV      <- cfpValidations
-            bandV     <- bandValidations
-            stepOne    = calV |+| genV |+| cfpV |+| bandV
-            itcV       = itcValidations(science.view.filterKeys(k => stepOne.get(k).forall(_.isEmpty)).toMap)
-          yield stepOne |+| itcV
+        val prelimV: Map[Observation.Id, ObservationValidationMap] =
+          calibrationResults |+| scienceResults1 |+| scienceResults2
 
-        // Final validations
-        ResultT.liftF(preliminaryValidations).flatMap { prelimV =>
+        val toCheck: List[ObservationValidationInfo] =
+          science.values.toList.filter: info =>
+            info.isAccepted.toOption.forall(_ === true) && prelimV.get(info.oid).forall(_.isEmpty)
 
-          val toCheck: List[ObservationValidationInfo] =
-            science.values.toList.filter: info =>
-              info.isAccepted.toOption.forall(_ === true) && prelimV.get(info.oid).forall(_.isEmpty)
+        val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
+          validateConfigurations(toCheck)
 
-          val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-            validateConfigurations(toCheck)
-
-          configValidations.map(prelimV |+| _)
-
-        }
+        configValidations.map(prelimV |+| _)
 
       }
-
+      
       private def getInfoAndValidations(
         oids: List[Observation.Id],
         itcClient: ItcClient[F]
@@ -539,36 +497,8 @@ object ObservationWorkflowService {
         services.transactionallyT:
           for
             infos <- obsInfos(oids, itcClient)
-            ress  <- observationValidationsImpls(infos)
+            ress  <- observationValidationsImpl(infos)
           yield (infos, ress).tupled
-
-      private def getWorkflowImpl(
-        oid: Observation.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
-        getWorkflowsImpl(List(oid), commitHash, itcClient, ptc).map(_(oid))
-
-      private def getWorkflowsImpl(
-        oids: List[Observation.Id],
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F]): ResultT[F, Map[Observation.Id, ObservationWorkflow]] =
-        getInfoAndValidations(oids, itcClient).flatMap: map =>
-          val infos = map.values.map(_._1).toList
-          ResultT.liftF(executionStates(infos, commitHash, itcClient, ptc)).flatMap: exs =>
-            ResultT.fromResult:
-              map
-                .toList
-                .traverse:
-                  case (oid, (info, errMap)) =>
-                    val errs = errMap.toList
-                    workflowStateAndTransitions(info, exs.get(oid), errs.map(_.code))
-                      .map: (s, ss) =>
-                        oid -> ObservationWorkflow(s, ss, errs)
-                .map(_.toMap)
 
       override def getWorkflows(
         oids: List[Observation.Id],
@@ -576,24 +506,21 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
-        getWorkflowsImpl(oids, commitHash, itcClient, ptc).value
-
-      private def setWorkflowStateImpl(
-        oid: Observation.Id,
-        state: ObservationWorkflowState,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F]): ResultT[F, ObservationWorkflow] =
-        getWorkflowImpl(oid, commitHash, itcClient, ptc).flatMap: w =>
-          if w.state === state then ResultT.success(w)
-          else if !w.validTransitions.contains(state)
-          then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
-          else ResultT:
-            services.transactionally:
-              session.prepareR(Statements.UpdateUserState).use: pc =>
-                pc.execute(state.asUserState, oid)
-                  .as(Result(w.copy(state = state)))
+        getInfoAndValidations(oids, itcClient)
+          .flatMap: map =>
+            val infos = map.values.map(_._1).toList
+            ResultT.liftF(executionStates(infos, commitHash, itcClient, ptc)).flatMap: exs =>
+              ResultT.fromResult:
+                map
+                  .toList
+                  .traverse:
+                    case (oid, (info, errMap)) =>
+                      val errs = errMap.toList
+                      workflowStateAndTransitions(info, exs.get(oid), errs.map(_.code))
+                        .map: (s, ss) =>
+                          oid -> ObservationWorkflow(s, ss, errs)
+                  .map(_.toMap)
+          .value
 
       override def setWorkflowState(
         oid: Observation.Id,
@@ -602,7 +529,18 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        setWorkflowStateImpl(oid, state, commitHash, itcClient, ptc).value
+        ResultT(getWorkflows(List(oid), commitHash, itcClient, ptc))
+          .map(_(oid))
+          .flatMap: w =>
+            if w.state === state then ResultT.success(w)
+            else if !w.validTransitions.contains(state)
+            then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
+            else ResultT:
+              services.transactionally:
+                session.prepareR(Statements.UpdateUserState).use: pc =>
+                  pc.execute(state.asUserState, oid)
+                    .as(Result(w.copy(state = state)))
+          .value
 
   }
 
