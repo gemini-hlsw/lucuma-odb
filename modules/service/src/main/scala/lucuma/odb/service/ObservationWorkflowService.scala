@@ -45,6 +45,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -63,7 +64,7 @@ sealed trait ObservationWorkflowService[F[_]] {
     commitHash: CommitHash,
     itcClient: ItcClient[F],
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-  )(using NoTransaction[F]): F[Result[Map[Observation.Id, ObservationWorkflow]]]
+  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   def setWorkflowState(
     oid: Observation.Id,
@@ -218,7 +219,7 @@ object ObservationWorkflowService {
       // Make the enums available in a stable and implicit way
       given Enums = enums
 
-      private def obsInfos(oids: List[Observation.Id], itcClient: ItcClient[F])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationInfo]] = {
+      private def obsInfos(oids: List[Observation.Id], itcClient: ItcClient[F])(using Transaction[F], SuperUserAccess): ResultT[F, Map[Observation.Id, ObservationValidationInfo]] = {
 
         def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] = 
           val enc = observation_id.nel(oids)
@@ -239,12 +240,11 @@ object ObservationWorkflowService {
                 oid -> info.copy(asterism = results.get(oid).foldMap(_.map(_._2)))
 
         def addGeneratorParams(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          Services.asSuperUser:
-            generatorParamsService
-              .selectMany(input.keys.toList)
-              .map: results =>
-                input.map: (oid, info) =>
-                  oid -> info.copy(generatorParams = results.get(oid))
+          generatorParamsService
+            .selectMany(input.keys.toList)
+            .map: results =>
+              input.map: (oid, info) =>
+                oid -> info.copy(generatorParams = results.get(oid))
 
         def addCfpInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
           NonEmptyList.fromList(input.values.flatMap(_.cfpid).toList.distinct) match
@@ -280,7 +280,6 @@ object ObservationWorkflowService {
                     oid -> info.copy(programAllocations = result.get(info.pid))
 
         def addItcResults(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          Services.asSuperUser:
             itcService(itcClient)
               .selectAll:
                 input
@@ -493,7 +492,7 @@ object ObservationWorkflowService {
       private def getInfoAndValidations(
         oids: List[Observation.Id],
         itcClient: ItcClient[F]
-      )(using NoTransaction[F]): ResultT[F, Map[Observation.Id, (ObservationValidationInfo, ObservationValidationMap)]] =
+      )(using NoTransaction[F], SuperUserAccess): ResultT[F, Map[Observation.Id, (ObservationValidationInfo, ObservationValidationMap)]] =
         services.transactionallyT:
           for
             infos <- obsInfos(oids, itcClient)
@@ -505,7 +504,7 @@ object ObservationWorkflowService {
         commitHash: CommitHash,
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F]): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
         getInfoAndValidations(oids, itcClient)
           .flatMap: map =>
             val infos = map.values.map(_._1).toList
@@ -529,7 +528,7 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        ResultT(getWorkflows(List(oid), commitHash, itcClient, ptc))
+        ResultT(Services.asSuperUser(getWorkflows(List(oid), commitHash, itcClient, ptc)))
           .map(_(oid))
           .flatMap: w =>
             if w.state === state then ResultT.success(w)
