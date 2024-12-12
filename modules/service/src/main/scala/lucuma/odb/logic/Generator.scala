@@ -11,6 +11,7 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
@@ -147,7 +148,12 @@ sealed trait Generator[F[_]] {
     itcRes: ItcService.AsterismResults,
     params: GeneratorParams,
   ): F[ExecutionState]
-  
+
+  /** Equivalent to executionStates above, but computes many results. */
+  def executionStates(
+    input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+  ): F[Map[Observation.Id, ExecutionState]]
+
 }
 
 object Generator {
@@ -516,6 +522,17 @@ object Generator {
             _ => ExecutionState.NotDefined,
             _.science.executionState
           ))
+
+      override def executionStates(
+        input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+      ): F[Map[Observation.Id, ExecutionState]] =
+        input
+          .toList
+          .traverse: 
+            case (oid, (pid, itc, gps)) =>
+              executionState(pid, oid, itc, gps).map(oid -> _)
+          .map: list =>
+            list.toMap
 
   }
 }
