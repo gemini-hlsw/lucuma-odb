@@ -306,7 +306,8 @@ object Generator {
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
-      private def digest2(
+      /** Equivalent to `digest` but uses provided generator params and ITC results rather than computing them. */
+      private def digestWithProvidedContext(
         pid:    Program.Id,
         oid:    Observation.Id,
         itcRes: ItcService.AsterismResults,
@@ -509,7 +510,7 @@ object Generator {
         itcRes: ItcService.AsterismResults,
         params: GeneratorParams,
       ): F[ExecutionState] =
-        digest2(pid, oid, itcRes, params)
+        digestWithProvidedContext(pid, oid, itcRes, params)
           .value
           .map(_.fold(
             _ => ExecutionState.NotDefined,
