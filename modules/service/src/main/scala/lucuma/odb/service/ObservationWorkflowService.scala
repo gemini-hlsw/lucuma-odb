@@ -239,7 +239,7 @@ object ObservationWorkflowService {
                 oid -> info.copy(asterism = results.get(oid).foldMap(_.map(_._2)))
 
         def addGeneratorParams(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          Services.asSuperUser: // TODO: 
+          Services.asSuperUser:
             generatorParamsService
               .selectMany(input.keys.toList)
               .map: results =>
@@ -280,7 +280,7 @@ object ObservationWorkflowService {
                     oid -> info.copy(programAllocations = result.get(info.pid))
 
         def addItcResults(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          Services.asSuperUser: // TODO: 
+          Services.asSuperUser:
             itcService(itcClient)
               .selectAll:
                 input
