@@ -39,7 +39,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -319,32 +318,24 @@ object ObservationWorkflowService {
                 }
             .toMap
 
-      private def executionState(
-        info: ObservationValidationInfo,
-        gen: Generator[F]
-      )(using NoTransaction[F]): F[Option[ExecutionState]] =
-        (info.itcResults, info.generatorParams.flatMap(_.toOption))
-          .tupled
-          .flatTraverse: (itcRes, params) =>
-            gen.executionState(info.pid, info.oid, itcRes, params).map:
-              case ExecutionState.NotDefined => None
-              case ExecutionState.NotStarted => None
-              case ExecutionState.Ongoing    => Some(Ongoing)
-              case ExecutionState.Completed  => Some(Completed)              
-
       private def executionStates(
         infos: List[ObservationValidationInfo],
         commitHash: CommitHash,
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]] =
-        val gen = generator(commitHash, itcClient, ptc)
-        infos
-          .traverse(info => executionState(info, gen).tupleLeft(info.oid))
-          .map: list =>
-            list
+        generator(commitHash, itcClient, ptc)
+          .executionStates:
+            infos
+              .flatMap: info =>
+                (info.itcResults, info.generatorParams.flatMap(_.toOption)).mapN: (itc, gps) =>
+                  info.oid -> (info.pid, itc, gps)
+              .toMap      
+          .map: result =>
+            result
               .collect[(Observation.Id, ExecutionState)]:
-                case (oid, Some(state)) => oid -> state
+                case (oid, ExecutionState.Ongoing) => oid -> Ongoing
+                case (oid, ExecutionState.Completed) => oid -> Completed
               .toMap
 
       // Compute the observation status, as well as a list of legal transitions,
