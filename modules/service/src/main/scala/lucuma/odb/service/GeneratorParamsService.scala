@@ -269,12 +269,18 @@ object GeneratorParamsService {
         val brightnesses = 
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
+              .map(_.size > 0)
+        val wavelengthLines =
+          sourceProf.flatMap: sp =>
+            SourceProfile.integratedWavelengthLines.getOption(sp).orElse(SourceProfile.surfaceWavelengthLines.getOption(sp))
+              .map(_.size > 0)
+        val validBrightness = brightnesses.orElse(wavelengthLines).getOrElse(false)
 
         targetParams.targetId.toValidNel(MissingParam.forObservation("target")).andThen: tid =>
           (sourceProf.toValidNel(MissingParam.forTarget(tid, "source profile")),
-           Validated.condNel(brightnesses.exists(_.nonEmpty), (), MissingParam.forTarget(tid, "brightness measure")),
+           Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
            targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity"))
-          ).mapN: (sp, _, rv) =>
+          ).mapN: (sp,_, rv) =>
             tid -> TargetInput(sp, rv)
       }
 
