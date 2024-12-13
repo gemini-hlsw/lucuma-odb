@@ -32,6 +32,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
+import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
 import table.AttachmentTable
@@ -178,7 +179,7 @@ trait ObservationMapping[F[_]]
     // Pass the oids to observationWorkflowService.getWorkflows to get the
     // applicable workflows for each, then use this information to construct
     // our list of outgoing cursors.
-    def query(using Services[F]): ResultT[F, List[Cursor]] =
+    def query(using Services[F], SuperUserAccess): ResultT[F, List[Cursor]] =
       sequence.flatMap: tuples =>
         ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
           tuples.map: (key, cursor, childContext) =>
@@ -186,7 +187,8 @@ trait ObservationMapping[F[_]]
 
     // Do it!
     services.use: s => 
-      query(using s).value
+      Services.asSuperUser:
+        query(using s).value
     
   }
 
