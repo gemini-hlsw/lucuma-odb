@@ -144,6 +144,14 @@ sealed trait Generator[F[_]] {
     observationId: Observation.Id
   )(using NoTransaction[F]): F[ExecutionState]
 
+  /** Equivalent to executionState above, but uses provided asterism results and generator params rather than computing them. */
+  def executionState(
+    pid:    Program.Id,
+    oid:    Observation.Id,
+    itcRes: ItcService.AsterismResults,
+    params: GeneratorParams,
+  ): F[ExecutionState]
+  
 }
 
 object Generator {
@@ -302,16 +310,34 @@ object Generator {
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
-      override def digestWithParamsAndHash(
+      /** Equivalent to `digest` but uses provided generator params and ITC results rather than computing them. */
+      private def digestWithProvidedContext(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        itcRes: ItcService.AsterismResults,
+        params: GeneratorParams,
+        when: Option[Timestamp] = None
+      ): EitherT[F, Error, ExecutionDigest] =
+        digestWithParamsAndHash(Context(pid, oid, Right(itcRes), params), when).map(_._1)
+
+      private def digestWithParamsAndHash(
+        context: Context,
+        when: Option[Timestamp]
+      )(using NoTransaction[F]): EitherT[F, Error, (ExecutionDigest, GeneratorParams, Md5Hash)] =
+        context
+          .checkCache
+          .flatMap:
+            case Some(digest) => digest.pure
+            case None => calcDigestThenCache(context, when)
+          .map: digest =>
+            (digest, context.params, context.hash)
+ 
+      def digestWithParamsAndHash(
         pid:  Program.Id,
         oid:  Observation.Id,
         when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
-        (for {
-          c <- Context.lookup(pid, oid)
-          d <- c.checkCache.flatMap(_.fold(calcDigestThenCache(c, when))(EitherT.pure(_)))
-          r  = (d, c.params, c.hash)
-        } yield r).value
+        Context.lookup(pid, oid).flatMap(digestWithParamsAndHash(_, when)).value
 
       override def calculateDigest(
         pid:             Program.Id,
@@ -487,6 +513,18 @@ object Generator {
             _.science.executionState
           ))
 
+      override def executionState(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        itcRes: ItcService.AsterismResults,
+        params: GeneratorParams,
+      ): F[ExecutionState] =
+        digestWithProvidedContext(pid, oid, itcRes, params)
+          .value
+          .map(_.fold(
+            _ => ExecutionState.NotDefined,
+            _.science.executionState
+          ))
 
   }
 }
