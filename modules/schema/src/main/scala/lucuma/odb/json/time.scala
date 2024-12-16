@@ -23,46 +23,40 @@ object time {
 
   trait TimeDecoders {
 
-    given Decoder[DateInterval] =
-      Decoder.instance { c =>
-        for {
-          s <- c.downField("start").as[LocalDate]
-          e <- c.downField("end").as[LocalDate]
-          _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
-        } yield DateInterval.between(s, e)
-      }
+    given Decoder[DateInterval] = c =>
+      for {
+        s <- c.downField("start").as[LocalDate]
+        e <- c.downField("end").as[LocalDate]
+        _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
+      } yield DateInterval.between(s, e)
 
-    given Decoder[TimeSpan] =
-      Decoder.instance { c =>
-        def from[T: Decoder](field: String, format: Format[T, TimeSpan]): Decoder.Result[TimeSpan] =
-          c.downField(field).as[T].flatMap { t =>
-            format
-              .getOption(t)
-              .toRight(DecodingFailure(s"Invalid TimeSpan $field: $t", c.history))
-          }
+    given Decoder[TimeSpan] = c =>
+      def from[T: Decoder](field: String, format: Format[T, TimeSpan]): Decoder.Result[TimeSpan] =
+        c.downField(field).as[T].flatMap { t =>
+          format
+            .getOption(t)
+            .toRight(DecodingFailure(s"Invalid TimeSpan $field: $t", c.history))
+        }
 
-        c.downField("microseconds").as[Long].flatMap { µs =>
-          TimeSpan
-            .FromMicroseconds
-            .getOption(µs)
-            .toRight(DecodingFailure(s"Invalid TimeSpan microseconds: $µs", c.history))
-        } orElse
-          from("milliseconds", TimeSpan.FromMilliseconds) orElse
-          from("seconds",      TimeSpan.FromSeconds     ) orElse
-          from("minutes",      TimeSpan.FromMinutes     ) orElse
-          from("hours",        TimeSpan.FromHours       ) orElse
-          from("iso",          TimeSpan.FromString      ) orElse
-          DecodingFailure(s"Could not parse duration value ${c.value.spaces2}", c.history).asLeft
-      }
+      c.downField("microseconds").as[Long].flatMap { µs =>
+        TimeSpan
+          .FromMicroseconds
+          .getOption(µs)
+          .toRight(DecodingFailure(s"Invalid TimeSpan microseconds: $µs", c.history))
+      } orElse
+        from("milliseconds", TimeSpan.FromMilliseconds) orElse
+        from("seconds",      TimeSpan.FromSeconds     ) orElse
+        from("minutes",      TimeSpan.FromMinutes     ) orElse
+        from("hours",        TimeSpan.FromHours       ) orElse
+        from("iso",          TimeSpan.FromString      ) orElse
+        DecodingFailure(s"Could not parse duration value ${c.value.spaces2}", c.history).asLeft
 
-    given Decoder[TimestampInterval] =
-      Decoder.instance { c =>
-        for {
-          s <- c.downField("start").as[Timestamp]
-          e <- c.downField("end").as[Timestamp]
-          _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
-        } yield TimestampInterval.between(s, e)
-      }
+    given Decoder[TimestampInterval] = c =>
+      for {
+        s <- c.downField("start").as[Timestamp]
+        e <- c.downField("end").as[Timestamp]
+        _ <- Either.raiseWhen(s > e)(DecodingFailure(s"'start' ($s) after 'end' ($e)", c.history))
+      } yield TimestampInterval.between(s, e)
 
   }
 
