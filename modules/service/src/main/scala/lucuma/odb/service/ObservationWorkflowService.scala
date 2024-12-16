@@ -16,18 +16,17 @@ import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
-import lucuma.core.enums.Site.GN
-import lucuma.core.enums.Site.GS
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
-import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
+import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
@@ -52,7 +51,6 @@ import natchez.Trace
 import skunk.*
 import skunk.implicits.*
 
-import java.time.Duration
 import java.time.Instant
 
 import Services.Syntax.*
@@ -120,43 +118,13 @@ case class ObservationValidationInfo(
 
 case class CfpInfo(
   cfpid: CallForProposals.Id,
-  raStartNorth: RightAscension,
-  raEndNorth: RightAscension,
-  decStartNorth: Declination,
-  decEndNorth: Declination,
-  raStartSouth: RightAscension,
-  raEndSouth: RightAscension,
-  decStartSouth: Declination,
-  decEndSouth: Declination,
+  limits: CallCoordinatesLimits,
   active: DateInterval,
   instruments: List[Instrument]
 ) {
 
-  def raStart(at: Site): RightAscension =
-    at match
-      case GN => raStartNorth
-      case GS => raStartSouth
-
-  def raEnd(at: Site): RightAscension =
-    at match
-      case GN => raEndNorth
-      case GS => raEndSouth
-
-  def decStart(at: Site): Declination =
-    at match
-      case GN => decStartNorth
-      case GS => decStartSouth
-
-  def decEnd(at: Site): Declination =
-    at match
-      case GN => decEndNorth
-      case GS => decEndSouth
-
   def midpoint(at: Site): Instant =
-    val start    = ObservingNight.fromSiteAndLocalDate(at, active.start).start
-    val end      = ObservingNight.fromSiteAndLocalDate(at, active.end).end
-    val duration = Duration.between(start, end)
-    start.plus(duration.dividedBy(2L))
+    at.midpoint(active)
 
   def addInstrument(insts: Option[Instrument]): CfpInfo =
     insts.fold(this)(inst => copy(instruments = inst :: instruments))
@@ -194,15 +162,6 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Left(b)))  => (ls + (a -> b), rs)
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
-  extension (ra: RightAscension)
-    private def isInInterval(raStart: RightAscension, raEnd: RightAscension): Boolean =
-      if (raStart > raEnd) raStart <= ra || ra <= raEnd
-      else raStart <= ra && ra <= raEnd
-
-  extension (dec: Declination)
-    private def isInInterval(decStart: Declination, decEnd: Declination): Boolean =
-      decStart <= dec && dec <= decEnd
-
   extension (mp: MissingParamSet)
     def toObsValidation: ObservationValidation =
       ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
@@ -221,7 +180,7 @@ object ObservationWorkflowService {
 
       private def obsInfos(oids: List[Observation.Id], itcClient: ItcClient[F])(using Transaction[F], SuperUserAccess): ResultT[F, Map[Observation.Id, ObservationValidationInfo]] = {
 
-        def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] = 
+        def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] =
           val enc = observation_id.nel(oids)
           session
             .stream(Statements.ObservationValidationInfosWithoutAsterisms(enc))(oids, 1024)
@@ -330,7 +289,7 @@ object ObservationWorkflowService {
               case ExecutionState.NotDefined => None
               case ExecutionState.NotStarted => None
               case ExecutionState.Ongoing    => Some(Ongoing)
-              case ExecutionState.Completed  => Some(Completed)              
+              case ExecutionState.Completed  => Some(Completed)
 
       private def executionStates(
         infos: List[ObservationValidationInfo],
@@ -420,7 +379,7 @@ object ObservationWorkflowService {
             case Left(error)                           => ObservationValidationMap.singleton(error.toObsValidation)
             case Right(GeneratorParams(Left(m), _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
             case Right(ps)                             => ObservationValidationMap.empty
-        
+
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
             if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
@@ -432,7 +391,7 @@ object ObservationWorkflowService {
           info.cfpInfo.foldMap: cfp =>
             info.site.headOption.foldMap: site =>
               info.coordinatesAt(cfp.midpoint(site)).foldMap: coords =>
-                val ok = coords.ra.isInInterval(cfp.raStart(site), cfp.raEnd(site)) && coords.dec.isInInterval(cfp.decStart(site), cfp.decEnd(site))
+                val ok = cfp.limits.siteLimits(site).inLimits(coords)
                 if ok then ObservationValidationMap.empty
                 else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
 
@@ -488,7 +447,7 @@ object ObservationWorkflowService {
         configValidations.map(prelimV |+| _)
 
       }
-      
+
       private def getInfoAndValidations(
         oids: List[Observation.Id],
         itcClient: ItcClient[F]
@@ -601,7 +560,7 @@ object ObservationWorkflowService {
       """.query(cfp_id *: right_ascension *: right_ascension *: declination *: declination *: right_ascension *: right_ascension *: declination *: declination *: date_interval *: instrument.opt)
         .map:
           case (id, n_ra_s, n_ra_e, n_dec_s, n_dec_e, s_ra_s, s_ra_e, s_dec_s, s_dec_e, active, oinst) =>
-            (CfpInfo(id, n_ra_s, n_ra_e, n_dec_s, n_dec_e, s_ra_s, s_ra_e, s_dec_s, s_dec_e, active, Nil), oinst)
+            (CfpInfo(id, CallCoordinatesLimits(lucuma.core.model.SiteCoordinatesLimits.apply(n_ra_s, n_ra_e, n_dec_s, n_dec_e), SiteCoordinatesLimits(s_ra_s, s_ra_e, s_dec_s, s_dec_e)), active, Nil), oinst)
 
     val UpdateUserState: Command[(Option[UserState], Observation.Id)] =
       sql"""
