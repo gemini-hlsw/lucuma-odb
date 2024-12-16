@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.either.*
 import cats.syntax.traverse.*
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.math.SignalToNoise
@@ -43,87 +45,91 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       case _                            => sys.error("Expected two targets")
     }
 
+  def itcQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          id
+          itc {
+            science {
+              selected {
+                targetId
+                exposureTime {
+                  seconds
+                }
+                exposureCount
+                signalToNoise
+              }
+              all {
+                targetId
+              }
+            }
+            acquisition {
+              selected {
+                targetId
+                exposureTime {
+                  seconds
+                }
+                exposureCount
+                signalToNoise
+              }
+              all {
+                targetId
+              }
+            }
+          }
+        }
+      }
+    """
+
+    
+  def successfulItcResult(oid: Observation.Id, tid: Target.Id): Json = 
+    json"""
+      {
+        "observation": {
+          "id": $oid,
+          "itc": {
+            "science": {
+              "selected": {
+              "targetId": $tid,
+                "exposureTime": {
+                  "seconds": 10.000000
+                },
+                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+              },
+              "all": [
+                {
+                  "targetId": $tid
+                }
+              ]
+            },
+            "acquisition": {
+              "selected": {
+                "targetId": $tid,
+                "exposureTime": {
+                  "seconds": 10.000000
+                },
+                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+              },
+              "all": [
+                {
+                  "targetId": $tid
+                }
+              ]
+            }
+          }
+        }
+      }
+    """
+
   test("success, one target") {
     setup1.flatMap { case (_, oid, tid) =>
       expect(
         user = user,
-        query =
-          s"""
-            query {
-              observation(observationId: "$oid") {
-                id
-                itc {
-                  science {
-                    selected {
-                      targetId
-                      exposureTime {
-                        seconds
-                      }
-                      exposureCount
-                      signalToNoise
-                    }
-                    all {
-                      targetId
-                    }
-                  }
-                  acquisition {
-                    selected {
-                      targetId
-                      exposureTime {
-                        seconds
-                      }
-                      exposureCount
-                      signalToNoise
-                    }
-                    all {
-                      targetId
-                    }
-                  }
-                }
-              }
-            }
-          """,
-        expected = Right(
-          json"""
-            {
-              "observation": {
-                "id": $oid,
-                "itc": {
-                  "science": {
-                    "selected": {
-                      "targetId": $tid,
-                       "exposureTime": {
-                         "seconds": 10.000000
-                       },
-                       "exposureCount": ${FakeItcResult.exposureCount.value},
-                       "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
-                     },
-                     "all": [
-                       {
-                         "targetId": $tid
-                       }
-                    ]
-                  },
-                  "acquisition": {
-                    "selected": {
-                      "targetId": $tid,
-                       "exposureTime": {
-                         "seconds": 10.000000
-                       },
-                       "exposureCount": ${FakeItcResult.exposureCount.value},
-                       "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
-                     },
-                     "all": [
-                       {
-                         "targetId": $tid
-                       }
-                    ]
-                  }
-                }
-              }
-            }
-          """
-        )
+        query = itcQuery(oid),
+        expected = successfulItcResult(oid, tid).asRight
       )
     }
   }
@@ -176,6 +182,31 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("success, point emission lines target") {
+    for {
+      pid <- createProgram
+      tid <- createTargetWithProfileAs(user, pid, PointEmissionLinesProfile)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      r   <- expect(
+        user = user,
+        query = itcQuery(oid),
+        expected = successfulItcResult(oid, tid).asRight
+      )
+    } yield r
+  }
+
+  test("success, uniform emission lines target") {
+    for {
+      pid <- createProgram
+      tid <- createTargetWithProfileAs(user, pid, UniformEmissionLinesProfile)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      r   <- expect(
+        user = user,
+        query = itcQuery(oid),
+        expected = successfulItcResult(oid, tid).asRight
+    )
+  } yield r
+}
 
   test("observation missing observingMode") {
     def createObservation(pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
@@ -338,45 +369,45 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         user  = user,
         query =
         s"""
-           mutation {
-             createTarget(input: {
-               programId: ${pid.asJson},
-               SET: {
-                 name: "V1647 Orionis"
-                 sidereal: {
-                   ra: { hms: "05:46:13.137" },
-                   dec: { dms: "-00:06:04.89" },
-                   epoch: "J2000.0",
-                   properMotion: {
-                     ra: {
-                       milliarcsecondsPerYear: 0.918
-                     },
-                     dec: {
-                       milliarcsecondsPerYear: -1.057
-                     },
-                   },
-                   parallax: {
-                     milliarcseconds: 2.422
-                   }
-                 },
-                 sourceProfile: {
-                   point: {
-                     bandNormalized: {
-                       sed: {
-                         stellarLibrary: O5_V
-                       },
-                       brightnesses: [
-                       ]
-                     }
-                   }
-                 }
-               }
-             }) {
-               target {
-                 id
-               }
-             }
-           }
+          mutation {
+            createTarget(input: {
+              programId: ${pid.asJson},
+              SET: {
+                name: "V1647 Orionis"
+                sidereal: {
+                  ra: { hms: "05:46:13.137" },
+                  dec: { dms: "-00:06:04.89" },
+                  epoch: "J2000.0",
+                  properMotion: {
+                    ra: {
+                      milliarcsecondsPerYear: 0.918
+                    },
+                    dec: {
+                      milliarcsecondsPerYear: -1.057
+                    },
+                  },
+                  parallax: {
+                    milliarcseconds: 2.422
+                  }
+                },
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      },
+                      brightnesses: [
+                      ]
+                    }
+                  }
+                }
+              }
+            }) {
+              target {
+                id
+              }
+            }
+          }
         """
       ).map(
         _.hcursor.downFields("createTarget", "target", "id").require[Target.Id]
@@ -404,6 +435,36 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
           """,
         expected = Left(List(
           s"ITC cannot be queried until the following parameters are defined: brightness measure, radial velocity"
+        ))
+      )
+    } yield r
+  }
+
+  test("point emission lines missing lines") {
+    for {
+      pid <- createProgram
+      tid <- createTargetWithProfileAs(user, pid, PointEmissionLinesProfileNoLines)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      r   <- expect(
+        user = user,
+        query = itcQuery(oid),
+        expected = Left(List(
+          s"ITC cannot be queried until the following parameters are defined: brightness measure"
+        ))
+      )
+    } yield r
+  }
+
+  test("uniform emission lines missing lines") {
+    for {
+      pid <- createProgram
+      tid <- createTargetWithProfileAs(user, pid, UniformEmissionLinesProfileNoLines)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      r   <- expect(
+        user = user,
+        query = itcQuery(oid),
+        expected = Left(List(
+          s"ITC cannot be queried until the following parameters are defined: brightness measure"
         ))
       )
     } yield r
