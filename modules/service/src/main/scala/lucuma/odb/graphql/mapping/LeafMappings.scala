@@ -28,12 +28,12 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
+import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.IntPercent
-import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
@@ -78,6 +78,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
       LeafMapping[AtomStage](AtomStageType),
+      LeafMapping[Attachment.Id](AttachmentIdType),
+      LeafMapping[AttachmentType](AttachmentTypeType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
@@ -143,8 +145,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
-      LeafMapping[ObsAttachment.Id](ObsAttachmentIdType),
-      LeafMapping[Tag](ObsAttachmentTypeType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
@@ -158,7 +158,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ProgramReference](ProgramReferenceLabelType),
-      LeafMapping[Tag](ProposalAttachmentTypeType),
       LeafMapping[ProposalReference](ProposalReferenceLabelType),
       LeafMapping[Tag](ProposalStatusType),
       LeafMapping[ScienceBand](ScienceBandType),

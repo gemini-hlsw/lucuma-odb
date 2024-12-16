@@ -188,6 +188,12 @@ trait Codecs {
   val atom_stage: Codec[AtomStage] =
     enumerated(Type("e_atom_stage"))
 
+  val attachment_id: Codec[Attachment.Id] =
+    gid[Attachment.Id]
+
+  val attachment_type: Codec[AttachmentType] =
+    enumerated(Type("e_attachment_type"))
+
   val catalog_name: Codec[CatalogName] =
     enumerated(Type("e_catalog_name"))
 
@@ -334,9 +340,6 @@ trait Codecs {
     bool.imap(
       b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
     )(_.toBoolean)
-
-  val obs_attachment_id: Codec[ObsAttachment.Id] =
-    gid[ObsAttachment.Id]
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))

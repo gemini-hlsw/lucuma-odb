@@ -11,8 +11,8 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.ScienceBand
+import lucuma.core.model.Attachment
 import lucuma.core.model.Group
-import lucuma.core.model.ObsAttachment
 import lucuma.core.model.Target
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
@@ -41,7 +41,7 @@ object ObservationPropertiesInput {
     targetEnvironment:   Option[TargetEnvironmentInput.Create],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Option[List[TimingWindowInput]],
-    obsAttachments:      Option[List[ObsAttachment.Id]],
+    attachments:         Option[List[Attachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Option[ObservingModeInput.Create],
     existence:           Option[Existence],
@@ -63,7 +63,7 @@ object ObservationPropertiesInput {
         targetEnvironment   = None,
         constraintSet       = ConstraintSetInput.Default.some,
         timingWindows       = None,
-        obsAttachments      = None,
+        attachments         = None,
         scienceRequirements = None,
         observingMode       = None,
         existence           = Existence.Present.some,
@@ -81,7 +81,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Create.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Option("timingWindows", rTimingWindows),
-          ObsAttachmentIdBinding.List.Option("obsAttachments", rObsAttachments),
+          AttachmentIdBinding.List.Option("attachments", rAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Create.Binding.Option("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence),
@@ -95,7 +95,7 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             rTimingWindows,
-            rObsAttachments,
+            rAttachments,
             rScienceRequirements,
             rObservingMode,
             rExistence,
@@ -114,7 +114,7 @@ object ObservationPropertiesInput {
     targetEnvironment:   Option[TargetEnvironmentInput.Edit],
     constraintSet:       Option[ConstraintSetInput],
     timingWindows:       Nullable[List[TimingWindowInput]],
-    obsAttachments:      Nullable[List[ObsAttachment.Id]],
+    attachments:         Nullable[List[Attachment.Id]],
     scienceRequirements: Option[ScienceRequirementsInput],
     observingMode:       Nullable[ObservingModeInput.Edit],
     existence:           Option[Existence],
@@ -127,19 +127,19 @@ object ObservationPropertiesInput {
 
     val Empty: Edit =
       Edit(
-        subtitle =           Nullable.Absent,
-        scienceBand =        Nullable.Absent,
-        posAngleConstraint = None,
-        targetEnvironment =  None,
-        constraintSet =      None,
-        timingWindows =      Nullable.Absent,
-        obsAttachments =     Nullable.Absent,
-        scienceRequirements =None,
-        observingMode =      Nullable.Absent,
-        existence =          None,
-        group =              Nullable.Absent,
-        groupIndex =         None,
-        observerNotes =      Nullable.Absent,
+        subtitle =            Nullable.Absent,
+        scienceBand =         Nullable.Absent,
+        posAngleConstraint =  None,
+        targetEnvironment =   None,
+        constraintSet =       None,
+        timingWindows =       Nullable.Absent,
+        attachments =         Nullable.Absent,
+        scienceRequirements = None,
+        observingMode =       Nullable.Absent,
+        existence =           None,
+        group =               Nullable.Absent,
+        groupIndex =          None,
+        observerNotes =       Nullable.Absent,
       )
 
     val Binding: Matcher[Edit] =
@@ -151,7 +151,7 @@ object ObservationPropertiesInput {
           TargetEnvironmentInput.Edit.Binding.Option("targetEnvironment", rTargetEnvironment),
           ConstraintSetInput.Binding.Option("constraintSet", rConstraintSet),
           TimingWindowInput.Binding.List.Nullable("timingWindows", rTimingWindows),
-          ObsAttachmentIdBinding.List.Nullable("obsAttachments", rObsAttachments),
+          AttachmentIdBinding.List.Nullable("attachments", rAttachments),
           ScienceRequirementsInput.Binding.Option("scienceRequirements", rScienceRequirements),
           ObservingModeInput.Edit.Binding.Nullable("observingMode", rObservingMode),
           ExistenceBinding.Option("existence", rExistence),
@@ -165,7 +165,7 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             rTimingWindows,
-            rObsAttachments,
+            rAttachments,
             rScienceRequirements,
             rObservingMode,
             rExistence,

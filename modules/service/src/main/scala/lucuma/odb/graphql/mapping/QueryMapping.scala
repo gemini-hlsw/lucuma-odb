@@ -57,14 +57,12 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("events"),
       SqlObject("filterTypeMeta"),
       SqlObject("group"),
-      SqlObject("obsAttachmentTypeMeta"),
       SqlObject("observation"),
       SqlObject("observations"),
       SqlObject("observingModeGroup"),
       SqlObject("program"),
       SqlObject("programs"),
       SqlObject("programUsers"),
-      SqlObject("proposalAttachmentTypeMeta"),
       SqlObject("proposalStatusMeta"),
       SqlObject("spectroscopyConfigOptions"),
       SqlObject("target"),
@@ -83,14 +81,12 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Events,
       FilterTypeMeta,
       Group,
-      ObsAttachmentTypeMeta,
       Observation,
       Observations,
       ObservingModeGroup,
       Program,
       Programs,
       ProgramUsers,
-      ProposalAttachmentTypeMeta,
       ProposalStatusMeta,
       SpectroscopyConfigOptions,
       Target,
@@ -181,18 +177,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           }
         }
     }
-
-  private lazy val ObsAttachmentTypeMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "obsAttachmentTypeMeta", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Tag](ObsAttachmentTypeMetaType / "tag"))), child)
-      }
-
-  private lazy val ProposalAttachmentTypeMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (QueryType, "proposalAttachmentTypeMeta", Nil) =>
-      Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[Tag](ProposalAttachmentTypeMetaType / "tag"))), child)
-      }
 
   private lazy val ProposalStatusMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "proposalStatusMeta", Nil) =>

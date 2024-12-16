@@ -19,7 +19,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.syntax.*
-import lucuma.core.model.ObsAttachment
+import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
@@ -35,8 +35,8 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
+import table.AttachmentTable
 import table.ObsAttachmentAssignmentTable
-import table.ObsAttachmentTable
 import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
@@ -45,7 +45,7 @@ trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
      with ProgramTable[F]
      with TimingWindowView[F]
-     with ObsAttachmentTable[F]
+     with AttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
      with ObservationReferenceView[F] {
 
@@ -70,9 +70,9 @@ trait ObservationMapping[F[_]]
       SqlObject("targetEnvironment"),
       SqlObject("constraintSet"),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId)),
-      SqlObject("obsAttachments",
+      SqlObject("attachments",
         Join(ObservationView.Id, ObsAttachmentAssignmentTable.ObservationId),
-        Join(ObsAttachmentAssignmentTable.ObsAttachmentId, ObsAttachmentTable.Id)),
+        Join(ObsAttachmentAssignmentTable.AttachmentId, AttachmentTable.Id)),
       SqlObject("scienceRequirements"),
       SqlObject("observingMode"),
       SqlField("instrument", ObservationView.Instrument),
@@ -103,9 +103,9 @@ trait ObservationMapping[F[_]]
         )
       }
 
-    case (ObservationType, "obsAttachments", Nil) =>
+    case (ObservationType, "attachments", Nil) =>
       Elab.transformChild { child =>
-        OrderBy(OrderSelections(List(OrderSelection[ObsAttachment.Id](ObsAttachmentType / "id"))), child)
+        OrderBy(OrderSelections(List(OrderSelection[Attachment.Id](AttachmentType / "id"))), child)
       }
 
     case (ObservationType, "itc", List(BooleanBinding.Option("useCache", rUseCache))) =>

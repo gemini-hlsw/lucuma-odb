@@ -13,19 +13,16 @@ import lucuma.core.model.User
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.binding.*
 
-object WhereUser {
+object WhereUser:
 
   def binding(path: Path): Matcher[Predicate] =
-    val WhereUserId          = WhereOrder.binding[User.Id](path / "id", UserIdBinding)
-    val WhereType            = WhereEq.binding[UserType](path / "type", UserTypeBinding)
-    val WhereOrcidId         = WhereOptionString.binding(path / "orcidId")
-    val WhereOrcidGivenName  = WhereOptionString.binding(path / "orcidGivenName")
-    val WhereOrcidCreditName = WhereOptionString.binding(path / "orcidCreditName")
-    val WhereOrcidFamilyName = WhereOptionString.binding(path / "orcidFamilyName")
-    val WhereOrcidEmail      = WhereOptionString.binding(path / "orcidEmail")
+    val WhereUserId  = WhereOrder.binding[User.Id](path / "id", UserIdBinding)
+    val WhereType    = WhereEq.binding[UserType](path / "type", UserTypeBinding)
+    val WhereOrcidId = WhereOptionString.binding(path / "orcidId")
+    val WhereProfile = WhereUserProfile.binding(path / "profile")
 
     lazy val WhereUserBinding = binding(path)
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         WhereUserBinding.List.Option("AND", rAND),
         WhereUserBinding.List.Option("OR", rOR),
@@ -33,13 +30,10 @@ object WhereUser {
         WhereUserId.Option("id", rId),
         WhereType.Option("type", rType),
         WhereOrcidId.Option("orcidId", rOrcidId),
-        WhereOrcidGivenName.Option("orcidGivenName", rOrcidGivenName),
-        WhereOrcidCreditName.Option("orcidCreditName", rOrcidCreditName),
-        WhereOrcidFamilyName.Option("orcidFamilyName", rOrcidFamilyName),
-        WhereOrcidEmail.Option("orcidEmail", rOrcidEmail)
+        WhereProfile.Option("profile", rProfile)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rOrcidId, rOrcidGivenName, rOrcidCreditName, rOrcidFamilyName, rOrcidEmail).parMapN {
-          (AND, OR, NOT, id, t, orcid, givenName, creditName, familyName, email) =>
+        (rAND, rOR, rNOT, rId, rType, rOrcidId, rProfile).parMapN:
+          (AND, OR, NOT, id, t, orcid, profile) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -47,11 +41,5 @@ object WhereUser {
               id,
               t,
               orcid,
-              givenName,
-              creditName,
-              familyName,
-              email
+              profile
             ).flatten)
-        }
-    }
-}

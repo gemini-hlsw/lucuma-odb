@@ -1,9 +1,11 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.binding
+package lucuma.odb.graphql.table
 
-import lucuma.core.model.ObsAttachment
+trait UserProfileTable[R]:
+  def GivenName: R
+  def FamilyName: R
+  def CreditName: R
+  def Email: R
 
-val ObsAttachmentIdBinding: Matcher[ObsAttachment.Id] =
-  gidBinding("observation attachment")
