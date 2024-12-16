@@ -545,7 +545,7 @@ object Generator {
               .toList 
               .traverse:
                 case (oid, (pid, itc, gps)) =>
-                  digest(pid, oid).map(oid -> _)        // compute one by one
+                  calculateDigest(pid, oid, Right(itc), gps, None).map(oid -> _)  // compute one by one
               .map: list =>
                 list
                   .collect:
