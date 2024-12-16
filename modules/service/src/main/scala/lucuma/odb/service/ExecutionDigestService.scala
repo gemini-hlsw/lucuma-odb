@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.applicative.*
@@ -31,7 +32,6 @@ import skunk.data.Arr
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
-import cats.data.NonEmptyList
 
 sealed trait ExecutionDigestService[F[_]] {
 
