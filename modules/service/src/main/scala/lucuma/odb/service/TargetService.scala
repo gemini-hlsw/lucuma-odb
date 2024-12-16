@@ -248,7 +248,7 @@ object TargetService {
 
   object Statements {
 
-    import ProgramService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
+    import ProgramUserService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
 
     def insertSiderealFragment(
       pid:           Program.Id,
@@ -495,7 +495,7 @@ object TargetService {
         FROM t_target
         WHERE c_target_id = $target_id
       """.apply(pid, tid) |+|
-      ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      ProgramUserService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_target_id
       """

@@ -19,6 +19,7 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
+import lucuma.sso.client.SsoGraphQlClient
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
 import lucuma.sso.client.util.JwtDecoder
@@ -76,6 +77,14 @@ case class Config(
         httpClient = NatchezMiddleware.client(httpClient), // Note!
       ) .map(_.map(_.user))
     }
+
+  def ssoGqlClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoGraphQlClient[F]] =
+    httpClientResource[F].evalMap: httpClient =>
+      SsoGraphQlClient.create(
+        uri        = sso.root / "graphql",
+        client     = httpClient,
+        serviceJwt = serviceJwt
+      )
 
 }
 

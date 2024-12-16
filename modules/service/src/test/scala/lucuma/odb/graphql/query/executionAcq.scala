@@ -91,7 +91,6 @@ class executionAcq extends ExecutionTestSupport {
       }
     """
 
-
   test("initial generation") {
     val setup: IO[Observation.Id] =
       for {
@@ -115,6 +114,34 @@ class executionAcq extends ExecutionTestSupport {
       )
     }
   }
+
+  test("execute first step only, reset"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        // Record the first atom and one of its steps
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 ${excutionConfigQuery("gmosNorth", "acquisition(reset: true)", GmosAtomQuery, None)}
+               }
+             }
+           """,
+        expected = InitialAcquisition.asRight
+      )
 
   test("execute first atom - repeat of last acq step") {
     val setup: IO[Observation.Id] =
@@ -411,4 +438,5 @@ class executionAcq extends ExecutionTestSupport {
       )
     }
   }
+
 }

@@ -91,14 +91,17 @@ object UserService {
           ${varchar.opt},
           ${varchar.opt}
         ) on conflict (c_user_id) do update
-        set c_orcid_given_name  = ${varchar.opt},
-            c_orcid_credit_name = ${varchar.opt},
-            c_orcid_family_name = ${varchar.opt},
-            c_orcid_email       = ${varchar.opt}
+        set c_orcid_given_name     = ${varchar.opt},
+            c_orcid_credit_name    = ${varchar.opt},
+            c_orcid_family_name    = ${varchar.opt},
+            c_orcid_email          = ${varchar.opt}
       """.command.contramap { su =>
-        val p = su.profile
-        (su.id, p.orcidId, p.givenName, p.creditName, p.familyName, p.primaryEmail,
-                p.givenName, p.creditName, p.familyName, p.primaryEmail)
+        val p = su.profile.profile
+        (su.id,
+         su.profile.orcidId,
+         p.givenName, p.creditName, p.familyName, p.email,
+         p.givenName, p.creditName, p.familyName, p.email
+        )
       }
 
   }

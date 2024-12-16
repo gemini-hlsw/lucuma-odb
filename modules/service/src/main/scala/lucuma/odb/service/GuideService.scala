@@ -185,16 +185,12 @@ object GuideService {
     programId:          Program.Id,
     constraints:        ConstraintSet,
     posAngleConstraint: PosAngleConstraint,
-    optWavelength:      Option[Wavelength],
     explicitBase:       Option[Coordinates],
     optObsTime:         Option[Timestamp],
     optObsDuration:     Option[TimeSpan],
     guideStarName:      Option[GuideStarName],
     guideStarHash:      Option[Md5Hash]
   ) {
-    def wavelength: Result[Wavelength] =
-      optWavelength.toResult(generalError(s"No wavelength defined for observation $id.").asProblem)
-
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
 
@@ -231,9 +227,6 @@ object GuideService {
       given HashBytes[NonEmptyList[Angle]] = HashBytes.forJsonEncoder
       md5.update(availabilityAngles.hashBytes)
 
-      given HashBytes[Option[Wavelength]] = HashBytes.forJsonEncoder
-      md5.update(optWavelength.hashBytes)
-
       given Encoder[Coordinates] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
 
@@ -252,9 +245,6 @@ object GuideService {
       given HashBytes[PosAngleConstraint] = HashBytes.forJsonEncoder
       md5.update(posAngleConstraint.hashBytes)
     
-      given HashBytes[Option[Wavelength]] = HashBytes.forJsonEncoder
-      md5.update(optWavelength.hashBytes)
-
       given Encoder[Coordinates] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
 
@@ -274,11 +264,11 @@ object GuideService {
   ) {
     val timeEstimate                         = digest.fullTimeEstimate.sum
     val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
-    val (site, agsParams): (Site, AgsParams) = params.observingMode match
+    val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
-        (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side))
-      case mode: gmos.longslit.Config.GmosSouth =>
-        (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side))
+        (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
+      case mode: gmos.longslit.Config.GmosSouth => 
+        (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
 
   }
 
@@ -318,7 +308,7 @@ object GuideService {
 
       def checkProgramAccess(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
         services.transactionally(
-          programService.userHasAccess(pid).map(hasAccess =>
+          programUserService.userHasAccess(pid).map(hasAccess =>
             if (hasAccess) ().success
             else OdbError.InvalidObservation(oid).asFailure
           )
@@ -617,17 +607,16 @@ object GuideService {
         newHash:         Md5Hash
       ): F[Result[ContiguousTimestampMap[List[Angle]]]] = 
         (for {
-          wavelength   <- ResultT.fromResult(obsInfo.wavelength)
           asterism     <- ResultT(getAsterism(pid, obsInfo.id))
           tracking      = ObjectTracking.fromAsterism(asterism)
           candPeriod    = neededPeriods.tail.fold(neededPeriods.head)((a, b) => a.span(b))
           candidates   <- ResultT(
-                           getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, tracking, wavelength, obsInfo.constraints)
+                           getAllCandidates(obsInfo.id, candPeriod.start, candPeriod.end, tracking, genInfo.centralWavelength, obsInfo.constraints)
                           )
           positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
           neededLists  <- ResultT.fromResult(
                             neededPeriods.traverse(p => 
-                              buildAvailabilityList(p, obsInfo, genInfo, wavelength, asterism, tracking, candidates, positions)
+                              buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, asterism, tracking, candidates, positions)
                             )
                           )
           availability <- ResultT.fromResult(
@@ -774,7 +763,6 @@ object GuideService {
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and 
         // select the best.
         (for {
-          wavelength    <- ResultT.fromResult(obsInfo.wavelength)
           asterism      <- ResultT(getAsterism(pid, oid))
           baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
           visitEnd      <- ResultT.fromResult(
@@ -784,7 +772,7 @@ object GuideService {
                            )
           candidates    <- ResultT(
                              oGuideStarName.fold(
-                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, wavelength, obsInfo.constraints)
+                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
@@ -810,7 +798,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
-          optUsable      = chooseBestGuideStar(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          optUsable      = chooseBestGuideStar(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
           env           <- ResultT.fromResult(
                              optUsable
                               .map(_.toGuideEnvironment)
@@ -830,7 +818,6 @@ object GuideService {
           (for {
             obsInfo       <- ResultT(getObservationInfo(oid))
             obsTime       <- ResultT.fromResult(obsInfo.obsTime)
-            wavelength    <- ResultT.fromResult(obsInfo.wavelength)
             asterism      <- ResultT(getAsterism(pid, oid))
             genInfo       <- ResultT(getGeneratorInfo(pid, oid))
             duration       = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
@@ -858,7 +845,6 @@ object GuideService {
       ): F[Result[List[GuideEnvironment]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
-          wavelength    <- ResultT.fromResult(obsInfo.wavelength)
           asterism      <- ResultT(getAsterism(pid, oid))
           genInfo       <- ResultT(getGeneratorInfo(pid, oid))
           baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
@@ -868,7 +854,7 @@ object GuideService {
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
           candidates    <- ResultT(
-                            getAllCandidates(oid, obsTime, visitEnd, baseTracking, wavelength, obsInfo.constraints)
+                            getAllCandidates(oid, obsTime, visitEnd, baseTracking, genInfo.centralWavelength, obsInfo.constraints)
                           ).map(_.map(_.at(obsTime.toInstant)))
           baseCoords    <- ResultT.fromResult(
                              baseTracking.at(obsTime.toInstant).map(_.value)
@@ -889,7 +875,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
-          usable         = processCandidates(obsInfo, wavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
+          usable         = processCandidates(obsInfo, genInfo.centralWavelength, genInfo, baseCoords, scienceCoords, positions, candidates)
         } yield usable.toGuideEnvironments.toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
@@ -944,33 +930,32 @@ object GuideService {
     }
 
   object Statements {
-    import ProgramService.Statements.andWhereUserAccess
-    import ProgramService.Statements.whereUserAccess
+    import ProgramUserService.Statements.andWhereUserAccess
+    import ProgramUserService.Statements.whereUserAccess
 
     def getObservationInfo(oid: Observation.Id): AppliedFragment =
       sql"""
         select
-          obs.c_observation_id,
-          obs.c_program_id,
-          obs.c_cloud_extinction,
-          obs.c_image_quality,
-          obs.c_sky_background,
-          obs.c_water_vapor,
-          obs.c_air_mass_min,
-          obs.c_air_mass_max,
-          obs.c_hour_angle_min,
-          obs.c_hour_angle_max,
-          obs.c_pac_mode,
-          obs.c_pac_angle,
-          obs.c_spec_wavelength,
-          obs.c_explicit_ra,
-          obs.c_explicit_dec,
-          obs.c_observation_time,
-          obs.c_observation_duration,
-          obs.c_guide_target_name,
-          obs.c_guide_target_hash
-        from t_observation obs
-        where obs.c_observation_id = $observation_id
+          c_observation_id,
+          c_program_id,
+          c_cloud_extinction,
+          c_image_quality,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max,
+          c_pac_mode,
+          c_pac_angle,
+          c_explicit_ra,
+          c_explicit_dec,
+          c_observation_time,
+          c_observation_duration,
+          c_guide_target_name,
+          c_guide_target_hash
+        from t_observation
+        where c_observation_id = $observation_id
       """.apply(oid)
 
     def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment = 
@@ -1082,14 +1067,13 @@ object GuideService {
         hour_angle_range_value.opt *:
         pac_mode *:
         angle_µas *:
-        wavelength_pm.opt *:
         right_ascension.opt *:
         declination.opt *:
         core_timestamp.opt *:
         time_span.opt *:
         guide_target_name.opt *:
         md5_hash.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, wavelength, ra, dec, time, duration, guidestarName, guidestarHash) =>
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1121,7 +1105,7 @@ object GuideService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, wavelength, explicitBase, time, duration, guidestarName, guidestarHash)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash)
           )
       }
 

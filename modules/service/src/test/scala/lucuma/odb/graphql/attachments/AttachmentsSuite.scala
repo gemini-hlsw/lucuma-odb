@@ -5,11 +5,15 @@ package lucuma.odb.graphql
 
 package attachments
 
+import cats.Order.given
 import cats.effect.IO
 import cats.effect.Resource
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.text.utf8
-import lucuma.core.model.ObsAttachment
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.core.model.Attachment
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import org.http4s.*
 import org.http4s.client.Client
@@ -38,11 +42,11 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
     def expectOk: IO[Unit] = withExpectation(Status.Ok)
 
-    def toAttachmentId: IO[ObsAttachment.Id] =
+    def toAttachmentId: IO[Attachment.Id] =
       response.use { resp =>
         for {
           _   <- IO(resp.status).assertEquals(Status.Ok)
-          aid <- resp.getBody.map(s => ObsAttachment.Id.parse(s).get)
+          aid <- resp.getBody.map(s => Attachment.Id.parse(s).get)
         } yield aid
       }
     
@@ -60,6 +64,74 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   val validUsers: List[User] = List(pi, pi2, service)
 
+  case class TestAttachment(
+    fileName:       String,
+    attachmentType: String,
+    description:    Option[String],
+    content:        String,
+    checked:        Boolean = false
+  ) {
+    val upperType: String = attachmentType.toUpperCase
+  }
+
+  def insertAttachment(
+    user:      User,
+    programId: Program.Id,
+    ta:        TestAttachment
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      val uri =
+        (svr.baseUri / "attachment" / programId.toString)
+          .withQueryParam("fileName", ta.fileName)
+          .withQueryParam("attachmentType", ta.attachmentType)
+          .withOptionQueryParam("description", ta.description)
+
+      val request = Request[IO](
+        method = Method.POST,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      ).withEntity(ta.content)
+
+      client.run(request)
+    }
+  
+  def updateAttachment(
+    user:         User,
+    programId:    Program.Id,
+    attachmentId: Attachment.Id,
+    ta:           TestAttachment
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      val uri =
+        (svr.baseUri / "attachment" / programId.toString / attachmentId.toString)
+          .withQueryParam("fileName", ta.fileName)
+          .withOptionQueryParam("description", ta.description)
+
+      val request = Request[IO](
+        method = Method.PUT,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      ).withEntity(ta.content)
+
+      client.run(request)
+    }
+
+  def getAttachment(
+    user:         User,
+    programId:    Program.Id,
+    attachmentId: Attachment.Id
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+      val request = Request[IO](
+        method = Method.GET,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      )
+
+      client.run(request)
+    }
+
   def getViaPresignedUrl(url: NonEmptyString): Resource[IO, Response[IO]] =
     server.flatMap { _ =>
       val uri = Uri.unsafeFromString(url.value)
@@ -70,4 +142,64 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
       client.run(request)
     }
+
+  def getPresignedUrl(
+    user:         User,
+    programId:    Program.Id,
+    attachmentId: Attachment.Id
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      val uri     = svr.baseUri / "attachment" / "url" / programId.toString / attachmentId.toString
+      val request = Request[IO](
+        method = Method.GET,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      )
+
+      client.run(request)
+    }
+
+  def deleteAttachment(
+    user:         User,
+    programId:    Program.Id,
+    attachmentId: Attachment.Id
+  ): Resource[IO, Response[IO]] =
+    server.flatMap { svr =>
+      val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+      val request = Request[IO](
+        method = Method.DELETE,
+        uri = uri,
+        headers = Headers(authHeader(user))
+      )
+
+      client.run(request)
+    }
+
+  def expectedAttachments(
+    attachments: List[(Attachment.Id, TestAttachment)]
+  ): Json =
+    Json.obj(
+      "attachments" -> Json.fromValues(
+        attachments.sortBy(_._1).map((tid, ta) =>
+          Json.obj(
+            "id"             -> tid.asJson,
+            "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
+            "fileName"       -> ta.fileName.asJson,
+            "description"    -> ta.description.asJson,
+            "checked"        -> ta.checked.asJson,
+            "fileSize"       -> ta.content.length.asJson
+          )
+        )
+      )
+    )
+
+  val AttachmentsGraph: String =
+    """attachments {
+       |  id
+       |  attachmentType
+       |  fileName
+       |  description
+       |  checked
+       |  fileSize
+       |}""".stripMargin
 }

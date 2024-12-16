@@ -18,11 +18,10 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.AttachmentRoutes
 import lucuma.odb.graphql.EmailWebhookRoutes
 import lucuma.odb.graphql.GraphQLRoutes
-import lucuma.odb.graphql.ObsAttachmentRoutes
 import lucuma.odb.graphql.OdbMapping
-import lucuma.odb.graphql.ProposalAttachmentRoutes
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -31,6 +30,7 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
+import lucuma.sso.client.SsoGraphQlClient
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
@@ -209,6 +209,7 @@ object FMain extends MainParams {
       config.itcClient,
       config.commitHash,
       config.ssoClient,
+      config.ssoGqlClient,
       config.corsOverHttps,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
@@ -218,39 +219,40 @@ object FMain extends MainParams {
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console](
-    databaseConfig:      Config.Database,
-    awsConfig:           Config.Aws,
-    emailConfig:         Config.Email,
-    itcClientResource:   Resource[F, ItcClient[F]],
-    commitHash:          CommitHash,
-    ssoClientResource:   Resource[F, SsoClient[F, User]],
-    corsOverHttps:       Boolean,
-    domain:              List[String],
-    s3OpsResource:       Resource[F, S3AsyncClientOp[F]],
-    s3PresignerResource: Resource[F, S3Presigner],
-    httpClientResource:  Resource[F, Client[F]]
+    databaseConfig:       Config.Database,
+    awsConfig:            Config.Aws,
+    emailConfig:          Config.Email,
+    itcClientResource:    Resource[F, ItcClient[F]],
+    commitHash:           CommitHash,
+    ssoClientResource:    Resource[F, SsoClient[F, User]],
+    ssoGqlClientResource: Resource[F, SsoGraphQlClient[F]],
+    corsOverHttps:        Boolean,
+    domain:               List[String],
+    s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
+    s3PresignerResource:  Resource[F, S3Presigner],
+    httpClientResource:   Resource[F, Client[F]]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
       ssoClient         <- ssoClientResource
+      ssoGqlClient      <- ssoGqlClientResource
       httpClient        <- httpClientResource
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, ssoClient, ssoGqlClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
       metadataService    = GraphQLService(OdbMapping.forMetadata(pool, SkunkMonitor.noopMonitor[F], enums))
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
-      val obsAttachmentRoutes =  ObsAttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
-      val proposalAttachmentRoutes = ProposalAttachmentRoutes[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
+      val attachmentRoutes =  AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb)
       val metadataRoutes = GraphQLRoutes.enumMetadata(metadataService)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      middleware(graphQLRoutes(wsb) <+> obsAttachmentRoutes <+> proposalAttachmentRoutes <+> metadataRoutes <+> emailWebhookRoutes)
+      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+>  metadataRoutes <+> emailWebhookRoutes)
     }
 
   /** A startup action that runs database migrations using Flyway. */

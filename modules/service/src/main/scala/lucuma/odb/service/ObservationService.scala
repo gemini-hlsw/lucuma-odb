@@ -249,7 +249,7 @@ object ObservationService {
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
               }.flatMap { rOid =>
-                SET.obsAttachments.fold(rOid.pure[F]) { aids =>
+                SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
                     obsAttachmentAssignmentService
                       .insertAssignments(programId, List(oid), aids)
@@ -456,7 +456,7 @@ object ObservationService {
               _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
               _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
               _ <- ResultT(g.toList.traverse { case (pid, oids) =>
-                     obsAttachmentAssignmentService.setAssignments(pid, oids, SET.obsAttachments)
+                     obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                    }.map(_.sequence))
           } yield g
 
@@ -576,7 +576,7 @@ object ObservationService {
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
 
-    import ProgramService.Statements.whereUserAccess
+    import ProgramUserService.Statements.whereUserAccess
 
     def insertObservationAs(
       user:      User,
@@ -1045,7 +1045,7 @@ object ObservationService {
       FROM t_observation
       WHERE c_observation_id = $observation_id
       """.apply(gix, oid) |+|
-      ProgramService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      ProgramUserService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_observation_id
       """

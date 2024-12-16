@@ -7,25 +7,16 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.*
+import table.ProgramTable
+import table.UserTable
 
-trait UserMapping[F[_]]
-  extends ProgramTable[F]
-     with UserTable[F] { this: SkunkMapping[F] =>
-
-  lazy val UserType = schema.ref("User")
-
-  lazy val UserMapping =
-    ObjectMapping(UserType)(
-      SqlField("id", UserTable.UserId, key = true),
-      SqlField("type", UserTable.UserType),
-      SqlField("serviceName", UserTable.ServiceName),
-      SqlField("orcidId", UserTable.OrcidId),
-      SqlField("orcidGivenName", UserTable.OrcidGivenName),
-      SqlField("orcidCreditName", UserTable.OrcidCreditName),
-      SqlField("orcidFamilyName", UserTable.OrcidFamilyName),
-      SqlField("orcidEmail", UserTable.OrcidEmail)
-    )
-
-}
-
+trait UserMapping[F[_]] extends ProgramTable[F] with UserTable[F]:
+   this: SkunkMapping[F] =>
+     lazy val UserMapping =
+       ObjectMapping(UserType)(
+         SqlField("id", UserTable.UserId, key = true),
+         SqlField("type", UserTable.UserType),
+         SqlField("serviceName", UserTable.ServiceName),
+         SqlField("orcidId", UserTable.OrcidId),
+         SqlObject("profile")
+       )

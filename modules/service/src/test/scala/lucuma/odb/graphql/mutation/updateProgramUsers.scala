@@ -18,6 +18,7 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
+import lucuma.core.model.UserProfile
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 
@@ -33,13 +34,13 @@ class updateProgramUsers extends OdbSuite {
   val piCharles = TestUsers.Standard(
     7,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(7).get),
-    primaryEmail = "charles@guiteau.com".some
+    email = "charles@guiteau.com".some
   )
 
   val piLeon    = TestUsers.Standard(
     8,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(8).get),
-    primaryEmail = "leon@czolgosz.edu".some
+    email = "leon@czolgosz.edu".some
   )
 
   val service = TestUsers.service(10)
@@ -159,6 +160,83 @@ class updateProgramUsers extends OdbSuite {
       }
     """
 
+  def quotedOption(o: Option[String]): String =
+    o.fold("null")(s => s"\"$s\"")
+
+  def profileInput(o: Option[UserProfile]): String =
+    o.fold("null"): up =>
+      s"""
+        {
+          givenName: ${quotedOption(up.givenName)}
+          familyName: ${quotedOption(up.familyName)}
+          creditName: ${quotedOption(up.creditName)}
+          email: ${quotedOption(up.email)}
+        }
+      """
+
+  def updateFallback(p: Program.Id, u: User, profile: Option[UserProfile]): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              fallbackProfile: ${profileInput(profile)}
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            fallbackProfile {
+              givenName
+              familyName
+              creditName
+              email
+            }
+          }
+        }
+      }
+    """
+
+  def updateFallbackEmail(p: Program.Id, u: User, email: Option[String]): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              fallbackProfile: {
+                email: ${quotedOption(email)}
+              }
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            fallbackProfile {
+              email
+            }
+          }
+        }
+      }
+    """
+
   def expected(ts: (Program.Id, User, PartnerLink)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -213,6 +291,40 @@ class updateProgramUsers extends OdbSuite {
             "gender"  -> g.map(_.tag.toScreamingSnakeCase.asJson).getOrElse(Json.Null)
           )
         }.asJson
+      )
+    )
+
+  def expectedFallback(ts: (Program.Id, User, Option[UserProfile])*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, prof) =>
+           val p = prof.getOrElse(UserProfile.Empty)
+           Json.obj(
+             "program" -> Json.obj("id" -> pid.asJson),
+             "user"    -> Json.obj("id" -> user.id.asJson),
+             "fallbackProfile" -> Json.obj(
+               "givenName"  -> p.givenName.fold(Json.Null)(_.asJson),
+               "familyName" -> p.familyName.fold(Json.Null)(_.asJson),
+               "creditName" -> p.creditName.fold(Json.Null)(_.asJson),
+               "email"      -> p.email.fold(Json.Null)(_.asJson)
+             )
+           )
+         }.asJson
+      )
+    )
+
+  def expectedFallbackEmail(ts: (Program.Id, User, Option[String])*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, email) =>
+           Json.obj(
+             "program" -> Json.obj("id" -> pid.asJson),
+             "user"    -> Json.obj("id" -> user.id.asJson),
+             "fallbackProfile" -> Json.obj(
+               "email" -> email.fold(Json.Null)(_.asJson)
+             )
+           )
+         }.asJson
       )
     )
 
@@ -291,6 +403,52 @@ class updateProgramUsers extends OdbSuite {
         )
     }
   }
+
+  val GavriloPrincip: UserProfile =
+    UserProfile(
+      "Gavrilo".some,
+      "Princip".some,
+      "Гаврило Принцип".some,
+      "gprincip@mladabosna.org".some
+    )
+
+  test("update fallback"):
+    createProgramAs(pi).flatMap: pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+        expect(
+          user     = pi,
+          query    = updateFallback(pid, pi2, GavriloPrincip.some),
+          expected = expectedFallback((pid, pi2, GavriloPrincip.some)).asRight
+        )
+
+  test("unset fallback"):
+    createProgramAs(pi).flatMap: pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+        query(pi, updateFallback(pid, pi2, GavriloPrincip.some)) >>
+          expect(
+            user     = pi,
+            query    = updateFallback(pid, pi2, none),
+            expected = expectedFallback((pid, pi2, none)).asRight
+          )
+
+  test("update fallback email"):
+    createProgramAs(pi).flatMap: pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+        expect(
+          user     = pi,
+          query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
+          expected = expectedFallbackEmail((pid, pi2, GavriloPrincip.email)).asRight
+        )
+
+  test("unset fallback email"):
+    createProgramAs(pi).flatMap: pid =>
+      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+        query(pi, updateFallbackEmail(pid, pi2, GavriloPrincip.email)) >>
+          expect(
+            user     = pi,
+            query    = updateFallbackEmail(pid, pi2, none),
+            expected = expectedFallbackEmail((pid, pi2, none)).asRight
+          )
 
   test("cannot update another pi's partner as a PI") {
     createProgramAs(piCharles).flatMap { pid =>

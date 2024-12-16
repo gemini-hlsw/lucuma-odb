@@ -295,6 +295,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
       ssoClient.pure[Resource[IO, *]],
+      ssoGqlClient.pure[Resource[IO, *]],
       true,
       List("unused"),
       s3ClientOpsResource,
@@ -312,7 +313,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, itc, ssoGqlClient, CommitHash.Zero, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def server: Resource[IO, Server] =
