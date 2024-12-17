@@ -269,11 +269,11 @@ object GeneratorParamsService {
         val brightnesses = 
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
-              .map(_.size > 0)
+              .map(_.nonEmpty)
         val wavelengthLines =
           sourceProf.flatMap: sp =>
             SourceProfile.integratedWavelengthLines.getOption(sp).orElse(SourceProfile.surfaceWavelengthLines.getOption(sp))
-              .map(_.size > 0)
+              .map(_.nonEmpty)
         val validBrightness = brightnesses.orElse(wavelengthLines).getOrElse(false)
 
         targetParams.targetId.toValidNel(MissingParam.forObservation("target")).andThen: tid =>
