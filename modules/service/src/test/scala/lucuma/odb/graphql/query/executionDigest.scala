@@ -88,7 +88,101 @@ class executionDigest extends ExecutionTestSupport {
   def ProgramTime: BigDecimal =
     ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
 
-  test("digest") {
+  def digestQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution {
+            digest {
+              setup {
+                full { seconds }
+                reacquisition { seconds }
+              }
+              science {
+                observeClass
+                timeEstimate {
+                  program { seconds }
+                  partner { seconds }
+                  nonCharged { seconds }
+                  total { seconds }
+                }
+                offsets {
+                  p { arcseconds }
+                  q { arcseconds }
+                }
+                atomCount
+              }
+            }
+          }
+        }
+      }
+    """
+
+  val successDigestResult: Json =
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "digest": {
+              "setup" : {
+                "full" : {
+                  "seconds" : 960.000000
+                },
+                "reacquisition" : {
+                  "seconds" : 300.000000
+                }
+              },
+              "science" : {
+                "observeClass" : "SCIENCE",
+                "timeEstimate" : {
+                  "program" : {
+                    "seconds" : ${ProgramTime.asJson}
+                  },
+                  "partner" : {
+                    "seconds" : ${PartnerTime.asJson}
+                  },
+                  "nonCharged" : {
+                    "seconds" : 0.000000
+                  },
+                  "total" : {
+                    "seconds" : ${(ProgramTime + PartnerTime).asJson}
+                  }
+                },
+                "offsets" : [
+                  {
+                    "p" : {
+                      "arcseconds" : 0.000000
+                    },
+                    "q" : {
+                      "arcseconds" : -15.000000
+                    }
+                  },
+                  {
+                    "p" : {
+                      "arcseconds" : 0.000000
+                    },
+                    "q" : {
+                      "arcseconds" : 0.000000
+                    }
+                  },
+                  {
+                    "p" : {
+                      "arcseconds" : 0.000000
+                    },
+                    "q" : {
+                      "arcseconds" : 15.000000
+                    }
+                  }
+                ],
+                "atomCount": 4
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("digest - point band normalized") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -98,101 +192,42 @@ class executionDigest extends ExecutionTestSupport {
     setup.flatMap { oid =>
       expect(
         user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 execution {
-                   digest {
-                     setup {
-                       full { seconds }
-                       reacquisition { seconds }
-                     }
-                     science {
-                       observeClass
-                       timeEstimate {
-                         program { seconds }
-                         partner { seconds }
-                         nonCharged { seconds }
-                         total { seconds }
-                       }
-                       offsets {
-                         p { arcseconds }
-                         q { arcseconds }
-                       }
-                       atomCount
-                     }
-                   }
-                 }
-               }
-             }
-           """,
-        expected =
-          json"""
-            {
-              "observation": {
-                "execution": {
-                  "digest": {
-                    "setup" : {
-                      "full" : {
-                        "seconds" : 960.000000
-                      },
-                      "reacquisition" : {
-                        "seconds" : 300.000000
-                      }
-                    },
-                    "science" : {
-                      "observeClass" : "SCIENCE",
-                      "timeEstimate" : {
-                        "program" : {
-                          "seconds" : ${ProgramTime.asJson}
-                        },
-                        "partner" : {
-                          "seconds" : ${PartnerTime.asJson}
-                        },
-                        "nonCharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "total" : {
-                          "seconds" : ${(ProgramTime + PartnerTime).asJson}
-                        }
-                      },
-                      "offsets" : [
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : -15.000000
-                          }
-                        },
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 0.000000
-                          }
-                        },
-                        {
-                          "p" : {
-                            "arcseconds" : 0.000000
-                          },
-                          "q" : {
-                            "arcseconds" : 15.000000
-                          }
-                        }
-                      ],
-                      "atomCount": 4
-                    }
-                  }
-                }
-              }
-            }
-          """.asRight
+        query = digestQuery(oid),
+        expected = successDigestResult.asRight
       )
     }
+  }
 
+  test("digest - point emission lines") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p, PointEmissionLinesProfile)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query = digestQuery(oid),
+        expected = successDigestResult.asRight
+      )
+    }
+  }
+
+  test("digest - uniform emission lines") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p, UniformEmissionLinesProfile)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        user  = pi,
+        query = digestQuery(oid),
+        expected = successDigestResult.asRight
+      )
+    }
   }
 
   test("digest: deleted target") {
