@@ -3,8 +3,10 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.catsKernelOrderingForOrder
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -39,6 +41,10 @@ sealed trait ExecutionDigestService[F[_]] {
     hash:          Md5Hash
   )(using Transaction[F]): F[Option[ExecutionDigest]]
 
+  def selectMany(
+    input: List[(Observation.Id, Md5Hash)],
+  )(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]]
+
   def selectAll(
     programId: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, (Md5Hash, ExecutionDigest)]]
@@ -65,6 +71,32 @@ object ExecutionDigestService {
         session
           .option(Statements.SelectOneExecutionDigest)(pid, oid)
           .map(_.collect { case (h, d) if h === hash => d })
+
+      override def selectMany(
+        input: List[(Observation.Id, Md5Hash)],
+      )(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
+        NonEmptyList.fromList(input.map(_._1)) match
+          case None => Map.empty.pure
+          case Some(nel) =>
+            val enc = observation_id.nel(nel)
+            session
+              .stream(Statements.selectManyExecutionDigest(enc))(nel, 1024)
+              .compile
+              .toList
+              .map: list => // turn this into a lookup table
+                list
+                  .map:
+                    case (oid, hash, digest) => oid -> (hash, digest)
+                  .toMap
+              .map: cached =>
+                input
+                  .flatMap:
+                    case (oid, hash) =>
+                      cached
+                        .get(oid)
+                        .filter(_._1 === hash)
+                        .map(p => oid -> p._2)
+                  .toMap
 
       override def selectAll(
         pid: Program.Id
@@ -200,6 +232,17 @@ object ExecutionDigestService {
         FROM t_execution_digest
         WHERE
           c_program_id = $program_id
+      """.query(observation_id *: md5_hash *: execution_digest)
+
+    def selectManyExecutionDigest[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, Md5Hash, ExecutionDigest)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_hash,
+          #$DigestColumns
+        FROM t_execution_digest
+        WHERE
+          c_observation_id in ($enc)
       """.query(observation_id *: md5_hash *: execution_digest)
 
     val InsertOrUpdateExecutionDigest: Command[(

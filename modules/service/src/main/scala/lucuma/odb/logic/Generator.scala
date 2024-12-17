@@ -11,6 +11,7 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
@@ -151,7 +152,12 @@ sealed trait Generator[F[_]] {
     itcRes: ItcService.AsterismResults,
     params: GeneratorParams,
   ): F[ExecutionState]
-  
+
+  /** Equivalent to executionStates above, but computes many results. */
+  def executionStates(
+    input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+  )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]]
+
 }
 
 object Generator {
@@ -301,6 +307,11 @@ object Generator {
           } yield Context(pid, oid, as, params)
 
         }
+
+
+        def checkCache(contexts: List[Context])(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
+          executionDigestService.selectMany(contexts.map(c => (c.oid, c.hash)))
+
       }
 
       override def digest(
@@ -309,16 +320,6 @@ object Generator {
         when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
-
-      /** Equivalent to `digest` but uses provided generator params and ITC results rather than computing them. */
-      private def digestWithProvidedContext(
-        pid:    Program.Id,
-        oid:    Observation.Id,
-        itcRes: ItcService.AsterismResults,
-        params: GeneratorParams,
-        when: Option[Timestamp] = None
-      ): EitherT[F, Error, ExecutionDigest] =
-        digestWithParamsAndHash(Context(pid, oid, Right(itcRes), params), when).map(_._1)
 
       private def digestWithParamsAndHash(
         context: Context,
@@ -519,12 +520,42 @@ object Generator {
         itcRes: ItcService.AsterismResults,
         params: GeneratorParams,
       ): F[ExecutionState] =
-        digestWithProvidedContext(pid, oid, itcRes, params)
+        digestWithParamsAndHash(Context(pid, oid, Right(itcRes), params), None)
+          .map(_._1)
           .value
-          .map(_.fold(
-            _ => ExecutionState.NotDefined,
-            _.science.executionState
-          ))
+          .map:
+            case Left(_)  => ExecutionState.NotDefined
+            case Right(d) => d.science.executionState
+
+      override def executionStates(
+        input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
+      )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]] =
+        services
+          .transactionally:
+            Context.checkCache:
+              input
+                .toList
+                .map:
+                  case (oid, (pid, itc, gps)) => 
+                    Context(pid, oid, Right(itc), gps)
+          .flatMap: cached =>     
+            input
+              .view
+              .filterKeys(a => !cached.contains(a))     // remove cached subset
+              .toList 
+              .traverse:
+                case (oid, (pid, itc, gps)) =>
+                  calculateDigest(pid, oid, Right(itc), gps, None).map(oid -> _)  // compute one by one
+              .map: list =>
+                list
+                  .collect:
+                    case (oid, Right(d)) => (oid, d)    // filter out failures
+                  .toMap ++ cached                      // combine with cached results                  
+              .map: all =>
+                all
+                  .view
+                  .mapValues(_.science.executionState)  // narrow to just the execution state
+                  .toMap
 
   }
 }
