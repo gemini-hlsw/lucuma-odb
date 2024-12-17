@@ -1030,10 +1030,11 @@ class executionSci extends ExecutionTestSupport {
   }
 
   test("select min x-binning") {
+    val gaussianProfile = gaussianBandNormalizedProfile(Angle.fromMicroarcseconds(647_200L))
     val setup: IO[Observation.Id] =
       for {
         p  <- createProgram
-        t0 <- createTargetWithGaussianAs(pi, p, Angle.fromMicroarcseconds(647_200L))  // X-binning of 4
+        t0 <- createTargetWithProfileAs(pi, p, gaussianProfile)  // X-binning of 4
         t1 <- createTargetWithProfileAs(pi, p)  // X-binning of 1
         o  <- createObservationWithModeAs(pi, p, List(t0, t1),
                // use a 5" slit so that won't be a factor
