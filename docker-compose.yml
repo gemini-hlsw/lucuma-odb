@@ -15,8 +15,12 @@ services:
       POSTGRES_PASSWORD: banana
       POSTGRES_DB:       lucuma-odb
   adminer:
-    image: adminer
+    image: shyim/adminerevo
     restart: always
+    environment:
+      ADMINER_DEFAULT_DRIVER: pgsql
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DEFAULT_USERNAME: jimmy
+      ADMINER_DEFAULT_DB: lucuma-odb
     ports:
       - 8686:8080
-
