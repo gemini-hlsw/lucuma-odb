@@ -33,21 +33,21 @@ class linkUser extends OdbSuite:
   test("[coi] guest user can't link a coi"):
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: mid =>
         interceptGraphQL(s"Guest users may not add CoIs."):
-          linkUserAs(guest, rid, pi.id)
+          linkUserAs(guest, mid, pi.id)
 
   test("[coi] pi user can link coi to program they own"):
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id)
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id)
 
   test("[coi] pi user can't link another coi to program where they are a coi"):
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
           addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid2 =>
             linkUserAs(pi2, rid2, pi3.id)
@@ -55,39 +55,39 @@ class linkUser extends OdbSuite:
   test("[coi] pi user can't link coi to program they don't own"):
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
         interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
-          linkUserAs(pi2, rid, pi3.id)
+          linkUserAs(pi2, mid, pi3.id)
 
   test("[coi] service, admin, and staff users can add a coi to any program"):
     List(service, admin, staff).traverse_ : user =>
       createUsers(user) >>
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid).flatMap: rid =>
-          linkUserAs(user, rid, pi2.id)
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          linkUserAs(user, mid, pi2.id)
 
   test("[coi] ngo user can add coi to program with time allocated by user's partner"):
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
         setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-        linkUserAs(ngo, rid, pi2.id)
+        linkUserAs(ngo, mid, pi2.id)
 
   test("[coi] ngo user can't add coi to program without time allocated by user's partner"):
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
         interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
-          linkUserAs(ngo, rid, pi2.id)
+          linkUserAs(ngo, mid, pi2.id)
 
   // LINKING AN OBSERVER
 
   test("[observer] guest user can't link an observer"):
     createUsers(guest, pi) >>
     createProgramAs(guest).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.CoiRO).flatMap: mid =>
         interceptOdbError {
-          linkUserAs(guest, rid, pi.id)
+          linkUserAs(guest, mid, pi.id)
         } {
           case OdbError.NotAuthorized(guest.id, _) =>
         }
@@ -95,15 +95,15 @@ class linkUser extends OdbSuite:
   test("[observer] pi user can link observer to program they own"):
     createUsers(pi, pi2) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id)
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id)
 
   test("[observer] pi user can't link observer to program they don't own"):
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
         interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
-          linkUserAs(pi2, rid, pi3.id)
+          linkUserAs(pi2, mid, pi3.id)
 
   test("[observer] pi user can link an observer to a program where they are a coi"):
     createUsers(pi, pi2, pi3) >>
@@ -116,8 +116,8 @@ class linkUser extends OdbSuite:
   test("[observer] pi user can't link an observer to a program where they are an observer"):
     createUsers(pi, pi2, pi3) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id)  >>   // pi links pi2 as observer
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id)  >>   // pi links pi2 as observer
         addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid2 =>
           interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
             linkUserAs(pi2, rid2, pi3.id) // pi2 tries to link pi3 as observer
@@ -126,22 +126,22 @@ class linkUser extends OdbSuite:
     List(service, admin, staff).traverse_ : user =>
       createUsers(user) >>
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
-          linkUserAs(user, rid, pi2.id)
+        addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
+          linkUserAs(user, mid, pi2.id)
 
   test("[observer] ngo user can add observer to program with time allocated by user's partner"):
     createUsers(pi, pi2, ngo, admin) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
         setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
-        linkUserAs(ngo, rid, pi2.id)
+        linkUserAs(ngo, mid, pi2.id)
 
   test("[observer] ngo user can't add observer to program without time allocated by user's partner"):
     createUsers(pi, pi2, ngo) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: rid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
         interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
-          linkUserAs(ngo, rid, pi2.id)
+          linkUserAs(ngo, mid, pi2.id)
 
   // LINKING SUPPORT
 
@@ -153,31 +153,31 @@ class linkUser extends OdbSuite:
     test(s"[$role] guest user can't link a staff support user"):
       createUsers(guest, pi) >>
       createProgramAs(guest).flatMap: pid =>
-        addProgramUserAs(staff, pid, role).flatMap: rid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
           interceptGraphQL("Only admin, staff or service users may add support users."):
-            linkUserAs(guest, rid, pi.id)
+            linkUserAs(guest, mid, pi.id)
 
     test(s"[$role] pi user can't link a staff support user"):
       createUsers(pi, pi2) >>
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(staff, pid, role).flatMap: rid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
           interceptGraphQL("Only admin, staff or service users may add support users."):
-            linkUserAs(pi, rid, pi2.id)
+            linkUserAs(pi, mid, pi2.id)
 
     test(s"[$role] service, admin, and staff users can add a staff support user to any program"):
       List(service, admin, staff).traverse_ : user =>
         createUsers(user) >>
         createProgramAs(pi).flatMap: pid =>
-          addProgramUserAs(staff, pid, role).flatMap: rid =>
-            linkUserAs(user, rid, pi2.id)
+          addProgramUserAs(staff, pid, role).flatMap: mid =>
+            linkUserAs(user, mid, pi2.id)
 
     test(s"[$role] ngo user can't add staff support to program with time allocated by user's partner"):
       createUsers(pi, pi2, ngo, admin) >>
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(staff, pid, role).flatMap: rid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
           setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
           interceptGraphQL("Only admin, staff or service users may add support users."):
-            linkUserAs(ngo, rid, pi2.id)
+            linkUserAs(ngo, mid, pi2.id)
 
   // GENERAL RULES
 
@@ -193,9 +193,9 @@ class linkUser extends OdbSuite:
   test("[general] can't link a guest user"):
     createUsers(pi, guest) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: rid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.Coi).flatMap: mid =>
         interceptGraphQL(s"User ${guest.id} does not exist or is of a nonstandard type."):
-          linkUserAs(pi, rid, guest.id)
+          linkUserAs(pi, mid, guest.id)
 
   test("[general] can't link a PI user"):
     createUsers(pi) >>
@@ -206,6 +206,6 @@ class linkUser extends OdbSuite:
   test("[general] can't link a service user"):
     createUsers(pi, service) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
         interceptGraphQL(s"User ${service.id} does not exist or is of a nonstandard type."):
-          linkUserAs(pi, rid, service.id)
+          linkUserAs(pi, mid, service.id)

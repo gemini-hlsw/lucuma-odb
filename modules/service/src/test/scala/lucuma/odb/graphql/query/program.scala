@@ -70,8 +70,8 @@ class program extends OdbSuite {
     List(pi, service).traverse: user =>
       val name = s"${user.displayName}'s Science Program"
       createProgramAs(user, name).flatMap: pid =>
-        addProgramUserAs(user, pid).flatMap: rid =>
-          createUserInvitationAs(user, rid) >>
+        addProgramUserAs(user, pid).flatMap: mid =>
+          createUserInvitationAs(user, mid) >>
           expect(
             user  = user,
             query =
@@ -110,7 +110,7 @@ class program extends OdbSuite {
                         "status": ${InvitationStatus.Pending},
                         "issuer": { "id": ${user.id} },
                         "programUser": {
-                          "id": $rid,
+                          "id": $mid,
                           "partnerLink": {
                             "linkType": "HAS_PARTNER",
                             "partner": "US"

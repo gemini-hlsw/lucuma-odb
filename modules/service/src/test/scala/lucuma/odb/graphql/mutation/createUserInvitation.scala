@@ -75,32 +75,32 @@ class createUserInvitation extends OdbSuite:
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (key)"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, role).flatMap: rid =>
-          createUserInvitationAs(pi, rid)
+        addProgramUserAs(pi, pid, role).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (non-partner)"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, role, PartnerLink.HasNonPartner).flatMap: rid =>
-          createUserInvitationAs(pi, rid)
+        addProgramUserAs(pi, pid, role, PartnerLink.HasNonPartner).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (unspecified partner)"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, role, PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-          createUserInvitationAs(pi, rid)
+        addProgramUserAs(pi, pid, role, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, pur, PartnerLink.HasPartner(Partner.US)).flatMap: rid =>
+        addProgramUserAs(pi, pid, pur, PartnerLink.HasPartner(Partner.US)).flatMap: mid =>
           expect(
             user = pi,
             query = s"""
             mutation {
               createUserInvitation(
                 input: {
-                  programUserId: "$rid"
+                  programUserId: "$mid"
                   recipientEmail: "$successRecipient"
                 }
               ) {
@@ -130,7 +130,7 @@ class createUserInvitation extends OdbSuite:
                     "issuer" : { "id" : ${pi.id} },
                     "recipientEmail": $successRecipient,
                     "programUser" : {
-                      "id" : $rid,
+                      "id" : $mid,
                       "role": ${pur: ProgramUserRole},
                       "user": null,
                       "program": {
@@ -157,14 +157,14 @@ class createUserInvitation extends OdbSuite:
         rid3 <- addProgramUserAs(pi, pid, pur)
       yield (pid, rid3)
 
-      pidrid.flatMap: (pid, rid) =>
+      pidrid.flatMap: (pid, mid) =>
         expect(
           user = pi2,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programUserId: "$rid"
+                programUserId: "$mid"
                 recipientEmail: "$successRecipient"
               }
             ) {
@@ -195,7 +195,7 @@ class createUserInvitation extends OdbSuite:
                     "issuer" : { "id" : ${pi2.id} },
                     "recipientEmail": $successRecipient,
                     "programUser": {
-                      "id": $rid,
+                      "id": $mid,
                       "role" : ${pur: ProgramUserRole},
                       "user": null,
                       "program" : { "id" : $pid }
@@ -212,7 +212,7 @@ class createUserInvitation extends OdbSuite:
 
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
     test(s"readonly coi cannot invite a ${pur.toString.toLowerCase}"):
-      val rid = for
+      val mid = for
         pid  <- createProgramAs(pi)
         _    <- createProgramAs(pi2) // this creates pi2
         rid2 <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO)
@@ -220,14 +220,14 @@ class createUserInvitation extends OdbSuite:
         rid3 <- addProgramUserAs(pi, pid, pur)  // add as PI, try to invite as CoiRO below
       yield rid3
 
-      rid.flatMap: rid =>
+      mid.flatMap: mid =>
         expect(
           user = pi2,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programUserId: "$rid"
+                programUserId: "$mid"
                 recipientEmail: "$successRecipient"
               }
             ) {
@@ -245,14 +245,14 @@ class createUserInvitation extends OdbSuite:
   test("invite support (metadata)"):
     List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).traverse: role =>
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(staff, pid, role).flatMap: rid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
           expect(
             user  = staff,
             query = s"""
             mutation {
               createUserInvitation(
                 input: {
-                  programUserId: "$rid"
+                  programUserId: "$mid"
                   recipientEmail: "$successRecipient"
                 }
               ) {
@@ -282,7 +282,7 @@ class createUserInvitation extends OdbSuite:
                       "issuer" : { "id" : ${staff.id} },
                       "recipientEmail": $successRecipient,
                       "programUser": {
-                        "id": $rid,
+                        "id": $mid,
                         "role": ${role: ProgramUserRole},
                         "program" : { "id" : $pid }
                       },
@@ -296,12 +296,12 @@ class createUserInvitation extends OdbSuite:
               """.asRight
           )
 
-  def createUserInvitationQuery(rid: ProgramUser.Id): String =
+  def createUserInvitationQuery(mid: ProgramUser.Id): String =
     s"""
       mutation {
         createUserInvitation(
           input: {
-            programUserId: "$rid"
+            programUserId: "$mid"
             recipientEmail: "$successRecipient"
           }
         ) {
@@ -313,18 +313,18 @@ class createUserInvitation extends OdbSuite:
   test("can't invite a user with a non-existent program user id"):
     expect(
       user     = pi,
-      query    = createUserInvitationQuery(ProgramUser.Id.parse("r-ffff").get),
+      query    = createUserInvitationQuery(ProgramUser.Id.parse("m-ffff").get),
       expected = List(
-        s"ProgramUser r-ffff does not exist, or is ineligible for the requested operation."
+        s"ProgramUser m-ffff does not exist, or is ineligible for the requested operation."
       ).asLeft
     )
 
   test("pi can't invite a user if it's not their program"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
         expect(
           user     = pi2,
-          query    = createUserInvitationQuery(rid),
+          query    = createUserInvitationQuery(mid),
           expected = List(
             s"Specified program does not exist, or user is not the PI or COI."
           ).asLeft
@@ -332,10 +332,10 @@ class createUserInvitation extends OdbSuite:
 
   test("guest can't invite a coi"):
     createProgramAs(guest).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
         expect(
           user     = guest,
-          query    = createUserInvitationQuery(rid),
+          query    = createUserInvitationQuery(mid),
           expected = List(
             s"Guest users cannot create invitations."
           ).asLeft
@@ -343,10 +343,10 @@ class createUserInvitation extends OdbSuite:
 
   test("ngo without allocation can't add a coi"):
     createProgramAs(ngo).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
         expect(
           user     = ngo,
-          query    = createUserInvitationQuery(rid),
+          query    = createUserInvitationQuery(mid),
           expected = List(
             s"NGO users can't create invitations."
           ).asLeft
@@ -355,19 +355,19 @@ class createUserInvitation extends OdbSuite:
   test("staff, admin, service can create an invitation for any program"):
     createProgramAs(pi).flatMap: pid =>
       List(staff, admin, service).traverse: user =>
-        addProgramUserAs(pi, pid).flatMap: rid =>
-          createUserInvitationAs(user, rid)
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          createUserInvitationAs(user, mid)
 
   test("Bad response from sending email results in failure"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary).flatMap: rid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary).flatMap: mid =>
         expect(
           user  = staff,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programUserId: "$rid"
+                programUserId: "$mid"
                 recipientEmail: "$badResponseRecipient"
               }
             ) {
@@ -403,8 +403,8 @@ class createUserInvitation extends OdbSuite:
   test("program user invitations"):
     for
       pid  <- createProgramAs(pi)
-      rid  <- addProgramUserAs(pi, pid)
-      inv0 <- createUserInvitationAs(pi, rid)
+      mid  <- addProgramUserAs(pi, pid)
+      inv0 <- createUserInvitationAs(pi, mid)
       _    <- expect(
         user     = pi,
         query    = invitationsQuery(pi, pid),
@@ -426,9 +426,9 @@ class createUserInvitation extends OdbSuite:
   test("one pending invitation per user"):
     for
       pid <- createProgramAs(pi)
-      rid <- addProgramUserAs(pi, pid)
-      inv <- createUserInvitationAs(pi, rid)
-        _ <- interceptOdbError(createUserInvitationAs(pi, rid)):
+      mid <- addProgramUserAs(pi, pid)
+      inv <- createUserInvitationAs(pi, mid)
+        _ <- interceptOdbError(createUserInvitationAs(pi, mid)):
                case OdbError.UpdateFailed(_) => // ok
     yield ()
 
@@ -436,10 +436,10 @@ class createUserInvitation extends OdbSuite:
     createProgramAs(pi2).>>
       for
         pid  <- createProgramAs(pi)
-        rid  <- addProgramUserAs(pi, pid)
-        inv0 <- createUserInvitationAs(pi, rid)
+        mid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, mid)
         _    <- redeemUserInvitationAs(pi2, inv0, false)
-        inv1 <- createUserInvitationAs(pi, rid)
+        inv1 <- createUserInvitationAs(pi, mid)
         _    <- redeemUserInvitationAs(pi2, inv1, true)
       yield ()
 
@@ -447,18 +447,18 @@ class createUserInvitation extends OdbSuite:
     createProgramAs(pi2).>>
       for
         pid  <- createProgramAs(pi)
-        rid  <- addProgramUserAs(pi, pid)
-        inv0 <- createUserInvitationAs(pi, rid)
+        mid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, mid)
         _    <- revokeUserInvitationAs(pi, inv0.id)
-        inv1 <- createUserInvitationAs(pi, rid)
+        inv1 <- createUserInvitationAs(pi, mid)
         _    <- redeemUserInvitationAs(pi2, inv1, true)
       yield ()
 
   test("can't invite after linked"):
     for
       pid <- createProgramAs(pi)
-      rid <- addProgramUserAs(pi, pid)
-      _   <- linkUserAs(pi, rid, pi2.id)
-      _   <- interceptOdbError(createUserInvitationAs(pi, rid)):
-               case OdbError.InvalidProgramUser(rid, _) => // ok
+      mid <- addProgramUserAs(pi, pid)
+      _   <- linkUserAs(pi, mid, pi2.id)
+      _   <- interceptOdbError(createUserInvitationAs(pi, mid)):
+               case OdbError.InvalidProgramUser(mid, _) => // ok
     yield ()

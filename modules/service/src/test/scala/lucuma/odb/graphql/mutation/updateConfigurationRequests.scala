@@ -24,12 +24,12 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   object updateConfigurationRequestStatusAs {
 
-    def query(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): String =
+    def query(user: User, mid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): String =
       s"""
         mutation {
           updateConfigurationRequests(input: {
             SET: { status: ${status.tag.toUpperCase} }
-            WHERE: { id: { EQ: ${rid.asJson} } }
+            WHERE: { id: { EQ: ${mid.asJson} } }
           }) {
             requests {
               id
@@ -40,16 +40,16 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
         }
       """
 
-    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+    def apply(user: User, mid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
       expect(
         user = user,
-        query = query(user, rid, status),
+        query = query(user, mid, status),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {
               "requests" : [
                 {
-                  "id" : $rid,
+                  "id" : $mid,
                   "status" : $status
                 }
               ],
@@ -68,8 +68,8 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
       _   <- addProposal(pi, pid, Some(cid), None, "Foo")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      rid <- createConfigurationRequestAs(pi, oid)
-    yield rid
+      mid <- createConfigurationRequestAs(pi, oid)
+    yield mid
 
   ConfigurationRequestStatus.values.foreach: status =>
     test(s"Admin should be able to set status to $status."):
@@ -85,10 +85,10 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
         case OdbError.NotAuthorized(_, _) => () // expected
 
   test(s"PI can't set status on another user's request (update affects no rows)"):
-    setup.flatMap: rid =>
+    setup.flatMap: mid =>
       expect(
         user = pi2,
-        query = updateConfigurationRequestStatusAs.query(pi2, rid, ConfigurationRequestStatus.Withdrawn),
+        query = updateConfigurationRequestStatusAs.query(pi2, mid, ConfigurationRequestStatus.Withdrawn),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {

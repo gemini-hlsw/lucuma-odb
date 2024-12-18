@@ -57,8 +57,8 @@ class redeemUserInvitation extends OdbSuite:
   test("redeem an invitation"):
     createProgramAs(pi2) >>
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user  = pi2,
             query = redeem(inv),
@@ -69,7 +69,7 @@ class redeemUserInvitation extends OdbSuite:
                     "status" : ${InvitationStatus.Redeemed},
                     "issuer" : { "id" : ${pi.id} },
                     "programUser": {
-                      "id": $rid,
+                      "id": $mid,
                       "user": { "id": ${pi2.id} },
                       "program" : {
                         "users" : [
@@ -90,8 +90,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("redeem an invitation without partner"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user  = pi2,
             query = redeem(inv),
@@ -102,7 +102,7 @@ class redeemUserInvitation extends OdbSuite:
                     "status" : ${InvitationStatus.Redeemed},
                     "issuer" : { "id" : ${pi.id} },
                     "programUser": {
-                      "id": $rid,
+                      "id": $mid,
                       "user": { "id": ${pi2.id} },
                       "program" : {
                         "users" : [
@@ -123,8 +123,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("can't redeem an invitation that has been revoked"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           revokeUserInvitationAs(pi, inv.id) >>
           expect(
             user     = pi2,
@@ -136,8 +136,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("guests can't redeem invitations"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user     = guest,
             query    = redeem(inv),
@@ -148,8 +148,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("service users can't redeem invitations"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user     = service,
             query    = redeem(inv),
@@ -160,8 +160,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("can't redeem an invitation twice"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           redeemUserInvitationAs(pi2, inv) >>
           expect(
             user     = pi2,
@@ -173,8 +173,8 @@ class redeemUserInvitation extends OdbSuite:
 
   test("can't redeem your own invitation"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user     = pi,
             query    = redeem(inv),
@@ -185,9 +185,9 @@ class redeemUserInvitation extends OdbSuite:
 
   test("redeeming an invitation works if you aready have that role, but it's a no-op in terms of linking"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(staff, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
-          linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
+          linkUserAs(pi, mid, pi2.id) >>
           expect(
             user     = pi2,
             query    = redeem(inv),
