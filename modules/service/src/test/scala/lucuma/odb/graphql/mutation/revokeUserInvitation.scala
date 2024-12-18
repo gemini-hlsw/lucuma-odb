@@ -55,8 +55,8 @@ class revokeUserInvitation extends OdbSuite:
 
   test("revoke an invitation"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           expect(
             user     = pi,
             query    = revoke(inv.id),
@@ -67,7 +67,7 @@ class revokeUserInvitation extends OdbSuite:
                     "status" : ${InvitationStatus.Revoked},
                     "issuer" : { "id" : ${pi.id} },
                     "programUser": {
-                      "id": $rid,
+                      "id": $mid,
                       "user": null,
                       "program": {
                         "users": [
@@ -86,8 +86,8 @@ class revokeUserInvitation extends OdbSuite:
 
   test("create, query, then revoke an invitation"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           query(
             user = pi,
             query = s"""
@@ -112,7 +112,7 @@ class revokeUserInvitation extends OdbSuite:
                       "status" : ${InvitationStatus.Revoked},
                       "issuer" : { "id" : ${pi.id} },
                       "programUser": {
-                        "id": $rid,
+                        "id": $mid,
                         "user": null,
                         "program": {
                           "users": [
@@ -135,8 +135,8 @@ class revokeUserInvitation extends OdbSuite:
   List(true, false).foreach: accept =>
     test(s"can't revoke an invitation that was already ${if accept then "accepted" else "delined"}"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid).flatMap: rid =>
-          createUserInvitationAs(pi, rid).flatMap: inv =>
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          createUserInvitationAs(pi, mid).flatMap: inv =>
             redeemUserInvitationAs(pi2, inv, accept) >>
             expectOdbError(
               user     = pi,
@@ -146,8 +146,8 @@ class revokeUserInvitation extends OdbSuite:
 
   test("can't revoke an invitation twice"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           revokeUserInvitationAs(pi, inv.id) >>
           expectOdbError(
             user     = pi,
@@ -157,8 +157,8 @@ class revokeUserInvitation extends OdbSuite:
 
   test("guest can't revoke an invitation"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid).flatMap: inv =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
           val gid = guest.id
           expectOdbError(
             user     = guest,
@@ -170,8 +170,8 @@ class revokeUserInvitation extends OdbSuite:
   List(pi2, ngo).foreach: u =>
     test(s"non-superuser (${u.role.access}) can't revoke someone else's invitation"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid).flatMap: rid =>
-          createUserInvitationAs(pi, rid).flatMap: inv =>
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          createUserInvitationAs(pi, mid).flatMap: inv =>
             expectOdbError(
               user     = u,
               query    = revoke(inv.id),
@@ -181,6 +181,6 @@ class revokeUserInvitation extends OdbSuite:
   List(admin, staff, service).foreach: u =>
     test(s"superuser (${u.role.access}) *can* revoke someone else's invitation"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid).flatMap: rid =>
-          createUserInvitationAs(pi, rid).flatMap: inv =>
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          createUserInvitationAs(pi, mid).flatMap: inv =>
             revokeUserInvitationAs(u, inv.id)

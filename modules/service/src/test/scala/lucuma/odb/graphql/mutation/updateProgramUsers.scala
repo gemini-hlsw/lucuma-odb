@@ -339,8 +339,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update coi partner"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserMutation(pi2, PartnerLink.HasNonPartner),
@@ -349,8 +349,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update pi educational status"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, Some(EducationalStatus.UndergradStudent)),
@@ -359,8 +359,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset pi educational status"):
     createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, None),
@@ -369,8 +369,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update pi gender"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserGender(pid, pi2, Some(Gender.Other)),
@@ -379,8 +379,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset pi gender"):
     createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserGender(pid, pi2, None),
@@ -389,8 +389,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update pi thesis flag"):
     createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(pi, rid, pi3.id) >>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
         expect(
           user     = pi,
           query    = updateUserThesisFlag(pid, pi3, true),
@@ -407,8 +407,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update fallback"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateFallback(pid, pi2, GavriloPrincip.some),
@@ -417,8 +417,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset fallback"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         query(pi, updateFallback(pid, pi2, GavriloPrincip.some)) >>
           expect(
             user     = pi,
@@ -428,8 +428,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update fallback email"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
@@ -438,8 +438,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset fallback email"):
     createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid).flatMap: rid =>
-        linkUserAs(pi, rid, pi2.id) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         query(pi, updateFallbackEmail(pid, pi2, GavriloPrincip.email)) >>
           expect(
             user     = pi,
@@ -457,8 +457,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("cannot update another pi's partner"):
     createProgramAs(piLeon).flatMap: pid =>
-      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(piLeon, rid, piCharles.id) >>
+      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(piLeon, mid, piCharles.id) >>
         expect(
           user     = piCharles,
           query    = s"""
@@ -492,8 +492,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("cannot update another pi's educational status"):
     createProgramAs(piLeon).flatMap: pid =>
-      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: rid =>
-        linkUserAs(piLeon, rid, piCharles.id) >>
+      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(piLeon, mid, piCharles.id) >>
         expect(
           user     = piCharles,
           query    = s"""

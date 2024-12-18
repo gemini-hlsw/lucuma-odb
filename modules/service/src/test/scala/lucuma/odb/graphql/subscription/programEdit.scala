@@ -388,9 +388,9 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap: pid =>
             IO.sleep(1.second) >>
-            addProgramUserAs(pi, pid).flatMap: rid =>
+            addProgramUserAs(pi, pid).flatMap: mid =>
               IO.sleep(1.second) >> // give time to see the creation before we do an update
-              linkUserAs(pi, rid, pi2.id)
+              linkUserAs(pi, mid, pi2.id)
         ),
       expected =
         List(
@@ -426,9 +426,9 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           for {
             pid <- createProgram(pi, "foo")
             _   <- IO.sleep(1.second)
-            rid <- addProgramUserAs(pi, pid)
+            mid <- addProgramUserAs(pi, pid)
             _   <- IO.sleep(1.second)
-            inv <- createUserInvitationAs(pi, rid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
+            inv <- createUserInvitationAs(pi, mid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
             _   <- IO.sleep(1.second)
             _   <- revokeUserInvitationAs(pi, inv.id)
           } yield ()
@@ -470,8 +470,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           for {
             pid <- createProgram(pi, "foo")
             _   <- IO.sleep(1.second)
-            rid <- addProgramUserAs(pi, pid)
-            inv <- createUserInvitationAs(pi, rid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
+            mid <- addProgramUserAs(pi, pid)
+            inv <- createUserInvitationAs(pi, mid, recipientEmail = EmailAddress.from.getOption("here@there.com").get)
             _   <- IO.sleep(1.second)
             eid <- getEmailIdForInvitation(inv.id)
             _   <- updateEmailStatus(eid.get, EmailStatus.Accepted)

@@ -64,7 +64,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
         """.asRight
     )
 
-  def updateConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+  def updateConfigurationRequestStatusAs(user: User, mid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
     expect(
       user = user,
       query = 
@@ -72,7 +72,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
           mutation {
             updateConfigurationRequests(input: {
               SET: { status: ${status.tag.toUpperCase} }
-              WHERE: { id: { EQ: ${rid.asJson} } }
+              WHERE: { id: { EQ: ${mid.asJson} } }
             }) {
               requests {
                 id
@@ -87,7 +87,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
           "updateConfigurationRequests" : {
             "requests" : [
               {
-                "id" : $rid,
+                "id" : $mid,
                 "status" : $status
               }
             ],
@@ -146,9 +146,9 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
         Right(
           for
             (pid, oid) <- setup
-            rid        <- createConfigurationRequestAs(pi, oid)
+            mid        <- createConfigurationRequestAs(pi, oid)
             _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
-            _          <- updateConfigurationRequestStatusAs(pi, rid, ConfigurationRequestStatus.Withdrawn)
+            _          <- updateConfigurationRequestStatusAs(pi, mid, ConfigurationRequestStatus.Withdrawn)
           yield ()
         ),
       expected = List(

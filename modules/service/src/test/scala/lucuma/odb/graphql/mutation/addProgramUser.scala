@@ -194,8 +194,8 @@ class addProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
-        rid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
-        _   <- assertIO(listProgramUsersAs(pi1, pid), List((rid, link, None)))
+        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
+        _   <- assertIO(listProgramUsersAs(pi1, pid), List((mid, link, None)))
       yield ()
 
   List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
@@ -216,12 +216,12 @@ class addProgramUser extends OdbSuite:
     for
       _    <- createUsers(pi1, pi2)
       pid  <- createProgramAs(pi1)
-      rid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
-      _    <- linkUserAs(pi1, rid, pi2.id)
+      mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+      _    <- linkUserAs(pi1, mid, pi2.id)
       rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.CoiRO)
       _    <- assertIO(
                 listProgramUsersAs(pi1, pid),
-                List((rid, ProgramUserRole.Coi, pi2.id.some), (rid2, ProgramUserRole.CoiRO, none))
+                List((mid, ProgramUserRole.Coi, pi2.id.some), (rid2, ProgramUserRole.CoiRO, none))
               )
     yield ()
 
@@ -231,8 +231,8 @@ class addProgramUser extends OdbSuite:
         for
           _    <- createUsers(pi1, pi2)
           pid  <- createProgramAs(pi1)
-          rid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi)
-          _    <- linkUserAs(pi1, rid, pi2.id)
+          mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi)
+          _    <- linkUserAs(pi1, mid, pi2.id)
           _    <- addProgramUserAs(pi2, pid, role, partnerLinkFor(role))
         yield ()
       } {
