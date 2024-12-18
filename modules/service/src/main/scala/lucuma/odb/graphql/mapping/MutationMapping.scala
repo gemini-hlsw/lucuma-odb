@@ -10,6 +10,7 @@ import cats.data.NonEmptyList
 import cats.effect.Resource
 import cats.kernel.Order
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Context
 import grackle.Env

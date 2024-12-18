@@ -413,9 +413,11 @@ class createUserInvitation extends OdbSuite:
               "programUsers": {
                 "matches": [
                   {
-                    "invitation": {
+                    "invitations": [
+                      {
                       "status": "PENDING"
-                    }
+                      }
+                    ]
                   }
                 ]
               }
@@ -439,9 +441,14 @@ class createUserInvitation extends OdbSuite:
               "programUsers": {
                 "matches": [
                   {
-                    "invitation": {
-                      "status": "PENDING"
-                    }
+                    "invitations": [
+                      {
+                        "status": "PENDING"
+                      },
+                      {
+                        "status": "PENDING"
+                      }
+                    ]
                   }
                 ]
               }

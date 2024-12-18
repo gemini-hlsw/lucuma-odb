@@ -2613,6 +2613,7 @@ input LinkUserInput {
 
 scalar ProgramUserId
 
+scalar UserInvitationId
 scalar UserInvitationKey
 
 """
@@ -2649,6 +2650,9 @@ enum UserInvitationStatus {
 
 "Invitation"
 type UserInvitation {
+
+  "Id"
+  id: UserInvitationId!
 
   "Invitation status."
   status: UserInvitationStatus!
@@ -2693,7 +2697,7 @@ type RedeemUserInvitationResult {
 }
 
 input RevokeUserInvitationInput {
-  id: ProgramUserId!
+  id: UserInvitationId!
 }
 
 type RevokeUserInvitationResult {
@@ -3601,8 +3605,8 @@ type ProgramUser {
   "Flag indicating whether the user's proposal is part of a thesis."
   thesis: Boolean
 
-  "User invitation, if any, associated with this program user."
-  invitation: UserInvitation
+  "User invitations, if any, associated with this program user."
+  invitations: [UserInvitation!]!
 }
 
 """

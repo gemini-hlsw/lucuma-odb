@@ -17,7 +17,7 @@ trait UserInvitationMapping[F[_]]
 
   lazy val UserInvitationMapping =
     ObjectMapping(UserInvitationType)(
-      SqlField("id", UserInvitationTable.ProgramUserId, key = true, hidden = true),
+      SqlField("id", UserInvitationTable.InvitationId, key = true),
       SqlField("status", UserInvitationTable.Status),
       SqlObject("issuer", Join(UserInvitationTable.IssuerId, UserTable.UserId)),
       SqlField("recipientEmail", UserInvitationTable.RecipientEmail),

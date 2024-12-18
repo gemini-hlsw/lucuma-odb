@@ -10,6 +10,7 @@ import lucuma.core.enums.InvitationStatus
 import lucuma.core.enums.Partner
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.odb.data.OdbError
 
 class revokeUserInvitation extends OdbSuite:
@@ -28,11 +29,11 @@ class revokeUserInvitation extends OdbSuite:
 
   override val httpRequestHandler = invitationEmailRequestHandler
 
-  def revoke(id: ProgramUser.Id): String =
+  def revoke(id: UserInvitation.Id): String =
     s"""
       mutation {
         revokeUserInvitation(input: {
-          id: "$id"
+          id: "${UserInvitation.Id.fromString.reverseGet(id)}"
         }) {
           invitation {
             status
@@ -86,55 +87,47 @@ class revokeUserInvitation extends OdbSuite:
   test("create, query, then revoke an invitation"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid).flatMap: rid =>
-        createUserInvitationAs(pi, rid) >>
-        query(
-          user = pi,
-          query = s"""
-            query {
-              program(programId: "$pid") {
-                userInvitations {
-                  programUser {
-                    id
-                  }
-                }
-              }
-            }
-          """
-        ).flatMap: json =>
-          val id = json
-            .hcursor
-            .downField("program")
-            .downField("userInvitations")
-            .downArray
-            .downFields("programUser", "id")
-            .require[ProgramUser.Id]
-
-          expect(
-            user     = pi,
-            query    = revoke(id),
-            expected = json"""
-              {
-                "revokeUserInvitation" : {
-                  "invitation" : {
-                    "status" : ${InvitationStatus.Revoked},
-                    "issuer" : { "id" : ${pi.id} },
-                    "programUser": {
-                      "id": $rid,
-                      "user": null,
-                      "program": {
-                        "users": [
-                          {
-                            "role": "COI",
-                            "user": null
-                          }
-                        ]
-                      }
+        createUserInvitationAs(pi, rid).flatMap: inv =>
+          query(
+            user = pi,
+            query = s"""
+              query {
+                program(programId: "$pid") {
+                  userInvitations {
+                    programUser {
+                      id
                     }
                   }
                 }
               }
-            """.asRight
-          )
+            """
+          ).flatMap: json =>
+            expect(
+              user     = pi,
+              query    = revoke(inv.id),
+              expected = json"""
+                {
+                  "revokeUserInvitation" : {
+                    "invitation" : {
+                      "status" : ${InvitationStatus.Revoked},
+                      "issuer" : { "id" : ${pi.id} },
+                      "programUser": {
+                        "id": $rid,
+                        "user": null,
+                        "program": {
+                          "users": [
+                            {
+                              "role": "COI",
+                              "user": null
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              """.asRight
+            )
 
   def badInvitation(u: User): PartialFunction[OdbError, Unit] =
     case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
