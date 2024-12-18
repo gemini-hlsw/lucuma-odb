@@ -726,7 +726,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def linkUserAs(
     user: User,
-    rid: ProgramUser.Id,
+    mid: ProgramUser.Id,
     uid:  User.Id
   ): IO[Unit] =
     expect(
@@ -734,7 +734,7 @@ trait DatabaseOperations { this: OdbSuite =>
       query = s"""
         mutation {
           linkUser(input: {
-            programUserId: ${rid.asJson}
+            programUserId: ${mid.asJson}
             userId: ${uid.asJson}
           }) {
             user { id }
@@ -744,7 +744,7 @@ trait DatabaseOperations { this: OdbSuite =>
       expected = json"""
         {
           "linkUser" : {
-            "user": { "id": $rid }
+            "user": { "id": $mid }
           }
         }
       """.asRight
@@ -1475,14 +1475,14 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def deleteProgramUserAs(
     user: User,
-    rid:  ProgramUser.Id
+    mid:  ProgramUser.Id
   ): IO[Boolean] =
     query(
       user = user,
       query = s"""
         mutation {
           deleteProgramUser(input: {
-            programUserId: "$rid"
+            programUserId: "$mid"
           }) {
             result
           }
@@ -1525,7 +1525,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def createUserInvitationAs(
     user: User,
-    rid:  ProgramUser.Id,
+    mid:  ProgramUser.Id,
     recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get,
   ): IO[UserInvitation] =
     query(
@@ -1534,7 +1534,7 @@ trait DatabaseOperations { this: OdbSuite =>
       mutation {
         createUserInvitation(
           input: {
-            programUserId: "$rid"
+            programUserId: "$mid"
             recipientEmail: "$recipientEmail"
           }
         ) { key }

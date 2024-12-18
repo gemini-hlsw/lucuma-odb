@@ -31,26 +31,26 @@ class deleteProgramUser extends OdbSuite:
   test("Delete should return true if the user was removed."):
     for
       pid <- createProgramAs(pi1)
-      rid <- addProgramUserAs(pi1, pid)
-      _   <- assertIO(listProgramUsersAs(pi1, pid), List((rid, ProgramUserRole.Coi, None)))
-      _   <- assertIO(deleteProgramUserAs(pi1, rid), true)
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- assertIO(listProgramUsersAs(pi1, pid), List((mid, ProgramUserRole.Coi, None)))
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
       _   <- assertIO(listProgramUsersAs(pi1, pid), Nil)
     yield ()
 
   test("Delete should return false if the user doesn't exist."):
     for
       pid <- createProgramAs(pi1)
-      rid <- addProgramUserAs(pi1, pid)
-      _   <- assertIO(deleteProgramUserAs(pi1, rid), true)
-      _   <- assertIO(deleteProgramUserAs(pi1, rid), false)
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), false)
     yield ()
 
   test("Delete should fail if the program isn't accessible to the user."):
     for
       _   <- createUsers(pi1, pi2, pi3)
       pid <- createProgramAs(pi1)
-      rid <- addProgramUserAs(pi1, pid)
-      _   <- interceptOdbError(deleteProgramUserAs(pi3, rid)):
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- interceptOdbError(deleteProgramUserAs(pi3, mid)):
                case OdbError.NotAuthorized(_, _) => // ok
     yield ()
 
@@ -66,8 +66,8 @@ class deleteProgramUser extends OdbSuite:
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- deleteProgramUserAs(guest, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- deleteProgramUserAs(guest, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(guest.id, _) => // this is what we expect
@@ -81,8 +81,8 @@ class deleteProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
-        rid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
-        _   <- assertIO(deleteProgramUserAs(pi1, rid), true)
+        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
+        _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
       yield ()
 
   List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
@@ -91,8 +91,8 @@ class deleteProgramUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- deleteProgramUserAs(pi1, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- deleteProgramUserAs(pi1, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(pi1.id, _) => // this is what we expect
@@ -132,9 +132,9 @@ class deleteProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
         pid <- createProgramAs(pi1)
-        rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+        mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
         _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-        _   <- assertIO(deleteProgramUserAs(ngo, rid), true)
+        _   <- assertIO(deleteProgramUserAs(ngo, mid), true)
       yield ()
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
@@ -143,8 +143,8 @@ class deleteProgramUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- deleteProgramUserAs(ngo, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- deleteProgramUserAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
@@ -156,9 +156,9 @@ class deleteProgramUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
           _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-          _   <- deleteProgramUserAs(ngo, rid)
+          _   <- deleteProgramUserAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
@@ -172,8 +172,8 @@ class deleteProgramUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, u)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- assertIO(deleteProgramUserAs(u, rid), true)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- assertIO(deleteProgramUserAs(u, mid), true)
         yield ()
 
   test(s"Nobody can delete the PI."):
@@ -181,8 +181,8 @@ class deleteProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, admin)
         pid <- createProgramAs(pi1)
-        rid <- piProgramUserIdAs(pi1, pid)
-        _   <- assertIO(deleteProgramUserAs(admin, rid), false)
+        mid <- piProgramUserIdAs(pi1, pid)
+        _   <- assertIO(deleteProgramUserAs(admin, mid), false)
       yield ()
     } {
       case OdbError.UpdateFailed(Some("PIs are fixed at program creation time.")) => // expected

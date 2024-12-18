@@ -153,7 +153,7 @@ object UserInvitationService:
               .flatMap:
                 case None      =>
                   OdbError.InvitationError(input.key.id, "Invitation is invalid, or has already been accepted, declined, or revoked.".some).asFailureF
-                case Some(rid) =>
+                case Some(mid) =>
                   if !input.accept then input.key.id.success.pure
                   else
                     // Here we need to update t_program_user to assign the user id
@@ -161,7 +161,7 @@ object UserInvitationService:
                     xa.savepoint.flatMap: sp =>
                       services
                         .programUserService
-                        .linkInvitationAccept(rid)
+                        .linkInvitationAccept(mid)
                         .flatMap:
                           case Result.Success(_) => input.key.id.success.pure
                           case f                 => xa.rollback(sp).as(f.as(input.key.id))

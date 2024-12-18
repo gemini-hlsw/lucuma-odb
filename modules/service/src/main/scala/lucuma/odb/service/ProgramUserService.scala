@@ -232,14 +232,14 @@ object ProgramUserService:
                         OdbError.InvalidUser(targetUserId, s"User $targetUserId does not exist or is of a nonstandard type.".some).asFailure
 
       def unlinkUser(
-        rid: ProgramUser.Id
+        mid: ProgramUser.Id
       )(using Transaction[F]): F[Result[Option[User.Id]]] =
-        session.prepare(Statements.SelectLinkData).flatMap(_.option(rid)).flatMap:
-          case None                         => OdbError.InvalidProgramUser(rid).asFailureF
+        session.prepare(Statements.SelectLinkData).flatMap(_.option(mid)).flatMap:
+          case None                         => OdbError.InvalidProgramUser(mid).asFailureF
           case Some((pid, role, None))      => none.success.pure
           case Some((pid, role, Some(uid))) =>
             Statements.accessCheck("unlink", role, pid, user)
-              .map(Statements.unlinkStandardUser(rid, _))
+              .map(Statements.unlinkStandardUser(mid, _))
               .flatTraverse: af =>
                 val stmt = sql"${af.fragment}".command
                 session.prepare(stmt).flatMap: pq =>

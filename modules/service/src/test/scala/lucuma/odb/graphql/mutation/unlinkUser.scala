@@ -32,14 +32,14 @@ class unlinkUser extends OdbSuite:
 
   def unlinkAs(
     user: User,
-    rid:  ProgramUser.Id
+    mid:  ProgramUser.Id
   ): IO[Boolean] =
     query(
       user = user,
       query = s"""
         mutation {
           unlinkUser(input: {
-            programUserId: "$rid"
+            programUserId: "$mid"
           }) {
             result
           }
@@ -54,17 +54,17 @@ class unlinkUser extends OdbSuite:
     for
       _   <- createUsers(pi1, pi2)
       pid <- createProgramAs(pi1)
-      rid <- addProgramUserAs(pi1, pid)
-      _   <- assertIO(unlinkAs(pi1, rid), false)
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- assertIO(unlinkAs(pi1, mid), false)
     yield ()
 
   test("Unlink should fail if program isn't accessible to the user."):
     for
       _   <- createUsers(pi1, pi2, pi3)
       pid <- createProgramAs(pi1)
-      rid <- addProgramUserAs(pi1, pid, partnerLink = PartnerLink.HasPartner(Partner.US))
-      _   <- linkUserAs(pi1, rid, pi2.id)
-      _   <- interceptOdbError(unlinkAs(pi3, rid)):
+      mid <- addProgramUserAs(pi1, pid, partnerLink = PartnerLink.HasPartner(Partner.US))
+      _   <- linkUserAs(pi1, mid, pi2.id)
+      _   <- interceptOdbError(unlinkAs(pi3, mid)):
                case OdbError.NotAuthorized(_, _) => // ok
     yield ()
 
@@ -80,9 +80,9 @@ class unlinkUser extends OdbSuite:
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, rid, pi2.id)
-          _   <- unlinkAs(guest, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- linkUserAs(admin, mid, pi2.id)
+          _   <- unlinkAs(guest, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(guest.id, _) => // this is what we expect
@@ -96,9 +96,9 @@ class unlinkUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
-        rid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
-        _   <- linkUserAs(pi1, rid, pi2.id)
-        _   <- assertIO(unlinkAs(pi1, rid), true)
+        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
+        _   <- linkUserAs(pi1, mid, pi2.id)
+        _   <- assertIO(unlinkAs(pi1, mid), true)
       yield ()
 
   List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
@@ -107,9 +107,9 @@ class unlinkUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, rid, pi2.id)
-          _   <- unlinkAs(pi1, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- linkUserAs(admin, mid, pi2.id)
+          _   <- unlinkAs(pi1, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(pi1.id, _) => // this is what we expect
@@ -151,10 +151,10 @@ class unlinkUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
         pid <- createProgramAs(pi1)
-        rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-        _   <- linkUserAs(admin, rid, pi2.id)
+        mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+        _   <- linkUserAs(admin, mid, pi2.id)
         _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-        _   <- assertIO(unlinkAs(ngo, rid), true)
+        _   <- assertIO(unlinkAs(ngo, mid), true)
       yield ()
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
@@ -163,9 +163,9 @@ class unlinkUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, rid, pi2.id)
-          _   <- unlinkAs(ngo, rid)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- linkUserAs(admin, mid, pi2.id)
+          _   <- unlinkAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
@@ -177,10 +177,10 @@ class unlinkUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, rid, pi2.id)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- linkUserAs(admin, mid, pi2.id)
           _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-          _   <- unlinkAs(ngo, rid)
+          _   <- unlinkAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
@@ -194,9 +194,9 @@ class unlinkUser extends OdbSuite:
         for
           _   <- createUsers(pi1, pi2, u)
           pid <- createProgramAs(pi1)
-          rid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, rid, pi2.id)
-          _   <- assertIO(unlinkAs(u, rid), true)
+          mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
+          _   <- linkUserAs(admin, mid, pi2.id)
+          _   <- assertIO(unlinkAs(u, mid), true)
         yield ()
 
   test(s"Nobody can unlink the PI."):
@@ -204,8 +204,8 @@ class unlinkUser extends OdbSuite:
       for
         _   <- createUsers(pi1, admin)
         pid <- createProgramAs(pi1)
-        rid <- piProgramUserIdAs(pi1, pid)
-        _   <- assertIO(unlinkAs(admin, rid), false)
+        mid <- piProgramUserIdAs(pi1, pid)
+        _   <- assertIO(unlinkAs(admin, mid), false)
       yield ()
     } {
       case OdbError.UpdateFailed(Some("PIs are fixed at program creation time.")) => // expected
