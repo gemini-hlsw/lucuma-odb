@@ -1543,7 +1543,7 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: js =>
       js.hcursor.downFields("createUserInvitation", "key").require[UserInvitation]
 
-  def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[ProgramUser.Id] =
+  def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[UserInvitation.Id] =
     query(
       user = u,
       query = s"""
@@ -1552,36 +1552,28 @@ trait DatabaseOperations { this: OdbSuite =>
             key: "${UserInvitation.fromString.reverseGet(inv)}"
             accept: $accept
           }) {
-            invitation {
-              status
-              issuer { id }
-              programUser { id }
-            }
+            invitation { id }
           }
         }
       """
     ).map: j =>
-      j.hcursor.downFields("redeemUserInvitation", "invitation", "programUser", "id").require[ProgramUser.Id]
+      j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
 
-  def revokeUserInvitationAs(u: User, id: ProgramUser.Id): IO[ProgramUser.Id] =
+  def revokeUserInvitationAs(u: User, id: UserInvitation.Id): IO[UserInvitation.Id] =
     query(
       user = u,
       query = s"""
         mutation {
-          revokeUserInvitation(input: { id: "$id" }) {
-            invitation {
-              status
-              issuer { id }
-              programUser { id }
-            }
+          revokeUserInvitation(input: { id: "${UserInvitation.Id.fromString.reverseGet(id)}" }) {
+            invitation { id }
           }
         }
       """
     ).map: j =>
-      j.hcursor.downFields("revokeUserInvitation", "invitation", "programUser", "id").require[ProgramUser.Id]
+      j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
 
-  def getEmailIdForInvitation(id: ProgramUser.Id): IO[Option[EmailId]] =
-    val query = sql"select c_email_id from t_invitation where c_program_user_id = $program_user_id".query(email_id)
+  def getEmailIdForInvitation(id: UserInvitation.Id): IO[Option[EmailId]] =
+    val query = sql"select c_email_id from t_invitation where c_invitation_id = $user_invitation_id".query(email_id)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.option(id)))
 

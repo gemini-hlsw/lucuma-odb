@@ -42,7 +42,7 @@ trait ProgramUserMapping[F[_]]
       SqlObject("program", Join(ProgramUserTable.ProgramId, ProgramTable.Id)),
       SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId)),
       SqlObject("fallbackProfile"),
-      SqlObject("invitation", Join(ProgramUserTable.ProgramUserId, UserInvitationTable.ProgramUserId))
+      SqlObject("invitations", Join(ProgramUserTable.ProgramUserId, UserInvitationTable.ProgramUserId))
     )
 
 }

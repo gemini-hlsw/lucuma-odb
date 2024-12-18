@@ -43,6 +43,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -190,6 +191,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Long](TransactionIdType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[String](UserInvitationKeyType),
+      LeafMapping[UserInvitation.Id](UserInvitationIdType),
       LeafMapping[InvitationStatus](UserInvitationStatusType),
       LeafMapping[UserType](UserTypeType),
       LeafMapping[Visit.Id](VisitIdType),
