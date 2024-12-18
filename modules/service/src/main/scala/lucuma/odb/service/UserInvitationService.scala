@@ -32,6 +32,7 @@ import lucuma.odb.graphql.input.RevokeUserInvitationInput
 import lucuma.odb.util.Codecs.*
 import org.http4s.client.Client
 import skunk.Query
+import skunk.SqlState
 import skunk.Transaction
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -88,6 +89,9 @@ object UserInvitationService:
           .use: pq =>
             pq.option(user, pid, input)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, "Specified program does not exist, or user is not the PI or COI.".some).asProblem))
+              .recoverWith:
+                case SqlState.UniqueViolation(ex) =>
+                  OdbError.UpdateFailed(s"There is already a pending invitation for program user '${input.programUserId}'.".some).asFailureF
 
       def createInvitationAsSuperUser(
         input: CreateUserInvitationInput,
@@ -98,6 +102,9 @@ object UserInvitationService:
           .use: pq =>
             pq.option(user, pid, input)
               .map(Result.fromOption(_, OdbError.InvalidProgram(pid, "Specified program does not exist.".some).asProblem))
+              .recoverWith:
+                case SqlState.UniqueViolation(ex) =>
+                  OdbError.UpdateFailed(s"There is already a pending invitation for program user '${input.programUserId}'.".some).asFailureF
 
       def createUserInvitationImpl(
         input:        CreateUserInvitationInput,

@@ -24,6 +24,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.OdbError
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl
@@ -399,7 +400,7 @@ class createUserInvitation extends OdbSuite:
       }
     """
 
-  test("program user invitation"):
+  test("program user invitations"):
     for
       pid  <- createProgramAs(pi)
       rid  <- addProgramUserAs(pi, pid)
@@ -413,11 +414,7 @@ class createUserInvitation extends OdbSuite:
               "programUsers": {
                 "matches": [
                   {
-                    "invitations": [
-                      {
-                      "status": "PENDING"
-                      }
-                    ]
+                    "invitations": [ { "status": "PENDING" } ]
                   }
                 ]
               }
@@ -426,33 +423,11 @@ class createUserInvitation extends OdbSuite:
         )
     yield ()
 
-  test("one invitation per user"):
+  test("one pending invitation per user"):
     for
-      pid  <- createProgramAs(pi)
-      rid  <- addProgramUserAs(pi, pid)
-      inv0 <- createUserInvitationAs(pi, rid)
-      inv1 <- createUserInvitationAs(pi, rid)
-      _    <- expect(
-        user     = pi,
-        query    = invitationsQuery(pi, pid),
-        expected =
-          json"""
-            {
-              "programUsers": {
-                "matches": [
-                  {
-                    "invitations": [
-                      {
-                        "status": "PENDING"
-                      },
-                      {
-                        "status": "PENDING"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          """.asRight
-        )
+      pid <- createProgramAs(pi)
+      rid <- addProgramUserAs(pi, pid)
+      inv <- createUserInvitationAs(pi, rid)
+        _ <- interceptOdbError(createUserInvitationAs(pi, rid)):
+               case OdbError.UpdateFailed(_) => // ok
     yield ()

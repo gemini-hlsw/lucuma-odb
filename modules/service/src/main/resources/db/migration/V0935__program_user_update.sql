@@ -56,6 +56,13 @@ ALTER TABLE t_invitation
 ALTER TABLE t_invitation
   ADD COLUMN c_program_user_id d_program_user_id NOT NULL REFERENCES t_program_user(c_program_user_id) ON DELETE CASCADE;
 
+-- Add an index on the program user since will be joining invitations on this.
+CREATE INDEX idx_program_user_id ON t_invitation(c_program_user_id);
+
+-- Add a partial index to prevent multiple pending invitations.
+CREATE UNIQUE INDEX at_most_one_pending_invitation ON t_invitation(c_program_user_id)
+  WHERE c_status = 'pending';
+
 -- Update the invitation creation function.
 DROP FUNCTION insert_invitation;
 
