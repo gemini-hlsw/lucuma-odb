@@ -45,17 +45,16 @@ ALTER TABLE t_program_user
 ALTER SEQUENCE s_program_user_id OWNED BY t_program_user.c_program_user_id;
 
 -- Now that every invitation refers to a program user, it doesn't need duplicate
--- program user information or an invitation id.
+-- program user information.
 ALTER TABLE t_invitation
-  DROP COLUMN c_invitation_id,
   DROP COLUMN c_role,
   DROP COLUMN c_redeemer_id,
   DROP COLUMN c_partner,
   DROP COLUMN c_partner_link;
 
--- Add the program user id to the invitation as the new primary key.
+-- Add the program user id to the invitation.
 ALTER TABLE t_invitation
-  ADD COLUMN c_program_user_id d_program_user_id PRIMARY KEY REFERENCES t_program_user(c_program_user_id) ON DELETE CASCADE;
+  ADD COLUMN c_program_user_id d_program_user_id NOT NULL REFERENCES t_program_user(c_program_user_id) ON DELETE CASCADE;
 
 -- Update the invitation creation function.
 DROP FUNCTION insert_invitation;
@@ -68,11 +67,12 @@ CREATE FUNCTION insert_invitation(
   p_email_id        text
 ) RETURNS text AS $$
   DECLARE
-    invitation_key_id   text := substring(p_program_user_id FROM 3);
-    invitation_key      text := md5(random()::text) || md5(random()::text) ||  md5(random()::text);
-    invitation_key_hash text := md5(invitation_key);
+    invitation_key_id   d_invitation_id := to_hex(nextval('s_invitation_id'::regclass));
+    invitation_key      text            := md5(random()::text) || md5(random()::text) ||  md5(random()::text);
+    invitation_key_hash text            := md5(invitation_key);
   BEGIN
     INSERT INTO t_invitation (
+      c_invitation_id,
       c_program_user_id,
       c_issuer_id,
       c_program_id,
@@ -81,6 +81,7 @@ CREATE FUNCTION insert_invitation(
       c_email_id
     )
     VALUES (
+      invitation_key_id,
       p_program_user_id,
       p_issuer_id,
       p_program_id,

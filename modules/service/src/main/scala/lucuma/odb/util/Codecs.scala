@@ -720,6 +720,13 @@ trait Codecs {
       fromString.reverseGet
     )
 
+  val user_invitation_id: Codec[UserInvitation.Id] =
+    import UserInvitation.Id.fromString
+    varchar.eimap(
+      s => fromString.getOption(s).toRight("Invalid invitation id: $s"))(
+      fromString.reverseGet
+    )
+
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
 

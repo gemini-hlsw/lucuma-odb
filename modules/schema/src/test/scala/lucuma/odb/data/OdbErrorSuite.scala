@@ -14,6 +14,7 @@ import io.circe.testing.CodecTests
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Site
 import lucuma.core.model.*
+import lucuma.core.model.arb.ArbUserInvitation.given
 import lucuma.core.model.sequence.*
 import lucuma.core.model.sequence.Dataset.Filename
 import lucuma.core.util.Enumerated
@@ -70,7 +71,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.InvalidArgument           => OdbError.InvalidArgument(detail).pure[Gen]
           case Tag.NoAction                  => OdbError.NoAction(detail).pure[Gen]
           case Tag.NotAuthorized             => arbitrary[User.Id].map(OdbError.NotAuthorized(_, detail))
-          case Tag.InvitationError           => arbitrary[ProgramUser.Id].map(OdbError.InvitationError(_, detail))
+          case Tag.InvitationError           => arbitrary[UserInvitation.Id].map(OdbError.InvitationError(_, detail))
           case Tag.InvalidProgram            => arbitrary[Program.Id].map(OdbError.InvalidProgram(_, detail))
           case Tag.InvalidObservation        => arbitrary[Observation.Id].map(OdbError.InvalidObservation(_, detail))
           case Tag.InvalidObservationList    => arbitrary[NonEmptyList[Observation.Id]].map(OdbError.InvalidObservationList(_, detail))

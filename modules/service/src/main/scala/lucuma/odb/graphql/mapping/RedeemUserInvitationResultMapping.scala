@@ -13,6 +13,6 @@ trait RedeemUserInvitationResultMapping[F[_]] extends UserInvitationTable[F]:
 
   lazy val RedeemUserInvitationResultMapping =
     ObjectMapping(RedeemUserInvitationResultType)(
-      SqlField("id", UserInvitationTable.ProgramUserId, key = true, hidden = true),
+      SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
       SqlObject("invitation")
     )

@@ -10,6 +10,7 @@ import lucuma.odb.util.Codecs.*
 
 trait UserInvitationTable[F[_]] extends BaseMapping[F]:
  object UserInvitationTable extends TableDef("t_invitation"):
+    val InvitationId   = col("c_invitation_id", user_invitation_id)
     val ProgramUserId  = col("c_program_user_id", program_user_id)
     val Status         = col("c_status", user_invitation_status)
     val IssuerId       = col("c_issuer_id", user_id)
