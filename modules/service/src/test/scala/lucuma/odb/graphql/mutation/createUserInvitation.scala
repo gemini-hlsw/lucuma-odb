@@ -380,3 +380,72 @@ class createUserInvitation extends OdbSuite:
             "Unexpected status '400 Bad Request' while attempting to send email."
           ).asLeft
         )
+
+  def invitationsQuery(user: User, pid: Program.Id): String =
+    s"""
+      query {
+        programUsers(
+          WHERE: {
+            program: { id : { EQ: "$pid" } }
+            user: { IS_NULL: true }
+          }
+        ) {
+          matches {
+            invitations {
+              status
+            }
+          }
+        }
+      }
+    """
+
+  test("program user invitation"):
+    for
+      pid  <- createProgramAs(pi)
+      rid  <- addProgramUserAs(pi, pid)
+      inv0 <- createUserInvitationAs(pi, rid)
+      _    <- expect(
+        user     = pi,
+        query    = invitationsQuery(pi, pid),
+        expected =
+          json"""
+            {
+              "programUsers": {
+                "matches": [
+                  {
+                    "invitation": {
+                      "status": "PENDING"
+                    }
+                  }
+                ]
+              }
+            }
+          """.asRight
+        )
+    yield ()
+
+  test("one invitation per user"):
+    for
+      pid  <- createProgramAs(pi)
+      rid  <- addProgramUserAs(pi, pid)
+      inv0 <- createUserInvitationAs(pi, rid)
+      inv1 <- createUserInvitationAs(pi, rid)
+      _    <- expect(
+        user     = pi,
+        query    = invitationsQuery(pi, pid),
+        expected =
+          json"""
+            {
+              "programUsers": {
+                "matches": [
+                  {
+                    "invitation": {
+                      "status": "PENDING"
+                    }
+                  }
+                ]
+              }
+            }
+          """.asRight
+        )
+    yield ()
