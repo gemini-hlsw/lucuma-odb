@@ -431,3 +431,34 @@ class createUserInvitation extends OdbSuite:
         _ <- interceptOdbError(createUserInvitationAs(pi, rid)):
                case OdbError.UpdateFailed(_) => // ok
     yield ()
+
+  test("reject, invite again"):
+    createProgramAs(pi2).>>
+      for
+        pid  <- createProgramAs(pi)
+        rid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, rid)
+        _    <- redeemUserInvitationAs(pi2, inv0, false)
+        inv1 <- createUserInvitationAs(pi, rid)
+        _    <- redeemUserInvitationAs(pi2, inv1, true)
+      yield ()
+
+  test("revoke, invite again"):
+    createProgramAs(pi2).>>
+      for
+        pid  <- createProgramAs(pi)
+        rid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, rid)
+        _    <- revokeUserInvitationAs(pi, inv0.id)
+        inv1 <- createUserInvitationAs(pi, rid)
+        _    <- redeemUserInvitationAs(pi2, inv1, true)
+      yield ()
+
+  test("can't invite after linked"):
+    for
+      pid <- createProgramAs(pi)
+      rid <- addProgramUserAs(pi, pid)
+      _   <- linkUserAs(pi, rid, pi2.id)
+      _   <- interceptOdbError(createUserInvitationAs(pi, rid)):
+               case OdbError.InvalidProgramUser(rid, _) => // ok
+    yield ()

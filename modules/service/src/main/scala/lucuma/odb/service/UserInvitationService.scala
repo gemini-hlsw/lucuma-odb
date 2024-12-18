@@ -154,15 +154,17 @@ object UserInvitationService:
                 case None      =>
                   OdbError.InvitationError(input.key.id, "Invitation is invalid, or has already been accepted, declined, or revoked.".some).asFailureF
                 case Some(rid) =>
-                  // Here we need to update t_program_user to assign the user id
-                  val xa = transaction
-                  xa.savepoint.flatMap: sp =>
-                    services
-                      .programUserService
-                      .linkInvitationAccept(rid)
-                      .flatMap:
-                        case Result.Success(_) => input.key.id.success.pure
-                        case f                 => xa.rollback(sp).as(f.as(input.key.id))
+                  if !input.accept then input.key.id.success.pure
+                  else
+                    // Here we need to update t_program_user to assign the user id
+                    val xa = transaction
+                    xa.savepoint.flatMap: sp =>
+                      services
+                        .programUserService
+                        .linkInvitationAccept(rid)
+                        .flatMap:
+                          case Result.Success(_) => input.key.id.success.pure
+                          case f                 => xa.rollback(sp).as(f.as(input.key.id))
 
       def revokeUserInvitation(input: RevokeUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation.Id]] =
         user.role.access match
