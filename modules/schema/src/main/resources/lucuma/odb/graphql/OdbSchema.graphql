@@ -8726,6 +8726,7 @@ type ConfigurationRequest {
   program: Program!
   status: ConfigurationRequestStatus!
   configuration: Configuration!
+  applicableObservations: [ObservationId!]!
 }
 
 input CreateConfigurationRequestInput {
