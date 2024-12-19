@@ -502,6 +502,7 @@ object OdbMapping {
                 ObservationElaborator,
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
+                ProgramUserElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,
