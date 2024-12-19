@@ -18,6 +18,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
@@ -25,6 +26,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
+import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
@@ -38,8 +40,6 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.Services
-import lucuma.core.model.ConfigurationRequest
-import lucuma.odb.graphql.input.WhereConfigurationRequest
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>
