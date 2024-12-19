@@ -9,7 +9,6 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
-import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -82,34 +81,44 @@ object CallForProposalsService {
 
       override def createCallForProposals(
         input: CreateCallForProposalsInput
-      )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]] = {
+      )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]] =
 
-        def insertPartnersDefault(cids: List[CallForProposals.Id]): F[Unit] =
-          session
-           .prepareR(Statements.InsertDefaultPartners(cids))
-           .use(_.execute(cids))
-           .void
+        val insertCfp: F[Result[CallForProposals.Id]] =
+          session.unique(Statements.InsertCallForProposals)(input.SET)
+            .map(_.success)
+            .recoverWith:
+              case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
+                OdbError.InvalidArgument(s"The maximum semester is capped at the current year +1 (${input.SET.semester} specified).".some).asFailureF
 
-        def insertPartners(cids: List[CallForProposals.Id]): F[Unit] =
-          input.SET.partners.fold(insertPartnersDefault(cids)) { partners =>
+        case class UsingCid(cid: CallForProposals.Id):
+          val cids = List(cid)
+          val instruments = input.SET.instruments
+
+          val insertPartnersDefault: F[Unit] =
             session
-              .prepareR(Statements.InsertPartners(cids, partners))
-              .use(_.execute(cids, partners))
-              .whenA(partners.nonEmpty)
-          }
+             .prepareR(Statements.InsertDefaultPartners(cids))
+             .use(_.execute(cids))
+             .void
 
-        val instruments = input.SET.instruments
+          val insertPartners: F[Unit] =
+            input.SET.partners.fold(insertPartnersDefault): partners =>
+              session
+                .prepareR(Statements.InsertPartners(cids, partners))
+                .use(_.execute(cids, partners))
+                .whenA(partners.nonEmpty)
 
-        (for {
-          cid <- session.unique(Statements.InsertCallForProposals)(input.SET)
-          cids = List(cid)
-          _   <- insertPartners(cids)
-          _   <- session
-                   .prepareR(Statements.InsertInstruments(cids, instruments))
-                   .use(_.execute(cids, instruments))
-                   .whenA(instruments.nonEmpty)
-        } yield cid).map(_.success)
-      }
+          val insertInstruments: F[Unit] =
+            session
+              .prepareR(Statements.InsertInstruments(cids, instruments))
+              .use(_.execute(cids, instruments))
+              .whenA(instruments.nonEmpty)
+
+        (for
+          cid <- ResultT(insertCfp)
+          usingCid = UsingCid(cid)
+          _   <- ResultT.liftF(usingCid.insertPartners)
+          _   <- ResultT.liftF(usingCid.insertInstruments)
+        yield cid).value
 
       private def updateCfpTable(
         SET:   CallForProposalsPropertiesInput.Edit,

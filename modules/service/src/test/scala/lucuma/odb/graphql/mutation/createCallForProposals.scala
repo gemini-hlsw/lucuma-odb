@@ -736,4 +736,30 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
+  test("failure - too far in the future"):
+    expect(
+      user  = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type: REGULAR_SEMESTER
+                semester: "2099A"
+                activeStart: "2026-02-01"
+                activeEnd: "2026-07-31"
+                partners: [{ partner: CL }, { partner: US }]
+                instruments: [GMOS_NORTH, GMOS_SOUTH]
+              }
+            }
+          ) {
+            callForProposals {
+              id
+            }
+          }
+        }
+      """,
+      expected = List("The maximum semester is capped at the current year +1 (Semester(2099A) specified).").asLeft
+    )
+
 }
