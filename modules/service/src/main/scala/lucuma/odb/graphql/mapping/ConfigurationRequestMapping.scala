@@ -5,21 +5,22 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.effect.kernel.Resource
 import cats.syntax.all.*
-import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.ProgramTable
+import grackle.Context
+import grackle.Cursor
+import grackle.Query
 import grackle.Query.EffectHandler
-import lucuma.core.model.ConfigurationRequest
 import grackle.Result
 import grackle.ResultT
-import cats.effect.kernel.Resource
-import lucuma.odb.service.Services
-import grackle.Cursor
-import grackle.Context
-import grackle.Query
-import Services.Syntax.*
+import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
+import lucuma.core.model.ConfigurationRequest
+import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.service.Services
+
+import Services.Syntax.*
 
 trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with ProgramTable[F] {
 
