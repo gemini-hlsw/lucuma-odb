@@ -500,3 +500,25 @@ class createUserInvitation extends OdbSuite:
       _   <- interceptOdbError(createUserInvitationAs(pi, mid)):
                case OdbError.InvalidProgramUser(mid, _) => // ok
     yield ()
+
+  test(s"Delete a program user after invitation acceptance."):
+    createProgramAs(pi2).>>
+    for
+      pid <- createProgramAs(pi)
+      mid <- addProgramUserAs(pi, pid)
+      inv <- createUserInvitationAs(pi, mid)
+      _   <- redeemUserInvitationAs(pi2, inv, true)
+      _   <- deleteProgramUserAs(pi, mid)
+      _   <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [ ]
+                }
+              }
+            """.asRight
+      )
+    yield ()
