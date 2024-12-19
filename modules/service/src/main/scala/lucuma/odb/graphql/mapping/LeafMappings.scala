@@ -38,6 +38,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
@@ -156,6 +157,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramType](ProgramTypeType),
+      LeafMapping[ProgramUser.Id](ProgramUserIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),
       LeafMapping[ProgramReference](ProgramReferenceLabelType),
       LeafMapping[ProposalReference](ProposalReferenceLabelType),

@@ -83,6 +83,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.InvalidFilename           => arbitrary[Filename].map(OdbError.InvalidFilename(_, detail))
           case Tag.InvalidAtom               => arbitrary[Atom.Id].map(OdbError.InvalidAtom(_, detail))
           case Tag.InvalidDataset            => arbitrary[Dataset.Id].map(OdbError.InvalidDataset(_, detail))
+          case Tag.InvalidProgramUser        => arbitrary[ProgramUser.Id].map(OdbError.InvalidProgramUser(_, detail))
           case Tag.InvalidUser               => arbitrary[User.Id].map(OdbError.InvalidUser(_, detail))
           case Tag.UpdateFailed              => OdbError.UpdateFailed(detail).pure[Gen]
           case Tag.ItcError                  => OdbError.ItcError(detail).pure[Gen]

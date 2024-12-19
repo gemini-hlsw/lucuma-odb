@@ -4,20 +4,18 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.effect.IO
 import cats.syntax.eq.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.PartnerLink
-import lucuma.core.model.ProgramUser
-import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 
-class unlinkUser extends OdbSuite:
+class deleteProgramUser extends OdbSuite:
+  val partner = Partner.CA
 
   val pi1      = TestUsers.Standard.pi(nextId, nextId)
   val pi2      = TestUsers.Standard.pi(nextId, nextId)
@@ -30,41 +28,29 @@ class unlinkUser extends OdbSuite:
 
   lazy val validUsers = List(pi1, pi2, pi3, ngo, staff, admin, guest, service)
 
-  def unlinkAs(
-    user: User,
-    mid:  ProgramUser.Id
-  ): IO[Boolean] =
-    query(
-      user = user,
-      query = s"""
-        mutation {
-          unlinkUser(input: {
-            programUserId: "$mid"
-          }) {
-            result
-          }
-        }
-      """
-    ).map: j =>
-      j.hcursor.downFields("unlinkUser", "result").require[Boolean]
-
-  // General rules
-
-  test("Unlink should return false if link doesn't exist."):
+  test("Delete should return true if the user was removed."):
     for
-      _   <- createUsers(pi1, pi2)
       pid <- createProgramAs(pi1)
       mid <- addProgramUserAs(pi1, pid)
-      _   <- assertIO(unlinkAs(pi1, mid), false)
+      _   <- assertIO(listProgramUsersAs(pi1, pid), List((mid, ProgramUserRole.Coi, None)))
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
+      _   <- assertIO(listProgramUsersAs(pi1, pid), Nil)
     yield ()
 
-  test("Unlink should fail if program isn't accessible to the user."):
+  test("Delete should return false if the user doesn't exist."):
+    for
+      pid <- createProgramAs(pi1)
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
+      _   <- assertIO(deleteProgramUserAs(pi1, mid), false)
+    yield ()
+
+  test("Delete should fail if the program isn't accessible to the user."):
     for
       _   <- createUsers(pi1, pi2, pi3)
       pid <- createProgramAs(pi1)
-      mid <- addProgramUserAs(pi1, pid, partnerLink = PartnerLink.HasPartner(Partner.US))
-      _   <- linkUserAs(pi1, mid, pi2.id)
-      _   <- interceptOdbError(unlinkAs(pi3, mid)):
+      mid <- addProgramUserAs(pi1, pid)
+      _   <- interceptOdbError(deleteProgramUserAs(pi3, mid)):
                case OdbError.NotAuthorized(_, _) => // ok
     yield ()
 
@@ -72,17 +58,16 @@ class unlinkUser extends OdbSuite:
     if (role === ProgramUserRole.SupportPrimary || role === ProgramUserRole.SupportSecondary) PartnerLink.HasUnspecifiedPartner
     else PartnerLink.HasPartner(Partner.US)
 
-  // What can a Guest do?
+ // What can a Guest do?
 
   Enumerated[ProgramUserRole].all.foreach: role =>
-    test(s"Guest can't unlink $role (NotAuthorized)."):
+    test(s"Guest can't delete $role (NotAuthorized)."):
       interceptOdbError {
         for
           _   <- createUsers(guest, pi2, admin)
           pid <- createProgramAs(guest)
           mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, mid, pi2.id)
-          _   <- unlinkAs(guest, mid)
+          _   <- deleteProgramUserAs(guest, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(guest.id, _) => // this is what we expect
@@ -92,24 +77,22 @@ class unlinkUser extends OdbSuite:
   // What can a PI do?
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: link =>
-    test(s"PI can unlink $link"):
+    test(s"PI can delete $link"):
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
         mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
-        _   <- linkUserAs(pi1, mid, pi2.id)
-        _   <- assertIO(unlinkAs(pi1, mid), true)
+        _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
       yield ()
 
   List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
-    test(s"PI can't unlink $role (NotAuthorized)."):
+    test(s"PI can't delete $role (NotAuthorized)."):
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin)
           pid <- createProgramAs(pi1)
           mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, mid, pi2.id)
-          _   <- unlinkAs(pi1, mid)
+          _   <- deleteProgramUserAs(pi1, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(pi1.id, _) => // this is what we expect
@@ -117,19 +100,18 @@ class unlinkUser extends OdbSuite:
 
   // What can a Coi do?
 
-  test("Coi can unlink an observer"):
+  test("Coi can delete an observer"):
     for
       _    <- createUsers(pi1, pi2, pi3)
       pid  <- createProgramAs(pi1)
       rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
       _    <- linkUserAs(pi1, rid2, pi2.id)
       rid3 <- addProgramUserAs(pi1, pid, ProgramUserRole.CoiRO)
-      _    <- linkUserAs(pi1, rid3, pi3.id)
-      _    <- assertIO(unlinkAs(pi2, rid3), true)
+      _    <- assertIO(deleteProgramUserAs(pi2, rid3), true)
     yield ()
 
   List(ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
-    test(s"Coi can't unlink $role (NotAuthorized)."):
+    test(s"Coi can't delete $role (NotAuthorized)."):
       interceptOdbError {
         for
           _    <- createUsers(pi1, pi2, pi3, admin)
@@ -137,8 +119,7 @@ class unlinkUser extends OdbSuite:
           rid2 <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
           _    <- linkUserAs(admin, rid2, pi2.id)
           rid3 <- addProgramUserAs(admin, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.US))
-          _    <- linkUserAs(admin, rid3, pi3.id)
-          _    <- unlinkAs(pi3, rid2)
+          _    <- deleteProgramUserAs(pi3, rid3)
         yield ()
       } {
         case OdbError.NotAuthorized(pi3.id, _) => // this is what we expect
@@ -147,40 +128,37 @@ class unlinkUser extends OdbSuite:
   // What can NGO user do?
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
-    test(s"Ngo (CA) can unlink $role with allocated time."):
+    test(s"Ngo (CA) can delete $role with allocated time."):
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
         pid <- createProgramAs(pi1)
         mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-        _   <- linkUserAs(admin, mid, pi2.id)
         _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-        _   <- assertIO(unlinkAs(ngo, mid), true)
+        _   <- assertIO(deleteProgramUserAs(ngo, mid), true)
       yield ()
 
   List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
-    test(s"Ngo (CA) can't unlink $role without allocated time."):
+    test(s"Ngo (CA) can't delete $role without allocated time."):
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
           mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, mid, pi2.id)
-          _   <- unlinkAs(ngo, mid)
+          _   <- deleteProgramUserAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
       }
 
   List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
-    test(s"Ngo (CA) can't unlink $role (NotAuthorized)."):
+    test(s"Ngo (CA) can't delete $role (NotAuthorized)."):
       interceptOdbError {
         for
           _   <- createUsers(pi1, pi2, admin, ngo)
           pid <- createProgramAs(pi1)
           mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, mid, pi2.id)
           _   <- setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.Max) // so ngo can see the program
-          _   <- unlinkAs(ngo, mid)
+          _   <- deleteProgramUserAs(ngo, mid)
         yield ()
       } {
         case OdbError.NotAuthorized(ngo.id, _) => // this is what we expect
@@ -190,22 +168,21 @@ class unlinkUser extends OdbSuite:
 
   List(staff, admin, service).foreach: u =>
     List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
-      test(s"${u.role.access} can unlink $role."):
+      test(s"${u.role.access} can delete $role."):
         for
           _   <- createUsers(pi1, pi2, u)
           pid <- createProgramAs(pi1)
           mid <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
-          _   <- linkUserAs(admin, mid, pi2.id)
-          _   <- assertIO(unlinkAs(u, mid), true)
+          _   <- assertIO(deleteProgramUserAs(u, mid), true)
         yield ()
 
-  test(s"Nobody can unlink the PI."):
+  test(s"Nobody can delete the PI."):
     interceptOdbError {
       for
         _   <- createUsers(pi1, admin)
         pid <- createProgramAs(pi1)
         mid <- piProgramUserIdAs(pi1, pid)
-        _   <- assertIO(unlinkAs(admin, mid), false)
+        _   <- assertIO(deleteProgramUserAs(admin, mid), false)
       yield ()
     } {
       case OdbError.UpdateFailed(Some("PIs are fixed at program creation time.")) => // expected

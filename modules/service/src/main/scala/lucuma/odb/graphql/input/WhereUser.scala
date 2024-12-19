@@ -24,6 +24,7 @@ object WhereUser:
     lazy val WhereUserBinding = binding(path)
     ObjectFieldsBinding.rmap:
       case List(
+        BooleanBinding.Option("IS_NULL", rIsNull),
         WhereUserBinding.List.Option("AND", rAND),
         WhereUserBinding.List.Option("OR", rOR),
         WhereUserBinding.Option("NOT", rNOT),
@@ -32,9 +33,10 @@ object WhereUser:
         WhereOrcidId.Option("orcidId", rOrcidId),
         WhereProfile.Option("profile", rProfile)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rOrcidId, rProfile).parMapN:
-          (AND, OR, NOT, id, t, orcid, profile) =>
+        (rIsNull, rAND, rOR, rNOT, rId, rType, rOrcidId, rProfile).parMapN:
+          (isNull, AND, OR, NOT, id, t, orcid, profile) =>
             and(List(
+              isNull.map(IsNull(path / "id", _)),
               AND.map(and),
               OR.map(or),
               NOT.map(Not(_)),

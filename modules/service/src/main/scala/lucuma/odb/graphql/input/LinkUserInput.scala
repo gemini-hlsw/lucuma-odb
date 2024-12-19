@@ -7,28 +7,21 @@ package input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.enums.ProgramUserRole.*
-import lucuma.core.model.PartnerLink
-import lucuma.core.model.PartnerLink.HasUnspecifiedPartner
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.core.model.ProgramUser
+import lucuma.core.model.User
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.service.ProgramUserService.LinkUserRequest
+
+case class LinkUserInput(
+  programUserId: ProgramUser.Id,
+  userId:        User.Id
+)
 
 object LinkUserInput:
-
-  val Binding: Matcher[LinkUserRequest] =
+  val Binding: Matcher[LinkUserInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        ProgramIdBinding("programId", rProgramId),
-        UserIdBinding("userId", rUserId),
-        ProgramUserRoleBinding("role", rRole),
-        PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
+        ProgramUserIdBinding("programUserId", rProgramUserId),
+        UserIdBinding("userId", rUserId)
       ) =>
-        (rProgramId, rUserId, rRole, rPartnerLink).parTupled.flatMap:
-          case (pid, uid, Coi, p) => Result(LinkUserRequest.Coi(pid, p.getOrElse(HasUnspecifiedPartner), uid))
-          case (pid, uid, CoiRO, p) => Result(LinkUserRequest.CoiRo(pid, p.getOrElse(HasUnspecifiedPartner), uid))
-          case (pid, uid, t @ (SupportPrimary | SupportSecondary), None) => Result(LinkUserRequest.Support(pid, uid, t))
-          case (pid, uid, t @ (SupportPrimary | SupportSecondary), Some(PartnerLink.HasUnspecifiedPartner)) => Result(LinkUserRequest.Support(pid, uid, t))
-          case (_, _, SupportPrimary | SupportSecondary, _) => OdbError.InvalidArgument("A partnerLink may not be specified for support users.".some).asFailure
-          case (_, _, Pi, _) => OdbError.InvalidArgument("PIs are linked at program creation time.".some).asFailure
+        (rProgramUserId, rUserId).parTupled.map(LinkUserInput.apply)

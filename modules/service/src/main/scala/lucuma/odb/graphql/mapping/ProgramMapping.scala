@@ -22,6 +22,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
@@ -92,9 +93,14 @@ trait ProgramMapping[F[_]]
       }
 
     case (ProgramType, "users", Nil) =>
-      Elab.transformChild { child =>
-        Filter(Predicates.programUser.isNotPi, child)
-      }
+      Elab.transformChild: child =>
+        FilterOrderByOffsetLimit(
+          pred   = Predicates.programUser.isNotPi.some,
+          oss    = List(OrderSelection[ProgramUser.Id](ProgramUserType / "id")).some,
+          offset = none,
+          limit  = none,
+          child
+        )
 
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),

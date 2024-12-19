@@ -9,13 +9,10 @@ import grackle.skunk.SkunkMapping
 
 import table.UserInvitationTable
 
-trait RedeemUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
+trait RedeemUserInvitationResultMapping[F[_]] extends UserInvitationTable[F]:
 
   lazy val RedeemUserInvitationResultMapping =
     ObjectMapping(RedeemUserInvitationResultType)(
       SqlField("id", UserInvitationTable.InvitationId, key = true, hidden = true),
       SqlObject("invitation")
     )
-
-  }
-

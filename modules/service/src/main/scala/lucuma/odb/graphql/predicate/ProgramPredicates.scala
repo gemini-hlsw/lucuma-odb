@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.predicate
 
+import cats.syntax.option.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
@@ -21,7 +22,7 @@ class ProgramPredicates(path: Path) {
   def isVisibleTo(user: User): Predicate =
     user.role.access match {
       case Guest | Pi =>
-        Contains(path / "users" / "userId", Const(user.id)) // user is linked
+        Contains(path / "users" / "userId", Const(user.id.some)) // user is linked
       case Ngo => ???
       case Staff | Admin | Service => True
     }

@@ -25,7 +25,6 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
-import lucuma.sso.client.SsoGraphQlClient
 import natchez.Trace
 import org.http4s.Header
 import org.http4s.HttpRoutes
@@ -56,7 +55,6 @@ object GraphQLRoutes {
     itcClient:    ItcClient[F],
     commitHash:   CommitHash,
     ssoClient:    SsoClient[F, User],
-    ssoGqlClient: SsoGraphQlClient[F],
     pool:         Resource[F, Session[F]],
     monitor:      SkunkMonitor[F],
     ttl:          FiniteDuration,
@@ -104,7 +102,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, ssoGqlClient, commitHash, enums, ptc, httpClient, emailConfig)
+                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient, emailConfig)
                       svc   = new GraphQLService(map) {
                         override def query(request: Operation): F[Result[Json]] =
                           super.query(request).retryOnInvalidCursorName

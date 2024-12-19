@@ -18,7 +18,7 @@ val logbackVersion             = "1.5.11"
 val log4catsVersion            = "2.7.0"
 val lucumaCatalogVersion       = "0.48.10"
 val lucumaItcVersion           = "0.24.2"
-val lucumaCoreVersion          = "0.111.2"
+val lucumaCoreVersion          = "0.111.3"
 val lucumaGraphQLRoutesVersion = "0.8.15"
 val lucumaSsoVersion           = "0.7.1"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
@@ -32,7 +32,7 @@ val pprintVersion              = "0.9.0"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.17"
+ThisBuild / tlBaseVersion      := "0.18"
 ThisBuild / scalaVersion       := "3.5.1"
 ThisBuild / crossScalaVersions := Seq("3.5.1")
 

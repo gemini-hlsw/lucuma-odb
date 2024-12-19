@@ -42,6 +42,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.PartnerLink
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.UserInvitation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
@@ -428,6 +429,9 @@ trait Codecs {
 
   val program_type: Codec[ProgramType] =
     enumerated(Type("e_program_type"))
+
+  val program_user_id: Codec[ProgramUser.Id] =
+    gid[ProgramUser.Id]
 
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))

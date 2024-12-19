@@ -8,36 +8,29 @@ import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ProgramUserRole
-import lucuma.core.model.OrcidId
 import lucuma.core.model.Program
-import lucuma.core.syntax.string.toScreamingSnakeCase
 import lucuma.odb.graphql.binding.*
 
 case class AddProgramUserInput(
-  orcidId:   OrcidId,
   programId: Program.Id,
   role:      ProgramUserRole,
   SET:       Option[ProgramUserPropertiesInput]
 )
 
 object AddProgramUserInput:
-  def ensuringCoi(role: ProgramUserRole): Result[ProgramUserRole] =
+  def ensuringNotPi(role: ProgramUserRole): Result[ProgramUserRole] =
     role match
-      case ProgramUserRole.Coi | ProgramUserRole.CoiRO =>
-        role.success
-      case _                                           =>
-        Result.failure(s"Only co-investigators who have not accepted an invitation may be added via this method, not ${role.tag.toScreamingSnakeCase}")
+      case ProgramUserRole.Pi => Result.failure(s"PIs are added at program creation time.")
+      case _                  => role.success
 
   val Binding: Matcher[AddProgramUserInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        OrcidIdBinding("orcidId", rOrcidId),
         ProgramIdBinding("programId", rProgramId),
         ProgramUserRoleBinding("role", rRole),
         ProgramUserPropertiesInput.Binding.Option("SET", rProps)
       ) => (
-        rOrcidId,
         rProgramId,
-        rRole.flatMap(ensuringCoi),
+        rRole.flatMap(ensuringNotPi),
         rProps
       ).parMapN(AddProgramUserInput.apply)

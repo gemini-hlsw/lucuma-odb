@@ -9,4 +9,3 @@ import lucuma.core.model.UserInvitation
 class UserInvitationPredicates(path: Path) {
   val id = LeafPredicates[UserInvitation.Id](path / "id")
 }
-

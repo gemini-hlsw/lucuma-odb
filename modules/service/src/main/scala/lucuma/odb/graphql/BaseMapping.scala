@@ -10,7 +10,6 @@ import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
-  
      with SchemaSemigroup[F]
      with MappingExtras[F]
      with CirceMappingLike[F] {
@@ -97,6 +96,7 @@ trait BaseMapping[F[_]]
   lazy val DatasetStageType                        = schema.ref("DatasetStage")
   lazy val DateType                                = schema.ref("Date")
   lazy val DeclinationType                         = schema.ref("Declination")
+  lazy val DeleteProgramUserResultType             = schema.ref("DeleteProgramUserResult")
   lazy val DeleteProposalResultType                = schema.ref("DeleteProposalResult")
   lazy val DemoScienceType                         = schema.ref("DemoScience")
   lazy val DirectorsTimeType                       = schema.ref("DirectorsTime")
@@ -229,6 +229,7 @@ trait BaseMapping[F[_]]
   lazy val ProgramUserRoleType                     = schema.ref("ProgramUserRole")
   lazy val ProgramUserSupportRoleTypeType          = schema.ref("ProgramUserSupportRoleType")
   lazy val ProgramUserType                         = schema.ref("ProgramUser")
+  lazy val ProgramUserIdType                       = schema.ref("ProgramUserId")
   lazy val ProperMotionDeclinationType             = schema.ref("ProperMotionDeclination")
   lazy val ProperMotionRaType                      = schema.ref("ProperMotionRA")
   lazy val ProperMotionType                        = schema.ref("ProperMotion")
@@ -319,7 +320,7 @@ trait BaseMapping[F[_]]
   lazy val TransactionIdType                       = schema.ref("TransactionId")
   lazy val UnlinkUserResultType                    = schema.ref("UnlinkUserResult")
   lazy val UpdateAsterismsResultType               = schema.ref("UpdateAsterismsResult")
-  lazy val UpdateAttachmentsResultType          = schema.ref("UpdateAttachmentsResult")
+  lazy val UpdateAttachmentsResultType             = schema.ref("UpdateAttachmentsResult")
   lazy val UpdateCallsForProposalsResultType       = schema.ref("UpdateCallsForProposalsResult")
   lazy val UpdateConfigurationRequestsResultType   = schema.ref("UpdateConfigurationRequestsResult")
   lazy val UpdateDatasetsResultType                = schema.ref("UpdateDatasetsResult")
@@ -330,9 +331,9 @@ trait BaseMapping[F[_]]
   lazy val UpdateProposalResultType                = schema.ref("UpdateProposalResult")
   lazy val UpdateTargetsResultType                 = schema.ref("UpdateTargetsResult")
   lazy val UserIdType                              = schema.ref("UserId")
-  lazy val UserInvitationType                      = schema.ref("UserInvitation")
   lazy val UserInvitationIdType                    = schema.ref("UserInvitationId")
   lazy val UserInvitationKeyType                   = schema.ref("UserInvitationKey")
+  lazy val UserInvitationType                      = schema.ref("UserInvitation")
   lazy val UserInvitationStatusType                = schema.ref("UserInvitationStatus")
   lazy val UserProfileType                         = schema.ref("UserProfile")
   lazy val UserType                                = schema.ref("User")

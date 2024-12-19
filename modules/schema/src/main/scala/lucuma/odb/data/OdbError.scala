@@ -17,6 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
@@ -40,7 +41,7 @@ enum OdbError:
   case InvalidArgument(detail: Option[String] = None)      
   case NoAction(detail: Option[String] = None)          
   case NotAuthorized(userId: User.Id, detail: Option[String] = None)        
-  case InvitationError(invitationId: UserInvitation.Id, detail: Option[String] = None)
+  case InvitationError(invitation: UserInvitation.Id, detail: Option[String] = None)
   case InvalidProgram(programId: Program.Id, detail: Option[String] = None)       
   case InvalidObservation(observationId: Observation.Id, detail: Option[String] = None)   
   case InvalidObservationList(observationIds: NonEmptyList[Observation.Id], detail: Option[String] = None)
@@ -51,7 +52,8 @@ enum OdbError:
   case InvalidStep(stepId: Step.Id, detail: Option[String] = None)          
   case InvalidFilename(filename: Filename, detail: Option[String] = None)      
   case InvalidAtom(atomId: Atom.Id, detail: Option[String] = None)          
-  case InvalidDataset(datasetId: Dataset.Id, detail: Option[String] = None)       
+  case InvalidDataset(datasetId: Dataset.Id, detail: Option[String] = None)
+  case InvalidProgramUser(programUserId: ProgramUser.Id, detail: Option[String] = None)
   case InvalidUser(userId: User.Id, detail: Option[String] = None)          
   case UpdateFailed(detail: Option[String] = None)         
   case ItcError(detail: Option[String] = None)             
@@ -80,6 +82,7 @@ object OdbError:
     case InvalidFilename           extends Tag("invalid_filename")
     case InvalidAtom               extends Tag("invalid_atom")
     case InvalidDataset            extends Tag("invalid_dataset")
+    case InvalidProgramUser        extends Tag("invalid_program_user")
     case InvalidUser               extends Tag("invalid_user")
     case UpdateFailed              extends Tag("update_failed")
     case ItcError                  extends Tag("itc_error")
@@ -114,6 +117,7 @@ object OdbError:
       case InvalidFilename(_, _)              => Tag.InvalidFilename
       case InvalidAtom(_, _)                  => Tag.InvalidAtom
       case InvalidDataset(_, _)               => Tag.InvalidDataset
+      case InvalidProgramUser(_, _)           => Tag.InvalidProgramUser
       case InvalidUser(_, _)                  => Tag.InvalidUser
       case UpdateFailed(_)                    => Tag.UpdateFailed
       case ItcError(_)                        => Tag.ItcError
@@ -140,6 +144,7 @@ object OdbError:
       case InvalidFilename(n, _)         => s"Filename '$n' is invalid or already exists."
       case InvalidAtom(a, _)             => s"Atom $a does not exist, is not visible, or is ineligible for the requested operation."
       case InvalidDataset(d, _)          => s"Dataset $d does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidProgramUser(u, _)      => s"ProgramUser $u does not exist, or is ineligible for the requested operation."
       case InvalidUser(u, _)             => s"User $u user does not exist, or is ineligible for the requested operation."
       case UpdateFailed(_)               => "The specified operation could not be completed."
       case ItcError(_)                   => "The requested ITC operation could not be completed."
@@ -166,6 +171,7 @@ object OdbError:
       case InvalidFilename(n, _)              => JsonObject("filename" -> n.asJson)
       case InvalidAtom(a, _)                  => JsonObject("atomId" -> a.asJson)
       case InvalidDataset(d, _)               => JsonObject("datasetId" -> d.asJson)
+      case InvalidProgramUser(u, _)           => JsonObject("programUserId" -> u.asJson)
       case InvalidUser(u, _)                  => JsonObject("userId" -> u.asJson)
       case UpdateFailed(_)                    => JsonObject()
       case ItcError(_)                        => JsonObject()
@@ -192,6 +198,7 @@ object OdbError:
       case Tag.InvalidFilename           => c.downField("filename").as[Filename].map(InvalidFilename(_, detail))
       case Tag.InvalidAtom               => c.downField("atomId").as[Atom.Id].map(InvalidAtom(_, detail))
       case Tag.InvalidDataset            => c.downField("datasetId").as[Dataset.Id].map(InvalidDataset(_, detail))
+      case Tag.InvalidProgramUser        => c.downField("programUserId").as[ProgramUser.Id].map(InvalidProgramUser(_, detail))
       case Tag.InvalidUser               => c.downField("userId").as[User.Id].map(InvalidUser(_, detail))
       case Tag.UpdateFailed              => UpdateFailed(detail).asRight
       case Tag.ItcError                  => ItcError(detail).asRight
