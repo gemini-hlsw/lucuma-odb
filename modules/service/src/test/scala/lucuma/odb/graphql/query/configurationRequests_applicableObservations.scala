@@ -10,9 +10,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import lucuma.core.model.Observation
 
 class configurationRequests_applicableObservations
   extends OdbSuite 
