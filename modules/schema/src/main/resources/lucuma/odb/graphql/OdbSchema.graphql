@@ -2617,10 +2617,9 @@ scalar UserInvitationId
 scalar UserInvitationKey
 
 """
-Creates an invitation, if none exists for the indicated 'ProgramUser' and sets
-it to 'PENDING' status.  If an invitation exists but is still 'PENDING' it will
-be reissued.  If 'DECLINED' or 'REVOKED' the invitation will be reset to
-'PENDING' and reissued.  If already 'REDEEMED', nothing is done.
+Creates an invitation, if none exists for the indicated 'ProgramUser', and sets
+it to 'PENDING' status. If there is an outstanding invitation, it must be
+declined or revoked before a new one may be issued.
 """
 input CreateUserInvitationInput {
 
@@ -2707,7 +2706,6 @@ type RevokeUserInvitationResult {
 
 }
 
-# TODO: user -> programUser
 type LinkUserResult {
   user: ProgramUser!
 }
