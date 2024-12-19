@@ -388,7 +388,7 @@ class createUserInvitation extends OdbSuite:
         programUsers(
           WHERE: {
             program: { id : { EQ: "$pid" } }
-            user: { IS_NULL: true }
+            role: { NEQ: PI }
           }
         ) {
           matches {
@@ -441,6 +441,25 @@ class createUserInvitation extends OdbSuite:
         _    <- redeemUserInvitationAs(pi2, inv0, false)
         inv1 <- createUserInvitationAs(pi, mid)
         _    <- redeemUserInvitationAs(pi2, inv1, true)
+        _    <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [
+                    {
+                      "invitations": [
+                       { "status": "DECLINED" },
+                       { "status": "REDEEMED" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          )
       yield ()
 
   test("revoke, invite again"):
@@ -452,6 +471,25 @@ class createUserInvitation extends OdbSuite:
         _    <- revokeUserInvitationAs(pi, inv0.id)
         inv1 <- createUserInvitationAs(pi, mid)
         _    <- redeemUserInvitationAs(pi2, inv1, true)
+        _    <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [
+                    {
+                      "invitations": [
+                       { "status": "REVOKED" },
+                       { "status": "REDEEMED" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          )
       yield ()
 
   test("can't invite after linked"):

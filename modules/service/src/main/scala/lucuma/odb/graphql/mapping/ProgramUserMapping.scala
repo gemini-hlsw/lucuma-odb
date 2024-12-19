@@ -4,12 +4,20 @@
 package lucuma.odb.graphql
 package mapping
 
+import eu.timepit.refined.cats.*
+import grackle.Query.Binding
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
+import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.model.PartnerLink
+import lucuma.core.model.UserInvitation
 import lucuma.odb.json.partnerlink.given
 
 import table.*
@@ -44,6 +52,14 @@ trait ProgramUserMapping[F[_]]
       SqlObject("fallbackProfile"),
       SqlObject("invitations", Join(ProgramUserTable.ProgramUserId, UserInvitationTable.ProgramUserId))
     )
+
+  lazy val ProgramUserElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (ProgramUserType, "invitations", Nil) =>
+      Elab.transformChild: child =>
+        OrderBy(OrderSelections(List(
+          OrderSelection[UserInvitation.Id](UserInvitationType / "id")
+        )), child)
+  }
 
 }
 
