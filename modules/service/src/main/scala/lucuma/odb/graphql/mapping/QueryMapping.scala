@@ -38,6 +38,8 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.service.Services
+import lucuma.core.model.ConfigurationRequest
+import lucuma.odb.graphql.input.WhereConfigurationRequest
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>
@@ -51,6 +53,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("asterismGroup"),
       SqlObject("callForProposals"),
       SqlObject("callsForProposals"),
+      SqlObject("configurationRequests"),
       SqlObject("constraintSetGroup"),
       SqlObject("dataset"),
       SqlObject("datasets"),
@@ -75,6 +78,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       AsterismGroup,
       CallForProposals,
       CallsForProposals,
+      ConfigurationRequests,
       ConstraintSetGroup,
       Dataset,
       Datasets,
@@ -245,7 +249,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
     }
 
-
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
     {
@@ -398,6 +401,34 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
       }
   }
+
+  private lazy val ConfigurationRequests: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(Path.from(ConfigurationRequestType))
+    {
+      case (QueryType, "configurationRequests", List(
+        WhereConfigurationRequestsBinding.Option("WHERE", rWHERE),
+        ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+      )) =>
+        Elab.transformChild { child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, lim) =>
+            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql),
+                  WHERE.getOrElse(True),
+                  Predicates.configurationRequest.program.isVisibleTo(user),
+                ))),
+                oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id"))),
+                offset = None,
+                limit = Some(limit + 1),
+                q
+              )
+            }
+          }
+        }
+    }
 
   private lazy val ObservingModeGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     val WhereObservationBinding = WhereObservation.binding(ObservingModeGroupType / "observations" / "matches")
