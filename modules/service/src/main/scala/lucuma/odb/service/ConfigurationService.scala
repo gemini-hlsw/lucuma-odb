@@ -67,6 +67,11 @@ trait ConfigurationService[F[_]] {
 
 object ConfigurationService {
 
+  extension [A](self: Result[A]) def suppressWarnings: Result[A] =
+    self match
+      case Result.Warning(problems, value) => Result(value)
+      case other => other
+    
   extension (hc: ACursor) def downFields(fields: String*): ACursor = 
     fields.foldLeft(hc)(_.downField(_))
 
@@ -100,7 +105,7 @@ object ConfigurationService {
         impl.selectRequests(pairs).value
 
       override def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]] =
-        impl.selectObservations(rids).value
+        impl.selectObservations(rids).value.map(_.suppressWarnings) // we can disregard warnings
 
     }
 
@@ -214,11 +219,11 @@ object ConfigurationService {
           r.flatMap: json =>
             import Queries.SelectRequestsAndObservations.given
             json.hcursor.as[Queries.SelectRequestsAndObservations.Response] match
-              case Right(r)    => Result(r.matches)
+              case Right(r)    => Result(r)
               case Left(other) => Result.internalError(other.getMessage)
 
     def selectObservations(rids: List[ConfigurationRequest.Id]): ResultT[F, Map[ConfigurationRequest.Id, List[Observation.Id]]] =
-      queryRequestsAndObservations(rids.distinct).map: result =>                  
+      queryRequestsAndObservations(rids.distinct).map: result =>         
         result
           .map:
             case (req, list) =>
@@ -452,24 +457,26 @@ object ConfigurationService {
       """
 
     object SelectRequestsAndObservations:
-      case class Response(matches: List[(ConfigurationRequest, List[(Observation.Id, Configuration)])])
+      type Response = List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]
 
-      given Decoder[(Observation.Id, Configuration)] = hc =>
+      private given dc: Decoder[Option[Configuration]] =
+        summon[Decoder[Configuration]].attempt.map(_.toOption)
+
+      private given da: Decoder[Option[(Observation.Id, Configuration)]] = hc =>
         for
           id  <- hc.downField("id").as[Observation.Id]
-          cfg <- hc.downField("configuration").as[Configuration]
-        yield (id, cfg)
+          cfg <- hc.downField("configuration").as(dc)
+        yield cfg.tupleLeft(id)
 
-      given Decoder[(ConfigurationRequest, List[(Observation.Id, Configuration)])] = hc =>
+      private given db: Decoder[(ConfigurationRequest, List[(Observation.Id, Configuration)])] = hc =>
         for
           req <- hc.as[ConfigurationRequest]
-          obs <- hc.downFields("program", "observations", "matches").as[List[(Observation.Id, Configuration)]]
-        yield (req, obs)
+          obs <- hc.downFields("program", "observations", "matches").as(Decoder.decodeList(da))
+        yield (req, obs.flatten)
  
       given Decoder[Response] = hc =>
         hc.downFields("configurationRequests", "matches")
-          .as[List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]]
-          .map(Response(_))
+          .as(Decoder.decodeList(db))
 
       def apply(rids: List[ConfigurationRequest.Id]) =
         s"""

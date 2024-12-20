@@ -9,6 +9,7 @@ import cats.implicits.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -19,10 +20,9 @@ class configurationRequests_applicableObservations
      with ObservingModeSetupOperations 
      with UpdateConstraintSetOps {
 
-  val pi1   = TestUsers.Standard.pi(1, 30)
-  val pi2   = TestUsers.Standard.pi(2, 31)
+  val pi = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(3, 32)
-  val validUsers = List(pi1, pi2, admin)
+  val validUsers = List(pi, admin)
 
   private def expectRequests(user: User, data: List[(ConfigurationRequest.Id, List[Observation.Id])]): IO[Unit] =
     expect(
@@ -42,7 +42,8 @@ class configurationRequests_applicableObservations
             }
           }
         }
-      """,
+      """
+    ,
       expected = Right(json"""                
         {
           "configurationRequests" : {
@@ -61,23 +62,57 @@ class configurationRequests_applicableObservations
       """)
     )
 
-  // set up cfp, program, and fully configured observation
-  private def setupAs(user: User): IO[(ConfigurationRequest.Id, List[Observation.Id])] =
+  private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
+    updateObservation(user, oid, update,
+      query = """
+        observations {
+          id
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "id": $oid
+              }
+            ]                
+          }
+        }
+      """)
+    )
+
+  private def updateGratingAs(user: User, oid: Observation.Id, grating: GmosNorthGrating): IO[Unit] =
+    updateObservationAs(user, oid):
+      s"""
+        observingMode: {
+          gmosNorthLongSlit: {
+            grating: ${grating.tag.toUpperCase()}
+          }
+        }
+      """
+
+  test("applicable requests"):
     for
       cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(user)
-      _     <- addProposal(user, pid, Some(cfpid), None, "Foo")
-      tid   <- createTargetWithProfileAs(user, pid)
-      oid   <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
-      rid   <- createConfigurationRequestAs(user, oid)
-    yield (rid, List(oid))
+      pid   <- createProgramAs(pi)
+      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid)) // oid1 and oid2 are identical
+      oid2  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      oid3  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid)) // oid3 is different
+      _     <- updateGratingAs(pi, oid3, GmosNorthGrating.R150_G5306)   // due to this change
+      oid4  <- createObservationAs(pi, pid)  // oid4 has no configuration
 
-  test("create and select some configuration requests as different users"):
-    for
-      mine   <- setupAs(pi1).replicateA(5)
-      theirs <- setupAs(pi2).replicateA(5)
-      _      <- expectRequests(pi1, mine)
-      _      <- expectRequests(pi2, theirs)
+      rid1  <- createConfigurationRequestAs(pi, oid1)
+      rid2  <- createConfigurationRequestAs(pi, oid3)
+
+      _     <- expectRequests(pi, List(
+                rid1 -> List(oid1, oid2),
+                rid2 -> List(oid3)
+              ))
+      
     yield ()
+
 
 }
