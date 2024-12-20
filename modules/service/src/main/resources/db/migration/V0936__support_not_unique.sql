@@ -14,7 +14,7 @@ CREATE UNIQUE INDEX unique_program_user_investigator ON t_program_user (
 ) WHERE c_user_id IS NOT NULL
     AND c_role IN ('pi', 'coi', 'coi_ro');
 
--- And there can only be one pi.
+-- And there can only be one pi (whether linked to a user or not).
 CREATE UNIQUE INDEX unique_program_user_one_pi ON t_program_user (
   c_program_id
 ) WHERE c_role = 'pi';
