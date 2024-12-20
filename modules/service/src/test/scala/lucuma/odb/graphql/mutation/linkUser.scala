@@ -214,7 +214,7 @@ class linkUser extends OdbSuite:
       addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary).flatMap: rid0 =>
         linkUserAs(admin, rid0, pi2.id) >>
         addProgramUserAs(staff, pid, ProgramUserRole.SupportSecondary).flatMap: rid1 =>
-          linkUserAs(admin, rid0, pi2.id)
+          linkUserAs(admin, rid1, pi2.id)
 
 
   // GENERAL RULES
