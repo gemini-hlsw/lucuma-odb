@@ -80,6 +80,22 @@ class linkUser extends OdbSuite:
         interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
           linkUserAs(ngo, mid, pi2.id)
 
+  test(s"[general] a PI can't also be a COI"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid0 =>
+        interceptGraphQL(s"User ${pi.id} is already linked to program ${pid}."):
+          linkUserAs(admin, rid0, pi.id)
+
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+    test(s"[general] can't re-link a Coi as $role"):
+      createUsers(pi, pi2) >>
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid0 =>
+          linkUserAs(pi, rid0, pi2.id) >>
+          addProgramUserAs(pi, pid, role).flatMap: rid1 =>
+            interceptGraphQL(s"User ${pi2.id} is already linked to program ${pid}."):
+              linkUserAs(pi, rid1, pi2.id)
+
   // LINKING AN OBSERVER
 
   test("[observer] guest user can't link an observer"):
@@ -179,16 +195,20 @@ class linkUser extends OdbSuite:
           interceptGraphQL("Only admin, staff or service users may add support users."):
             linkUserAs(ngo, mid, pi2.id)
 
-  // GENERAL RULES
+    test(s"[$role] pi can also be a support user"):
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
+          linkUserAs(staff, mid, pi.id)
 
-  test("[general] can't re-link a user"):
-    createUsers(pi, pi2) >>
-    createProgramAs(pi).flatMap: pid =>
-      addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid0 =>
-        linkUserAs(pi, rid0, pi2.id) >>
-        addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid1 =>
-          interceptGraphQL(s"User ${pi2.id} is already linked to program ${pid}."):
-            linkUserAs(pi, rid1, pi2.id)
+    test(s"[$role] coi can also be a support user"):
+      createUsers(pi2, admin) >>
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid0 =>
+          linkUserAs(pi, rid0, pi2.id) >>
+          addProgramUserAs(staff, pid, role).flatMap: rid1 =>
+            linkUserAs(staff, rid1, pi2.id)
+
+  // GENERAL RULES
 
   test("[general] can't link a guest user"):
     createUsers(pi, guest) >>
