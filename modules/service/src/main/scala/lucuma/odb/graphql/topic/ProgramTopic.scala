@@ -66,7 +66,7 @@ object ProgramTopic {
   ): F[List[User.Id]] =
     val q =
       sql"""
-        select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
+        select distinct c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
       """.query(user_id)
     s.execute(q)
 
