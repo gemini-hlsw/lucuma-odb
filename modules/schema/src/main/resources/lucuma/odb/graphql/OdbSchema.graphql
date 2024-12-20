@@ -8726,6 +8726,7 @@ type ConfigurationRequest {
   program: Program!
   status: ConfigurationRequestStatus!
   configuration: Configuration!
+  applicableObservations: [ObservationId!]!
 }
 
 input CreateConfigurationRequestInput {
@@ -9560,6 +9561,32 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
+
+
+
+  """
+  Selects the first `LIMIT` matching configuration requests based on the provided `WHERE` parameter, if any.
+  """
+  configurationRequests(
+    
+    """
+    Filters the selection of observations.
+    """
+    WHERE: WhereConfigurationRequest
+
+    """
+    Starts the result set at (or after if not existent) the given observation id.
+    """
+    OFFSET: ConfigurationRequestId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT: NonNegInt
+
+  ): ConfigurationRequestSelectResult!
+
+
 
   """
   Observations grouped by commonly held observing modes. Identify the program by

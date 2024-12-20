@@ -42,8 +42,11 @@ trait ConfigurationService[F[_]] {
   /** Selects all configuration requests that subsume this observation's configuration. */
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
 
- /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
+  /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
   def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]]
+
+  /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
+  def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -64,6 +67,11 @@ trait ConfigurationService[F[_]] {
 
 object ConfigurationService {
 
+  extension [A](self: Result[A]) def suppressWarnings: Result[A] =
+    self match
+      case Result.Warning(problems, value) => Result(value)
+      case other => other
+    
   extension (hc: ACursor) def downFields(fields: String*): ACursor = 
     fields.foldLeft(hc)(_.downField(_))
 
@@ -95,6 +103,9 @@ object ConfigurationService {
 
       override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
         impl.selectRequests(pairs).value
+
+      override def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]] =
+        impl.selectObservations(rids).value.map(_.suppressWarnings) // we can disregard warnings
 
     }
 
@@ -199,10 +210,32 @@ object ConfigurationService {
               .foldMap: (cfg, nel) =>
                 nel.filter(_.configuration.subsumes(cfg))
           .toMap
-                    
+
+    def queryRequestsAndObservations(
+      rids: List[ConfigurationRequest.Id]
+    ): ResultT[F, List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]] =
+      ResultT:
+        services.runGraphQLQuery(Queries.SelectRequestsAndObservations(rids)).map: r =>
+          r.flatMap: json =>
+            import Queries.SelectRequestsAndObservations.given
+            json.hcursor.as[Queries.SelectRequestsAndObservations.Response] match
+              case Right(r)    => Result(r)
+              case Left(other) => Result.internalError(other.getMessage)
+
+    def selectObservations(rids: List[ConfigurationRequest.Id]): ResultT[F, Map[ConfigurationRequest.Id, List[Observation.Id]]] =
+      queryRequestsAndObservations(rids.distinct).map: result =>         
+        result
+          .map:
+            case (req, list) =>
+              req.id ->
+                list.collect:
+                  case (oid, cfg) if req.configuration.subsumes(cfg) => oid
+          .toMap        
+          .withDefaultValue(Nil)
+
   } 
 
-  private object Queries {
+  object Queries {
 
     object RequestsAndConfigurations:
       type Response = (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])
@@ -422,6 +455,105 @@ object ConfigurationService {
           }
         }
       """
+
+    object SelectRequestsAndObservations:
+      type Response = List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]
+
+      private given dc: Decoder[Option[Configuration]] =
+        summon[Decoder[Configuration]].attempt.map(_.toOption)
+
+      private given da: Decoder[Option[(Observation.Id, Configuration)]] = hc =>
+        for
+          id  <- hc.downField("id").as[Observation.Id]
+          cfg <- hc.downField("configuration").as(dc)
+        yield cfg.tupleLeft(id)
+
+      private given db: Decoder[(ConfigurationRequest, List[(Observation.Id, Configuration)])] = hc =>
+        for
+          req <- hc.as[ConfigurationRequest]
+          obs <- hc.downFields("program", "observations", "matches").as(Decoder.decodeList(da))
+        yield (req, obs.flatten)
+ 
+      given Decoder[Response] = hc =>
+        hc.downFields("configurationRequests", "matches")
+          .as(Decoder.decodeList(db))
+
+      def apply(rids: List[ConfigurationRequest.Id]) =
+        s"""
+          query {
+            configurationRequests(
+              WHERE: {
+                id: {
+                  IN: ${rids.asJson}
+                }
+              }
+            ) {
+              matches {
+                id
+                status
+                configuration {
+                  conditions {
+                    imageQuality
+                    cloudExtinction
+                    skyBackground
+                    waterVapor
+                  }
+                  referenceCoordinates {
+                    ra { 
+                      hms 
+                    }
+                    dec { 
+                      dms 
+                    }
+                  }
+                  observingMode {
+                    instrument
+                    mode
+                    gmosNorthLongSlit {
+                      grating
+                    }
+                    gmosSouthLongSlit {
+                      grating
+                    }
+                  }
+                }
+                program {
+                  observations {
+                    matches {
+                      id
+                      configuration {
+                        conditions {
+                          imageQuality
+                          cloudExtinction
+                          skyBackground
+                          waterVapor
+                        }
+                        referenceCoordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        observingMode {
+                          instrument
+                          mode
+                          gmosNorthLongSlit {
+                            grating
+                          }
+                          gmosSouthLongSlit {
+                            grating
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """
 
     def selectAllRequestsForProgram2(pid: Program.Id) =
       s"""
