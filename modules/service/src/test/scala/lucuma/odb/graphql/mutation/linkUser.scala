@@ -208,6 +208,15 @@ class linkUser extends OdbSuite:
           addProgramUserAs(staff, pid, role).flatMap: rid1 =>
             linkUserAs(staff, rid1, pi2.id)
 
+  test(s"[${ProgramUserRole.SupportPrimary}] same user can be both primary and secondary"):
+    createUsers(pi2, admin) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary).flatMap: rid0 =>
+        linkUserAs(admin, rid0, pi2.id) >>
+        addProgramUserAs(staff, pid, ProgramUserRole.SupportSecondary).flatMap: rid1 =>
+          linkUserAs(admin, rid0, pi2.id)
+
+
   // GENERAL RULES
 
   test("[general] can't link a guest user"):
