@@ -183,17 +183,15 @@ object CalibrationsService extends CalibrationObservations {
       private def configAtWavelength(
         calibConfigs: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)]
       ): Map[CalibrationConfigSubset, Option[Wavelength]] =
-        val atWavelengthPerConfig =
-          calibConfigs.groupBy(_._3).map { case (k, v) =>
-            val lw = v.map(_._2.map(_.spectroscopy.atWavelength)).flattenOption
-            val meanWv = if (lw.isEmpty) None
-            else
-              // there must be a way to sum in wavelength space :/
-              val pm = lw.map(_.toPicometers.value.value).combineAll / lw.size
-              PosInt.from(pm).map(Wavelength(_)).toOption
-            k -> meanWv
-          }
-        atWavelengthPerConfig
+        calibConfigs.groupBy(_._3).map { case (k, v) =>
+          val lw = v.map(_._2.map(_.spectroscopy.atWavelength)).flattenOption
+          val meanWv = if (lw.isEmpty) None
+          else
+            // there must be a way to sum in wavelength space :/
+            val pm = lw.map(_.toPicometers.value.value).combineAll / lw.size
+            PosInt.from(pm).map(Wavelength(_)).toOption
+          k -> meanWv
+        }
 
       private def uniqueConfiguration(
         all: List[(Observation.Id, Option[ItcInput], ObservingMode)]
@@ -289,6 +287,8 @@ object CalibrationsService extends CalibrationObservations {
         oids.fold(List.empty.pure[F])(os => observationService.deleteCalibrationObservations(os).as(os.toList))
       }
 
+      // Update the signal to noise at wavelength for each calbiration observation depending
+      // on the average wavelength of the configuration
       private def updateWvAt(
         calibrations: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)],
         removed: List[Observation.Id],
@@ -314,7 +314,8 @@ object CalibrationsService extends CalibrationObservations {
                   )
                 )
               ),
-              // Only update the obs that need it or it will produce a cascade of infinite updates
+              // Important: Only update the obs that need it or it will produce a cascade of infinite updates
+              // TODO: This could be slightly optimized by grouping obs per configuration and updating in batches
               sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
             )
           }.void
