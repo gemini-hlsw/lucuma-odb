@@ -125,7 +125,7 @@ trait CalibrationObservations {
     pid:     Program.Id,
     gid:     Group.Id,
     tid:     Target.Id,
-    wvAt: Map[CalibrationConfigSubset, Option[Wavelength]],
+    wvAt:    Map[CalibrationConfigSubset, Option[Wavelength]],
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
     configs.traverse{c =>
@@ -141,10 +141,10 @@ trait CalibrationObservations {
     }
 
   private def specPhotoObservation[F[_]: Services: MonadThrow: Transaction](
-    pid: Program.Id,
-    gid: Group.Id,
-    tid: Target.Id,
-    wvAt: Option[Wavelength],
+    pid:     Program.Id,
+    gid:     Group.Id,
+    tid:     Target.Id,
+    wvAt:    Option[Wavelength],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
 
