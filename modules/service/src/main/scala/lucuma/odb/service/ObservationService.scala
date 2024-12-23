@@ -943,7 +943,7 @@ object ObservationService {
           SET.observationDuration.foldPresent(ts => sql"c_observation_duration = ${time_span.opt}"(ts)),
         ).flatten
 
-      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment = 
+      def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
         void"UPDATE t_observation "                                  |+|
           void"SET " |+| us.intercalate(void", ") |+| void" "        |+|
           void"WHERE c_observation_id IN (" |+| which |+| void")"    |+|
