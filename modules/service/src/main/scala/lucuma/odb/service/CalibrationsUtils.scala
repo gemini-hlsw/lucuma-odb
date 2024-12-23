@@ -125,9 +125,13 @@ trait CalibrationObservations {
     pid:     Program.Id,
     gid:     Group.Id,
     tid:     Target.Id,
+    wvAt:    Map[CalibrationConfigSubset, Option[Wavelength]],
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
-    configs.traverse(c => specPhotoObservation(pid, gid, tid, c.centralWavelength, c.toLongSlitInput))
+    configs.traverse{c =>
+      val wavelengthAt = wvAt.get(c).flatten
+      specPhotoObservation(pid, gid, tid, wavelengthAt, c.toLongSlitInput)
+    }
 
   def roleConstraints(role: CalibrationRole) =
     role match {
@@ -137,10 +141,10 @@ trait CalibrationObservations {
     }
 
   private def specPhotoObservation[F[_]: Services: MonadThrow: Transaction](
-    pid: Program.Id,
-    gid: Group.Id,
-    tid: Target.Id,
-    cw: Wavelength,
+    pid:     Program.Id,
+    gid:     Group.Id,
+    tid:     Target.Id,
+    wvAt:    Option[Wavelength],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
 
@@ -165,7 +169,7 @@ trait CalibrationObservations {
                       mode = ScienceMode.Spectroscopy.some,
                       spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
                         signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0)),
-                        signalToNoiseAt = Nullable.NonNull(cw),
+                        signalToNoiseAt = Nullable.orNull(wvAt),
                     ).some
                   ).some
                 ).some
