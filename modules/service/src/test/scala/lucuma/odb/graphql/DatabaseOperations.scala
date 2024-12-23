@@ -210,7 +210,7 @@ trait DatabaseOperations { this: OdbSuite =>
        .liftTo[IO]
     }
 
-  def addQueueProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] = {
+  def addQueueProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
     addProposal(
       user,
       pid,
@@ -223,7 +223,6 @@ trait DatabaseOperations { this: OdbSuite =>
       """.some,
       "Queue Proposal"
     )
-  }
 
   def addDemoScienceProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
     addProposal(
@@ -484,6 +483,7 @@ trait DatabaseOperations { this: OdbSuite =>
           wavelength: { nanometers: 500 }
           resolution: 100
           signalToNoise: 100.0
+          signalToNoiseAt: { nanometers: 510 }
           wavelengthCoverage: { nanometers: 20 }
           focalPlane: SINGLE_SLIT
           focalPlaneAngle: { microarcseconds: 0 }
