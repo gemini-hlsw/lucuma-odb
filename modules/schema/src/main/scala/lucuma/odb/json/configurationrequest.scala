@@ -9,6 +9,7 @@ import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import io.circe.refined.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GmosNorthGrating
@@ -24,6 +25,7 @@ import lucuma.core.model.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.core.model.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.json.coordinates.query.given
+import eu.timepit.refined.types.string.NonEmptyString
 
 object configurationrequest:
 
@@ -89,13 +91,15 @@ object configurationrequest:
       for
         id <- hc.downField("id").as[ConfigurationRequest.Id]
         st <- hc.downField("status").as[ConfigurationRequestStatus]
+        ju <- hc.downField("justification").as[Option[NonEmptyString]]
         cf <- hc.downField("configuration").as[Configuration]
-      yield ConfigurationRequest(id, st, cf)
+      yield ConfigurationRequest(id, st, ju, cf)
 
     given Encoder[ConfigurationRequest] = cr =>
       Json.obj(
         "id" -> cr.id.asJson,
         "status" -> cr.status.asJson,
+        "justification" -> cr.justification.asJson,
         "configuration" -> cr.configuration.asJson
       )
 

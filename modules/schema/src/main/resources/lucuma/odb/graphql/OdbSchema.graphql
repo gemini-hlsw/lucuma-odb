@@ -8725,6 +8725,7 @@ type ConfigurationRequest {
   id: ConfigurationRequestId!
   program: Program!
   status: ConfigurationRequestStatus!
+  justification: NonEmptyString
   configuration: Configuration!
   applicableObservations: [ObservationId!]!
 }
