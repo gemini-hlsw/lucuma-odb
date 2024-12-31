@@ -605,6 +605,7 @@ object ConfigurationService {
         SELECT
           c_configuration_request_id,
           c_status,
+          c_justification,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -631,6 +632,7 @@ object ConfigurationService {
         (
           configuration_request_id *:
           configuration_request_status *:
+          text_nonempty.opt        *:
           cloud_extinction         *:
           image_quality            *:
           sky_background           *:
@@ -644,6 +646,7 @@ object ConfigurationService {
           { case 
             id                       *:
             status                   *:
+            justification            *:
             cloudExtinction          *:
             imageQuality             *:
             skyBackground            *:
@@ -670,6 +673,7 @@ object ConfigurationService {
                 ConfigurationRequest(
                   id, 
                   status,
+                  justification,
                   Configuration(
                     Conditions(
                       cloudExtinction,
@@ -730,6 +734,7 @@ object ConfigurationService {
         RETURNING
           c_configuration_request_id,
           c_status,
+          c_justification,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -743,6 +748,7 @@ object ConfigurationService {
         (
           configuration_request_id *:
           configuration_request_status *:
+          text_nonempty.opt        *:
           cloud_extinction         *:
           image_quality            *:
           sky_background           *:
@@ -756,6 +762,7 @@ object ConfigurationService {
           { case 
             id                       *:
             status                   *:
+            justification            *:
             cloudExtinction          *:
             imageQuality             *:
             skyBackground            *:
@@ -782,6 +789,7 @@ object ConfigurationService {
                 ConfigurationRequest(
                   id, 
                   status,
+                  justification,
                   Configuration(
                     Conditions(
                       cloudExtinction,
