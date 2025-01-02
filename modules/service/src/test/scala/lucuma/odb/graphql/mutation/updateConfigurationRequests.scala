@@ -75,8 +75,8 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
       _   <- addProposal(pi, pid, Some(cid), None, "Foo")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      rid <- createConfigurationRequestAs(pi, oid)
-    yield rid
+      mid <- createConfigurationRequestAs(pi, oid)
+    yield mid
 
   ConfigurationRequestStatus.values.foreach: status =>
     test(s"Admin should be able to set status to $status."):
