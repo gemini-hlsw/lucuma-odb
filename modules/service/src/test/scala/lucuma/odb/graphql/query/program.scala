@@ -66,73 +66,65 @@ class program extends OdbSuite {
     }
   }
 
-  test("invitations are visible") {
-    List(pi, service).traverse { user =>
+  test("invitations are visible"):
+    List(pi, service).traverse: user =>
       val name = s"${user.displayName}'s Science Program"
-      createProgramAs(user, name).flatMap { id =>
-        createUserInvitationAs(user, id) >> {
-        expect(
-          user = user,
-          query =
-            s"""
-              query {
-                program(programId: "$id") {
-                  id
-                  name
-                  userInvitations {
-                    status
-                    issuer {
-                      id
-                    }
-                    program {
-                      id
-                    }
-                    email {
+      createProgramAs(user, name).flatMap: pid =>
+        addProgramUserAs(user, pid).flatMap: mid =>
+          createUserInvitationAs(user, mid) >>
+          expect(
+            user  = user,
+            query =
+              s"""
+                query {
+                  program(programId: "$pid") {
+                    id
+                    name
+                    userInvitations {
                       status
-                    }
-                    partnerLink {
-                      linkType
-                      ... on HasPartner {
-                        partner
+                      issuer { id }
+                      programUser {
+                        id
+                        partnerLink {
+                          linkType
+                          ... on HasPartner {
+                            partner
+                          }
+                        }
+                      }
+                      email {
+                        status
                       }
                     }
                   }
                 }
-              }
-            """,
-          expected = Right(
-            json"""
-              {
-                "program": {
-                  "id": $id,
-                  "name": $name,
-                  "userInvitations": [
-                    {
-                      "status": ${InvitationStatus.Pending},
-                      "issuer": {
-                        "id": ${user.id}
-                      },
-                      "program": {
-                        "id": $id
-                      },
-                      "email": {
-                        "status": ${EmailStatus.Queued}
-                      },
-                      "partnerLink": {
-                        "linkType": "HAS_PARTNER",
-                        "partner": "US"
+              """,
+            expected =
+              json"""
+                {
+                  "program": {
+                    "id": $pid,
+                    "name": $name,
+                    "userInvitations": [
+                      {
+                        "status": ${InvitationStatus.Pending},
+                        "issuer": { "id": ${user.id} },
+                        "programUser": {
+                          "id": $mid,
+                          "partnerLink": {
+                            "linkType": "HAS_PARTNER",
+                            "partner": "US"
+                          }
+                        },
+                        "email": {
+                          "status": ${EmailStatus.Queued}
+                        }
                       }
-                    }
-                  ]
+                    ]
+                  }
                 }
-              }
-            """
+              """.asRight
           )
-        )
-      }
-    }
-    }
-  }
 
   test("guest and standard user can't see each others' programs") {
     val users = List(guest, pi)

@@ -10,7 +10,7 @@ import lucuma.core.model.UserInvitation
 
 import table.UserInvitationTable
 
-trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
+trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F]:
 
   lazy val CreateUserInvitationResultMapping =
     ObjectMapping(CreateUserInvitationResultType)(
@@ -18,6 +18,3 @@ trait CreateUserInvitationResultMapping[F[_]] extends UserInvitationTable[F] {
       SqlObject("invitation"),
       CursorField("key", c => c.envR[UserInvitation]("inv").map(UserInvitation.fromString.reverseGet), List("id"))
     )
-
-}
-

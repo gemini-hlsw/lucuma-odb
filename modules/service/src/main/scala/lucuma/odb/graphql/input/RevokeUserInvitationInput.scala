@@ -13,8 +13,7 @@ final case class RevokeUserInvitationInput(id: UserInvitation.Id)
 object RevokeUserInvitationInput:
 
   val Binding: Matcher[RevokeUserInvitationInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         UserInvitationIdInput.Binding("id", rId),
       ) => rId.map(RevokeUserInvitationInput.apply)
-    }
