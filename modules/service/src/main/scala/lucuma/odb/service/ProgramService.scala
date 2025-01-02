@@ -15,9 +15,7 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ProgramType
-import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
-import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramReference.Description
@@ -206,9 +204,7 @@ object ProgramService {
                     Concurrent[F].unit
                   case nonServiceUser    =>
                     // Link the PI to the program.
-                    session.executeCommand(
-                      ProgramUserService.Statements.LinkUser(pid, user.id, UserType.fromUser(user), ProgramUserRole.Pi, PartnerLink.HasUnspecifiedPartner)
-                    ).void
+                    programUserService.addAndLinkPi(pid).void
               .map(_.success)
 
           val proprietaryMonths =

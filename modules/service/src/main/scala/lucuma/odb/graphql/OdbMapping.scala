@@ -31,7 +31,6 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
-import lucuma.sso.client.SsoGraphQlClient
 import natchez.Trace
 import org.http4s.client.Client
 import org.tpolecat.sourcepos.SourcePos
@@ -80,7 +79,6 @@ object OdbMapping {
     user0:         User,
     topics0:       Topics[F],
     itcClient0:    ItcClient[F],
-    ssoGqlClient0: SsoGraphQlClient[F],
     commitHash0:   CommitHash,
     enums:         Enums,
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -257,7 +255,6 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val itcClient = itcClient0
-          override val ssoGraphQlClient: SsoGraphQlClient[F] = ssoGqlClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
 
@@ -272,7 +269,6 @@ object OdbMapping {
                   user0,
                   topics0,
                   itcClient0,
-                  ssoGqlClient0,
                   commitHash0,
                   enums,
                   tec,
@@ -506,6 +502,7 @@ object OdbMapping {
                 ObservationElaborator,
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
+                ProgramUserElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,

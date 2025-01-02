@@ -21,13 +21,15 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import org.http4s.Charset
 import org.http4s.UrlForm
 import org.http4s.dsl.Http4sDsl
 
-class createUserInvitation extends OdbSuite {
+class createUserInvitation extends OdbSuite:
 
   val partner = Partner.CA
 
@@ -70,54 +72,112 @@ class createUserInvitation extends OdbSuite {
       Resource.eval(response)
     }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
-    test(s"invite ${role.toString.toLowerCase} (key)") {
-      createProgramAs(pi).flatMap { pid =>
-        createUserInvitationAs(pi, pid, role)
-      }
-    }
-  }
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+    test(s"invite ${role.toString.toLowerCase} (key)"):
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, role).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
-    test(s"invite ${role.toString.toLowerCase} (non-partner)") {
-      createProgramAs(pi).flatMap { pid =>
-        createUserInvitationAs(pi, pid, role, partnerLink = PartnerLink.HasNonPartner)
-      }
-    }
-  }
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+    test(s"invite ${role.toString.toLowerCase} (non-partner)"):
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, role, PartnerLink.HasNonPartner).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { role =>
-    test(s"invite ${role.toString.toLowerCase} (unspecified partner)") {
-      createProgramAs(pi).flatMap { pid =>
-        createUserInvitationAs(pi, pid, role, partnerLink = PartnerLink.HasUnspecifiedPartner)
-      }
-    }
-  }
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+    test(s"invite ${role.toString.toLowerCase} (unspecified partner)"):
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, role, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+          createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
-    test(s"invite ${pur.toString.toLowerCase} (metadata)") {
-      createProgramAs(pi).flatMap { pid =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+    test(s"invite ${pur.toString.toLowerCase} (metadata)"):
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, pur, PartnerLink.HasPartner(Partner.US)).flatMap: mid =>
+          expect(
+            user = pi,
+            query = s"""
+            mutation {
+              createUserInvitation(
+                input: {
+                  programUserId: "$mid"
+                  recipientEmail: "$successRecipient"
+                }
+              ) {
+                invitation {
+                  status
+                  issuer { id }
+                  recipientEmail
+                  programUser {
+                    id
+                    role
+                    user { id }
+                    program { id }
+                  }
+                  email {
+                    senderEmail
+                    status
+                  }
+                }
+              }
+            }
+            """,
+            expected = json"""
+              {
+                "createUserInvitation" : {
+                  "invitation" : {
+                    "status" : ${InvitationStatus.Pending},
+                    "issuer" : { "id" : ${pi.id} },
+                    "recipientEmail": $successRecipient,
+                    "programUser" : {
+                      "id" : $mid,
+                      "role": ${pur: ProgramUserRole},
+                      "user": null,
+                      "program": {
+                        "id": $pid
+                      }
+                    },
+                    "email": {
+                      "senderEmail": ${emailConfig.invitationFrom},
+                      "status": ${EmailStatus.Queued}
+                    }
+                  }
+                }
+              }
+            """.asRight
+          )
+
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+    test(s"coi can invite a ${pur.toString.toLowerCase} (metadata)"):
+      val pidrid = for
+        pid  <- createProgramAs(pi)
+        _    <- createProgramAs(pi2) // this creates pi2
+        rid2 <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasPartner(Partner.US))
+        _    <- linkUserAs(pi, rid2, pi2.id)
+        rid3 <- addProgramUserAs(pi, pid, pur)
+      yield (pid, rid3)
+
+      pidrid.flatMap: (pid, mid) =>
         expect(
-          user = pi,
+          user = pi2,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programId: "$pid"
+                programUserId: "$mid"
                 recipientEmail: "$successRecipient"
-                role: ${pur.tag.toUpperCase}
-                partnerLink: {
-                  partner: US
-                }
               }
             ) {
               invitation {
                 status
                 issuer { id }
                 recipientEmail
-                redeemer { id }
-                program { id }
-                role
+                programUser {
+                  id
+                  role
+                  user { id }
+                  program { id }
+                }
                 email {
                   senderEmail
                   status
@@ -126,21 +186,20 @@ class createUserInvitation extends OdbSuite {
             }
           }
           """,
-          expected = Right(
+          expected =
             json"""
               {
                 "createUserInvitation" : {
                   "invitation" : {
                     "status" : ${InvitationStatus.Pending},
-                    "issuer" : {
-                      "id" : ${pi.id}
-                    },
+                    "issuer" : { "id" : ${pi2.id} },
                     "recipientEmail": $successRecipient,
-                    "redeemer" : null,
-                    "program" : {
-                      "id" : $pid
+                    "programUser": {
+                      "id": $mid,
+                      "role" : ${pur: ProgramUserRole},
+                      "user": null,
+                      "program" : { "id" : $pid }
                     },
-                    "role" : ${pur: ProgramUserRole},
                     "email": {
                       "senderEmail": ${emailConfig.invitationFrom},
                       "status": ${EmailStatus.Queued}
@@ -148,101 +207,28 @@ class createUserInvitation extends OdbSuite {
                   }
                 }
               }
-            """
-          )
+            """.asRight
         )
-      }
-    }
-  }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
-    test(s"coi can invite a ${pur.toString.toLowerCase} (metadata)") {
-      val pid = for {
-        pid <- createProgramAs(pi)
-        _   <- createProgramAs(pi2) // this creates pi2
-        _   <- linkCoiAs(pi, pi2.id -> pid, Partner.US)
-      } yield pid
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+    test(s"readonly coi cannot invite a ${pur.toString.toLowerCase}"):
+      val mid = for
+        pid  <- createProgramAs(pi)
+        _    <- createProgramAs(pi2) // this creates pi2
+        rid2 <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO)
+        _    <- linkUserAs(pi, rid2, pi2.id)
+        rid3 <- addProgramUserAs(pi, pid, pur)  // add as PI, try to invite as CoiRO below
+      yield rid3
 
-      pid.flatMap { pid =>
+      mid.flatMap: mid =>
         expect(
           user = pi2,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programId: "$pid"
+                programUserId: "$mid"
                 recipientEmail: "$successRecipient"
-                role: ${pur.tag.toUpperCase}
-                partnerLink: {
-                  partner: US
-                }
-              }
-            ) {
-              invitation {
-                status
-                issuer { id }
-                recipientEmail
-                redeemer { id }
-                program { id }
-                role
-                email {
-                  senderEmail
-                  status
-                }
-              }
-            }
-          }
-          """,
-          expected = Right(
-            json"""
-              {
-                "createUserInvitation" : {
-                  "invitation" : {
-                    "status" : ${InvitationStatus.Pending},
-                    "issuer" : {
-                      "id" : ${pi2.id}
-                    },
-                    "recipientEmail": $successRecipient,
-                    "redeemer" : null,
-                    "program" : {
-                      "id" : $pid
-                    },
-                    "role" : ${pur: ProgramUserRole},
-                    "email": {
-                      "senderEmail": ${emailConfig.invitationFrom},
-                      "status": ${EmailStatus.Queued}
-                    }
-                  }
-                }
-              }
-            """
-          )
-        )
-      }
-    }
-  }
-
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach { pur =>
-    test(s"readonly coi cannot invite a ${pur.toString.toLowerCase}") {
-      val pid = for {
-        pid <- createProgramAs(pi)
-        _   <- createProgramAs(pi2) // this creates pi2
-        _   <- linkObserverAs(pi, pi2.id -> pid, Partner.US)
-      } yield pid
-
-      pid.flatMap { pid =>
-        expect(
-          user = pi2,
-          query = s"""
-          mutation {
-            createUserInvitation(
-              input: {
-                programId: "$pid"
-                recipientEmail: "$successRecipient"
-                role: ${pur.tag.toUpperCase}
-                partnerLink: {
-                  partner: US
-                }
               }
             ) {
               invitation {
@@ -251,212 +237,288 @@ class createUserInvitation extends OdbSuite {
             }
           }
           """,
-          expected = Left(
-            List("Specified program does not exist, or user is not the PI or a COI.")
-          )
+          expected = List(
+            "Specified program does not exist, or user is not the PI or COI."
+          ).asLeft
         )
-      }
-    }
-  }
 
-  test("invite support (metadata)") {
+  test("invite support (metadata)"):
     List(ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).traverse: role =>
-      createProgramAs(pi).flatMap { pid =>
-        expect(
-          user = staff,
-          query = s"""
-          mutation {
-            createUserInvitation(
-              input: {
-                programId: "$pid"
-                recipientEmail: "$successRecipient"
-                role: ${role.tag.toUpperCase}
-              }
-            ) {
-              invitation {
-                status
-                issuer { id }
-                recipientEmail
-                redeemer { id }
-                program { id }
-                role
-                email {
-                  senderEmail
-                  status
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(staff, pid, role).flatMap: mid =>
+          expect(
+            user  = staff,
+            query = s"""
+            mutation {
+              createUserInvitation(
+                input: {
+                  programUserId: "$mid"
+                  recipientEmail: "$successRecipient"
                 }
-              }
-            }
-          }
-          """,
-          expected = Right(
-            json"""
-              {
-                "createUserInvitation" : {
-                  "invitation" : {
-                    "status" : ${InvitationStatus.Pending},
-                    "issuer" : {
-                      "id" : ${staff.id}
-                    },
-                    "recipientEmail": $successRecipient,
-                    "redeemer" : null,
-                    "program" : {
-                      "id" : $pid
-                    },
-                    "role" : ${role: ProgramUserRole},
-                    "email": {
-                      "senderEmail": ${emailConfig.invitationFrom},
-                      "status": ${EmailStatus.Queued}
-                    }
+              ) {
+                invitation {
+                  status
+                  issuer { id }
+                  recipientEmail
+                  programUser {
+                    id
+                    role
+                    program { id }
+                  }
+                  email {
+                    senderEmail
+                    status
                   }
                 }
               }
-            """
+            }
+            """,
+            expected =
+              json"""
+                {
+                  "createUserInvitation" : {
+                    "invitation" : {
+                      "status" : ${InvitationStatus.Pending},
+                      "issuer" : { "id" : ${staff.id} },
+                      "recipientEmail": $successRecipient,
+                      "programUser": {
+                        "id": $mid,
+                        "role": ${role: ProgramUserRole},
+                        "program" : { "id" : $pid }
+                      },
+                      "email": {
+                        "senderEmail": ${emailConfig.invitationFrom},
+                        "status": ${EmailStatus.Queued}
+                      }
+                    }
+                  }
+                }
+              """.asRight
           )
-        )
-      }
-  }
 
-  test("can't invite a user to a non-existent program") {
-    expect(
-      user = pi,
-      query = s"""
+  def createUserInvitationQuery(mid: ProgramUser.Id): String =
+    s"""
       mutation {
         createUserInvitation(
           input: {
-            programId: "p-ffff"
+            programUserId: "$mid"
             recipientEmail: "$successRecipient"
-            role: ${ProgramUserRole.Coi.tag.toUpperCase}
-            partnerLink: {
-              partner: US
-            }
           }
         ) {
           key
         }
       }
-      """,
-      expected = Left(
-        List(s"Specified program does not exist, or user is not the PI or a COI.")
-      )
+    """
+
+  test("can't invite a user with a non-existent program user id"):
+    expect(
+      user     = pi,
+      query    = createUserInvitationQuery(ProgramUser.Id.parse("m-ffff").get),
+      expected = List(
+        s"ProgramUser m-ffff does not exist, or is ineligible for the requested operation."
+      ).asLeft
     )
-  }
 
-
-  test("pi can't invite a user if it's not their program") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = pi2,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Coi.tag.toUpperCase}
-              partnerLink: {
-                partner: US
-              }
-            }
-          ) {
-            key
-          }
-        }
-        """,
-        expected = Left(
-          List(s"Specified program does not exist, or user is not the PI or a COI.")
+  test("pi can't invite a user if it's not their program"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        expect(
+          user     = pi2,
+          query    = createUserInvitationQuery(mid),
+          expected = List(
+            s"Specified program does not exist, or user is not the PI or COI."
+          ).asLeft
         )
-      )
-    }
-  }
 
-  test("pi can't invite a user to become the pi") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$successRecipient"
-              role: ${ProgramUserRole.Pi.tag.toUpperCase}
-              partnerLink: {
-                partner: US
-              }
-            }
-          ) {
-            key
-          }
-        }
-        """,
-        expected = List(s"Argument 'input' is invalid: Cannot create an invitation for the PI.").asLeft
-      )
-    }
-  }
+  test("guest can't invite a coi"):
+    createProgramAs(guest).flatMap: pid =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        expect(
+          user     = guest,
+          query    = createUserInvitationQuery(mid),
+          expected = List(
+            s"Guest users cannot create invitations."
+          ).asLeft
+       )
 
-  List(guest, ngo).foreach: user =>
-    test(s"${user.role.access} can't invite a user") {
-      createProgramAs(user).flatMap { pid =>
-        expectOdbError(
-          user = user,
+  test("ngo without allocation can't add a coi"):
+    createProgramAs(ngo).flatMap: pid =>
+      addProgramUserAs(staff, pid).flatMap: mid =>
+        expect(
+          user     = ngo,
+          query    = createUserInvitationQuery(mid),
+          expected = List(
+            s"NGO users can't create invitations."
+          ).asLeft
+        )
+
+  test("staff, admin, service can create an invitation for any program"):
+    createProgramAs(pi).flatMap: pid =>
+      List(staff, admin, service).traverse: user =>
+        addProgramUserAs(pi, pid).flatMap: mid =>
+          createUserInvitationAs(user, mid)
+
+  test("Bad response from sending email results in failure"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary).flatMap: mid =>
+        expect(
+          user  = staff,
           query = s"""
           mutation {
             createUserInvitation(
               input: {
-                programId: "$pid"
-                recipientEmail: "$successRecipient"
-                role: ${ProgramUserRole.Coi.tag.toUpperCase}
-                partnerLink: {
-                  partner: US
-                }
+                programUserId: "$mid"
+                recipientEmail: "$badResponseRecipient"
               }
             ) {
-              key
+              invitation {
+                status
+              }
             }
           }
           """,
-          expected =
-            val Id = user.id
-            {
-              case OdbError.NotAuthorized(Id, _) =>
-            }
+          expected = List(
+            "Unexpected status '400 Bad Request' while attempting to send email."
+          ).asLeft
         )
-      }
-    }
 
-  test("staff, admin, service can create an invitation for any program") {
-    createProgramAs(pi).flatMap { pid =>
-      List(staff, admin, service).traverse { user =>
-        createUserInvitationAs(user, pid)
-      }
-    }
-  }
-
-
-  test("Bad response from sending email results in failure") {
-    createProgramAs(pi).flatMap { pid =>
-      expect(
-        user = staff,
-        query = s"""
-        mutation {
-          createUserInvitation(
-            input: {
-              programId: "$pid"
-              recipientEmail: "$badResponseRecipient"
-              role: ${ProgramUserRole.SupportPrimary.tag.toUpperCase}
-            }
-          ) {
-            invitation {
+  def invitationsQuery(user: User, pid: Program.Id): String =
+    s"""
+      query {
+        programUsers(
+          WHERE: {
+            program: { id : { EQ: "$pid" } }
+            role: { NEQ: PI }
+          }
+        ) {
+          matches {
+            invitations {
               status
             }
           }
         }
-        """,
-        expected = Left(List(
-          "Unexpected status '400 Bad Request' while attempting to send email."
-        ))
-      )
-    }
-  }
+      }
+    """
 
-}
+  test("program user invitations"):
+    for
+      pid  <- createProgramAs(pi)
+      mid  <- addProgramUserAs(pi, pid)
+      inv0 <- createUserInvitationAs(pi, mid)
+      _    <- expect(
+        user     = pi,
+        query    = invitationsQuery(pi, pid),
+        expected =
+          json"""
+            {
+              "programUsers": {
+                "matches": [
+                  {
+                    "invitations": [ { "status": "PENDING" } ]
+                  }
+                ]
+              }
+            }
+          """.asRight
+        )
+    yield ()
+
+  test("one pending invitation per user"):
+    for
+      pid <- createProgramAs(pi)
+      mid <- addProgramUserAs(pi, pid)
+      inv <- createUserInvitationAs(pi, mid)
+        _ <- interceptOdbError(createUserInvitationAs(pi, mid)):
+               case OdbError.UpdateFailed(_) => // ok
+    yield ()
+
+  test("reject, invite again"):
+    createProgramAs(pi2).>>
+      for
+        pid  <- createProgramAs(pi)
+        mid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, mid)
+        _    <- redeemUserInvitationAs(pi2, inv0, false)
+        inv1 <- createUserInvitationAs(pi, mid)
+        _    <- redeemUserInvitationAs(pi2, inv1, true)
+        _    <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [
+                    {
+                      "invitations": [
+                       { "status": "DECLINED" },
+                       { "status": "REDEEMED" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          )
+      yield ()
+
+  test("revoke, invite again"):
+    createProgramAs(pi2).>>
+      for
+        pid  <- createProgramAs(pi)
+        mid  <- addProgramUserAs(pi, pid)
+        inv0 <- createUserInvitationAs(pi, mid)
+        _    <- revokeUserInvitationAs(pi, inv0.id)
+        inv1 <- createUserInvitationAs(pi, mid)
+        _    <- redeemUserInvitationAs(pi2, inv1, true)
+        _    <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [
+                    {
+                      "invitations": [
+                       { "status": "REVOKED" },
+                       { "status": "REDEEMED" }
+                      ]
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          )
+      yield ()
+
+  test("can't invite after linked"):
+    for
+      pid <- createProgramAs(pi)
+      mid <- addProgramUserAs(pi, pid)
+      _   <- linkUserAs(pi, mid, pi2.id)
+      _   <- interceptOdbError(createUserInvitationAs(pi, mid)):
+               case OdbError.InvalidProgramUser(mid, _) => // ok
+    yield ()
+
+  test(s"Delete a program user after invitation acceptance."):
+    createProgramAs(pi2).>>
+    for
+      pid <- createProgramAs(pi)
+      mid <- addProgramUserAs(pi, pid)
+      inv <- createUserInvitationAs(pi, mid)
+      _   <- redeemUserInvitationAs(pi2, inv, true)
+      _   <- deleteProgramUserAs(pi, mid)
+      _   <- expect(
+          user     = pi,
+          query    = invitationsQuery(pi, pid),
+          expected =
+            json"""
+              {
+                "programUsers": {
+                  "matches": [ ]
+                }
+              }
+            """.asRight
+      )
+    yield ()

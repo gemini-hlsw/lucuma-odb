@@ -19,7 +19,9 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
@@ -46,11 +48,13 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
+import lucuma.core.model.UserProfile
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -66,7 +70,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
-import lucuma.odb.json.partnerlink.given
 import lucuma.odb.json.stepconfig.given
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
@@ -722,71 +725,51 @@ trait DatabaseOperations { this: OdbSuite =>
   ): IO[Json] =
     setAllocationsAs(user, pid, List(AllocationInput(category, scienceBand, duration)))
 
-  def linkAs(
+  def linkUserAs(
     user: User,
-    uid: User.Id,
-    pid: Program.Id,
-    role: ProgramUserRole,
-    partnerLink: PartnerLink
+    mid: ProgramUser.Id,
+    uid:  User.Id
   ): IO[Unit] =
     expect(
       user = user,
       query = s"""
         mutation {
           linkUser(input: {
-            programId: ${pid.asJson}
+            programUserId: ${mid.asJson}
             userId: ${uid.asJson}
-            role: ${role.tag.toUpperCase}
-            partnerLink: {
-              linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toScreamingSnakeCase}")}
-            }
           }) {
-            user {
-              role
-              partnerLink {
-                linkType
-                ... on HasPartner {
-                  partner
-                }
-              }
-              user { id }
-            }
+            user { id }
           }
         }
       """,
       expected = json"""
         {
           "linkUser" : {
-            "user": {
-              "role" : $role,
-              "partnerLink" : $partnerLink,
-              "user" : {
-                "id": $uid
-              }
-            }
+            "user": { "id": $mid }
           }
         }
       """.asRight
     )
 
-  def linkCoiAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(partner))
-
-  def linkCoiAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
-    linkCoiAs(user, arrow._1, arrow._2, partner)
-
-  def linkObserverAs(user: User, uid: User.Id, pid: Program.Id, partner: Partner): IO[Unit] =
-    linkAs(user, uid, pid, ProgramUserRole.CoiRO, PartnerLink.HasPartner(partner))
-
-  def linkObserverAs(user: User, arrow: (User.Id, Program.Id), partner: Partner): IO[Unit] =
-    linkObserverAs(user, arrow._1, arrow._2, partner)
-
-  def linkSupportAs(user: User, uid: User.Id, pid: Program.Id, tpe: ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type): IO[Unit] =
-    linkAs(user, uid, pid, tpe, PartnerLink.HasUnspecifiedPartner)
-
   def createUsers(users: User*): IO[Unit] =
     users.toList.traverse_(createProgramAs(_)) // TODO: something cheaper
+
+  def piProgramUserIdAs(
+    user: User,
+    pid:  Program.Id
+  ): IO[ProgramUser.Id] =
+    query(
+      user,
+      s"""
+        query {
+          program(programId: "$pid") {
+            pi { id }
+          }
+        }
+      """
+    ).map: js =>
+      js.hcursor
+        .downFields("program", "pi", "id").require[ProgramUser.Id]
 
   def updateAsterisms(
     user: User,
@@ -1446,11 +1429,104 @@ trait DatabaseOperations { this: OdbSuite =>
       )
     )
 
+  def addProgramUserAs(
+    user:        User,
+    pid:         Program.Id,
+    role:        ProgramUserRole   = ProgramUserRole.Coi,
+    partnerLink: PartnerLink       = PartnerLink.HasPartner(Partner.US),
+    fallback:    UserProfile       = UserProfile.Empty,
+    education:   EducationalStatus = EducationalStatus.PhD,
+    thesis:      Boolean           = false,
+    gender:      Gender            = Gender.NotSpecified
+  ): IO[ProgramUser.Id] =
+    extension (o: Option[String]) def strOrNull: String = o.fold("null")(s => s""""$s"""")
+
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          addProgramUser(
+            input: {
+              programId: "$pid"
+              role: ${role.tag.toScreamingSnakeCase}
+              SET: {
+                partnerLink: {
+                  ${
+                    partnerLink match
+                      case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
+                      case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                  }
+                }
+                fallbackProfile: {
+                  givenName: ${fallback.givenName.strOrNull}
+                  familyName: ${fallback.familyName.strOrNull}
+                  creditName: ${fallback.creditName.strOrNull}
+                  email: ${fallback.email.strOrNull}
+                }
+                educationalStatus: ${education.tag.toScreamingSnakeCase}
+                thesis: $thesis
+                gender: ${gender.tag.toScreamingSnakeCase}
+              }
+            }
+          ) { programUser { id } }
+        }
+        """
+    ).map: j =>
+      j.hcursor.downFields("addProgramUser", "programUser", "id").require[ProgramUser.Id]
+
+  def deleteProgramUserAs(
+    user: User,
+    mid:  ProgramUser.Id
+  ): IO[Boolean] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          deleteProgramUser(input: {
+            programUserId: "$mid"
+          }) {
+            result
+          }
+        }
+      """
+    ).map: js =>
+      js.hcursor.downFields("deleteProgramUser", "result").require[Boolean]
+
+  def listProgramUsersAs(
+    user: User,
+    pid:  Program.Id
+  ): IO[List[(ProgramUser.Id, ProgramUserRole, Option[User.Id])]] =
+    query(
+      user  = user,
+      query = s"""
+        query {
+          program(programId: "$pid") {
+            users {
+              id
+              role
+              user { id }
+            }
+          }
+        }
+      """
+    ).map: js =>
+
+      def userId(c: io.circe.HCursor): io.circe.Decoder.Result[Option[User.Id]] =
+        c.downField("user").focus match
+          case Some(v) if v.isNull => Right(None)
+          case _                   => c.downFields("user", "id").as[Option[User.Id]]
+
+      val cs = js.hcursor.downFields("program", "users").values.get.toList.map(_.hcursor)
+      cs.map: c =>
+        (for
+          i <- c.get[ProgramUser.Id]("id")
+          r <- c.get[ProgramUserRole]("role")
+          u <- userId(c)
+        yield (i, r, u)).fold(f => sys.error(f.message), identity)
+
   def createUserInvitationAs(
     user: User,
-    pid: Program.Id,
-    role: ProgramUserRole = ProgramUserRole.Coi,
-    partnerLink: PartnerLink = PartnerLink.HasPartner(Partner.US),
+    mid:  ProgramUser.Id,
     recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get,
   ): IO[UserInvitation] =
     query(
@@ -1459,24 +1535,14 @@ trait DatabaseOperations { this: OdbSuite =>
       mutation {
         createUserInvitation(
           input: {
-            programId: "$pid"
+            programUserId: "$mid"
             recipientEmail: "$recipientEmail"
-            role: ${role.tag.toUpperCase}
-            partnerLink: {
-              linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}
-              ${partnerLink.partnerOption.foldMap(p => s"partner: ${p.tag.toUpperCase}")}
-            }
           }
-        ) {
-          key
-        }
+        ) { key }
       }
       """
-    ).map { js =>
-      js.hcursor
-        .downFields("createUserInvitation", "key")
-        .require[UserInvitation]
-    }
+    ).map: js =>
+      js.hcursor.downFields("createUserInvitation", "key").require[UserInvitation]
 
   def redeemUserInvitationAs(u: User, inv: UserInvitation, accept: Boolean = true): IO[UserInvitation.Id] =
     query(
@@ -1487,53 +1553,30 @@ trait DatabaseOperations { this: OdbSuite =>
             key: "${UserInvitation.fromString.reverseGet(inv)}"
             accept: $accept
           }) {
-            invitation {
-              id
-              status
-              issuer {
-                id
-              }
-              redeemer {
-                id
-              }
-            }
+            invitation { id }
           }
         }
       """
-    ).map { j =>
+    ).map: j =>
       j.hcursor.downFields("redeemUserInvitation", "invitation", "id").require[UserInvitation.Id]
-    }
 
   def revokeUserInvitationAs(u: User, id: UserInvitation.Id): IO[UserInvitation.Id] =
     query(
       user = u,
       query = s"""
         mutation {
-          revokeUserInvitation(input: {
-            id: "${UserInvitation.Id.fromString.reverseGet(id)}"
-          }) {
-            invitation {
-              id
-              status
-              issuer {
-                id
-              }
-              redeemer {
-                id
-              }
-            }
+          revokeUserInvitation(input: { id: "${UserInvitation.Id.fromString.reverseGet(id)}" }) {
+            invitation { id }
           }
         }
       """
-    ).map { j =>
+    ).map: j =>
       j.hcursor.downFields("revokeUserInvitation", "invitation", "id").require[UserInvitation.Id]
-    }
 
-  def getEmailIdForInvitation(id: UserInvitation.Id): IO[Option[EmailId]] = {
+  def getEmailIdForInvitation(id: UserInvitation.Id): IO[Option[EmailId]] =
     val query = sql"select c_email_id from t_invitation where c_invitation_id = $user_invitation_id".query(email_id)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.option(id)))
-  }
 
   // email will be inserted with a status of Queued
   def insertEmail(
