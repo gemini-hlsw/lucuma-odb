@@ -47,7 +47,13 @@ class programUsers extends OdbSuite:
 
   val service = TestUsers.service(10)
 
-  val validUsers = List(pi, pi2, pi3, guest1, guest2, staff, piCharles, piLeon, piPhd, service).toList
+  val piJohn  = TestUsers.Standard(
+    11,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(11).get),
+    email = "john@wilkes.net".some
+  )
+
+  val validUsers = List(pi, pi2, pi3, guest1, guest2, staff, piCharles, piLeon, piPhd, service, piJohn).toList
 
   test("simple program user selection"):
     createProgramAs(pi).replicateA(5).flatMap: pids =>
@@ -82,6 +88,39 @@ class programUsers extends OdbSuite:
           )
         )
       )
+
+  test("program user selection via id"):
+    val lho = UserProfile("Lee".some, "Oswald".some, "Lee Harvey Oswald".some, "lee@oswald.co".some)
+    createProgramAs(piJohn).flatMap: pid =>
+      addProgramUserAs(piJohn, pid, fallback = lho).flatMap: puid =>
+        expect(
+          user = staff,
+          query = s"""
+            query {
+              programUsers(
+                WHERE: {
+                  id: { EQ: "$puid" }
+                }
+              ) {
+                matches {
+                  program { id }
+                  user { id }
+                }
+              }
+            }
+          """,
+          expected =
+            Json.obj(
+              "programUsers" -> Json.obj(
+                "matches"    -> Json.fromValues(List(
+                   Json.obj(
+                     "program" -> Json.obj("id" -> pid.asJson),
+                     "user"    -> Json.Null
+                   )
+                ))
+              )
+            ).asRight
+        )
 
   test("program user selection via PI email"):
     createProgramAs(piLeon) >>

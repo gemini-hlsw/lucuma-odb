@@ -13461,7 +13461,6 @@ input WhereOrderLong {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderObservationId {
   """
@@ -13738,6 +13737,55 @@ input WhereOrderProgramId {
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
   LTE: ProgramId
+}
+
+"""
+Filters on equality or order comparisons of the program user id.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderProgramUserId {
+
+  """
+  Matches if the program user id is exactly the supplied value.
+  """
+  EQ: ProgramUserId
+
+  """
+  Matches if the program user id is not the supplied value.
+  """
+  NEQ: ProgramUserId
+
+  """
+  Matches if the program user id is any of the supplied options.
+  """
+  IN: [ProgramUserId!]
+
+  """
+  Matches if the program user id is none of the supplied values.
+  """
+  NIN: [ProgramUserId!]
+
+  """
+  Matches if the program user id is ordered after (>) the supplied value.
+  """
+  GT: ProgramUserId
+
+  """
+  Matches if the program user id is ordered before (<) the supplied value.
+  """
+  LT: ProgramUserId
+
+  """
+  Matches if the program user id is ordered after or equal (>=) the supplied
+  value.
+  """
+  GTE: ProgramUserId
+
+  """
+  Matches if the program user id is ordered before or equal (<=) the supplied
+  value.
+  """
+  LTE: ProgramUserId
 }
 
 input WhereOrderUserId {
@@ -14261,6 +14309,11 @@ input WhereProgramUser {
   A nested program user filter that must not match in order for the NOT itself to match.
   """
   NOT: WhereProgramUser
+
+  """
+  Matches the program user id.
+  """
+  id: WhereOrderProgramUserId
 
   """
   Matches the program.
