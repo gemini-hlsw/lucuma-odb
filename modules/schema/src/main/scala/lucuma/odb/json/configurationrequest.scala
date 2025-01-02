@@ -4,12 +4,13 @@
 package lucuma.odb.json
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.syntax.*
 import io.circe.refined.*
+import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GmosNorthGrating
@@ -25,7 +26,6 @@ import lucuma.core.model.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.core.model.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.json.coordinates.query.given
-import eu.timepit.refined.types.string.NonEmptyString
 
 object configurationrequest:
 
