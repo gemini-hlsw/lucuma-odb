@@ -328,81 +328,74 @@ class updateProgramUsers extends OdbSuite {
       )
     )
 
-  test("update pi partner") {
-    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
+  test("update pi partner"):
+    createProgramAs(pi2) >>
+    createProgramAs(pi).flatMap: pid =>
       expect(
         user     = pi,
         query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
         expected = expected((pid, pi, PartnerLink.HasPartner(US))).asRight
       )
-    }
-  }
 
-  test("update coi partner") {
-    createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("update coi partner"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserMutation(pi2, PartnerLink.HasNonPartner),
           expected = expected((pid, pi2, PartnerLink.HasNonPartner)).asRight
         )
-    }
-  }
 
-  test("update pi educational status") {
-    createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("update pi educational status"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, Some(EducationalStatus.UndergradStudent)),
           expected = expectedES((pid, pi2, Some(EducationalStatus.UndergradStudent))).asRight
         )
-    }
-  }
 
-  test("unset pi educational status") {
-    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("unset pi educational status"):
+    createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserEducationalStatus(pid, pi2, None),
           expected = expectedES((pid, pi2, None)).asRight
         )
-    }
-  }
 
-  test("update pi gender") {
-    createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("update pi gender"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserGender(pid, pi2, Some(Gender.Other)),
           expected = expectedGender((pid, pi2, Some(Gender.Other))).asRight
         )
-    }
-  }
 
-  test("unset pi gender") {
-    createProgramAs(pi2) >> createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("unset pi gender"):
+    createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateUserGender(pid, pi2, None),
           expected = expectedGender((pid, pi2, None)).asRight
         )
-    }
-  }
 
-  test("update pi thesis flag") {
-    createProgramAs(pi3) >> createProgramAs(pi).flatMap { pid =>
-      linkAs(pi, pi3.id, pid, ProgramUserRole.Coi, PartnerLink.HasUnspecifiedPartner) >>
+  test("update pi thesis flag"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
         expect(
           user     = pi,
           query    = updateUserThesisFlag(pid, pi3, true),
           expected = expectedThesis((pid, pi3, true)).asRight
         )
-    }
-  }
 
   val GavriloPrincip: UserProfile =
     UserProfile(
@@ -414,7 +407,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update fallback"):
     createProgramAs(pi).flatMap: pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateFallback(pid, pi2, GavriloPrincip.some),
@@ -423,7 +417,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset fallback"):
     createProgramAs(pi).flatMap: pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         query(pi, updateFallback(pid, pi2, GavriloPrincip.some)) >>
           expect(
             user     = pi,
@@ -433,7 +428,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("update fallback email"):
     createProgramAs(pi).flatMap: pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
           query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
@@ -442,7 +438,8 @@ class updateProgramUsers extends OdbSuite {
 
   test("unset fallback email"):
     createProgramAs(pi).flatMap: pid =>
-      linkAs(pi, pi2.id, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(US)) >>
+      addProgramUserAs(pi, pid).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
         query(pi, updateFallbackEmail(pid, pi2, GavriloPrincip.email)) >>
           expect(
             user     = pi,
@@ -450,86 +447,82 @@ class updateProgramUsers extends OdbSuite {
             expected = expectedFallbackEmail((pid, pi2, none)).asRight
           )
 
-  test("cannot update another pi's partner as a PI") {
-    createProgramAs(piCharles).flatMap { pid =>
+  test("cannot update another pi's partner as a PI"):
+    createProgramAs(piCharles).flatMap: pid =>
       expect(
         user     = piCharles,
         query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
         expected = expected().asRight
       )
-    }
-  }
 
-  test("cannot update another pi's partner") {
-    createProgramAs(piLeon).flatMap { pid =>
-      linkAs(piLeon, piCharles.id, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner) >>
-      expect(
-        user     = piCharles,
-        query    = s"""
-          mutation {
-            updateProgramUsers(
-              input: {
-                SET: {
-                  partnerLink: { linkType: HAS_NON_PARTNER }
-                }
-                WHERE: {
-                  program: {
-                    id: { EQ: "$pid" }
+  test("cannot update another pi's partner"):
+    createProgramAs(piLeon).flatMap: pid =>
+      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(piLeon, mid, piCharles.id) >>
+        expect(
+          user     = piCharles,
+          query    = s"""
+            mutation {
+              updateProgramUsers(
+                input: {
+                  SET: {
+                    partnerLink: { linkType: HAS_NON_PARTNER }
+                  }
+                  WHERE: {
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
                   }
                 }
-              }
-            ) {
-              programUsers {
-                user { id }
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "updateProgramUsers": {
-              "programUsers": []
-            }
-          }
-        """.asRight
-      )
-    }
-  }
-
-  test("cannot update another pi's educational status") {
-    createProgramAs(piLeon).flatMap { pid =>
-      linkAs(piLeon, piCharles.id, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner) >>
-      expect(
-        user     = piCharles,
-        query    = s"""
-          mutation {
-            updateProgramUsers(
-              input: {
-                SET: {
-                  educationalStatus: PHD
+              ) {
+                programUsers {
+                  user { id }
                 }
-                WHERE: {
-                  program: {
-                    id: { EQ: "$pid" }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "updateProgramUsers": {
+                "programUsers": []
+              }
+            }
+          """.asRight
+        )
+
+  test("cannot update another pi's educational status"):
+    createProgramAs(piLeon).flatMap: pid =>
+      addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(piLeon, mid, piCharles.id) >>
+        expect(
+          user     = piCharles,
+          query    = s"""
+            mutation {
+              updateProgramUsers(
+                input: {
+                  SET: {
+                    educationalStatus: PHD
+                  }
+                  WHERE: {
+                    program: {
+                      id: { EQ: "$pid" }
+                    }
                   }
                 }
-              }
-            ) {
-              programUsers {
-                user { id }
+              ) {
+                programUsers {
+                  user { id }
+                }
               }
             }
-          }
-        """,
-        expected = json"""
-          {
-            "updateProgramUsers": {
-              "programUsers": []
+          """,
+          expected = json"""
+            {
+              "updateProgramUsers": {
+                "programUsers": []
+              }
             }
-          }
-        """.asRight
-      )
-    }
-  }
+          """.asRight
+        )
 
 }

@@ -114,24 +114,24 @@ class observation_configurationRequests
     for
       oid   <- setup
       oid2  <- cloneObservationAs(pi, oid)
-      rid   <- createConfigurationRequestAs(pi, oid)
-      _     <- expectRequests(pi, oid2, List(rid))
+      mid   <- createConfigurationRequestAs(pi, oid)
+      _     <- expectRequests(pi, oid2, List(mid))
     yield ()
 
   test("request should apply for nearby base position"):
     for
       oid  <- setup
       _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
-      _    <- expectRequests(pi, oid, List(rid))
+      _    <- expectRequests(pi, oid, List(mid))
     yield ()
 
   test("request should not apply for faraway base position"):
     for
       oid  <- setup
       _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
       _    <- expectRequests(pi, oid, Nil)
     yield ()
@@ -140,18 +140,18 @@ class observation_configurationRequests
     for
       oid  <- setup
       _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
       _    <- expectRequests(pi, oid, Nil) // sanity check
       _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      _    <- expectRequests(pi, oid, List(rid))
+      _    <- expectRequests(pi, oid, List(mid))
     yield ()
 
   test("request should not apply for different observing mode"):
     for
       oid  <- setup
       _    <- updateGratingAs(pi, oid, GmosNorthGrating.B600_G5307)
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5306)
       _    <- expectRequests(pi, oid, Nil)
     yield ()
@@ -160,7 +160,7 @@ class observation_configurationRequests
     for
       oid  <- setup
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive)
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive) // can't ask for better conditions
       _    <- expectRequests(pi, oid, Nil)
     yield ()
@@ -169,9 +169,9 @@ class observation_configurationRequests
     for
       oid  <- setup
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive)
-      rid  <- createConfigurationRequestAs(pi, oid)
+      mid  <- createConfigurationRequestAs(pi, oid)
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive) // ok to ask for worse conditions
-      _    <- expectRequests(pi, oid, List(rid))
+      _    <- expectRequests(pi, oid, List(mid))
     yield ()
 
 }

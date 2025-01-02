@@ -549,7 +549,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                   ))
                 ),
                 oss = Some(List(
-                  OrderSelection[lucuma.core.model.User.Id](ProgramUserType / "userId"),
+                  OrderSelection[Option[lucuma.core.model.User.Id]](ProgramUserType / "userId"),
                   OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
                 )),
                 offset = None,
