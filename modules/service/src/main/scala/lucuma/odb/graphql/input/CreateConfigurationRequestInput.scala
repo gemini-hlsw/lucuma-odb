@@ -5,16 +5,24 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.*
 
-object CreateConfigurationRequestInput {
+case class CreateConfigurationRequestInput(
+  oid: Observation.Id,
+  SET: ConfigurationRequestPropertiesInput.Create =
+    ConfigurationRequestPropertiesInput.Create.Empty
+)
 
- val Binding: Matcher[Observation.Id] =
+object CreateConfigurationRequestInput {
+  val Binding: Matcher[CreateConfigurationRequestInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ObservationIdBinding("observationId", rObsId)
-      ) => rObsId
+        ObservationIdBinding("observationId", rObsId),
+        ConfigurationRequestPropertiesInput.Create.Binding.Option("SET", rProps)
+      ) => (rObsId, rProps).parMapN: (oid, props) =>
+        CreateConfigurationRequestInput(oid, props.getOrElse(ConfigurationRequestPropertiesInput.Create.Empty))
     }
 
 }

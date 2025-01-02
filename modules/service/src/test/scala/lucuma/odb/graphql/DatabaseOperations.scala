@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.AtomStage
@@ -1702,13 +1703,16 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user = user, query = q).void
   }
 
-  def createConfigurationRequestAs(user: User, oid: Observation.Id): IO[ConfigurationRequest.Id] =
+  def createConfigurationRequestAs(user: User, oid: Observation.Id, justification: Option[NonEmptyString] = None): IO[ConfigurationRequest.Id] =
     query(
       user = user,
       query = s"""
         mutation {
           createConfigurationRequest(input: {
-            observationId: "$oid"
+            observationId: "$oid",
+            SET: {
+              justification: ${justification.asJson}
+            }
           }) {
             id
           }
