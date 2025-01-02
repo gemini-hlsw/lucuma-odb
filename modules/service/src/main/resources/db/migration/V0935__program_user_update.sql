@@ -29,14 +29,6 @@ CREATE SEQUENCE s_program_user_id START WITH 256;
 ALTER TABLE t_program_user
   ADD COLUMN c_program_user_id d_program_user_id DEFAULT 'm-' || to_hex(nextval('s_program_user_id'));
 
--- Update existing rows with the new program/user id.
-WITH seq AS (
-  SELECT nextval('s_program_user_id') AS seq_val
-)
-UPDATE t_program_user
-   SET c_program_user_id = 'm-' || to_hex(seq.seq_val)
-  FROM seq;
-
 -- Make the id the primary key.
 ALTER TABLE t_program_user
   ADD PRIMARY KEY (c_program_user_id);
