@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.odb.data.OdbError
@@ -29,8 +30,12 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 mutation {
                   createConfigurationRequest(input: {
                     observationId: "$oid"
+                    SET: {
+                      justification: "Because I said so."
+                    }
                   }) {
                     status
+                    justification
                     configuration {
                       conditions {
                         imageQuality
@@ -64,6 +69,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                 {
                   "createConfigurationRequest" : {
                     "status" : "REQUESTED",
+                    "justification" : "Because I said so.",
                     "configuration" : {
                       "conditions" : {
                         "imageQuality" : "POINT_ONE",
@@ -186,6 +192,18 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
         oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         req1  <- createConfigurationRequestAs(pi, oid)
         req2  <- createConfigurationRequestAs(pi, oid)
+      yield assert(req1 === req2)    
+  }
+
+  test("identical requests are canonicalized, even if justifications differ") {
+    for
+        cfpid <- createCallForProposalsAs(admin)
+        pid   <- createProgramAs(pi)
+        _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+        tid   <- createTargetWithProfileAs(pi, pid)
+        oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        req1  <- createConfigurationRequestAs(pi, oid, NonEmptyString.from("j1").toOption)
+        req2  <- createConfigurationRequestAs(pi, oid, NonEmptyString.from("j1").toOption)
       yield assert(req1 === req2)    
   }
 

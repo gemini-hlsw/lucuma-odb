@@ -5,8 +5,10 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
@@ -22,35 +24,40 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   val validUsers = List(pi, pi2, admin).toList
 
-  object updateConfigurationRequestStatusAs {
+  object updateConfigurationRequestAs {
 
-    def query(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): String =
+    def query(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): String =
       s"""
         mutation {
           updateConfigurationRequests(input: {
-            SET: { status: ${status.tag.toUpperCase} }
+            SET: { 
+              status: ${status.tag.toUpperCase}
+              justification: ${justification.asJson}
+            }
             WHERE: { id: { EQ: ${rid.asJson} } }
           }) {
             requests {
               id
               status
+              justification
             }
             hasMore
           }
         }
       """
 
-    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): IO[Unit] =
       expect(
         user = user,
-        query = query(user, rid, status),
+        query = query(user, rid, status, justification),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {
               "requests" : [
                 {
                   "id" : $rid,
-                  "status" : $status
+                  "status" : $status,
+                  "justification": $justification
                 }
               ],
               "hasMore" : false
@@ -73,22 +80,22 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   ConfigurationRequestStatus.values.foreach: status =>
     test(s"Admin should be able to set status to $status."):
-      setup.flatMap(updateConfigurationRequestStatusAs(admin, _, status))
+      setup.flatMap(updateConfigurationRequestAs(admin, _, status))
 
   List(ConfigurationRequestStatus.Requested, ConfigurationRequestStatus.Withdrawn).foreach: status =>
     test(s"PI should be able to set status to $status."):
-      setup.flatMap(updateConfigurationRequestStatusAs(pi, _, status))
+      setup.flatMap(updateConfigurationRequestAs(pi, _, status))
 
   List(ConfigurationRequestStatus.Approved, ConfigurationRequestStatus.Denied).foreach: status =>
     test(s"PI should *not* be able to set status to $status."):
-      interceptOdbError(setup.flatMap(updateConfigurationRequestStatusAs(pi, _, status))):
+      interceptOdbError(setup.flatMap(updateConfigurationRequestAs(pi, _, status))):
         case OdbError.NotAuthorized(_, _) => () // expected
 
   test(s"PI can't set status on another user's request (update affects no rows)"):
     setup.flatMap: rid =>
       expect(
         user = pi2,
-        query = updateConfigurationRequestStatusAs.query(pi2, rid, ConfigurationRequestStatus.Withdrawn),
+        query = updateConfigurationRequestAs.query(pi2, rid, ConfigurationRequestStatus.Withdrawn),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {
@@ -98,5 +105,9 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
           }
         """)
       )
+
+  test("Should be able to update justification."):
+    setup.flatMap: rid =>
+      updateConfigurationRequestAs(pi, rid, ConfigurationRequestStatus.Requested, NonEmptyString.from("A new justification.").toOption)
 
 }

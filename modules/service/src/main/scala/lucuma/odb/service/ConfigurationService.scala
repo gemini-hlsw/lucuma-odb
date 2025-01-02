@@ -26,6 +26,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
 import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
+import lucuma.odb.graphql.input.CreateConfigurationRequestInput
 import lucuma.odb.json.configurationrequest.query.DecodingFailures
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
@@ -49,7 +50,7 @@ trait ConfigurationService[F[_]] {
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
-  def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]]
+  def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
 
   /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each observation in `pid`. */
   def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]]
@@ -61,7 +62,7 @@ trait ConfigurationService[F[_]] {
    * Updates the requests specified by `where`, which is an `AppliedFragment` that should return a stream
    * of request ids filtered to those where the caller has write access.
    */
-  def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]]
+  def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]]
 
 }
 
@@ -82,8 +83,8 @@ object ConfigurationService {
       override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]] =
         impl.selectRequests(oid).value
 
-      override def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): F[Result[ConfigurationRequest]] =
-        impl.canonicalizeRequest(oid).value
+      override def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]] =
+        impl.canonicalizeRequest(input).value
 
       override def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]] =
         impl.canonicalizeAll(pid).value
@@ -92,7 +93,7 @@ object ConfigurationService {
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
 
-      override def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
+      override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
         val doUpdate = impl.updateRequests(SET, where).value
         SET.status match
           case None                                       | 
@@ -171,15 +172,15 @@ object ConfigurationService {
             json.hcursor.as[Queries.RequestsAndConfigurations.Response] match
               case Right(r)    => Result(r)
               case Left(other) => Result.internalError(other.getMessage)
-                        
-    private def canonicalizeRequest(oid: Observation.Id, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+
+    private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       ResultT.liftF:
         session.prepareR(Statements.InsertRequest).use: pq =>
-          pq.option(oid, cfg).flatMap:
+          pq.option(input, cfg).flatMap:
             case Some(req) => req.pure[F]
             case None      =>
               session.prepareR(Statements.SelectRequest).use: pq =>
-                pq.unique(oid, cfg)
+                pq.unique(input.oid, cfg)
 
     def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       selectAllRequestsForProgram(oid).flatMap: crs =>
@@ -187,14 +188,14 @@ object ConfigurationService {
         else selectConfiguration(oid).map: cfg =>
           crs.filter(_.configuration.subsumes(cfg))
 
-    def canonicalizeRequest(oid: Observation.Id)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
-      selectConfiguration(oid).flatMap(canonicalizeRequest(oid, _))
+    def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
+      selectConfiguration(input.oid).flatMap(canonicalizeRequest(input, _))
 
     def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
       selectConfigurations(pid).flatMap: map =>
-        map.toList.traverse((oid, config) => canonicalizeRequest(oid, config).tupleLeft(oid)).map(_.toMap)
+        map.toList.traverse((oid, config) => canonicalizeRequest(CreateConfigurationRequestInput(oid), config).tupleLeft(oid)).map(_.toMap)
 
-    def updateRequests(SET: ConfigurationRequestPropertiesInput, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
+    def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
       // access level has been checked already
       ResultT.liftF:
         val af = Statements.updateRequests(SET, where)
@@ -705,10 +706,11 @@ object ConfigurationService {
       }
 
     // insert and return row, or return nothing if a matching row exists
-    val InsertRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
+    val InsertRequest: Query[(CreateConfigurationRequestInput, Configuration), ConfigurationRequest] =
       sql"""
         INSERT INTO t_configuration_request (
           c_program_id,
+          c_justification,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -720,6 +722,7 @@ object ConfigurationService {
           c_gmos_south_longslit_grating
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
+          ${text_nonempty.opt},
           $cloud_extinction,
           $image_quality,
           $sky_background,
@@ -806,8 +809,9 @@ object ConfigurationService {
                 )
 
           }
-      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
-        oid                                                         *:
+      ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) => 
+        input.oid                                                   *:
+        input.SET.justification                                     *:
         cfg.conditions.cloudExtinction                              *:
         cfg.conditions.imageQuality                                 *:
         cfg.conditions.skyBackground                                *:
@@ -829,11 +833,12 @@ object ConfigurationService {
       """.query(configuration_request_id)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
-    def updateRequests(SET: ConfigurationRequestPropertiesInput, which: AppliedFragment): AppliedFragment =
+    def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =
       val statusExpr: AppliedFragment = SET.status.fold(void"c_status")(sql"$configuration_request_status".apply)
+      val justExpr = SET.justification.fold(void"null", void"c_justification", sql"$text_nonempty".apply)
       void"""
         update t_configuration_request
-        set c_status = """ |+| statusExpr |+| 
+        set c_status = """ |+| statusExpr |+| void", c_justification = " |+| justExpr |+|
       void" where c_configuration_request_id in (" |+| which |+| void""")
         returning c_configuration_request_id
       """
