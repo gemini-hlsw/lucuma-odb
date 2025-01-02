@@ -11,12 +11,14 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.ProgramUser
 import lucuma.odb.graphql.binding.*
 
 object WhereProgramUser {
 
   def binding(path: Path): Matcher[Predicate] =
 
+    val WhereOrderProgramUserId       = WhereOrder.binding[ProgramUser.Id](path / "id", ProgramUserIdBinding)
     lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")
     val WhereUserBinding              = WhereUser.binding(path / "user")
     val WhereRoleBinding              = WhereEq.binding(path / "role", ProgramUserRoleBinding)
@@ -32,6 +34,7 @@ object WhereProgramUser {
         WhereProgramUserBinding.List.Option("AND", rAND),
         WhereProgramUserBinding.List.Option("OR", rOR),
         WhereProgramUserBinding.Option("NOT", rNOT),
+        WhereOrderProgramUserId.Option("id", rId),
         WhereProgramBinding.Option("program", rProgram),
         WhereUserBinding.Option("user", rUser),
         WhereRoleBinding.Option("role", rRole),
@@ -41,12 +44,13 @@ object WhereProgramUser {
         WhereThesisBinding.Option("thesis", rThesis),
         WhereGenderBinding.Option("gender", rGender)
       ) =>
-        (rAND, rOR, rNOT, rProgram, rUser, rRole, rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN {
-          (AND, OR, NOT, program, user, role, partnerLink, fallbackProfile, educationalStatus, thesis, gender) =>
+        (rAND, rOR, rNOT, rId, rProgram, rUser, rRole, rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN {
+          (AND, OR, NOT, id, program, user, role, partnerLink, fallbackProfile, educationalStatus, thesis, gender) =>
             and(List(
               AND.map(and),
               OR.map(or),
               NOT.map(Not(_)),
+              id,
               program,
               user,
               role,
