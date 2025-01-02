@@ -29,6 +29,7 @@ class program_configurationRequests extends OdbSuite with ObservingModeSetupOper
               configurationRequests {
                 matches {
                   id
+                  justification
                 }
               }
             }
@@ -38,7 +39,12 @@ class program_configurationRequests extends OdbSuite with ObservingModeSetupOper
           {
             "program" : {
               "configurationRequests" : {
-                "matches" : ${ids.map(id => Json.obj("id" -> id.asJson))}
+                "matches" : ${ids.map(id => 
+                  Json.obj(
+                    "id" -> id.asJson,
+                    "justification" -> Json.Null
+                  )
+                )}
               }
             }
           }                

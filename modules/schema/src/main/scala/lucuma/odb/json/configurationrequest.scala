@@ -4,10 +4,12 @@
 package lucuma.odb.json
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ConfigurationRequestStatus
@@ -89,13 +91,15 @@ object configurationrequest:
       for
         id <- hc.downField("id").as[ConfigurationRequest.Id]
         st <- hc.downField("status").as[ConfigurationRequestStatus]
+        ju <- hc.downField("justification").as[Option[NonEmptyString]]
         cf <- hc.downField("configuration").as[Configuration]
-      yield ConfigurationRequest(id, st, cf)
+      yield ConfigurationRequest(id, st, ju, cf)
 
     given Encoder[ConfigurationRequest] = cr =>
       Json.obj(
         "id" -> cr.id.asJson,
         "status" -> cr.status.asJson,
+        "justification" -> cr.justification.asJson,
         "configuration" -> cr.configuration.asJson
       )
 

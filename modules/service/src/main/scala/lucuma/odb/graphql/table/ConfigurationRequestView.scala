@@ -14,6 +14,7 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val Id = col("c_configuration_request_id", configuration_request_id)
     val ProgramId = col("c_program_id", program_id)
     val Status = col("c_status", configuration_request_status)
+    val Justification = col("c_justification", text_nonempty.opt)
 
     object Conditions:
       val CloudExtinction = col("c_cloud_extinction", cloud_extinction)

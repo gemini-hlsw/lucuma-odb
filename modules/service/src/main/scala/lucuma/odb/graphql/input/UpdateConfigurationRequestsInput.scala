@@ -10,7 +10,7 @@ import grackle.Predicate
 import lucuma.odb.graphql.binding.*
 
 case class UpdateConfigurationRequestsInput(
-  SET:   ConfigurationRequestPropertiesInput,
+  SET:   ConfigurationRequestPropertiesInput.Update,
   WHERE: Option[Predicate],
   LIMIT: Option[NonNegInt]
 )
@@ -21,7 +21,7 @@ object UpdateConfigurationRequestsInput {
     val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(path)
     ObjectFieldsBinding.rmap {
       case List(
-        ConfigurationRequestPropertiesInput.Binding("SET", rSET),
+        ConfigurationRequestPropertiesInput.Update.Binding("SET", rSET),
         WhereConfigurationRequestsBinding.Option("WHERE", rWHERE),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       ) =>
