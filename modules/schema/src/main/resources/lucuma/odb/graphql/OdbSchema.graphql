@@ -3211,6 +3211,7 @@ Configuration request properties.
 """
 input ConfigurationRequestProperties {
   status: ConfigurationRequestStatus
+  justification: NonEmptyString
 }
 
 """
@@ -8732,6 +8733,7 @@ type ConfigurationRequest {
 
 input CreateConfigurationRequestInput {
   observationId: ObservationId
+  SET: ConfigurationRequestProperties
 }
 
 type Itc {
