@@ -95,7 +95,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           input.flatMap(_.programId).forall(_ === e.programId)         &&
           input.flatMap(_.observationId).forall(_ === e.observationId) &&
           input.flatMap(_.visitId).forall(_ === e.visitId)             &&
-          input.flatMap(_.eventType).forall(_ === e.eventType)
+          input.flatMap(_.eventType).forall(_.matches(e.eventType))
         .map: e =>
           Unique(Filter(Predicates.executionEventAdded.executionEventId.eql(e.exectionEventId), child)).success
 
