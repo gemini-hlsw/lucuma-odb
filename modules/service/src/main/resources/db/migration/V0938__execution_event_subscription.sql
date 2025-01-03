@@ -19,11 +19,16 @@ DECLARE
 BEGIN
   PERFORM pg_notify(
     'ch_execution_event_added',
-    NEW.c_execution_event_id || ',' ||
-    NEW.c_program_id         || ',' ||
-    NEW.c_observation_id     || ',' ||
-    NEW.c_visit_id           || ',' ||
-    NEW.c_event_type
+    array_to_string(
+      ARRAY[
+        NEW.c_execution_event_id,
+        NEW.c_program_id,
+        NEW.c_observation_id,
+        NEW.c_visit_id,
+        NEW.c_event_type::text
+      ],
+      ','
+    )
   );
   RETURN NEW;
 END;
