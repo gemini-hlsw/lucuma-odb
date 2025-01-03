@@ -15,6 +15,7 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -23,6 +24,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.ConfigurationRequestEditInput
+import lucuma.odb.graphql.input.ExecutionEventAddedInput
 import lucuma.odb.graphql.input.GroupEditInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
@@ -43,6 +45,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
   private lazy val subscriptionFields: List[SubscriptionField] =
     List(
+      ExecutionEventAdded,
       GroupEdit,
       ObservationEdit,
       ProgramEdit,
@@ -81,6 +84,20 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
             }
       }
   }
+
+  private val ExecutionEventAdded =
+    SubscriptionField("executionEventAdded", ExecutionEventAddedInput.Binding.Option): (input, child) =>
+      topics
+        .executionEvent
+        .subscribe(1024)
+        .filter: e =>
+          e.canRead(user)                                              &&
+          input.flatMap(_.programId).forall(_ === e.programId)         &&
+          input.flatMap(_.observationId).forall(_ === e.observationId) &&
+          input.flatMap(_.visitId).forall(_ === e.visitId)             &&
+          input.flatMap(_.eventType).forall(_ === e.eventType)
+        .map: e =>
+          Unique(Filter(Predicates.executionEventAdded.executionEventId.eql(e.exectionEventId), child)).success
 
   private val ProgramEdit =
     SubscriptionField("programEdit", ProgramEditInput.Binding.Option) { (input, child) =>
