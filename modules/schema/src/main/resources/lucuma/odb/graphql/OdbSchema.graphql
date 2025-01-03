@@ -4740,6 +4740,21 @@ type Subscription {
   configurationRequestEdit(
     input: ConfigurationRequestEditInput
   ): ConfigurationRequestEdit!
+
+  executionEventAdded(
+    input: ExecutionEventAddedInput
+  ): ExecutionEventAdded!
+}
+
+input ExecutionEventAddedInput {
+  programId:     ProgramId
+  observationId: ObservationId
+  visitId:       VisitId
+  eventType:     ExecutionEventType
+}
+
+type ExecutionEventAdded {
+  value: ExecutionEvent!
 }
 
 input TargetEditInput {
