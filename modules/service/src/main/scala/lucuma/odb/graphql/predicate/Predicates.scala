@@ -30,6 +30,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val dataset                       = DatasetPredicates(Path.from(DatasetType))
     val datasetEvent                  = ExecutionEventPredicates(Path.from(DatasetEventType))
     val executionEvent                = ExecutionEventPredicates(Path.from(ExecutionEventType))
+    val executionEventAdded           = ExecutionEventAddedPredicates(Path.from(ExecutionEventAddedType))
     val gmosNorthStep                 = StepPredicates(Path.from(GmosNorthStepType))
     val gmosSouthStep                 = StepPredicates(Path.from(GmosSouthStepType))
     val group                         = GroupPredicates(Path.from(GroupType))

@@ -111,6 +111,7 @@ trait BaseMapping[F[_]]
   lazy val EphemerisKeyTypeType                    = schema.ref("EphemerisKeyType")
   lazy val EpochStringType                         = schema.ref("EpochString")
   lazy val ExampleProgramReferenceType             = schema.ref("ExampleProgramReference")
+  lazy val ExecutionEventAddedType                 = schema.ref("ExecutionEventAdded")
   lazy val ExecutionEventIdType                    = schema.ref("ExecutionEventId")
   lazy val ExecutionType                           = schema.ref("Execution")
   lazy val ExecutionEventType                      = schema.ref("ExecutionEvent")
