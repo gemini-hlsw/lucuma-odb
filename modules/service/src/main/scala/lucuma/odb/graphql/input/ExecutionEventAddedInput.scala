@@ -15,15 +15,18 @@ case class ExecutionEventAddedInput(
   programId:     Option[Program.Id],
   observationId: Option[Observation.Id],
   visitId:       Option[Visit.Id],
-  eventType:     Option[ExecutionEventType]
+  eventType:     Option[WhereEq[ExecutionEventType]]
 )
 
 object ExecutionEventAddedInput:
+
+  private val WhereEqExecutionEventType = WhereEq.inputBinding(ExecutionEventTypeBinding)
+
   val Binding = ObjectFieldsBinding.rmap:
     case List(
       ProgramIdBinding.Option("programId", rProgramId),
       ObservationIdBinding.Option("observationId", rObservationId),
       VisitIdBinding.Option("visitId", rVisitId),
-      ExecutionEventTypeBinding.Option("eventType", rEventType)
+      WhereEqExecutionEventType.Option("eventType", rEventType)
     ) =>
       (rProgramId, rObservationId, rVisitId, rEventType).parMapN(apply)
