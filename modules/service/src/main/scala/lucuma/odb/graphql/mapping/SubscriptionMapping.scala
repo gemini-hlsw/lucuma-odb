@@ -153,8 +153,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
               Filter(
                 Predicates.observationEdit.programId.eql(e.programId),
                 Query.mapSomeFields(child):
-                  case Select("value", a, c) =>
-                    Select("value", a,
+                  case Select("configurationRequest", a, c) =>
+                    Select("configurationRequest", a,
                       // This predicate needs to be down here
                       Filter(
                         if e.editType === EditType.DeletedCal

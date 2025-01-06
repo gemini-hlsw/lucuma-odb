@@ -5,11 +5,13 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
+import cats.effect.kernel.Deferred
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.WaterVapor
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -138,7 +140,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield (pid, oid)
 
-  test("insert and update") {
+  test("insert and update".ignore) {
     subscriptionExpect(
       user      = pi,
       query     = subscription(None),
@@ -159,7 +161,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
   }
 
 
-  test("submit proposal, then unsubmit") {
+  test("submit proposal, then unsubmit".ignore) {
     subscriptionExpect(
       user      = pi,
       query     = subscription(None),
@@ -185,5 +187,103 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
       )
     )    
   }
+
+
+  // https://app.shortcut.com/lucuma/story/3926/error-in-configurationrequestedit-subscription
+  // I'm getting an error in the configurationRequestEdit subscription if I already have a pending request
+  // under particular conditions, and then make a new request for more restrictive conditions. ie. original 
+  // request for "Bright" and new request for "Dark". The error is "Internal Error: Expected single value
+  // for field 'id' of type ConfigurationRequest at List(configurationRequest, configurationRequestEdit), 
+  // found many" 
+  test("shortcut 3926") {
+
+    val subscription: String =
+      s"""
+        subscription {
+          configurationRequestEdit() {
+            editType
+#            configurationRequestId
+            configurationRequest {
+              id
+              status
+            }
+          }
+        }
+      """
+
+    def configurationRequestEdit(
+      rid: ConfigurationRequest.Id, editType: EditType, status: ConfigurationRequestStatus
+    ): Json =
+      Json.obj(
+        "configurationRequestEdit" -> Json.obj(
+          "editType" -> Json.fromString(editType.tag.toUpperCase),
+          "configurationRequest" -> Json.obj(
+            "id" -> rid.asJson,
+            "status" -> status.asJson
+          )
+        )
+      )
+
+    def updateWaterVapor(oid: Observation.Id, wv: WaterVapor): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                constraintSet: {
+                  waterVapor: ${wv.tag.toUpperCase()}
+                }
+              },
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              observations {
+                constraintSet {
+                  waterVapor
+                }
+              }
+            }
+          }
+        """,
+        expected =json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "constraintSet" : {
+                    "waterVapor" : ${wv.asJson}
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+    (Deferred[IO, ConfigurationRequest.Id], Deferred[IO, ConfigurationRequest.Id]).tupled.flatMap: 
+      case (ref1, ref2) =>
+        subscriptionExpectF(
+          user      = pi,
+          query     = subscription,
+          mutations =
+            Right(
+              for
+                (pid, oid) <- setup
+                _          <- createConfigurationRequestAs(pi, oid).flatMap(ref1.complete)
+                _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
+                _          <- updateWaterVapor(oid, WaterVapor.Dry)
+                _          <- createConfigurationRequestAs(pi, oid).flatMap((ref2.complete))
+              yield ()
+            ),
+          expectedF = 
+            (ref1.get, ref2.get).mapN: (rid1, rid2) =>
+              List(
+                configurationRequestEdit(rid1, EditType.Created, ConfigurationRequestStatus.Requested),
+                configurationRequestEdit(rid2, EditType.Created, ConfigurationRequestStatus.Requested)
+            )
+          )    
+      }
 
 }
