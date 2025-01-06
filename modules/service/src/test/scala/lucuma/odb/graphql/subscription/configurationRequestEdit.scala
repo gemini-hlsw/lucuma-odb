@@ -140,7 +140,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield (pid, oid)
 
-  test("insert and update".ignore) {
+  test("insert and update") {
     subscriptionExpect(
       user      = pi,
       query     = subscription(None),
@@ -161,7 +161,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
   }
 
 
-  test("submit proposal, then unsubmit".ignore) {
+  test("submit proposal, then unsubmit") {
     subscriptionExpect(
       user      = pi,
       query     = subscription(None),
