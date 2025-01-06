@@ -284,6 +284,7 @@ object ExecutionEventService {
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
+          c_program_id,
           c_observation_id,
           c_visit_id,
           c_atom_id,
@@ -291,12 +292,15 @@ object ExecutionEventService {
         )
         SELECT
           'atom' :: e_execution_event_type,
+          o.c_program_id,
           a.c_observation_id,
           a.c_visit_id,
           $atom_id,
           $atom_stage
         FROM
           t_atom_record a
+        INNER JOIN
+          t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE
           a.c_atom_id = $atom_id
         RETURNING
@@ -311,6 +315,7 @@ object ExecutionEventService {
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
+          c_program_id,
           c_observation_id,
           c_visit_id,
           c_atom_id,
@@ -320,6 +325,7 @@ object ExecutionEventService {
         )
         SELECT
           'dataset' :: e_execution_event_type,
+          o.c_program_id,
           d.c_observation_id,
           d.c_visit_id,
           s.c_atom_id,
@@ -328,6 +334,8 @@ object ExecutionEventService {
           $dataset_stage
         FROM
           t_dataset d
+        INNER JOIN
+          t_observation o ON o.c_observation_id = d.c_observation_id
         INNER JOIN
           t_step_record s ON s.c_step_id = d.c_step_id
         WHERE
@@ -346,17 +354,21 @@ object ExecutionEventService {
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
+          c_program_id,
           c_observation_id,
           c_visit_id,
           c_sequence_command
         )
         SELECT
           'sequence' :: e_execution_event_type,
+          o.c_program_id,
           v.c_observation_id,
           $visit_id,
           $sequence_command
         FROM
           t_visit v
+        INNER JOIN
+          t_observation o ON o.c_observation_id = v.c_observation_id
         WHERE
           v.c_visit_id = $visit_id
         RETURNING
@@ -370,17 +382,21 @@ object ExecutionEventService {
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
+          c_program_id,
           c_observation_id,
           c_visit_id,
           c_slew_stage
         )
         SELECT
           'slew' :: e_execution_event_type,
+          o.c_program_id,
           v.c_observation_id,
           $visit_id,
           $slew_stage
         FROM
           t_visit v
+        INNER JOIN
+          t_observation o ON o.c_observation_id = v.c_observation_id
         WHERE
           v.c_visit_id = $visit_id
         RETURNING
@@ -394,6 +410,7 @@ object ExecutionEventService {
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
+          c_program_id,
           c_observation_id,
           c_visit_id,
           c_atom_id,
@@ -402,6 +419,7 @@ object ExecutionEventService {
         )
         SELECT
           'step' :: e_execution_event_type,
+          o.c_program_id,
           a.c_observation_id,
           a.c_visit_id,
           s.c_atom_id,
@@ -409,7 +427,10 @@ object ExecutionEventService {
           $step_stage
         FROM
           t_step_record s
-        INNER JOIN t_atom_record a ON a.c_atom_id = s.c_atom_id
+        INNER JOIN
+          t_atom_record a ON a.c_atom_id = s.c_atom_id
+        INNER JOIN
+          t_observation o ON o.c_observation_id = a.c_observation_id
         WHERE
           s.c_step_id = $step_id
         RETURNING

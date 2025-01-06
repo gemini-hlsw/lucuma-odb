@@ -22,6 +22,7 @@ import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
+import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
@@ -42,11 +43,12 @@ import scala.io.Source
 object OdbMapping {
 
   case class Topics[F[_]](
-    program:     Topic[F, ProgramTopic.Element],
-    observation: Topic[F, ObservationTopic.Element],
-    target:      Topic[F, TargetTopic.Element],
-    group:       Topic[F, GroupTopic.Element],
+    program:              Topic[F, ProgramTopic.Element],
+    observation:          Topic[F, ObservationTopic.Element],
+    target:               Topic[F, TargetTopic.Element],
+    group:                Topic[F, GroupTopic.Element],
     configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
+    executionEvent:       Topic[F, ExecutionEventAddedTopic.Element]
   )
 
   object Topics {
@@ -59,7 +61,8 @@ object OdbMapping {
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar, grp, cr)
+        exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, tar, grp, cr, exe)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -142,6 +145,7 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with EmailMapping[F]
           with ExecutionMapping[F]
+          with ExecutionEventAddedMapping[F]
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with FilterTypeMetaMapping[F]
@@ -338,8 +342,9 @@ object OdbMapping {
                 EngineeringProgramReferenceMapping,
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
-                ExecutionMapping,
+                ExecutionEventAddedMapping,
                 ExecutionEventMapping,
+                ExecutionMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
                 GmosNorthLongSlitMapping,
