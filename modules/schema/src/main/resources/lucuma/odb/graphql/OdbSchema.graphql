@@ -1808,6 +1808,12 @@ type GmosNorthDynamic {
   GMOS North FPU
   """
   fpu: GmosNorthFpu
+
+  """
+  Central wavelength, which is taken from the grating (if defined) or else
+  from the filter (if defined).
+  """
+  centralWavelength: Wavelength
 }
 
 """
@@ -2213,6 +2219,12 @@ type GmosSouthDynamic {
   GMOS South FPU
   """
   fpu: GmosSouthFpu
+
+  """
+  Central wavelength, which is taken from the grating (if defined) or else
+  from the filter (if defined).
+  """
+  centralWavelength: Wavelength
 }
 
 """

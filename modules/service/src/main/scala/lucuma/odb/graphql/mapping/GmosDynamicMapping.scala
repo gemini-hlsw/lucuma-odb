@@ -8,7 +8,7 @@ import grackle.Path
 
 import table.GmosDynamicTables
 
-trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
+trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F]:
 
   private def dynamicMappingAtPath[G, L, U](
     path: Path,
@@ -22,7 +22,8 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
       SqlField("roi",      table.Roi),
       SqlObject("gratingConfig"),
       SqlField("filter",   table.Filter),
-      SqlObject("fpu")
+      SqlObject("fpu"),
+      SqlObject("centralWavelength")
     )
 
   // Defines a switch mapping from the step record root to prevent the mapping
@@ -40,5 +41,3 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F] {
 
   lazy val GmosSouthDynamicMappings: List[TypeMapping] =
     dynamicSwitchMapping("gmosSouth", GmosSouthDynamicTable)
-
-}
