@@ -9,16 +9,15 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
 
-object WhereProposal {
+object WhereProposal:
 
-  def binding(path: Path): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] =
 
     val WhereTitleBinding             = WhereOptionString.binding(path / "title")
     val WhereProposalReferenceBinding = WhereProposalReference.binding(path / "reference")
 
-    lazy val WhereProposalBinding = binding(path)
-
-    ObjectFieldsBinding.rmap {
+    lazy val WhereProposalBinding = binding(path) // lazy self-reference
+    ObjectFieldsBinding.rmap:
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
         WhereProposalBinding.List.Option("AND", rAND),
@@ -27,7 +26,7 @@ object WhereProposal {
         WhereTitleBinding.Option("title", rTitle),
         WhereProposalReferenceBinding.Option("reference", rRef),
       ) =>
-          (rIsNull, rAND, rOR, rNOT, rTitle, rRef).parMapN {
+          (rIsNull, rAND, rOR, rNOT, rTitle, rRef).parMapN:
             (isNull, AND, OR, NOT, title, ref) =>
               and(List(
                 isNull.map(IsNull(path / "program_id", _)),
@@ -37,8 +36,4 @@ object WhereProposal {
                 title,
                 ref
               ).flatten)
-        }
-    }
-  }
 
-}
