@@ -12654,17 +12654,7 @@ input WhereObservation {
   """
   scienceBand: WhereOptionOrderScienceBand
 
-  workflow: WhereObservationWorkflow
-
 }
-
-input WhereObservationWorkflow {
-  AND: [WhereObservationWorkflow!]
-  OR: [WhereObservationWorkflow!]
-  NOT: WhereObservationWorkflow
-  state: WhereEqObservationWorkflowState
-}
-
 
 """
 Configuration request filter options.  All specified items must match.
@@ -13629,31 +13619,6 @@ input WhereOrderConfigurationRequestStatus {
   """
   LTE: ConfigurationRequestStatus
 }
-
-input WhereEqObservationWorkflowState {
-  
-  """
-  Matches if the property is exactly the supplied value.
-  """
-  EQ: ObservationWorkflowState
-
-  """
-  Matches if the property is not the supplied value.
-  """
-  NEQ: ObservationWorkflowState
-
-  """
-  Matches if the property value is any of the supplied options.
-  """
-  IN: [ObservationWorkflowState!]
-
-  """
-  Matches if the property value is none of the supplied values.
-  """
-  NIN: [ObservationWorkflowState!]
-
-}
-
 
 """
 Filters on equality or order comparisons of PosBigDecimal properties.  All
