@@ -9594,6 +9594,10 @@ type Query {
   ): ObservationSelectResult!
 
 
+  observationsByWorkflowState(
+    WHERE: WhereObservation,
+    states: [ObservationWorkflowState!]
+  ): [Observation!]!
 
   """
   Selects the first `LIMIT` matching configuration requests based on the provided `WHERE` parameter, if any.
@@ -12650,7 +12654,17 @@ input WhereObservation {
   """
   scienceBand: WhereOptionOrderScienceBand
 
+  workflow: WhereObservationWorkflow
+
 }
+
+input WhereObservationWorkflow {
+  AND: [WhereObservationWorkflow!]
+  OR: [WhereObservationWorkflow!]
+  NOT: WhereObservationWorkflow
+  state: WhereEqObservationWorkflowState
+}
+
 
 """
 Configuration request filter options.  All specified items must match.
@@ -13614,6 +13628,30 @@ input WhereOrderConfigurationRequestStatus {
   Matches if the property is ordered before or equal (<=) the supplied value.
   """
   LTE: ConfigurationRequestStatus
+}
+
+input WhereEqObservationWorkflowState {
+  
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ObservationWorkflowState
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ObservationWorkflowState
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ObservationWorkflowState!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ObservationWorkflowState!]
+
 }
 
 
