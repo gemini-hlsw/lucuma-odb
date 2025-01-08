@@ -21,7 +21,6 @@ object WhereObservation {
     val WhereReferenceBinding = WhereObservationReference.binding(path / "reference")
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
-    val WorkflowBinding = WhereObservationWorkflow.binding(path / "workflow")
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -34,10 +33,9 @@ object WhereObservation {
         WhereProgramBinding.Option("program", rProgram),
         SubtitleBinding.Option("subtitle", rSubtitle),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
-        WorkflowBinding.Option("workflow", rWorkflow)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rWorkflow).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, workflow) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -47,7 +45,6 @@ object WhereObservation {
               program,
               subtitle,
               scienceBand,
-              workflow,
             ).flatten)
         }
     }
