@@ -54,6 +54,11 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
       val Builtin: ColumnRef       = col("c_fpu_builtin",                fpu.opt)
     }
 
+    object CentralWavelength {
+      val SyntheticId: ColumnRef = col("c_central_wavelength_id", step_id.embedded)
+      val Value: ColumnRef       = col("c_central_wavelength",    wavelength_pm.embedded)
+    }
+
   }
 
   object GmosNorthDynamicTable extends GmosDynamicTable(

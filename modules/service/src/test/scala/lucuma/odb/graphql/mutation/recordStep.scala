@@ -92,6 +92,9 @@ class recordStep extends OdbSuite {
                   }
                   builtin
                 }
+                centralWavelength {
+                  nanometers
+                }
               }
               gmosSouth {
                 exposure {
@@ -134,6 +137,9 @@ class recordStep extends OdbSuite {
                 "fpu": {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
+                },
+                "centralWavelength": {
+                  "nanometers": 600.000
                 }
               },
               "gmosSouth": null,
@@ -200,6 +206,9 @@ class recordStep extends OdbSuite {
                   }
                   builtin
                 }
+                centralWavelength {
+                  nanometers
+                }
               },
               observeClass
               estimate {
@@ -237,6 +246,9 @@ class recordStep extends OdbSuite {
                 "fpu": {
                   "customMask": null,
                   "builtin": "LONG_SLIT_0_50"
+                },
+                "centralWavelength": {
+                  "nanometers": 600.000
                 }
               },
               "observeClass": "ACQUISITION",
@@ -277,7 +289,7 @@ class recordStep extends OdbSuite {
     )
   }
 
-  test("recordStep - no grating") {
+  test("recordStep - no grating, no filter") {
     val instrumentNoGrating: String =
     """
       gmosNorth: {
@@ -323,6 +335,9 @@ class recordStep extends OdbSuite {
                     nanometers
                   }
                 }
+                centralWavelength {
+                  nanometers
+                }
               }
             }
           }
@@ -336,7 +351,85 @@ class recordStep extends OdbSuite {
                 "exposure": {
                   "seconds": 1200.000000
                 },
-                "gratingConfig": null
+                "gratingConfig": null,
+                "centralWavelength": null
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  test("recordStep - no grating, yes filter") {
+    val instrumentNoGrating: String =
+    """
+      gmosNorth: {
+        exposure: {
+          seconds: 1200
+        },
+        readout: {
+          xBin: ONE,
+          yBin: ONE,
+          ampCount: TWELVE,
+          ampGain: LOW,
+          ampReadMode: SLOW
+        },
+        dtax: TWO,
+        roi: FULL_FRAME,
+        filter: U_PRIME,
+        fpu: {
+          builtin: LONG_SLIT_0_50
+        }
+      }
+    """
+
+    recordStepTest(
+      ObservingModeType.GmosNorthLongSlit,
+      service,
+      aid => s"""
+        mutation {
+          recordGmosNorthStep(input: {
+            atomId: ${aid.asJson},
+            $instrumentNoGrating,
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
+          }) {
+            stepRecord {
+              gmosNorth {
+                exposure {
+                  seconds
+                }
+                gratingConfig {
+                  grating
+                  order
+                  wavelength {
+                    nanometers
+                  }
+                }
+                filter
+                centralWavelength {
+                  nanometers
+                }
+              }
+            }
+          }
+        }
+      """,
+      _ => json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "gmosNorth": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "gratingConfig": null,
+                "filter": "U_PRIME",
+                "centralWavelength": {
+                  "nanometers": 350.000
+                }
               }
             }
           }

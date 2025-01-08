@@ -239,26 +239,28 @@ trait GmosCodec {
   given given_Encoder_DynamicConfig_GmosNorth(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[DynamicConfig.GmosNorth] =
     Encoder.instance { (a: DynamicConfig.GmosNorth) =>
       Json.obj(
-        "exposure"      -> a.exposure.asJson,
-        "readout"       -> a.readout.asJson,
-        "dtax"          -> a.dtax.asJson,
-        "roi"           -> a.roi.asJson,
-        "gratingConfig" -> a.gratingConfig.asJson,
-        "filter"        -> a.filter.asJson,
-        "fpu"           -> a.fpu.asJson
+        "exposure"          -> a.exposure.asJson,
+        "readout"           -> a.readout.asJson,
+        "dtax"              -> a.dtax.asJson,
+        "roi"               -> a.roi.asJson,
+        "gratingConfig"     -> a.gratingConfig.asJson,
+        "filter"            -> a.filter.asJson,
+        "fpu"               -> a.fpu.asJson,
+        "centralWavelength" -> a.centralWavelength.asJson
       )
     }
 
   given given_Encoder_DynamicConfig_GmosSouth(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[DynamicConfig.GmosSouth] =
     Encoder.instance { (a: DynamicConfig.GmosSouth) =>
       Json.obj(
-        "exposure"      -> a.exposure.asJson,
-        "readout"       -> a.readout.asJson,
-        "dtax"          -> a.dtax.asJson,
-        "roi"           -> a.roi.asJson,
-        "gratingConfig" -> a.gratingConfig.asJson,
-        "filter"        -> a.filter.asJson,
-        "fpu"           -> a.fpu.asJson
+        "exposure"          -> a.exposure.asJson,
+        "readout"           -> a.readout.asJson,
+        "dtax"              -> a.dtax.asJson,
+        "roi"               -> a.roi.asJson,
+        "gratingConfig"     -> a.gratingConfig.asJson,
+        "filter"            -> a.filter.asJson,
+        "fpu"               -> a.fpu.asJson,
+        "centralWavelength" -> a.centralWavelength.asJson
       )
     }
 
