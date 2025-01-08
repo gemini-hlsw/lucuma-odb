@@ -61,6 +61,8 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelength", Spectroscopy.Wavelength.Value, Spectroscopy.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "signalToNoiseAt", Spectroscopy.SignalToNoiseAt.Value, Spectroscopy.SignalToNoiseAt.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelengthCoverage", Spectroscopy.WavelengthCoverage.Value, Spectroscopy.WavelengthCoverage.SyntheticId),
+      wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "centralWavelength", GmosNorthDynamicTable.CentralWavelength.Value, GmosNorthDynamicTable.CentralWavelength.SyntheticId),
+      wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id)
     )

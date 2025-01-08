@@ -1196,10 +1196,24 @@ trait DatabaseOperations { this: OdbSuite =>
 
     def step = stepConfig.asJson.mapObject(_.remove("stepType"))
 
+    // HACK: to make it easy to write test cases we take the instrument dynamic
+    // config scala object and turn it into JSON, relying on the fact that the
+    // input is explicitly structured to be equivalent to the output.  There's
+    // just one problem, the `centralWavelength` is a computed value that
+    // appears only in the output.  So, we prune `centralWavelength` from the
+    // JSON here.
+    val instJson = instrumentInput
+                     .asJson
+                     .hcursor
+                     .downField("centralWavelength")
+                     .delete
+                     .top
+                     .fold(instrumentInput.asJson)(_.asJson)
+
     val vars = Json.obj(
       "input" -> Json.obj(
         "atomId" -> aid.asJson,
-        instrument.fieldName -> instrumentInput.asJson,
+        instrument.fieldName -> instJson,
         "stepConfig" -> (stepConfig match {
           case StepConfig.Bias          => Json.obj("bias"      -> true.asJson)
           case StepConfig.Dark          => Json.obj("dark"      -> true.asJson)

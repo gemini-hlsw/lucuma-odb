@@ -254,6 +254,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           }
           filter
           fpu { builtin }
+          centralWavelength { nanometers }
         }
         stepConfig {
           stepType
@@ -404,6 +405,13 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         "filter": ${gn.filter},
         "fpu": ${gn.fpu.fold(Json.Null) { fpu =>
           json"""{ "builtin": ${fpu.builtin.map(_.value)} }"""
+        }},
+        "centralWavelength": ${gn.centralWavelength.fold(Json.Null) { cw =>
+          json"""
+            {
+              "nanometers": ${cw.toNanometers.value.value}
+            }
+          """
         }}
       }
     """
