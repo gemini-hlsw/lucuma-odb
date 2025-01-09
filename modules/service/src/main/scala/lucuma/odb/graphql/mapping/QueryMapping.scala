@@ -7,15 +7,21 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all.*
+import grackle.Context
+import grackle.Env
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
+import grackle.QueryInterpreter
 import grackle.Result
+import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
@@ -23,6 +29,7 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.sequence.DatasetReference
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
@@ -39,6 +46,10 @@ import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.ConfigurationService.downFields
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 
 trait QueryMapping[F[_]] extends Predicates[F] {
@@ -47,6 +58,9 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // Resources defined in the final cake.
   def user: model.User
   def services: Resource[F, Services[F]]
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  def itcClient: ItcClient[F]
+  def commitHash: CommitHash
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(QueryType)(
@@ -62,6 +76,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("group"),
       SqlObject("observation"),
       SqlObject("observations"),
+      RootEffect.computeChild("observationsByWorkflowState")(observationsByWorkflowState),
       SqlObject("observingModeGroup"),
       SqlObject("program"),
       SqlObject("programs"),
@@ -87,6 +102,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Group,
       Observation,
       Observations,
+      ObservationsByWorkflowState,
       ObservingModeGroup,
       Program,
       Programs,
@@ -97,6 +113,75 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       TargetGroup,
       Targets,
     ).combineAll
+
+  import Services.Syntax.*
+
+  // We can't directly filter for computed values like workflow state, so our strategy here
+  // is to first fetch the oids of the observations that match the WhereObservation, then 
+  // fetch the workflow states for just those oids, then find the ones with the states we're
+  // interested in and build a new query that's the same as the original but with a swapped
+  // out predicate that explicitly matches the set of oids we have computed.
+  def observationsByWorkflowState(query: Query, p: Path, e: Env): F[Result[Query]] =     
+    query match {
+      case Environment(env, Filter(pred, child)) =>
+
+        // observation query result to list of oids
+        def decode(json: Json): Result[List[model.Observation.Id]] =
+          Result.fromEither:
+            json
+              .hcursor.downFields("observations", "matches").as[List[Json]].flatMap: jsons =>
+                jsons.traverse(_.hcursor.downField("id").as[model.Observation.Id])
+              .leftMap(_.toString)
+
+        // given an observation predicate, find ids of matching observations
+        def oids(pred: Predicate): ResultT[F, List[model.Observation.Id]] =
+          val idQuery    = Select("observations", Select("matches", Filter(pred, Select("id"))))
+          val rootCursor = RootCursor(Context(QueryType), None, env)
+          for
+            pjson <- ResultT(interpreter.runOneShot(idQuery, QueryType, rootCursor))
+            json  <- ResultT(QueryInterpreter.complete[F](pjson))
+            oids  <- ResultT.fromResult(decode(json))
+          yield oids
+
+        // given a list of oids, find their workflows
+        def stateMap(oids: List[model.Observation.Id])(using Services[F], NoTransaction[F]) : F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
+          Services.asSuperUser:
+            observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
+              r.map: m => 
+                m.view.mapValues(_.state).toMap
+
+        // a new query with a predicate over the specified oids, with ordering by oid
+        def newQuery(oids: List[model.Observation.Id], child: Query): Query =
+          FilterOrderByOffsetLimit(
+            pred = Some(In(ObservationType / "id", oids)),
+            oss = Some(List(
+              OrderSelection[model.Observation.Id](ObservationType / "id")
+            )),
+            offset = None,
+            limit = None,
+            child
+          )
+
+        // Ok here we go. Figure out which observations we're talking about, filter based on state, and return a
+        // query that will just fetch the matches.
+        def go(using Services[F], NoTransaction[F]): ResultT[F, Query] =
+          for
+            states   <- ResultT.fromResult(env.getR[List[ObservationWorkflowState]]("states"))
+            oids     <- oids(pred)
+            stateMap <- ResultT(stateMap(oids))
+            filtered  = oids.filter(stateMap.get(_).exists(states.contains))
+          yield Environment(env, newQuery(filtered, child))
+
+        // I can't believe this works.
+        services.useNonTransactionally:
+          requireServiceAccess: // N.B. this is only for services, at least for now
+            go.value
+
+      case other =>
+        Result.internalError("observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got ${other}").pure[F]
+    
+    }
+      
 
   // Elaborators below
 
@@ -397,6 +482,32 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 child = q
               )
             }
+          }
+        }
+      }
+  }
+
+  private lazy val ObservationsByWorkflowState: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
+    val StateBinding = enumeratedBinding[ObservationWorkflowState]
+    {
+      case (QueryType, "observationsByWorkflowState", List(
+        WhereObservationBinding.Option("WHERE", rWHERE),
+        StateBinding.List.Option("states", rStates)
+      )) =>
+        Elab.transformChild { child =>
+          (rWHERE, rStates).parMapN { (WHERE, states) =>
+            Environment(
+              Env("states" -> states.orEmpty), 
+              Filter(
+                and(List(
+                  Predicates.observation.existence.includeDeleted(false),
+                  Predicates.observation.program.isVisibleTo(user),
+                  WHERE.getOrElse(True)
+                )),
+                child
+              )
+            )
           }
         }
       }
