@@ -566,6 +566,9 @@ object OdbMapping {
       // These are unused for enum metadata queries.
       def user = sys.error("OdbMapping.forMetadata: no user available")
       def services = sys.error("OdbMapping.forMetadata: no services available")
+      def timeEstimateCalculator = sys.error("OdbMapping.forMetadata: no timeEstimateCalculator available")
+      def itcClient = sys.error("OdbMapping.forMetadata: no itcClient available")
+      def commitHash = sys.error("OdbMapping.forMetadata: no commitHash available")
 
       // Our schema
       val schema: Schema =
