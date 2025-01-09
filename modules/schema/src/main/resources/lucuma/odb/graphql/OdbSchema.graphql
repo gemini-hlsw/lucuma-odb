@@ -9594,6 +9594,11 @@ type Query {
   ): ObservationSelectResult!
 
 
+  """
+  Selects observations via a normal predicate *and* an additional filter for allowed
+  workflow states. This query is intended for operations and is available only for
+  service users.
+  """
   observationsByWorkflowState(
     WHERE: WhereObservation,
     states: [ObservationWorkflowState!]
