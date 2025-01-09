@@ -49,8 +49,8 @@ import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ConfigurationService.downFields
-import lucuma.odb.service.Services
 import lucuma.odb.service.NoTransaction
+import lucuma.odb.service.Services
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>

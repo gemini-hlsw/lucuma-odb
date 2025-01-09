@@ -6,8 +6,8 @@ package query
 
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.model.Observation
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.model.Observation
 
 class observationsByWorkflowState extends OdbSuite {
 
