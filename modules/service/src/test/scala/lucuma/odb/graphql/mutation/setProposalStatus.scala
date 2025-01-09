@@ -10,7 +10,9 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
@@ -20,8 +22,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
-import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.CalibrationRole
 
 class setProposalStatus extends OdbSuite 
   with ObservingModeSetupOperations {
