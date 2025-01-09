@@ -50,6 +50,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ConfigurationService.downFields
 import lucuma.odb.service.Services
+import lucuma.odb.service.NoTransaction
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>
@@ -143,25 +144,38 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           yield oids
 
         // given a list of oids, find their workflows
-        def stateMap(oids: List[model.Observation.Id]): F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
-          services.useNonTransactionally:
-            Services.asSuperUser:
-              observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
-                r.map: m => 
-                  m.view.mapValues(_.state).toMap
+        def stateMap(oids: List[model.Observation.Id])(using Services[F], NoTransaction[F]) : F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
+          Services.asSuperUser:
+            observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
+              r.map: m => 
+                m.view.mapValues(_.state).toMap
+
+        // a new query with a predicate over the specified oids, with ordering by oid
+        def newQuery(oids: List[model.Observation.Id], child: Query): Query =
+          FilterOrderByOffsetLimit(
+            pred = Some(In(ObservationType / "id", oids)),
+            oss = Some(List(
+              OrderSelection[model.Observation.Id](ObservationType / "id")
+            )),
+            offset = None,
+            limit = None,
+            child
+          )
 
         // Ok here we go. Figure out which observations we're talking about, filter based on state, and return a
         // query that will just fetch the matches.
-        val go: ResultT[F, Query] =
+        def go(using Services[F], NoTransaction[F]): ResultT[F, Query] =
           for
             states   <- ResultT.fromResult(env.getR[List[ObservationWorkflowState]]("states"))
             oids     <- oids(pred)
             stateMap <- ResultT(stateMap(oids))
-            newPred   = Predicate.In(ObservationType / "id", oids.filter(stateMap.get(_).exists(states.contains)))
-          yield Environment(env, Filter(newPred, child)) : Query
+            filtered  = oids.filter(stateMap.get(_).exists(states.contains))
+          yield Environment(env, newQuery(filtered, child))
 
         // I can't believe this works.
-        go.value
+        services.useNonTransactionally:
+          requireServiceAccess: // N.B. this is only for services, at least for now
+            go.value
 
       case other =>
         Result.internalError("observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got ${other}").pure[F]
