@@ -379,41 +379,41 @@ GMOS-S	B600 IFU2 NS	ifu	IFU-NS-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no	Nod&
 GMOS-S	R150 NS1.0 GG455	singleslit,multislit	NS1.0"	1.000	330	R150	GG455	0.46	1.03	0.717	0.57	316	no	Nod&Shuffle	s
 GMOS-S	R150 NS1.0 OG515	singleslit,multislit	NS1.0"	1.000	330	R150	OG515	0.52	1.03	0.717	0.51	316	no	Nod&Shuffle	s
 GMOS-S	R831 NS1.0 CaT	singleslit,multislit	NS1.0"	1.000	330	R831	CaT	0.78	0.933	0.757	0.23	2198	no	Nod&Shuffle	s
-FLAMINGOS2	R3K + J + 0.36"	singleslit,multislit	2pixel	0.360	263	R3000	J	1.175	1.333	1.254	0.158	2800	no		s
-FLAMINGOS2	R3K + H + 0.36"	singleslit,multislit	2pixel	0.360	263	R3000	H	1.486	1.775	1.6305	0.289	2800	no		s
-FLAMINGOS2	R3K + Ks + 0.36"	singleslit,multislit	2pixel	0.360	263	R3000	K-short	1.991	2.32	2.1555	0.329	2900	no		s
-FLAMINGOS2	R3K + Kb + 0.36"	singleslit,multislit	2pixel	0.360	263	R3000	K-blue	1.934	2.177	2.0555	0.243	2900	no		s
-FLAMINGOS2	R3K + Kr + 0.36"	singleslit,multislit	2pixel	0.360	263	R3000	K-red	2.181	2.446	2.3135	0.265	2900	no		s
-FLAMINGOS2	JH 0.36"	singleslit,multislit	2pixel	0.360	263	R1200JH	JH	0.97	1.805	1.3875	0.835	900	no		s
-FLAMINGOS2	HK 0.36"	singleslit,multislit	2pixel	0.360	263	R1200HK	HK	1.261	2.551	1.906	1.29	900	no		s
-FLAMINGOS2	R3K + J + 0.36"	singleslit,multislit	3pixel	0.540	263	R3000	J	1.175	1.333	1.254	0.158	1867	no		s
-FLAMINGOS2	R3K + H + 0.36"	singleslit,multislit	3pixel	0.540	263	R3000	H	1.486	1.775	1.6305	0.289	1867	no		s
-FLAMINGOS2	R3K + Ks + 0.36"	singleslit,multislit	3pixel	0.540	263	R3000	K-short	1.991	2.32	2.1555	0.329	1933	no		s
-FLAMINGOS2	R3K + Kb + 0.36"	singleslit,multislit	3pixel	0.540	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1933	no		s
-FLAMINGOS2	R3K + Kr + 0.36"	singleslit,multislit	3pixel	0.540	263	R3000	K-red	2.181	2.446	2.3135	0.265	1933	no		s
-FLAMINGOS2	JH 0.36"	singleslit,multislit	3pixel	0.540	263	R1200JH	JH	0.97	1.805	1.3875	0.835	600	no		s
-FLAMINGOS2	HK 0.36"	singleslit,multislit	3pixel	0.540	263	R1200HK	HK	1.261	2.551	1.906	1.29	600	no		s
-FLAMINGOS2	R3K + J + 0.36"	singleslit,multislit	4pixel	0.720	263	R3000	J	1.175	1.333	1.254	0.158	1400	no		s
-FLAMINGOS2	R3K + H + 0.36"	singleslit,multislit	4pixel	0.720	263	R3000	H	1.486	1.775	1.6305	0.289	1400	no		s
-FLAMINGOS2	R3K + Ks + 0.36"	singleslit,multislit	4pixel	0.720	263	R3000	K-short	1.991	2.32	2.1555	0.329	1450	no		s
-FLAMINGOS2	R3K + Kb + 0.36"	singleslit,multislit	4pixel	0.720	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1450	no		s
-FLAMINGOS2	R3K + Kr + 0.36"	singleslit,multislit	4pixel	0.720	263	R3000	K-red	2.181	2.446	2.3135	0.265	1450	no		s
-FLAMINGOS2	JH 0.36"	singleslit,multislit	4pixel	0.720	263	R1200JH	JH	0.97	1.805	1.3875	0.835	450	no		s
-FLAMINGOS2	HK 0.36"	singleslit,multislit	4pixel	0.720	263	R1200HK	HK	1.261	2.551	1.906	1.29	450	no		s
-FLAMINGOS2	R3K + J + 0.36"	singleslit,multislit	6pixel	1.080	263	R3000	J	1.175	1.333	1.254	0.158	933	no		s
-FLAMINGOS2	R3K + H + 0.36"	singleslit,multislit	6pixel	1.080	263	R3000	H	1.486	1.775	1.6305	0.289	933	no		s
-FLAMINGOS2	R3K + Ks + 0.36"	singleslit,multislit	6pixel	1.080	263	R3000	K-short	1.991	2.32	2.1555	0.329	967	no		s
-FLAMINGOS2	R3K + Kb + 0.36"	singleslit,multislit	6pixel	1.080	263	R3000	K-blue	1.934	2.177	2.0555	0.243	967	no		s
-FLAMINGOS2	R3K + Kr + 0.36"	singleslit,multislit	6pixel	1.080	263	R3000	K-red	2.181	2.446	2.3135	0.265	967	no		s
-FLAMINGOS2	JH 0.36"	singleslit,multislit	6pixel	1.080	263	R1200JH	JH	0.97	1.805	1.3875	0.835	300	no		s
-FLAMINGOS2	HK 0.36"	singleslit,multislit	6pixel	1.080	263	R1200HK	HK	1.261	2.551	1.906	1.29	300	no		s
-FLAMINGOS2	R3K + J + 0.36"	singleslit,multislit	8pixel	1.440	263	R3000	J	1.175	1.333	1.254	0.158	700	no		s
-FLAMINGOS2	R3K + H + 0.36"	singleslit,multislit	8pixel	1.440	263	R3000	H	1.486	1.775	1.6305	0.289	700	no		s
-FLAMINGOS2	R3K + Ks + 0.36"	singleslit,multislit	8pixel	1.440	263	R3000	K-short	1.991	2.32	2.1555	0.329	725	no		s
-FLAMINGOS2	R3K + Kb + 0.36"	singleslit,multislit	8pixel	1.440	263	R3000	K-blue	1.934	2.177	2.0555	0.243	725	no		s
-FLAMINGOS2	R3K + Kr + 0.36"	singleslit,multislit	8pixel	1.440	263	R3000	K-red	2.181	2.446	2.3135	0.265	725	no		s
-FLAMINGOS2	JH 0.36"	singleslit,multislit	8pixel	1.440	263	R1200JH	JH	0.97	1.805	1.3875	0.835	225	no		s
-FLAMINGOS2	HK 0.36"	singleslit,multislit	8pixel	1.440	263	R1200HK	HK	1.261	2.551	1.906	1.29	225	no		s
+Flamingos2	R3K + J + 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R3000	J	1.175	1.333	1.254	0.158	2800	no		s
+Flamingos2	R3K + H + 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R3000	H	1.486	1.775	1.6305	0.289	2800	no		s
+Flamingos2	R3K + Ks + 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R3000	K-short	1.991	2.32	2.1555	0.329	2900	no		s
+Flamingos2	R3K + Kb + 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R3000	K-blue	1.934	2.177	2.0555	0.243	2900	no		s
+Flamingos2	R3K + Kr + 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R3000	K-red	2.181	2.446	2.3135	0.265	2900	no		s
+Flamingos2	JH 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R1200JH	JH	0.97	1.805	1.3875	0.835	900	no		s
+Flamingos2	HK 0.36"	singleslit,multislit	Long Slit 2px	0.360	263	R1200HK	HK	1.261	2.551	1.906	1.29	900	no		s
+Flamingos2	R3K + J + 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R3000	J	1.175	1.333	1.254	0.158	1867	no		s
+Flamingos2	R3K + H + 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R3000	H	1.486	1.775	1.6305	0.289	1867	no		s
+Flamingos2	R3K + Ks + 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R3000	K-short	1.991	2.32	2.1555	0.329	1933	no		s
+Flamingos2	R3K + Kb + 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1933	no		s
+Flamingos2	R3K + Kr + 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R3000	K-red	2.181	2.446	2.3135	0.265	1933	no		s
+Flamingos2	JH 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R1200JH	JH	0.97	1.805	1.3875	0.835	600	no		s
+Flamingos2	HK 0.36"	singleslit,multislit	Long Slit 3px	0.540	263	R1200HK	HK	1.261	2.551	1.906	1.29	600	no		s
+Flamingos2	R3K + J + 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R3000	J	1.175	1.333	1.254	0.158	1400	no		s
+Flamingos2	R3K + H + 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R3000	H	1.486	1.775	1.6305	0.289	1400	no		s
+Flamingos2	R3K + Ks + 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R3000	K-short	1.991	2.32	2.1555	0.329	1450	no		s
+Flamingos2	R3K + Kb + 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R3000	K-blue	1.934	2.177	2.0555	0.243	1450	no		s
+Flamingos2	R3K + Kr + 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R3000	K-red	2.181	2.446	2.3135	0.265	1450	no		s
+Flamingos2	JH 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R1200JH	JH	0.97	1.805	1.3875	0.835	450	no		s
+Flamingos2	HK 0.36"	singleslit,multislit	Long Slit 4px	0.720	263	R1200HK	HK	1.261	2.551	1.906	1.29	450	no		s
+Flamingos2	R3K + J + 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R3000	J	1.175	1.333	1.254	0.158	933	no		s
+Flamingos2	R3K + H + 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R3000	H	1.486	1.775	1.6305	0.289	933	no		s
+Flamingos2	R3K + Ks + 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R3000	K-short	1.991	2.32	2.1555	0.329	967	no		s
+Flamingos2	R3K + Kb + 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R3000	K-blue	1.934	2.177	2.0555	0.243	967	no		s
+Flamingos2	R3K + Kr + 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R3000	K-red	2.181	2.446	2.3135	0.265	967	no		s
+Flamingos2	JH 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R1200JH	JH	0.97	1.805	1.3875	0.835	300	no		s
+Flamingos2	HK 0.36"	singleslit,multislit	Long Slit 6px	1.080	263	R1200HK	HK	1.261	2.551	1.906	1.29	300	no		s
+Flamingos2	R3K + J + 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R3000	J	1.175	1.333	1.254	0.158	700	no		s
+Flamingos2	R3K + H + 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R3000	H	1.486	1.775	1.6305	0.289	700	no		s
+Flamingos2	R3K + Ks + 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R3000	K-short	1.991	2.32	2.1555	0.329	725	no		s
+Flamingos2	R3K + Kb + 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R3000	K-blue	1.934	2.177	2.0555	0.243	725	no		s
+Flamingos2	R3K + Kr + 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R3000	K-red	2.181	2.446	2.3135	0.265	725	no		s
+Flamingos2	JH 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R1200JH	JH	0.97	1.805	1.3875	0.835	225	no		s
+Flamingos2	HK 0.36"	singleslit,multislit	Long Slit 8px	1.440	263	R1200HK	HK	1.261	2.551	1.906	1.29	225	no		s
 GPI-2	Y	ifu	Coronagraph	0.156	2.8	Prism	Y	0.95	1.14	1.045	0.19	35	yes	coronagraph	s
 GPI-2	J	ifu	Coronagraph	0.184	2.8	Prism	J	1.12	1.35	1.235	0.23	36	yes	coronagraph	s
 GPI-2	H	ifu	Coronagraph	0.246	2.8	Prism	H	1.5	1.8	1.65	0.30	46	yes	coronagraph	s
