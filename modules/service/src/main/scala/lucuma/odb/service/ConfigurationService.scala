@@ -52,7 +52,7 @@ trait ConfigurationService[F[_]] {
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
 
-  /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each observation in `pid`. */
+  /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each non-inactive, non-calibration observation in `pid`. */
   def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]]
 
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
@@ -150,9 +150,6 @@ object ConfigurationService {
             if res.toOption.exists(_.contains(oid)) then res
             else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asWarning(Map.empty)
 
-    private def selectConfigurations(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
-      ResultT(selectConfigurationsImpl(Queries.selectConfigurations(pid)))
-
     private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
@@ -192,8 +189,13 @@ object ConfigurationService {
       selectConfiguration(input.oid).flatMap(canonicalizeRequest(input, _))
 
     def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
-      selectConfigurations(pid).flatMap: map =>
-        map.toList.traverse((oid, config) => canonicalizeRequest(CreateConfigurationRequestInput(oid), config).tupleLeft(oid)).map(_.toMap)
+      ResultT
+        .liftF:
+          session.prepareR(Statements.SelectActiveNonCalibrations).use: pq =>
+            pq.stream(pid, 1024).compile.toList
+        .flatMap: oids =>
+          selectConfigurations(oids).flatMap: map =>
+            map.toList.traverse((oid, config) => canonicalizeRequest(CreateConfigurationRequestInput(oid), config).tupleLeft(oid)).map(_.toMap)
 
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): ResultT[F, List[ConfigurationRequest.Id]] =
       // access level has been checked already
@@ -842,6 +844,16 @@ object ConfigurationService {
       void" where c_configuration_request_id in (" |+| which |+| void""")
         returning c_configuration_request_id
       """
+
+    val SelectActiveNonCalibrations: Query[Program.Id, Observation.Id] =
+      sql"""
+        select c_observation_id
+        from t_observation
+        where c_program_id = $program_id
+        and c_workflow_user_state is distinct from 'inactive'::e_workflow_user_state
+        and c_calibration_role is null
+      """.query(observation_id)
+    
   }
 
 }
