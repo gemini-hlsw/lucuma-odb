@@ -318,11 +318,9 @@ object AttachmentFileService {
         description:    Option[NonEmptyString],
         data:           Stream[F, Byte]
       )(using NoTransaction[F]): F[Either[AttachmentException, Attachment.Id]] =
-        FileName
-          .fromString(fileName)
-          .liftF
-          .flatMap(fn =>
+          (
             for {
+              fn     <- FileName.fromString(fileName).liftF
               _      <- services.transactionallyEitherT {
                           checkAccess(session, user, programId) >>
                             validateFileExtensionByType(attachmentType, fn).liftF >>
@@ -331,6 +329,19 @@ object AttachmentFileService {
                         }
               uuid   <- UUIDGen[F].randomUUID.right
               path    = filePath(programId, uuid, fn.value)
+            } yield (fn, path)
+          ).value
+          .flatTap {
+            // Up to this point, we haven't read the data yet. 
+            // If we don't drain the request body before returning,
+            // the client that Heroku uses as a proxy will simply 
+            // return a network error. See this for more info:
+            // https://github.com/http4s/http4s/pull/7602
+            case Left(_)  => data.compile.drain
+            case _ => ().pure
+          }.asEitherT
+          .flatMap((fn, path) =>
+            for {
               size   <- s3FileSvc.upload(path, data).right
               _      <- checkForEmptyFile(size).liftF
               result <- insertAttachmentInDB(programId,
@@ -352,32 +363,39 @@ object AttachmentFileService {
         description:  Option[NonEmptyString],
         data:         Stream[F, Byte]
       )(using NoTransaction[F]): F[Either[AttachmentException, Unit]] =
-        FileName
-          .fromString(fileName)
-          .liftF
-          .flatMap(fn =>
-            for {
-              oldPath <- services.transactionallyEitherT {
-                           checkAccess(session, user, programId) >>
-                             validateFileExtensionById(programId, attachmentId, fn).asEitherT >>
-                             checkForDuplicateName(programId, fn, attachmentId.some).asEitherT >>
-                             getAttachmentRemotePathFromDB(programId, attachmentId).asEitherT
-                         }
-              uuid    <- UUIDGen[F].randomUUID.right
-              newPath  = filePath(programId, uuid, fn.value)
-              size    <- s3FileSvc.upload(newPath, data).right
-              _       <- checkForEmptyFile(size).liftF
-              _       <- updateAttachmentInDB(programId,
-                                              attachmentId,
-                                              fn,
-                                              description,
-                                              size,
-                                              newPath
-                         ).asEitherT
-              _       <- s3FileSvc.delete(oldPath).right
-            } yield ()
-          )
-          .value
+        (
+          for {
+            fn      <- FileName.fromString(fileName).liftF
+            oldPath <- services.transactionallyEitherT {
+                          checkAccess(session, user, programId) >>
+                            validateFileExtensionById(programId, attachmentId, fn).asEitherT >>
+                            checkForDuplicateName(programId, fn, attachmentId.some).asEitherT >>
+                            getAttachmentRemotePathFromDB(programId, attachmentId).asEitherT
+                        }
+            uuid    <- UUIDGen[F].randomUUID.right
+            newPath  = filePath(programId, uuid, fn.value)
+          } yield (fn, oldPath, newPath)
+        ).value
+        .flatTap {
+          // See comment in similar location in insertAttachment.
+          case Left(_)  => data.compile.drain
+          case _ => ().pure
+        }.asEitherT
+        .flatMap((fn, oldPath, newPath) =>
+          for {
+            size    <- s3FileSvc.upload(newPath, data).right
+            _       <- checkForEmptyFile(size).liftF
+            _       <- updateAttachmentInDB(programId,
+                                            attachmentId,
+                                            fn,
+                                            description,
+                                            size,
+                                            newPath
+                        ).asEitherT
+            _       <- s3FileSvc.delete(oldPath).right
+          } yield ()
+        )
+        .value
 
       def deleteAttachment(
         user:         User,
