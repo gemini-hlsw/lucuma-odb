@@ -10,7 +10,9 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
@@ -543,7 +545,7 @@ class setProposalStatus extends OdbSuite
     )
   }
 
-  test("ensure that configuration requests are created when the proposal is submitted") {
+  test("ensure that configuration requests are created when the proposal is submitted, but not for inactive observations or calibrations") {
     for
       cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramAs(pi)
@@ -551,6 +553,10 @@ class setProposalStatus extends OdbSuite
       _   <- addPartnerSplits(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      ina <- createObservationAs(pi, pid) // inactive, should be ignored
+      _   <- setObservationWorkflowState(pi, ina, ObservationWorkflowState.Inactive)
+      cal <- createObservationAs(pi, pid) // calibration, should be ignored
+      _   <- setObservationCalibratioRole(cal, Some(CalibrationRole.Photometric))
       _   <-
         expect(
           user = pi,
