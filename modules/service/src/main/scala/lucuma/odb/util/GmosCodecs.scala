@@ -176,6 +176,7 @@ trait GmosCodecs {
       g.mosPreImaging,
       g.stageMode
     )}
+
 }
 
 object GmosCodecs extends GmosCodecs

@@ -11,6 +11,7 @@ import fs2.Pipe
 import fs2.Stream
 import fs2.io.readInputStream
 import lucuma.core.enums.Instrument
+import lucuma.odb.phase0.F2SpectroscopyRow
 import lucuma.odb.phase0.FileReader
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.SpectroscopyRow
@@ -77,7 +78,8 @@ object Phase0Loader {
     val rdr = FileReader[IO](fileName)
     List(
       new Phase0Loader[GmosSpectroscopyRow.GmosNorth](Instrument.GmosNorth, rdr.gmosNorth, _.spec, Phase0Table.SpectroscopyGmosNorth),
-      new Phase0Loader[GmosSpectroscopyRow.GmosSouth](Instrument.GmosSouth, rdr.gmosSouth, _.spec, Phase0Table.SpectroscopyGmosSouth)
+      new Phase0Loader[GmosSpectroscopyRow.GmosSouth](Instrument.GmosSouth, rdr.gmosSouth, _.spec, Phase0Table.SpectroscopyGmosSouth),
+      new Phase0Loader[F2SpectroscopyRow](Instrument.Flamingos2, rdr.f2, _.spec, Phase0Table.SpectroscopyF2)
     ).traverse_(_.load(bc, is))
 
 }
