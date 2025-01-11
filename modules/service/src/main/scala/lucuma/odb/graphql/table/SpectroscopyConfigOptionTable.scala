@@ -36,7 +36,7 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Site               = col("c_site",       site)
   }
 
-  object SpectrsocopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
+  object SpectroscopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
@@ -45,7 +45,7 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Filter     = col("c_filter",  gmos_north_filter.opt)
   }
 
-  object SpectrsocopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
+  object SpectroscopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 

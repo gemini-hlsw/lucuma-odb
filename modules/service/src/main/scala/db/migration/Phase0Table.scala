@@ -16,6 +16,7 @@ import lucuma.odb.phase0.F2SpectroscopyRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.F2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
@@ -174,7 +175,7 @@ object Phase0Table {
     override def columns: List[String] =
       List(
         "c_instrument",
-        "c_grating",
+        "c_disperser",
         "c_filter",
         "c_fpu"
       )

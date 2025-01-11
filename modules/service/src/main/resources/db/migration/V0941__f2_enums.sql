@@ -175,7 +175,7 @@ CREATE TABLE t_spectroscopy_config_option_f2 (
   FOREIGN KEY (c_instrument, c_index) REFERENCES t_spectroscopy_config_option (c_instrument, c_index),
 
   c_fpu        d_tag NOT NULL REFERENCES t_f2_fpu(c_tag),
-  c_grating    d_tag NOT NULL REFERENCES t_f2_disperser(c_tag),
+  c_disperser  d_tag NOT NULL REFERENCES t_f2_disperser(c_tag),
   c_filter     d_tag          REFERENCES t_f2_filter(c_tag)
 );
 

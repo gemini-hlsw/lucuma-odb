@@ -6,9 +6,6 @@ package lucuma.odb.util
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -180,14 +177,6 @@ trait GmosCodecs {
       g.stageMode
     )}
 
-  val f2_disperser: Codec[F2Disperser] =
-    enumerated(Type.varchar)
-
-  val f2_fpu: Codec[F2Fpu] =
-    enumerated(Type.varchar)
-
-  val f2_filter: Codec[F2Filter] =
-    enumerated(Type.varchar)
 }
 
 object GmosCodecs extends GmosCodecs
