@@ -41,6 +41,11 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlObject("gmosSouth", Join(List(
         SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGmosSouthTable.Instrument,
         SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGmosSouthTable.Index
+      ))),
+
+      SqlObject("flamingos2", Join(List(
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionF2Table.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionF2Table.Index
       )))
 
     )
@@ -69,4 +74,15 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
 
     )
 
+  lazy val SpectroscopyConfigOptionF2Mapping: ObjectMapping =
+    ObjectMapping(SpectroscopyConfigOptionF2Type)(
+
+      SqlField("instrument", SpectroscopyConfigOptionF2Table.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionF2Table.Index, key = true, hidden = true),
+
+      SqlField("fpu",        SpectroscopyConfigOptionF2Table.Fpu),
+      SqlField("disperser",  SpectroscopyConfigOptionF2Table.Disperser),
+      SqlField("filter",     SpectroscopyConfigOptionF2Table.Filter)
+
+    )
 }
