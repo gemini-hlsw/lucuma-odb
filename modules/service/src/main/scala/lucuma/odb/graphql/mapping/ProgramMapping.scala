@@ -199,7 +199,7 @@ trait ProgramMapping[F[_]]
     keyValueEffectHandler[Program.Id, Option[CategorizedTimeRange]]("id") { pid =>
       services.useNonTransactionally {
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
-          .estimateProgram(pid)
+          .estimateProgramRange(pid)
       }
     }
 

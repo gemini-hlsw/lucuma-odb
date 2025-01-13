@@ -78,7 +78,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
     keyValueEffectHandler[Group.Id, Option[CategorizedTimeRange]]("id") { gid =>
       services.useNonTransactionally {
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
-          .estimateGroup(gid)
+          .estimateGroupRange(gid)
       }
     }
 
