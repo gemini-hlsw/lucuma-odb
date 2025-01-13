@@ -7926,6 +7926,8 @@ type Group {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  # bandedTimeEstimate: BandedTime!
+
   existence: Existence!
 
   system: Boolean!

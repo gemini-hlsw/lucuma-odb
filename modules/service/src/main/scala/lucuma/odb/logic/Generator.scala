@@ -418,11 +418,11 @@ object Generator {
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
 
-          case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role) =>
             gmosSouthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
         )
@@ -446,11 +446,11 @@ object Generator {
         when:     Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match
-          case GeneratorParams(_, config: gmos.longslit.Config.GmosNorth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role) =>
             gmosNorthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
 
-          case GeneratorParams(_, config: gmos.longslit.Config.GmosSouth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role) =>
             gmosSouthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 

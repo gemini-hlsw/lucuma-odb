@@ -14,11 +14,14 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
+import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.model.sequence.ExecutionDigest
@@ -37,13 +40,13 @@ import skunk.Transaction
 /**
  * A service that can estimate the time for a program.
  */
-sealed trait TimeEstimateService[F[_]] {
+sealed trait TimeEstimateService[F[_]]:
 
   /**
    * Estimates the remaining time for all observations in the program that are
    * well defined.
    */
-  def estimateProgram(
+  def estimateProgramRange(
     programId: Program.Id
   )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
 
@@ -51,95 +54,97 @@ sealed trait TimeEstimateService[F[_]] {
    * Estimates the remaining time for all observations in the group that are
    * well defined.
    */
-  def estimateGroup(
+  def estimateGroupRange(
     groupId: Group.Id
   )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
 
-}
+  def estimateProgramBanded(
+    programId: Program.Id
+  )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]]
 
-object TimeEstimateService {
+  def estimateGroupBanded(
+    groupId: Group.Id
+  )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]]
+
+
+object TimeEstimateService:
 
   private case class ObservationData(
     generatorParams: GeneratorParams,
     asterismResults: Option[AsterismResults],
     executionDigest: Option[ExecutionDigest]
-  ) {
-
+  ):
     def cachedFullTimeEstimate: Option[CategorizedTime] =
       executionDigest.map(_.fullTimeEstimate)
 
-  }
-
-  private object ObservationData {
-
+  private object ObservationData:
     def load[F[_]: Concurrent](
       pid:       Program.Id,
       itcClient: ItcClient[F]
     )(using Services[F], Transaction[F]): F[Map[Observation.Id, ObservationData]] =
-      for {
+      for
         p <- generatorParamsService.selectAll(pid /*, ObsStatus.Included*/)
         pʹ = p.collect { case (oid, Right(gp)) => (oid, gp) }
         i <- itcService(itcClient).selectAll(pid, pʹ)
         d <- executionDigestService.selectAll(pid)
         dʹ = d.map { case (oid, (_, digest)) => (oid, digest) }
-      } yield pʹ.map { case (oid, gp) => (oid, ObservationData(gp, i.get(oid), dʹ.get(oid))) }
-
-  }
+      yield pʹ.map { case (oid, gp) => (oid, ObservationData(gp, i.get(oid), dʹ.get(oid))) }
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
   )(using Services[F]): TimeEstimateService[F] =
-    new TimeEstimateService[F] {
+    new TimeEstimateService[F]:
 
       // CategorizedTime Ordering that sorts longest to shortest.
       val longestToShortest: Ordering[CategorizedTime] =
         catsKernelOrderingForOrder(Order.reverse(Order[CategorizedTime]))
 
-      def combine(minRequired: Int, children: List[CategorizedTimeRange]): Option[CategorizedTimeRange] =
-        Option.when(children.size >= minRequired) {
-          CategorizedTimeRange.from(
-            // Combines the first minRequired elements after sorting by ascending min CategorizedTime
-            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero),
-            // Combines the first minRequired elements after sorting by descending max CategorizedTime
-            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero)
-          )
-        }
-
-      def leafRange(
+      def observationTime(
         pid: Program.Id,
         oid: Observation.Id,
         m:   Map[Observation.Id, ObservationData]
-      ): F[Option[CategorizedTimeRange]] =
-        OptionT.fromOption(m.get(oid)).flatMap { data =>
+      ): F[Option[BandedTime]] =
+        OptionT.fromOption(m.get(oid)).flatMap: data =>
           OptionT
             .fromOption(data.cachedFullTimeEstimate)  // try the cache first
-            .orElse {
+            .orElse
               // ExecutionDigest not in the cache, we'll need to calculate it.
               // For that we need the ITC results, which may be cached.  Use the
               // cached ITC AsterismResults if available, else call remote ITC.
               val asterismResults = OptionT.fromOption(data.asterismResults).map(_.asRight).orElseF(
                 itcService(itcClient)
                   .callRemote(pid, oid, data.generatorParams)
-                  .map {
+                  .map:
                     case Left(ItcService.Error.ObservationDefinitionError(GeneratorParamsService.Error.MissingData(p))) =>
                       p.asLeft[AsterismResults].some
                     case Left(_)   => none
                     case Right(ar) => ar.asRight.some
-                  }
               )
 
               // Calculate time estimate using provided ITC result and params.
-              asterismResults.flatMapF { ar =>
+              asterismResults.flatMapF: ar =>
                 generator(commitHash, itcClient, calculator)
                   .calculateDigest(pid, oid, ar, data.generatorParams)
-                  .map(_.toOption.map(_.fullTimeEstimate))
-              }
-            }
-            .map(CategorizedTimeRange.single)
-        }.value
+                  .map(_.toOption.map(dig => BandedTime(data.generatorParams.scienceBand, dig.fullTimeEstimate)))
+        .value
 
+      def combine(minRequired: Int, children: List[CategorizedTimeRange]): Option[CategorizedTimeRange] =
+        Option.when(children.size >= minRequired):
+          CategorizedTimeRange.from(
+            // Combines the first minRequired elements after sorting by ascending min CategorizedTime
+            children.map(_.min).sorted.take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero),
+            // Combines the first minRequired elements after sorting by descending max CategorizedTime
+            children.map(_.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero)
+          )
+
+      def leafRange(
+        pid: Program.Id,
+        oid: Observation.Id,
+        m:   Map[Observation.Id, ObservationData]
+      ): F[Option[CategorizedTimeRange]] =
+        observationTime(pid, oid, m).map(_.map(bt => CategorizedTimeRange.single(bt.time)))
 
       def parentRange(
         pid:         Program.Id,
@@ -163,34 +168,65 @@ object TimeEstimateService {
         root: GroupTree,
         m:    Map[Observation.Id, ObservationData]
       ): F[Option[CategorizedTimeRange]] =
-        root match {
+        root match
           case GroupTree.Leaf(oid)                                  => leafRange(pid, oid, m)
           case GroupTree.Branch(_, min, _, children, _, _, _, _, _) => parentRange(pid, min, children, m)
           case GroupTree.Root(_, children)                          => parentRange(pid, None, children, m)
-        }
 
       private def load(pid: Program.Id): F[(GroupTree, Map[Observation.Id, ObservationData])] =
-        services.transactionally {
+        services.transactionally:
           (groupService.selectGroups(pid), ObservationData.load(pid, itcClient)).tupled
-        }
 
-      override def estimateProgram(
+      override def estimateProgramRange(
         pid: Program.Id
       )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
-        load(pid).flatMap { case (tree, dataMap) =>
-          timeEstimateRange(pid, tree, dataMap)
-        }
+        load(pid).flatMap:
+          case (tree, dataMap) => timeEstimateRange(pid, tree, dataMap)
 
-      override def estimateGroup(
-        groupId: Group.Id
+      override def estimateGroupRange(
+        gid: Group.Id
       )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
-        (for {
-          p <- OptionT(groupService.selectPid(groupId))
+        (for
+          p <- OptionT(groupService.selectPid(gid))
           d <- OptionT.liftF(load(p))
           (tree, dataMap) = d
-          t <- OptionT.fromOption(tree.findGroup(groupId))
+          t <- OptionT.fromOption(tree.findGroup(gid))
           r <- OptionT(timeEstimateRange(p, t, dataMap))
-        } yield r).value
+        yield r).value
 
-  }
-}
+      def bandedTimeEstimate(
+        pid:  Program.Id,
+        root: GroupTree,
+        m:    Map[Observation.Id, ObservationData]
+      ): F[Map[Option[ScienceBand], CategorizedTime]] =
+
+        val empty: Map[Option[ScienceBand], CategorizedTime] = Map.empty
+
+        def leaf(oid: Observation.Id): F[Map[Option[ScienceBand], CategorizedTime]] =
+          observationTime(pid, oid, m).map: obt =>
+            obt.fold(empty)(bt => Map(bt.band -> bt.time))
+
+        def parent(cs: List[GroupTree.Child]): F[Map[Option[ScienceBand], CategorizedTime]] =
+          cs.traverse(bandedTimeEstimate(pid, _, m)).map(_.foldLeft(empty)(_ |+| _))
+
+        root match
+          case GroupTree.Leaf(oid)                                => leaf(oid)
+          case GroupTree.Branch(_, _, _, children, _, _, _, _, _) => parent(children)
+          case GroupTree.Root(_, children)                        => parent(children)
+
+      def estimateProgramBanded(
+        pid: Program.Id
+      )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]] =
+        load(pid).flatMap:
+          case (tree, dataMap) => bandedTimeEstimate(pid, tree, dataMap).map(_.some)
+
+      override def estimateGroupBanded(
+        gid: Group.Id
+      )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]] =
+        (for
+          p <- OptionT(groupService.selectPid(gid))
+          d <- OptionT.liftF(load(p))
+          (tree, dataMap) = d
+          t <- OptionT.fromOption(tree.findGroup(gid))
+          r <- OptionT.liftF(bandedTimeEstimate(p, t, dataMap))
+        yield r).value
