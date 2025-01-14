@@ -14,7 +14,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.ScienceBand
@@ -215,7 +214,7 @@ object TimeEstimateService:
             obt.fold(empty)(bt => Map(bt.band -> bt.time))
 
         def parent(cs: List[GroupTree.Child]): F[Map[Option[ScienceBand], CategorizedTime]] =
-          cs.traverse(bandedTimeEstimate(pid, _, m)).map(_.foldLeft(empty)(_ |+| _))
+          cs.traverse(bandedTimeEstimate(pid, _, m)).map(_.combineAll)
 
         root match
           case GroupTree.Leaf(oid)                                => leaf(oid)
