@@ -23,6 +23,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -153,7 +154,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, _, Some(om), _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, _, Some(om), _, _, _, _) => (oid, om) }.distinct
           m          <- observingModeServices.selectObservingMode(oms)
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -225,7 +226,7 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), gn, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole)
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
               cw,
@@ -235,7 +236,7 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), gs, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole)
 
       private def itcObsParams(
         obsParams:  ObsParams,
@@ -293,6 +294,7 @@ object GeneratorParamsService {
     signalToNoise:   Option[SignalToNoise],
     signalToNoiseAt: Option[Wavelength],
     observingMode:   Option[ObservingModeType],
+    scienceBand:     Option[ScienceBand],
     targetId:        Option[Target.Id],
     radialVelocity:  Option[RadialVelocity],
     sourceProfile:   Option[SourceProfile]
@@ -311,6 +313,7 @@ object GeneratorParamsService {
     signalToNoise:   Option[SignalToNoise],
     signalToNoiseAt: Option[Wavelength],
     observingMode:   Option[ObservingModeType],
+    scienceBand:     Option[ScienceBand],
     targets:         NonEmptyList[TargetParams]
   )
 
@@ -324,6 +327,7 @@ object GeneratorParamsService {
           oParams.head.signalToNoise,
           oParams.head.signalToNoiseAt,
           oParams.head.observingMode,
+          oParams.head.scienceBand,
           oParams.map: r =>
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile)
         )
@@ -348,6 +352,7 @@ object GeneratorParamsService {
        signal_to_noise.opt     *:
        wavelength_pm.opt       *:
        observing_mode_type.opt *:
+       science_band.opt        *:
        target_id.opt           *:
        radial_velocity.opt     *:
        source_profile.opt
@@ -368,6 +373,7 @@ object GeneratorParamsService {
         $tab.c_spec_signal_to_noise,
         $tab.c_spec_signal_to_noise_at,
         $tab.c_observing_mode_type,
+        $tab.c_science_band,
         $tab.c_target_id,
         $tab.c_sid_rv,
         $tab.c_source_profile

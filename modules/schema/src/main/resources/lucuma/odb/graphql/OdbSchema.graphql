@@ -7926,6 +7926,14 @@ type Group {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  """
+  Prepared time by band ignoring `minimumRequired`, for observations that can be
+  calculated.  In order for an observation to have an estimate, it must be
+  fully defined such that a sequence can be generated for it.  All defined
+  observations in every band present in the group are included.
+  """
+  timeEstimateBanded: [BandedTime!]!
+
   existence: Existence!
 
   system: Boolean!
@@ -9142,6 +9150,14 @@ type Program {
   cannot be calculated.
   """
   timeEstimateRange: CategorizedTimeRange
+
+  """
+  Prepared time by band ignoring `minimumRequired` in groups, for observations
+  that can be calculated.  In order for an observation to have an estimate, it
+  must be fully defined such that a sequence can be generated for it.  All
+  defined observations in every band present in the program are included.
+  """
+  timeEstimateBanded: [BandedTime!]!
 
   """
   Program-wide time charge, summing all corrected observation time charges.
