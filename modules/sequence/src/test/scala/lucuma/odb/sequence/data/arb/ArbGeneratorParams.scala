@@ -8,6 +8,7 @@ package arb
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
@@ -43,17 +44,19 @@ trait ArbGeneratorParams:
     for
       mo  <- arbitrary[InstrumentMode.GmosNorthSpectroscopy]
       itc <- genItcInput(mo)
+      bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
-    yield GeneratorParams(Either.right(itc), cfg, rol)
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
       mo  <- arbitrary[InstrumentMode.GmosSouthSpectroscopy]
       itc <- genItcInput(mo)
+      bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
-    yield GeneratorParams(Either.right(itc), cfg, rol)
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

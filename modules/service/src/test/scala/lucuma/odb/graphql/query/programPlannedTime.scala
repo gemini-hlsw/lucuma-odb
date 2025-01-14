@@ -12,6 +12,8 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -19,10 +21,12 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.graphql.input.AllocationInput
 
 
-class programPlannedTime extends ExecutionTestSupport {
+class programPlannedTime extends ExecutionTestSupport:
 
   extension (s: String)
     def sec: BigDecimal =
@@ -38,7 +42,7 @@ class programPlannedTime extends ExecutionTestSupport {
   val user: User = serviceUser
 
   // 1736.262500
-  def createLongerGmosNorthLongSlitObservationAs(
+  private def createLongerGmosNorthLongSlitObservationAs(
     user: User,
     pid:  Program.Id,
     tids: Target.Id*
@@ -82,289 +86,21 @@ class programPlannedTime extends ExecutionTestSupport {
   // goal for the first 10 goals).
   val LongTime  = "960".sec + ("67.1".sec * 10) + ("57.1".sec * 10) + ("1266.1".sec * 10)
 
-  test("program level: single complete observation") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-      } yield p
+  private def createBandedGmosNorthLongSlitObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id,
+    band: Option[ScienceBand]
+  ): IO[Observation.Id] =
+    for
+      o <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      _ <- setScienceBandAs(user, o, band)
+    yield o
 
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-
-  }
-
-  // test("program level: single complete, but 'New' observation") {
-  //   val setup: IO[Program.Id] =
-  //     for {
-  //       p <- createProgram
-  //       t <- createTargetWithProfileAs(user, p)
-  //       _ <- createGmosNorthLongSlitObservationAs(user, p, List(t), status = New)
-  //     } yield p
-
-  //   setup.flatMap { pid =>
-  //     expect(
-  //       user  = user,
-  //       query =
-  //         s"""
-  //            query {
-  //              program(programId: "$pid") {
-  //                timeEstimateRange {
-  //                  minimum { total { seconds } }
-  //                  maximum { total { seconds } }
-  //                }
-  //              }
-  //            }
-  //          """,
-  //       expected = Right(
-  //         json"""
-  //           {
-  //             "program": {
-  //               "timeEstimateRange": {
-  //                 "minimum": {
-  //                   "total" : {
-  //                       "seconds" : 0.000000
-  //                   }
-  //                 },
-  //                 "maximum": {
-  //                   "total" : {
-  //                       "seconds" : 0.000000
-  //                   }
-  //                 }
-  //               }
-  //             }
-  //           }
-  //         """
-  //       )
-  //     )
-  //   }
-
-  // }
-
-  test("program level: single complete, but 'Inactive' observation") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
-      } yield p
-
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-
-  }
-
-  test("program level: two complete observations") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-      } yield p
-
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : ${ShortTime * 2}
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : ${ShortTime * 2}
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-  }
-
-  test("program level: two complete observations, but one is inactive") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
-      } yield p
-
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-  }
-
-  test("program level: one incomplete, one complete observation") {
-    val setup: IO[Program.Id] =
-      for {
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- createObservationWithNoModeAs(user, p, t)
-      } yield p
-
-    setup.flatMap { pid =>
-      expect(
-        user  = user,
-        query =
-          s"""
-             query {
-               program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
-                 }
-               }
-             }
-           """,
-        expected = Right(
-          json"""
-            {
-              "program": {
-                 "timeEstimateRange": {
-                  "minimum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  },
-                  "maximum": {
-                    "total" : {
-                        "seconds" : $ShortTime
-                    }
-                  }
-                }
-              }
-            }
-          """
-        )
-      )
-    }
-  }
+  val TenHours: TimeSpan = TimeSpan.fromHours(10.0).get
+  val AllocationB1: AllocationInput = AllocationInput(TimeAccountingCategory.AR, ScienceBand.Band1, TenHours)
+  val AllocationB2: AllocationInput = AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, TenHours)
+  val AllocationB3: AllocationInput = AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band3, TenHours)
 
   private def moveObsToGroup(gid: Group.Id, oids: Observation.Id*): IO[Unit] =
     query(
@@ -387,17 +123,15 @@ class programPlannedTime extends ExecutionTestSupport {
       """
     ).void
 
-  test("program level: one group with one observation") {
+  test("program level range.: single complete observation"):
     val setup: IO[Program.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        g <- createGroupAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- moveObsToGroup(g, o)
-      } yield p
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -417,14 +151,10 @@ class programPlannedTime extends ExecutionTestSupport {
               "program": {
                 "timeEstimateRange": {
                   "minimum": {
-                    "total" : {
-                      "seconds" : $ShortTime
-                    }
+                    "total": { "seconds" : $ShortTime }
                   },
                   "maximum": {
-                    "total" : {
-                      "seconds" : $ShortTime
-                    }
+                    "total": { "seconds" : $ShortTime }
                   }
                 }
               }
@@ -432,20 +162,444 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("group level..: one group with one observation") {
+  test("program level banded: single complete observation, no band"):
     val setup: IO[Program.Id] =
-      for {
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": null,
+                    "time": {
+                      "total": { "seconds" : $ShortTime }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level banded: single complete observation, B2"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(staff, p, List(AllocationB2))
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": "BAND2",
+                    "time": {
+                      "total": { "seconds" : $ShortTime }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: single complete, but 'Inactive' observation"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total": { "seconds" : 0.000000 }
+                  },
+                  "maximum": {
+                    "total": { "seconds" : 0.000000 }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: two complete observations"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total": { "seconds" : ${ShortTime * 2} }
+                  },
+                  "maximum": {
+                    "total": { "seconds" : ${ShortTime * 2} }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+
+  test("program level banded: two complete observations, same band"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB1))
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": "BAND1",
+                    "time": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level banded: two complete observations, different bands"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB1, AllocationB2))
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": "BAND1",
+                    "time": {
+                      "total" : { "seconds" : $ShortTime }
+                    }
+                  },
+                  {
+                    "band": "BAND2",
+                    "time": {
+                      "total" : { "seconds" : $ShortTime }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level banded: two complete observations, one no band"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB1))
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, none)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": null,
+                    "time": {
+                      "total" : { "seconds" : $ShortTime }
+                    }
+                  },
+                  {
+                    "band": "BAND1",
+                    "time": {
+                      "total" : { "seconds" : $ShortTime }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: two complete observations, but one is inactive"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total": { "seconds" : $ShortTime }
+                  },
+                  "maximum": {
+                    "total": { "seconds" : $ShortTime }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: one incomplete, one complete observation"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- createObservationWithNoModeAs(user, p, t)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                 "timeEstimateRange": {
+                  "minimum": {
+                    "total": { "seconds" : $ShortTime }
+                  },
+                  "maximum": {
+                    "total": { "seconds" : $ShortTime }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: one group with one observation"):
+    val setup: IO[Program.Id] =
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g <- createGroupAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(g, o)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateRange {
+                   minimum { total { seconds } }
+                   maximum { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateRange": {
+                  "minimum": {
+                    "total": { "seconds" : $ShortTime }
+                  },
+                  "maximum": {
+                    "total": { "seconds" : $ShortTime }
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+
+  test("group level range...: one group with one observation"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        g <- createGroupAs(user, p)
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- moveObsToGroup(g, o)
+      yield p
+
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -472,14 +626,10 @@ class programPlannedTime extends ExecutionTestSupport {
                     "group": {
                       "timeEstimateRange": {
                         "minimum": {
-                          "total" : {
-                            "seconds" : $ShortTime
-                          }
+                          "total": { "seconds" : $ShortTime }
                         },
                         "maximum": {
-                          "total" : {
-                            "seconds" : $ShortTime
-                          }
+                          "total": { "seconds" : $ShortTime }
                         }
                       }
                     }
@@ -490,21 +640,62 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("program level: a group with observation and a top-level obs") {
+  test("program level banded: one group with one observation"):
     val setup: IO[Program.Id] =
-      for {
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB3))
+        t <- createTargetWithProfileAs(user, p)
+        g <- createGroupAs(user, p)
+        o <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band3.some)
+        _ <- moveObsToGroup(g, o)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": "BAND3",
+                    "time": {
+                      "total" : { "seconds" : $ShortTime }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: a group with observation and a top-level obs"):
+    val setup: IO[Program.Id] =
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         g <- createGroupAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(g, o)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -524,14 +715,10 @@ class programPlannedTime extends ExecutionTestSupport {
               "program": {
                 "timeEstimateRange": {
                   "minimum": {
-                    "total" : {
-                        "seconds" : ${ShortTime * 2}
-                    }
+                    "total": { "seconds" : ${ShortTime * 2} }
                   },
                   "maximum": {
-                    "total" : {
-                        "seconds" : ${ShortTime * 2}
-                    }
+                    "total": { "seconds" : ${ShortTime * 2} }
                   }
                 }
               }
@@ -539,21 +726,63 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("program level: a simple OR group") {
+  test("program level banded: a group with observation and a top-level obs"):
     val setup: IO[Program.Id] =
-      for {
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB1))
+        t <- createTargetWithProfileAs(user, p)
+        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        g <- createGroupAs(user, p)
+        o <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _ <- moveObsToGroup(g, o)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 timeEstimateBanded {
+                   band
+                   time { total { seconds } }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "timeEstimateBanded": [
+                  {
+                    "band": "BAND1",
+                    "time": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test("program level range.: a simple OR group"):
+    val setup: IO[Program.Id] =
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
         oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g, oShort, oLong)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -573,14 +802,10 @@ class programPlannedTime extends ExecutionTestSupport {
               "program": {
                 "timeEstimateRange": {
                   "minimum": {
-                    "total" : {
-                      "seconds" : $ShortTime
-                    }
+                    "total": { "seconds" : $ShortTime }
                   },
                   "maximum": {
-                    "total" : {
-                      "seconds" : $LongTime
-                    }
+                    "total": { "seconds" : $LongTime }
                   }
                 }
               }
@@ -588,21 +813,19 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("group level..: a simple OR group") {
+  test("group level range...: a simple OR group"):
     val setup: IO[Program.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
         oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g, oShort, oLong)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -629,14 +852,10 @@ class programPlannedTime extends ExecutionTestSupport {
                     "group": {
                       "timeEstimateRange": {
                         "minimum": {
-                          "total" : {
-                            "seconds" : $ShortTime
-                          }
+                          "total": { "seconds" : $ShortTime }
                         },
                         "maximum": {
-                          "total" : {
-                            "seconds" : $LongTime
-                          }
+                          "total": { "seconds" : $LongTime }
                         }
                       }
                     }
@@ -647,21 +866,19 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("program level: a group with explicit minRequired, missing required children") {
+  test("program level range.: a group with explicit minRequired, missing required children"):
     val setup: IO[Program.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(user, p)
         g  <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(2).some)
         o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         o2 <- createObservationWithNoModeAs(user, p, t)
         _  <- moveObsToGroup(g, o1, o2)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -681,14 +898,10 @@ class programPlannedTime extends ExecutionTestSupport {
               "program": {
                 "timeEstimateRange": {
                   "minimum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
+                    "total": { "seconds" : 0.000000 }
                   },
                   "maximum": {
-                    "total" : {
-                        "seconds" : 0.000000
-                    }
+                    "total": { "seconds" : 0.000000 }
                   }
                 }
               }
@@ -696,12 +909,10 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("program level: two groups") {
+  test("program level range.: two groups"):
     val setup: IO[Program.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g0 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
@@ -712,9 +923,9 @@ class programPlannedTime extends ExecutionTestSupport {
         oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g1, oShort1, oLong1)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -734,14 +945,10 @@ class programPlannedTime extends ExecutionTestSupport {
               "program": {
                 "timeEstimateRange": {
                   "minimum": {
-                    "total" : {
-                        "seconds" : ${ShortTime * 2}
-                    }
+                    "total": { "seconds" : ${ShortTime * 2} }
                   },
                   "maximum": {
-                    "total" : {
-                        "seconds" : ${LongTime * 2}
-                    }
+                    "total": { "seconds" : ${LongTime * 2} }
                   }
                 }
               }
@@ -749,12 +956,10 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
 
-  test("group level..: two groups") {
+  test("group level range...: two groups"):
     val setup: IO[Program.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
         g0 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
@@ -765,9 +970,9 @@ class programPlannedTime extends ExecutionTestSupport {
         oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g1, oShort1, oLong1)
-      } yield p
+      yield p
 
-    setup.flatMap { pid =>
+    setup.flatMap: pid =>
       expect(
         user  = user,
         query =
@@ -810,14 +1015,10 @@ class programPlannedTime extends ExecutionTestSupport {
                     "group": {
                       "timeEstimateRange": {
                         "minimum": {
-                          "total" : {
-                              "seconds" : $ShortTime
-                          }
+                          "total": { "seconds" : $ShortTime }
                         },
                         "maximum": {
-                          "total" : {
-                              "seconds" : $LongTime
-                          }
+                          "total": { "seconds" : $LongTime }
                         }
                       }
                     }
@@ -828,6 +1029,77 @@ class programPlannedTime extends ExecutionTestSupport {
           """
         )
       )
-    }
-  }
-}
+
+  test("group level banded..: two groups"):
+    val setup: IO[Program.Id] =
+      for
+        p <- createProgram
+        _ <- setAllocationsAs(user, p, List(AllocationB1, AllocationB2))
+        t <- createTargetWithProfileAs(user, p)
+        g0 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        oShort0 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        oLong0  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- moveObsToGroup(g0, oShort0, oLong0)
+        g1 <- createGroupAs(user, p, minRequired = NonNegShort.unsafeFrom(1).some)
+        oShort1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
+        _ <- moveObsToGroup(g1, oShort1, oLong1)
+      yield p
+
+    setup.flatMap: pid =>
+      expect(
+        user  = user,
+        query =
+          s"""
+             query {
+               program(programId: "$pid") {
+                 groupElements {
+                   group {
+                     timeEstimateBanded {
+                       band
+                       time { total { seconds } }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "groupElements": [
+                  {
+                    "group": {
+                      "timeEstimateBanded": [
+                        {
+                          "band": null,
+                          "time": { "total": { "seconds" : $LongTime } }
+                        },
+                        {
+                          "band": "BAND2",
+                          "time": { "total": { "seconds" : $ShortTime } }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "group": {
+                      "timeEstimateBanded": [
+                        {
+                          "band": null,
+                          "time": { "total": { "seconds" : $LongTime } }
+                        },
+                        {
+                          "band": "BAND2",
+                          "time": { "total": { "seconds" : $ShortTime } }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )

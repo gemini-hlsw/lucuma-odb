@@ -158,7 +158,7 @@ object CalibrationsService extends CalibrationObservations {
         requiresItcInputs: Boolean
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), (Observation.Id, Option[ItcInput], ObservingMode)] =
         {
-          case (oid, Right(GeneratorParams(itc, mode, _))) if itc.isRight || !requiresItcInputs => (oid, itc.toOption, mode)
+          case (oid, Right(GeneratorParams(itc, _, mode, _))) if itc.isRight || !requiresItcInputs => (oid, itc.toOption, mode)
         }
 
       // Find all active observations in the program

@@ -6,6 +6,7 @@ package lucuma.odb.sequence.util
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -85,5 +86,10 @@ object HashBytes {
   given [A](using HashBytes[A]): HashBytes[Option[A]] with {
     def hashBytes(opt: Option[A]): Array[Byte] =
       opt.fold(Array.emptyByteArray)(HashBytes[A].hashBytes)
+  }
+
+  given[A](using Enumerated[A]): HashBytes[A] with {
+    def hashBytes(a: A): Array[Byte] =
+      Enumerated[A].tag(a).getBytes(UTF_8)
   }
 }

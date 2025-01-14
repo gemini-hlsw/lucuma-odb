@@ -86,7 +86,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               $ScienceRequirements,
               observingMode: {
                 $mode
-              },
+              }
             }
           }) {
             observation {

@@ -6,6 +6,8 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import cats.implicits.catsKernelOrderingForOrder
+import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query
 import grackle.Query.Binding
@@ -17,6 +19,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model.Group
 import lucuma.core.model.User
+import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
@@ -33,7 +36,7 @@ import lucuma.odb.service.Services
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F] {
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
   def user: User
   def itcClient: ItcClient[F]
@@ -54,7 +57,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       SqlObject("maximumInterval"),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
-      EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
+      EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
+      EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
     )
@@ -74,13 +78,15 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
           )
       }
 
-  private lazy val timeEstimateHandler: EffectHandler[F] =
-    keyValueEffectHandler[Group.Id, Option[CategorizedTimeRange]]("id") { gid =>
-      services.useNonTransactionally {
+  private lazy val estimateRangeHandler: EffectHandler[F] =
+    keyValueEffectHandler[Group.Id, Option[CategorizedTimeRange]]("id"): gid =>
+      services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
-          .estimateGroup(gid)
-      }
-    }
+          .estimateGroupRange(gid)
 
-}
-
+  private lazy val estimateBandedHandler: EffectHandler[F] =
+    keyValueEffectHandler[Group.Id, List[BandedTime]]("id"): gid =>
+      services.useNonTransactionally:
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+          .estimateGroupBanded(gid)
+          .map(_.toList.flatMap(_.toList.sortBy(_._1).map((b, t) => BandedTime(b, t))))
