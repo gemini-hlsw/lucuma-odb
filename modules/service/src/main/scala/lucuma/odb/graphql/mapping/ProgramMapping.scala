@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Predicate
@@ -77,7 +78,8 @@ trait ProgramMapping[F[_]]
       SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
-      EffectField("timeEstimateRange", timeEstimateHandler, List("id")),
+      EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
+      EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
@@ -195,13 +197,18 @@ trait ProgramMapping[F[_]]
 
   }
 
-  private lazy val timeEstimateHandler: EffectHandler[F] =
-    keyValueEffectHandler[Program.Id, Option[CategorizedTimeRange]]("id") { pid =>
-      services.useNonTransactionally {
+  private lazy val estimateRangeHandler: EffectHandler[F] =
+    keyValueEffectHandler[Program.Id, Option[CategorizedTimeRange]]("id"): pid =>
+      services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
           .estimateProgramRange(pid)
-      }
-    }
+
+  private lazy val estimateBandedHandler: EffectHandler[F] =
+    keyValueEffectHandler[Program.Id, List[BandedTime]]("id"): gid =>
+      services.useNonTransactionally:
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+          .estimateProgramBanded(gid)
+          .map(_.toList.flatMap(_.toList.sortBy(_._1).map((b, t) => BandedTime(b, t))))
 
   private val timeChargeHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, List[BandedTime]]("id") { pid =>
