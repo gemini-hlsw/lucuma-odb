@@ -58,10 +58,18 @@ sealed trait TimeEstimateService[F[_]]:
     groupId: Group.Id
   )(using NoTransaction[F]): F[Option[CategorizedTimeRange]]
 
+  /**
+   * Estimates the remaining time for all observations in the program by band,
+   * ignoring `minRequired` in groups.
+   */
   def estimateProgramBanded(
     programId: Program.Id
   )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]]
 
+  /**
+   * Estimates the remaining time for all observations in the group by band,
+   * ignoring `minRequired`.
+   */
   def estimateGroupBanded(
     groupId: Group.Id
   )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]]
@@ -214,7 +222,7 @@ object TimeEstimateService:
           case GroupTree.Branch(_, _, _, children, _, _, _, _, _) => parent(children)
           case GroupTree.Root(_, children)                        => parent(children)
 
-      def estimateProgramBanded(
+      override def estimateProgramBanded(
         pid: Program.Id
       )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]] =
         load(pid).flatMap:
