@@ -70,6 +70,5 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
   val f2: Pipe[F, Byte, (F2SpectroscopyRow, PosInt)] =
     read(Instrument.Flamingos2, F2SpectroscopyRow.f2)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
-      .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
 
 }
