@@ -16,8 +16,8 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
 
   test("select configuration for fully-configured observation") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
-      createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
           createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
             expect(

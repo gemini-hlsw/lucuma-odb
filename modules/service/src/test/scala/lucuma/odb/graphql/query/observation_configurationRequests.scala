@@ -97,8 +97,8 @@ class observation_configurationRequests
   private def setup: IO[Observation.Id] =
     for
       cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(pi)
-      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(pi, pid)
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield oid
