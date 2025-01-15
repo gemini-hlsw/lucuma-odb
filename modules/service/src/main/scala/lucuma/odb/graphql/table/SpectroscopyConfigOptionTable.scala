@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.F2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.codec.boolean.bool
 
@@ -36,7 +37,7 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Site               = col("c_site",       site)
   }
 
-  object SpectrsocopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
+  object SpectroscopyConfigOptionGmosNorthTable extends TableDef("t_spectroscopy_config_option_gmos_north") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
@@ -45,13 +46,22 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Filter     = col("c_filter",  gmos_north_filter.opt)
   }
 
-  object SpectrsocopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
+  object SpectroscopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
     val Fpu        = col("c_fpu",     gmos_south_fpu)
     val Grating    = col("c_grating", gmos_south_grating)
     val Filter     = col("c_filter",  gmos_south_filter.opt)
+  }
+
+  object SpectroscopyConfigOptionF2Table extends TableDef("t_spectroscopy_config_option_f2") {
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Fpu        = col("c_fpu",       f2_fpu)
+    val Disperser  = col("c_disperser", f2_disperser)
+    val Filter     = col("c_filter",    f2_filter)
   }
 
 }

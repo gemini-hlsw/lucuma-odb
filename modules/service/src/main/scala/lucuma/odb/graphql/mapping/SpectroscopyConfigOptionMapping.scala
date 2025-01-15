@@ -34,13 +34,18 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("site",           SpectroscopyConfigOptionTable.Site),
 
       SqlObject("gmosNorth", Join(List(
-        SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosNorthTable.Instrument,
-        SpectroscopyConfigOptionTable.Index      -> SpectrsocopyConfigOptionGmosNorthTable.Index
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGmosNorthTable.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGmosNorthTable.Index
       ))),
 
       SqlObject("gmosSouth", Join(List(
-        SpectroscopyConfigOptionTable.Instrument -> SpectrsocopyConfigOptionGmosSouthTable.Instrument,
-        SpectroscopyConfigOptionTable.Index      -> SpectrsocopyConfigOptionGmosSouthTable.Index
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGmosSouthTable.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGmosSouthTable.Index
+      ))),
+
+      SqlObject("flamingos2", Join(List(
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionF2Table.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionF2Table.Index
       )))
 
     )
@@ -48,25 +53,36 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
   lazy val SpectroscopyConfigOptionGmosNorthMapping: ObjectMapping =
     ObjectMapping(SpectroscopyConfigOptionGmosNorthType)(
 
-      SqlField("instrument", SpectrsocopyConfigOptionGmosNorthTable.Instrument, key = true, hidden = true),
-      SqlField("index",      SpectrsocopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
+      SqlField("instrument", SpectroscopyConfigOptionGmosNorthTable.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectrsocopyConfigOptionGmosNorthTable.Fpu),
-      SqlField("grating",    SpectrsocopyConfigOptionGmosNorthTable.Grating),
-      SqlField("filter",     SpectrsocopyConfigOptionGmosNorthTable.Filter)
+      SqlField("fpu",        SpectroscopyConfigOptionGmosNorthTable.Fpu),
+      SqlField("grating",    SpectroscopyConfigOptionGmosNorthTable.Grating),
+      SqlField("filter",     SpectroscopyConfigOptionGmosNorthTable.Filter)
 
     )
 
   lazy val SpectroscopyConfigOptionGmosSouthMapping: ObjectMapping =
     ObjectMapping(SpectroscopyConfigOptionGmosSouthType)(
 
-      SqlField("instrument", SpectrsocopyConfigOptionGmosSouthTable.Instrument, key = true, hidden = true),
-      SqlField("index",      SpectrsocopyConfigOptionGmosSouthTable.Index, key = true, hidden = true),
+      SqlField("instrument", SpectroscopyConfigOptionGmosSouthTable.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionGmosSouthTable.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectrsocopyConfigOptionGmosSouthTable.Fpu),
-      SqlField("grating",    SpectrsocopyConfigOptionGmosSouthTable.Grating),
-      SqlField("filter",     SpectrsocopyConfigOptionGmosSouthTable.Filter)
+      SqlField("fpu",        SpectroscopyConfigOptionGmosSouthTable.Fpu),
+      SqlField("grating",    SpectroscopyConfigOptionGmosSouthTable.Grating),
+      SqlField("filter",     SpectroscopyConfigOptionGmosSouthTable.Filter)
 
     )
 
+  lazy val SpectroscopyConfigOptionF2Mapping: ObjectMapping =
+    ObjectMapping(SpectroscopyConfigOptionF2Type)(
+
+      SqlField("instrument", SpectroscopyConfigOptionF2Table.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionF2Table.Index, key = true, hidden = true),
+
+      SqlField("fpu",        SpectroscopyConfigOptionF2Table.Fpu),
+      SqlField("disperser",  SpectroscopyConfigOptionF2Table.Disperser),
+      SqlField("filter",     SpectroscopyConfigOptionF2Table.Filter)
+
+    )
 }

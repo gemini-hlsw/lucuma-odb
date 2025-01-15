@@ -262,10 +262,10 @@ object OdbMapping {
           override val user: User = user0
           override val topics: Topics[F] = topics0
 
-          override val services: Resource[F, Services[F]] = 
+          override val services: Resource[F, Services[F]] =
             pool.map: session =>
               Services.forUser(
-                user, 
+                user,
                 enums,
                 Option.when(allowSub)(apply(
                   Resource.pure(session), // Always use this session
@@ -277,7 +277,7 @@ object OdbMapping {
                   enums,
                   tec,
                   httpClient0,
-                  emailConfig0,            
+                  emailConfig0,
                   false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                   Some(schema),           // don't re-parse the schema
                 ))
@@ -400,6 +400,7 @@ object OdbMapping {
                 ScienceRequirementsMapping,
                 SequenceEventMapping,
                 SpectroscopyConfigOptionMapping,
+                SpectroscopyConfigOptionF2Mapping,
                 SpectroscopyConfigOptionGmosNorthMapping,
                 SpectroscopyConfigOptionGmosSouthMapping,
                 SpectroscopyScienceRequirementsMapping,

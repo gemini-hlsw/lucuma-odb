@@ -12,9 +12,11 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Instrument
+import lucuma.odb.phase0.F2SpectroscopyRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.F2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
@@ -150,6 +152,33 @@ object Phase0Table {
 
     override def encoder: Encoder[GmosSpectroscopyRow.GmosSouth] =
       enc(gmos_south_grating, gmos_south_filter, gmos_south_fpu)
+  }
+
+  val SpectroscopyF2 = new Phase0Table[F2SpectroscopyRow] {
+
+    override def name: String =
+      s"${Spectroscopy.name}_f2"
+
+    override def encoder: Encoder[F2SpectroscopyRow] =
+      (
+        instrument   *:
+        f2_disperser *:
+        f2_filter    *:
+        f2_fpu
+      ).contramap[F2SpectroscopyRow] { row => (
+        row.spec.instrument,
+        row.disperser,
+        row.filter,
+        row.fpu
+      )}
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_disperser",
+        "c_filter",
+        "c_fpu"
+      )
   }
 
 }
