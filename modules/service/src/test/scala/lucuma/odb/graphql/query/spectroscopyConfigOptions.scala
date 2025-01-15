@@ -18,11 +18,20 @@ import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import skunk.Session
+import skunk.syntax.all.*
 
 class spectroscopyConfigOptions extends OdbSuite {
 
   val pi = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
+
+
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
+    // Add a F2 option
+    (s.execute(sql"insert into t_spectroscopy_config_option values('Flamingos2', 1, 'R3K + H + 0.36\"', 'single_slit', 'Long Slit 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')".command) *>
+      s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit8', 'R3000', 'H')".command)).void
+  }
 
   case class ConfigOption(
     name:               String,
@@ -519,6 +528,42 @@ class spectroscopyConfigOptions extends OdbSuite {
               "gmosSouth": {
                 "fpu": "LONG_SLIT_1_50",
                 "grating": "R150_G5326"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("Flamingos2") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              instrument: { EQ: FLAMINGOS2 }
+            }
+          ) {
+            name
+            flamingos2 {
+              fpu
+              disperser
+              filter
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R3K + H + 0.36\\\"",
+              "flamingos2": {
+                "fpu": "LONG_SLIT8",
+                "disperser": "R3000",
+                "filter": "H"
               }
             }
           ]
