@@ -332,8 +332,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
@@ -667,8 +667,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- computeItcResult(oid)
@@ -692,8 +692,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -720,8 +720,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -749,8 +749,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -778,8 +778,8 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -830,8 +830,8 @@ class observation_workflow
     val oid1: IO[Observation.Id]  =
       for {
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        pid <- createProgramAs(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")

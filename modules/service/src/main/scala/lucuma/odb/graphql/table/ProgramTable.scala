@@ -15,6 +15,7 @@ trait ProgramTable[F[_]] extends BaseMapping[F]:
     val Id              = col("c_program_id", program_id)
     val Existence       = col("c_existence", existence)
     val Name            = col("c_name", text_nonempty.opt)
+    val Description     = col("c_description", text_nonempty.opt)
     val ProposalStatus  = col("c_proposal_status", tag)
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
 

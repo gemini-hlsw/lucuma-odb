@@ -252,7 +252,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
               value {
                 name
                 proposal {
-                  title
+                  category
                 }
               }
             }
@@ -262,7 +262,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            addProposal(pi, pid, title = "initial") >>
+            addProposal(pi, pid) >>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
             query(
               pi,
@@ -270,10 +270,10 @@ class programEdit extends OdbSuite with SubscriptionUtils {
               mutation {
                 updateProposal(input: {
                   programId: "$pid"
-                  SET: { title: "updated" }
+                  SET: { category: COSMOLOGY }
                 }) {
                   proposal {
-                    title
+                    category
                   }
                 }
               }
@@ -285,8 +285,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": null } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "title": "initial" } } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "title": "updated" } } } }"""
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "category": "GALACTIC_OTHER" } } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "category": "COSMOLOGY" } } } }"""
         )
     )
   }
@@ -347,7 +347,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                   }
                 }) {
                   proposal {
-                    title
+                    category
                   }
                 }
               }

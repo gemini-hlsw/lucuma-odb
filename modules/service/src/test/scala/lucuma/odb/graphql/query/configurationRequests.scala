@@ -56,8 +56,8 @@ class configurationRequests
   private def setupAs(user: User): IO[ConfigurationRequest.Id] =
     for
       cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(user)
-      _     <- addProposal(user, pid, Some(cfpid), None, "Foo")
+      pid   <- createProgramAs(user, "Foo")
+      _     <- addProposal(user, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(user, pid)
       oid   <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
       rid   <- createConfigurationRequestAs(user, oid)

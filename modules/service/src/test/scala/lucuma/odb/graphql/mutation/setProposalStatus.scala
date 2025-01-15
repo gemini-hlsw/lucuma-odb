@@ -358,7 +358,7 @@ class setProposalStatus extends OdbSuite
               }
             }
           ) {
-            proposal { title }
+            proposal { category }
           }
         }
       """

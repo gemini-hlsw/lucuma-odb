@@ -111,8 +111,8 @@ class setObservationWorkflowState
   test("Unapproved <-> Inactive") {
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi)
-      _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+      pid <- createProgramAs(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -127,8 +127,8 @@ class setObservationWorkflowState
   test("Defined    <-> Inactive        (proposal not yet accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi)
-      _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+      pid <- createProgramAs(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
@@ -141,8 +141,8 @@ class setObservationWorkflowState
   test("Defined    <-> Inactive, Ready (proposal accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi)
-      _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+      pid <- createProgramAs(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")

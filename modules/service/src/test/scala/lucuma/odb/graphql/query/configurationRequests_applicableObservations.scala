@@ -95,8 +95,8 @@ class configurationRequests_applicableObservations
   test("applicable requests"):
     for
       cfpid <- createCallForProposalsAs(admin)
-      pid   <- createProgramAs(pi)
-      _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(pi, pid)
       oid1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid)) // oid1 and oid2 are identical
       oid2  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))

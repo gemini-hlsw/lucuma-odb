@@ -87,6 +87,39 @@ class createProgram extends OdbSuite {
     )
   }
 
+  test("'description' may be set") {
+    expect(
+      user = pi,
+      query =
+        s"""
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  description: "my abstract"
+                }
+              }
+            ) {
+              program {
+                description
+              }
+            }
+          }
+        """,
+      expected = Right(
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "description": "my abstract"
+              }
+            }
+          }
+        """
+      )
+    )
+  }
+
   test("GOA properties default") {
     expect(
       user = pi,
