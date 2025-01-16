@@ -328,7 +328,13 @@ object ObservationWorkflowService {
 
           def userStatus(validationStatus: ValidationState): Option[UserState] =
             if info.role.isDefined then Some(Ready) // Calibrations are immediately ready
-            else info.userState
+            else info.userState.flatMap:
+              case Inactive => Some(Inactive)       // Inactive overrides validation errors
+              case Ready    =>
+                validationStatus match              // Validation errors override Ready
+                  case Undefined  => None
+                  case Unapproved => None
+                  case Defined    => Some(Ready)
 
           // Our final state is the execution state (if any), else the user state (if any), else the validation state,
           // with the one exception that user state Inactive overrides execution state Ongoing
