@@ -13,6 +13,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
@@ -843,6 +844,77 @@ class observation_workflow
         ).asRight
       )
 
+    }
+
+  }
+
+
+  test("observation should move back to Unapproved if better conditions are requested") {
+
+    def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
+      updateObservation(user, oid, 
+        update = s"""
+          constraintSet: {
+            cloudExtinction: ${cloudExtinction.tag.toUpperCase()}
+          }
+        """,
+        query = """
+          observations {
+            id
+          }
+        """,
+        expected = Right(json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "id": $oid
+                }
+              ]
+            }
+          }
+        """)
+      )
+
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResult(oid)
+      } yield oid
+
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),  // intially approved
+            Nil
+          )
+        ).asRight
+      ) >>
+      updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
+      computeItcResult(oid) >> // recompute ITC
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Unapproved,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configurationRequestNotRequested)
+          )
+        ).asRight
+      )
     }
 
   }
