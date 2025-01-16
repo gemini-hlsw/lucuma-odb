@@ -303,6 +303,31 @@ class observation_workflow
       s.prepareR(sql"update t_configuration_request set c_status = 'denied' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
         ps.execute(req).void
 
+  def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
+    updateObservation(user, oid, 
+      update = s"""
+        constraintSet: {
+          cloudExtinction: ${cloudExtinction.tag.toUpperCase()}
+        }
+      """,
+      query = """
+        observations {
+          id
+        }
+      """,
+      expected = Right(json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "id": $oid
+              }
+            ]
+          }
+        }
+      """)
+    )
+
   test("no validations") {
     val setup: IO[Observation.Id] =
       for {
@@ -851,31 +876,6 @@ class observation_workflow
 
   test("observation should move back to Unapproved if better conditions are requested") {
 
-    def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
-      updateObservation(user, oid, 
-        update = s"""
-          constraintSet: {
-            cloudExtinction: ${cloudExtinction.tag.toUpperCase()}
-          }
-        """,
-        query = """
-          observations {
-            id
-          }
-        """,
-        expected = Right(json"""
-          {
-            "updateObservations": {
-              "observations": [
-                {
-                  "id": $oid
-                }
-              ]
-            }
-          }
-        """)
-      )
-
     val setup: IO[Observation.Id] =
       for {
         cfp <- createCallForProposalsAs(staff)
@@ -898,6 +898,52 @@ class observation_workflow
           ObservationWorkflow(          
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),  // intially approved
+            Nil
+          )
+        ).asRight
+      ) >>
+      updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
+      computeItcResult(oid) >> // recompute ITC
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Unapproved,
+            List(ObservationWorkflowState.Inactive),
+            List(ObservationValidation.configurationRequestNotRequested)
+          )
+        ).asRight
+      )
+    }
+
+  }
+
+  test("sc-4269 observation should move back to Unapproved from Ready if better conditions are requested") {
+
+    val setup: IO[Observation.Id] =
+      for {
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramAs(pi)
+        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addPartnerSplits(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResult(oid)
+        _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)
+      } yield oid
+
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Ready,
+            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Defined),  // intially approved
             Nil
           )
         ).asRight
