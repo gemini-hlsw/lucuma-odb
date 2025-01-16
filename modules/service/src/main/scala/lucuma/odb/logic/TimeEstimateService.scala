@@ -81,8 +81,8 @@ object TimeEstimateService:
     asterismResults: Option[AsterismResults],
     executionDigest: Option[ExecutionDigest]
   ):
-    def cachedFullTimeEstimate: Option[CategorizedTime] =
-      executionDigest.map(_.fullTimeEstimate)
+    def cachedFullTimeEstimate: Option[BandedTime] =
+      executionDigest.map(dig => BandedTime(generatorParams.scienceBand, dig.fullTimeEstimate))
 
   private object ObservationData:
     def load[F[_]: Concurrent](
@@ -116,7 +116,7 @@ object TimeEstimateService:
         OptionT.fromOption(m.get(oid)).flatMap: data =>
           OptionT
             .fromOption(data.cachedFullTimeEstimate)  // try the cache first
-            .orElse
+            .orElse:
               // ExecutionDigest not in the cache, we'll need to calculate it.
               // For that we need the ITC results, which may be cached.  Use the
               // cached ITC AsterismResults if available, else call remote ITC.
