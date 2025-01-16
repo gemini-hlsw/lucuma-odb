@@ -7,15 +7,25 @@ package subscription
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ExecutionTestSupport
 
 class observationEditOnCachedResultUpdate extends ExecutionTestSupport with SubscriptionUtils:
 
-  def updateSubscription(oid: Observation.Id): String =
+  def observationUpdateSubscription(oid: Observation.Id): String =
     s"""
       subscription {
         observationEdit(input: { observationId: "$oid" }) {
+          editType
+        }
+      }
+    """
+
+  def programUpdateSubscription(pid: Program.Id): String =
+    s"""
+      subscription {
+        observationEdit(input: { programId: "$pid" }) {
           editType
         }
       }
@@ -76,7 +86,7 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupport with Subs
 
       _   <- subscriptionExpect(
         user      = pi,
-        query     = updateSubscription(oid),
+        query     = observationUpdateSubscription(oid),
         mutations = Right(requestItcResult(pi, oid)),
         expected  = List(updateResponse)
       )
@@ -90,8 +100,42 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupport with Subs
 
       _   <- subscriptionExpect(
         user      = pi,
-        query     = updateSubscription(oid),
+        query     = observationUpdateSubscription(oid),
         mutations = Right(requestSequenceDigest(pi, oid)),
         expected  = List(updateResponse, updateResponse)  // caches ITC and then sequence digest
+      )
+    yield ()
+
+  test("doesn't trigger when querying after cached"):
+    def timeQuery(pid: Program.Id) =
+     sleep >>
+       query(
+         user  = pi,
+         query = s"""
+           query {
+             program(programId: "$pid") {
+               timeEstimateRange {
+                 minimum { program { microseconds } }
+               }
+             }
+           }
+         """
+       )
+
+    for
+      pid <- createProgram(pi, "foo")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = programUpdateSubscription(pid),
+        mutations = Right(timeQuery(pid)),
+        expected  = List(updateResponse, updateResponse)
+      )
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = programUpdateSubscription(pid),
+        mutations = Right(timeQuery(pid)),
+        expected  = List()
       )
     yield ()
