@@ -11,7 +11,6 @@ import cats.effect.std.UUIDGen
 import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
-import clue.ErrorPolicy
 import clue.FetchClient
 import clue.GraphQLOperation
 import clue.ResponseException
@@ -105,8 +104,6 @@ object OdbSuite:
  * among all tests.
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with TestSsoClient with ChronicleOperations {
-  private implicit val DefaultErrorPolicy: ErrorPolicy.RaiseAlways.type = ErrorPolicy.RaiseAlways
-
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   /** Ensure that exactly the specified errors are reported, in order. */
@@ -528,7 +525,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       .use { conn =>
 //        println(s"[$query]")
         val req = conn.request(Operation(query))
-        val op  = variables.fold(req.apply)(req.withInput)
+        val op  = variables.fold(req.apply)(req.withInput).raiseGraphQLErrors
         op.onError:
           case ResponseException(es, _) =>
             es.traverse_ : e =>
@@ -547,7 +544,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Resource.eval(IO(serverFixture()))
       .flatMap(client.connection(user))
       .use { conn =>
-        val req = conn.request(Operation(query))(ErrorPolicy.ReturnAlways)
+        val req = conn.request(Operation(query))
         val op  = variables.fold(req.apply)(req.withInput)
         op.map(_.result)
       }
@@ -558,25 +555,28 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         .flatMap(streamingClient(user))
         .use { conn =>
           val req = conn.subscribe(Operation(query))
-          variables.fold(req.apply)(req.withInput).allocated.flatMap { case (sub, cleanup) =>
-            for {
-              _   <- log.info("*** ----- about to start stream fiber")
-              fib <- sup.supervise(sub.compile.toList)
-              _   <- log.info("*** ----- pausing a bit")
-              _   <- IO.sleep(1.second)
-              _   <- log.info("*** ----- running mutations")
-              _   <- mutations.fold(_.traverse_ { case (query, vars) =>
-                val req = conn.request(Operation(query))
-                vars.fold(req.apply)(req.withInput)
-              }, identity)
-              _   <- log.info("*** ----- pausing a bit")
-              _   <- IO.sleep(1.second)
-              _   <- log.info("*** ----- stopping subscription")
-              _   <- cleanup
-              _   <- log.info("*** ----- joining fiber")
-              obt <- fib.joinWithNever
-            } yield obt
-          }
+          variables.fold(req.apply)(req.withInput)
+            .logGraphQLErrors(_ => "****** Error in GraphQL Subscription")
+            .allocated
+            .flatMap { case (sub, cleanup) =>
+              for {
+                _   <- log.info("*** ----- about to start stream fiber")
+                fib <- sup.supervise(sub.compile.toList)
+                _   <- log.info("*** ----- pausing a bit")
+                _   <- IO.sleep(1.second)
+                _   <- log.info("*** ----- running mutations")
+                _   <- mutations.fold(_.traverse_ { case (query, vars) =>
+                  val req = conn.request(Operation(query))
+                  vars.fold(req.apply)(req.withInput)
+                }, identity)
+                _   <- log.info("*** ----- pausing a bit")
+                _   <- IO.sleep(1.second)
+                _   <- log.info("*** ----- stopping subscription")
+                _   <- cleanup
+                _   <- log.info("*** ----- joining fiber")
+                obt <- fib.joinWithNever
+              } yield obt
+            }
         }
     }
 
