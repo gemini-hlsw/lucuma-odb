@@ -658,7 +658,7 @@ object Science:
           val blocksʹ     = blocks.updatedUnsafe(pos, block.add(n))
           ((blocksʹ, aix + 1, csʹ), atom)
         }
-        .cons1((blocks, 0, 0), atom0) // put the first atom back
+        .cons1((blocks, 0, TimeEstimateCalculator.Last.empty), atom0) // put the first atom back
         .takeThrough { case ((bs, _, _), _) => bs.foldMap(_.completed.value) < time.exposureCount.value }
         .collect { case (_, Some(atom)) => atom }
     end generate
