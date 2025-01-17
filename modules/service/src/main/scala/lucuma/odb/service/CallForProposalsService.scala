@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -71,7 +70,7 @@ object CallForProposalsService {
         s"The Call for Proposals $cid is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".some
       )
 
-  def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): CallForProposalsService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): CallForProposalsService[F] =
     new CallForProposalsService[F] {
 
       override def selectProperties(

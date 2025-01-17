@@ -7,7 +7,6 @@ package input
 
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
