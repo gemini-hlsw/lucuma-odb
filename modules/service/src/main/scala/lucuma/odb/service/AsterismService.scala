@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.effect.MonadCancelThrow
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
@@ -97,7 +96,7 @@ trait AsterismService[F[_]] {
 
 object AsterismService {
 
-  def instantiate[F[_]: MonadCancelThrow: Concurrent](using Services[F]): AsterismService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): AsterismService[F] =
 
     new AsterismService[F] {
 

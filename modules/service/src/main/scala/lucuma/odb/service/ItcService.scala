@@ -11,7 +11,6 @@ import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.effect.Concurrent
 import cats.effect.Resource
-import cats.effect.Temporal
 import cats.effect.syntax.spawn.*
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -206,7 +205,7 @@ object ItcService {
       }
   }
 
-  def pollVersionsForever[F[_]: Async: Temporal: Logger](
+  def pollVersionsForever[F[_]: Async: Logger](
     client:     Resource[F, ItcClient[F]],
     session:    Resource[F, Session[F]],
     pollPeriod: FiniteDuration
