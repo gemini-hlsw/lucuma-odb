@@ -554,7 +554,11 @@ object ProgramUserService:
           sql"WHERE #$alias.c_program_user_id IN ("(Void) |+| which |+| void")"
 
         (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
-          up |+| void" AND " |+| exists
+          up |+| void" AND (" |+|
+            sql"#$alias.c_user_id = $user_id"(user.id) |+|   // updating our own user
+            void" OR " |+|
+            exists |+|                                       // user otherwise has access
+          void")"
         }) |+| sql" RETURNING #$alias.c_program_user_id"(Void)
 
     end updateProgramUsers
