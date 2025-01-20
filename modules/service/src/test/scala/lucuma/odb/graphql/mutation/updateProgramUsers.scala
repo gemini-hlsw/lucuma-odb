@@ -22,7 +22,7 @@ import lucuma.core.model.UserProfile
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 
-class updateProgramUsers extends OdbSuite {
+class updateProgramUsers extends OdbSuite:
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
@@ -455,7 +455,7 @@ class updateProgramUsers extends OdbSuite {
         expected = expected().asRight
       )
 
-  test("cannot update another pi's partner"):
+  test("Read-only COI cannot update pi's partner, but can update its own"):
     createProgramAs(piLeon).flatMap: pid =>
       addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(piLeon, mid, piCharles.id) >>
@@ -484,13 +484,19 @@ class updateProgramUsers extends OdbSuite {
           expected = json"""
             {
               "updateProgramUsers": {
-                "programUsers": []
+                "programUsers": [
+                  {
+                    "user": {
+                      "id": ${piCharles.id.asJson}
+                    }
+                  }
+                ]
               }
             }
           """.asRight
         )
 
-  test("cannot update another pi's educational status"):
+  test("Read-only COI cannot update pi's educational status, but can update its own"):
     createProgramAs(piLeon).flatMap: pid =>
       addProgramUserAs(piLeon, pid, ProgramUserRole.CoiRO, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(piLeon, mid, piCharles.id) >>
@@ -519,10 +525,25 @@ class updateProgramUsers extends OdbSuite {
           expected = json"""
             {
               "updateProgramUsers": {
-                "programUsers": []
+                "programUsers": [
+                  {
+                    "user": {
+                      "id": ${piCharles.id.asJson}
+                    }
+                  }
+                ]
               }
             }
           """.asRight
         )
 
-}
+  test("Read-only COI can update its own profile"):
+    createProgramAs(pi2) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
+        expect(
+          user     = pi2,
+          query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
+          expected = expectedFallbackEmail((pid, pi2, GavriloPrincip.email)).asRight
+        )
