@@ -12,12 +12,12 @@ import fs2.Stream
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
+import lucuma.core.model.sequence.f2.F2DynamicConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Focus
 import monocle.Lens
 import monocle.Optional
-import lucuma.core.model.sequence.f2.F2DynamicConfig
 
 object Flamingos2:
 
