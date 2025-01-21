@@ -21,43 +21,27 @@ import lucuma.core.model.sequence.f2.F2DynamicConfig
 
 object Flamingos2:
 
-  case class SearchKey(
+  case class TableKey(
     disperser: Option[F2Disperser],
     filter:    F2Filter,
     fpu:       Option[F2Fpu]
-  ) {
+  )
 
-    def format: String = {
-      val g = s"disperser: ${disperser.map(_.toString).getOrElse("None")}"
-      val f = s"filter: $filter"
-      val u = s"fpu: ${fpu.map(_.toString).getOrElse("None")}"
-      s"Flamingos2 { $g, $f, $u }"
-    }
-
-  }
-
-  object SearchKey:
-    def fromDynamicConfig(f2: F2DynamicConfig): SearchKey =
-      SearchKey(
+  object TableKey:
+    def fromDynamicConfig(f2: F2DynamicConfig): TableKey =
+      TableKey(
         f2.disperser,
         f2.filter,
         f2.fpu.builtin.map(_.value)
       )
 
-  case class TableKey(
-    disperser: Option[F2Disperser],
-    filter:    F2Filter,
-    fpu:       F2Fpu
-  )
-
-  object TableKey:
     def disperser: Lens[TableKey, Option[F2Disperser]] =
       Focus[TableKey](_.disperser)
 
     def filter: Lens[TableKey, F2Filter] =
       Focus[TableKey](_.filter)
 
-    def fpu: Lens[TableKey, F2Fpu] =
+    def fpu: Lens[TableKey, Option[F2Fpu]] =
       Focus[TableKey](_.fpu)
 
   case class TableRow(
@@ -103,7 +87,7 @@ object Flamingos2:
         c <- d.fold(NonEmptyList.one(none)) { g => NonEmptyList.one(g.some) }
         f <- filters
         u <- fpus
-      } yield TableKey(c, f, u)
+      } yield TableKey(c, f, u.some)
 
   }
 
