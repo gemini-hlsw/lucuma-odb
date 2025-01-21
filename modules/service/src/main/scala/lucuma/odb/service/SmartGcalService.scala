@@ -32,7 +32,7 @@ import lucuma.core.model.sequence.f2.F2DynamicConfig as Flamingos2
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.TimeSpan
-import lucuma.odb.smartgcal.data.Flamingos2.SearchKey as Flamingos2SearchKey
+import lucuma.odb.smartgcal.data.Flamingos2.TableKey as Flamingos2SearchKey
 import lucuma.odb.smartgcal.data.Flamingos2.TableRow as Flamingos2TableRow
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
@@ -464,7 +464,7 @@ object SmartGcalService {
       PosLong            ,
       Option[F2Disperser],
       F2Filter           ,
-      F2Fpu              ,
+      Option[F2Fpu]      ,
       TimeSpan
     )] =
       sql"""
@@ -482,7 +482,7 @@ object SmartGcalService {
           $int8_pos,
           ${f2_disperser.opt},
           $f2_filter,
-          $f2_fpu,
+          ${f2_fpu.opt},
           $time_span
       """
 

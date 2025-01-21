@@ -12,7 +12,7 @@ CREATE TABLE t_smart_f2 (
   PRIMARY KEY (c_instrument, c_gcal_id),
 
   FOREIGN KEY (c_instrument, c_gcal_id) REFERENCES t_gcal(c_instrument, c_gcal_id),
-  CONSTRAINT check_is_gmos_south CHECK (c_instrument = 'Flamingos2'),
+  CONSTRAINT check_is_f2 CHECK (c_instrument = 'Flamingos2'),
 
   -- Flamingos 2 Search Key.  We find smart gcal rows via lookups on the full
   -- search key.  An index of the first three columns is created after the

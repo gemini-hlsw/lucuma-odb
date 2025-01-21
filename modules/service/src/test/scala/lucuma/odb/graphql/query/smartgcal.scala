@@ -161,7 +161,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             Flamingos2.TableKey(
               F2Disperser.R3000.some,
               F2Filter.JH,
-              F2Fpu.LongSlit8
+              F2Fpu.LongSlit8.some
             ),
             s
           )
