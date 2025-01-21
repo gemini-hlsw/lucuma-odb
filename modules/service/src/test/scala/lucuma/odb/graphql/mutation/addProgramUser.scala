@@ -286,7 +286,7 @@ class addProgramUser extends OdbSuite:
           _   <- addProgramUserAs(u, pid, role, partnerLinkFor(role))
         yield ()
 
-  test(s"Nobody can add nother PI."):
+  test(s"Nobody can add another PI."):
     interceptOdbError {
       for
         _   <- createUsers(pi1, admin)

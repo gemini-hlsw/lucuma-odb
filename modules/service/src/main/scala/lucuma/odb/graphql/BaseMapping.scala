@@ -49,6 +49,7 @@ trait BaseMapping[F[_]]
   lazy val CategorizedTimeType                     = schema.ref("CategorizedTime")
   lazy val CatalogInfoType                         = schema.ref("CatalogInfo")
   lazy val CatalogNameType                         = schema.ref("CatalogName")
+  lazy val ChangeProgramUserRoleResultType         = schema.ref("ChangeProgramUserRoleResult")
   lazy val ChargeClassType                         = schema.ref("ChargeClass")
   lazy val ChronicleIdType                         = schema.ref("ChronicleId")
   lazy val ClassicalType                           = schema.ref("Classical")

@@ -95,6 +95,7 @@ object OdbMapping {
           with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
+          with AddProgramUserResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddSlewEventResultMapping[F]
           with AddStepEventResultMapping[F]
@@ -110,6 +111,7 @@ object OdbMapping {
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
+          with ChangeProgramUserRoleResultMapping[F]
           with CloneGroupResultMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -132,7 +134,6 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
-          with AddProgramUserResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -294,6 +295,7 @@ object OdbMapping {
                 AddAtomEventResultMapping,
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
+                AddProgramUserResultMapping,
                 AddSequenceEventResultMapping,
                 AddSlewEventResultMapping,
                 AddStepEventResultMapping,
@@ -310,6 +312,7 @@ object OdbMapping {
                 CallForProposalsPartnerMapping,
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
+                ChangeProgramUserRoleResultMapping,
                 ClassicalMapping,
                 CloneGroupResultMapping,
                 CloneObservationResultMapping,
@@ -328,7 +331,6 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
-                AddProgramUserResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,

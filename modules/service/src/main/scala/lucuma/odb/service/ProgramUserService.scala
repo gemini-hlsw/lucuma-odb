@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -32,6 +33,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.AddProgramUserInput
+import lucuma.odb.graphql.input.ChangeProgramUserRoleInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.util.Codecs.educational_status
@@ -67,6 +69,10 @@ trait ProgramUserService[F[_]]:
   def deleteProgramUser(
     id: ProgramUser.Id
   )(using Transaction[F]): F[Result[Boolean]]
+
+  def changeProgramUserRole(
+    input: ChangeProgramUserRoleInput
+  )(using Transaction[F]): F[Result[ProgramUser.Id]]
 
   /**
    * Updates program user properties such as fallback profile, thesis and
@@ -160,6 +166,25 @@ object ProgramUserService:
           set = ProgramUserPropertiesInput.partnerLink.replace(link.some)(set0)
           _  <- ResultT(updateProperties(set, sql"$program_user_id"(id)))
         yield id).value
+
+      override def changeProgramUserRole(
+        input: ChangeProgramUserRoleInput
+      )(using Transaction[F]): F[Result[ProgramUser.Id]] =
+        session
+          .prepare(Statements.SelectLinkData)
+          .flatMap(_.option(input.programUserId))
+          .flatMap:
+            case None                     =>
+              OdbError.InvalidProgramUser(input.programUserId, s"ProgramUser ${input.programUserId} was not found.".some).asFailureF
+            case Some((pid, prevRole, _)) =>
+              Statements
+                .changeProgramUserRole(input.programUserId, prevRole, input.newRole, pid, user)
+                .flatTraverse: af =>
+                  session.prepare(af.fragment.command).flatMap: pq =>
+                    pq.execute(af.argument).map:
+                      case Completion.Update(1) => input.programUserId.success
+                      case _                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+
 
       override def deleteProgramUser(
         id: ProgramUser.Id
@@ -294,6 +319,28 @@ object ProgramUserService:
             SELECT $program_id, $program_user_role, $partner_link"""(
               targetProgramId, targetRole, targetPartnerLink
             ) |+| ac
+
+    def changeProgramUserRole(
+      targetProgramUserId: ProgramUser.Id,
+      prevRole:            ProgramUserRole,
+      nextRole:            ProgramUserRole,
+      programId:           Program.Id,
+      sourceUser:          User
+    ): Result[AppliedFragment] =
+      (accessCheck("unassign", prevRole, programId, sourceUser),
+       accessCheck("assign",   nextRole, programId, sourceUser)
+      )
+        .mapN:
+          case (None,    None   ) => AppliedFragment.empty
+          case (None,    Some(a)) => void" AND " |+| a
+          case (Some(u), None   ) => void" AND " |+| u
+          case (Some(u), Some(a)) => void" AND " |+| u |+| void" AND " |+| a
+        .map: ac =>
+          sql"""
+            UPDATE t_program_user
+               SET c_role = $program_user_role
+             WHERE c_program_user_id = $program_user_id
+          """(nextRole, targetProgramUserId) |+| ac
 
     def deleteProgramUser(
       pui:             ProgramUser.Id,
