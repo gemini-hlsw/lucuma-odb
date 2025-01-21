@@ -162,7 +162,7 @@ object ProgramUserService:
 
         (for
           o  <- ResultT(insert)
-          id <- o.fold(ResultT.fromResult(OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure))(ResultT.pure)
+          id <- o.fold(ResultT.fromResult(OdbError.NotAuthorized(user.id).asFailure))(ResultT.pure)
           set = ProgramUserPropertiesInput.partnerLink.replace(link.some)(set0)
           _  <- ResultT(updateProperties(set, sql"$program_user_id"(id)))
         yield id).value
@@ -183,7 +183,7 @@ object ProgramUserService:
                   session.prepare(af.fragment.command).flatMap: pq =>
                     pq.execute(af.argument).map:
                       case Completion.Update(1) => input.programUserId.success
-                      case _                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+                      case _                    => OdbError.NotAuthorized(user.id).asFailure
 
 
       override def deleteProgramUser(
@@ -201,7 +201,7 @@ object ProgramUserService:
                   session.prepare(af.fragment.command).flatMap: pq =>
                     pq.execute(af.argument).map:
                       case Completion.Delete(1) => true.success
-                      case _                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+                      case _                    => OdbError.NotAuthorized(user.id).asFailure
 
       override def updateProperties(
         SET:   ProgramUserPropertiesInput,
@@ -249,7 +249,7 @@ object ProgramUserService:
                   pq.execute(af.argument)
                     .map:
                       case Completion.Update(1) => ().success
-                      case a                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+                      case a                    => OdbError.NotAuthorized(user.id).asFailure
                     .recover:
                       case SqlState.UniqueViolation(_)     =>
                         OdbError.NoAction(s"User $targetUserId is already linked to program $pid.".some).asFailure
@@ -271,7 +271,7 @@ object ProgramUserService:
                   pq.execute(af.argument)
                     .map:
                       case Completion.Update(1) => uid.some.success
-                      case a                    => OdbError.NotAuthorized(user.id, s"User ${user.id} is not authorized to perform this operation.".some).asFailure
+                      case a                    => OdbError.NotAuthorized(user.id).asFailure
 
       override def userHasAccess(
         programId: Program.Id
