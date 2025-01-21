@@ -78,6 +78,7 @@ trait MutationMapping[F[_]] extends Predicates[F] {
       AddSlewEvent,
       AddStepEvent,
       AddTimeChargeCorrection,
+      ChangeProgramUserRole,
       CloneGroup,
       CloneObservation,
       CloneTarget,
@@ -290,9 +291,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
   private lazy val AddProgramUser: MutationField =
     MutationField("addProgramUser", AddProgramUserInput.Binding): (input, child) =>
       services.useTransactionally:
-        programUserService.addProgramUser(input).map: r =>
-          r.map: pui =>
-            Unique(Filter(Predicates.programUser.id.eql(pui) , child))
+        programUserService.addProgramUser(input).map: m =>
+          m.map: pui =>
+            Unique(Filter(Predicates.programUser.id.eql(pui), child))
 
   private lazy val AddTimeChargeCorrection: MutationField =
     MutationField("addTimeChargeCorrection", AddTimeChargeCorrectionInput.Binding): (input, child) =>
@@ -302,6 +303,13 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             Result(
               Filter(Predicates.addTimeChargeCorrectionResult.timeChargeInvoice.id.eql(input.visitId), child)
             )
+
+  private lazy val ChangeProgramUserRole: MutationField =
+    MutationField("changeProgramUserRole", ChangeProgramUserRoleInput.Binding): (input, child) =>
+      services.useTransactionally:
+        programUserService.changeProgramUserRole(input).map: m =>
+          m.map: pui =>
+            Unique(Filter(Predicates.programUser.id.eql(pui), child))
 
   private lazy val CloneGroup: MutationField =
     MutationField("cloneGroup", CloneGroupInput.Binding): (input, child) =>
