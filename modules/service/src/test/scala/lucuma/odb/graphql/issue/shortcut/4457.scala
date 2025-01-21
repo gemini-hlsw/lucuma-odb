@@ -10,9 +10,9 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType.RegularSemester
+import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
