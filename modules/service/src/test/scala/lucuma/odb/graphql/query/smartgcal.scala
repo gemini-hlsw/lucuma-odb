@@ -13,6 +13,9 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
@@ -42,9 +45,9 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
-import lucuma.odb.smartgcal.data.Gmos.TableKey
-import lucuma.odb.smartgcal.data.Gmos.TableRow
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import natchez.Trace.Implicits.noop
@@ -104,10 +107,10 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             )
           )
 
-        def northRow(s: SmartGcalValue[LegacyInstrumentConfig]): TableRow.North =
-          TableRow(
+        def northRow(s: SmartGcalValue[LegacyInstrumentConfig]): Gmos.TableRow.North =
+          Gmos.TableRow(
             PosLong.unsafeFrom(1),
-            TableKey(
+            Gmos.TableKey(
               GratingConfigKey(
                 GmosNorthGrating.R831_G5302,
                 GmosGratingOrder.One,
@@ -122,16 +125,16 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             s
           )
 
-        val tableRowArcN: TableRow.North =
+        val tableRowArcGmosN: Gmos.TableRow.North =
           northRow(arc)
 
-        val tableRowFlatN: TableRow.North =
+        val tableRowFlatGmosN: Gmos.TableRow.North =
           northRow(flat)
 
-        def southRow(s: SmartGcalValue[LegacyInstrumentConfig]): TableRow.South =
-          TableRow(
+        def southRow(s: SmartGcalValue[LegacyInstrumentConfig]): Gmos.TableRow.South =
+          Gmos.TableRow(
             PosLong.unsafeFrom(1),
-            TableKey(
+            Gmos.TableKey(
               GratingConfigKey(
                 GmosSouthGrating.R600_G5324,
                 GmosGratingOrder.One,
@@ -146,15 +149,31 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             s
           )
 
-        val tableRowArcS: TableRow.South =
+        val tableRowArcGmosS: Gmos.TableRow.South =
           southRow(arc)
 
-        val tableRowFlatS: TableRow.South =
+        val tableRowFlatGmosS: Gmos.TableRow.South =
           southRow(flat)
 
-        def defineN(
+        def f2Row(s: SmartGcalValue[LegacyInstrumentConfig]): Flamingos2.TableRow =
+          Flamingos2.TableRow(
+            PosLong.unsafeFrom(1),
+            Flamingos2.TableKey(
+              F2Disperser.R3000.some,
+              F2Filter.JH,
+              F2Fpu.LongSlit8.some
+            ),
+            s
+          )
+        val tableRowArcF2: Flamingos2.TableRow =
+          f2Row(arc)
+
+        val tableRowFlatF2: Flamingos2.TableRow =
+          f2Row(flat)
+
+        def defineGmosN(
           id:         Int,
-          row:        TableRow.North,
+          row:        Gmos.TableRow.North,
           stepOrder:  Int              = 1,
           disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
           low:        Int              = Wavelength.Min.pm.value.value,
@@ -162,11 +181,11 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int              = 1,
           count:      Int              = 1
         ): IO[Unit] =
-          define(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
+          defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
 
-        def defineS(
+        def defineGmosS(
           id:         Int,
-          row:        TableRow.South,
+          row:        Gmos.TableRow.South,
           stepOrder:  Int              = 1,
           disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
           low:        Int              = Wavelength.Min.pm.value.value,
@@ -174,9 +193,9 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int              = 1,
           count:      Int              = 1
         ): IO[Unit] =
-          define(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)
+          defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)
 
-        def define[G, L, U](
+        def defineGmos[G, L, U](
           id:         Int,
           stepOrder:  Int,
           disperser:  G,
@@ -185,8 +204,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int,
           count:      Int
         )(
-          tableRow:   TableRow[G, L, U],
-          insert:     (Int, TableRow[G, L, U]) => IO[Unit]
+          tableRow:   Gmos.TableRow[G, L, U],
+          insert:     (Int, Gmos.TableRow[G, L, U]) => IO[Unit]
         ): IO[Unit] = {
 
           import lucuma.core.optics.syntax.all.*
@@ -196,38 +215,61 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                         Wavelength.unsafeFromIntPicometers(high)
                       )
 
-          val update: State[TableRow[G, L, U], Unit] =
+          val update: State[Gmos.TableRow[G, L, U], Unit] =
             for {
-              _ <- TableRow.line            := PosLong.unsafeFrom(stepOrder)
-              _ <- TableRow.grating         := disperser
-              _ <- TableRow.wavelengthRange := range
-              _ <- TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-              _ <- TableRow.stepCount       := PosInt.unsafeFrom(count)
+              _ <- Gmos.TableRow.line            := PosLong.unsafeFrom(stepOrder)
+              _ <- Gmos.TableRow.grating         := disperser
+              _ <- Gmos.TableRow.wavelengthRange := range
+              _ <- Gmos.TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+              _ <- Gmos.TableRow.stepCount       := PosInt.unsafeFrom(count)
             } yield ()
 
           insert(id, update.runS(tableRow).value)
         }
 
+        def defineF2(
+          id:         Int,
+          stepOrder:  Int,
+          expTimeSec: Int,
+          count:      Int,
+          tableRow:   Flamingos2.TableRow
+        ): IO[Unit] = {
+          import lucuma.core.optics.syntax.all.*
+
+          val update: State[Flamingos2.TableRow, Unit] =
+            for {
+              _ <- Flamingos2.TableRow.line            := PosLong.unsafeFrom(stepOrder)
+              _ <- Flamingos2.TableRow.disperser       := tableRow.key.disperser
+              _ <- Flamingos2.TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
+              _ <- Flamingos2.TableRow.stepCount       := PosInt.unsafeFrom(count)
+            } yield ()
+
+          services.smartGcalService.insertFlamingos2(id, update.runS(tableRow).value)
+        }
+
         for {
           // simple lookup
-          _ <- defineN(1, tableRowFlatN, high = 500_000, expTimeSec = 1)
-          _ <- defineN(2, tableRowFlatN, low  = 500_000, high = 600_000, expTimeSec = 2)
-          _ <- defineN(3, tableRowFlatN, low  = 600_000, expTimeSec = 3)
-          _ <- defineN(4, tableRowArcN,  expTimeSec = 1)
+          _ <- defineGmosN(1, tableRowFlatGmosN, high = 500_000, expTimeSec = 1)
+          _ <- defineGmosN(2, tableRowFlatGmosN, low  = 500_000, high = 600_000, expTimeSec = 2)
+          _ <- defineGmosN(3, tableRowFlatGmosN, low  = 600_000, expTimeSec = 3)
+          _ <- defineGmosN(4, tableRowArcGmosN,  expTimeSec = 1)
 
-          _ <- defineS(1, tableRowFlatS, high = 500_000, expTimeSec = 1)
-          _ <- defineS(2, tableRowFlatS, low  = 500_000, high = 600_000, expTimeSec = 2)
-          _ <- defineS(3, tableRowFlatS, low  = 600_000, expTimeSec = 3)
-          _ <- defineS(4, tableRowArcS,  expTimeSec = 1)
+          _ <- defineGmosS(1, tableRowFlatGmosS, high = 500_000, expTimeSec = 1)
+          _ <- defineGmosS(2, tableRowFlatGmosS, low  = 500_000, high = 600_000, expTimeSec = 2)
+          _ <- defineGmosS(3, tableRowFlatGmosS, low  = 600_000, expTimeSec = 3)
+          _ <- defineGmosS(4, tableRowArcGmosS,  expTimeSec = 1)
+
+          _ <- defineF2(1, 1, expTimeSec = 1, count = 1, tableRow = tableRowFlatF2)
+          _ <- defineF2(2, 1, expTimeSec = 1, count = 1, tableRow = tableRowArcF2)
 
           // multi steps
-          _ <- defineN(5, tableRowFlatN, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-          _ <- defineN(6, tableRowFlatN, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
-          _ <- defineN(7, tableRowArcN, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 1)
+          _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
+          _ <- defineGmosN(6, tableRowFlatGmosN, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
+          _ <- defineGmosN(7, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 1)
 
           // step count
-          _ <- defineN(8, tableRowFlatN, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
-          _ <- defineN(9, tableRowArcN, disperser = GmosNorthGrating.B600_G5307, expTimeSec = 1)
+          _ <- defineGmosN(8, tableRowFlatGmosN, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
+          _ <- defineGmosN(9, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5307, expTimeSec = 1)
 
         } yield ()
       }
