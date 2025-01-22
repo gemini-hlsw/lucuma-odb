@@ -507,6 +507,13 @@ trait Codecs {
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
 
+  val _tag: Codec[Arr[Tag]] =
+    Codec.array[Tag](
+      _.value,
+      s => Tag(s).asRight,
+      Type("_d_tag", List(Type("d_tag")))
+    )
+
   val target_id: Codec[Target.Id] =
     gid[Target.Id]
 

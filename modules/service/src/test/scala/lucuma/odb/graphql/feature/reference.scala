@@ -131,17 +131,20 @@ class reference extends OdbSuite {
       pid0 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid0, cid0)
       _    <- addPartnerSplits(pi, pid0)
+      _    <- addCoisAs(pi, pid0)
       ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid1, cid0)
       _    <- addPartnerSplits(pi, pid1)
+      _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
       cid1 <- createCallForProposalsAs(staff, semester = sem2025A)
       pid2 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid2, cid1)
       _    <- addPartnerSplits(pi, pid2)
+      _    <- addCoisAs(pi, pid2)
       ref2 <- submitProposal(pi, pid2)
     } yield {
       assertEquals(ref0, ref2024B1)
@@ -260,6 +263,7 @@ class reference extends OdbSuite {
       pid  <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
+      _    <- addCoisAs(pi, pid)
       ref0 <- submitProposal(pi, pid)
       _    <- unsubmitProposal(pi, pid)
       ref1 <- submitProposal(pi, pid)
@@ -275,6 +279,7 @@ class reference extends OdbSuite {
       pid  <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
+      _    <- addCoisAs(pi, pid)
       _    <- submitProposal(pi, pid)
       ref0 <- fetchProgramReference(pi, pid)
        _   <- acceptProposal(staff, pid)
@@ -291,6 +296,7 @@ class reference extends OdbSuite {
       pid <- createProgramAs(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       _   <- expect(pi, s"""
@@ -698,6 +704,7 @@ class reference extends OdbSuite {
       pid <- createProgramAs(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0001-Q".programReference.some)
@@ -1210,10 +1217,4 @@ class reference extends OdbSuite {
     } yield assertEquals(ref, "G-2025B-0002-P".programReference.some)
   }
 
-//  test("select via WHERE program reference science subtype POOR_WEATHER") {
-//    assertIO(
-//      programRefsWhere( s"""{ reference: { scienceSubtype: { EQ: POOR_WEATHER } } }"""),
-//      List("G-2025B-0002-P".programReference)
-//    )
-//  }
 }
