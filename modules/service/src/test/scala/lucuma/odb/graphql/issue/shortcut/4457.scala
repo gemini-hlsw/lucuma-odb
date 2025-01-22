@@ -34,6 +34,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
       o <- createObservationWithNoModeAs(pi, p, t)
       _ <- addProposal(pi, p, c.some)
       _ <- addPartnerSplits(pi, p)
+      _ <- addCoisAs(pi, p)
       _ <- acceptProposal(staff, p)
       m <- addProgramUserAs(pi, p, CoiRO)
       _ <- linkUserAs(pi, m, coiRo.id)

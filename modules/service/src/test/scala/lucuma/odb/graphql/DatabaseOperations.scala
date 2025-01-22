@@ -1488,6 +1488,10 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: j =>
       j.hcursor.downFields("addProgramUser", "programUser", "id").require[ProgramUser.Id]
 
+  def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
+    ps.traverse_ : p =>
+      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasPartner(p))
+
   def deleteProgramUserAs(
     user: User,
     mid:  ProgramUser.Id
