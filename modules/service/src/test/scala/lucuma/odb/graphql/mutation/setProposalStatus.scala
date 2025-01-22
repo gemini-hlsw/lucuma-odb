@@ -18,6 +18,7 @@ import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
+import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -40,6 +41,7 @@ class setProposalStatus extends OdbSuite
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
+        addCoisAs(pi, pid) *>
         expect(
           user = pi,
           query = s"""
@@ -66,6 +68,61 @@ class setProposalStatus extends OdbSuite
                 }
               }
             """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ missing two matching partners") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected = List(
+            s"Program $pid requests time from CA and US, but there are no matching investigators with these partners."
+          ).asLeft
+        )
+      }
+    }
+  }
+
+  test("⨯ missing one matching partner") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        addCoisAs(pi, pid, List(Partner.CA)) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected = List(
+            s"Program $pid requests time from US, but there is no matching investigator with this partner."
+          ).asLeft
         )
       }
     }
@@ -125,6 +182,7 @@ class setProposalStatus extends OdbSuite
     createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some, "fastTurnaround: { piAffiliation: US }".some) *>
+        addCoisAs(pi, pid, List(Partner.US)) *>
         expect(
           user = pi,
           query = s"""
@@ -424,6 +482,7 @@ class setProposalStatus extends OdbSuite
       _ <- addProposal(pi, p)
       _ <- setCallId(p, c)
       _ <- addPartnerSplits(pi, p)
+      _ <- addCoisAs(pi, p)
       _ <- submit(p)
       _ <- recall(p)
       l <- chronProgramUpdates(p)
@@ -490,6 +549,7 @@ class setProposalStatus extends OdbSuite
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
       _ <- addPartnerSplits(pi, p)
+      _ <- addCoisAs(pi, p)
       _ <- setCallId(p, c)
       _ <- accept(p)
       _ <- recall(p)
@@ -551,6 +611,7 @@ class setProposalStatus extends OdbSuite
       pid <- createProgramAs(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       ina <- createObservationAs(pi, pid) // inactive, should be ignored
@@ -605,6 +666,7 @@ class setProposalStatus extends OdbSuite
       pid <- createProgramAs(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <-

@@ -119,6 +119,15 @@ object ProposalService {
           s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
       }
 
+    def missingPartners(pid: Program.Id, partners: Set[Tag] = Set.empty): OdbError =
+      partners.toList.map(_.value.toUpperCase).sorted match
+        case Nil     =>
+          s"Program $pid requests time from partners not represented by any investigator.".invalidArg
+        case List(p) =>
+          s"Program $pid requests time from $p, but there is no matching investigator with this partner.".invalidArg
+        case ps      =>
+          s"Program $pid requests time from ${ps.init.mkString(", ")} and ${ps.last}, but there are no matching investigators with these partners.".invalidArg
+
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
 
@@ -165,13 +174,15 @@ object ProposalService {
           .map(o => Result.fromOption(o, cfpNotFound(cid).asProblem))
 
       case class ProposalContext(
-        statusTag:      Tag,
-        hasProposal:    Boolean,
-        semester:       Option[Semester],
-        scienceSubtype: Option[ScienceSubtype],
-        splitsSum:      Long,
-        proprietary:    NonNegInt,
-        cfp:            Option[CfpProperties]
+        statusTag:         Tag,
+        hasProposal:       Boolean,
+        semester:          Option[Semester],
+        scienceSubtype:    Option[ScienceSubtype],
+        splitsSum:         Long,
+        availablePartners: Set[Tag],
+        requestedPartners: Set[Tag],
+        proprietary:       NonNegInt,
+        cfp:               Option[CfpProperties]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
@@ -180,6 +191,7 @@ object ProposalService {
           pid: Program.Id,
           newStatus: enumsVal.ProposalStatus
         ): Result[Unit] =
+          val unmatchedPartners = requestedPartners -- availablePartners
           (
             missingProposal(pid).asFailure.unlessA(hasProposal),
             missingCfP(pid).asFailure.unlessA(cfp.isDefined),
@@ -192,7 +204,8 @@ object ProposalService {
                  (s === ScienceSubtype.FastTurnaround) ||
                  (s === ScienceSubtype.Queue))
               )
-            }
+            },
+            missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty)
           ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
 
         def updateProgram(
@@ -230,8 +243,11 @@ object ProposalService {
       }
 
       object ProposalContext {
-        val codec: Codec[ProposalContext] =
-          (tag *: bool *: semester.opt *: science_subtype.opt *: int8 *: int4_nonneg *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
+        val parts: Decoder[Set[Tag]] =
+          _tag.map(_.toList.toSet)
+
+        val codec: Decoder[ProposalContext] =
+          (tag *: bool *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -501,7 +517,18 @@ object ProposalService {
           prop.c_program_id IS NOT NULL,
           prog.c_semester,
           prog.c_science_subtype,
-          COALESCE((SELECT SUM(c_percent) FROM t_partner_split WHERE c_program_id = prog.c_program_id), 0) AS c_splits_sum,
+          COALESCE(
+            (SELECT SUM(c_percent) FROM t_partner_split WHERE c_program_id = prog.c_program_id),
+            0
+          ) AS c_splits_sum,
+          COALESCE(
+            (SELECT ARRAY_AGG(DISTINCT c_partner) FROM t_program_user WHERE c_program_id = prog.c_program_id AND c_partner IS NOT NULL),
+            '{}'
+          ) AS c_available_partners,
+          COALESCE(
+            (SELECT ARRAY_AGG(DISTINCT c_partner) FROM t_partner_split WHERE c_program_id = prog.c_program_id AND c_percent > 0),
+            '{}'
+          ) AS c_requested_partners,
           prog.c_goa_proprietary,
           cfp.c_cfp_id,
           cfp.c_type,

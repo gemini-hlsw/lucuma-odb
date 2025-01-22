@@ -136,6 +136,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
       pid <- createProgramAs(pi)
       _   <- addProposal(pi, pid, Some(cid), None, "Foo")
       _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield (pid, oid)
