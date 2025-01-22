@@ -60,11 +60,13 @@ class GitHub_1237 extends OdbSuite {
       pid1 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)
       _    <- addPartnerSplits(pi, pid1)
+      _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
       pid2 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid2, cid25A)
       _    <- addPartnerSplits(pi, pid2)
+      _    <- addCoisAs(pi, pid2)
       _    <- submitProposal(pi, pid2)
       ref2 <- switchCfp(staff, pid2, cid24B) // switches the semester to 2024B (updates index to 0002)
 
@@ -82,11 +84,13 @@ class GitHub_1237 extends OdbSuite {
       pid1 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)
       _    <- addPartnerSplits(pi, pid1)
+      _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
       pid2 <- createProgramAs(pi)
       _    <- addQueueProposal(pi, pid2, cid25A)
       _    <- addPartnerSplits(pi, pid2)
+      _    <- addCoisAs(pi, pid2)
       _    <- submitProposal(pi, pid2)
       _    <- unsubmitProposal(pi, pid2)  // keeps the index 0001 of 2025A that was previously assigned
       ref2 <- switchCfp(pi, pid2, cid24B) // switches the semester to 2024B and deletes the index
