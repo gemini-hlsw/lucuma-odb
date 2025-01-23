@@ -40,7 +40,6 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.Gid
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcVersions
@@ -325,20 +324,21 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     FMain.singleSession(databaseConfig)
 
   private def transactionalClient(user: User)(svr: Server): IO[FetchClient[IO, Nothing]] =
-    for {
-      xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
-      uri  = svr.baseUri / "odb"
-      xc  <- Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, Gid[User.Id].fromString.reverseGet(user.id)))))(Async[IO], xbe, Logger[IO])
-    } yield xc
+    authorizationHeader(user).flatMap: auth =>
+      for {
+        xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
+        uri  = svr.baseUri / "odb"
+        xc  <- Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(Async[IO], xbe, Logger[IO])
+      } yield xc
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, WebSocketClient[IO, Nothing]] =
-    for {
-      sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWebSocketBackend[IO](_)))
-      uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
-      sc  <- Resource.eval(Http4sWebSocketClient.of[IO, Nothing](uri)(using Async[IO], Logger[IO], sbe))
-      ps   = Map("Authorization" -> Json.fromString(s"Bearer ${Gid[User.Id].fromString.reverseGet(user.id)}"))
-      _   <- Resource.make(sc.connect(ps.pure[IO]))(_ => sc.disconnect())
-    } yield sc
+    Resource.eval(authorizationObject(user)).flatMap: ps =>
+      for {
+        sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWebSocketBackend[IO](_)))
+        uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
+        sc  <- Resource.eval(Http4sWebSocketClient.of[IO, Nothing](uri)(using Async[IO], Logger[IO], sbe))
+        _   <- Resource.make(sc.connect(ps.pure[IO]))(_ => sc.disconnect())
+      } yield sc
 
   case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
 

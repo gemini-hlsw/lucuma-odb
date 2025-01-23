@@ -38,7 +38,7 @@ abstract class AttachmentRoutesSuite extends CatsEffectSuite with TestSsoClient 
     else if (user === invalidFileUser) AttachmentException.InvalidRequest(invalidFileName).some
     else none
 
-  protected def headers(user: User): Headers = Headers(authHeader(user))
+  protected def headers(user: User): IO[Headers] = authorizationHeader(user).map(Headers(_))
 
   extension (resp: IO[Response[IO]])
     def assertResponse(expectedStatus: Status, expectedBody: Option[String]): IO[Unit] =
