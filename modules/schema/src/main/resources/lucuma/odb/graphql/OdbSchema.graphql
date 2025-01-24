@@ -1199,27 +1199,26 @@ input ExposureTimeModeInput {
   """
   The signalToNoise field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  signalToNoise: SignalToNoiseModeInput
+  signalToNoise: SignalToNoiseExposureTimeModeInput
 
   """
-  The fixedExposure field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The timeAndCount field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  fixedExposure: FixedExposureModeInput
+  timeAndCount: TimeAndCountExposureTimeModeInput
 }
 
 """
-Fixed exposure time mode parameters
+Time And Count exposure time mode parameters
 """
-input FixedExposureModeInput {
-  """
-  exposure count
-  """
+input TimeAndCountExposureTimeModeInput {
+  "Exposure time."
+  time: TimeSpanInput!
+
+  "Exposure count."
   count: NonNegInt!
 
-  """
-  exposure time
-  """
-  time: TimeSpanInput!
+  "S/N at wavelength."
+  at: WavelengthInput!
 }
 
 """
@@ -4523,11 +4522,14 @@ input SiderealInput {
 """
 Signal-to-noise mode parameters
 """
-input SignalToNoiseModeInput {
+input SignalToNoiseExposureTimeModeInput {
   """
   s/n value
   """
   value: SignalToNoise!
+
+  "Corresponding wavelength."
+  at: WavelengthInput!
 }
 
 """
@@ -4570,14 +4572,10 @@ input SpectroscopyScienceRequirementsInput {
   resolution: PosInt
 
   """
-  The signalToNoise field may be unset by assigning a null value, or ignored by skipping it altogether
+  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
-  signalToNoise: SignalToNoise
-
-  """
-  The signalToNoiseAt field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  signalToNoiseAt: WavelengthInput
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The wavelengthCoverage field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -6651,15 +6649,12 @@ type ExecutionDigest {
 Exposure time mode, either signal to noise or fixed
 """
 type ExposureTimeMode {
-  """
-  Signal to noise exposure time mode data, if applicable
-  """
-  signalToNoise: SignalToNoiseMode
 
-  """
-  Fixed exposure time mode data, if applicable
-  """
-  fixedExposure: FixedExposureMode
+  "Signal to noise exposure time mode data, if applicable."
+  signalToNoise: SignalToNoiseExposureTimeMode
+
+  "Time and Count mode data, if applicable."
+  timeAndCount: TimeAndCountExposureTimeMode
 }
 
 """
@@ -6810,18 +6805,17 @@ type FilterTypeMeta {
 }
 
 """
-Fixed exposure time mode
+Time and Count exposure time mode.
 """
-type FixedExposureMode {
-  """
-  Exposure count
-  """
+type TimeAndCountExposureTimeMode {
+  "Exposure time."
+  time: TimeSpan!
+
+  "Exposure count."
   count: NonNegInt!
 
-  """
-  Exposure time
-  """
-  time: TimeSpan!
+  "S/N at Wavelength."
+  at: Wavelength!
 }
 
 type FluxDensityContinuumIntegrated {
@@ -10410,11 +10404,12 @@ scalar SignalToNoise
 """
 Signal to noise exposure time mode
 """
-type SignalToNoiseMode {
-  """
-  Signal/Noise value
-  """
+type SignalToNoiseExposureTimeMode {
+  "Signal/Noise value"
   value: SignalToNoise!
+
+  "Signal/Noise wavelength"
+  at: Wavelength!
 }
 
 """
@@ -10590,14 +10585,9 @@ type SpectroscopyScienceRequirements {
   resolution: PosInt
 
   """
-  Requested signal to noise ratio
+  Requested exposure time mode.
   """
-  signalToNoise: SignalToNoise
-
-  """
-  Requested wavelength for the requested signal to noise
-  """
-  signalToNoiseAt: Wavelength
+  exposureTimeMode: ExposureTimeMode
 
   """
   Wavelength range

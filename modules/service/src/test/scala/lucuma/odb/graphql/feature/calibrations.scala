@@ -115,9 +115,11 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                       nanometers: 400.000
                     },
                     resolution: 10,
-                    signalToNoise: 75.000,
-                    signalToNoiseAt: {
-                      nanometers: ${snAt.toNanometers}
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 75.000,
+                        at: { nanometers: ${snAt.toNanometers} }
+                      }
                     },
                     wavelengthCoverage: {
                       nanometers: 0.010
@@ -160,8 +162,10 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Eq, Decoder
   case class CalibCE(cloudExtinction: CloudExtinction) derives Decoder
-  case class ScienceRequirementsWvAt(signalToNoiseAt: Wavelength) derives Decoder
-  case class ScienceRequirements(spectroscopy: ScienceRequirementsWvAt) derives Decoder
+  case class ScienceRequirements(spectroscopy: ExposureTimeMode) derives Decoder
+  case class ExposureTimeMode(exposureTimeMode: SignalToNoise) derives Decoder
+  case class SignalToNoise(signalToNoise: At) derives Decoder
+  case class At(at: Wavelength) derives Decoder
   case class CalibObs(
     id: Observation.Id,
     groupId: Option[Group.Id],
@@ -206,8 +210,10 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                   }
                   scienceRequirements {
                     spectroscopy {
-                      signalToNoiseAt {
-                        nanometers
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { nanometers }
+                        }
                       }
                     }
                   }
@@ -1043,7 +1049,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       ob   <- queryObservations(pid)
     } yield {
       val wv = ob.collect {
-        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ScienceRequirementsWvAt(wv))) => wv
+        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(At(wv))))) => wv
       }
       // 510 is the average across the science observations
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)

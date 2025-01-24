@@ -18,13 +18,13 @@ trait WavelengthMapping[F[_]]
      with ChronConditionsEntryView[F]
      with GmosDynamicTables[F]
      with ObservationView[F]
-     with SpectroscopyConfigOptionTable[F] {
+     with SpectroscopyConfigOptionTable[F]:
 
   private def wavelengthMappingAtPath(
     path: Path,
     valueColumn: ColumnRef,
     idColumns: ColumnRef*
-  ): ObjectMapping = {
+  ): ObjectMapping =
 
     def fromPm(w: Wavelength, left: Int): BigDecimal =
       BigDecimal(w.toPicometers.value.value).underlying.movePointLeft(left)
@@ -43,7 +43,6 @@ trait WavelengthMapping[F[_]]
         value.as("micrometers", fromPm(_, 6))
       )*
     )
-  }
 
   import ObservationView.ScienceRequirements.Spectroscopy
 
@@ -54,17 +53,16 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitView.Common.InitialCentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitView.Common.CentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitView.Common.InitialCentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
+      wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", Spectroscopy.ExposureTimeMode.SignalToNoise.At, Spectroscopy.ExposureTimeMode.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMax", SpectroscopyConfigOptionTable.WavelengthMax, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthOptimal", SpectroscopyConfigOptionTable.WavelengthOptimal, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthCoverage", SpectroscopyConfigOptionTable.WavelengthCoverage, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelength", Spectroscopy.Wavelength.Value, Spectroscopy.Wavelength.SyntheticId),
-      wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "signalToNoiseAt", Spectroscopy.SignalToNoiseAt.Value, Spectroscopy.SignalToNoiseAt.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelengthCoverage", Spectroscopy.WavelengthCoverage.Value, Spectroscopy.WavelengthCoverage.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "centralWavelength", GmosNorthDynamicTable.CentralWavelength.Value, GmosNorthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
-      wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id)
+      wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
+      wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", Spectroscopy.ExposureTimeMode.TimeAndCount.At, Spectroscopy.ExposureTimeMode.TimeAndCount.SyntheticId)
     )
-
-  }

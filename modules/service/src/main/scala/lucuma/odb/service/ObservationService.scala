@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
 import eu.timepit.refined.api.Refined.value
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -34,6 +35,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -42,8 +44,10 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.OdbError
@@ -569,6 +573,12 @@ object ObservationService {
 
   object Statements {
 
+    extension (m: ExposureTimeMode)
+      def tpe: ExposureTimeModeType =
+        m match
+          case ExposureTimeMode.SignalToNoiseMode(_, _)   => ExposureTimeModeType.SignalToNoiseMode
+          case ExposureTimeMode.TimeAndCountMode(_, _, _) => ExposureTimeModeType.TimeAndCountMode
+
     val selectOid: Query[ObservationReference, Observation.Id] =
       sql"""
         SELECT c_observation_id
@@ -626,6 +636,18 @@ object ObservationService {
         val spectroscopy: Option[SpectroscopyScienceRequirementsInput] =
           scienceRequirements.flatMap(_.spectroscopy)
 
+        val specExposureTimeMode: Option[ExposureTimeMode] =
+          spectroscopy.flatMap(_.exposureTimeMode.toOption)
+
+        val specExposureTimeModeType: Option[ExposureTimeModeType] =
+          specExposureTimeMode.map(_.tpe)
+
+        val specSignalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
+          specExposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
+
+        val specTimeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
+          specExposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
+
         InsertObservation.apply(
           programId    ,
            groupId     ,
@@ -648,8 +670,11 @@ object ObservationService {
            scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ,
            spectroscopy.flatMap(_.wavelength.toOption)                              ,
            spectroscopy.flatMap(_.resolution.toOption)                              ,
-           spectroscopy.flatMap(_.signalToNoise.toOption)                           ,
-           spectroscopy.flatMap(_.signalToNoiseAt.toOption)                         ,
+           specExposureTimeModeType                                                 ,
+           specExposureTimeMode.map(_.at)                                           ,
+           specSignalToNoiseExposureTimeMode.map(_.value)                           ,
+           specTimeAndCountExposureTimeMode.map(_.time)                             ,
+           specTimeAndCountExposureTimeMode.map(_.count)                            ,
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ,
            spectroscopy.flatMap(_.focalPlane.toOption)                              ,
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
@@ -690,8 +715,11 @@ object ObservationService {
       ScienceMode                      ,
       Option[Wavelength]               ,
       Option[PosInt]                   ,
-      Option[SignalToNoise]            ,
+      Option[ExposureTimeModeType]     ,
       Option[Wavelength]               ,
+      Option[SignalToNoise]            ,
+      Option[TimeSpan]                 ,
+      Option[NonNegInt]                ,
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
@@ -723,8 +751,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_signal_to_noise,
+          c_spec_exp_time_mode,
           c_spec_signal_to_noise_at,
+          c_spec_signal_to_noise,
+          c_spec_exp_time,
+          c_spec_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -755,8 +786,11 @@ object ObservationService {
           $science_mode,
           ${wavelength_pm.opt},
           ${int4_pos.opt},
-          ${signal_to_noise.opt},
+          ${exposure_time_mode_type.opt},
           ${wavelength_pm.opt},
+          ${signal_to_noise.opt},
+          ${time_span.opt},
+          ${int4_nonneg.opt},
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
@@ -848,18 +882,28 @@ object ObservationService {
 
       val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
       val upResolution         = sql"c_spec_resolution = ${int4_pos.opt}"
-      val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTimeModeType    = sql"c_spec_exp_time_mode = ${exposure_time_mode_type.opt}"
       val upSignalToNoiseAt    = sql"c_spec_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTime            = sql"c_spec_exp_time = ${time_span.opt}"
+      val upExpCount           = sql"c_spec_exp_count = ${int4_nonneg.opt}"
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
       val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
 
+      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
+      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+
       List(
         in.wavelength.foldPresent(upWavelength),
         in.resolution.foldPresent(upResolution),
-        in.signalToNoise.foldPresent(upSignalToNoise),
-        in.signalToNoiseAt.foldPresent(upSignalToNoiseAt),
+        expTimeModeType.foldPresent(upExpTimeModeType),
+        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
+        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
+        timeAndCountMode.map(_.time).foldPresent(upExpTime),
+        timeAndCountMode.map(_.count).foldPresent(upExpCount),
         in.wavelengthCoverage.foldPresent(upWavelengthCoverage),
         in.focalPlane.foldPresent(upFocalPlane),
         in.focalPlaneAngle.foldPresent(upFocalPlaneAngle),
@@ -1000,8 +1044,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_signal_to_noise,
+          c_spec_exp_time_mode,
           c_spec_signal_to_noise_at,
+          c_spec_signal_to_noise,
+          c_spec_exp_time,
+          c_spec_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -1035,8 +1082,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_signal_to_noise,
+          c_spec_exp_time_mode,
           c_spec_signal_to_noise_at,
+          c_spec_signal_to_noise,
+          c_spec_exp_time,
+          c_spec_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
