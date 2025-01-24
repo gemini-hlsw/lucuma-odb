@@ -79,21 +79,22 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     programId: Program.Id,
     ta:        TestAttachment
   ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri =
-        (svr.baseUri / "attachment" / programId.toString)
-          .withQueryParam("fileName", ta.fileName)
-          .withQueryParam("attachmentType", ta.attachmentType)
-          .withOptionQueryParam("description", ta.description)
+    Resource.eval(authorizationHeader(user)).flatMap: auth =>
+      server.flatMap { svr =>
+        val uri =
+          (svr.baseUri / "attachment" / programId.toString)
+            .withQueryParam("fileName", ta.fileName)
+            .withQueryParam("attachmentType", ta.attachmentType)
+            .withOptionQueryParam("description", ta.description)
 
-      val request = Request[IO](
-        method = Method.POST,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      ).withEntity(ta.content)
+        val request = Request[IO](
+          method = Method.POST,
+          uri = uri,
+          headers = Headers(auth)
+        ).withEntity(ta.content)
 
-      client.run(request)
-    }
+        client.run(request)
+      }
   
   def updateAttachment(
     user:         User,
@@ -101,36 +102,38 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     attachmentId: Attachment.Id,
     ta:           TestAttachment
   ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri =
-        (svr.baseUri / "attachment" / programId.toString / attachmentId.toString)
-          .withQueryParam("fileName", ta.fileName)
-          .withOptionQueryParam("description", ta.description)
+    Resource.eval(authorizationHeader(user)).flatMap: auth =>
+      server.flatMap { svr =>
+        val uri =
+          (svr.baseUri / "attachment" / programId.toString / attachmentId.toString)
+            .withQueryParam("fileName", ta.fileName)
+            .withOptionQueryParam("description", ta.description)
 
-      val request = Request[IO](
-        method = Method.PUT,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      ).withEntity(ta.content)
+        val request = Request[IO](
+          method = Method.PUT,
+          uri = uri,
+          headers = Headers(auth)
+        ).withEntity(ta.content)
 
-      client.run(request)
-    }
+        client.run(request)
+      }
 
   def getAttachment(
     user:         User,
     programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
-      val request = Request[IO](
-        method = Method.GET,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
+    Resource.eval(authorizationHeader(user)).flatMap: auth =>
+      server.flatMap { svr =>
+        val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+        val request = Request[IO](
+          method = Method.GET,
+          uri = uri,
+          headers = Headers(auth)
+        )
 
-      client.run(request)
-    }
+        client.run(request)
+      }
 
   def getViaPresignedUrl(url: NonEmptyString): Resource[IO, Response[IO]] =
     server.flatMap { _ =>
@@ -148,32 +151,34 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri     = svr.baseUri / "attachment" / "url" / programId.toString / attachmentId.toString
-      val request = Request[IO](
-        method = Method.GET,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
+    Resource.eval(authorizationHeader(user)).flatMap: auth =>
+      server.flatMap { svr =>
+        val uri     = svr.baseUri / "attachment" / "url" / programId.toString / attachmentId.toString
+        val request = Request[IO](
+          method = Method.GET,
+          uri = uri,
+          headers = Headers(auth)
+        )
 
-      client.run(request)
-    }
+        client.run(request)
+      }
 
   def deleteAttachment(
     user:         User,
     programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
-    server.flatMap { svr =>
-      val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
-      val request = Request[IO](
-        method = Method.DELETE,
-        uri = uri,
-        headers = Headers(authHeader(user))
-      )
+    Resource.eval(authorizationHeader(user)).flatMap: auth =>
+      server.flatMap { svr =>
+        val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+        val request = Request[IO](
+          method = Method.DELETE,
+          uri = uri,
+          headers = Headers(auth)
+        )
 
-      client.run(request)
-    }
+        client.run(request)
+      }
 
   def expectedAttachments(
     attachments: List[(Attachment.Id, TestAttachment)]
