@@ -24,7 +24,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   val validUsers = List(pi, pi2, staff, guest)
 
   test("✓ default to queue") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -33,13 +33,11 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Queue Proposal"
                   category: COSMOLOGY
                 }
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -56,7 +54,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Queue Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "QUEUE",
@@ -72,8 +69,8 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ already exists") {
-    createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "existing proposal") *>
+    createProgramAs(pi, "My Demo Science Proposal").flatMap { pid =>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -82,7 +79,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
                       toOActivation: NONE
@@ -92,7 +88,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -103,7 +99,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ multiple call properties") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Demo Science Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -112,7 +108,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
                       toOActivation: NONE
@@ -126,7 +121,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -137,7 +132,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ unknown call") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Demo Science Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -147,7 +142,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   callId: "c-123"
-                  title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
                       toOActivation: NONE
@@ -157,7 +151,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -178,7 +172,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   callId: "$cid"
-                  title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
                       toOActivation: NONE
@@ -188,7 +181,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -198,7 +191,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
 
     for {
       cid <- createCallForProposalsAs(staff, CallForProposalsType.PoorWeather)
-      pid <- createProgramAs(pi)
+      pid <- createProgramAs(pi, "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
   }
@@ -214,7 +207,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 programId: "$pid"
                 SET: {
                   callId: "$cid"
-                  title: "My Demo Science Proposal"
                   type: {
                     demoScience: {
                       toOActivation: NONE
@@ -225,7 +217,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 call { id }
                 type {
                   scienceSubtype
@@ -239,7 +230,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             {
               "createProposal" : {
                 "proposal" : {
-                  "title" : "My Demo Science Proposal",
                   "call": {
                     "id": $cid
                   },
@@ -254,7 +244,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
 
     for {
       cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
-      pid <- createProgramAs(pi)
+      pid <- createProgramAs(pi,  "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
   }
@@ -286,7 +276,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ classical") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -295,7 +285,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Classical Proposal"
                   category: COSMOLOGY
                   type: {
                     classical: {
@@ -316,7 +305,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -336,7 +324,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Classical Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "CLASSICAL",
@@ -361,7 +348,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ classical defaults") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -370,14 +357,12 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Classical Proposal"
                   category: COSMOLOGY
                   type: { classical: { } }
                 }
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -397,7 +382,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Classical Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "CLASSICAL",
@@ -413,7 +397,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ demo science") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Demo Science Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -422,7 +406,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Demo Science Proposal"
                   category: COSMOLOGY
                   type: {
                     demoScience: {
@@ -434,7 +417,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -451,7 +433,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Demo Science Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "DEMO_SCIENCE",
@@ -467,7 +448,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ demo science defaults") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Demo Science Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -476,7 +457,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Demo Science Proposal"
                   category: COSMOLOGY
                   type: {
                     demoScience: { }
@@ -485,7 +465,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -502,7 +481,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Demo Science Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "DEMO_SCIENCE",
@@ -518,7 +496,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ director's time") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Director's Time Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -527,7 +505,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Director's Time Proposal"
                   category: COSMOLOGY
                   type: {
                     directorsTime: {
@@ -539,7 +516,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -556,7 +532,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Director's Time Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "DIRECTORS_TIME",
@@ -572,7 +547,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ fast turnaround") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -581,7 +556,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Fast Turnaround Proposal"
                   category: COSMOLOGY
                   type: {
                     fastTurnaround: {
@@ -594,7 +568,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -612,7 +585,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Fast Turnaround Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "FAST_TURNAROUND",
@@ -629,7 +601,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ fast turnaround defaults") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -638,7 +610,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Fast Turnaround Proposal"
                   category: COSMOLOGY
                   type: {
                     fastTurnaround: { }
@@ -647,7 +618,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -665,7 +635,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Fast Turnaround Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "FAST_TURNAROUND",
@@ -682,7 +651,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ large program") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Large Program Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -691,7 +660,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Large Program Proposal"
                   category: COSMOLOGY
                   type: {
                     largeProgram: {
@@ -705,7 +673,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -724,7 +691,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Large Program Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "LARGE_PROGRAM",
@@ -745,7 +711,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
 
 
   test("✓ large program defaults") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Large Program Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -754,7 +720,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Large Program Proposal"
                   category: COSMOLOGY
                   type: {
                     largeProgram: { }
@@ -763,7 +728,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -782,7 +746,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Large Program Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "LARGE_PROGRAM",
@@ -802,7 +765,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ poor weather") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Poor Weather Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -811,7 +774,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Poor Weather Proposal"
                   category: COSMOLOGY
                   type: {
                     poorWeather: {}
@@ -820,7 +782,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -833,7 +794,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Poor Weather Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "POOR_WEATHER"
@@ -847,7 +807,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ poor weather explicit dummy") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Poor Weather Proposal 2").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -856,7 +816,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Poor Weather Proposal 2"
                   category: COSMOLOGY
                   type: {
                     poorWeather: {
@@ -867,7 +826,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -880,7 +838,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Poor Weather Proposal 2",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "POOR_WEATHER"
@@ -894,7 +851,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ queue") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -903,7 +860,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Queue Proposal"
                   category: COSMOLOGY
                   type: {
                     queue: {
@@ -925,7 +881,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -946,7 +901,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Queue Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "QUEUE",
@@ -972,7 +926,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ system verification") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My System Verification Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -981,7 +935,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My System Verification Proposal"
                   category: COSMOLOGY
                   type: {
                     systemVerification: {
@@ -993,7 +946,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -1010,7 +962,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My System Verification Proposal",
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "SYSTEM_VERIFICATION",
@@ -1026,7 +977,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ partner splits sum to 100") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -1035,7 +986,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Queue Proposal"
                   type: {
                     queue: {
                       toOActivation:  NONE
@@ -1055,7 +1005,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -1066,7 +1016,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ partner splits empty") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -1075,7 +1025,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Queue Proposal"
                   type: {
                     queue: {
                       toOActivation:  NONE
@@ -1086,7 +1035,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -1097,7 +1046,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("✓ partner splits missing") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
@@ -1106,7 +1055,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "My Queue Proposal"
                   type: {
                     queue: {
                       toOActivation:  NONE
@@ -1117,7 +1065,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
               }
             ) {
               proposal {
-                title
                 type {
                   ... on Queue {
                     partnerSplits {
@@ -1134,7 +1081,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           {
             "createProposal" : {
               "proposal" : {
-                "title" : "My Queue Proposal",
                 "type": {
                   "partnerSplits": []
                 }
@@ -1148,18 +1094,20 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ guest create a proposal") {
-    createProgramAs(guest).flatMap { pid =>
+    createProgramAs(guest, "My Guest Proposal").flatMap { pid =>
       expect(
         user = guest,
         query = s"""
           mutation {
             createProposal(
               input: {
-                programId: "$pid"
-                SET: { title: "My Guest Proposal" }
+                programId: "$pid",
+                SET: {
+                  category: GALACTIC_OTHER
+                }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -1169,18 +1117,20 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ create a proposal in another user's program") {
-    createProgramAs(pi2).flatMap { pid =>
+    createProgramAs(pi2, "My Proposal for Someone Else").flatMap { pid =>
       expect(
         user = pi,
         query = s"""
           mutation {
             createProposal(
               input: {
-                programId: "$pid"
-                SET: { title: "My Proposal for Someone Else" }
+                programId: "$pid",
+                SET: {
+                  category: GALACTIC_OTHER
+                }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -1197,11 +1147,13 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           mutation {
             createProposal(
               input: {
-                programId: "$badPid"
-                SET: { title: "My Ghost Proposal" }
+                programId: "$badPid",
+                SET: {
+                  category: GALACTIC_OTHER
+                }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -1210,7 +1162,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
   }
 
   test("⨯ create a proposal in a non-science program") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramAs(pi, "My Guest Proposal" ).flatMap { pid =>
       setProgramReference(staff, pid, """example: { instrument: GMOS_SOUTH }""") >>
       expect(
         user = pi,
@@ -1218,11 +1170,13 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           mutation {
             createProposal(
               input: {
-                programId: "$pid"
-                SET: { title: "My Guest Proposal" }
+                programId: "$pid",
+                SET: {
+                  category: GALACTIC_OTHER
+                }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,

@@ -224,8 +224,7 @@ trait DatabaseOperations { this: OdbSuite =>
           toOActivation: NONE
           minPercentTime: 0
         }
-      """.some,
-      "Queue Proposal"
+      """.some
     )
 
   def addDemoScienceProposal(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
@@ -238,16 +237,14 @@ trait DatabaseOperations { this: OdbSuite =>
           toOActivation: NONE
           minPercentTime: 0
         }
-      """.some,
-      "Demo Science Proposal"
+      """.some
     )
 
   def addProposal(
     user: User,
     pid: Program.Id,
     callId: Option[CallForProposals.Id] = None,
-    callProps: Option[String] = None,
-    title: String = "my proposal"
+    callProps: Option[String] = None
   ): IO[Unit] =
     expect(
       user = user,
@@ -257,8 +254,7 @@ trait DatabaseOperations { this: OdbSuite =>
             input: {
               programId: "$pid"
               SET: {
-                title: "$title"
-                category: COSMOLOGY
+                category: GALACTIC_OTHER
                 ${callId.fold("")(c => s"callId: \"$c\"")}
                 ${callProps.fold("") { c =>
                   s"""
@@ -271,7 +267,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           ) {
             proposal {
-              title
+              category
             }
           }
         }
@@ -280,7 +276,7 @@ trait DatabaseOperations { this: OdbSuite =>
         Json.obj(
           "createProposal" -> Json.obj(
             "proposal" -> Json.obj(
-              "title" -> title.asJson
+              "category" -> "GALACTIC_OTHER".asJson
             )
           )
         ).asRight
@@ -332,7 +328,7 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         ) {
-          proposal { title }
+          proposal { category }
         }
       }
     """).void

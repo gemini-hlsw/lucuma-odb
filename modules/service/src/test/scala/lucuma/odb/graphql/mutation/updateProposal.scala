@@ -23,7 +23,7 @@ class updateProposal extends OdbSuite {
 
   test("✓ generic properties") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       // Now update it, but not the call type
       expect(
         user = pi,
@@ -33,13 +33,11 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                 }
               }
             ) {
               proposal {
-                title
                 category
               }
             }
@@ -49,7 +47,6 @@ class updateProposal extends OdbSuite {
           {
             "updateProposal": {
               "proposal": {
-                "title": "updated title",
                 "category": "SMALL_BODIES"
               }
             }
@@ -61,7 +58,7 @@ class updateProposal extends OdbSuite {
 
   test("✓ type-specific properties") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -126,7 +123,7 @@ class updateProposal extends OdbSuite {
 
   test("✓ change type") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -135,7 +132,6 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                   type: {
                     demoScience: {
@@ -147,7 +143,6 @@ class updateProposal extends OdbSuite {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -164,7 +159,6 @@ class updateProposal extends OdbSuite {
           {
             "updateProposal": {
               "proposal": {
-                "title": "updated title",
                 "category": "SMALL_BODIES",
                 "type": {
                   "scienceSubtype": "DEMO_SCIENCE",
@@ -182,7 +176,7 @@ class updateProposal extends OdbSuite {
 
   test("✓ change type to LP") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -191,7 +185,6 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                   type: {
                     largeProgram: {
@@ -202,7 +195,6 @@ class updateProposal extends OdbSuite {
               }
             ) {
               proposal {
-                title
                 category
                 type {
                   scienceSubtype
@@ -219,7 +211,6 @@ class updateProposal extends OdbSuite {
           {
             "updateProposal": {
               "proposal": {
-                "title": "updated title",
                 "category": "SMALL_BODIES",
                 "type": {
                   "scienceSubtype": "LARGE_PROGRAM",
@@ -253,7 +244,6 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                   type: {
                     demoScience: { }
@@ -308,7 +298,6 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                   type: {
                     poorWeather: { }
@@ -359,7 +348,6 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
                   category: SMALL_BODIES
                   type: {
                     classical: { }
@@ -403,10 +391,10 @@ class updateProposal extends OdbSuite {
             updateProposal(
               input: {
                 programId: "$pid"
-                SET: { title: "updated title" }
+                SET: { category: COSMOLOGY }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -418,7 +406,7 @@ class updateProposal extends OdbSuite {
 
   test("⨯ splits sum to 100") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -444,7 +432,7 @@ class updateProposal extends OdbSuite {
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -456,7 +444,7 @@ class updateProposal extends OdbSuite {
 
   test("⨯ set invalid cfp id") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi,
         query = s"""
@@ -467,7 +455,7 @@ class updateProposal extends OdbSuite {
                 SET: { callId: "c-123" }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -480,7 +468,7 @@ class updateProposal extends OdbSuite {
   test("⨯ set mismatched cfp") {
     createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, title = "initial title") *>
+        addProposal(pi, pid) *>
         expect(
           user = pi,
           query = s"""
@@ -491,7 +479,7 @@ class updateProposal extends OdbSuite {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { title }
+                proposal { category }
               }
             }
           """,
@@ -505,7 +493,7 @@ class updateProposal extends OdbSuite {
   test("✓ set matching cfp") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, title = "initial title") *>
+        addProposal(pi, pid) *>
         expect(
           user = pi,
           query = s"""
@@ -540,7 +528,7 @@ class updateProposal extends OdbSuite {
   test("⨯ invalid type change") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, title = "initial title") *>
+        addProposal(pi, pid) *>
         query(
           user = pi,
           query = s"""
@@ -551,7 +539,7 @@ class updateProposal extends OdbSuite {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { title }
+                proposal { category }
               }
             }
           """
@@ -573,7 +561,7 @@ class updateProposal extends OdbSuite {
                   }
                 }
               ) {
-                proposal { title }
+                proposal { category }
               }
             }
           """,
@@ -587,7 +575,7 @@ class updateProposal extends OdbSuite {
   test("✓ change call and type") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, title = "initial title") *>
+        addProposal(pi, pid) *>
         query(
           user = pi,
           query = s"""
@@ -598,7 +586,7 @@ class updateProposal extends OdbSuite {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { title }
+                proposal { category }
               }
             }
           """
@@ -647,7 +635,7 @@ class updateProposal extends OdbSuite {
   test("✓ delete cfp") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, title = "initial title") *>
+        addProposal(pi, pid) *>
         query(
           user = pi,
           query = s"""
@@ -658,7 +646,7 @@ class updateProposal extends OdbSuite {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { title }
+                proposal { category }
               }
             }
           """
@@ -704,7 +692,7 @@ class updateProposal extends OdbSuite {
 
   test("⨯ update proposal in another user's program") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       expect(
         user = pi2,
         query = s"""
@@ -713,11 +701,11 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
+                  category: COSMOLOGY
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -729,7 +717,7 @@ class updateProposal extends OdbSuite {
 
   test("⨯ guest update proposal") {
     createProgramAs(pi).flatMap { pid =>
-      addProposal(pi, pid, title = "initial title") *>
+      addProposal(pi, pid) *>
       // the non-guest requirement gets caught before it even gets to the service.
       expect(
         user = guest,
@@ -739,11 +727,11 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
+                  category: COSMOLOGY
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,
@@ -763,11 +751,11 @@ class updateProposal extends OdbSuite {
             input: {
               programId: "$badPid"
               SET: {
-                title: "updated title"
+                category: COSMOLOGY
               }
             }
           ) {
-            proposal { title }
+            proposal { category }
           }
         }
       """,
@@ -787,11 +775,11 @@ class updateProposal extends OdbSuite {
               input: {
                 programId: "$pid"
                 SET: {
-                  title: "updated title"
+                  category: COSMOLOGY
                 }
               }
             ) {
-              proposal { title }
+              proposal { category }
             }
           }
         """,

@@ -8,7 +8,6 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
@@ -423,9 +422,7 @@ object ProposalService {
     def updates(SET: ProposalPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
       val mainUpdates: List[AppliedFragment] =
         List(
-          SET.abstractʹ.foldPresent(sql"c_abstract = ${text_nonempty.opt}"),
           SET.category.foldPresent(sql"c_category = ${tag.opt}"),
-          SET.title.foldPresent(sql"c_title = ${text_nonempty.opt}"),
           SET.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}")
         ).flatten
 
@@ -459,8 +456,6 @@ object ProposalService {
         INSERT INTO t_proposal (
           c_program_id,
           c_cfp_id,
-          c_title,
-          c_abstract,
           c_category,
           c_science_subtype,
           c_too_activation,
@@ -470,8 +465,6 @@ object ProposalService {
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
-          ${text_nonempty.opt},
-          ${text_nonempty.opt},
           ${tag.opt},
           ${science_subtype},
           ${too_activation},
@@ -481,8 +474,6 @@ object ProposalService {
       """.apply(
         pid,
         c.callId,
-        c.title,
-        c.abstractʹ,
         c.category,
         c.typeʹ.scienceSubtype,
         c.typeʹ.tooActivation,

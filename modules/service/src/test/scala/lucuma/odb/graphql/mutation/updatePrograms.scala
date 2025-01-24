@@ -91,6 +91,92 @@ class updatePrograms extends OdbSuite {
     }
   }
 
+  test("delete name"):
+    createProgramAs(pi, "Foo").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  name: null
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              hasMore
+              programs {
+                id
+                name
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+          {
+            "updatePrograms": {
+              "hasMore": false,
+              "programs": [
+                {
+                  "id": $pid,
+                  "name": null
+                }
+              ]
+            }
+          }
+          """
+        )
+      )
+
+  test("edit description"):
+    createProgramAs(pi, "Foo").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: {
+                  description: "Foo"
+                }
+                WHERE: {
+                  id: {
+                    EQ: "$pid"
+                  }
+                }
+              }
+            ) {
+              hasMore
+              programs {
+                id
+                description
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+          {
+            "updatePrograms": {
+              "hasMore": false,
+              "programs": [
+                {
+                  "id": $pid,
+                  "description": "Foo"
+                }
+              ]
+            }
+          }
+          """
+        )
+      )
+
   test("edit existence") {
     createProgramAs(pi).flatMap { pid =>
       expect(
