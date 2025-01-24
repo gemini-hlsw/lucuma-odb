@@ -32,6 +32,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with VisitTable[F]
                                with ChronConditionsEntryView[F] {
 
+  import ObservationView.ScienceRequirements.Spectroscopy.ExposureTimeMode
+
   lazy val TimeSpanMappings: List[TypeMapping] =
     List(
       timeSpanMappingAtPath(AllocationType / "duration", AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
@@ -42,6 +44,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "estimate", StepRecordView.TimeEstimate)(StepRecordView.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
+      timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", ExposureTimeMode.TimeAndCount.Time)(ExposureTimeMode.SyntheticId),
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
       timeSpanMappingAtPath(TimeChargeDiscountType / "partner", TimeChargeDiscountTable.Partner)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),

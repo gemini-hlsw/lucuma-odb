@@ -68,37 +68,42 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         }
       }
 
-      object ScienceRequirements {
+      object ScienceRequirements:
         val Mode: ColumnRef = col("c_science_mode", science_mode.embedded)
 
-        object Spectroscopy {
+        object Spectroscopy:
 
-          object Wavelength {
+          object Wavelength:
             val SyntheticId: ColumnRef = col("c_spec_wavelength_id", observation_id.embedded)
             val Value: ColumnRef       = col("c_spec_wavelength",    wavelength_pm.embedded)
-          }
 
-          object SignalToNoiseAt {
-            val SyntheticId: ColumnRef = col("c_spec_signal_to_noise_at_id", observation_id.embedded)
-            val Value: ColumnRef       = col("c_spec_signal_to_noise_at",    wavelength_pm.embedded)
-          }
+          object ExposureTimeMode:
+            val SyntheticId: ColumnRef   = col("c_spec_exp_time_mode_id", observation_id.embedded)
 
-          object WavelengthCoverage {
+            object SignalToNoise:
+              val SyntheticId: ColumnRef = col("c_spec_signal_to_noise_id", observation_id.embedded)
+              val Value: ColumnRef       = col("c_spec_signal_to_noise",    signal_to_noise.embedded)
+              val At: ColumnRef          = col("c_spec_signal_to_noise_at", wavelength_pm.embedded)
+
+            object TimeAndCount:
+              val SyntheticId: ColumnRef = col("c_spec_time_and_count_id",  observation_id.embedded)
+              val Time: ColumnRef        = col("c_spec_exp_time",           time_span.embedded)
+              val Count: ColumnRef       = col("c_spec_exp_count",          int4_nonneg.embedded)
+              val At: ColumnRef          = col("c_spec_signal_to_noise_at", wavelength_pm.embedded)
+
+          object WavelengthCoverage:
             val SyntheticId: ColumnRef = col("c_spec_wavelength_coverage_id", observation_id.embedded)
             val Value: ColumnRef       = col("c_spec_wavelength_coverage",    wavelength_pm.embedded)
-          }
 
-          object FocalPlaneAngle {
+          object FocalPlaneAngle:
             val SyntheticId: ColumnRef = col("c_spec_focal_plane_angle_id", observation_id.embedded)
             val Value: ColumnRef       = col("c_spec_focal_plane_angle",    angle_µas.embedded)
-          }
 
           val Resolution: ColumnRef    = col("c_spec_resolution",          int4_pos.opt)
-          val SignalToNoise: ColumnRef = col("c_spec_signal_to_noise",     signal_to_noise.opt)
           val FocalPlane: ColumnRef    = col("c_spec_focal_plane",         focal_plane.opt)
           val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capabilities.opt)
-        }
-      }
+
+      end ScienceRequirements
 
       object ObservingMode {
         val Key: ColumnRef = col("c_mode_key", text)

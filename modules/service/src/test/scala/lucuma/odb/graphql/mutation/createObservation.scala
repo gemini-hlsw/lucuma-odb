@@ -1442,8 +1442,12 @@ class createObservation extends OdbSuite {
                 spectroscopy: {
                   wavelength: { nanometers: 400 }
                   resolution: 200
-                  signalToNoise: 75.5
-                  signalToNoiseAt: { micrometers: 2.5 }
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.5
+                      at: { micrometers: 2.5 }
+                    }
+                  }
                   wavelengthCoverage: { picometers: 100000 }
                   focalPlane: SINGLE_SLIT
                   focalPlaneAngle: { microarcseconds: 3 }
@@ -1458,8 +1462,12 @@ class createObservation extends OdbSuite {
                 spectroscopy {
                   wavelength { picometers }
                   resolution
-                  signalToNoise
-                  signalToNoiseAt { nanometers }
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
                   wavelengthCoverage { micrometers }
                   focalPlane
                   focalPlaneAngle { microarcseconds }
@@ -1481,8 +1489,8 @@ class createObservation extends OdbSuite {
           (reqs.downIO[ScienceMode]("mode"),
            spectroscopy.downIO[Long]("wavelength", "picometers"),
            spectroscopy.downIO[Int]("resolution"),
-           spectroscopy.downIO[BigDecimal]("signalToNoise"),
-           spectroscopy.downIO[Long]("signalToNoiseAt", "nanometers"),
+           spectroscopy.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           spectroscopy.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
            spectroscopy.downIO[FocalPlane]("focalPlane"),
            spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),

@@ -21,7 +21,9 @@ import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
 import lucuma.core.math.RightAscension
+import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -184,7 +186,7 @@ object CalibrationsService extends CalibrationObservations {
         calibConfigs: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)]
       ): Map[CalibrationConfigSubset, Option[Wavelength]] =
         calibConfigs.groupBy(_._3).map { case (k, v) =>
-          val lw = v.map(_._2.map(_.spectroscopy.atWavelength)).flattenOption
+          val lw = v.map(_._2.map(_.spectroscopy.exposureTimeMode.at)).flattenOption
           val meanWv = if (lw.isEmpty) None
           else
             // there must be a way to sum in wavelength space :/
@@ -304,11 +306,15 @@ object CalibrationsService extends CalibrationObservations {
               ObservationPropertiesInput.Edit.Empty.copy(
                 scienceRequirements = Some(
                   ScienceRequirementsInput(
-                    mode = None,
+                    mode         = None,
                     spectroscopy = Some(
                       SpectroscopyScienceRequirementsInput.Default.copy(
-                        signalToNoise = Nullable.Absent,
-                        signalToNoiseAt = Nullable.NonNull(w)
+                        exposureTimeMode = Nullable.NonNull(
+                          ExposureTimeMode.SignalToNoiseMode(
+                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                            w
+                          )
+                        )
                       )
                     )
                   )
