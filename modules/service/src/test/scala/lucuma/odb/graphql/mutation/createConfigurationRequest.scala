@@ -20,8 +20,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   test("create and select configuration request for fully-configured observation") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
-      createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
           createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
             expect(
@@ -106,8 +106,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   test("can't create configuration request if no targets") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
-      createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
         createObservationAs(pi, pid).flatMap { oid =>
           expectOdbError(
             user = pi,
@@ -157,8 +157,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   test("can't create configuration request if no observing mode") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
-      createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, Some(cfpid), None, "Foo") >>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
           createObservationAs(pi, pid, tid).flatMap { oid =>
             expectOdbError(
@@ -186,8 +186,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
   test("identical requests are canonicalized") {
     for
         cfpid <- createCallForProposalsAs(admin)
-        pid   <- createProgramAs(pi)
-        _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+        pid   <- createProgramAs(pi, "Foo")
+        _     <- addProposal(pi, pid, Some(cfpid), None)
         tid   <- createTargetWithProfileAs(pi, pid)
         oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         req1  <- createConfigurationRequestAs(pi, oid)
@@ -198,8 +198,8 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
   test("identical requests are canonicalized, even if justifications differ") {
     for
         cfpid <- createCallForProposalsAs(admin)
-        pid   <- createProgramAs(pi)
-        _     <- addProposal(pi, pid, Some(cfpid), None, "Foo")
+        pid   <- createProgramAs(pi, "Foo")
+        _     <- addProposal(pi, pid, Some(cfpid), None)
         tid   <- createTargetWithProfileAs(pi, pid)
         oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         req1  <- createConfigurationRequestAs(pi, oid, NonEmptyString.from("j1").toOption)

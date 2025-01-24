@@ -38,14 +38,8 @@ class program extends OdbSuite {
                 program(programId: "$id") {
                   id
                   name
-                  userInvitations {
-                    status
-                  }
-                  proposal {
-                    title
-                    category
-                    abstract
-                  }
+                  userInvitations { status }
+                  proposal { category }
                 }
               }
             """,

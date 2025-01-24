@@ -65,6 +65,7 @@ trait ProgramMapping[F[_]]
       SqlField("id", ProgramTable.Id, key = true),
       SqlField("existence", ProgramTable.Existence),
       SqlField("name", ProgramTable.Name),
+      SqlField("description", ProgramTable.Description),
 
       SqlField("type", ProgramTable.ProgramType),
       SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),

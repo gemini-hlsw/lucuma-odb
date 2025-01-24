@@ -313,7 +313,8 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.name.map(sql"c_name = $text_nonempty"),
+          SET.name.foldPresent(sql"c_name = ${text_nonempty.opt}"),
+          SET.description.foldPresent(sql"c_description = ${text_nonempty.opt}"),
           SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
           SET.goa.flatMap(_.shouldNotify).map(sql"c_goa_should_notify = $bool"),
           SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool")
@@ -336,12 +337,14 @@ object ProgramService {
       sql"""
         INSERT INTO t_program (
           c_name,
+          c_description,
           c_goa_proprietary,
           c_goa_should_notify,
           c_goa_private_header,
           c_existence
         )
         VALUES (
+          ${text_nonempty.opt},
           ${text_nonempty.opt},
           $int4_nonneg,
           $bool,
@@ -351,6 +354,7 @@ object ProgramService {
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
         c.name,
+        c.description,
         c.goa.proprietaryMonths,
         c.goa.shouldNotify,
         c.goa.privateHeader,
