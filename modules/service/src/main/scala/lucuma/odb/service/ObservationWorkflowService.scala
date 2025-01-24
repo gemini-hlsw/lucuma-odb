@@ -14,6 +14,7 @@ import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -76,6 +77,7 @@ sealed trait ObservationWorkflowService[F[_]] {
 /* Validation Info Record */
 case class ObservationValidationInfo(
   pid: Program.Id,
+  tpe: ProgramType,
   oid: Observation.Id,
   instrument: Option[Instrument],
   ra: Option[RightAscension],
@@ -352,7 +354,7 @@ object ObservationWorkflowService {
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
-              case Defined    => List(Inactive) ++ Option.when(isAccepted)(Ready)
+              case Defined    => List(Inactive) ++ Option.when(isAccepted || info.tpe === ProgramType.Engineering)(Ready)
               case Ready      => List(Inactive, validationStatus)
               case Ongoing    => List(Inactive)
               case Completed  => Nil
@@ -367,7 +369,8 @@ object ObservationWorkflowService {
 
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
-        val (cals, science) = infos.partition(_._2.role.isDefined)
+        val (cals, other) = infos.partition(_._2.role.isDefined)
+        val (engineering, science) = other.partition(_._2.tpe === ProgramType.Engineering)
 
         // Here are our simple validators
 
@@ -404,7 +407,7 @@ object ObservationWorkflowService {
 
         // Here are our composed validators
 
-        val calibrationValidator: Validator = info =>
+        val calibrationValidator, engValidator: Validator = info =>
           ObservationValidationMap.empty
 
         val scienceValidator1: Validator =
@@ -417,6 +420,9 @@ object ObservationWorkflowService {
           itcValidator
 
         // And our validation results
+
+        val engResults: Map[Observation.Id, ObservationValidationMap] =
+          engineering.view.mapValues(engValidator).toMap
 
         val calibrationResults: Map[Observation.Id, ObservationValidationMap] =
           cals.view.mapValues(calibrationValidator).toMap
@@ -432,7 +438,7 @@ object ObservationWorkflowService {
             .toMap
 
         val prelimV: Map[Observation.Id, ObservationValidationMap] =
-          calibrationResults |+| scienceResults1 |+| scienceResults2
+          calibrationResults |+| engResults |+| scienceResults1 |+| scienceResults2
 
         val toCheck: List[ObservationValidationInfo] =
           science.values.toList.filter: info =>
@@ -505,6 +511,7 @@ object ObservationWorkflowService {
       sql"""
         SELECT
           o.c_program_id,
+          p.c_program_type,
           o.c_observation_id,
           o.c_instrument,
           o.c_explicit_ra,
@@ -519,10 +526,10 @@ object ObservationWorkflowService {
         LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
         WHERE c_observation_id IN ($enc)
       """
-      .query(program_id *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: tag *: cfp_id.opt *: science_band.opt)
+      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: tag *: cfp_id.opt *: science_band.opt)
       .map:
-        case (pid, oid, inst, ra, dec, cal, state, tag, cfp, sci) =>
-          ObservationValidationInfo(pid, oid, inst, ra, dec, cal, state, tag, cfp, sci, Nil)
+        case (pid, tpe, oid, inst, ra, dec, cal, state, tag, cfp, sci) =>
+          ObservationValidationInfo(pid, tpe, oid, inst, ra, dec, cal, state, tag, cfp, sci, Nil)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
