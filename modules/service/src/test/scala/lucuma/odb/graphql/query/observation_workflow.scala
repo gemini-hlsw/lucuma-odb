@@ -885,7 +885,7 @@ class observation_workflow
       for {
         cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
@@ -931,7 +931,7 @@ class observation_workflow
       for {
         cfp <- createCallForProposalsAs(staff)
         pid <- createProgramAs(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
