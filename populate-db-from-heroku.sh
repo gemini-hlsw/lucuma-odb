@@ -1,7 +1,17 @@
 #!/bin/bash
 set -e
+shopt -s extglob
 
-HEROKU_APP=lucuma-postgres-odb-dev
+function usage {
+  echo -e "Usage: $0 [dev|staging|production]"
+  exit 1
+}
+
+if [[ $1 != @(dev|staging|production) ]]; then
+  usage
+fi
+
+HEROKU_APP=lucuma-postgres-odb-$1
 SCRIPT_DIR=modules/service/src/main/resources/db/migration/
 PG_HOST=localhost
 PG_USER=jimmy
@@ -17,6 +27,8 @@ function clean_up {
   fi
 }
 trap clean_up EXIT
+
+echo "🍏 Populating local database from $HEROKU_APP."
 
 echo "🍏 Starting the database."
 docker-compose up -d > /dev/null 2>&1
