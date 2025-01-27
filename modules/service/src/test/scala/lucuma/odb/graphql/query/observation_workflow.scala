@@ -825,6 +825,28 @@ class observation_workflow
     }
   }
 
+  test("observartions in engineering programs are not validated and are immediately Defined") {
+    val setup: IO[Observation.Id] =
+      for {
+        pid <- createProgramAs(pi)
+        _   <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
+        oid <- createObservationAs(pi, pid)
+      } yield oid
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          ObservationWorkflow(          
+            ObservationWorkflowState.Defined,
+            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
+            Nil
+          )
+        ).asRight
+      )
+    }
+  }
+
   test("approved configuration request AND asterism outside limits") {      
 
     val oid1: IO[Observation.Id]  =
