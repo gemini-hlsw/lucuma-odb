@@ -354,7 +354,7 @@ object ObservationWorkflowService {
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
-              case Defined    => List(Inactive) ++ Option.when(isAccepted || info.tpe === ProgramType.Engineering)(Ready)
+              case Defined    => List(Inactive) ++ Option.when(isAccepted || info.tpe =!= ProgramType.Science)(Ready)
               case Ready      => List(Inactive, validationStatus)
               case Ongoing    => List(Inactive)
               case Completed  => Nil
@@ -370,7 +370,7 @@ object ObservationWorkflowService {
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
         val (cals, other) = infos.partition(_._2.role.isDefined)
-        val (engineering, science) = other.partition(_._2.tpe === ProgramType.Engineering)
+        val (nonScience, science) = other.partition(_._2.tpe =!= ProgramType.Science)
 
         // Here are our simple validators
 
@@ -422,7 +422,7 @@ object ObservationWorkflowService {
         // And our validation results
 
         val engResults: Map[Observation.Id, ObservationValidationMap] =
-          engineering.view.mapValues(engValidator).toMap
+          nonScience.view.mapValues(engValidator).toMap
 
         val calibrationResults: Map[Observation.Id, ObservationValidationMap] =
           cals.view.mapValues(calibrationValidator).toMap
