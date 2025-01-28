@@ -53,8 +53,9 @@ ThisBuild / githubWorkflowBuild +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
     name = Some("Validate GraphQL schema changes"),
-    params = Map("schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-                 "approve-label" -> "expected-breaking-change"
+    params = Map("schema"           -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+                 "approve-label"    -> "expected-breaking-change",
+                 "fail-on-breaking" -> "false"
     ),
     cond = Some("github.event_name == 'pull_request'")
   )

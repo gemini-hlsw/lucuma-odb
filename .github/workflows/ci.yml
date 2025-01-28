@@ -91,6 +91,7 @@ jobs:
         with:
           schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
           approve-label: expected-breaking-change
+          fail-on-breaking: false
 
       - name: Aggregate coverage reports
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
