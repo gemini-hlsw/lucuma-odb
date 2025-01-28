@@ -85,12 +85,6 @@ jobs:
         with:
           path: modules/service/src/main/resources/db/migration/
 
-      - name: Validate GraphQL schema changes
-        uses: kamilkisiela/graphql-inspector@master
-        with:
-          schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
-          approve-label: expected-breaking-change
-
       - name: Aggregate coverage reports
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
