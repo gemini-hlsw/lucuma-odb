@@ -49,6 +49,16 @@ ThisBuild / githubWorkflowBuild +=
     cond = Some("github.event_name == 'pull_request'")
   )
 
+ThisBuild / githubWorkflowBuild +=
+  WorkflowStep.Use(
+    UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
+    name = Some("Validate GraphQL schema changes"),
+    params = Map("schema"           -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+                 "approve-label"    -> "expected-breaking-change"
+    ),
+    cond = Some("github.event_name == 'pull_request'")
+  )
+
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
