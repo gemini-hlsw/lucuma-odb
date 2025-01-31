@@ -5,7 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ExecutionState
@@ -27,7 +27,7 @@ class executionState extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      PosInt.unsafeFrom(2),
+      NonNegInt.unsafeFrom(2),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
