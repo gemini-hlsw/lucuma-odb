@@ -14,6 +14,7 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
@@ -46,7 +47,7 @@ object TestItcClient {
     withResult[F](
       IntegrationTime(
         exposureTime,
-        PosInt.unsafeFrom(exposureCount),
+        NonNegInt.unsafeFrom(exposureCount),
         SignalToNoise.unsafeFromBigDecimalExact(signalToNoise)
       ),
       bandOrLine,
@@ -64,13 +65,20 @@ object TestItcClient {
         input:    SpectroscopyIntegrationTimeInput,
         useCache: Boolean
       ): F[IntegrationTimeResult] =
+        val resultʹ =
+          input.exposureTimeMode match
+            case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
+              result
+            case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
+              IntegrationTime(t, NonNegInt.unsafeFrom(c.value), result.signalToNoise)
+
         IntegrationTimeResult(
           Version,
           AsterismIntegrationTimeOutcomes(
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(result)), bandOrLine).asRight
+                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine).asRight
                 )
               )
             ).get
