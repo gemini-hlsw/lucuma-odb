@@ -7,7 +7,7 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
@@ -35,7 +35,7 @@ class setObservationWorkflowState
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      PosInt.unsafeFrom(2),
+      NonNegInt.unsafeFrom(2),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 

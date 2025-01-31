@@ -64,6 +64,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.PosAngleConstraintMode
@@ -280,6 +281,9 @@ trait Codecs {
 
   val existence: Codec[Existence] =
     enumerated(Type("e_existence"))
+
+  val exposure_time_mode_type: Codec[ExposureTimeModeType] =
+    enumerated(Type("e_exp_time_mode"))
 
   val focal_plane: Codec[FocalPlane] =
     enumerated[FocalPlane](Type.varchar)

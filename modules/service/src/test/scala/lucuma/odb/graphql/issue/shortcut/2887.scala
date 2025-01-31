@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.effect.IO
 import cats.effect.Ref
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.math.SignalToNoise
@@ -25,7 +25,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       1.hrTimeSpan,
-      PosInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1),
+      NonNegInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 

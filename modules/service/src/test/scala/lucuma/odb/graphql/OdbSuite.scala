@@ -22,7 +22,7 @@ import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import fs2.text.utf8
 import grackle.Mapping
@@ -38,6 +38,7 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.AsterismIntegrationTimeOutcomes
@@ -163,7 +164,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      PosInt.unsafeFrom(6),
+      NonNegInt.unsafeFrom(6),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
@@ -199,18 +200,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           case _                                                                        => signal
         IO.whenA(wavelength === signal) {
           IO.raiseError(new RuntimeException("Artifical exception for test cases."))
-        } *> IntegrationTimeResult(
-          FakeItcVersions,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine).asRight
+        } *> {
+          val result =
+            input.exposureTimeMode match
+              case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
+                fakeItcSpectroscopyResult
+              case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
+                IntegrationTime(t, c, fakeItcSpectroscopyResult.signalToNoise)
+
+           IntegrationTimeResult(
+            FakeItcVersions,
+            AsterismIntegrationTimeOutcomes(
+              NonEmptyChain.fromSeq(
+                List.fill(input.asterism.length)(
+                  TargetIntegrationTimeOutcome(
+                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine).asRight
+                  )
                 )
-              )
-            ).get
-          )
-        ).pure[IO]
+              ).get
+            )
+          ).pure[IO]
+        }
       }
 
       def spectroscopyGraphs(

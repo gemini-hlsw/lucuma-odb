@@ -16,6 +16,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.skycalc.ImprovedSkyCalc
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -166,14 +167,17 @@ trait CalibrationObservations {
                   observingMode = obsMode.some,
                   scienceRequirements =
                     ScienceRequirementsInput(
-                      mode = ScienceMode.Spectroscopy.some,
+                      mode         = ScienceMode.Spectroscopy.some,
                       spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                        signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0)),
-                        signalToNoiseAt = Nullable.orNull(wvAt),
+                        exposureTimeMode = Nullable.orNull(wvAt).map: w =>
+                          ExposureTimeMode.SignalToNoiseMode(
+                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                            w
+                          )
+                      ).some
                     ).some
                   ).some
-                ).some
-        )
+          )
       ).orError
 
   def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
@@ -205,8 +209,12 @@ trait CalibrationObservations {
                     ScienceRequirementsInput(
                       mode = ScienceMode.Spectroscopy.some,
                       spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                        signalToNoise = Nullable.NonNull(SignalToNoise.unsafeFromBigDecimalExact(100.0)),
-                        signalToNoiseAt = Nullable.NonNull(cw),
+                        exposureTimeMode = Nullable.NonNull(
+                          ExposureTimeMode.SignalToNoiseMode(
+                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                            cw
+                          )
+                        )
                     ).some
                   ).some
                 ).some

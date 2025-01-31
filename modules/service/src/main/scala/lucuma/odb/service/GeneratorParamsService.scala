@@ -28,6 +28,7 @@ import lucuma.core.math.RadialVelocity
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
@@ -40,6 +41,7 @@ import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
 import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
 import lucuma.itc.client.TargetInput
+import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -154,7 +156,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, _, Some(om), _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _) => (oid, om) }.distinct
           m          <- observingModeServices.selectObservingMode(oms)
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -242,20 +244,17 @@ object GeneratorParamsService {
         obsParams:  ObsParams,
         mode:       InstrumentMode,
       ): Either[MissingParamSet, ItcInput] =
-        (obsParams.signalToNoise.toValidNel(MissingParam.forObservation("signal to noise")),
-         obsParams.signalToNoiseAt.toValidNel(MissingParam.forObservation("signal to noise at wavelength")),
+        (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
          obsParams.targets.traverse(itcTargetParams)
-        ).mapN { case (s2n, λ, targets) =>
+        ).mapN { case (exposureTimeMode, targets) =>
           ItcInput(
             ImagingIntegrationTimeParameters(
-              λ,
-              Acquisition.AcquisitionSN,
+              ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
               obsParams.constraints,
-              mode.asImaging(λ)
+              mode.asImaging(exposureTimeMode.at)
             ),
             SpectroscopyIntegrationTimeParameters(
-              λ,
-              s2n,
+              exposureTimeMode,
               obsParams.constraints,
               mode
             ),
@@ -288,16 +287,15 @@ object GeneratorParamsService {
     }
 
   case class ParamsRow(
-    observationId:   Observation.Id,
-    calibrationRole: Option[CalibrationRole],
-    constraints:     ConstraintSet,
-    signalToNoise:   Option[SignalToNoise],
-    signalToNoiseAt: Option[Wavelength],
-    observingMode:   Option[ObservingModeType],
-    scienceBand:     Option[ScienceBand],
-    targetId:        Option[Target.Id],
-    radialVelocity:  Option[RadialVelocity],
-    sourceProfile:   Option[SourceProfile]
+    observationId:    Observation.Id,
+    calibrationRole:  Option[CalibrationRole],
+    constraints:      ConstraintSet,
+    exposureTimeMode: Option[ExposureTimeMode],
+    observingMode:    Option[ObservingModeType],
+    scienceBand:      Option[ScienceBand],
+    targetId:         Option[Target.Id],
+    radialVelocity:   Option[RadialVelocity],
+    sourceProfile:    Option[SourceProfile]
   )
 
   case class TargetParams(
@@ -307,14 +305,13 @@ object GeneratorParamsService {
   )
 
   case class ObsParams(
-    observationId:   Observation.Id,
-    calibrationRole: Option[CalibrationRole],
-    constraints:     ConstraintSet,
-    signalToNoise:   Option[SignalToNoise],
-    signalToNoiseAt: Option[Wavelength],
-    observingMode:   Option[ObservingModeType],
-    scienceBand:     Option[ScienceBand],
-    targets:         NonEmptyList[TargetParams]
+    observationId:    Observation.Id,
+    calibrationRole:  Option[CalibrationRole],
+    constraints:      ConstraintSet,
+    exposureTimeMode: Option[ExposureTimeMode],
+    observingMode:    Option[ObservingModeType],
+    scienceBand:      Option[ScienceBand],
+    targets:          NonEmptyList[TargetParams]
   )
 
   object ObsParams {
@@ -324,8 +321,7 @@ object GeneratorParamsService {
           oParams.head.observationId,
           oParams.head.calibrationRole,
           oParams.head.constraints,
-          oParams.head.signalToNoise,
-          oParams.head.signalToNoiseAt,
+          oParams.head.exposureTimeMode,
           oParams.head.observingMode,
           oParams.head.scienceBand,
           oParams.map: r =>
@@ -345,12 +341,34 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
+    val exposure_time_mode: Decoder[Option[ExposureTimeMode]] =
+      (
+        exposure_time_mode_type.opt  *:
+        wavelength_pm.opt            *:
+        signal_to_noise.opt          *:
+        time_span.opt                *:
+        int4_nonneg.opt
+      ).emap: (tpe, at, s2n, time, count) =>
+        tpe.fold(none[ExposureTimeMode].asRight[String]) {
+          case ExposureTimeModeType.SignalToNoiseMode =>
+            (s2n, at)
+              .mapN(ExposureTimeMode.SignalToNoiseMode.apply)
+              .toRight("Both c_spec_signal_to_noise and c_spec_signal_to_noise_at must be defined for the SignalToNoise exposure time mode.")
+              .map(_.some)
+
+          case ExposureTimeModeType.TimeAndCountMode  =>
+            (time, count, at)
+              .mapN(ExposureTimeMode.TimeAndCountMode.apply)
+              .toRight("c_spec_exp_time, c_spec_exp_count and c_spec_signal_to_noise_at must be defined for the TimeAndCount exposure time mode.")
+              .map(_.some)
+        }
+
+
     val params: Decoder[ParamsRow] =
       (observation_id          *:
        calibration_role.opt    *:
        constraint_set          *:
-       signal_to_noise.opt     *:
-       wavelength_pm.opt       *:
+       exposure_time_mode      *:
        observing_mode_type.opt *:
        science_band.opt        *:
        target_id.opt           *:
@@ -370,8 +388,11 @@ object GeneratorParamsService {
         $tab.c_air_mass_max,
         $tab.c_hour_angle_min,
         $tab.c_hour_angle_max,
-        $tab.c_spec_signal_to_noise,
+        $tab.c_spec_exp_time_mode,
         $tab.c_spec_signal_to_noise_at,
+        $tab.c_spec_signal_to_noise,
+        $tab.c_spec_exp_time,
+        $tab.c_spec_exp_count,
         $tab.c_observing_mode_type,
         $tab.c_science_band,
         $tab.c_target_id,

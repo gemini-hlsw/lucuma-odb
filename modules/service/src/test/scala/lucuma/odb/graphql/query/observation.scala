@@ -38,7 +38,12 @@ class observation extends OdbSuite {
                     spectroscopy: {
                       wavelength: { nanometers: 500 }
                       resolution: 100
-                      signalToNoise: 100.0
+                      exposureTimeMode: {
+                        signalToNoise: {
+                          value: 100.0
+                          at: { nanometers: 500 }
+                        }
+                      }
                       wavelengthCoverage: { nanometers: 20 }
                       focalPlane: SINGLE_SLIT
                       focalPlaneAngle: { microarcseconds: 0 }

@@ -35,7 +35,11 @@ class cloneObservation extends OdbSuite {
         spectroscopy {
           wavelength { nanometers }
           resolution
-          signalToNoise
+          exposureTimeMode {
+            signalToNoise {
+              value
+            }
+          }
           wavelengthCoverage { nanometers }
           focalPlane
           focalPlaneAngle { microarcseconds }

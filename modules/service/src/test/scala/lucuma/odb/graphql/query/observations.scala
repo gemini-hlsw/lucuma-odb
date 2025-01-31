@@ -200,8 +200,11 @@ class observations extends OdbSuite {
                     wavelength: {
                       angstroms: 42
                     }
-                    signalToNoiseAt: {
-                      angstroms: 71
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 100.0
+                        at: { angstroms: 71 }
+                      }
                     }
                     wavelengthCoverage: {
                       angstroms: 99
@@ -244,8 +247,10 @@ class observations extends OdbSuite {
                         wavelength {
                           picometers
                         }
-                        signalToNoiseAt {
-                          picometers
+                        exposureTimeMode {
+                          signalToNoise {
+                            at { picometers }
+                          }
                         }
                         wavelengthCoverage {
                           picometers
@@ -271,8 +276,12 @@ class observations extends OdbSuite {
                           "wavelength" : {
                             "picometers" : 4200
                           },
-                          "signalToNoiseAt" : {
-                            "picometers" : 7100
+                          "exposureTimeMode": {
+                            "signalToNoise": {
+                              "at": {
+                                "picometers": 7100
+                              }
+                            }
                           },
                           "wavelengthCoverage" : {
                             "picometers" : 9900
@@ -288,7 +297,7 @@ class observations extends OdbSuite {
                       "scienceRequirements" : {
                         "spectroscopy" : {
                           "wavelength" : null,
-                          "signalToNoiseAt" : null,
+                          "exposureTimeMode" : null,
                           "wavelengthCoverage" : null,
                           "focalPlaneAngle" : null
                         }

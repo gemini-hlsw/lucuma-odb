@@ -149,6 +149,7 @@ object OdbMapping {
           with ExecutionEventAddedMapping[F]
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
+          with ExposureTimeModeMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
@@ -208,6 +209,7 @@ object OdbMapping {
           with SetProgramReferenceResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
+          with SignalToNoiseExposureTimeModeMapping[F]
           with SiteCoordinateLimitsMapping[F]
           with SpectroscopyConfigOptionMapping[F]
           with SpectroscopyScienceRequirementsMapping[F]
@@ -222,6 +224,7 @@ object OdbMapping {
           with TargetGroupSelectResultMapping[F]
           with TargetSelectResultMapping[F]
           with TelescopeConfigMapping[F]
+          with TimeAndCountExposureTimeModeMapping[F]
           with TimeChargeCorrectionMapping[F]
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
@@ -347,6 +350,7 @@ object OdbMapping {
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
                 ExecutionMapping,
+                ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
                 GmosNorthLongSlitMapping,
@@ -411,6 +415,7 @@ object OdbMapping {
                 SetProgramReferenceResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,
+                SignalToNoiseExposureTimeModeMapping,
                 SlewEventMapping,
                 StepConfigMapping,
                 StepConfigBiasMapping,
@@ -431,6 +436,7 @@ object OdbMapping {
                 TargetMapping,
                 TargetSelectResultMapping,
                 TelescopeConfigMapping,
+                TimeAndCountExposureTimeModeMapping,
                 TimeChargeCorrectionMapping,
                 TimeChargeDaylightDiscountMapping,
                 TimeChargeNoDataDiscountMapping,
