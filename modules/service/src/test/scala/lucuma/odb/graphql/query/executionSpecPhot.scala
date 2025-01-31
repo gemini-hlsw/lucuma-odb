@@ -7,7 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -21,7 +21,7 @@ class executionSpecPhot extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      PosInt.unsafeFrom(10),
+      NonNegInt.unsafeFrom(10),
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 

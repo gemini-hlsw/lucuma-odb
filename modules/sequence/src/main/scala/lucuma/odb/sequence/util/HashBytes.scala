@@ -3,6 +3,7 @@
 
 package lucuma.odb.sequence.util
 
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
@@ -53,6 +54,11 @@ object HashBytes {
   given HashBytes[Int] with {
     def hashBytes(a: Int): Array[Byte] =
       toByteArray(BigInt(a), 4)
+  }
+
+  given HashBytes[NonNegInt] with {
+    def hashBytes(a: NonNegInt): Array[Byte] =
+      HashBytes[Int].hashBytes(a.value)
   }
 
   given HashBytes[PosInt] with {
