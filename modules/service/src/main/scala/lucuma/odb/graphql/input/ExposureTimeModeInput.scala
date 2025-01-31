@@ -12,9 +12,9 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ExposureTimeMode.SignalToNoiseMode
 import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.binding.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.binding.*
 
 object ExposureTimeModeInput:
 
