@@ -6,8 +6,8 @@ package query
 
 import cats.effect.IO
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
