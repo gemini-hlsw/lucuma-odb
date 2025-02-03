@@ -31,7 +31,8 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
       c <- createCallForProposalsAs(staff, RegularSemester)
       p <- createProgramAs(pi, "ShortCut 4457")
       t <- createTargetWithProfileAs(pi, p)
-      o <- createObservationWithNoModeAs(pi, p, t)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- computeItcResult(pi, o)
       _ <- addProposal(pi, p, c.some)
       _ <- addPartnerSplits(pi, p)
       _ <- addCoisAs(pi, p)
@@ -83,7 +84,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
         {
           "observation": {
             "index": 1,
-            "workflow": { "state": "UNDEFINED" }
+            "workflow": { "state": "UNAPPROVED" }
           }
         }
       """
@@ -119,7 +120,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
               "matches": [
                 {
                   "index": 1,
-                  "workflow": { "state": "UNDEFINED" }
+                  "workflow": { "state": "UNAPPROVED" }
                 }
               ]
             }
