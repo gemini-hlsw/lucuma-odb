@@ -123,8 +123,13 @@ trait ProgramUserService[F[_]]:
     programId: Program.Id
   )(using Transaction[F]): F[ProgramUser.Id]
 
-  /** Check to see if the user has access to the given program. */
-  def userHasAccess(
+  /** Check to see if the user has read access to the given program. */
+  def userHasReadAccess(
+    programId: Program.Id
+  )(using Transaction[F]): F[Boolean]
+
+  /** Check to see if the user has write access to the given program. */
+  def userHasWriteAccess(
     programId: Program.Id
   )(using Transaction[F]): F[Boolean]
 
@@ -273,10 +278,18 @@ object ProgramUserService:
                       case Completion.Update(1) => uid.some.success
                       case a                    => OdbError.NotAuthorized(user.id).asFailure
 
-      override def userHasAccess(
+      override def userHasReadAccess(
         programId: Program.Id
       )(using Transaction[F]): F[Boolean] =
-        Statements.existsUserAccess(user, programId).fold(true.pure[F]): af =>
+        Statements.existsUserReadAccess(user, programId).fold(true.pure[F]): af =>
+          val stmt = sql"SELECT ${af.fragment}".query(bool)
+          session.prepareR(stmt).use: pg =>
+            pg.unique(af.argument)
+
+      override def userHasWriteAccess(
+        programId: Program.Id
+      )(using Transaction[F]): F[Boolean] =
+        Statements.existsUserWriteAccess(user, programId).fold(true.pure[F]): af =>
           val stmt = sql"SELECT ${af.fragment}".query(bool)
           session.prepareR(stmt).use: pg =>
             pg.unique(af.argument)
@@ -493,6 +506,12 @@ object ProgramUserService:
     ): AppliedFragment =
       existsUserAs(programId, userId, ProgramUserRole.Coi)
 
+    def existsUserAsCoiRO(
+      programId: Program.Id,
+      userId: User.Id,
+    ): AppliedFragment =
+      existsUserAs(programId, userId, ProgramUserRole.CoiRO)
+
     def existsAllocationForPartner(
       programId: Program.Id,
       partner: Partner
@@ -501,7 +520,19 @@ object ProgramUserService:
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
       """.apply(programId, partner.timeAccountingCategory)
 
-    def existsUserAccess(
+    def existsUserReadAccess(
+      user:      User,
+      programId: Program.Id
+    ): Option[AppliedFragment] =
+      user.role match
+        case GuestRole                    => existsUserAsPi(programId, user.id).some
+        case StandardRole.Pi(_)           => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void" OR " |+| existsUserAsCoiRO(programId, user.id) |+|void")").some
+        case StandardRole.Ngo(_, partner) => existsAllocationForPartner(programId, partner).some
+        case ServiceRole(_) |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_)        => none
+
+    def existsUserWriteAccess(
       user:      User,
       programId: Program.Id
     ): Option[AppliedFragment] =
@@ -513,19 +544,35 @@ object ProgramUserService:
              StandardRole.Admin(_) |
              StandardRole.Staff(_)        => none
 
-    def whereUserAccess(
+    def whereUserReadAccess(
       user:      User,
       programId: Program.Id
     ): AppliedFragment =
-      existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
+      existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af =>
         void"WHERE " |+| af
       }
 
-    def andWhereUserAccess(
+    def whereUserWriteAccess(
       user:      User,
       programId: Program.Id
     ): AppliedFragment =
-      existsUserAccess(user, programId).fold(AppliedFragment.empty) { af =>
+      existsUserWriteAccess(user, programId).fold(AppliedFragment.empty) { af =>
+        void"WHERE " |+| af
+      }
+
+    def andWhereUserReadAccess(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af =>
+        void"AND " |+| af
+      }
+
+    def andWhereUserWriteAccess(
+      user:      User,
+      programId: Program.Id
+    ): AppliedFragment =
+      existsUserWriteAccess(user, programId).fold(AppliedFragment.empty) { af =>
         void"AND " |+| af
       }
 

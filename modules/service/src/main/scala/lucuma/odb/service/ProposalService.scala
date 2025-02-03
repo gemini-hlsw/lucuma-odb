@@ -533,7 +533,7 @@ object ProposalService {
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
-      ProgramUserService.Statements.andWhereUserAccess(user, pid)
+      ProgramUserService.Statements.andWhereUserReadAccess(user, pid)
 
     def updateProposalStatus(user: User, pid: Program.Id, status: Tag): AppliedFragment =
       sql"""
@@ -541,7 +541,7 @@ object ProposalService {
         SET c_proposal_status = $tag
         WHERE c_program_id = $program_id
       """.apply(status, pid) |+|
-      ProgramUserService.Statements.andWhereUserAccess(user, pid)
+      ProgramUserService.Statements.andWhereUserWriteAccess(user, pid)
 
   }
 }
