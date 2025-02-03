@@ -495,7 +495,7 @@ object TargetService {
         FROM t_target
         WHERE c_target_id = $target_id
       """.apply(pid, tid) |+|
-      ProgramUserService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      ProgramUserService.Statements.existsUserWriteAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_target_id
       """
