@@ -160,7 +160,7 @@ object AttachmentFileService {
       case GuestUser(_) => Forbidden.asLeftT
       case _            =>
         programUserService
-          .userHasAccess(programId)
+          .userHasWriteAccess(programId)
           .map(b => if (b) ().asRight else Forbidden.asLeft)
           .asEitherT
     }

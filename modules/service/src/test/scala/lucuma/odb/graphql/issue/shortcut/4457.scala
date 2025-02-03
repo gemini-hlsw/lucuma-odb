@@ -84,7 +84,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
         {
           "observation": {
             "index": 1,
-            "workflow": { "state": "UNDEFINED" }
+            "workflow": { "state": "UNAPPROVED" }
           }
         }
       """
@@ -120,7 +120,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
               "matches": [
                 {
                   "index": 1,
-                  "workflow": { "state": "UNDEFINED" }
+                  "workflow": { "state": "UNAPPROVED" }
                 }
               ]
             }
