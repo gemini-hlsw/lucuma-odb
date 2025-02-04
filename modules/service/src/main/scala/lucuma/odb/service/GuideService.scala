@@ -308,7 +308,7 @@ object GuideService {
 
       def checkProgramAccess(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
         services.transactionally(
-          programUserService.userHasAccess(pid).map(hasAccess =>
+          programUserService.userHasWriteAccess(pid).map(hasAccess =>
             if (hasAccess) ().success
             else OdbError.InvalidObservation(oid).asFailure
           )
@@ -930,8 +930,9 @@ object GuideService {
     }
 
   object Statements {
-    import ProgramUserService.Statements.andWhereUserAccess
-    import ProgramUserService.Statements.whereUserAccess
+    import ProgramUserService.Statements.andWhereUserReadAccess
+    import ProgramUserService.Statements.andWhereUserWriteAccess
+    import ProgramUserService.Statements.whereUserWriteAccess
 
     def getObservationInfo(oid: Observation.Id): AppliedFragment =
       sql"""
@@ -964,7 +965,7 @@ object GuideService {
         from t_guide_availability
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
-      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+      """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
 
     def insertOrUpdateGuideAvailabilityHash(
       user: User,
@@ -983,7 +984,7 @@ object GuideService {
           $observation_id,
           $md5_hash
       """.apply(pid, oid, hash) |+| 
-      whereUserAccess(user, pid) |+|
+      whereUserWriteAccess(user, pid) |+|
       sql"""
         on conflict on constraint t_guide_availability_pkey do update
           set c_hash = $md5_hash
@@ -998,7 +999,7 @@ object GuideService {
         from t_guide_availability_period
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
-      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+      """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
     
     def insertManyAvailabilityPeriods(
       user: User,
@@ -1031,7 +1032,7 @@ object GuideService {
         delete from t_guide_availability_period
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
-      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+      """.apply(pid, oid) |+| andWhereUserWriteAccess(user, pid)
 
     // both guideStarName and guideStarHash should either have values or be empty.
     def updateGuideTargetName(
@@ -1048,7 +1049,7 @@ object GuideService {
           c_guide_target_hash = ${md5_hash.opt}
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
-      """.apply(guideStarName, guideStarHash, pid, oid) |+| andWhereUserAccess(user, pid) |+|
+      """.apply(guideStarName, guideStarHash, pid, oid) |+| andWhereUserWriteAccess(user, pid) |+|
       void"""  returning c_observation_id"""
   }
 

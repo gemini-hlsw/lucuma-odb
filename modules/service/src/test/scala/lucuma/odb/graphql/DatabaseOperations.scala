@@ -1758,7 +1758,6 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: json =>
       json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
 
-
   private def itcQuery(oids: Observation.Id*) = 
     s"""
       query {
