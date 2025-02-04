@@ -599,9 +599,9 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
-      services.useTransactionally:
+      services.useNonTransactionally:
         requirePiAccess:
-          proposalService.setProposalStatus(input).nestMap: pid =>
+          proposalService.setProposalStatus(input, commitHash, itcClient, timeEstimateCalculator).nestMap: pid =>
             Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
 
   // An applied fragment that selects all observation ids that satisfy

@@ -1758,4 +1758,29 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: json =>
       json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
 
+
+  private def itcQuery(oids: Observation.Id*) = 
+    s"""
+      query {
+        observations(
+          WHERE: {
+            id: { IN: ${oids.asJson} }
+          }
+        ) {
+          matches {
+            itc {
+              science {
+                selected {
+                  targetId
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def computeItcResultAs(user: User, oid: Observation.Id): IO[Unit] =
+    query(user, itcQuery(oid)).void
+
 }
