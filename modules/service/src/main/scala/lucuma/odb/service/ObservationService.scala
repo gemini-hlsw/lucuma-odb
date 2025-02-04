@@ -586,7 +586,7 @@ object ObservationService {
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
 
-    import ProgramUserService.Statements.whereUserAccess
+    import ProgramUserService.Statements.whereUserWriteAccess
 
     def insertObservationAs(
       user:      User,
@@ -689,7 +689,7 @@ object ObservationService {
         void"RETURNING c_observation_id"
 
       // done!
-      insert |+| whereUserAccess(user, programId) |+| returning
+      insert |+| whereUserWriteAccess(user, programId) |+| returning
 
     }
 
@@ -1095,7 +1095,7 @@ object ObservationService {
       FROM t_observation
       WHERE c_observation_id = $observation_id
       """.apply(gix, oid) |+|
-      ProgramUserService.Statements.existsUserAccess(user, pid).foldMap(void"AND " |+| _) |+|
+      ProgramUserService.Statements.existsUserWriteAccess(user, pid).foldMap(void"AND " |+| _) |+|
       void"""
         RETURNING c_observation_id
       """

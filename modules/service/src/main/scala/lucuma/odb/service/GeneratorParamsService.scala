@@ -334,7 +334,7 @@ object GeneratorParamsService {
 
   object Statements {
 
-    import ProgramUserService.Statements.existsUserAccess
+    import ProgramUserService.Statements.existsUserReadAccess
 
     private val source_profile: Decoder[SourceProfile] =
       jsonb.emap { sp =>
@@ -415,7 +415,7 @@ object GeneratorParamsService {
         void""" AND gp.c_observation_id IN (""" |+|
           which.map(sql"$observation_id").intercalate(void", ") |+|
         void")" |+|
-        existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
+        existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
 
     def selectManyParams(
       which: NonEmptyList[Observation.Id]
@@ -454,7 +454,7 @@ object GeneratorParamsService {
         // sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
         // void""" AND ob.c_active_status = 'active' """              |+|
         selector                                                             |+|
-        existsUserAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
+        existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }
   }
 }

@@ -210,7 +210,7 @@ object AsterismService {
 
   object Statements {
 
-    import ProgramUserService.Statements.{andWhereUserAccess, whereUserAccess}
+    import ProgramUserService.Statements.{andWhereUserReadAccess, andWhereUserWriteAccess, whereUserWriteAccess}
 
     def selectProgramId(
       observationIds: NonEmptyList[Observation.Id]
@@ -248,7 +248,7 @@ object AsterismService {
       val as: AppliedFragment =
         void""") AS t (c_program_id, c_observation_id, c_target_id) """
 
-      insert |+| values |+| as |+| whereUserAccess(user, programId) |+|
+      insert |+| values |+| as |+| whereUserWriteAccess(user, programId) |+|
         void""" ON CONFLICT DO NOTHING"""  // the key consists of all the columns anyway
     }
 
@@ -281,7 +281,7 @@ object AsterismService {
          void"WHERE " |+| programIdEqual(programId)     |+|
          void" AND " |+| observationIdIn(observationIds) |+|
          void" AND " |+| targetIdIn(targetIds)           |+|
-         andWhereUserAccess(user, programId)
+         andWhereUserWriteAccess(user, programId)
 
     def deleteAllLinksAs(
       user:           User,
@@ -291,7 +291,7 @@ object AsterismService {
       void"DELETE FROM ONLY t_asterism_target "         |+|
         void"WHERE " |+| programIdEqual(programId)      |+|
         void" AND "  |+| observationIdIn(observationIds) |+|
-        andWhereUserAccess(user, programId)
+        andWhereUserWriteAccess(user, programId)
 
     // programs that aren't visible.
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
@@ -335,7 +335,7 @@ object AsterismService {
           and a.c_program_id = $program_id
           and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
-      """.apply(pid, oid) |+| andWhereUserAccess(user, pid)
+      """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
 
     def getAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, (Target.Id, Target))] =
       sql"""

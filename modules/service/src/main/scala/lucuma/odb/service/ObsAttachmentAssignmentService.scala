@@ -126,7 +126,7 @@ object ObsAttachmentAssignmentService {
 
   object Statements {
 
-    import ProgramUserService.Statements.{andWhereUserAccess}
+    import ProgramUserService.Statements.{andWhereUserWriteAccess}
 
     def insertLinksAs(
       user:             User,
@@ -145,7 +145,7 @@ object ObsAttachmentAssignmentService {
         FROM t_attachment a, t_observation o
         WHERE """ |+| observationIdIn(observationIds) |+|
       void" AND " |+| attachmentIdIn(attachmentIds) |+|
-      andWhereUserAccess(user, programId) |+|
+      andWhereUserWriteAccess(user, programId) |+|
       void""" ON CONFLICT DO NOTHING""" // the key consists of all the columns, anyway
 
     private def programIdEqual(
@@ -177,7 +177,7 @@ object ObsAttachmentAssignmentService {
         void"WHERE " |+| programIdEqual(programId) |+|
         void" AND " |+| observationIdIn(observationIds) |+|
         void" AND " |+| attachmentIdIn(attachmentIds) |+|
-        andWhereUserAccess(user, programId)
+        andWhereUserWriteAccess(user, programId)
 
     def deleteAllLinksAs(
       user:           User,
@@ -187,7 +187,7 @@ object ObsAttachmentAssignmentService {
       void"DELETE FROM ONLY t_obs_attachment_assignment " |+|
         void"WHERE " |+| programIdEqual(programId) |+|
         void" AND " |+| observationIdIn(observationIds) |+|
-        andWhereUserAccess(user, programId)
+        andWhereUserWriteAccess(user, programId)
 
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
       sql"""
