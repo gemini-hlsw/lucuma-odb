@@ -10,6 +10,7 @@ import cats.syntax.option.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.RegularSemester
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -32,6 +33,7 @@ class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
         p <- createProgramAs(pi, "ShortCut 4460")
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)
+        _ <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Inactive) // avoid submission check
         _ <- addProposal(pi, p, c.some)
         _ <- addPartnerSplits(pi, p)
         _ <- addCoisAs(pi, p)

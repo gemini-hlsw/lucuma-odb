@@ -39,24 +39,6 @@ class setObservationWorkflowState
       SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
-  def computeItcResult(oid: Observation.Id): IO[Unit] =
-    query(
-      pi,
-      s"""
-        query {
-          observation(observationId: "$oid") {
-            itc {
-              science {
-                selected {
-                  targetId
-                }
-              }
-            }
-          }
-        }
-      """
-    ).void
-
   def approveConfigurationRequest(req: ConfigurationRequest.Id): IO[Unit] =
     import skunk.syntax.all.*
     import lucuma.odb.util.Codecs.configuration_request_id
@@ -118,7 +100,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- computeItcResult(oid)
+      _   <- computeItcResultAs(pi, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Unapproved)
       _   <- testTransitions(oid, Unapproved, Inactive)
     } yield ()
@@ -132,7 +114,7 @@ class setObservationWorkflowState
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
-      _   <- computeItcResult(oid)
+      _   <- computeItcResultAs(pi, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(oid, Defined, Inactive)
     } yield ()
@@ -149,7 +131,7 @@ class setObservationWorkflowState
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
-      _   <- computeItcResult(oid)
+      _   <- computeItcResultAs(pi, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(oid, Defined, Inactive, Ready)
     } yield ()
@@ -168,7 +150,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s1)
       s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s2)
-      _  <- computeItcResult(o)
+      _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _  <- testTransitions(o, Ongoing, Inactive)
     yield ()
@@ -189,7 +171,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s2)
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s3)
-      _  <- computeItcResult(o)
+      _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Completed)
       _  <- testTransitions(o, Completed)
     yield ()
@@ -217,7 +199,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s1)
       s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s2)
-      _  <- computeItcResult(o)
+      _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _  <- testTransitions(o, Ongoing, Inactive)
     yield ()
@@ -238,7 +220,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s2)
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s3)
-      _  <- computeItcResult(o)
+      _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Completed)
       _  <- testTransitions(o, Completed)
     yield ()
