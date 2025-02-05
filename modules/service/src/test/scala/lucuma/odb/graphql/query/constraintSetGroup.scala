@@ -17,6 +17,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.enums.ObservationWorkflowState
 
 class constraintSetGroup extends OdbSuite {
 
@@ -125,7 +126,10 @@ class constraintSetGroup extends OdbSuite {
   test("should be able to use a proposal reference") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
-        def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
+        def create2(iq: ImageQuality, sb: SkyBackground) = 
+          createObservation(user, pid, iq, sb)
+            .flatTap(setObservationWorkflowState(user, _, ObservationWorkflowState.Inactive)) // avoid submission error
+            .replicateA(2)
         (
           create2(ImageQuality.OnePointFive, SkyBackground.Bright),
           create2(ImageQuality.PointOne, SkyBackground.Bright),

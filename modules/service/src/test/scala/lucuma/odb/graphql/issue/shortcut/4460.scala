@@ -14,6 +14,7 @@ import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.core.enums.ObservationWorkflowState
 
 class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
 
@@ -32,6 +33,7 @@ class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
         p <- createProgramAs(pi, "ShortCut 4460")
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)
+        _ <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Inactive) // avoid submission check
         _ <- addProposal(pi, p, c.some)
         _ <- addPartnerSplits(pi, p)
         _ <- addCoisAs(pi, p)
