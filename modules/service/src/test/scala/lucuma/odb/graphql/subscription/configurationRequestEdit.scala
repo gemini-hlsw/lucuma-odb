@@ -139,6 +139,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
       _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- computeItcResultAs(pi, oid)
     yield (pid, oid)
 
   test("insert and update") {
