@@ -10,11 +10,11 @@ import cats.syntax.option.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.RegularSemester
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
-import lucuma.core.enums.ObservationWorkflowState
 
 class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
 
