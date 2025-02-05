@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
@@ -21,6 +22,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -29,6 +31,8 @@ import lucuma.odb.graphql.input.DeleteProposalInput
 import lucuma.odb.graphql.input.ProposalPropertiesInput
 import lucuma.odb.graphql.input.SetProposalStatusInput
 import lucuma.odb.graphql.input.UpdateProposalInput
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -75,8 +79,11 @@ private[service] trait ProposalService[F[_]] {
    * Set the proposal status associated with the program specified in the `input`.
    */
   def setProposalStatus(
-    input: SetProposalStatusInput
-  )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
+    input: SetProposalStatusInput,
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], Services.PiAccess): F[Result[Program.Id]]
 
 }
 
@@ -141,6 +148,10 @@ object ProposalService {
 
     def notAuthorizedOld(pid: Program.Id, user: User, ps: Tag): OdbError =
       s"User ${user.id} not authorized to change proposal status from ${ps.value.toUpperCase} in program $pid.".noAuth(user.id)
+
+    def undefinedObservations(pid: Program.Id): OdbError =
+      s"Submitted proposal $pid contains undefined observations.".invalidArg
+
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
@@ -375,16 +386,21 @@ object ProposalService {
           }
 
       override def setProposalStatus(
-        input: SetProposalStatusInput
-      )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
+        input: SetProposalStatusInput,
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
         def validate(
           pid: Program.Id,
           ctx: ProposalContext,
+          states: Set[ObservationWorkflowState],
           oldStatus: enumsVal.ProposalStatus,
           newStatus: enumsVal.ProposalStatus
         ): Result[Unit] =
           for {
+            _ <- undefinedObservations(pid).asFailure.whenA(states.contains(ObservationWorkflowState.Undefined))
             _ <- notAuthorizedNew(pid, user, Tag(newStatus.tag)).asFailure.unlessA(newStatus.userCanChangeStatus)
             _ <- notAuthorizedOld(pid, user, ctx.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
             _ <- ctx.validateSubmission(pid, newStatus)
@@ -394,16 +410,25 @@ object ProposalService {
           val af = Statements.updateProposalStatus(user, pid, tag)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        (for {
-          pid       <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-          info      <- ResultT(ProposalContext.lookup(pid))
-          oldStatus <- ResultT.fromResult(info.status) // This 'should' be succesful, since it is from the DB
-          newStatus <- ResultT.fromResult(input.status.toProposalStatus)
-          _         <- ResultT.fromResult(validate(pid, info, oldStatus, newStatus))
-          _         <- ResultT.liftF(update(pid, input.status))
-          _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
-          _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
-        } yield pid).value
+        ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+          .flatMap: pid =>
+            ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid, commitHash, itcClient, ptc))).flatMap: wfs =>
+              val states = wfs.values.map(_.state).toSet
+              ResultT:
+                services.transactionally:
+                  val go2 =
+                    for
+                      info      <- ResultT(ProposalContext.lookup(pid))
+                      oldStatus <- ResultT.fromResult(info.status) // This 'should' be succesful, since it is from the DB
+                      newStatus <- ResultT.fromResult(input.status.toProposalStatus)
+                      _         <- ResultT.fromResult(validate(pid, info, states, oldStatus, newStatus))
+                      _         <- ResultT.liftF(update(pid, input.status))
+                      _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
+                      _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
+                    yield pid
+                  go2.value 
+          .value
+
       }                
     }
 
