@@ -78,6 +78,7 @@ class addProgramUser extends OdbSuite:
                 educationalStatus
                 thesis
                 gender
+                hasDataAccess
               }
             }
           }
@@ -99,7 +100,8 @@ class addProgramUser extends OdbSuite:
                 },
                 "educationalStatus": "GRAD_STUDENT",
                 "thesis": false,
-                "gender": "MALE"
+                "gender": "MALE",
+                "hasDataAccess": true
               }
             }
           }
@@ -189,7 +191,7 @@ class addProgramUser extends OdbSuite:
         ).asLeft
       )
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: link =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: link =>
     test(s"PI can add $link"):
       for
         _   <- createUsers(pi1, pi2)
@@ -212,18 +214,19 @@ class addProgramUser extends OdbSuite:
 
   // What can a Coi do?
 
-  test("Coi can add an observer"):
-    for
-      _    <- createUsers(pi1, pi2)
-      pid  <- createProgramAs(pi1)
-      mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
-      _    <- linkUserAs(pi1, mid, pi2.id)
-      rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.CoiRO)
-      _    <- assertIO(
-                listProgramUsersAs(pi1, pid),
-                List((mid, ProgramUserRole.Coi, pi2.id.some), (rid2, ProgramUserRole.CoiRO, none))
-              )
-    yield ()
+  List(ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
+    test(s"Coi can add $role."):
+      for
+        _    <- createUsers(pi1, pi2)
+        pid  <- createProgramAs(pi1)
+        mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+        _    <- linkUserAs(pi1, mid, pi2.id)
+        rid2 <- addProgramUserAs(pi1, pid, role)
+        _    <- assertIO(
+                  listProgramUsersAs(pi1, pid),
+                  List((mid, ProgramUserRole.Coi, pi2.id.some), (rid2, ProgramUserRole.CoiRO, none))
+                )
+      yield ()
 
   List(ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"Coi can't add $role (NotAuthorized)."):
@@ -239,9 +242,25 @@ class addProgramUser extends OdbSuite:
         case OdbError.NotAuthorized(pi2.id, _) => // this is what we expect
       }
 
+  // What can an External user do?
+  Enumerated[ProgramUserRole].all.foreach: role =>
+    test(s"External users can't add $role (NotAuthorized)."):
+      interceptOdbError {
+        for
+          _    <- createUsers(pi1, pi2)
+          pid  <- createProgramAs(pi1)
+          mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.External)
+          _    <- linkUserAs(pi1, mid, pi2.id)
+          _    <- addProgramUserAs(pi2, pid, role, partnerLinkFor(role))
+        yield ()
+      } {
+        case OdbError.NotAuthorized(pi2.id, _) => // this is what we expect
+        case OdbError.InvalidArgument(Some("Argument 'input' is invalid: PIs are added at program creation time.")) => // ok
+      }
+
   // What can NGO user do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can add $role with allocated time."):
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
@@ -250,7 +269,7 @@ class addProgramUser extends OdbSuite:
         _   <- addProgramUserAs(ngo, pid, role, partnerLinkFor(role))
       yield ()
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can't add $role without allocated time."):
       interceptOdbError {
         for

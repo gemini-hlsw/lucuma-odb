@@ -88,6 +88,40 @@ class redeemUserInvitation extends OdbSuite:
             """.asRight
           )
 
+  test("redeem a data sharing invitation"):
+    createProgramAs(pi2) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, role = ProgramUserRole.External).flatMap: mid =>
+        createUserInvitationAs(pi, mid).flatMap: inv =>
+          expect(
+            user  = pi2,
+            query = redeem(inv),
+            expected = json"""
+              {
+                "redeemUserInvitation" : {
+                  "invitation" : {
+                    "status" : ${InvitationStatus.Redeemed},
+                    "issuer" : { "id" : ${pi.id} },
+                    "programUser": {
+                      "id": $mid,
+                      "user": { "id": ${pi2.id} },
+                      "program" : {
+                        "users" : [
+                          {
+                            "role" : ${ProgramUserRole.External.tag.toUpperCase},
+                            "user" : {
+                              "id": ${pi2.id}
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            """.asRight
+          )
+
   test("redeem an invitation without partner"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>

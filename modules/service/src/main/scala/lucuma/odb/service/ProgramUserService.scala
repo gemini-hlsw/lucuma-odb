@@ -388,7 +388,7 @@ object ProgramUserService:
      * - Staff, Admin, and Service users can always do this.
      * - Standard user can only do this if they're the program's PI.
      */
-    private def accessCheckCoi(
+    private def isPiOrBetter(
       action:          String,
       targetProgramId: Program.Id,
       sourceUser:      User  // user doing the program user update
@@ -407,7 +407,7 @@ object ProgramUserService:
      * - Staff, Admin, and Service users can always do this.
      * - Standard user can only do this if they're the program's PI or Coi.
      */
-    private def accessCheckCoiRo(
+    private def isCoiOrBetter(
       action:          String,
       targetProgramId: Program.Id,
       sourceUser:      User  // user doing the program user update
@@ -432,7 +432,7 @@ object ProgramUserService:
      * - Staff, Admin, and Service users can always do this.
      * - Nobody else can do this.
      */
-    private def accessCheckSupport(
+    private def isStaffOrBetter(
       action:     String,
       sourceUser: User // user doing the program user update
     ): Result[Option[AppliedFragment]] =
@@ -454,10 +454,11 @@ object ProgramUserService:
     ): Result[Option[AppliedFragment]] =
       targetRole match
         case ProgramUserRole.Pi               => OdbError.UpdateFailed("PIs are fixed at program creation time.".some).asFailure
-        case ProgramUserRole.Coi              => accessCheckCoi(action, targetProgramId, sourceUser)
-        case ProgramUserRole.CoiRO            => accessCheckCoiRo(action, targetProgramId, sourceUser)
+        case ProgramUserRole.Coi              => isPiOrBetter(action, targetProgramId, sourceUser)
+        case ProgramUserRole.CoiRO          |
+             ProgramUserRole.External         => isCoiOrBetter(action, targetProgramId, sourceUser)
         case ProgramUserRole.SupportPrimary |
-             ProgramUserRole.SupportSecondary => accessCheckSupport(action, sourceUser)
+             ProgramUserRole.SupportSecondary => isStaffOrBetter(action, sourceUser)
 
     def linkStandardUser(
       targetId:     ProgramUser.Id,
@@ -623,6 +624,7 @@ object ProgramUserService:
       val upEducationalStatus = sql"c_educational_status   = ${educational_status.opt}"
       val upThesis            = sql"c_thesis               = ${bool.opt}"
       val upGender            = sql"c_gender               = ${gender.opt}"
+      val upDataAccess        = sql"c_has_data_access      = $bool"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
@@ -632,7 +634,8 @@ object ProgramUserService:
           SET.fallbackProfile.flatMap(_.email).foldPresent(upEmail),
           SET.educationalStatus.foldPresent(upEducationalStatus),
           SET.thesis.foldPresent(upThesis),
-          SET.gender.foldPresent(upGender)
+          SET.gender.foldPresent(upGender),
+          SET.hasDataAccess.map(upDataAccess)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),

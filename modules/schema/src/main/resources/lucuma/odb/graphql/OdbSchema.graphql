@@ -3598,6 +3598,9 @@ input ProgramUserPropertiesInput {
 
   "The user's reported gender."
   gender: Gender
+
+  "Whether the user has data access."
+  hasDataAccess: Boolean
 }
 
 """
@@ -3607,6 +3610,7 @@ enum ProgramUserRole {
   "Primary Investigator"               PI
   "Co-Investigator"                    COI
   "Co-Investigator (read-only access)" COI_RO
+  "External"                           EXTERNAL
   "Staff/Partner Primary Support"      SUPPORT_PRIMARY
   "Staff/Partner Secondary Support"    SUPPORT_SECONDARY
 }
@@ -3649,6 +3653,9 @@ type ProgramUser {
 
   "User invitations, if any, associated with this program user."
   invitations: [UserInvitation!]!
+
+  "Has access to data."
+  hasDataAccess: Boolean!
 }
 
 """
@@ -14561,6 +14568,11 @@ input WhereProgramUser {
   Matches the gender status.
   """
   gender: WhereOptionEqGender
+
+  """
+  Matches the data access flag.
+  """
+  hasDataAccess: WhereOptionBoolean
 }
 
 """

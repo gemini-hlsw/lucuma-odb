@@ -76,7 +76,7 @@ class deleteProgramUser extends OdbSuite:
 
   // What can a PI do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: link =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: link =>
     test(s"PI can delete $link"):
       for
         _   <- createUsers(pi1, pi2)
@@ -100,15 +100,16 @@ class deleteProgramUser extends OdbSuite:
 
   // What can a Coi do?
 
-  test("Coi can delete an observer"):
-    for
-      _    <- createUsers(pi1, pi2, pi3)
-      pid  <- createProgramAs(pi1)
-      rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
-      _    <- linkUserAs(pi1, rid2, pi2.id)
-      rid3 <- addProgramUserAs(pi1, pid, ProgramUserRole.CoiRO)
-      _    <- assertIO(deleteProgramUserAs(pi2, rid3), true)
-    yield ()
+  List(ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
+    test(s"Coi can delete $role."):
+      for
+        _    <- createUsers(pi1, pi2, pi3)
+        pid  <- createProgramAs(pi1)
+        rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+        _    <- linkUserAs(pi1, rid2, pi2.id)
+        rid3 <- addProgramUserAs(pi1, pid, role)
+        _    <- assertIO(deleteProgramUserAs(pi2, rid3), true)
+      yield ()
 
   List(ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"Coi can't delete $role (NotAuthorized)."):
@@ -127,7 +128,7 @@ class deleteProgramUser extends OdbSuite:
 
   // What can NGO user do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can delete $role with allocated time."):
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
@@ -137,7 +138,7 @@ class deleteProgramUser extends OdbSuite:
         _   <- assertIO(deleteProgramUserAs(ngo, mid), true)
       yield ()
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can't delete $role without allocated time."):
       interceptOdbError {
         for
@@ -167,7 +168,7 @@ class deleteProgramUser extends OdbSuite:
   // What can superusers do?
 
   List(staff, admin, service).foreach: u =>
-    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
+    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
       test(s"${u.role.access} can delete $role."):
         for
           _   <- createUsers(pi1, pi2, u)
