@@ -69,6 +69,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 
 -- Update the entry point for formatting to handle COM and MON
+-- Update the entry point for formatting to handle SYS
 CREATE OR REPLACE FUNCTION format_program_reference(
   ptype           e_program_type,
   semester        d_semester,
@@ -90,6 +91,9 @@ BEGIN
       WHEN ptype = 'example' OR
            ptype = 'library' THEN
           public.format_lib_or_xpl_reference(ptype, instrument, description)
+
+      WHEN ptype = 'system' THEN
+          CONCAT('SYS-', description)
 
       WHEN ptype = 'science' AND proposal_status = 'accepted' THEN
           public.format_science_reference(semester, index, science_subtype)
