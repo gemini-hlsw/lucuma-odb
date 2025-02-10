@@ -311,7 +311,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -364,7 +364,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -415,7 +415,7 @@ class observation_workflow
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))     
-         _   <- computeItcResult(pi, oid)
+         _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
@@ -444,7 +444,7 @@ class observation_workflow
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       List((RaStartWrap, DecStart), (RaEndWrap, DecEnd), (RaStartWrap, DecEnd), (RaCenterWrap, DecCenter)).traverse { (ra, dec) =>
@@ -529,7 +529,7 @@ class observation_workflow
         _   <- setTargetCoords(tid, RaCenter, DecCenter)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -613,7 +613,7 @@ class observation_workflow
         _   <- setAllocationsAs(staff, pid, allocations)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
         _   <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
         _   <- setAllocationsAs(staff, pid, allocations.tail).intercept[ResponseException[Json]].void
       } yield oid
@@ -645,7 +645,7 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -673,7 +673,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -702,7 +702,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -731,7 +731,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(denyConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -760,7 +760,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
       expect(
@@ -834,7 +834,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
 
     val oid2: IO[Observation.Id] =
@@ -889,7 +889,7 @@ class observation_workflow
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
       } yield oid
 
     setup.flatMap { oid =>
@@ -905,7 +905,7 @@ class observation_workflow
         ).asRight
       ) >>
       updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
-      computeItcResult(pi, oid) >> // recompute ITC
+      computeItcResultAs(pi, oid) >> // recompute ITC
       expect(
         pi,
         workflowQuery(oid),
@@ -935,7 +935,7 @@ class observation_workflow
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResult(pi, oid)
+        _   <- computeItcResultAs(pi, oid)
         _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)
       } yield oid
 
@@ -952,7 +952,7 @@ class observation_workflow
         ).asRight
       ) >>
       updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
-      computeItcResult(pi, oid) >> // recompute ITC
+      computeItcResultAs(pi, oid) >> // recompute ITC
       expect(
         pi,
         workflowQuery(oid),
