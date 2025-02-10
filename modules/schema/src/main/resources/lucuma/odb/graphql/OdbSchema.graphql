@@ -9738,6 +9738,15 @@ type Query {
   filterTypeMeta: [FilterTypeMeta!]!
 
   """
+  Obtains a list of program references for which the user with ORCiD `orcidId`
+  has GOA data-download access privileges.  These will be those for which the
+  user is a ProgramUser of any role with the `hasDataAccess` flag set.
+
+  This query is for use by the GOA and will fail for other users.
+  """
+  goaDataDownloadAccess(orcidId: String!): [ProgramReferenceLabel!]!
+
+  """
   Returns the group indicated by the given groupId, if found.
   """
   group(
@@ -14572,7 +14581,7 @@ input WhereProgramUser {
   """
   Matches the data access flag.
   """
-  hasDataAccess: WhereOptionBoolean
+  hasDataAccess: WhereBoolean
 }
 
 """
