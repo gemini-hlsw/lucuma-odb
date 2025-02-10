@@ -73,6 +73,35 @@ class setProposalStatus extends OdbSuite
     }
   }
 
+  test("⨯ undefined observation") {
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        addCoisAs(pi, pid) *>
+        createObservationAs(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposal { reference { label } } }
+              }
+            }
+          """,
+          expected = List(
+            s"Submitted proposal $pid contains undefined observations."
+          ).asLeft
+        )
+      }
+    }
+  }
+
   test("⨯ missing two matching partners") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
@@ -614,6 +643,7 @@ class setProposalStatus extends OdbSuite
       _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- computeItcResultAs(pi, oid)
       ina <- createObservationAs(pi, pid) // inactive, should be ignored
       _   <- setObservationWorkflowState(pi, ina, ObservationWorkflowState.Inactive)
       cal <- createObservationAs(pi, pid) // calibration, should be ignored
@@ -669,6 +699,7 @@ class setProposalStatus extends OdbSuite
       _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- computeItcResultAs(pi, oid)
       _   <-
         query(
           user = pi,

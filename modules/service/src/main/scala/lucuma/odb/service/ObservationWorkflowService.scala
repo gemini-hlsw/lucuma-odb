@@ -64,6 +64,13 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
+  def getWorkflows(
+    pid: Program.Id,
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
+
   def setWorkflowState(
     oid: Observation.Id,
     state: ObservationWorkflowState,
@@ -483,6 +490,18 @@ object ObservationWorkflowService {
                   .map(_.toMap)
           .value
 
+      override def getWorkflows(
+        pid: Program.Id,
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
+        services
+          .transactionally:
+            session.prepareR(Statements.selectObservationIds).use: pq =>
+              pq.stream(pid, 1024).compile.toList
+          .flatMap(getWorkflows(_, commitHash, itcClient, ptc))
+
       override def setWorkflowState(
         oid: Observation.Id,
         state: ObservationWorkflowState,
@@ -572,6 +591,14 @@ object ObservationWorkflowService {
         SET c_workflow_user_state = ${user_state.opt}
         WHERE c_observation_id = $observation_id
       """.command
+
+    val selectObservationIds: Query[Program.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
+        WHERE c_existence = 'present'
+        AND c_program_id = $program_id
+      """.query(observation_id)
 
   }
 
