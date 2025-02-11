@@ -25,16 +25,22 @@ class goaAccessQuery extends OdbSuite:
   val pi4   = TestUsers.Standard.pi(4, 34)
   val staff = TestUsers.Standard.staff(10, 100)
 
-  val goa   = TestUsers.Standard(
+  val goa1  = TestUsers.Standard(
     20,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(200).get),
     email = "charles@guiteau.com".some
   )
 
-  override protected def goaUser: Option[User.Id] =
-    goa.id.some
+  val goa2  = TestUsers.Standard(
+    21,
+    StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(201).get),
+    email = "leon@czolgosz.edu".some
+  )
 
-  val validUsers = List(pi, pi2, pi3, pi4, staff, goa).toList
+  override protected def goaUsers: Set[User.Id] =
+    Set(goa1.id, goa2.id)
+
+  val validUsers = List(pi, pi2, pi3, pi4, staff, goa1, goa2).toList
 
   val sem2025B   = Semester.unsafeFromString("2025B")
 
@@ -69,7 +75,7 @@ class goaAccessQuery extends OdbSuite:
     for
       ref <- setup(none)
       _   <- expect(
-        user     = goa,
+        user     = goa1,
         query    = queryString(pi),
         expected =
           json"""
@@ -82,7 +88,7 @@ class goaAccessQuery extends OdbSuite:
       )
     yield ()
 
-  test("only GOA user may perform this query"):
+  test("non-GOA, non-staff users may not perform this query"):
     for
       _ <- setup(none)
       _ <- expect(
@@ -96,7 +102,7 @@ class goaAccessQuery extends OdbSuite:
     for
       ref <- setup((pi2, ProgramUserRole.External).some)
       _   <- expect(
-        user     = goa,
+        user     = goa2,
         query    = queryString(pi2),
         expected =
           json"""
@@ -113,7 +119,7 @@ class goaAccessQuery extends OdbSuite:
     for
       ref <- setup((pi3, ProgramUserRole.Coi).some)
       _   <- expect(
-        user     = goa,
+        user     = goa1,
         query    = queryString(pi3),
         expected =
           json"""
@@ -156,7 +162,7 @@ class goaAccessQuery extends OdbSuite:
         """
       ).void
       _   <- expect(
-        user     = goa,
+        user     = goa2,
         query    = queryString(pi4),
         expected =
           json"""
@@ -168,18 +174,27 @@ class goaAccessQuery extends OdbSuite:
       )
     yield ()
 
+  private def label(idx: Int): String =
+    ProgramReference.fromString.unsafeGet(s"G-2025B-000$idx-Q").label
+
   test("GOA data access: multiple"):
-    def label(idx: Int): String =
-      ProgramReference.fromString.unsafeGet(s"G-2025B-000$idx-Q").label
-
-    val labels = (1 to 5).map(label).asJson
-
     expect(
-      user     = goa,
+      user     = goa1,
       query    = queryString(pi),
       expected = json"""
         {
-          "goaDataDownloadAccess": $labels
+          "goaDataDownloadAccess": ${(1 to 5).map(label).asJson}
+        }
+      """.asRight
+    )
+
+  test("GOA data access: by staff"):
+    expect(
+      user     = staff,
+      query    = queryString(pi),
+      expected = json"""
+        {
+          "goaDataDownloadAccess": ${(1 to 5).map(label).asJson}
         }
       """.asRight
     )

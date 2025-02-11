@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.effect.Resource
 import cats.syntax.all.*
 import grackle.Context
@@ -25,6 +26,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model
+import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObservationReference
@@ -69,7 +71,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
   def commitHash: CommitHash
-  def goaUser: Option[User.Id]
+  def goaUsers: Set[User.Id]
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(QueryType)(
@@ -196,8 +198,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (p, e) =>
     val notAuthorized = OdbError.NotAuthorized(user.id, "Only the GOA user may access this field.".some).asFailure
     val goaUserCheck  = user match
-      case StandardUser(id, _, _, _) => notAuthorized.unlessA(goaUser.contains(id))
-      case _                         => notAuthorized
+      case StandardUser(id, r, rs, _) => notAuthorized.unlessA(goaUsers.contains(id) || ((r::rs).map(_.access).max >= Access.Staff))
+      case _                          => notAuthorized
 
     def decode(r: Json): Result[List[ProgramReference]] =
       r.hcursor.downFields("programUsers", "matches").values.toList.flatMap(_.toList).traverse: json =>
