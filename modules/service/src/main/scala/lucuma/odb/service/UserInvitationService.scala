@@ -55,14 +55,23 @@ object UserInvitationService:
   def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] =
     new UserInvitationService[F]:
 
-      def sendInvitation(input: CreateUserInvitationInput, invitation: UserInvitation, pid: Program.Id)(
-        using Transaction[F]): F[Result[EmailId]] = {
+      def sendInvitation(
+        input:      CreateUserInvitationInput,
+        invitation: UserInvitation,
+        pid:        Program.Id,
+        targetRole: ProgramUserRole
+      )(using Transaction[F]): F[Result[EmailId]] = {
+
+        val (action, preposition) = targetRole match
+          case ProgramUserRole.External => ("share data", "from")
+          case _                        => ("collaborate", "on")
+
         val subject: NonEmptyString = NonEmptyString.unsafeFrom(
-          s"Invitation to collaborate from ${user.displayName}"
+          s"Invitation to $action from ${user.displayName}"
         )
 
         val textMessage: NonEmptyString = NonEmptyString.unsafeFrom(
-          s"""${user.displayName} has invited you to collaborate on a Gemini proposal. To accept this invitation go to ${emailConfig.exploreUrl} to log in, then from the upper right menu select "Redeem Invitations" and enter the following key:
+          s"""${user.displayName} has invited you to $action $preposition a Gemini proposal. To accept this invitation go to ${emailConfig.exploreUrl} to log in, then from the upper right menu select "Redeem Invitations" and enter the following key:
           |
           |${invitation.token}
           |
@@ -128,16 +137,17 @@ object UserInvitationService:
           // Science users can only create CoI or Observer invitations, and only if they're the PI
           case StandardRole.Pi(_)     =>
             targetRole match
-              case ProgramUserRole.Coi   => createInvitationAsPi(input, targetPid)
-              case ProgramUserRole.CoiRO => createInvitationAsPi(input, targetPid)
-              case _                     => OdbError.NotAuthorized(user.id, "Science users can only create co-investigator and observer invitations.".some).asFailureF
+              case ProgramUserRole.Coi      |
+                   ProgramUserRole.CoiRO    |
+                   ProgramUserRole.External => createInvitationAsPi(input, targetPid)
+              case _                        => OdbError.NotAuthorized(user.id, "Science users can only create co-investigator and external (data only) invitations.".some).asFailureF
 
       def createUserInvitation(input: CreateUserInvitationInput)(using Transaction[F]): F[Result[UserInvitation]] =
         (for {
           (p, r, u)  <- ResultT(programUserService.selectLinkData(input.programUserId))
           _          <- u.fold(ResultT.unit[F])(uid => ResultT.fromResult(OdbError.InvalidProgramUser(input.programUserId, s"ProgramUser ${input.programUserId} is already associated with user $uid.".some).asFailure))
           invitation <- ResultT(createUserInvitationImpl(input, p, r))
-          emailId    <- ResultT(sendInvitation(input, invitation, p))
+          emailId    <- ResultT(sendInvitation(input, invitation, p, r))
           _          <- ResultT(updateEmailId(invitation.id, emailId))
         } yield invitation).value
 

@@ -83,6 +83,7 @@ object OdbMapping {
     topics0:       Topics[F],
     itcClient0:    ItcClient[F],
     commitHash0:   CommitHash,
+    goaUser0:      Option[User.Id],
     enums:         Enums,
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:   Client[F],
@@ -262,6 +263,7 @@ object OdbMapping {
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
+          override val goaUser = goaUser0
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
@@ -278,6 +280,7 @@ object OdbMapping {
                   topics0,
                   itcClient0,
                   commitHash0,
+                  goaUser0,
                   enums,
                   tec,
                   httpClient0,
@@ -578,6 +581,7 @@ object OdbMapping {
       def timeEstimateCalculator = sys.error("OdbMapping.forMetadata: no timeEstimateCalculator available")
       def itcClient = sys.error("OdbMapping.forMetadata: no itcClient available")
       def commitHash = sys.error("OdbMapping.forMetadata: no commitHash available")
+      def goaUser = sys.error("OdbMapping.forMetadata: no goaUser available")
 
       // Our schema
       val schema: Schema =

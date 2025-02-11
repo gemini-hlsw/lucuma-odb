@@ -159,6 +159,69 @@ class linkUser extends OdbSuite:
         interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
           linkUserAs(ngo, mid, pi2.id)
 
+  // LINKING EXTERNAL USERS
+
+  test("[external] guest user can't link an external user"):
+    createUsers(guest, pi) >>
+    createProgramAs(guest).flatMap: pid =>
+      addProgramUserAs(staff, pid, ProgramUserRole.External).flatMap: mid =>
+        interceptOdbError {
+          linkUserAs(guest, mid, pi.id)
+        } {
+          case OdbError.NotAuthorized(guest.id, _) =>
+        }
+
+  test("[external] pi user can link external user to program they own"):
+    createUsers(pi, pi2) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id)
+
+  test("[external] pi user can't link external user to program they don't own"):
+    createUsers(pi, pi2, pi3) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: mid =>
+        interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+          linkUserAs(pi2, mid, pi3.id)
+
+  test("[external] pi user can link an external user to a program where they are a coi"):
+    createUsers(pi, pi2, pi3) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.Coi).flatMap: rid2 =>
+        linkUserAs(pi, rid2, pi2.id) >>   // pi links pi2 as coi
+        addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: rid3 =>
+          linkUserAs(pi2, rid3, pi3.id)   // pi2 links pi3 as external user
+
+  test("[external] pi user can't link an external user to a program where they are an observer"):
+    createUsers(pi, pi2, pi3) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id)  >>   // pi links pi2 as observer
+        addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: rid2 =>
+          interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation."):
+            linkUserAs(pi2, rid2, pi3.id) // pi2 tries to link pi3 as observer
+
+  test("[external] service, admin, and staff users can add an external user to any program"):
+    List(service, admin, staff).traverse_ : user =>
+      createUsers(user) >>
+      createProgramAs(pi).flatMap: pid =>
+        addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: mid =>
+          linkUserAs(user, mid, pi2.id)
+
+  test("[external] ngo user can add external user to program with time allocated by user's partner"):
+    createUsers(pi, pi2, ngo, admin) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: mid =>
+        setOneAllocationAs(admin, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 42.hourTimeSpan) >>
+        linkUserAs(ngo, mid, pi2.id)
+
+  test("[external] ngo user can't add observer to program without time allocated by user's partner"):
+    createUsers(pi, pi2, ngo) >>
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, ProgramUserRole.External).flatMap: mid =>
+        interceptGraphQL(s"User ${ngo.id} is not authorized to perform this operation."):
+          linkUserAs(ngo, mid, pi2.id)
+
   // LINKING SUPPORT
 
   List[ProgramUserRole.SupportPrimary.type | ProgramUserRole.SupportSecondary.type](

@@ -21,6 +21,7 @@ trait ProgramUserTable[F[_]] extends BaseMapping[F] {
     val EducationalStatus = col("c_educational_status", educational_status.opt)
     val Thesis            = col("c_thesis", bool.opt)
     val Gender            = col("c_gender", gender.opt)
+    val HasDataAccess     = col("c_has_data_access", bool)
 
     object Fallback extends UserProfileTable[ColumnRef]:
       override val GivenName  = col("c_fallback_given_name", varchar.opt)
