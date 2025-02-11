@@ -224,7 +224,7 @@ class addProgramUser extends OdbSuite:
         rid2 <- addProgramUserAs(pi1, pid, role)
         _    <- assertIO(
                   listProgramUsersAs(pi1, pid),
-                  List((mid, ProgramUserRole.Coi, pi2.id.some), (rid2, ProgramUserRole.CoiRO, none))
+                  List((mid, ProgramUserRole.Coi, pi2.id.some), (rid2, role, none))
                 )
       yield ()
 
