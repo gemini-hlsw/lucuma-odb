@@ -187,7 +187,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
         // I can't believe this works.
         services.useNonTransactionally:
-          requireServiceAccess: // N.B. this is only for services, at least for now
+          requireStaffAccess: // N.B. this is only for staff or better, at least for now
             go.value
 
       case other =>
