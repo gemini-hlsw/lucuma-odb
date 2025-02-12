@@ -41,6 +41,9 @@ sealed trait Nullable[+A] extends Product with Serializable {
   def isPresent: Boolean =
     fold(ifNull = false, ifAbsent = false, _ => true)
 
+  def isDefined: Boolean =
+    fold(ifNull = true, ifAbsent = false, _ => true)
+
 }
 
 object Nullable {

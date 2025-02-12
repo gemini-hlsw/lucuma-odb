@@ -501,29 +501,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     expected:  Ior[List[String], Json],
     variables: Option[JsonObject] = None,
     client:    ClientOption = ClientOption.Default
-  ): IO[Unit] = {
-    val op = this.query(user, query, variables, client)
-    expected.fold(
-      errors => {
-        op.intercept[ResponseException[Any]]
-          .map(_.errors.toList.map(_.message))
-          .assertEquals(errors)
-      },
-      success => {
-        op.map(_.spaces2)
-//          .flatTap(s => IO.println(s))
-          .assertEquals(success.spaces2) // by comparing strings we get more useful errors
-      },
-      (errors, success) => {
-        op.intercept[ResponseException[Json]]
-          .map { case ResponseException(e, d) =>
-            assertEquals(e.toList.map(_.message), errors)
-            assertEquals(d.map(_.spaces2), success.spaces2.some)
-          }
-      }
-    )
-  }
-
+  ): IO[Unit] =
+    queryIor(user, query, variables, client).map: ior =>
+      assertEquals(ior.leftMap(_.toList.map(_.message)), expected)
+        
   def query(
     user:      User,
     query:     String,

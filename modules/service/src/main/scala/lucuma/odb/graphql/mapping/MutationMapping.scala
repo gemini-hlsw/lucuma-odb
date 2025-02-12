@@ -58,6 +58,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.syntax.observationWorkflowState.*
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
 import skunk.AppliedFragment
@@ -65,6 +66,8 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import lucuma.core.enums.ObservationWorkflowState
+import lucuma.odb.service.NoTransaction
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 
@@ -625,39 +628,60 @@ trait MutationMapping[F[_]] extends Predicates[F] {
     ).flatMap(_.fragment)
   }
 
+  private def observationIdSelectWithWorkflowState(
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean,
+    allowedStates:       Set[ObservationWorkflowState]
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] = 
+    Services.asSuperUser:
+      observationIdSelect(includeDeleted, WHERE, includeCalibrations)
+        .flatTraverse: which =>
+          observationWorkflowService.filterState(
+            which, 
+            allowedStates,
+            commitHash,
+            itcClient,
+            timeEstimateCalculator
+          )
+
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
-      services.useTransactionally {
 
-        val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE, false)
-
-        val selectObservations: F[Result[(List[Observation.Id], Query)]] =
-          idSelect.traverse { which =>
-            observationService.selectObservations(which)
-          } map { r =>
-            r.flatMap { oids =>
-              observationResultSubquery(oids, input.LIMIT, child)
-                .tupleLeft(oids)
-            }
+      def selectObservations(using Services[F], NoTransaction[F]): F[Result[(List[Observation.Id], Query)]] =
+        observationIdSelectWithWorkflowState(
+          input.includeDeleted, 
+          input.WHERE, 
+          false,
+          ObservationWorkflowState.preExecutionSet // not allowed once we start executing
+        ).map { r =>
+          r.flatMap { oids =>
+            observationResultSubquery(oids, input.LIMIT, child)
+              .tupleLeft(oids)
           }
+        }
 
-        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-          NonEmptyList.fromList(oids).traverse { os =>
-            val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
-            val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
-            asterismService.updateAsterism(os, add, del)
-          }.map(_.getOrElse(Result.unit))
+      def setAsterisms(oids: List[Observation.Id])(using Services[F], Transaction[F]): F[Result[Unit]] =
+        NonEmptyList.fromList(oids).traverse { os =>
+          val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
+          val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
+          asterismService.updateAsterism(os, add, del)
+        }.map(_.getOrElse(Result.unit))
 
-        for {
-          rTup  <- selectObservations
-          oids   = rTup.toList.flatMap(_._1)
-          rUnit <- setAsterisms(oids)
-          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-          _     <- transaction.rollback.unlessA(query.hasValue)
-        } yield query
+      services
+        .useNonTransactionally(selectObservations)
+        .flatMap: rTup =>
+          val oids = rTup.toList.flatMap(_._1)
+          services
+            .useTransactionally:
+              setAsterisms(oids)
+                .flatMap: rUnit =>
+                  val query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
+                  transaction
+                    .rollback
+                    .unlessA(query.hasValue)
+                    .as(query)
 
-      }
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
@@ -750,24 +774,47 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
-      services.useTransactionally {
 
-        val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE, false)
+      // If any property other than grouping changes then disallow the edit for observations
+      // that are ongoing or completed.
+      def allowedStates(SET: ObservationPropertiesInput.Edit): Set[ObservationWorkflowState] =
+        if
+          SET.subtitle.isDefined            ||
+          SET.scienceBand.isDefined         ||
+          SET.posAngleConstraint.isDefined  ||
+          SET.targetEnvironment.isDefined   ||
+          SET.constraintSet.isDefined       ||
+          SET.timingWindows.isDefined       ||
+          SET.attachments.isDefined         ||
+          SET.scienceRequirements.isDefined ||
+          SET.observingMode.isDefined       ||
+          SET.existence.isDefined           ||
+          SET.observerNotes.isDefined
+        then ObservationWorkflowState.preExecutionSet
+        else ObservationWorkflowState.fullSet
 
-        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
-          idSelect.flatTraverse { which =>
-            observationService
-              .updateObservations(input.SET, which)
-              .map { r =>
-                r.flatMap { m =>
-                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
-                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
-                }
+      def applicableOids(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
+        Services.asSuperUser:
+          observationIdSelectWithWorkflowState(
+            input.includeDeleted, 
+            input.WHERE, 
+            false, 
+            allowedStates(input.SET)
+          )
+
+      def updateObservations(oids: List[Observation.Id])(using Services[F], Transaction[F]): ResultT[F, (Map[Program.Id, List[Observation.Id]], Query)] =
+        ResultT:
+          observationService
+            .updateObservations(input.SET, oids)
+            .map { r =>
+              r.flatMap { m =>
+                val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
+                observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
               }
-          }
+            }
 
-        def setAsterisms(m: Map[Program.Id, List[Observation.Id]]): F[Result[Unit]] =
+      def setAsterisms(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F]): ResultT[F, Unit] =
+        ResultT:
           // The "obvious" implementation with `traverse` doesn't work here because
           // ResultT isn't a Monad and thus doesn't short-circuit. Doing an explicit
           // fold with the [non-monadic] short-circuiting `flatMap` fixes it.
@@ -777,13 +824,21 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             }).flatMap(_ => accum)
           }.value
 
-        val r = for {
-          tup <- ResultT(updateObservations)
-          _   <- ResultT(setAsterisms(tup._1))
-        } yield tup._2
+      // Put it all together
+      services
+        .useNonTransactionally(applicableOids)
+        .flatMap: oids =>
+          services.useTransactionally:
+            oids.flatTraverse: oids =>
+              updateObservations(oids)
+                .flatMap: 
+                  case (map, query) =>
+                    setAsterisms(map)
+                      .as(query)
+                .value
+                .flatTap: q =>
+                  transaction.rollback.unlessA(q.hasValue)
 
-        r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
-      }
     }
 
   private lazy val UpdateObservationsTimes: MutationField =
