@@ -293,8 +293,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def s3PresignerResource: Resource[IO, S3Presigner] =
     S3FileService.s3PresignerResource[IO](awsConfig)
 
-  protected def goaUser: Option[User.Id] =
-    none
+  protected def goaUsers: Set[User.Id] =
+    Set.empty
 
   private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
@@ -303,7 +303,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       emailConfig,
       itcClient.pure[Resource[IO, *]],
       CommitHash.Zero,
-      goaUser,
+      goaUsers,
       ssoClient.pure[Resource[IO, *]],
       true,
       List("unused"),
@@ -322,7 +322,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, goaUser, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def server: Resource[IO, Server] =

@@ -9746,7 +9746,7 @@ type Query {
   has GOA data-download access privileges.  These will be those for which the
   user is a ProgramUser of any role with the `hasDataAccess` flag set.
 
-  This query is for use by the GOA and will fail for other users.
+  This query is for use by staff and the GOA and will fail for other users.
   """
   goaDataDownloadAccess(orcidId: String!): [ProgramReferenceLabel!]!
 
