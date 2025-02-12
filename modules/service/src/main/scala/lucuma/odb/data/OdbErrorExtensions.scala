@@ -4,13 +4,13 @@
 package lucuma.odb.data
 
 import cats.Applicative
+import cats.data.NonEmptyChain
 import cats.syntax.all.*
 import clue.model.GraphQLError
 import grackle.Problem
 import grackle.Result
 import io.circe.JsonObject
 import io.circe.syntax.*
-import cats.data.NonEmptyChain
 
 object OdbErrorExtensions:
 

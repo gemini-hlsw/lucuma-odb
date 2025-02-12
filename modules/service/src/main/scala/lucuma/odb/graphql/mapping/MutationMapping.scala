@@ -27,6 +27,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
@@ -56,6 +57,7 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.observationWorkflowState.*
@@ -66,8 +68,6 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import lucuma.core.enums.ObservationWorkflowState
-import lucuma.odb.service.NoTransaction
 
 trait MutationMapping[F[_]] extends Predicates[F] {
 

@@ -4,31 +4,32 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
+import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObservationWorkflowState.{ Ongoing, Completed }
+import lucuma.core.enums.ObservationWorkflowState.Completed
+import lucuma.core.enums.ObservationWorkflowState.Ongoing
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
-import lucuma.core.model.Program
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import io.circe.literal.*
-import lucuma.core.model.User
-import io.circe.Json
-import io.circe.syntax.*
-import cats.data.Ior
 
 //https://app.shortcut.com/lucuma/story/4596/api-should-prevent-editing-of-observations-for-which-execution-has-started
 class ShortCut_4596 extends OdbSuite 
