@@ -207,7 +207,7 @@ object FMain extends MainParams {
       config.email,
       config.itcClient,
       config.commitHash,
-      config.goaUser,
+      config.goaUsers,
       config.ssoClient,
       config.corsOverHttps,
       config.domain,
@@ -223,7 +223,7 @@ object FMain extends MainParams {
     emailConfig:          Config.Email,
     itcClientResource:    Resource[F, ItcClient[F]],
     commitHash:           CommitHash,
-    goaUser:              Option[User.Id],
+    goaUsers:             Set[User.Id],
     ssoClientResource:    Resource[F, SsoClient[F, User]],
     corsOverHttps:        Boolean,
     domain:               List[String],
@@ -240,7 +240,7 @@ object FMain extends MainParams {
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, goaUser, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
+      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
