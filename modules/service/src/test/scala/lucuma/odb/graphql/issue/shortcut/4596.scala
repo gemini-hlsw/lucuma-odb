@@ -104,6 +104,32 @@ class ShortCut_4596 extends OdbSuite
       """
     expectIor(user, query, expected)
 
+  def tryUpdateGroupIndex(
+    user: User,
+    oids: List[Observation.Id],
+    expected: Ior[List[String], Json]
+  ) =
+    val query =
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              groupIndex: 0
+            }
+            WHERE: {
+              id: { 
+                IN: ${oids.asJson.noSpaces} 
+              }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    expectIor(user, query, expected)
+
 
   test(s"Ongoing observations should not be editable") {
 
@@ -216,10 +242,43 @@ class ShortCut_4596 extends OdbSuite
   test(s"Ongoing observations should not allow their asterism's targets to be edited".ignore):
     ()
 
-  test(s"Ongoing observations *should* be movable".ignore):
-    ()
+  List(Ongoing, Completed).foreach { state =>
 
-  test(s"Ongoing observations *should* allow obs time updates".ignore):
-    ()
+    test(s"$state observations *should* be movable") {
+      val setup: IO[(Observation.Id, Observation.Id)] =
+        for 
+          pid <- createProgramAs(pi)
+          o1  <- createExecutedObservation(pid, state)
+          o2  <- createObservationAs(pi, pid)
+        yield (o1,o2)
+        
+      setup.flatMap: (ongoing, undefined) =>
+        tryUpdateGroupIndex(
+          user = pi,
+          oids = List(ongoing, undefined),
+          expected = Ior.Right(
+            json"""
+            {
+              "updateObservations": {
+                "observations": [
+                  {
+                    "id": $ongoing
+                  },
+                  {
+                    "id": $undefined
+                  }
+                ]
+              }
+            }
+            """
+          )
+        )
+
+    }
+  }
+
+  List(Ongoing, Completed).foreach: state =>
+    test(s"$state observations *should* allow obs time updates".ignore):
+      ()
 
 }
