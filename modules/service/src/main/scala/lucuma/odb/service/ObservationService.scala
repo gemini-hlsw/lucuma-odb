@@ -104,6 +104,11 @@ sealed trait ObservationService[F[_]] {
     which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
+  def updateObservations(
+    SET:   ObservationPropertiesInput.Edit,
+    oids: List[Observation.Id]
+  )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
+
   def updateObservationsTimes(
     SET:   ObservationTimesInput,
     which: AppliedFragment
@@ -474,6 +479,13 @@ object ObservationService {
             _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
           } yield r
         }
+
+      override def updateObservations(
+        SET:  ObservationPropertiesInput.Edit,
+        oids: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
+        if oids.isEmpty then Result(Map.empty).pure[F]
+        else updateObservations(SET, sql"${observation_id.list(oids)}"(oids))
 
       override def updateObservationsTimes(
         SET:   ObservationTimesInput,

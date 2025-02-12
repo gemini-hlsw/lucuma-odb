@@ -10,6 +10,7 @@ import grackle.Problem
 import grackle.Result
 import io.circe.JsonObject
 import io.circe.syntax.*
+import cats.data.NonEmptyChain
 
 object OdbErrorExtensions:
 
@@ -20,6 +21,9 @@ object OdbErrorExtensions:
 
     def asProblem: Problem =
       Problem(e.message, Nil, Nil, Some(JsonObject(Key -> e.asJson)))
+
+    def asProblemNec: NonEmptyChain[Problem] =
+      NonEmptyChain(asProblem)
 
     def asFailure: Result[Nothing] =
       Result.failure(asProblem)
