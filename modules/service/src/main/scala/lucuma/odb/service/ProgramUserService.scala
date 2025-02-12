@@ -608,6 +608,17 @@ object ProgramUserService:
              StandardRole.Admin(_) |
              StandardRole.Staff(_)        => none
 
+    private def correlatedPiAccessOnly(
+      user:       User,
+      outerAlias: String,
+      innerAlias: String
+    ): Option[AppliedFragment] =
+      user.role match
+        case ServiceRole(_)        |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_)   => none
+        case _                       => correlatedExistsUserAs(user.id, outerAlias, innerAlias, ProgramUserRole.Pi).some
+
     def updateProgramUsers(
       user:  User,
       SET:   ProgramUserPropertiesInput,
@@ -650,13 +661,20 @@ object ProgramUserService:
             SET """(Void) |+| nel.intercalate(void", ") |+| void" " |+|
           sql"WHERE #$alias.c_program_user_id IN ("(Void) |+| which |+| void")"
 
-        (correlatedExistsUserAccess(user, alias, "i").fold(up) { exists =>
-          up |+| void" AND (" |+|
-            sql"#$alias.c_user_id = $user_id"(user.id) |+|   // updating our own user
-            void" OR " |+|
-            exists |+|                                       // user otherwise has access
-          void")"
-        }) |+| sql" RETURNING #$alias.c_program_user_id"(Void)
+        // If updating the data access flag, you must be the PI (or staff).
+        // Otherwise normal access rules apply with the caveat that a user can
+        // update their own record.
+        val access = (SET.hasDataAccess *> correlatedPiAccessOnly(user, alias, "i")).orElse:
+                       correlatedExistsUserAccess(user, alias, "i").map: ac =>
+                         void" ("                                     |+|
+                           sql"#$alias.c_user_id = $user_id"(user.id) |+| // updating our own user
+                           void" OR "                                 |+|
+                           ac                                         |+|
+                         void")"
+
+        (access.fold(up): exists =>
+          up |+| void" AND " |+| exists
+        ) |+| sql" RETURNING #$alias.c_program_user_id"(Void)
 
     end updateProgramUsers
   end Statements
