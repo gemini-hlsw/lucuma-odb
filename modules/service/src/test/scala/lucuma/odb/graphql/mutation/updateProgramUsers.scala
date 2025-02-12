@@ -447,6 +447,23 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedDataAccess((pid, pi3, false)).asRight
         )
 
+  test("coi cannot update hasDataAccess flag"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi3,
+          query    = updateUserDataAccess(pid, pi3, false),
+          expected =
+            json"""
+              {
+                "updateProgramUsers": {
+                  "programUsers": []
+                }
+              }
+            """.asRight
+        )
+
   val GavriloPrincip: UserProfile =
     UserProfile(
       "Gavrilo".some,
