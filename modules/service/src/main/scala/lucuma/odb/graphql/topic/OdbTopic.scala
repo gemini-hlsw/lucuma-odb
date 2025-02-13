@@ -37,7 +37,7 @@ object OdbTopic:
   ): F[List[User.Id]] =
     s.execute(
       sql"""
-        select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
+        select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull order by c_user_id
       """.query(user_id)
     )
 

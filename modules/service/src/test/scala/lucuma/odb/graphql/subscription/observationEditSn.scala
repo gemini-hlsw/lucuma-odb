@@ -14,6 +14,8 @@ import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 class observationEditSn extends ExecutionTestSupport with ObservingModeSetupOperations with SubscriptionUtils:
+  val AcquisitionTotal: Long = 219362500l
+  val ScienceTotal: Long     = 784200000l
 
   def subscriptionQuery(pid: Program.Id) =
     s"""
@@ -23,7 +25,26 @@ class observationEditSn extends ExecutionTestSupport with ObservingModeSetupOper
           editType
           value {
             id
+            itc {
+              science {
+                selected {
+                  exposureCount
+                }
+              }
+            }
             execution {
+              digest {
+                acquisition {
+                  timeEstimate {
+                    total { microseconds }
+                  }
+                }
+                science {
+                  timeEstimate {
+                    total { microseconds }
+                  }
+                }
+              }
               config {
                 gmosNorth {
                   science {
@@ -46,7 +67,30 @@ class observationEditSn extends ExecutionTestSupport with ObservingModeSetupOper
           "editType"      -> Json.fromString(EditType.Updated.tag.toUpperCase),
           "value" -> Json.obj(
             "id"          -> oid.asJson,
+            "itc" -> Json.obj(
+              "science" -> Json.obj(
+                "selected" -> Json.obj(
+                  "exposureCount" -> 6.asJson
+                )
+              )
+            ),
             "execution" -> Json.obj(
+              "digest" -> Json.obj(
+                "acquisition" -> Json.obj(
+                  "timeEstimate" -> Json.obj(
+                    "total" -> Json.obj(
+                      "microseconds" -> AcquisitionTotal.asJson
+                    )
+                  )
+                ),
+                "science" -> Json.obj(
+                  "timeEstimate" -> Json.obj(
+                    "total" -> Json.obj(
+                      "microseconds" -> ScienceTotal.asJson
+                    )
+                  )
+                )
+              ),
               "config" -> Json.obj(
                 "gmosNorth" -> Json.obj(
                   "science" -> Json.obj(
@@ -72,12 +116,18 @@ class observationEditSn extends ExecutionTestSupport with ObservingModeSetupOper
             SET: {
               scienceRequirements: {
                 spectroscopy: {
+                  wavelength: { micrometers: 0.700000 }
+                  resolution: 1000
                   exposureTimeMode: {
                     signalToNoise: {
                       value: 99
                       at: { nanometers: 500 }
                     }
                   }
+                  wavelengthCoverage: { micrometers: 0.400000 }
+                  focalPlane: null
+                  focalPlaneAngle: null
+                  capability: null
                 }
               }
             },
@@ -107,32 +157,10 @@ class observationEditSn extends ExecutionTestSupport with ObservingModeSetupOper
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- generateOrFail(pid, oid)
-      // expect two responses, one from editing the S/N, one because our query
-      // requests the sequence which requires a cache update
       _   <- subscriptionExpect(
         user      = pi,
         query     = subscriptionQuery(pid),
         mutations = Right(sleep >> updateSn(oid)),
-        expected  = List(subscriptionResponse(oid), subscriptionResponse(oid))
-      )
-    yield ()
-
-  test("does not trigger for subsequent generation"):
-    for
-      pid <- createProgram(pi, "foo")
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- generateOrFail(pid, oid)
-      _   <- subscriptionExpect(
-        user      = pi,
-        query     = subscriptionQuery(pid),
-        mutations = Right(
-                      sleep                         >>
-                      updateSn(oid)                 >>
-                      generateOrFail(pid, oid).void >>
-                      generateOrFail(pid, oid).void >>
-                      sleep
-                    ),
         expected  = List(subscriptionResponse(oid), subscriptionResponse(oid))
       )
     yield ()

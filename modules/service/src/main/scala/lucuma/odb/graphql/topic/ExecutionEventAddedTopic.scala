@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.topic
 
+import cats.derived.*
 import cats.effect.Concurrent
 import cats.effect.std.Supervisor
 import cats.syntax.apply.*
@@ -27,7 +28,7 @@ object ExecutionEventAddedTopic:
     visitId:         Visit.Id,
     eventType:       ExecutionEventType,
     users:           List[User.Id]
-  ) extends TopicElement
+  ) extends TopicElement derives cats.Eq
 
   private val topic =
     OdbTopic.define[(ExecutionEvent.Id, Program.Id, Observation.Id, Visit.Id, ExecutionEventType), Element](

@@ -5,8 +5,11 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Eq
 import cats.data.Nested
+import cats.effect.kernel.Temporal
 import cats.syntax.all.*
+import fs2.concurrent.Topic
 import fs2.Stream
 import grackle.Env
 import grackle.Query
@@ -34,9 +37,13 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import org.tpolecat.typename.TypeName
 
+import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 
-trait SubscriptionMapping[F[_]] extends Predicates[F] {
+import SubscriptionMapping.groupingSubscribe
+
+trait SubscriptionMapping[F[_]: Temporal] extends Predicates[F] {
+
 
   def topics: Topics[F]
   def user: User
@@ -89,7 +96,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("executionEventAdded", ExecutionEventAddedInput.Binding.Option): (input, child) =>
       topics
         .executionEvent
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter: e =>
           e.canRead(user)                                              &&
           input.flatMap(_.programId).forall(_ === e.programId)         &&
@@ -103,7 +110,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("programEdit", ProgramEditInput.Binding.Option) { (input, child) =>
       topics
         .program
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter(e => e.canRead(user) && input.flatMap(_.programId).forall(_ === e.programId))
         .map(e => Result(
           Environment(
@@ -117,7 +124,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("observationEdit", ObservationEditInput.Binding.Option) { (input, child) =>
       topics
         .observation
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter { e =>
           e.canRead(user) && ((
             input.flatMap(_.programId).forall(_ === e.programId) &&
@@ -154,7 +161,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("configurationRequestEdit", ConfigurationRequestEditInput.Binding.Option) { (input, child) =>
       topics
         .configurationRequest
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter { e =>
           e.canRead(user) && ((
             input.flatMap(_.programId).forall(_ === e.programId)
@@ -190,7 +197,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("targetEdit", TargetEditInput.Binding.Option) { (input, child) =>
       topics
         .target
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter { e =>
           e.canRead(user) &&
           input.flatMap(_.programId).forall(_ === e.programId) &&
@@ -226,7 +233,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     SubscriptionField("groupEdit", GroupEditInput.Binding.Option) { (input, child) =>
       topics
         .group
-        .subscribe(1024)
+        .groupingSubscribe()
         .filter { e =>
           e.canRead(user) &&
           input.flatMap(_.programId).forall(_ === e.programId) &&
@@ -269,3 +276,18 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
 }
 
+object SubscriptionMapping:
+  val MaxQueued: Int                  = 1024
+  val GroupingChunkSize: Int          = 10
+  val GroupingTimeout: FiniteDuration = 100.millis
+
+  extension [F[_]: Temporal, E: Eq](topic: Topic[F, E])
+    def groupingSubscribe(
+      maxQueued: Int          = MaxQueued,
+      chunkSize: Int          = GroupingChunkSize,
+      timeout: FiniteDuration = GroupingTimeout
+    ): Stream[F, E] =
+      topic
+        .subscribe(maxQueued)
+        .groupWithin(chunkSize, timeout)
+        .flatMap(Stream.chunk(_).changes)
