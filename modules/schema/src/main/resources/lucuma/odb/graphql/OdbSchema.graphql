@@ -330,6 +330,7 @@ input BandBrightnessSurfaceInput {
   """
   Error values are optional
   """
+  
   error: BigDecimal
 }
 
