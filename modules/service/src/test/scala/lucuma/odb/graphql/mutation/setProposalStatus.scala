@@ -16,6 +16,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
@@ -755,4 +756,39 @@ class setProposalStatus extends OdbSuite
 
   }
 
+  test("✓ A partner of 'HasNonPartner' counts as a US partner for validation"):
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap: cid =>
+      createProgramAs(pi).flatMap: pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasPartner(Partner.CA)) *>
+        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasNonPartner) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "setProposalStatus" : {
+                "program": {
+                  "id" : $pid,
+                  "proposalStatus": "SUBMITTED"
+                 }
+              }
+            }
+          """.asRight
+        )
 }
