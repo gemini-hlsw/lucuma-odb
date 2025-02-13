@@ -369,7 +369,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
                 exp = List((oid0, List(tid0, tid1)), (oid1, List(tid1)))
               )
           ),
-        expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "One"))
+        expected  = List(titleUpdated(oid1, "One"), titleUpdated(oid0, "Zero, One"))
       )
     } yield ()
   }
