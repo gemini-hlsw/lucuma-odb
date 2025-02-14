@@ -282,4 +282,24 @@ class ShortCut_4596 extends OdbSuite
     test(s"$state observations *should* allow obs time updates".ignore):
       ()
 
+  test("Ongoing observations should not allow guide star changes (PI)".ignore):
+    ()
+
+  test("Ongoing observations *should* allow guide star changes (Staff)".ignore):
+    ()
+
+  test("Ongoing observations should not allow position angle changes (PI)".ignore):
+    ()
+
+  test("Ongoing observations *should* allow position angle changes (Staff)".ignore):
+    ()
+
+  test("Ongoing observations should not allow acquisition time changes (PI)".ignore):
+    ()
+
+  test("Ongoing observations *should* allow acquisition time changes (Staff)".ignore):
+    ()
+
+
+    
 }
