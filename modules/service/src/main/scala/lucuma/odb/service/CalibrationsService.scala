@@ -13,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -90,6 +91,15 @@ object CalibrationsService extends CalibrationObservations {
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
   val CalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
+  case class ObsExtract[A](
+    id:   Observation.Id,
+    itc:  Option[ItcInput],
+    band: Option[ScienceBand],
+    data: A
+  ):
+    def map[B](f: A => B): ObsExtract[B] =
+      copy(data = f(data))
+
   private def targetCoordinates(when: Instant)(
     rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])]
   ): List[(Target.Id, String, CalibrationRole, Coordinates)] =
@@ -158,14 +168,15 @@ object CalibrationsService extends CalibrationObservations {
 
       private def collectValid(
         requiresItcInputs: Boolean
-      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), (Observation.Id, Option[ItcInput], ObservingMode)] =
+      ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
         {
-          case (oid, Right(GeneratorParams(itc, _, mode, _))) if itc.isRight || !requiresItcInputs => (oid, itc.toOption, mode)
+          case (oid, Right(GeneratorParams(itc, band, mode, _))) if itc.isRight || !requiresItcInputs =>
+            ObsExtract(oid, itc.toOption, band, mode)
         }
 
       // Find all active observations in the program
-      private def activeObservations(pid: Program.Id)(using Transaction[F]): F[List[Observation.Id]] =
-        session.execute(Statements.selectActiveObservations)(pid)
+      private def activeObservations(pid: Program.Id)(using Transaction[F]): F[Set[Observation.Id]] =
+        session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
 
       /**
        * Requests configuration params for a program id and selection (either science or calibration)
@@ -173,20 +184,20 @@ object CalibrationsService extends CalibrationObservations {
       private def allObservations(
         pid:       Program.Id,
         selection: ObservationSelection
-      )(using Transaction[F]): F[List[(Observation.Id, Option[ItcInput], ObservingMode)]] =
+      )(using Transaction[F]): F[List[ObsExtract[ObservingMode]]] =
         services
           .generatorParamsService
           .selectAll(pid, selection = selection)
           .map(_.toList.collect(collectValid(selection === ObservationSelection.Science)))
 
-      private def toConfigForCalibration(all: List[(Observation.Id, Option[ItcInput], ObservingMode)]): List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)] =
+      private def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
         all.map(_.map(_.toConfigSubset))
 
       private def configAtWavelength(
-        calibConfigs: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)]
+        calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationConfigSubset, Option[Wavelength]] =
-        calibConfigs.groupBy(_._3).map { case (k, v) =>
-          val lw = v.map(_._2.map(_.spectroscopy.exposureTimeMode.at)).flattenOption
+        calibConfigs.groupBy(_.data).map { case (k, v) =>
+          val lw = v.map(_.itc.map(_.spectroscopy.exposureTimeMode.at)).flattenOption
           val meanWv = if (lw.isEmpty) None
           else
             // there must be a way to sum in wavelength space :/
@@ -196,10 +207,9 @@ object CalibrationsService extends CalibrationObservations {
         }
 
       private def uniqueConfiguration(
-        all: List[(Observation.Id, Option[ItcInput], ObservingMode)]
-      ): List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)] =
-        val calibConfigs = toConfigForCalibration(all)
-        calibConfigs.distinctBy(_._3)
+        all: List[ObsExtract[ObservingMode]]
+      ): List[(CalibrationConfigSubset, Option[ScienceBand])] =
+        toConfigForCalibration(all).groupMapReduce(_.data)(_.band)(_ max _).toList
 
       private def calibObservation(
         calibRole: CalibrationRole,
@@ -292,14 +302,14 @@ object CalibrationsService extends CalibrationObservations {
       // Update the signal to noise at wavelength for each calbiration observation depending
       // on the average wavelength of the configuration
       private def updateWvAt(
-        calibrations: List[(Observation.Id, Option[ItcInput], CalibrationConfigSubset)],
-        removed: List[Observation.Id],
+        calibrations: List[ObsExtract[CalibrationConfigSubset]],
+        removed:      List[Observation.Id],
         atWavelength: Map[CalibrationConfigSubset, Option[Wavelength]],
-        role: CalibrationRole
+        role:         CalibrationRole
       )(using Transaction[F]): F[Unit] =
         calibrations
-          .filterNot { case (oid, _, _) => removed.contains(oid) }
-          .map { case (oid, _, c) => (oid, atWavelength.get(c).flatten) }
+          .filterNot { o => removed.contains(o.id) }
+          .map { o => (o.id, atWavelength.get(o.data).flatten) }
           .collect { case (oid, Some(w)) => (oid, w) }
           .traverse { (oid, w) =>
             services.observationService.updateObservations(
@@ -353,10 +363,10 @@ object CalibrationsService extends CalibrationObservations {
           // Average s/n wavelength at each configuration
           configWvAt    = configAtWavelength(toConfigForCalibration(allSci))
           // Get all unique configurations
-          configs       = uniqueSci.map(_._3).diff(uniqueCalibs.map(_._3))
+          configs       = uniqueSci.map(_._1).diff(uniqueCalibs.map(_._1))
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._3), calibs.map {
-                            case (oid, _, c) => (oid, c)
+          removedOids  <- removeUnnecessaryCalibrations(uniqueSci.map(_._1), calibs.map {
+                            case ObsExtract(oid, _, _, c) => (oid, c)
                           })
           // Generate new calibrations for each unique configuration
           addedOids    <- generateGMOSLSCalibrations(pid, configWvAt, configs, gnTgt, gsTgt)
