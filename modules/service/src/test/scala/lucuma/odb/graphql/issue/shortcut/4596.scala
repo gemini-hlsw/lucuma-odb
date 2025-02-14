@@ -130,7 +130,7 @@ class ShortCut_4596 extends OdbSuite
         }
       """
     expectIor(user, query, expected)
-
+    
 
   test(s"Ongoing observations should not be editable") {
 
@@ -234,15 +234,63 @@ class ShortCut_4596 extends OdbSuite
 
   }
 
-  test(s"Ongoing observations should allow updateObsevationTimes".ignore):
-    ()
 
+  test(s"Ongoing observations should allow updateObservationsTimes") {
+
+    val setup: IO[Observation.Id] =
+      for 
+        pid <- createProgramAs(pi)
+        o   <- createExecutedObservation(pid, Ongoing)
+      yield o
+      
+    setup.flatMap: oid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservationsTimes(
+              input: {
+                SET: {
+                  observationDuration: {
+                    hours: 1.23
+                  }
+                }
+                WHERE: {
+                  id: {
+                    EQ: ${oid.asJson}
+                  }
+                }
+              }
+            ) {
+              observations {
+                id
+              }
+            }
+          }
+        """,
+        expected = Right(json"""
+          {
+            "updateObservationsTimes" : {
+              "observations" : [
+                {
+                  "id" : $oid
+                }
+              ]
+            }
+          }
+        """)    
+      )
+
+  }
+  
   test(s"Ongoing observations should not allow asterism edits".ignore):
     ()
 
+  
   test(s"Ongoing observations should not allow their asterism's targets to be edited".ignore):
     ()
 
+  
   List(Ongoing, Completed).foreach { state =>
 
     test(s"$state observations *should* be movable") {
@@ -278,24 +326,31 @@ class ShortCut_4596 extends OdbSuite
     }
   }
 
+
   List(Ongoing, Completed).foreach: state =>
     test(s"$state observations *should* allow obs time updates".ignore):
       ()
 
+  
   test("Ongoing observations should not allow guide star changes (PI)".ignore):
     ()
+
 
   test("Ongoing observations *should* allow guide star changes (Staff)".ignore):
     ()
 
+
   test("Ongoing observations should not allow position angle changes (PI)".ignore):
     ()
+
 
   test("Ongoing observations *should* allow position angle changes (Staff)".ignore):
     ()
 
+
   test("Ongoing observations should not allow acquisition time changes (PI)".ignore):
     ()
+
 
   test("Ongoing observations *should* allow acquisition time changes (Staff)".ignore):
     ()
