@@ -11,8 +11,8 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.Site
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.syntax.instrument.*
