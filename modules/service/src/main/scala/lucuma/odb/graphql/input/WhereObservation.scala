@@ -21,6 +21,9 @@ object WhereObservation {
 
   def binding(path: Path): Matcher[Predicate] = {
 
+    // Site filters are defined in terms of the observation's instrument.
+    // For example, a site of GN means that the observation's instrument must be
+    // set to one of the Gemini North instruments.
     def siteBinding(binding: Matcher[Site]): Matcher[Predicate] =
       val instrumentPath = path / "instrument"
 
