@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
@@ -21,10 +22,12 @@ class observations extends OdbSuite {
 
   val pi      = TestUsers.Standard.pi(nextId, nextId)
   val pi2     = TestUsers.Standard.pi(nextId, nextId)
+  val pi3     = TestUsers.Standard.pi(nextId, nextId)
+  val pi4     = TestUsers.Standard.pi(nextId, nextId)
   val service = TestUsers.service(nextId)
   val staff   = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, service, staff).toList
+  val validUsers = List(pi, pi2, pi3, pi4, service, staff).toList
 
   test("simple observation selection") {
     createProgramAs(pi).flatMap { pid =>
@@ -383,4 +386,48 @@ class observations extends OdbSuite {
 
     } yield ()
   }
+
+  test("filter on site"):
+    for
+      pid     <- createProgramAs(pi3)
+      oid1    <- createObservationAs(pi3, pid, ObservingModeType.GmosNorthLongSlit.some)
+      oid2    <- createObservationAs(pi3, pid, ObservingModeType.GmosSouthLongSlit.some)
+      oid3    <- createObservationAs(pi3, pid)
+      gn      <- observationsWhere(pi3, """site: { EQ: GN }""")
+      gs      <- observationsWhere(pi3, """site: { EQ: GS }""")
+      both    <- observationsWhere(pi3, """site: { IN: [ GN, GS] }""")
+      isNull  <- observationsWhere(pi3, """site: { IS_NULL: true }""")
+      notNull <- observationsWhere(pi3, """site: { IS_NULL: false }""")
+    yield
+      assertEquals(gn, List(oid1))
+      assertEquals(gs, List(oid2))
+      assertEquals(both,    List(oid1, oid2))
+      assertEquals(isNull,  List(oid3))
+      assertEquals(notNull, List(oid1, oid2))
+
+  test("filter on instrument"):
+    for
+      pid     <- createProgramAs(pi4)
+      oid1    <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthLongSlit.some)
+      oid2    <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
+      oid3    <- createObservationAs(pi4, pid)
+      gn      <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }""")
+      gs      <- observationsWhere(pi4, """instrument: { EQ: GMOS_SOUTH }""")
+      both    <- observationsWhere(pi4, """instrument: { IN: [ GMOS_NORTH, GMOS_SOUTH ] }""")
+      isNull  <- observationsWhere(pi4, """instrument: { IS_NULL: true }""")
+      notNull <- observationsWhere(pi4, """instrument: { IS_NULL: false }""")
+    yield
+      assertEquals(gn, List(oid1))
+      assertEquals(gs, List(oid2))
+      assertEquals(both,    List(oid1, oid2))
+      assertEquals(isNull,  List(oid3))
+      assertEquals(notNull, List(oid1, oid2))
+
+  test("conflicting filter"):
+    for
+      pid  <- createProgramAs(pi4)
+      oid1 <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthLongSlit.some)
+      oid2 <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
+      res  <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }, site: { EQ: GS }""")
+    yield assertEquals(res, Nil)
 }

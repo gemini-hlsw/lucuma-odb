@@ -12489,6 +12489,38 @@ input WhereOptionEqGender {
 }
 
 """
+Filters on equality (or not) of the instrument. All supplied criteria must
+match, but usually only one is selected.
+"""
+input WhereOptionEqInstrument {
+  """
+  When `true`, matches if the instrument is not defined. When `false` matches if
+  the instrument is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the instrument is exactly the supplied value.
+  """
+  EQ: Instrument
+
+  """
+  Matches if the instrument is not the supplied value.
+  """
+  NEQ: Instrument
+
+  """
+  Matches if the instrument is any of the supplied options.
+  """
+  IN: [Instrument!]
+
+  """
+  Matches if the instrument is none of the supplied values.
+  """
+  NIN: [Instrument!]
+}
+
+"""
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
@@ -12646,6 +12678,40 @@ input WhereEqSite {
   Matches if the site is none of the supplied values.
   """
   NIN: [Site!]
+}
+
+"""
+Filters on equality of an optional site property.  All supplied criteria must
+match, but usually only one is selected.
+"""
+input WhereOptionEqSite {
+
+  """
+  When `true`, matches if the site is not defined. When `false` matches if the
+  site role is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the site is exactly the supplied value.
+  """
+  EQ: Site
+
+  """
+  Matches if the site is not the supplied value.
+  """
+  NEQ: Site
+
+  """
+  Matches if the site is any of the supplied options.
+  """
+  IN: [Site!]
+
+  """
+  Matches if the site is none of the supplied values.
+  """
+  NIN: [Site!]
+
 }
 
 """
@@ -12860,6 +12926,16 @@ input WhereObservation {
   """
   scienceBand: WhereOptionOrderScienceBand
 
+  """
+  Matches on the instrument in use, if any.
+  """
+  instrument: WhereOptionEqInstrument
+
+  """
+  Matches on the site associated with the observation's instrument, if any.
+  """
+  site: WhereOptionEqSite
+
 }
 
 """
@@ -13042,7 +13118,8 @@ All supplied criteria must match, but usually only one is selected.  E.g.
 """
 input WhereOptionEqCalibrationRole {
   """
-  When `true`, matches if the QaState is not defined. When `false` matches if the QaState is defined.
+  When `true`, matches if the calibration role is not defined. When `false`
+  matches if the calibration role is defined.
   """
   IS_NULL: Boolean
 
