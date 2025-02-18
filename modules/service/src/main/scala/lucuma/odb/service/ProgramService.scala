@@ -34,6 +34,8 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
+import java.time.LocalDate
+
 import OdbErrorExtensions.*
 import Services.Syntax.*
 
@@ -179,6 +181,16 @@ object ProgramService {
             } yield r).value
       }
 
+      def validateActivePeriodUpdate[A](active: Option[A]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, s"Only staff members may change the program active period.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => active.isEmpty
+          )
+
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
         OdbError
           .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
@@ -188,7 +200,6 @@ object ProgramService {
               case Access.Admin | Access.Service | Access.Staff => true
               case _                                            => period.isEmpty
           )
-
 
       def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]] =
         Trace[F].span("insertProgram") {
@@ -210,9 +221,15 @@ object ProgramService {
           val proprietaryMonths =
             SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
 
+          def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
+            val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
+            updatePrograms(edit, sql"select $program_id"(p)).map(_.void)
+
           (for {
+            _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
             _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
             p <- ResultT(create)
+            _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
           } yield p).value
         }
 
@@ -227,33 +244,33 @@ object ProgramService {
       def updatePrograms(
         SET:   ProgramPropertiesInput.Edit,
         where: AppliedFragment
-      )(using Transaction[F]): F[Result[List[Program.Id]]] = {
+      )(using Transaction[F]): F[Result[List[Program.Id]]] =
 
         // Create the temp table with the programs we're updating. We will join with this
         // several times later on in the transaction.
-        val setup: F[Unit] = {
+        val setup: F[Unit] =
           val af = Statements.createProgramUpdateTempTable(where)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
-        }
 
         // Update programs
         val updatePrograms: F[Result[List[Program.Id]]] =
-          Statements.updatePrograms(SET).fold(Nil.success.pure[F]) { af =>
-            session.prepareR(af.fragment.query(program_id)).use { ps =>
+          Statements.updatePrograms(SET).fold(Nil.success.pure[F]): af =>
+            session.prepareR(af.fragment.query(program_id)).use: ps =>
               ps.stream(af.argument, 1024)
                 .compile
                 .toList
                 .map(_.success)
-            }
-          }
+                .recover {
+                  case SqlState.CheckViolation(e) if e.constraintName.contains("active_dates_check") =>
+                    OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+                }
 
-        (for {
+        (for
           _   <- ResultT.liftF(setup)
           _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
           ids <- ResultT(updatePrograms)
-        } yield ids).value
-
-      }
+        yield ids).value
 
     }
 
@@ -317,7 +334,9 @@ object ProgramService {
           SET.description.foldPresent(sql"c_description = ${text_nonempty.opt}"),
           SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
           SET.goa.flatMap(_.shouldNotify).map(sql"c_goa_should_notify = $bool"),
-          SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool")
+          SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool"),
+          SET.active.flatMap(_.left).map(sql"c_active_start = $date"),
+          SET.active.flatMap(_.right).map(sql"c_active_end = $date")
         ).flatten
       )
 
