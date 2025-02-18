@@ -6,11 +6,16 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.Program
+import lucuma.core.util.DateInterval
+
+import java.time.LocalDate
+import java.time.Month
 
 class updateProposal extends OdbSuite {
   
@@ -524,6 +529,37 @@ class updateProposal extends OdbSuite {
       }
     }
   }
+
+  test("✓ set cfp on creation, default active period"):
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2025, Month.FEBRUARY, 1), LocalDate.of(2025, Month.JULY, 31))))
+      }
+    }
+
+  test("✓ set cfp later, default active period"):
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid) *>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateProposal(
+                input: {
+                  programId: "$pid"
+                  SET: { callId: "$cid" }
+                }
+              ) {
+                proposal { type { scienceSubtype } }
+              }
+            }
+          """
+        ) *>
+        assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2025, Month.FEBRUARY, 1), LocalDate.of(2025, Month.JULY, 31))))
+      }
+    }
 
   test("⨯ invalid type change") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
