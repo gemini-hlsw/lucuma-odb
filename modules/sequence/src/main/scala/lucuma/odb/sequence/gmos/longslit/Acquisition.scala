@@ -175,13 +175,13 @@ object Acquisition:
       AcquisitionState.ExpectCcd2(visitId, calcState, tracker, builder, steps)
 
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-      if updatesVisit(step) then
+      if step.isScienceSequence then
+        reset(step.visitId)
+      else if updatesVisit(step) then
         reset(step.visitId).recordStep(step)
       else
         val a = updateTracker(calcState.next(step.protoStep), tracker.record(step))
-        if !step.isAcquisitionSequence     then a.reset(step.visitId)
-        else if step.successfullyCompleted then a.recordCompleted(step)
-        else a
+        if step.successfullyCompleted then a.recordCompleted(step) else a
 
     // when a new visit is recorded, we reset the acquisition so that it begins
     // at the first step.
