@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -482,4 +483,36 @@ class executionAcq extends ExecutionTestSupport {
       yield Set(x0, x1, x2, x3)
 
     assertIO(execAcq.map(_.size), 1)
+
+  def nextAtomStepIds(p: Program.Id, o: Observation.Id): IO[NonEmptyList[Step.Id]] =
+    import lucuma.odb.testsyntax.execution.*
+    generateOrFail(p, o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.map(_.id))
+
+  test("nextAtom step ids don't change while executing"):
+    val execAcq: IO[List[NonEmptyList[Step.Id]]] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        x0 <- nextAtomStepIds(p, o)
+
+        // First atom with 3 steps.
+        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+
+        x1 <- nextAtomStepIds(p, o)
+
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s1)
+
+        x2 <- nextAtomStepIds(p, o)
+      yield List(x0, x1, x2)
+
+    execAcq.map: ids =>
+      ids.zip(ids.tail).foreach: (before, after) =>
+        assertEquals(before.tail, after.toList, s"before: $before, after: $after")
+
 }
