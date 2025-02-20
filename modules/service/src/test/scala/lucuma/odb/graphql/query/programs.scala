@@ -16,6 +16,8 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 
+import java.time.LocalDate
+
 class programs extends OdbSuite {
 
   val pi      = TestUsers.Standard.pi(1, 30)
@@ -240,5 +242,72 @@ class programs extends OdbSuite {
         ).asRight
     )
   }
+
+  val start = LocalDate.parse("2025-02-01")
+  val end   = LocalDate.parse("2025-07-01")
+
+  test("program selection via active period"):
+    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+      createProgramAs(pi, "Active Period Test").flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user     = pi,
+          query    = s"""
+            query {
+              programs(
+                WHERE: {
+                  activeStart: { GT: "2025-01-31" }
+                  activeEnd: { LT: "2025-07-02" }
+                }
+              ) {
+                matches { id }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "programs": {
+                  "matches": [
+                    {
+                      "id": ${pid.asJson}
+                    }
+                  ]
+                }
+              }
+            """.asRight
+        )
+      }
+    }
+
+  test("program selection via active period (empty)"):
+    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+      createProgramAs(pi, "Active Period Test").flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user     = pi,
+          query    = s"""
+            query {
+              programs(
+                WHERE: {
+                  activeStart: { GT: "2025-02-02" }
+                  activeEnd: { LT: "2025-06-30" }
+                }
+              ) {
+                matches { id }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "programs": {
+                  "matches": []
+                }
+              }
+            """.asRight
+        )
+      }
+    }
 
 }
