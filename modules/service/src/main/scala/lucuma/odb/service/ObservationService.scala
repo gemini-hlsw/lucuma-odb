@@ -76,6 +76,7 @@ import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.graphql.mapping.AccessControl
 
 sealed trait ObservationService[F[_]] {
 
@@ -100,13 +101,13 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
-    SET:   ObservationPropertiesInput.Edit,
-    which: AppliedFragment
+    update: AccessControl.ApprovedUpdate[ObservationPropertiesInput.Edit, Observation.Id]
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
+  // TODO: fix, used by cals
   def updateObservations(
     SET:   ObservationPropertiesInput.Edit,
-    oids: List[Observation.Id]
+    which: AppliedFragment
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def updateObservationsTimes(
@@ -481,11 +482,12 @@ object ObservationService {
         }
 
       override def updateObservations(
-        SET:  ObservationPropertiesInput.Edit,
-        oids: List[Observation.Id]
+        update: AccessControl.ApprovedUpdate[ObservationPropertiesInput.Edit, Observation.Id]
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
-        if oids.isEmpty then Result(Map.empty).pure[F]
-        else updateObservations(SET, sql"${observation_id.list(oids)}"(oids))
+        if update.ids.isEmpty then Result(Map.empty).pure[F]
+        else 
+          val oids2 = update.ids
+          updateObservations(update.SET, sql"${observation_id.list(oids2)}"(oids2))
 
       override def updateObservationsTimes(
         SET:   ObservationTimesInput,
