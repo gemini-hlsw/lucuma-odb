@@ -16,6 +16,9 @@ UPDATE t_program AS g
   JOIN t_cfp c ON p.c_cfp_id = c.c_cfp_id
  WHERE p.c_program_id = g.c_program_id;
 
+-- Add an index on the active period to make the filter fast.
+CREATE INDEX program_active_period_index ON t_program (c_active_start, c_active_end);
+
 -- When a CfP is updated, change all the related programs which were using the
 -- previous period.
 
