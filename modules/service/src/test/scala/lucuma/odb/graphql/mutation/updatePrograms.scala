@@ -6,10 +6,15 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.DateInterval
 import lucuma.odb.data.Existence
+
+import java.time.LocalDate
+import java.time.Month
 
 class updatePrograms extends OdbSuite {
 
@@ -402,4 +407,89 @@ class updatePrograms extends OdbSuite {
         ).asLeft
       )
   }
+
+  def editActivePeriodQuery(pid: Program.Id): String =
+    s"""
+      mutation {
+        updatePrograms(
+          input: {
+            SET: {
+              activeStart: "2020-01-01"
+              activeEnd: "2030-01-01"
+            }
+            WHERE: {
+              id: {
+                EQ: "$pid"
+              }
+            }
+          }
+        ) {
+          programs {
+            id
+            active {
+              start
+              end
+            }
+          }
+        }
+      }
+    """
+
+  test("can edit active period as staff"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = staff,
+        query = editActivePeriodQuery(pid),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "active": {
+                     "start": "2020-01-01",
+                     "end": "2030-01-01"
+                  }
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+
+  test("changing CfP active period in non-default active period has no impact"):
+    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramAs(pi).flatMap { pid =>
+        for
+          _ <- addProposal(pi, pid, cid.some).void
+          _ <- assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2025, Month.FEBRUARY, 1), LocalDate.of(2025, Month.JULY, 31))))
+          _ <- query(staff, editActivePeriodQuery(pid)).void
+          _ <- assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2020, Month.JANUARY, 1), LocalDate.of(2030, Month.JANUARY, 1))))
+          _ <- query(staff,
+            s"""
+              mutation {
+                updateCallsForProposals(input: {
+                  SET: {
+                    activeStart: "2024-12-31"
+                    activeEnd:   "2026-01-01"
+                  },
+                  WHERE: {
+                    id: { EQ: "$cid" }
+                  }
+                }) {
+                  callsForProposals {
+                    active {
+                      start
+                      end
+                    }
+                  }
+                }
+              }
+            """
+          )
+          _ <- assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2020, Month.JANUARY, 1), LocalDate.of(2030, Month.JANUARY, 1))))
+        yield ()
+      }
+    }
 }

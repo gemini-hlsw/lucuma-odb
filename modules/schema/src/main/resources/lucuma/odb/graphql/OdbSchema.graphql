@@ -3574,6 +3574,26 @@ input ProgramPropertiesInput {
   Whether the program is considered deleted (defaults to PRESENT) but may be edited
   """
   existence: Existence
+
+  """
+  Active period start date (inclusive) for this program.  The date is considered
+  to be the local date at each observation site.  Observations may begin the
+  evening of the indicated date at the site of the observation.
+
+  This property is avaliable only to those with staff access or better. Not
+  nullable.  Limited to dates between 1900 and 2100 (exclusive).
+  """
+  activeStart: Date
+
+  """
+  Active period end date (exclusive) for this program.  The date is considered
+  to be the local date at each observation site.  Observations may end the
+  morning of the indicated date at the site of the observation.
+
+  This property is avaliable only to those with staff access or better. Not
+  nullable.  Limited to dates between 1900 and 2100 (exclusive).
+  """
+  activeEnd: Date
 }
 
 """
@@ -9262,6 +9282,14 @@ type Program {
   proposal: Proposal
 
   """
+  Active period for this program.  Observations must be completed during this
+  time interval. By default, if there is an associated proposal tied to a
+  particular Call for Proposals (CfP), the active period will correspond to the
+  Cfp active period.
+  """
+  active: DateInterval!
+
+  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -14568,6 +14596,12 @@ input WhereProgram {
   Matches the calibration role.
   """
   calibrationRole: WhereOptionEqCalibrationRole
+
+  "Matches the active period start."
+  activeStart: WhereOrderDate
+
+  "Matches the active period end."
+  activeEnd: WhereOrderDate
 }
 
 input WhereProgramReference {
