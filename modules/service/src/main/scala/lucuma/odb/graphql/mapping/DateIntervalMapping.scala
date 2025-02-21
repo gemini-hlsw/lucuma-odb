@@ -5,14 +5,16 @@ package lucuma.odb.graphql.mapping
 
 import grackle.Path
 import lucuma.odb.graphql.table.CallForProposalsView
+import lucuma.odb.graphql.table.ProgramTable
 
-trait DateIntervalMapping[F[_]] extends CallForProposalsView[F] {
+trait DateIntervalMapping[F[_]] extends CallForProposalsView[F]
+                                   with ProgramTable[F]:
 
   private def dateIntervalMappingAtPath(
-    path: Path,
+    path:        Path,
     startColumn: ColumnRef,
     endColumn:   ColumnRef,
-    idColumn: ColumnRef
+    idColumn:    ColumnRef
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField(s"synthetic_id", idColumn, key = true, hidden = true),
@@ -22,7 +24,6 @@ trait DateIntervalMapping[F[_]] extends CallForProposalsView[F] {
 
   lazy val DateIntervalMappings: List[TypeMapping] =
     List(
-      dateIntervalMappingAtPath(CallForProposalsType / "active", CallForProposalsView.ActiveStart, CallForProposalsView.ActiveEnd, CallForProposalsView.Id)
+      dateIntervalMappingAtPath(CallForProposalsType / "active", CallForProposalsView.ActiveStart, CallForProposalsView.ActiveEnd, CallForProposalsView.Id),
+      dateIntervalMappingAtPath(ProgramType / "active", ProgramTable.ActiveStart, ProgramTable.ActiveEnd, ProgramTable.Id)
     )
-
-}

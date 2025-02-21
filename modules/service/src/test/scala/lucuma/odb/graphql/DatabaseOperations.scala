@@ -62,6 +62,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.util.DateInterval
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
@@ -299,6 +300,29 @@ trait DatabaseOperations { this: OdbSuite =>
         .traverse(_.as[Int].map(NonNegInt.unsafeFrom))
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
+
+  def getActivePeriod(
+    user: User,
+    pid:  Program.Id
+  ): IO[DateInterval] =
+    query(
+      user  = user,
+      query = s"""
+        query {
+          program(programId: "$pid") {
+            active {
+              start
+              end
+            }
+          }
+        }
+      """
+    ).flatMap: js =>
+      val interval = js.hcursor.downFields("program", "active")
+      (for
+        s <- interval.downField("start").as[LocalDate]
+        e <- interval.downField("end").as[LocalDate]
+      yield DateInterval.between(s, e)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   def addPartnerSplits(
     user: User,

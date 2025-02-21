@@ -6,11 +6,16 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.User
+import lucuma.core.util.DateInterval
+
+import java.time.LocalDate
+import java.time.Month
 
 class updateCallsForProposals extends OdbSuite {
 
@@ -431,12 +436,12 @@ class updateCallsForProposals extends OdbSuite {
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: activeStart must come before activeEnd").asLeft
+        List("Argument 'input.SET' is invalid: 'activeStart' must come before 'activeEnd'").asLeft
       )
     }
   }
 
-    test("active - end before start, start moved") {
+  test("active - end before start, start moved") {
     createCall.flatMap { id =>
       expect(
         staff,
@@ -922,6 +927,7 @@ class updateCallsForProposals extends OdbSuite {
           }
         """.asRight
       )
+      _ <- assertIOBoolean(getActivePeriod(pi, pid).map(_ === DateInterval.between(LocalDate.of(2024, Month.DECEMBER, 31), LocalDate.of(2026, Month.JANUARY, 1))))
     } yield ()
   }
 
@@ -958,4 +964,5 @@ class updateCallsForProposals extends OdbSuite {
         """.asRight
       )
   }
+
 }

@@ -21,20 +21,10 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import org.typelevel.cats.time.*
 
 import java.time.LocalDate
 
 object CallForProposalsPropertiesInput {
-
-  // We default RA and Dec from the LST of the active period start/end.  Our
-  // code for computing the LST only works until 2100 apparently.
-  private def validateYear(name: String, rDate: Result[LocalDate]): Result[LocalDate] =
-    rDate.flatMap { date =>
-      val year = date.getYear  // year in UTC timezone
-      if ((year > 1900) && (year < 2100)) date.success
-      else Matcher.validationFailure(s"'$name' date must be between 1900 and 2100 UTC (exclusive)")
-    }
 
   case class Create(
     cfpType:     CallForProposalsType,
@@ -67,16 +57,7 @@ object CallForProposalsPropertiesInput {
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           ExistenceBinding.Option("existence", rExistence)
         ) => {
-          // Check that active start comes before end.
-          val rValidStart = validateYear("activeStart", rActiveStart)
-          val rValidEnd   = validateYear("activeEnd", rActiveEnd)
-          val rActive = (rValidStart, rValidEnd).parTupled.flatMap { (start, end) =>
-            Result.fromOption(
-              Option.when(start < end)(DateInterval.between(start, end)),
-              Matcher.validationProblem("activeStart must come before activeEnd")
-            )
-          }
-
+          val rActive       = date.validateInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
           val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
@@ -145,13 +126,7 @@ object CallForProposalsPropertiesInput {
           val rLimNorth = rLimits.map(_.flatMap(_.north))
           val rLimSouth = rLimits.map(_.flatMap(_.south))
 
-          // If both start and end are specified, they should be in order.
-          val rActive = (rActiveStart, rActiveEnd).parTupled.flatMap {
-            case (Some(start), Some(end)) if start > end =>
-              Matcher.validationFailure("activeStart must come before activeEnd")
-            case (s, e)                                  =>
-              Result(Ior.fromOptions(s, e))
-          }
+          val rActive       = date.validateOptionalInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
           val rPartnersʹ    = dedup("partners",    rPartners)(_.partner, _.tag.toScreamingSnakeCase)
           val rInstrumentsʹ = dedup("instruments", rInstruments)(identity, _.tag.toScreamingSnakeCase)
           (
