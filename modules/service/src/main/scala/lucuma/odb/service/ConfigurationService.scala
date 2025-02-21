@@ -249,18 +249,18 @@ object ConfigurationService {
           crs <- hc.downFields("configurationRequests", "matches").as[List[ConfigurationRequest]]
         yield (id, crs)
 
-      private given Decoder[((Program.Id, Observation.Id), Configuration)] = hc =>
+      private given Decoder[((Program.Id, Observation.Id), Option[Configuration])] = hc =>
         for
           pid <- hc.downFields("program", "id").as[Program.Id]
           oid <- hc.downField("id").as[Observation.Id]
-          cfg <- hc.downField("configuration").as[Configuration]
+          cfg  = hc.downField("configuration").as[Configuration].toOption
         yield ((pid, oid), cfg)
 
       given Decoder[Response] = hc =>
         for
           m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, List[ConfigurationRequest])]]
-          m2 <- hc.downFields("observations", "matches").as[List[((Program.Id, Observation.Id), Configuration)]]
-        yield (m1.toMap, m2.toMap)
+          m2 <- hc.downFields("observations", "matches").as[List[((Program.Id, Observation.Id), Option[Configuration])]]
+        yield (m1.toMap, m2.collect { case ((pid, oid), Some(cfg)) => ((pid, oid), cfg) }.toMap)
 
       def apply(
         pids: List[Program.Id], 
