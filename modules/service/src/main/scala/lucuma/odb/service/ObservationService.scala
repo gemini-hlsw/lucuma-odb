@@ -101,18 +101,11 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
-    update: AccessControl.ApprovedUpdate[ObservationPropertiesInput.Edit, Observation.Id]
-  )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
-
-  // TODO: fix, used by cals
-  def updateObservations(
-    SET:   ObservationPropertiesInput.Edit,
-    which: AppliedFragment
+    update: AccessControl.Checked[ObservationPropertiesInput.Edit]
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def updateObservationsTimes(
-    SET:   ObservationTimesInput,
-    which: AppliedFragment
+    update: AccessControl.Checked[ObservationTimesInput]
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
@@ -296,10 +289,12 @@ object ObservationService {
 
         // delete targets, asterisms and observations
         for {
-          _    <- oids.traverse(o =>
+          _    <- oids.traverse { o =>
                     // set the existence to deleted, so it gets removed from groups too
-                    updateObservations(existenceOff, sql"$observation_id"(o))
-                  )
+                    updateObservations:
+                      Services.asSuperUser:
+                        AccessControl.unchecked(existenceOff, List(o), observation_id)
+                  }
                   // Look for the linked targets
           tids <- session.execute(Statements.linkedTargets(oids))(oids.toList)
                   // Delete asterisms and targets
@@ -446,65 +441,55 @@ object ObservationService {
             session.prepareR(af.fragment.query(void)).use(pq => pq.stream(af.argument, 512).compile.drain)
 
       override def updateObservations(
-        SET:   ObservationPropertiesInput.Edit,
-        which: AppliedFragment
+        update: AccessControl.Checked[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
         Trace[F].span("updateObservation") {
-          def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-            SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
+          update.fold(Result(Map.empty).pure[F]): (SET, which) =>
+            def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
+              SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
 
-          val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
+            val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
+              for {
+                r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
+                        session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
+                          pq.stream(af.argument, chunkSize = 1024).compile.toList
+                        }
+                    })
+                g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
+                u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
+                _ <- validateBand(g.keys.toList)
+                _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
+                _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
+                _ <- ResultT(g.toList.traverse { case (pid, oids) =>
+                      obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
+                    }.map(_.sequence))
+            } yield g
+
             for {
-              r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
-                      session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
-                        pq.stream(af.argument, chunkSize = 1024).compile.toList
-                      }
-                   })
-              g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
-              u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
-              _ <- validateBand(g.keys.toList)
-              _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
-              _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
-              _ <- ResultT(g.toList.traverse { case (pid, oids) =>
-                     obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
-                   }.map(_.sequence))
-          } yield g
-
-          for {
-            _ <- session.execute(sql"set constraints all deferred".command)
-            _ <- moveObservations(SET.group, SET.groupIndex, which)
-            r <- updates.value.recoverWith {
-                   case SqlState.CheckViolation(ex) =>
-                     OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
-                 }
-            _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
-          } yield r
+              _ <- session.execute(sql"set constraints all deferred".command)
+              _ <- moveObservations(SET.group, SET.groupIndex, which)
+              r <- updates.value.recoverWith {
+                    case SqlState.CheckViolation(ex) =>
+                      OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
+                  }
+              _ <- transaction.rollback.unlessA(r.hasValue) // rollback if something failed
+            } yield r
         }
-
-      override def updateObservations(
-        update: AccessControl.ApprovedUpdate[ObservationPropertiesInput.Edit, Observation.Id]
-      )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
-        if update.ids.isEmpty then Result(Map.empty).pure[F]
-        else 
-          val oids2 = update.ids
-          updateObservations(update.SET, sql"${observation_id.list(oids2)}"(oids2))
 
       override def updateObservationsTimes(
-        SET:   ObservationTimesInput,
-        which: AppliedFragment
+        update: AccessControl.Checked[ObservationTimesInput]
       )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]] =
-        Trace[F].span("updateObservationTimes") {
-          val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
-            for {
-              r <- ResultT(Statements.updateObsTime(SET, which).traverse { af =>
-                      session.prepareR(af.fragment.query(program_id *: observation_id)).use { pq =>
-                        pq.stream(af.argument, chunkSize = 1024).compile.toList
-                      }
-                   })
-              g  = r.groupMap(_._1)(_._2)                 // grouped:   Map[Program.Id, List[Observation.Id]]
-            } yield g
-          updates.value
-        }
+        Trace[F].span("updateObservationTimes"):
+          update.fold(Result(Map.empty).pure[F]): (set, which) =>
+            Statements.updateObsTime(set, which).traverse: af =>
+              session
+                .prepareR(af.fragment.query(program_id *: observation_id))
+                .use: pq =>
+                  pq.stream(af.argument, chunkSize = 1024)
+                    .compile
+                    .toList
+                .map: list =>
+                  list.groupMap(_._1)(_._2)
 
       private def cloneObservationImpl(
         observationId: Observation.Id,
@@ -556,8 +541,7 @@ object ObservationService {
                   SET match
                     case None    => Result((pid, oid2)).pure[F] // nothing to do
                     case Some(s) =>
-                      updateObservations(s, sql"select $observation_id".apply(oid2))
-                        .map { r =>
+                      updateObservations(Services.asSuperUser(AccessControl.unchecked(s, List(oid2), observation_id))).map { r =>
                           // We probably don't need to check this return value, but I feel bad not doing it.
                           r.map(_.toList).flatMap {
                             case List((`pid`, List(`oid2`))) => Result((pid, oid2))

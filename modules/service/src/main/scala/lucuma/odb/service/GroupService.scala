@@ -23,6 +23,7 @@ import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
@@ -63,8 +64,12 @@ object GroupService {
 
       private def moveObservationToEnd(child: Observation.Id, parent: Group.Id)(using Transaction[F]): F[Unit] =
         observationService.updateObservations(
-          ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.NonNull(parent)),
-          sql"$observation_id"(child)
+          Services.asSuperUser:
+            AccessControl.unchecked(
+              ObservationPropertiesInput.Edit.Empty.copy(group = Nullable.NonNull(parent)), 
+              List(child),
+              observation_id
+            )
         ).void
 
       override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
