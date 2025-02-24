@@ -11,6 +11,7 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding.*
 import org.typelevel.cats.time.given
@@ -22,7 +23,7 @@ object WhereProgram {
     val WhereNameBinding             = WhereOptionString.binding(path / "name")
     val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
     val WhereProgramReferenceBinding = WhereProgramReference.binding(path / "reference")
-    val WherePiBinding               = WhereProgramUser.binding(path / "pi")
+    val WherePiBinding               = WhereProgramUser.binding(path / "pi", ProgramUserRole.Pi.some)
     val WhereEqProposalStatus        = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     val WhereProposalBinding         = WhereProposal.binding(path / "proposal")
     val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])

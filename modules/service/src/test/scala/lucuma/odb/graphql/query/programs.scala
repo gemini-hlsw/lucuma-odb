@@ -9,6 +9,8 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Partner
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.StandardRole
@@ -150,8 +152,12 @@ class programs extends OdbSuite {
   }
 
   test("program selection via PI email") {
-    createProgramAs(piLeon) >>
     createProgramAs(piCharles).replicateA(2).flatMap { pids =>
+      createProgramAs(piLeon).flatMap { pid =>
+        addProgramUserAs(piLeon, pid, partnerLink = PartnerLink.HasPartner(Partner.BR)).flatMap { mid =>
+          linkUserAs(piLeon, mid, piCharles.id)
+        }
+      } >>
       expect(
         user = staff,
         query = s"""
