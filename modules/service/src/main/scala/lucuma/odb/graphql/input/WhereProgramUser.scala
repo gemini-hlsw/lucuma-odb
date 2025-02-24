@@ -16,7 +16,12 @@ import lucuma.odb.graphql.binding.*
 
 object WhereProgramUser {
 
-  def binding(path: Path): Matcher[Predicate] =
+  /**
+   * @param path path to program user
+   * @param onlyRole set to restrict to a particular role even if the "role"
+   *                 field is not set
+   */
+  def binding(path: Path, onlyRole: Option[ProgramUserRole] = None): Matcher[Predicate] =
 
     val WhereOrderProgramUserId       = WhereOrder.binding[ProgramUser.Id](path / "id", ProgramUserIdBinding)
     lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")
@@ -29,7 +34,7 @@ object WhereProgramUser {
     val WhereGenderBinding            = WhereOptionEq.binding(path / "gender", GenderBinding)
     val WhereHasDataAccessBinding     = WhereBoolean.binding(path / "hasDataAccess", BooleanBinding)
 
-    lazy val WhereProgramUserBinding = binding(path)
+    lazy val WhereProgramUserBinding = binding(path, onlyRole)
     ObjectFieldsBinding.rmap {
       case List(
         WhereProgramUserBinding.List.Option("AND", rAND),
@@ -56,6 +61,7 @@ object WhereProgramUser {
               program,
               user,
               role,
+              onlyRole.map(r => Eql(path / "role", Const(r))),
               partnerLink,
               fallbackProfile,
               educationalStatus,
