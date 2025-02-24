@@ -153,6 +153,8 @@ class programs extends OdbSuite {
 
   test("program selection via PI email") {
     createProgramAs(piCharles).replicateA(2).flatMap { pids =>
+      // Add a program where Charles Guiteau is the COI.  It
+      // shouldn't match the `WHERE` filter below.
       createProgramAs(piLeon).flatMap { pid =>
         addProgramUserAs(piLeon, pid, partnerLink = PartnerLink.HasPartner(Partner.BR)).flatMap { mid =>
           linkUserAs(piLeon, mid, piCharles.id)
