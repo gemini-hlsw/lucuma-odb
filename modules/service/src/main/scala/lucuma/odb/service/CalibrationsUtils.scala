@@ -7,6 +7,7 @@ import cats.MonadThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -126,13 +127,13 @@ trait CalibrationObservations {
     pid:     Program.Id,
     gid:     Group.Id,
     tid:     Target.Id,
-    wvAt:    Map[CalibrationConfigSubset, Option[Wavelength]],
+    props:   Map[CalibrationConfigSubset, CalibrationsService.CalObsProps],
     configs: List[CalibrationConfigSubset.Gmos[G, L, U]]
   ): F[List[Observation.Id]] =
-    configs.traverse{c =>
-      val wavelengthAt = wvAt.get(c).flatten
-      specPhotoObservation(pid, gid, tid, wavelengthAt, c.toLongSlitInput)
-    }
+    configs.traverse: c =>
+      val wavelengthAt = props.get(c).flatMap(_.wavelengthAt)
+      val band         = props.get(c).flatMap(_.band)
+      specPhotoObservation(pid, gid, tid, wavelengthAt, band, c.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match {
@@ -146,6 +147,7 @@ trait CalibrationObservations {
     gid:     Group.Id,
     tid:     Target.Id,
     wvAt:    Option[Wavelength],
+    band:    Option[ScienceBand],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
 
@@ -155,6 +157,7 @@ trait CalibrationObservations {
           proposalReference = none,
           programReference = none,
           SET = ObservationPropertiesInput.Create.Default.copy(
+                  scienceBand = band,
                   targetEnvironment = TargetEnvironmentInput.Create(
                     none,
                     List(tid).some
