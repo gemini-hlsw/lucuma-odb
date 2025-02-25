@@ -58,6 +58,12 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
               e <- cursor.fieldAs[Option[Timestamp]]("end")
             } yield (s, e).mapN { (ts, te) => TimestampInterval.between(ts, te) }.asJson,
           List("start", "end")
+      ),
+
+      CursorFieldJson(
+        "isWritten",
+        _.fieldAs[Option[Timestamp]]("end").map(_.isDefined.asJson),
+        List("end")
       )
     )
 

@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.User
 
@@ -356,5 +357,40 @@ class datasets extends OdbSuite with DatasetSetupOperations {
         expect(pi, q, e)
     }
   }
+
+  test("isWritten selection"):
+    recordDatasets(mode, pi, service, 34, 1, 3).flatMap {
+      case (_, List((_, List(did0, did1, _)))) =>
+
+        val q = s"""
+          query {
+            datasets(WHERE: { isWritten: { EQ: true } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0035.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        for
+          _ <- addDatasetEventAs(service, did0, DatasetStage.StartExpose)
+          _ <- addDatasetEventAs(service, did0, DatasetStage.EndWrite)
+          _ <- addDatasetEventAs(service, did1, DatasetStage.StartExpose)
+          _ <- expect(pi, q, e)
+        yield ()
+
+      case _ =>
+        sys.error("Expected 1 step, 3 datasets.")
+    }
 
 }

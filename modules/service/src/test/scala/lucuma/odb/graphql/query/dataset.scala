@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -139,4 +140,26 @@ class dataset extends OdbSuite with DatasetSetupOperations {
         fail("expected a single step and single dataset")
     }
   }
+
+  test("isWritten"):
+    def isWritten(did: Dataset.Id): IO[Boolean] =
+      query(
+        user  = pi,
+        query = s"""
+          query { dataset(datasetId: "$did") { isWritten } }
+        """
+      ).map: json =>
+        json.hcursor.downFields("dataset", "isWritten").require[Boolean]
+
+    val res = for
+      ds <- recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 400, 1, 1)
+      (_, List((_, List(did)))) = ds
+      s  <- addDatasetEventAs(service, did, DatasetStage.StartExpose)
+      w0 <- isWritten(did)
+      e  <- addDatasetEventAs(service, did, DatasetStage.EndWrite)
+      w1 <- isWritten(did)
+    yield (w0, w1)
+
+    assertIO(res, (false, true))
+
 }

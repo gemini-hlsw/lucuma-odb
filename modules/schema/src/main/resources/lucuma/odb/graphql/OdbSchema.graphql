@@ -6263,6 +6263,12 @@ type Dataset {
   "Dataset time interval, if the dataset collection has started."
   interval: TimestampInterval
 
+  """
+  Has the dataset been written to disk.  We assume the dataset has been
+  written when an `END_WRITE` event is received from Observe.
+  """
+  isWritten: Boolean!
+
 }
 
 """
@@ -12381,6 +12387,13 @@ input WhereDataset {
 
   "Matches the dataset comment."
   comment: WhereOptionString
+
+  """
+  Matches whether the dataset has been written (or not). In particular, a
+  dataset is considered written when a corresponding `END_WRITE` dataset event
+  has been recieved.
+  """
+  isWritten: WhereBoolean
 }
 
 input WhereDatasetReference {
