@@ -25,6 +25,13 @@ object WhereDataset {
     val WhereFilenameBinding       = WhereString.binding(path / "filename")
     val QaStateBinding             = WhereOptionEq.binding[DatasetQaState](path / "qaState", enumeratedBinding[DatasetQaState])
     val CommentBinding             = WhereOptionString.binding(path / "comment")
+    val IsWrittenBinding           = ObjectFieldsBinding.rmap {
+      case List(BooleanBinding.Option("EQ", rEQ)) =>
+        rEQ.map(_.fold(Predicate.True)(b => IsNull(path / "end", !b)))
+    }
+
+
+    WhereBoolean.binding(path / "isWritten", BooleanBinding)
 
     lazy val WhereDatasetBinding = binding(path)
 
@@ -41,22 +48,25 @@ object WhereDataset {
         WhereOrderIndexBinding.Option("index", rIndex),
         WhereFilenameBinding.Option("filename", rFile),
         QaStateBinding.Option("qaState", rQa),
-        CommentBinding.Option("comment", rComment)
+        CommentBinding.Option("comment", rComment),
+        IsWrittenBinding.Option("isWritten", rIsWritten)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rObs, rStepId, rIndex, rFile, rQa, rComment).parMapN { (AND, OR, NOT, id, ref, obs, sid, index, file, qa, comment) =>
-          and(List(
-            AND.map(and),
-            OR.map(or),
-            NOT.map(Not(_)),
-            id,
-            ref,
-            obs,
-            sid,
-            index,
-            file,
-            qa,
-            comment
-          ).flatten)
+        (rAND, rOR, rNOT, rId, rRef, rObs, rStepId, rIndex, rFile, rQa, rComment, rIsWritten).parMapN {
+          (AND, OR, NOT, id, ref, obs, sid, index, file, qa, comment, isWritten) =>
+            and(List(
+              AND.map(and),
+              OR.map(or),
+              NOT.map(Not(_)),
+              id,
+              ref,
+              obs,
+              sid,
+              index,
+              file,
+              qa,
+              comment,
+              isWritten
+            ).flatten)
         }
     }
   }
