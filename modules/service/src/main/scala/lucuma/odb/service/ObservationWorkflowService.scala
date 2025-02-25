@@ -578,7 +578,6 @@ object ObservationWorkflowService {
                       OdbError.InvalidObservation(oid, (prefix + suffix).some)
                         .asProblemNec
 
-
       def filterState(
         which: AppliedFragment,
         states: Set[ObservationWorkflowState],

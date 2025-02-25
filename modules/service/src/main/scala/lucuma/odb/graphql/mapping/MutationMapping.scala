@@ -624,11 +624,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                 .useTransactionally:
                   asterismService.updateAsterism(approved)
                     .flatMap: rUnit =>
-                      val query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
                       transaction
                         .rollback
-                        .unlessA(query.hasValue)
-                        .as(query)
+                        .unlessA(rUnit.hasValue)
+                        .as(Result(query))
 
     }
 
