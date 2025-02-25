@@ -21,6 +21,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
@@ -78,7 +79,6 @@ class ShortCut_4596 extends OdbSuite
       _  <- assertIO(queryObservationWorkflowState(o), state)
     yield o
 
-
   def tryUpdateSubtitleAs(
     user:     User,
     oids: List[Observation.Id],
@@ -94,6 +94,33 @@ class ShortCut_4596 extends OdbSuite
             WHERE: {
               id: { 
                 IN: ${oids.asJson.noSpaces} 
+              }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    expectIor(user, query, expected)
+
+  def tryUpdateAsterismsAs(
+    user: User,
+    oid: Observation.Id,
+    tid: Target.Id,
+    expected: Ior[List[String], Json]
+  ) = 
+    val query =
+      s"""
+        mutation {
+          updateAsterisms(input: {
+            SET: {
+              ADD: [${tid.asJson}]
+            }
+            WHERE: {
+              id: { 
+                EQ: ${oid.asJson} 
               }
             }
           }) {
@@ -283,14 +310,58 @@ class ShortCut_4596 extends OdbSuite
 
   }
   
-  test(s"Ongoing observations should not allow asterism edits".ignore):
-    ()
+  test(s"Ongoing observations should not allow asterism edits") {
 
+    val setup: IO[(Observation.Id, Target.Id)] =
+      for 
+        pid <- createProgramAs(pi)
+        oid <- createExecutedObservation(pid, Ongoing)
+        tid <- createTargetAs(pi, pid)
+      yield (oid, tid)
+    
+    setup.flatMap: (oid, tid) =>
+      tryUpdateAsterismsAs(pi, oid, tid,
+        Ior.Both(
+          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."),
+          json"""
+            {
+              "updateAsterisms": {
+                  "observations": []
+              }
+            }
+          """
+        )
+      )
+ 
+  }
   
+  test(s"Completed observations should not allow asterism edits") {
+
+    val setup: IO[(Observation.Id, Target.Id)] =
+      for 
+        pid <- createProgramAs(pi)
+        oid <- createExecutedObservation(pid, Completed)
+        tid <- createTargetAs(pi, pid)
+      yield (oid, tid)
+    
+    setup.flatMap: (oid, tid) =>
+      tryUpdateAsterismsAs(pi, oid, tid,
+        Ior.Both(
+          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Completed)."),
+          json"""
+            {
+              "updateAsterisms": {
+                  "observations": []
+              }
+            }
+          """
+        )
+      )
+ 
+  }
   test(s"Ongoing observations should not allow their asterism's targets to be edited".ignore):
     ()
 
-  
   List(Ongoing, Completed).foreach { state =>
 
     test(s"$state observations *should* be movable") {
