@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.mapping
 
+import cats.Functor
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Context
@@ -12,12 +13,14 @@ import grackle.Query
 import grackle.Query.*
 import grackle.Result
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
+import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
@@ -49,6 +52,7 @@ object AccessControl:
         case Checked.Empty => ifEmpty
         case Checked.NonEmpty(set, which) => ifNonEmpty(set, which)
         case Checked.NonEmptyWithIds(set, ids, enc) => ifNonEmpty(set, sql"${enc.nel(ids)}"(ids))
+        case Checked.NonEmptyWithId(set, id, enc) => ifNonEmpty(set, sql"$enc"(id))
 
   /**
    * A `Checked` that knows the affect ids beforehand.
@@ -62,6 +66,15 @@ object AccessControl:
       this match
         case Checked.Empty => ifEmpty
         case Checked.NonEmptyWithIds(set, ids, _) => ifNonEmpty(set, ids)
+        case Checked.NonEmptyWithId(set, id, _) => ifNonEmpty(set, NonEmptyList.one(id))
+
+  }
+
+  sealed abstract class CheckedWithId[+A,+B] extends CheckedWithIds[A,B] {
+    def foldWithId[C](ifEmpty: => C)(ifNonEmpty: (A, B) => C): C =
+      this match
+        case Checked.NonEmptyWithId(set, id, _) => ifNonEmpty(set, id)
+        case Checked.Empty => ifEmpty
 
   }
 
@@ -73,14 +86,20 @@ object AccessControl:
     /** An approved operation defined over `ids`, encodable via `enc`. */    
     sealed abstract case class NonEmptyWithIds[A,B](SET: A, ids: NonEmptyList[B], enc: Encoder[B]) extends CheckedWithIds[A,B]
 
+    /** An approved operation defined over `id`, encodable via `enc`. */    
+    sealed abstract case class NonEmptyWithId[A,B](SET: A, id: B, enc: Encoder[B]) extends CheckedWithId[A,B]
+
     /** An approved operation that is known to have no effect. */
-    case object Empty extends CheckedWithIds[Nothing, Nothing]
+    case object Empty extends CheckedWithId[Nothing, Nothing]
 
   }
 
   def unchecked[A,B](SET: A, ids: List[B], enc: Encoder[B])(using SuperUserAccess): CheckedWithIds[A,B] =
     NonEmptyList.fromList(ids).fold(Checked.Empty): ids =>
       new Checked.NonEmptyWithIds(SET, ids, enc) {}
+
+  def unchecked[A,B](SET: A, id: B, enc: Encoder[B])(using SuperUserAccess): CheckedWithId[A,B] =
+      new Checked.NonEmptyWithId(SET, id, enc) {}
 
   def unchecked[A](SET: A, which: AppliedFragment)(using SuperUserAccess): Checked[A] =
     new Checked.NonEmpty(SET, which) {}
@@ -91,6 +110,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
   def commitHash: CommitHash
+
+  // We do this a lot
+  extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
+    def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
+    def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
   private def selectForObservationUpdateImpl(
     includeDeleted:      Option[Boolean],
@@ -127,8 +151,21 @@ trait AccessControl[F[_]] extends Predicates[F] {
             itcClient,
             timeEstimateCalculator
           )
-  
+
   }
+
+  private def selectForObservationUpdateImpl(
+    includeDeleted:      Option[Boolean],
+    oids:                List[Observation.Id],
+    includeCalibrations: Boolean,
+    allowedStates:       Set[ObservationWorkflowState]
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] = 
+    selectForObservationUpdateImpl(
+      includeDeleted,
+      Some(Predicates.observation.id.in(oids)),
+      includeCalibrations,
+      allowedStates
+    )
 
   def selectForUpdate(
     input: UpdateObservationsInput, 
@@ -176,6 +213,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
         includeCalibrations, 
         ObservationWorkflowState.preExecutionSet // not allowed once we start executing
       ).map(_.map(AccessControl.unchecked(input.SET, _, observation_id)))
+      // TODO: need to ensure that all observations and targets are in the same program
 
   def selectForUpdate(
     input: UpdateObservationsTimesInput,
@@ -191,4 +229,26 @@ trait AccessControl[F[_]] extends Predicates[F] {
         ObservationWorkflowState.allButComplete // allowed unless we're complete
       ).map(_.map(AccessControl.unchecked(input.SET, _, observation_id)))
 
+  def selectForUpdate(
+    input: SetGuideTargetNameInput,
+    includeCalibrations: Boolean
+  )(using Services[F],
+          NoTransaction[F]
+  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]]  =
+    observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
+      r.flatTraverse: oid =>
+        Services.asSuperUser:
+          selectForObservationUpdateImpl(
+            None,
+            List(oid),
+            includeCalibrations,
+            if user.role.access <= Access.Pi 
+              then ObservationWorkflowState.preExecutionSet
+              else ObservationWorkflowState.allButComplete
+          ).map: r =>
+            r.flatMap:
+              case Nil => Result(AccessControl.Checked.Empty)
+              case List(x) => Result(AccessControl.unchecked(input, x, observation_id))
+              case _ => Result.internalError("Impossbile: got more than one oid back")
+    
 }

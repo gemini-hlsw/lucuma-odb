@@ -5,11 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
-import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
