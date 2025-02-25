@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Functor
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Resource
@@ -273,11 +272,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         child  = q
       )
     }
-
-  // We do this a lot
-  extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
-    def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
-    def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
   // Field definitions
 
@@ -581,9 +575,11 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
-        guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(input)
-          .nestMap: oid =>
-            Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+        Services.asSuperUser(selectForUpdate(input, false /* ignore cals */)).flatMap: r =>
+          r.flatTraverse: checked =>
+            guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(checked)
+              .nestMap: oid =>
+                Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
@@ -627,7 +623,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                       transaction
                         .rollback
                         .unlessA(rUnit.hasValue)
-                        .as(Result(query))
+                        .as(rUnit.as(query))
 
     }
 

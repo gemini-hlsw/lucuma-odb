@@ -159,6 +159,7 @@ class ShortCut_4596 extends OdbSuite
     expectIor(user, query, expected)
     
 
+
   test(s"Ongoing observations should not be editable") {
 
     val setup: IO[(Observation.Id, Observation.Id)] =
@@ -396,12 +397,6 @@ class ShortCut_4596 extends OdbSuite
 
     }
   }
-
-
-  List(Ongoing, Completed).foreach: state =>
-    test(s"$state observations *should* allow obs time updates".ignore):
-      ()
-
   
   test("Ongoing observations should not allow guide star changes (PI)".ignore):
     ()
