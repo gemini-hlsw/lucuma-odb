@@ -4750,6 +4750,12 @@ enum StepType {
 }
 
 type Subscription {
+
+  datasetEdit(
+    input: DatasetEditInput
+  ): DatasetEdit!
+
+
   """
 
   Subscribes to an event that is generated whenever a(n) observation is
@@ -4853,6 +4859,24 @@ input ConfigurationRequestEditInput {
     """
     programId: ProgramId
 
+}
+
+input DatasetEditInput {
+  datasetId:     DatasetId
+  observationId: ObservationId
+  programId:     ProgramId
+  isWritten:     Boolean
+}
+
+type DatasetEdit {
+  "Type of edit."
+  editType: EditType!
+
+  "The id of the edited object."
+  datasetId: DatasetId!
+
+  "Edited dataset."
+  value: Dataset
 }
 
 input ObservationEditInput {
