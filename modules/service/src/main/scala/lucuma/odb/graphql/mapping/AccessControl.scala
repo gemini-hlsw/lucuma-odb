@@ -54,9 +54,7 @@ object AccessControl:
         case Checked.NonEmptyWithIds(set, ids, enc) => ifNonEmpty(set, sql"${enc.nel(ids)}"(ids))
         case Checked.NonEmptyWithId(set, id, enc) => ifNonEmpty(set, sql"$enc"(id))
 
-  /**
-   * A `Checked` that knows the affect ids beforehand.
-   */
+  /** Specialization of `Checked` that knows the affected ids beforehand. */
   sealed abstract class CheckedWithIds[+A,+B] extends Checked[A] {
 
     def idsOrEmpty: List[B] =
@@ -70,6 +68,7 @@ object AccessControl:
 
   }
 
+  /** Specialization of `Checked` that knows there is at most a single affected id. */
   sealed abstract class CheckedWithId[+A,+B] extends CheckedWithIds[A,B] {
     def foldWithId[C](ifEmpty: => C)(ifNonEmpty: (A, B) => C): C =
       this match
@@ -94,13 +93,16 @@ object AccessControl:
 
   }
 
+  /** Construct a `CheckedWithIds` (requires SuperUser access). */
   def unchecked[A,B](SET: A, ids: List[B], enc: Encoder[B])(using SuperUserAccess): CheckedWithIds[A,B] =
     NonEmptyList.fromList(ids).fold(Checked.Empty): ids =>
       new Checked.NonEmptyWithIds(SET, ids, enc) {}
 
+  /** Construct a `CheckedWithId` (requires SuperUser access). */
   def unchecked[A,B](SET: A, id: B, enc: Encoder[B])(using SuperUserAccess): CheckedWithId[A,B] =
       new Checked.NonEmptyWithId(SET, id, enc) {}
 
+  /** Construct a `Checked` (requires SuperUser access). */
   def unchecked[A](SET: A, which: AppliedFragment)(using SuperUserAccess): Checked[A] =
     new Checked.NonEmpty(SET, which) {}
 
@@ -116,12 +118,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
     def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
     def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
+  /**
+   * Select and return the ids of observations that are editable by the current user and meet
+   * all the specified filters.
+   */
   private def selectForObservationUpdateImpl(
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState]
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =  {
+
     def observationIdWhereClause(
       includeDeleted:      Option[Boolean],
       WHERE:               Option[Predicate],
@@ -134,7 +141,6 @@ trait AccessControl[F[_]] extends Predicates[F] {
           if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
           WHERE.getOrElse(True)
         ))
-
       MappedQuery(
         Filter(whereObservation, Select("id", None, Query.Empty)),
         Context(QueryType, List("observations"), List("observations"), List(ObservationType))
@@ -154,6 +160,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   }
 
+  /** Overload of `selectForObservationUpdateImpl` that takes a list of oids instead of a `Predicate`.  */
   private def selectForObservationUpdateImpl(
     includeDeleted:      Option[Boolean],
     oids:                List[Observation.Id],
@@ -167,6 +174,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
       allowedStates
     )
 
+  /**
+   * Given an operation that defines a set of observations and a proposed edit, select and filter this
+   * set based on access control policies and return a checked edit that is valid for execution.
+   */
   def selectForUpdate(
     input: UpdateObservationsInput, 
     includeCalibrations: Boolean
@@ -204,6 +215,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
     }
       
+  /**
+   * Given an operation that defines a set of observations and a proposed edit, select and filter this
+   * set based on access control policies and return a checked edit that is valid for execution.
+   */
   def selectForUpdate(
     input: UpdateAsterismsInput,
     includeCalibrations: Boolean
@@ -219,6 +234,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
       Services.asSuperUser:
         AccessControl.unchecked(input.SET, oids, observation_id)
 
+  /**
+   * Given an operation that defines a set of observations and a proposed edit, select and filter this
+   * set based on access control policies and return a checked edit that is valid for execution.
+   */
   def selectForUpdate(
     input: UpdateObservationsTimesInput,
     includeCalibrations: Boolean
@@ -234,6 +253,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
       Services.asSuperUser:
         AccessControl.unchecked(input.SET, oids, observation_id)
 
+  /**
+   * Given an operation that defines a set of observations and a proposed edit, select and filter this
+   * set based on access control policies and return a checked edit that is valid for execution.
+   */
   def selectForUpdate(
     input: SetGuideTargetNameInput,
     includeCalibrations: Boolean
