@@ -209,7 +209,7 @@ object CalibrationsService extends CalibrationObservations {
               // there must be a way to sum in wavelength space :/
               val pm = ws.map(_.toPicometers.value.value).combineAll / ws.size
               PosInt.from(pm).map(Wavelength(_)).toOption
-          k -> CalObsProps(w, v.map(_.band).max)
+          k -> CalObsProps(w, v.map(_.band).min)
         }
 
       private def uniqueConfiguration(
