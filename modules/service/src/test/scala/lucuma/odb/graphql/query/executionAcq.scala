@@ -4,8 +4,10 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetQaState
@@ -14,6 +16,8 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.json.all.transport.given
@@ -438,5 +442,77 @@ class executionAcq extends ExecutionTestSupport {
       )
     }
   }
+
+  def firstScienceStepId(p: Program.Id, o: Observation.Id): IO[Step.Id] =
+    import lucuma.odb.testsyntax.execution.*
+    generateOrFail(p, o, 5.some).map(_.gmosNorthScience.nextAtom.steps.head.id)
+
+  test("science step ids do not change while executing acquisition"):
+    val execAcq: IO[Set[Step.Id]] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        x0 <- firstScienceStepId(p, o)
+
+        // First atom with 3 steps.
+        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+
+        x1 <- firstScienceStepId(p, o)
+
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s1)
+
+        x1 <- firstScienceStepId(p, o)
+
+        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s2)
+
+        x2 <- firstScienceStepId(p, o)
+
+        // Second atom with just the last acq step
+        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s3)
+
+        x3 <- firstScienceStepId(p, o)
+      yield Set(x0, x1, x2, x3)
+
+    assertIO(execAcq.map(_.size), 1)
+
+  def nextAtomStepIds(p: Program.Id, o: Observation.Id): IO[NonEmptyList[Step.Id]] =
+    import lucuma.odb.testsyntax.execution.*
+    generateOrFail(p, o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.map(_.id))
+
+  test("nextAtom step ids don't change while executing"):
+    val execAcq: IO[List[NonEmptyList[Step.Id]]] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        x0 <- nextAtomStepIds(p, o)
+
+        // First atom with 3 steps.
+        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+
+        x1 <- nextAtomStepIds(p, o)
+
+        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s1)
+
+        x2 <- nextAtomStepIds(p, o)
+      yield List(x0, x1, x2)
+
+    execAcq.map: ids =>
+      ids.zip(ids.tail).foreach: (before, after) =>
+        assertEquals(before.tail, after.toList, s"before: $before, after: $after")
 
 }

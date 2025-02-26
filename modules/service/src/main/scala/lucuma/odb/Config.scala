@@ -16,6 +16,7 @@ import fs2.io.net.Network
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Gid
 import lucuma.itc.client.ItcClient
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.sso.client.SsoClient
@@ -47,7 +48,8 @@ case class Config(
   email:         Config.Email,     // Mailgun config
   corsOverHttps: Boolean,          // Whether to require CORS over HTTPS
   domain:        List[String],     // Domains, for CORS headers
-  commitHash:    CommitHash        // From Heroku Dyno Metadata
+  commitHash:    CommitHash,       // From Heroku Dyno Metadata
+  goaUsers:      Set[User.Id]      // Gemini Observatory Archive user id(s)
 ) {
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -272,6 +274,13 @@ object Config {
   private given ConfigDecoder[String, CommitHash] =
     ConfigDecoder[String].mapOption("CommitHash")(CommitHash.FromString.getOption)
 
+  private given [A](using Gid[A]): ConfigDecoder[String, A] =
+    ConfigDecoder[String].mapOption("Gid[A]")(Gid[A].fromString.getOption)
+
+  private given [A](using ConfigDecoder[String, A]): ConfigDecoder[String, List[A]] =
+    ConfigDecoder[String].map(_.split(",").map(_.trim).toList).mapEither: (key, ss) =>
+      ss.traverse(ConfigDecoder[String, A].decode(key, _))
+
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
@@ -285,8 +294,9 @@ object Config {
     Aws.fromCiris,
     Email.fromCirrus,
     envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
-    envOrProp("ODB_DOMAIN").map(_.split(",").map(_.trim).toList).as[List[String]],
-    envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero)
+    envOrProp("ODB_DOMAIN").as[List[String]],
+    envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero),
+    envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty)
   ).parMapN(Config.apply)
 
 }

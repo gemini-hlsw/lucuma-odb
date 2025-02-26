@@ -677,35 +677,38 @@ object Science:
         .getOrElse(pos)
 
     override def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-      val trackerʹ = tracker.record(step)
+      if step.isAcquisitionSequence then
+        this
+      else
+        val trackerʹ = tracker.record(step)
 
-      // Advance the block we're focusing upon, if necessary.  This will happen
-      // (potentially) for the first step recorded, or when a new atom is started
-      val (recordsʹ, posʹ) =
-        tracker match
-          case IndexTracker.Zero =>
-            (records, advancePos(0, step))
-          case _                 =>
-            if tracker.atomCount === trackerʹ.atomCount then (records, pos)
-            else (records.map(_.settle), advancePos(pos+1, step))
+        // Advance the block we're focusing upon, if necessary.  This will happen
+        // (potentially) for the first step recorded, or when a new atom is started
+        val (recordsʹ, posʹ) =
+          tracker match
+            case IndexTracker.Zero =>
+              (records, advancePos(0, step))
+            case _                 =>
+              if tracker.atomCount === trackerʹ.atomCount then (records, pos)
+              else (records.map(_.settle), advancePos(pos+1, step))
 
-      val recordsʹʹ =
-        step.stepConfig.stepType match
-          case StepType.Bias | StepType.Dark | StepType.SmartGcal =>
-            // GMOS Longslit doesn't use biases or darks, and smart gcal has
-            // been expanded so ignore these.
-            recordsʹ
-          case StepType.Gcal | StepType.Science                   =>
-            // Record the step at the current index, settle all others
-            recordsʹ.zipWithIndex.map: (rec, idx) =>
-              if posʹ === idx then rec.record(step) else rec.settle
+        val recordsʹʹ =
+          step.stepConfig.stepType match
+            case StepType.Bias | StepType.Dark | StepType.SmartGcal =>
+              // GMOS Longslit doesn't use biases or darks, and smart gcal has
+              // been expanded so ignore these.
+              recordsʹ
+            case StepType.Gcal | StepType.Science                   =>
+              // Record the step at the current index, settle all others
+              recordsʹ.zipWithIndex.map: (rec, idx) =>
+                if posʹ === idx then rec.record(step) else rec.settle
 
-      copy(
-        lastSteps = lastSteps.next(step.protoStep),
-        records   = recordsʹʹ,
-        tracker   = trackerʹ,
-        pos       = posʹ
-      )
+        copy(
+          lastSteps = lastSteps.next(step.protoStep),
+          records   = recordsʹʹ,
+          tracker   = trackerʹ,
+          pos       = posʹ
+        )
 
     end recordStep
 

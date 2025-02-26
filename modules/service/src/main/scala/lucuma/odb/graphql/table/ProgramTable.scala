@@ -8,6 +8,7 @@ package table
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
+import skunk.codec.temporal.date
 
 trait ProgramTable[F[_]] extends BaseMapping[F]:
 
@@ -18,6 +19,8 @@ trait ProgramTable[F[_]] extends BaseMapping[F]:
     val Description     = col("c_description", text_nonempty.opt)
     val ProposalStatus  = col("c_proposal_status", tag)
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
+    val ActiveStart     = col("c_active_start", date)
+    val ActiveEnd       = col("c_active_end", date)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)

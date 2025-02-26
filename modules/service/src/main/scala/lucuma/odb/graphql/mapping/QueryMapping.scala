@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Order.catsKernelOrderingForOrder
 import cats.effect.Resource
 import cats.syntax.all.*
 import grackle.Context
@@ -20,16 +21,24 @@ import grackle.Result
 import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
 import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model
+import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ObservationReference
+import lucuma.core.model.OrcidId
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.core.model.StandardUser
+import lucuma.core.model.User
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
@@ -51,6 +60,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ConfigurationService.downFields
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
+import skunk.Transaction
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>
@@ -61,6 +71,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
   def commitHash: CommitHash
+  def goaUsers: Set[User.Id]
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(QueryType)(
@@ -73,6 +84,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("filterTypeMeta"),
+      RootEffect.computeJson("goaDataDownloadAccess")(goaDataDownloadAccess),
       SqlObject("group"),
       SqlObject("observation"),
       SqlObject("observations"),
@@ -99,6 +111,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Datasets,
       Events,
       FilterTypeMeta,
+      GoaDataDownloadAccess,
       Group,
       Observation,
       Observations,
@@ -121,7 +134,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // fetch the workflow states for just those oids, then find the ones with the states we're
   // interested in and build a new query that's the same as the original but with a swapped
   // out predicate that explicitly matches the set of oids we have computed.
-  def observationsByWorkflowState(query: Query, p: Path, e: Env): F[Result[Query]] =     
+  def observationsByWorkflowState(query: Query, p: Path, e: Env): F[Result[Query]] =
     query match {
       case Environment(env, Filter(pred, child)) =>
 
@@ -174,14 +187,53 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
         // I can't believe this works.
         services.useNonTransactionally:
-          requireServiceAccess: // N.B. this is only for services, at least for now
+          requireStaffAccess: // N.B. this is only for staff or better, at least for now
             go.value
 
       case other =>
-        Result.internalError("observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got ${other}").pure[F]
+        Result.internalError(s"observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got $other").pure[F]
     
     }
-      
+
+  private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (p, e) =>
+    val notAuthorized = OdbError.NotAuthorized(user.id, "Only the GOA user may access this field.".some).asFailure
+    val goaUserCheck  = user match
+      case StandardUser(id, r, rs, _) => notAuthorized.unlessA(goaUsers.contains(id) || ((r::rs).map(_.access).max >= Access.Staff))
+      case _                          => notAuthorized
+
+    def decode(r: Json): Result[List[ProgramReference]] =
+      r.hcursor.downFields("programUsers", "matches").values.toList.flatMap(_.toList).traverse: json =>
+        json
+          .hcursor
+          .downFields("program", "reference", "label")
+          .as[String]
+          .toOption
+          .flatMap(ProgramReference.fromString.getOption)
+          .fold(Result.internalError[ProgramReference](s"Could not parse program reference label results: ${json.spaces2}"))(_.success)
+
+    def refs(orcidId: OrcidId): ResultT[F, List[ProgramReference]] =
+      val pred     = and(List(
+        Predicates.programUser.program.referenceLabel.isNull(false),
+        Eql(Path.from(ProgramUserType) / "user" / "orcidId", Const(orcidId.value.some)),
+        Predicates.programUser.hasDataAccess.eql(true)
+      ))
+      val refQuery   = Select("programUsers", Select("matches", Filter(pred, Select("program", Select("reference", Select("label"))))))
+      val rootCursor = RootCursor(Context(QueryType), None, Env.EmptyEnv)
+      for
+        pjson <- ResultT(interpreter.runOneShot(refQuery, QueryType, rootCursor))
+        json  <- ResultT(QueryInterpreter.complete[F](pjson))
+        mids  <- ResultT.fromResult(decode(json))
+      yield mids
+
+    def go(using Services[F], Transaction[F]): ResultT[F, List[ProgramReference]] =
+      for
+        _     <- ResultT.fromResult(goaUserCheck)
+        orcid <- ResultT.fromResult(e.getR[OrcidId]("orcidId"))
+        refs  <- refs(orcid)
+      yield refs.distinct.sorted
+
+    services.useTransactionally:
+      go.map(_.map(_.asJson).asJson).value
 
   // Elaborators below
 
@@ -407,6 +459,12 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Tag](FilterTypeMetaType / "tag"))), child)
       }
+
+  private lazy val GoaDataDownloadAccess: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "goaDataDownloadAccess", List(
+      OrcidIdBinding("orcidId", rOrcidId)
+    )) =>
+      Elab.liftR(rOrcidId).flatMap(orcidId => Elab.env("orcidId", orcidId))
 
   private lazy val Group: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "group", List(

@@ -9,12 +9,16 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Partner
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+
+import java.time.LocalDate
 
 class programs extends OdbSuite {
 
@@ -148,8 +152,14 @@ class programs extends OdbSuite {
   }
 
   test("program selection via PI email") {
-    createProgramAs(piLeon) >>
     createProgramAs(piCharles).replicateA(2).flatMap { pids =>
+      // Add a program where Charles Guiteau is the COI.  It
+      // shouldn't match the `WHERE` filter below.
+      createProgramAs(piLeon).flatMap { pid =>
+        addProgramUserAs(piLeon, pid, partnerLink = PartnerLink.HasPartner(Partner.BR)).flatMap { mid =>
+          linkUserAs(piLeon, mid, piCharles.id)
+        }
+      } >>
       expect(
         user = staff,
         query = s"""
@@ -240,5 +250,72 @@ class programs extends OdbSuite {
         ).asRight
     )
   }
+
+  val start = LocalDate.parse("2025-02-01")
+  val end   = LocalDate.parse("2025-07-01")
+
+  test("program selection via active period"):
+    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+      createProgramAs(pi, "Active Period Test").flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user     = pi,
+          query    = s"""
+            query {
+              programs(
+                WHERE: {
+                  activeStart: { GT: "2025-01-31" }
+                  activeEnd: { LT: "2025-07-02" }
+                }
+              ) {
+                matches { id }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "programs": {
+                  "matches": [
+                    {
+                      "id": ${pid.asJson}
+                    }
+                  ]
+                }
+              }
+            """.asRight
+        )
+      }
+    }
+
+  test("program selection via active period (empty)"):
+    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+      createProgramAs(pi, "Active Period Test").flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        expect(
+          user     = pi,
+          query    = s"""
+            query {
+              programs(
+                WHERE: {
+                  activeStart: { GT: "2025-02-02" }
+                  activeEnd: { LT: "2025-06-30" }
+                }
+              ) {
+                matches { id }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "programs": {
+                  "matches": []
+                }
+              }
+            """.asRight
+        )
+      }
+    }
 
 }
