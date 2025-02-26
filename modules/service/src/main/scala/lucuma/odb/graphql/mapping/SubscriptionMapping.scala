@@ -101,7 +101,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
         .map(e => Result(
           Environment(
             Env("editType" -> e.editType),
-            Unique(Filter(Predicates.dataset.id.eql(e.datasetId), child))
+            Unique(Filter(Predicates.datasetEdit.value.id.eql(e.datasetId), child))
           )
         ))
 

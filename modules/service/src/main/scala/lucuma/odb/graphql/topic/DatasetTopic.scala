@@ -11,10 +11,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
-import lucuma.odb.data.EditType
 import lucuma.core.util.Gid
+import lucuma.odb.data.EditType
 import org.typelevel.log4cats.Logger
-
 import skunk.*
 import skunk.syntax.stringcontext.*
 

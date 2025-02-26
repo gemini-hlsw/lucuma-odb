@@ -11,6 +11,8 @@ BEGIN
   FROM t_observation
   WHERE c_observation_id = NEW.c_observation_id;
 
+  -- RAISE WARNING 'Calling ch_dataset_edit %', NEW.c_dataset_id;
+
   PERFORM pg_notify(
     'ch_dataset_edit',
     array_to_string(
@@ -19,7 +21,8 @@ BEGIN
         NEW.c_observation_id,
         pid,
         -- isWritten
-        CASE WHEN NEW.c_end_time IS NOT NULL THEN 'true' ELSE 'false' END
+        CASE WHEN NEW.c_end_time IS NOT NULL THEN 'true' ELSE 'false' END,
+        TG_OP
       ],
       ','
     )
