@@ -173,7 +173,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F], 
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]] =
-    Services.asSuperUser {
+    {
 
       def allowedStates(SET: ObservationPropertiesInput.Edit): Set[ObservationWorkflowState] =
         if
@@ -196,7 +196,9 @@ trait AccessControl[F[_]] extends Predicates[F] {
         input.WHERE, 
         includeCalibrations, 
         allowedStates(input.SET)
-      ).map(_.map(AccessControl.unchecked(input.SET, _, observation_id)))
+      ).nestMap: oids =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, oids, observation_id)
 
     }
       
@@ -206,14 +208,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F], 
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]]] =
-    Services.asSuperUser:
-      selectForObservationUpdateImpl(
-        input.includeDeleted, 
-        input.WHERE, 
-        includeCalibrations, 
-        ObservationWorkflowState.preExecutionSet // not allowed once we start executing
-      ).map(_.map(AccessControl.unchecked(input.SET, _, observation_id)))
-      // TODO: need to ensure that all observations and targets are in the same program
+    selectForObservationUpdateImpl(
+      input.includeDeleted, 
+      input.WHERE, 
+      includeCalibrations, 
+      ObservationWorkflowState.preExecutionSet // not allowed once we start executing
+    ).nestMap: oids =>
+      Services.asSuperUser:
+        AccessControl.unchecked(input.SET, oids, observation_id)
 
   def selectForUpdate(
     input: UpdateObservationsTimesInput,
@@ -221,13 +223,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F], 
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithIds[ObservationTimesInput, Observation.Id]]]  =
-    Services.asSuperUser:
-      selectForObservationUpdateImpl(
-        input.includeDeleted, 
-        input.WHERE, 
-        includeCalibrations, 
-        ObservationWorkflowState.allButComplete // allowed unless we're complete
-      ).map(_.map(AccessControl.unchecked(input.SET, _, observation_id)))
+    selectForObservationUpdateImpl(
+      input.includeDeleted, 
+      input.WHERE, 
+      includeCalibrations, 
+      ObservationWorkflowState.allButComplete // allowed unless we're complete
+    ).nestMap: oids =>
+      Services.asSuperUser:
+        AccessControl.unchecked(input.SET, oids, observation_id)
 
   def selectForUpdate(
     input: SetGuideTargetNameInput,
@@ -237,18 +240,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
   ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]]  =
     observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
       r.flatTraverse: oid =>
-        Services.asSuperUser:
-          selectForObservationUpdateImpl(
-            None,
-            List(oid),
-            includeCalibrations,
-            if user.role.access <= Access.Pi 
-              then ObservationWorkflowState.preExecutionSet
-              else ObservationWorkflowState.allButComplete
-          ).map: r =>
-            r.flatMap:
-              case Nil => Result(AccessControl.Checked.Empty)
-              case List(x) => Result(AccessControl.unchecked(input, x, observation_id))
-              case _ => Result.internalError("Impossbile: got more than one oid back")
+        selectForObservationUpdateImpl(
+          None,
+          List(oid),
+          includeCalibrations,
+          if user.role.access <= Access.Pi 
+            then ObservationWorkflowState.preExecutionSet
+            else ObservationWorkflowState.allButComplete
+        ).map: r =>
+          r.flatMap:
+            case Nil => Result(AccessControl.Checked.Empty)
+            case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
+            case _ => Result.internalError("Unpossible: got more than one oid back")
     
 }

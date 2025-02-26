@@ -64,6 +64,8 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
+import grackle.Result.Failure
+import grackle.Result.Warning
 
 trait MutationMapping[F[_]] extends AccessControl[F] {
 
@@ -572,14 +574,20 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             allocationResultSubquery(input.programId, child)
           )
 
+
   private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
-        Services.asSuperUser(selectForUpdate(input, false /* ignore cals */)).flatMap: r =>
-          r.flatTraverse: checked =>
-            guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(checked)
-              .nestMap: oid =>
-                Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+        selectForUpdate(input, false /* ignore cals */).flatMap: r =>
+          r match
+            // This shortcuts setGuideTargetName if we know it has to fail
+            case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
+            case other =>
+              other.flatTraverse: checked =>
+                guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+                  .setGuideTargetName(checked)
+                  .nestMap: oid =>
+                    Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
