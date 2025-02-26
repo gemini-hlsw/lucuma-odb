@@ -175,11 +175,13 @@ trait AccessControl[F[_]] extends Predicates[F] {
   ): F[Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]] =
     {
 
-      def allowedStates(SET: ObservationPropertiesInput.Edit): Set[ObservationWorkflowState] =
+      // Which workflow states would permit the proposed update (also taking user into account)?
+      val allowedStates: Set[ObservationWorkflowState] =
+        val SET = input.SET
         if
+          (SET.posAngleConstraint.isDefined && user.role.access <= Access.Pi) || // staff are allowed to do this
           SET.subtitle.isDefined            ||
           SET.scienceBand.isDefined         ||
-          (SET.posAngleConstraint.isDefined && user.role.access <= Access.Pi) ||
           SET.targetEnvironment.isDefined   ||
           SET.constraintSet.isDefined       ||
           SET.timingWindows.isDefined       ||
@@ -188,14 +190,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
           SET.observingMode.isDefined       ||
           SET.existence.isDefined           ||
           SET.observerNotes.isDefined
-        then ObservationWorkflowState.preExecutionSet
-        else ObservationWorkflowState.fullSet
+        then ObservationWorkflowState.preExecutionSet // ok prior to execution
+        else ObservationWorkflowState.fullSet         // always ok
 
       selectForObservationUpdateImpl(
         input.includeDeleted, 
         input.WHERE, 
         includeCalibrations, 
-        allowedStates(input.SET)
+        allowedStates
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)
