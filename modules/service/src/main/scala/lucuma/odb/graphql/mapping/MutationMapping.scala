@@ -20,6 +20,8 @@ import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.Result.Failure
+import grackle.Result.Warning
 import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
@@ -64,8 +66,6 @@ import skunk.SqlState
 import skunk.Transaction
 
 import scala.reflect.ClassTag
-import grackle.Result.Failure
-import grackle.Result.Warning
 
 trait MutationMapping[F[_]] extends AccessControl[F] {
 

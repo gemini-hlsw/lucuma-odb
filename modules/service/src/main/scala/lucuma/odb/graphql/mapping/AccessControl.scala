@@ -179,7 +179,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
         if
           SET.subtitle.isDefined            ||
           SET.scienceBand.isDefined         ||
-          SET.posAngleConstraint.isDefined  ||
+          (SET.posAngleConstraint.isDefined && user.role.access <= Access.Pi) ||
           SET.targetEnvironment.isDefined   ||
           SET.constraintSet.isDefined       ||
           SET.timingWindows.isDefined       ||
