@@ -31,12 +31,15 @@ import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
+import lucuma.ags.GuideStarName
 
 //https://app.shortcut.com/lucuma/story/4596/api-should-prevent-editing-of-observations-for-which-execution-has-started
 class ShortCut_4596 extends OdbSuite 
   with ExecutionTestSupport 
   with ObservingModeSetupOperations 
   with UpdateConstraintSetOps {
+
+  val guideTargetName: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
   // required in order to get the correct "complete" execution status below (see executionState.scala)
   override def fakeItcSpectroscopyResult: IntegrationTime =
@@ -398,13 +401,61 @@ class ShortCut_4596 extends OdbSuite
     }
   }
   
-  test("Ongoing observations should not allow guide star changes (PI)".ignore):
-    ()
+  test("Ongoing observations should not allow guide star changes (PI)"):
+    createProgramAs(pi)
+      .flatMap(createExecutedObservation(_, Ongoing))
+      .flatMap: oid =>
+        expectIor(
+          user = pi,
+          query = s"""
+            mutation {
+              setGuideTargetName(
+                input: {
+                  observationId: ${oid.asJson}
+                  targetName: ${guideTargetName.asJson}
+                }
+              ) {
+                observation {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Ior.Left(List(
+            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+          ))
+        )  
 
-
-  test("Ongoing observations *should* allow guide star changes (Staff)".ignore):
-    ()
-
+  test("Ongoing observations *should* allow guide star changes (Staff)"):
+    createProgramAs(pi)
+      .flatMap(createExecutedObservation(_, Ongoing))
+      .flatMap: oid =>
+        expectIor(
+          user = staff,
+          query = s"""
+            mutation {
+              setGuideTargetName(
+                input: {
+                  observationId: ${oid.asJson}
+                  targetName: ${guideTargetName.asJson}
+                }
+              ) {
+                observation {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Ior.Right(json"""
+            {
+              "setGuideTargetName": {
+                "observation": {
+                  "id": $oid
+                }
+              }
+            }
+          """)
+        )
 
   test("Ongoing observations should not allow position angle changes (PI)".ignore):
     ()
