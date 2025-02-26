@@ -21,8 +21,8 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
-import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
+import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
