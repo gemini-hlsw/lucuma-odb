@@ -498,10 +498,12 @@ class ShortCut_4596 extends OdbSuite
             )
         )
 
+  // can't implement yet
   test("Ongoing observations should not allow acquisition time changes (PI)".ignore):
     ()
 
 
+  // can't implement yet
   test("Ongoing observations *should* allow acquisition time changes (Staff)".ignore):
     ()
 
