@@ -54,6 +54,7 @@ object GraphQLRoutes {
   def apply[F[_]: Async: Parallel: Trace: Logger](
     itcClient:    ItcClient[F],
     commitHash:   CommitHash,
+    goaUsers:     Set[User.Id],
     ssoClient:    SsoClient[F, User],
     pool:         Resource[F, Session[F]],
     monitor:      SkunkMonitor[F],
@@ -102,7 +103,7 @@ object GraphQLRoutes {
                       _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                       _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, enums, ptc, httpClient, emailConfig)
+                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
                       svc   = new GraphQLService(map) {
                         override def query(request: Operation): F[Result[Json]] =
                           super.query(request).retryOnInvalidCursorName

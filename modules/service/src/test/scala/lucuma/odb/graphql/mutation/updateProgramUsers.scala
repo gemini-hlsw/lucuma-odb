@@ -133,6 +133,33 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
+  def updateUserDataAccess(p: Program.Id, u: User, hasDataAccess: Boolean): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              hasDataAccess: $hasDataAccess
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            hasDataAccess
+          }
+        }
+      }
+    """
+
   def updateUserGender(p: Program.Id, u: User, g: Option[Gender]): String =
     s"""
       mutation {
@@ -281,6 +308,19 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
+  def expectedDataAccess(ts: (Program.Id, User, Boolean)*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, th) =>
+          Json.obj(
+            "program"       -> Json.obj("id" -> pid.asJson),
+            "user"          -> Json.obj("id" -> user.id.asJson),
+            "hasDataAccess" -> th.asJson
+          )
+        }.asJson
+      )
+    )
+
   def expectedGender(ts: (Program.Id, User, Option[Gender])*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -347,7 +387,7 @@ class updateProgramUsers extends OdbSuite:
           expected = expected((pid, pi2, PartnerLink.HasNonPartner)).asRight
         )
 
-  test("update pi educational status"):
+  test("update coi educational status"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
@@ -357,7 +397,7 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedES((pid, pi2, Some(EducationalStatus.UndergradStudent))).asRight
         )
 
-  test("unset pi educational status"):
+  test("unset coi educational status"):
     createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
@@ -367,7 +407,7 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedES((pid, pi2, None)).asRight
         )
 
-  test("update pi gender"):
+  test("update coi gender"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
@@ -377,7 +417,7 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedGender((pid, pi2, Some(Gender.Other))).asRight
         )
 
-  test("unset pi gender"):
+  test("unset coi gender"):
     createProgramAs(pi2) >> createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
@@ -387,7 +427,7 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedGender((pid, pi2, None)).asRight
         )
 
-  test("update pi thesis flag"):
+  test("update coi thesis flag"):
     createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
         linkUserAs(pi, mid, pi3.id) >>
@@ -395,6 +435,33 @@ class updateProgramUsers extends OdbSuite:
           user     = pi,
           query    = updateUserThesisFlag(pid, pi3, true),
           expected = expectedThesis((pid, pi3, true)).asRight
+        )
+
+  test("update coi hasDataAccess flag"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserDataAccess(pid, pi3, false),
+          expected = expectedDataAccess((pid, pi3, false)).asRight
+        )
+
+  test("coi cannot update hasDataAccess flag"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi3,
+          query    = updateUserDataAccess(pid, pi3, false),
+          expected =
+            json"""
+              {
+                "updateProgramUsers": {
+                  "programUsers": []
+                }
+              }
+            """.asRight
         )
 
   val GavriloPrincip: UserProfile =

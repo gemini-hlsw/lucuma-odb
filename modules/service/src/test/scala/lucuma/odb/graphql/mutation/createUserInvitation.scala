@@ -72,25 +72,25 @@ class createUserInvitation extends OdbSuite:
       Resource.eval(response)
     }
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (key)"):
       createProgramAs(pi).flatMap: pid =>
         addProgramUserAs(pi, pid, role).flatMap: mid =>
           createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (non-partner)"):
       createProgramAs(pi).flatMap: pid =>
         addProgramUserAs(pi, pid, role, PartnerLink.HasNonPartner).flatMap: mid =>
           createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: role =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
     test(s"invite ${role.toString.toLowerCase} (unspecified partner)"):
       createProgramAs(pi).flatMap: pid =>
         addProgramUserAs(pi, pid, role, PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
           createUserInvitationAs(pi, mid)
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)"):
       createProgramAs(pi).flatMap: pid =>
         addProgramUserAs(pi, pid, pur, PartnerLink.HasPartner(Partner.US)).flatMap: mid =>
@@ -147,7 +147,7 @@ class createUserInvitation extends OdbSuite:
             """.asRight
           )
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: pur =>
     test(s"coi can invite a ${pur.toString.toLowerCase} (metadata)"):
       val pidrid = for
         pid  <- createProgramAs(pi)
@@ -210,7 +210,7 @@ class createUserInvitation extends OdbSuite:
             """.asRight
         )
 
-  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO).foreach: pur =>
+  List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: pur =>
     test(s"readonly coi cannot invite a ${pur.toString.toLowerCase}"):
       val mid = for
         pid  <- createProgramAs(pi)

@@ -16,7 +16,12 @@ import lucuma.odb.graphql.binding.*
 
 object WhereProgramUser {
 
-  def binding(path: Path): Matcher[Predicate] =
+  /**
+   * @param path path to program user
+   * @param onlyRole set to restrict to a particular role even if the "role"
+   *                 field is not set
+   */
+  def binding(path: Path, onlyRole: Option[ProgramUserRole] = None): Matcher[Predicate] =
 
     val WhereOrderProgramUserId       = WhereOrder.binding[ProgramUser.Id](path / "id", ProgramUserIdBinding)
     lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")
@@ -27,8 +32,9 @@ object WhereProgramUser {
     val WhereEducationalStatusBinding = WhereOptionEq.binding(path / "educationalStatus", EducationalStatusBinding)
     val WhereThesisBinding            = WhereOptionBoolean.binding(path / "thesis", BooleanBinding)
     val WhereGenderBinding            = WhereOptionEq.binding(path / "gender", GenderBinding)
+    val WhereHasDataAccessBinding     = WhereBoolean.binding(path / "hasDataAccess", BooleanBinding)
 
-    lazy val WhereProgramUserBinding = binding(path)
+    lazy val WhereProgramUserBinding = binding(path, onlyRole)
     ObjectFieldsBinding.rmap {
       case List(
         WhereProgramUserBinding.List.Option("AND", rAND),
@@ -42,10 +48,11 @@ object WhereProgramUser {
         WhereFallbackProfileBinding.Option("fallbackProfile", rFallbackProfile),
         WhereEducationalStatusBinding.Option("educationalStatus", rEducationalStatus),
         WhereThesisBinding.Option("thesis", rThesis),
-        WhereGenderBinding.Option("gender", rGender)
+        WhereGenderBinding.Option("gender", rGender),
+        WhereHasDataAccessBinding.Option("hasDataAccess", rDataAccess)
       ) =>
-        (rAND, rOR, rNOT, rId, rProgram, rUser, rRole, rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN {
-          (AND, OR, NOT, id, program, user, role, partnerLink, fallbackProfile, educationalStatus, thesis, gender) =>
+        (rAND, rOR, rNOT, rId, rProgram, rUser, rRole, rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender, rDataAccess).parMapN {
+          (AND, OR, NOT, id, program, user, role, partnerLink, fallbackProfile, educationalStatus, thesis, gender, hasDataAccess) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -54,11 +61,13 @@ object WhereProgramUser {
               program,
               user,
               role,
+              onlyRole.map(r => Eql(path / "role", Const(r))),
               partnerLink,
               fallbackProfile,
               educationalStatus,
               thesis,
-              gender
+              gender,
+              hasDataAccess
             ).flatten)
         }
     }

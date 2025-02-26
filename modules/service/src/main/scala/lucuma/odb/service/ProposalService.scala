@@ -538,7 +538,17 @@ object ProposalService {
             0
           ) AS c_splits_sum,
           COALESCE(
-            (SELECT ARRAY_AGG(DISTINCT c_partner) FROM t_program_user WHERE c_program_id = prog.c_program_id AND c_partner IS NOT NULL),
+            (SELECT
+               ARRAY_AGG(DISTINCT
+                 CASE
+                   WHEN c_partner_link = 'has_non_partner' THEN 'us'::d_tag
+                   ELSE c_partner
+                 END
+               )
+             FROM t_program_user
+             WHERE c_program_id = prog.c_program_id
+               AND (c_partner IS NOT NULL OR c_partner_link = 'has_non_partner')
+            ),
             '{}'
           ) AS c_available_partners,
           COALESCE(

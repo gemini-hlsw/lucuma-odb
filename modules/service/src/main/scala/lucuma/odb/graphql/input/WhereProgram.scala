@@ -11,8 +11,10 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ProgramType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding.*
+import org.typelevel.cats.time.given
 
 object WhereProgram {
 
@@ -21,10 +23,12 @@ object WhereProgram {
     val WhereNameBinding             = WhereOptionString.binding(path / "name")
     val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
     val WhereProgramReferenceBinding = WhereProgramReference.binding(path / "reference")
-    val WherePiBinding               = WhereProgramUser.binding(path / "pi")
+    val WherePiBinding               = WhereProgramUser.binding(path / "pi", ProgramUserRole.Pi.some)
     val WhereEqProposalStatus        = WhereUnorderedTag.binding(path / "proposalStatus", TagBinding)
     val WhereProposalBinding         = WhereProposal.binding(path / "proposal")
     val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
+    val WhereStartBinding            = WhereOrder.binding(path / "active" / "start", DateBinding)
+    val WhereEndBinding              = WhereOrder.binding(path / "active" / "end",   DateBinding)
 
     lazy val WhereProgramBinding = binding(path)
 
@@ -41,9 +45,11 @@ object WhereProgram {
         WhereEqProposalStatus.Option("proposalStatus", rPs),
         WhereProposalBinding.Option("proposal", rPro),
         WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
+        WhereStartBinding.Option("activeStart", rStart),
+        WhereEndBinding.Option("activeEnd", rEnd)
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole).parMapN {
-            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd).parMapN {
+            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -55,7 +61,9 @@ object WhereProgram {
                 pi,
                 ps,
                 pro,
-                calib
+                calib,
+                start,
+                end
               ).flatten)
         }
     }

@@ -50,7 +50,7 @@ class createProgram extends OdbSuite {
           List(
             "Argument 'input.SET.name' is invalid: string value must be non-empty."
           )
-        ),
+        )
     )
   }
 
@@ -251,6 +251,178 @@ class createProgram extends OdbSuite {
         """.asRight
     )
   }
+
+  test("active period will default"):
+    expect(
+      user = pi,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {}) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "active": {
+                  "start": "1901-01-01",
+                  "end": "2099-12-31"
+                }
+              }
+            }
+          }
+        """.asRight
+    )
+
+  test("active period can be set by staff"):
+    expect(
+      user = staff,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {
+              SET: {
+                activeStart: "2025-02-01"
+                activeEnd: "2025-08-01"
+              }
+            }) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "active": {
+                  "start": "2025-02-01",
+                  "end": "2025-08-01"
+                }
+              }
+            }
+          }
+        """.asRight
+    )
+
+  test("active period cannot be set by pi"):
+    expect(
+      user = pi,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {
+              SET: {
+                activeStart: "2025-02-01"
+                activeEnd: "2025-08-01"
+              }
+            }) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected = List("Only staff members may change the program active period.").asLeft
+    )
+
+  test("invalid active period: start at the end"):
+    expect(
+      user = staff,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {
+              SET: {
+                activeStart: "2099-12-31"
+              }
+            }) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected = List("Requested update to the active period is invalid: activeStart must come before activeEnd").asLeft
+    )
+
+  test("invalid active period: end at the start"):
+    expect(
+      user = staff,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {
+              SET: {
+                activeEnd: "1901-01-01"
+              }
+            }) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected = List("Requested update to the active period is invalid: activeStart must come before activeEnd").asLeft
+    )
+
+  test("set only the active start"):
+    expect(
+      user = staff,
+      query =
+        s"""
+          mutation {
+            createProgram(input: {
+              SET: {
+                activeStart: "2025-02-01"
+              }
+            }) {
+              program {
+                active {
+                  start
+                  end
+                }
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "active": {
+                  "start": "2025-02-01",
+                  "end": "2099-12-31"
+                }
+              }
+            }
+          }
+        """.asRight
+    )
 
   test("guest + standard/pi,ngo,staff,admin user becomes the PI") {
     List(guest, pi, ngo, staff, admin).traverse { u =>

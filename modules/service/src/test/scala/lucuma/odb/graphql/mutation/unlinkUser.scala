@@ -91,7 +91,7 @@ class unlinkUser extends OdbSuite:
 
   // What can a PI do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: link =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: link =>
     test(s"PI can unlink $link"):
       for
         _   <- createUsers(pi1, pi2)
@@ -117,16 +117,17 @@ class unlinkUser extends OdbSuite:
 
   // What can a Coi do?
 
-  test("Coi can unlink an observer"):
-    for
-      _    <- createUsers(pi1, pi2, pi3)
-      pid  <- createProgramAs(pi1)
-      rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
-      _    <- linkUserAs(pi1, rid2, pi2.id)
-      rid3 <- addProgramUserAs(pi1, pid, ProgramUserRole.CoiRO)
-      _    <- linkUserAs(pi1, rid3, pi3.id)
-      _    <- assertIO(unlinkAs(pi2, rid3), true)
-    yield ()
+  List(ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: role =>
+    test(s"Coi can unlink $role."):
+      for
+        _    <- createUsers(pi1, pi2, pi3)
+        pid  <- createProgramAs(pi1)
+        rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+        _    <- linkUserAs(pi1, rid2, pi2.id)
+        rid3 <- addProgramUserAs(pi1, pid, role)
+        _    <- linkUserAs(pi1, rid3, pi3.id)
+        _    <- assertIO(unlinkAs(pi2, rid3), true)
+      yield ()
 
   List(ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
     test(s"Coi can't unlink $role (NotAuthorized)."):
@@ -146,7 +147,7 @@ class unlinkUser extends OdbSuite:
 
   // What can NGO user do?
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can unlink $role with allocated time."):
       for
         _   <- createUsers(pi1, pi2, admin, ngo)
@@ -157,7 +158,7 @@ class unlinkUser extends OdbSuite:
         _   <- assertIO(unlinkAs(ngo, mid), true)
       yield ()
 
-  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi).foreach: role =>
+  List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External).foreach: role =>
     test(s"Ngo (CA) can't unlink $role without allocated time."):
       interceptOdbError {
         for
@@ -189,7 +190,7 @@ class unlinkUser extends OdbSuite:
   // What can superusers do?
 
   List(staff, admin, service).foreach: u =>
-    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
+    List(ProgramUserRole.CoiRO, ProgramUserRole.Coi, ProgramUserRole.External, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary).foreach: role =>
       test(s"${u.role.access} can unlink $role."):
         for
           _   <- createUsers(pi1, pi2, u)

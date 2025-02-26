@@ -76,6 +76,7 @@ trait ProgramMapping[F[_]]
       SqlObject("observations"),
       SqlObject("configurationRequests"),
       SqlObject("proposal", Join(ProgramTable.Id, ProposalView.ProgramId)),
+      SqlObject("active"),
       SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),

@@ -21,6 +21,7 @@ case class ProgramUserPropertiesInput(
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
+  hasDataAccess:     Option[Boolean]
 )
 
 object ProgramUserPropertiesInput:
@@ -31,7 +32,8 @@ object ProgramUserPropertiesInput:
       Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
-      Nullable.Absent
+      Nullable.Absent,
+      none
     )
 
   val partnerLink: Lens[ProgramUserPropertiesInput, Option[PartnerLink]] =
@@ -45,4 +47,5 @@ object ProgramUserPropertiesInput:
         EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
         BooleanBinding.Nullable("thesis", rThesis),
         GenderBinding.Nullable("gender", rGender),
-      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender).parMapN(ProgramUserPropertiesInput.apply)
+        BooleanBinding.Option("hasDataAccess", rDataAccess)
+      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)

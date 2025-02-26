@@ -52,7 +52,7 @@ class createCallForProposals extends OdbSuite {
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: 'activeStart' date must be between 1900 and 2100 UTC (exclusive)").asLeft
+      expected = List("Argument 'input.SET' is invalid: 'activeStart' date (2100-02-28) must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
   }
 
@@ -73,7 +73,7 @@ class createCallForProposals extends OdbSuite {
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: 'activeEnd' date must be between 1900 and 2100 UTC (exclusive)").asLeft
+      expected = List("Argument 'input.SET' is invalid: 'activeEnd' date (2100-07-31) must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
   }
 
@@ -211,7 +211,7 @@ class createCallForProposals extends OdbSuite {
           ) { callForProposals { id } }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: activeStart must come before activeEnd").asLeft
+      expected = List("Argument 'input.SET' is invalid: 'activeStart' must come before 'activeEnd'").asLeft
     )
   }
 
@@ -760,6 +760,74 @@ class createCallForProposals extends OdbSuite {
         }
       """,
       expected = List("The maximum semester is capped at the current year +1 (Semester(2099A) specified).").asLeft
+    )
+
+  test("success - maximum active period"):
+
+    // existence defaults to PRESENT
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                type:        REGULAR_SEMESTER
+                semester:    "2024B"
+                activeStart: "1901-01-01"
+                activeEnd:   "2099-12-31"
+              }
+            }
+          ) {
+            callForProposals {
+              coordinateLimits {
+                north {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+                south {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+              active {
+                start
+                end
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "coordinateLimits": {
+                "north": {
+                  "raStart": { "hms": "01:30:00.000000" },
+                  "raEnd": { "hms": "12:00:00.000000" },
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
+                },
+                "south": {
+                  "raStart": { "hms": "03:30:00.000000" },
+                  "raEnd": { "hms": "10:00:00.000000" },
+                  "decStart": { "dms": "-90:00:00.000000" },
+                  "decEnd": { "dms": "+28:00:00.000000" }
+                }
+              },
+              "active": {
+                "start": "1901-01-01",
+                "end": "2099-12-31"
+              }
+            }
+          }
+        }
+      """.asRight
     )
 
 }
