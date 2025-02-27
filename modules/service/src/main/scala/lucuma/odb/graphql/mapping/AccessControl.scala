@@ -15,15 +15,18 @@ import grackle.Result
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -36,9 +39,6 @@ import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.syntax.stringcontext.*
-import lucuma.core.model.Target
-import lucuma.odb.graphql.input.UpdateTargetsInput
-import lucuma.odb.graphql.input.TargetPropertiesInput
 
 object AccessControl:
 
