@@ -51,10 +51,11 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.graphql.mapping.AccessControl
 
 trait TargetService[F[_]] {
   def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
-  def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]]
+  def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F]): F[Result[Unit]]
@@ -104,7 +105,7 @@ object TargetService {
         }
       }
 
-      def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]] =
+      override def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]] =
         programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
           r.flatTraverse: pid =>
             createTargetImpl(pid, input.SET).map:
@@ -112,16 +113,14 @@ object TargetService {
               case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
               case Success(id)          => Result(id)
 
-      def updateTargets(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Target.Id]]] =
-        updateTargetsImpl(input, which).map:
-          case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
-          case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
-          case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
+      override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
+        checked.fold(Result(Nil).pure[F]): (props, which) =>
+          updateTargetsImpl(props, which).map:
+            case UpdateTargetsResponse.Success(selected)                    => Result.success(selected)
+            case UpdateTargetsResponse.SourceProfileUpdatesFailed(problems) => Result.Failure(problems.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
+            case UpdateTargetsResponse.TrackingSwitchFailed(s)              => OdbError.UpdateFailed(Some(s)).asFailure
 
-      def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
-        updateTargetsʹ(input, which)
-
-      def updateTargetsʹ(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
+      private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[UpdateTargetsResponse] =
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
@@ -172,7 +171,7 @@ object TargetService {
         val stmt = Statements.cloneTarget(pid, targetId, user)
         session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
 
-      def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
+      private def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
         import CloneTargetResponse.*
 
         val pid: F[Option[Program.Id]] =
@@ -181,7 +180,7 @@ object TargetService {
           }
 
         def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
-          input.SET.traverse(updateTargetsʹ(_, sql"SELECT $target_id".apply(tid)))
+          input.SET.traverse(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid)))
 
         def replaceIn(tid: Target.Id): F[Unit] =
           input.REPLACE_IN.traverse_ { which =>
@@ -204,7 +203,7 @@ object TargetService {
             }
         }
 
-      def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+      override def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
         cloneTargetImpl(input).map(cloneResultTranslation)
 
       private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
@@ -235,7 +234,7 @@ object TargetService {
             case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
-      def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
         cloneTargetIntoImpl(targetId, programId).map(cloneResultTranslation)
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] = {
@@ -447,7 +446,9 @@ object TargetService {
           void"SET " |+| us.intercalate(void", ") |+| void" "          |+|
           void"WHERE t_target.c_target_id IN (" |+| which |+| void") " |+|
           void"RETURNING t_target.c_target_id"
-      updates(SET).fold(which)(update)
+      val ifNone =
+        void"SELECT c_target_id FROM t_target WHERE c_target_id IN (" |+| which |+| void")"
+      updates(SET).fold(ifNone)(update)
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
