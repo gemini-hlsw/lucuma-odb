@@ -35,6 +35,7 @@ import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
@@ -51,7 +52,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.graphql.mapping.AccessControl
 
 trait TargetService[F[_]] {
   def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
