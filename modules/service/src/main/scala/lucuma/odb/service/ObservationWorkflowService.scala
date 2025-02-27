@@ -102,6 +102,14 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
+  def filterTargets(
+    which: AppliedFragment,
+    states: Set[ObservationWorkflowState],
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]]
+
 }
 
 /* Validation Info Record */
@@ -557,7 +565,10 @@ object ObservationWorkflowService {
                     .as(Result(w.copy(state = state)))
           .value
 
-      def filterState(
+      extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
+        (wf.state :: wf.validTransitions).forall(states.contains)
+
+      override def filterState(
         oids: List[Observation.Id], 
         states: Set[ObservationWorkflowState],
         commitHash: CommitHash,
@@ -571,14 +582,14 @@ object ObservationWorkflowService {
                 wfs.get(oid) match
                   case None => r.withProblems(OdbError.InvalidObservation(oid).asProblemNec)
                   case Some(wf) =>
-                    if (wf.state :: wf.validTransitions).forall(states.contains) then r.map(oid :: _)
+                    if wf.isCompatibleWith(states) then r.map(oid :: _)
                     else r.withProblems:
                       val prefix = s"Observation $oid is ineligibile for this operation due to its workflow state (${wf.state}"
                       val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
                       OdbError.InvalidObservation(oid, (prefix + suffix).some)
                         .asProblemNec
 
-      def filterState(
+      override def filterState(
         which: AppliedFragment,
         states: Set[ObservationWorkflowState],
         commitHash: CommitHash,
@@ -591,6 +602,36 @@ object ObservationWorkflowService {
           .flatMap: oids =>
             filterState(oids, states, commitHash, itcClient, ptc)
 
+      private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
+        services.transactionally:
+          val af = Statements.selectObservationsForTargets(whichTargets)
+          session.prepareR(af.fragment.query(target_id *: observation_id.opt)).use: pq =>
+            pq.stream(af.argument, 1024).compile.toList.map: list =>
+              list.groupMap(_._1)(_._2).view.mapValues(_.flatten).toMap
+
+      override def filterTargets(
+        which: AppliedFragment,
+        states: Set[ObservationWorkflowState],
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]] =
+        getObservationsForTargets(which)
+          .flatMap: map =>
+            getWorkflows(map.values.toList.flatten, commitHash, itcClient, ptc)
+              .map: res =>
+                res.flatMap: wfs =>
+                  map.toList.foldLeft(Result(Nil)): 
+                    case (accum, (tid, oids)) =>
+                      oids.traverse(wfs.get) match
+                        case None => Result.internalError("Unpossible: query returned one or more bogus oids")
+                        case Some(wfs) =>
+                          if wfs.forall(_.isCompatibleWith(states)) then accum.map(tid :: _)
+                          else accum.withProblems:
+                            val msg = s"Target $tid is not eligible for this operation due to the workflow state of one or more associated observations."
+                            OdbError.InvalidTarget(tid, msg.some)
+                              .asProblemNec
+    
   }
 
   object Statements {
@@ -668,6 +709,16 @@ object ObservationWorkflowService {
         WHERE c_existence = 'present'
         AND c_program_id = $program_id
       """.query(observation_id)
+
+    /** An applied fragment returning (Target.Id, Option[Observation.Id]) */
+    def selectObservationsForTargets(whichTargets: AppliedFragment): AppliedFragment =
+      void"""
+        SELECT t.c_target_id, a.c_observation_id
+        FROM t_target t
+        LEFT JOIN t_asterism_target a
+        ON t.c_target_id = a.c_target_id
+        WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
+        """
 
   }
 

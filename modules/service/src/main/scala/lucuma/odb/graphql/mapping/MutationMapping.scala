@@ -842,28 +842,15 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     )
 
   private lazy val UpdateTargets =
-    MutationField("updateTargets", UpdateTargetsInput.binding(Path.from(TargetType))) { (input, child) =>
-      services.useTransactionally {
-
-        // Our predicate for selecting targets to update
-        val filterPredicate = and(List(
-          Predicates.target.program.isWritableBy(user),
-          Predicates.target.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-          input.WHERE.getOrElse(True)
-        ))
-
-        // An applied fragment that selects all target ids that satisfy `filterPredicate`
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("targets"), List("targets"), List(TargetType))).flatMap(_.fragment)
-
-        // Update the specified targets and then return a query for the affected targets (or an error)
-        idSelect.flatTraverse: which =>
-          ResultT(targetService.updateTargets(input.SET, which)).flatMap: selected =>
-            ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
-          .value
-
-      }
-    }
+    MutationField("updateTargets", UpdateTargetsInput.binding(Path.from(TargetType))): (input, child) =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            ResultT(services.useTransactionally(targetService.updateTargets(checked)))
+              .flatMap: selected =>
+                ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
+              .value  
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
