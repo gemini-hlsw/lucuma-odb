@@ -35,10 +35,12 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
+import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
@@ -323,32 +325,35 @@ object CalibrationsService extends CalibrationObservations {
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(
-              ObservationPropertiesInput.Edit.Empty.copy(
-                scienceBand         = Nullable.orAbsent(props.band),
-                scienceRequirements = props.wavelengthAt.map: w =>
-                  ScienceRequirementsInput(
-                    mode         = None,
-                    spectroscopy = Some(
-                      SpectroscopyScienceRequirementsInput.Default.copy(
-                        exposureTimeMode = Nullable.NonNull(
-                          ExposureTimeMode.SignalToNoiseMode(
-                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                            w
+              Services.asSuperUser:
+                AccessControl.unchecked(
+                  ObservationPropertiesInput.Edit.Empty.copy(
+                    scienceBand         = Nullable.orAbsent(props.band),
+                    scienceRequirements = props.wavelengthAt.map: w =>
+                      ScienceRequirementsInput(
+                        mode         = None,
+                        spectroscopy = Some(
+                          SpectroscopyScienceRequirementsInput.Default.copy(
+                            exposureTimeMode = Nullable.NonNull(
+                              ExposureTimeMode.SignalToNoiseMode(
+                                SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                                w
+                              )
+                            )
                           )
                         )
                       )
-                    )
-                  )
-              ),
-              // Important: Only update the obs that need it or it will produce a cascade of infinite updates
-              // TODO: This could be slightly optimized by grouping obs per configuration and updating in batches
-              sql"""
-                SELECT $observation_id
-                  FROM t_observation
-                 WHERE c_observation_id = $observation_id
-                   AND c_calibration_role = $calibration_role
-                   AND ("""(oid, oid, role) |+| needsUpdate |+| void")"
-//              sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
+                  ),
+                  // Important: Only update the obs that need it or it will produce a cascade of infinite updates
+                  // TODO: This could be slightly optimized by grouping obs per configuration and updating in batches
+                  sql"""
+                    SELECT $observation_id
+                      FROM t_observation
+                    WHERE c_observation_id = $observation_id
+                      AND c_calibration_role = $calibration_role
+                      AND ("""(oid, oid, role) |+| needsUpdate |+| void")"
+    //              sql"select $observation_id where c_calibration_role = $calibration_role and c_spec_signal_to_noise_at <> $wavelength_pm".apply(oid, role, w)
+                )
             )
           }.void
 
@@ -421,10 +426,17 @@ object CalibrationsService extends CalibrationObservations {
                       ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
-                                NonEmptyList.one(oid),
-                                Some(NonEmptyList.one(ct)),
-                                NonEmptyList.fromList(otgs))
+                                Services.asSuperUser:
+                                  AccessControl.unchecked(
+                                    EditAsterismsPatchInput(
+                                      Some(List(ct)),
+                                      NonEmptyList.fromList(otgs).map(_.toList)
+                                    ),
+                                    List(oid),
+                                    observation_id
+                                  )
                               )
+                            )
                     } yield ()
                 }.getOrElse(Result.unit.pure[F])
             // targets may have been orphaned, delete those

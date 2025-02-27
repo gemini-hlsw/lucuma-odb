@@ -60,6 +60,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
@@ -107,8 +108,12 @@ trait GuideService[F[_]] {
     NoTransaction[F]
   ): F[Result[List[AvailabilityPeriod]]]
   
-  def setGuideTargetName(input: SetGuideTargetNameInput)(
-    using NoTransaction[F]): F[Result[Observation.Id]]
+  // def setGuideTargetName(input: SetGuideTargetNameInput)(
+  //   using NoTransaction[F]): F[Result[Observation.Id]]
+            
+  def setGuideTargetName(
+    checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]
+  )(using NoTransaction[F]): F[Result[Observation.Id]]
 
   def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using 
     NoTransaction[F]
@@ -305,14 +310,6 @@ object GuideService {
             _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid).asProblem))
           )
       }
-
-      def checkProgramAccess(pid: Program.Id, oid: Observation.Id): F[Result[Unit]] =
-        services.transactionally(
-          programUserService.userHasWriteAccess(pid).map(hasAccess =>
-            if (hasAccess) ().success
-            else OdbError.InvalidObservation(oid).asFailure
-          )
-        )
 
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -918,15 +915,17 @@ object GuideService {
           } yield result).value
         }
 
-      override def setGuideTargetName(input: SetGuideTargetNameInput)(
+      override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(
         using NoTransaction[F]): F[Result[Observation.Id]] = 
           Trace[F].span("setGuideTargetName"):
-            (for {
-            obsId   <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
-            obsInfo <- ResultT(getObservationInfo(obsId))
-            _       <- ResultT(checkProgramAccess(obsInfo.programId, obsInfo.id))
-            result  <- ResultT(setGuideTargetNameImpl(obsInfo, input.targetName))
-          } yield result).value
+            checked.foldWithId(
+              OdbError.InvalidArgument().asFailureF
+            ): (input, obsId) =>
+              ResultT(getObservationInfo(obsId))
+                .flatMap: obsInfo =>
+                  ResultT(setGuideTargetNameImpl(obsInfo, input.targetName))
+                .value
+
     }
 
   object Statements {

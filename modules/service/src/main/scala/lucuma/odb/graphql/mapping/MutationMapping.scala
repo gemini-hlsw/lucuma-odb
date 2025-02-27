@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Functor
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Resource
@@ -21,6 +20,8 @@ import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.Result
+import grackle.Result.Failure
+import grackle.Result.Warning
 import grackle.ResultT
 import grackle.Term
 import grackle.TypeRef
@@ -52,10 +53,10 @@ import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
-import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
@@ -66,7 +67,7 @@ import skunk.Transaction
 
 import scala.reflect.ClassTag
 
-trait MutationMapping[F[_]] extends Predicates[F] {
+trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val mutationFields: List[MutationField] =
     List(
@@ -273,11 +274,6 @@ trait MutationMapping[F[_]] extends Predicates[F] {
         child  = q
       )
     }
-
-  // We do this a lot
-  extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
-    def nestMap[B](fab: A => B): F[G[B]] = fga.map(_.map(fab))
-    def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
   // Field definitions
 
@@ -578,12 +574,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             allocationResultSubquery(input.programId, child)
           )
 
+
   private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
-        guideService(httpClient, itcClient, commitHash, timeEstimateCalculator).setGuideTargetName(input)
-          .nestMap: oid =>
-            Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+        selectForUpdate(input, false /* ignore cals */).flatMap: r =>
+          r match
+            // This shortcuts setGuideTargetName if we know it has to fail
+            case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
+            case other =>
+              other.flatTraverse: checked =>
+                guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+                  .setGuideTargetName(checked)
+                  .nestMap: oid =>
+                    Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
@@ -604,60 +608,31 @@ trait MutationMapping[F[_]] extends Predicates[F] {
           proposalService.setProposalStatus(input, commitHash, itcClient, timeEstimateCalculator).nestMap: pid =>
             Unique(Filter(Predicates.setProposalStatusResult.programId.eql(pid), child))
 
-  // An applied fragment that selects all observation ids that satisfy
-  // `filterPredicate`
-  private def observationIdSelect(
-    includeDeleted:      Option[Boolean],
-    WHERE:               Option[Predicate],
-    includeCalibrations: Boolean
-  ): Result[AppliedFragment] = {
-    val whereObservation: Predicate =
-      and(List(
-        Predicates.observation.program.isWritableBy(user),
-        Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-        if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
-        WHERE.getOrElse(True)
-      ))
-
-    MappedQuery(
-      Filter(whereObservation, Select("id", None, Query.Empty)),
-      Context(QueryType, List("observations"), List("observations"), List(ObservationType))
-    ).flatMap(_.fragment)
-  }
-
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
-      services.useTransactionally {
 
-        val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE, false)
-
-        val selectObservations: F[Result[(List[Observation.Id], Query)]] =
-          idSelect.traverse { which =>
-            observationService.selectObservations(which)
-          } map { r =>
-            r.flatMap { oids =>
-              observationResultSubquery(oids, input.LIMIT, child)
-                .tupleLeft(oids)
-            }
+      def selectObservations(using Services[F], NoTransaction[F]): F[Result[(AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id], Query)]] =
+        selectForUpdate(input, false /* exclude cals */).map { r =>
+          r.flatMap { update =>
+            observationResultSubquery(update.idsOrEmpty, input.LIMIT, child)
+              .tupleLeft(update)
           }
+        }
 
-        def setAsterisms(oids: List[Observation.Id]): F[Result[Unit]] =
-          NonEmptyList.fromList(oids).traverse { os =>
-            val add = input.SET.ADD.flatMap(NonEmptyList.fromList)
-            val del = input.SET.DELETE.flatMap(NonEmptyList.fromList)
-            asterismService.updateAsterism(os, add, del)
-          }.map(_.getOrElse(Result.unit))
+      services
+        .useNonTransactionally(selectObservations)
+        .flatMap: rTup =>
+          rTup.flatTraverse:
+            case (approved, query) =>
+              services
+                .useTransactionally:
+                  asterismService.updateAsterism(approved)
+                    .flatMap: rUnit =>
+                      transaction
+                        .rollback
+                        .unlessA(rUnit.hasValue)
+                        .as(rUnit.as(query))
 
-        for {
-          rTup  <- selectObservations
-          oids   = rTup.toList.flatMap(_._1)
-          rUnit <- setAsterisms(oids)
-          query  = (rTup, rUnit).parMapN { case ((_, query), _) => query }
-          _     <- transaction.rollback.unlessA(query.hasValue)
-        } yield query
-
-      }
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
@@ -750,24 +725,20 @@ trait MutationMapping[F[_]] extends Predicates[F] {
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>
-      services.useTransactionally {
 
-        val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE, false)
-
-        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
-          idSelect.flatTraverse { which =>
-            observationService
-              .updateObservations(input.SET, which)
-              .map { r =>
-                r.flatMap { m =>
-                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
-                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
-                }
+      def updateObservations(checked: AccessControl.Checked[ObservationPropertiesInput.Edit])(using Services[F], Transaction[F]): ResultT[F, (Map[Program.Id, List[Observation.Id]], Query)] =
+        ResultT:
+          observationService
+            .updateObservations(checked)
+            .map { r =>
+              r.flatMap { m =>
+                val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
+                observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
               }
-          }
+            }
 
-        def setAsterisms(m: Map[Program.Id, List[Observation.Id]]): F[Result[Unit]] =
+      def setAsterisms(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F]): ResultT[F, Unit] =
+        ResultT:
           // The "obvious" implementation with `traverse` doesn't work here because
           // ResultT isn't a Monad and thus doesn't short-circuit. Doing an explicit
           // fold with the [non-monadic] short-circuiting `flatMap` fixes it.
@@ -777,37 +748,35 @@ trait MutationMapping[F[_]] extends Predicates[F] {
             }).flatMap(_ => accum)
           }.value
 
-        val r = for {
-          tup <- ResultT(updateObservations)
-          _   <- ResultT(setAsterisms(tup._1))
-        } yield tup._2
+      // Put it all together
+      services
+        .useNonTransactionally(selectForUpdate(input, false /* ignore calibrations */)) // this performs all the access control checks
+        .flatMap: approval =>
+          services.useTransactionally:
+            approval.flatTraverse: edit =>
+                updateObservations(edit)
+                  .flatMap: 
+                    case (map, query) =>
+                      setAsterisms(map)
+                        .as(query)
+                  .value
+                  .flatTap: q =>
+                    transaction.rollback.unlessA(q.hasValue)
 
-        r.value.flatTap { q => transaction.rollback.unlessA(q.hasValue) }
-      }
     }
 
   private lazy val UpdateObservationsTimes: MutationField =
-    MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))) { (input, child) =>
-      services.useTransactionally {
-
-        val idSelect: Result[AppliedFragment] =
-          observationIdSelect(input.includeDeleted, input.WHERE, true)
-
-        val updateObservations: F[Result[(Map[Program.Id, List[Observation.Id]], Query)]] =
-          idSelect.flatTraverse { which =>
-            observationService
-              .updateObservationsTimes(input.SET, which)
-              .map { r =>
-                r.flatMap { m =>
-                  val oids = m.values.foldLeft(List.empty[Observation.Id])(_ ++ _)
-                  observationResultSubquery(oids, input.LIMIT, child).tupleLeft(m)
-                }
-              }
-          }
-
-        updateObservations.map(_.map(_._2))
-      }
-    }
+    MutationField("updateObservationsTimes", UpdateObservationsTimesInput.binding(Path.from(ObservationType))): (input, child) =>
+      services
+        .useNonTransactionally(selectForUpdate(input, true)) // include cals
+        .flatMap: result =>
+          result.flatTraverse: approved =>
+            services.useTransactionally:
+              observationService
+                .updateObservationsTimes(approved)
+                .map: r =>
+                  r.flatMap: m =>
+                    observationResultSubquery(m.values.flatten.toList, input.LIMIT, child)
 
   private lazy val UpdateProgramUsers =
     MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))): (input, child) =>

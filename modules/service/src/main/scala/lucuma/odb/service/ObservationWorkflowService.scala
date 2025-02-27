@@ -64,6 +64,13 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
+  def getWorkflow(
+    oid: Observation.Id,
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]]
+
   def getWorkflows(
     pid: Program.Id,
     commitHash: CommitHash,
@@ -78,6 +85,22 @@ sealed trait ObservationWorkflowService[F[_]] {
     itcClient: ItcClient[F],
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
+
+  def filterState(
+    oids: List[Observation.Id], 
+    states: Set[ObservationWorkflowState],
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
+
+  def filterState(
+    which: AppliedFragment,
+    states: Set[ObservationWorkflowState],
+    commitHash: CommitHash,
+    itcClient: ItcClient[F],
+    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]]
 
 }
 
@@ -490,6 +513,18 @@ object ObservationWorkflowService {
                   .map(_.toMap)
           .value
 
+      override def getWorkflow(
+        oid: Observation.Id,
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]] =
+        getWorkflows(List(oid), commitHash, itcClient, ptc).map: result =>
+          result.flatMap: map =>
+            map.get(oid) match
+              case Some(wf) => Result(wf)
+              case None     => OdbError.InvalidObservation(oid).asFailure
+
       override def getWorkflows(
         pid: Program.Id,
         commitHash: CommitHash,
@@ -521,6 +556,40 @@ object ObservationWorkflowService {
                   pc.execute(state.asUserState, oid)
                     .as(Result(w.copy(state = state)))
           .value
+
+      def filterState(
+        oids: List[Observation.Id], 
+        states: Set[ObservationWorkflowState],
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
+        getWorkflows(oids, commitHash, itcClient, ptc)
+          .map: res =>
+            res.flatMap: wfs =>
+              oids.foldLeft(Result(Nil)): (r, oid) =>
+                wfs.get(oid) match
+                  case None => r.withProblems(OdbError.InvalidObservation(oid).asProblemNec)
+                  case Some(wf) =>
+                    if (wf.state :: wf.validTransitions).forall(states.contains) then r.map(oid :: _)
+                    else r.withProblems:
+                      val prefix = s"Observation $oid is ineligibile for this operation due to its workflow state (${wf.state}"
+                      val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
+                      OdbError.InvalidObservation(oid, (prefix + suffix).some)
+                        .asProblemNec
+
+      def filterState(
+        which: AppliedFragment,
+        states: Set[ObservationWorkflowState],
+        commitHash: CommitHash,
+        itcClient: ItcClient[F],
+        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+      )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
+        services
+          .transactionally:
+            observationService.selectObservations(which)
+          .flatMap: oids =>
+            filterState(oids, states, commitHash, itcClient, ptc)
 
   }
 

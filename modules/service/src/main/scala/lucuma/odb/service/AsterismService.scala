@@ -5,11 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
-import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
@@ -27,6 +23,8 @@ import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.EditAsterismsPatchInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -74,9 +72,7 @@ trait AsterismService[F[_]] {
    * deleting targets as indicated.
    */
   def updateAsterism(
-    observationIds: NonEmptyList[Observation.Id],
-    ADD:            Option[NonEmptyList[Target.Id]],
-    DELETE:         Option[NonEmptyList[Target.Id]]
+    update: AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
   def cloneAsterism(
@@ -161,20 +157,21 @@ object AsterismService {
         }
 
       override def updateAsterism(
-        observationIds: NonEmptyList[Observation.Id],
-        ADD:            Option[NonEmptyList[Target.Id]],
-        DELETE:         Option[NonEmptyList[Target.Id]]
+        update: AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        ResultT(selectProgramId(observationIds)).flatMap { pid =>
-          ResultT(ADD.fold(Result.unit.pure[F])(insertAsterism(pid, observationIds, _))) *>
-            ResultT(DELETE.fold(Result.unit.pure[F]) { tids =>
-              val af = Statements.deleteLinksAs(user, pid, observationIds, tids)
-              session.prepareR(af.fragment.command).use { p =>
-                p.execute(af.argument).as(Result.unit)
-              }
-            })
-        }.value
-
+        update.foldWithIds(Result.unit.pure[F]): (set, observationIds) =>
+          val ADD = set.ADD.flatMap(NonEmptyList.fromList)
+          val DELETE = set.DELETE.flatMap(NonEmptyList.fromList)
+          ResultT(selectProgramId(observationIds)).flatMap { pid =>
+            ResultT(ADD.fold(Result.unit.pure[F])(insertAsterism(pid, observationIds, _))) *>
+              ResultT(DELETE.fold(Result.unit.pure[F]) { tids =>
+                val af = Statements.deleteLinksAs(user, pid, observationIds, tids)
+                session.prepareR(af.fragment.command).use { p =>
+                  p.execute(af.argument).as(Result.unit)
+                }
+              })
+          }.value
+        
       override def cloneAsterism(
         originalId: Observation.Id,
         newId: Observation.Id,
