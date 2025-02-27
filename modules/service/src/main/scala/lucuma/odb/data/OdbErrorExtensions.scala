@@ -4,6 +4,7 @@
 package lucuma.odb.data
 
 import cats.Applicative
+import cats.data.NonEmptyChain
 import cats.syntax.all.*
 import clue.model.GraphQLError
 import grackle.Problem
@@ -20,6 +21,9 @@ object OdbErrorExtensions:
 
     def asProblem: Problem =
       Problem(e.message, Nil, Nil, Some(JsonObject(Key -> e.asJson)))
+
+    def asProblemNec: NonEmptyChain[Problem] =
+      NonEmptyChain(asProblem)
 
     def asFailure: Result[Nothing] =
       Result.failure(asProblem)
