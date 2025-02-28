@@ -3,38 +3,38 @@ val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.10"
 val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.7.0"
-val clueVersion                = "0.43.0"
+val clueVersion                = "0.43.1"
 val declineVersion             = "2.5.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
-val fs2AwsVersion              = "6.1.3"
+val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.11.0"
 val grackleVersion             = "0.23.0"
 val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
-val http4sJdkHttpClientVersion = "0.9.2"
+val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.16"
 val log4catsVersion            = "2.7.0"
 val lucumaCatalogVersion       = "0.49.1"
 val lucumaItcVersion           = "0.26.0"
-val lucumaCoreVersion          = "0.115.2"
+val lucumaCoreVersion          = "0.115.3"
 val lucumaGraphQLRoutesVersion = "0.8.17"
 val lucumaSsoVersion           = "0.8.2"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
-val natchezHttp4sVersion       = "0.6.0"
+val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
 val paigesVersion              = "0.4.4"
-val postgresVersion            = "42.7.4"
+val postgresVersion            = "42.7.5"
 val pprintVersion              = "0.9.0"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.18"
-ThisBuild / scalaVersion       := "3.6.2"
-ThisBuild / crossScalaVersions := Seq("3.6.2")
+ThisBuild / scalaVersion       := "3.6.3"
+ThisBuild / crossScalaVersions := Seq("3.6.3")
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
@@ -146,7 +146,7 @@ lazy val service = project
       "com.dimafeng"             %% "testcontainers-scala-postgresql"    % testcontainersScalaVersion % Test,
       // testcontainers-scala-localstack-v2 requires both v1 and v2 of the aws sdk
       "io.circe"                 %% "circe-testing"                      % circeVersion               % Test,
-      "com.amazonaws"             % "aws-java-sdk-core"                  % "1.12.780"                 % Test,
+      "com.amazonaws"             % "aws-java-sdk-core"                  % "1.12.781"                 % Test,
       "edu.gemini"               %% "clue-http4s"                        % clueVersion                % Test,
       "org.scalameta"            %% "munit"                              % munitVersion               % Test,
       "org.scalameta"            %% "munit-scalacheck"                   % munitVersion               % Test,
