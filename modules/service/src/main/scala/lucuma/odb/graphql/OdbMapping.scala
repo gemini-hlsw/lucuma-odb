@@ -22,6 +22,7 @@ import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
+import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObservationTopic
@@ -48,7 +49,8 @@ object OdbMapping {
     target:               Topic[F, TargetTopic.Element],
     group:                Topic[F, GroupTopic.Element],
     configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
-    executionEvent:       Topic[F, ExecutionEventAddedTopic.Element]
+    executionEvent:       Topic[F, ExecutionEventAddedTopic.Element],
+    dataset:              Topic[F, DatasetTopic.Element]
   )
 
   object Topics {
@@ -62,7 +64,8 @@ object OdbMapping {
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
         exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar, grp, cr, exe)
+        dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, tar, grp, cr, exe, dst)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -139,6 +142,7 @@ object OdbMapping {
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
           with CreateUserInvitationResultMapping[F]
+          with DatasetEditMapping[F]
           with DatasetMapping[F]
           with DatasetReferenceMapping[F]
           with DatasetSelectResultMapping[F]
@@ -341,6 +345,7 @@ object OdbMapping {
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,
                 CreateUserInvitationResultMapping,
+                DatasetEditMapping,
                 DatasetEventMapping,
                 DatasetMapping,
                 DatasetReferenceMapping,

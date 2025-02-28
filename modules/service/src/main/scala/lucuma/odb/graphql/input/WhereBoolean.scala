@@ -8,12 +8,10 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
 
-object WhereBoolean {
+object WhereBoolean:
 
   def binding(path: Path, binding: Matcher[Boolean]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(binding.Option("EQ", rEQ)) =>
         rEQ.map(_.fold(Predicate.True)(b => Eql(path, Const(b))))
     }
-
-}

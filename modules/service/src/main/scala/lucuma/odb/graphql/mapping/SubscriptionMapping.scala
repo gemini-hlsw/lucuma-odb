@@ -24,6 +24,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.OdbMapping.Topics
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.input.ConfigurationRequestEditInput
+import lucuma.odb.graphql.input.DatasetEditInput
 import lucuma.odb.graphql.input.ExecutionEventAddedInput
 import lucuma.odb.graphql.input.GroupEditInput
 import lucuma.odb.graphql.input.ObservationEditInput
@@ -45,6 +46,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
 
   private lazy val subscriptionFields: List[SubscriptionField] =
     List(
+      DatasetEdit,
       ExecutionEventAdded,
       GroupEdit,
       ObservationEdit,
@@ -84,6 +86,24 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
             }
       }
   }
+
+  private val DatasetEdit =
+    SubscriptionField("datasetEdit", DatasetEditInput.Binding.Option): (input, child) =>
+      topics
+        .dataset
+        .subscribe(1024)
+        .filter: e =>
+          e.canRead(user)                                              &&
+          input.flatMap(_.programId).forall(_ === e.programId)         &&
+          input.flatMap(_.observationId).forall(_ === e.observationId) &&
+          input.flatMap(_.datasetId).forall(_ === e.datasetId)         &&
+          input.flatMap(_.isWritten).forall(_ === e.isWritten)
+        .map(e => Result(
+          Environment(
+            Env("editType" -> e.editType),
+            Unique(Filter(Predicates.datasetEdit.value.id.eql(e.datasetId), child))
+          )
+        ))
 
   private val ExecutionEventAdded =
     SubscriptionField("executionEventAdded", ExecutionEventAddedInput.Binding.Option): (input, child) =>
