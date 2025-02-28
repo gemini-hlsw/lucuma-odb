@@ -15,15 +15,18 @@ import grackle.Result
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -159,6 +162,56 @@ trait AccessControl[F[_]] extends Predicates[F] {
           )
 
   }
+
+
+  /**
+   * Select and return the ids of targets that are editable by the current user and meet
+   * all the specified filters.
+   */
+  private def selectForTargetUpdateImpl(
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    allowedStates:       Set[ObservationWorkflowState]
+  )(using Services[F], NoTransaction[F]): F[Result[List[Target.Id]]] =  {
+
+    val rWhichTargets: Result[AppliedFragment] =
+      val whereTarget: Predicate =
+        and(List(
+          Predicates.target.program.isWritableBy(user),
+          Predicates.target.existence.includeDeleted(includeDeleted.getOrElse(false)),
+          WHERE.getOrElse(True)
+        ))
+      MappedQuery(
+        Filter(whereTarget, Select("id", None, Query.Empty)),
+        Context(QueryType, List("targets"), List("targets"), List(TargetType))
+      ).flatMap(_.fragment)
+
+    Services.asSuperUser:
+      rWhichTargets.flatTraverse: which =>
+        observationWorkflowService.filterTargets(
+          which,
+          allowedStates,
+          commitHash,
+          itcClient,
+          timeEstimateCalculator
+        )
+      
+  }
+
+  /**
+   * Given an operation that defines a set of targets and a proposed edit, select and filter this
+   * set based on access control policies and return a checked edit that is valid for execution.
+   */
+  def selectForUpdate(
+    input: UpdateTargetsInput,
+  )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithIds[TargetPropertiesInput.Edit, Target.Id]]] =
+    selectForTargetUpdateImpl(
+      input.includeDeleted,
+      input.WHERE,
+      ObservationWorkflowState.preExecutionSet,      
+    ).nestMap: tids =>
+      Services.asSuperUser:
+        AccessControl.unchecked(input.SET, tids, target_id)
 
   /** Overload of `selectForObservationUpdateImpl` that takes a list of oids instead of a `Predicate`.  */
   private def selectForObservationUpdateImpl(
