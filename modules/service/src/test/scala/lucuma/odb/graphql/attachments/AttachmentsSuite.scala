@@ -82,7 +82,8 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
         val uri =
-          (svr.baseUri / "attachment" / programId.toString)
+          (svr.baseUri / "attachment")
+            .withQueryParam("programId", programId.toString)
             .withQueryParam("fileName", ta.fileName)
             .withQueryParam("attachmentType", ta.attachmentType)
             .withOptionQueryParam("description", ta.description)
