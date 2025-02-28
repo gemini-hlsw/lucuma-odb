@@ -26,10 +26,6 @@ import org.http4s.server.middleware.EntityLimiter
 import skunk.Session
 
 object AttachmentRoutes {
-  object ProgramId {
-    def unapply(str: String): Option[Program.Id] = Program.Id.parse(str)
-  }
-
   object AttachmentId {
     def unapply(str: String): Option[Attachment.Id] = Attachment.Id.parse(str)
   }
@@ -86,25 +82,34 @@ object AttachmentRoutes {
     def attachmentTypeFailure(s: String): ParseFailure =
       val msg = s"Invalid attachment type '$s'"
       ParseFailure(msg, msg)
+    def programIdFailure(s: String): ParseFailure =
+      val msg = s"Invalid program id '$s'"
+      ParseFailure(msg, msg)
 
     given QueryParamDecoder[AttachmentType] =
       QueryParamDecoder[String].emap(s => Enumerated[AttachmentType].fromTag(s.toLowerCase).fold(attachmentTypeFailure(s).asLeft)(_.asRight))
+    given QueryParamDecoder[Program.Id] =
+      QueryParamDecoder[String].emap(s => Program.Id.parse(s).fold(programIdFailure(s).asLeft)(_.asRight))
 
+    object ProgramIdMatcher      extends QueryParamDecoderMatcher[Program.Id]("programId")
     object FileNameMatcher       extends QueryParamDecoderMatcher[String]("fileName")
     object AttachmentTypeMatcher extends QueryParamDecoderMatcher[AttachmentType]("attachmentType")
     object DescriptionMatcher    extends OptionalQueryParamDecoderMatcher[String]("description")
 
     val routes = HttpRoutes.of[F] {
-      case req @ GET -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ GET -> Root / "attachment" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
-            s.getAttachment(user, programId, attachmentId)
+            s.getAttachment(user, attachmentId)
               .toResponse(s => Response(Status.Ok, body = s).pure)
           }
         }
 
-      case req @ POST -> Root / "attachment" / ProgramId(programId)
-          :? FileNameMatcher(fileName) +& AttachmentTypeMatcher(attachmentType) +& DescriptionMatcher(optDesc) =>
+      case req @ POST -> Root / "attachment"
+          :? ProgramIdMatcher(programId)
+          +& FileNameMatcher(fileName)
+          +& AttachmentTypeMatcher(attachmentType) 
+          +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
@@ -118,13 +123,13 @@ object AttachmentRoutes {
           }
         }
 
-      case req @ PUT -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId)
+      case req @ PUT -> Root / "attachment" / AttachmentId(attachmentId)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
-              .updateAttachment(user, programId, attachmentId, fileName, description, req.body)
+              .updateAttachment(user, attachmentId, fileName, description, req.body)
               .toResponse(_ => Ok())
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
@@ -133,20 +138,20 @@ object AttachmentRoutes {
           }
         }
 
-      case req @ DELETE -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ DELETE -> Root / "attachment" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             s
-              .deleteAttachment(user, programId, attachmentId)
+              .deleteAttachment(user, attachmentId)
               .toResponse(Ok(_))
           }
         }
 
-      case req @ GET -> Root / "attachment" / "url" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ GET -> Root / "attachment" / "url" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             s
-              .getPresignedUrl(user, programId, attachmentId)
+              .getPresignedUrl(user, attachmentId)
               .toResponse(Ok(_))
           }
         }
