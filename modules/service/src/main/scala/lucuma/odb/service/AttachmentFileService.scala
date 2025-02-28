@@ -33,7 +33,6 @@ trait AttachmentFileService[F[_]] {
   /** Retrieves the given file from S3 as a stream. */
   def getAttachment(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id
   )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
 
@@ -49,7 +48,6 @@ trait AttachmentFileService[F[_]] {
 
   def updateAttachment(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id,
     fileName:     String,
     description:  Option[NonEmptyString],
@@ -57,11 +55,11 @@ trait AttachmentFileService[F[_]] {
   )(using NoTransaction[F]): F[Either[AttachmentException, Unit]]
 
   /** Deletes the file from the database and then removes it from S3. */
-  def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id)(using
+  def deleteAttachment(user: User, attachmentId: Attachment.Id)(using
     NoTransaction[F]
   ): F[Either[AttachmentException, Unit]]
 
-  def getPresignedUrl(user: User, programId: Program.Id, attachmentId: Attachment.Id)(using
+  def getPresignedUrl(user: User, attachmentId: Attachment.Id)(using
     NoTransaction[F]
   ): F[Either[AttachmentException, String]]
 }
@@ -150,18 +148,17 @@ object AttachmentFileService {
     s3FileSvc: S3FileService[F]
   )(using Services[F]): AttachmentFileService[F] = {
 
-    // TODO: eventually will probably want to check for write access for uploading/deleting files.
     def checkAccess(
-      session:   Session[F],
       user:      User,
-      programId: Program.Id
+      programId: Program.Id,
+      onNoAccess: AttachmentException
     )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, Unit] = user match {
       // guest users not allowed to upload files
       case GuestUser(_) => Forbidden.asLeftT
       case _            =>
         programUserService
           .userHasWriteAccess(programId)
-          .map(b => if (b) ().asRight else Forbidden.asLeft)
+          .map(b => if (b) ().asRight else onNoAccess.asLeft)
           .asEitherT
     }
 
@@ -218,23 +215,28 @@ object AttachmentFileService {
           }
       }
 
-    def getAttachmentRemotePathFromDB(
-      programId:    Program.Id,
+    def getAttachmentInfoFromDB(
       attachmentId: Attachment.Id
-    ): F[Either[AttachmentException, NonEmptyString]] =
-      Trace[F].span("getAttachmentRemotePathFromDB") {
+    ): F[Either[AttachmentException, (Program.Id, NonEmptyString)]] =
         session
-          .option(Statements.GetAttachmentRemotePath)(programId, attachmentId)
+          .option(Statements.GetAttachmentInfo)(attachmentId)
           .map(_.toRight(FileNotFound))
-      }
+
+    def getAttachmentInfoAndCheckAccess(
+      user:         User,
+      attachmentId: Attachment.Id
+    )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, (Program.Id, NonEmptyString)] =
+      for {
+        (pid, path) <- getAttachmentInfoFromDB(attachmentId).asEitherT
+        _           <- checkAccess(user, pid, FileNotFound)
+      } yield (pid, path)
 
     def deleteAttachmentFromDB(
-      programId:    Program.Id,
       attachmentId: Attachment.Id
     ): F[Either[AttachmentException, NonEmptyString]] =
       Trace[F].span("deleteAttachmentFromDB") {
         session
-          .option(Statements.DeleteAttachment)(programId, attachmentId)
+          .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
       }
 
@@ -256,11 +258,10 @@ object AttachmentFileService {
     }
 
     def getAttachmentTypeById(
-      programId:    Program.Id,
       attachmentId: Attachment.Id
     ): F[Either[AttachmentException, AttachmentType]] =
       session
-        .option(Statements.GetAttachmentTypeById)(programId, attachmentId)
+        .option(Statements.GetAttachmentTypeById)(attachmentId)
         .map(_.toRight(FileNotFound))
 
     def validateFileExtensionByType(
@@ -270,11 +271,10 @@ object AttachmentFileService {
       checkExtension(fileName, attachmentType.fileExtensions)
 
     def validateFileExtensionById(
-      programId:    Program.Id,
       attachmentId: Attachment.Id,
       fileName:     FileName
     ): F[Either[AttachmentException, Unit]] =
-      getAttachmentTypeById(programId, attachmentId)
+      getAttachmentTypeById(attachmentId)
         .map(_.flatMap(at => checkExtension(fileName, at.fileExtensions)))
 
     // This can only be an issue on insert
@@ -295,13 +295,11 @@ object AttachmentFileService {
 
       def getAttachment(
         user:         User,
-        programId:    Program.Id,
         attachmentId: Attachment.Id
       )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] =
         (for {
           path <- services.transactionallyEitherT {
-                    checkAccess(session, user, programId) >>
-                      getAttachmentRemotePathFromDB(programId, attachmentId).asEitherT
+                      getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
                   }
           res  <- s3FileSvc.verifyAndGet(path).right
         } yield res).value
@@ -322,7 +320,7 @@ object AttachmentFileService {
             for {
               fn     <- FileName.fromString(fileName).liftF
               _      <- services.transactionallyEitherT {
-                          checkAccess(session, user, programId) >>
+                          checkAccess(user, programId, Forbidden) >>
                             validateFileExtensionByType(attachmentType, fn).liftF >>
                             checkForDuplicateType(programId, attachmentType).asEitherT >>
                             checkForDuplicateName(programId, fn, none).asEitherT
@@ -357,7 +355,6 @@ object AttachmentFileService {
 
       def updateAttachment(
         user:         User,
-        programId:    Program.Id,
         attachmentId: Attachment.Id,
         fileName:     String,
         description:  Option[NonEmptyString],
@@ -366,26 +363,27 @@ object AttachmentFileService {
         (
           for {
             fn      <- FileName.fromString(fileName).liftF
-            oldPath <- services.transactionallyEitherT {
-                          checkAccess(session, user, programId) >>
-                            validateFileExtensionById(programId, attachmentId, fn).asEitherT >>
-                            checkForDuplicateName(programId, fn, attachmentId.some).asEitherT >>
-                            getAttachmentRemotePathFromDB(programId, attachmentId).asEitherT
-                        }
-            uuid    <- UUIDGen[F].randomUUID.right
-            newPath  = filePath(programId, uuid, fn.value)
-          } yield (fn, oldPath, newPath)
+            (pid, oldPath) <- services.transactionallyEitherT {
+                for {
+                  (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId)
+                  _              <- validateFileExtensionById(attachmentId, fn).asEitherT
+                  _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT 
+                } yield (pid, oldPath)
+              }
+            uuid           <- UUIDGen[F].randomUUID.right
+            newPath         = filePath(pid, uuid, fn.value)
+          } yield (fn, pid, oldPath, newPath)
         ).value
         .flatTap {
           // See comment in similar location in insertAttachment.
           case Left(_)  => data.compile.drain
           case _ => ().pure
         }.asEitherT
-        .flatMap((fn, oldPath, newPath) =>
+        .flatMap((fn, pid, oldPath, newPath) =>
           for {
             size    <- s3FileSvc.upload(newPath, data).right
             _       <- checkForEmptyFile(size).liftF
-            _       <- updateAttachmentInDB(programId,
+            _       <- updateAttachmentInDB(pid,
                                             attachmentId,
                                             fn,
                                             description,
@@ -399,27 +397,27 @@ object AttachmentFileService {
 
       def deleteAttachment(
         user:         User,
-        programId:    Program.Id,
         attachmentId: Attachment.Id
       )(using NoTransaction[F]): F[Either[AttachmentException, Unit]] =
         (for {
           path <- services.transactionallyEitherT {
-                    checkAccess(session, user, programId) >>
-                      deleteAttachmentFromDB(programId, attachmentId).asEitherT
-                  }
+              for {
+                (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId)
+                _         <- deleteAttachmentFromDB(attachmentId).asEitherT
+              } yield path
+            }
           res  <-
             // We'll trap errors from the remote delete because, although not ideal, we don't
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
             s3FileSvc.delete(path).handleError { case _ => () }.right
         } yield res).value
 
-      def getPresignedUrl(user: User, programId: Program.Id, attachmentId: Attachment.Id)(using
+      def getPresignedUrl(user: User, attachmentId: Attachment.Id)(using
         NoTransaction[F]
       ): F[Either[AttachmentException, String]] =
         (for {
           path <- services.transactionallyEitherT {
-                    checkAccess(session, user, programId) >>
-                      getAttachmentRemotePathFromDB(programId, attachmentId).asEitherT
+                      getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
                   }
           res  <- s3FileSvc.presignedUrl(path).right
         } yield res).value
@@ -467,12 +465,12 @@ object AttachmentFileService {
         RETURNING true
       """.query(bool)
 
-    val GetAttachmentRemotePath: Query[(Program.Id, Attachment.Id), NonEmptyString] =
+    val GetAttachmentInfo: Query[Attachment.Id, (Program.Id, NonEmptyString)] =
       sql"""
-        SELECT c_remote_path
+        SELECT c_program_id, c_remote_path
         FROM t_attachment
-        WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
-      """.query(text_nonempty)
+        WHERE c_attachment_id = $attachment_id
+      """.query(program_id *: text_nonempty)
 
     def checkForDuplicateName(
       programId:    Program.Id,
@@ -496,18 +494,18 @@ object AttachmentFileService {
       """.query(bool)
 
     // returns the UUID for the remote file id
-    val DeleteAttachment: Query[(Program.Id, Attachment.Id), NonEmptyString] =
+    val DeleteAttachment: Query[Attachment.Id, NonEmptyString] =
       sql"""
         DELETE FROM t_attachment
-        WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
+        WHERE c_attachment_id = $attachment_id
         RETURNING c_remote_path
       """.query(text_nonempty)
 
-    val GetAttachmentTypeById: Query[(Program.Id, Attachment.Id), AttachmentType] =
+    val GetAttachmentTypeById: Query[Attachment.Id, AttachmentType] =
       sql"""
         SELECT c_attachment_type
         FROM t_attachment
-        WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
+        WHERE c_attachment_id = $attachment_id
       """.query(attachment_type)
   }
 }

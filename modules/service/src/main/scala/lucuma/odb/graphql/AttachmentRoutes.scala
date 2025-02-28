@@ -95,10 +95,10 @@ object AttachmentRoutes {
     object DescriptionMatcher    extends OptionalQueryParamDecoderMatcher[String]("description")
 
     val routes = HttpRoutes.of[F] {
-      case req @ GET -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ GET -> Root / "attachment" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
-            s.getAttachment(user, programId, attachmentId)
+            s.getAttachment(user, attachmentId)
               .toResponse(s => Response(Status.Ok, body = s).pure)
           }
         }
@@ -118,13 +118,13 @@ object AttachmentRoutes {
           }
         }
 
-      case req @ PUT -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId)
+      case req @ PUT -> Root / "attachment" / AttachmentId(attachmentId)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
-              .updateAttachment(user, programId, attachmentId, fileName, description, req.body)
+              .updateAttachment(user, attachmentId, fileName, description, req.body)
               .toResponse(_ => Ok())
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
@@ -133,20 +133,20 @@ object AttachmentRoutes {
           }
         }
 
-      case req @ DELETE -> Root / "attachment" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ DELETE -> Root / "attachment" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             s
-              .deleteAttachment(user, programId, attachmentId)
+              .deleteAttachment(user, attachmentId)
               .toResponse(Ok(_))
           }
         }
 
-      case req @ GET -> Root / "attachment" / "url" / ProgramId(programId) / AttachmentId(attachmentId) =>
+      case req @ GET -> Root / "attachment" / "url" / AttachmentId(attachmentId) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             s
-              .getPresignedUrl(user, programId, attachmentId)
+              .getPresignedUrl(user, attachmentId)
               .toResponse(Ok(_))
           }
         }
