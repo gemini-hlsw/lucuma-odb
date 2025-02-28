@@ -6,12 +6,10 @@ DECLARE
   pid d_program_id;
 BEGIN
 
-  -- Otherwise select the next open one. No shuffling needed.
+  -- Select the corresponding program id.
   SELECT c_program_id INTO pid
   FROM t_observation
   WHERE c_observation_id = NEW.c_observation_id;
-
-  -- RAISE WARNING 'Calling ch_dataset_edit %', NEW.c_dataset_id;
 
   PERFORM pg_notify(
     'ch_dataset_edit',

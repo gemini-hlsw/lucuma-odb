@@ -4751,10 +4751,16 @@ enum StepType {
 
 type Subscription {
 
+  """
+  Subscribes to an event that is generated whenever a dataset is created or
+  updated.  The input allows the caller to filter on program, observation or
+  individual dataset (so that all events received correspond to that program,
+  observation or dataset).  It also permits limiting events to only those for
+  which a dataset file has been written.
+  """
   datasetEdit(
     input: DatasetEditInput
   ): DatasetEdit!
-
 
   """
 
@@ -4861,10 +4867,26 @@ input ConfigurationRequestEditInput {
 
 }
 
+"""
+Specifies filtering options for dataset edit events from the `datasetEdit`
+subscription.
+"""
 input DatasetEditInput {
+
+  "If set, only events for the associated dataset are sent."
   datasetId:     DatasetId
+
+  "If set, only events for datasets produced by the associated observation are sent."
   observationId: ObservationId
+
+  "If set, only events for datasets produced by the associated program are sent."
   programId:     ProgramId
+
+  """
+  If set, only events for datasets that are written to disk are sent.  (Note,
+  datasets are considered to be written when an `END_WRITE` event is received by
+  the database.)
+  """
   isWritten:     Boolean
 }
 
@@ -6288,7 +6310,7 @@ type Dataset {
   interval: TimestampInterval
 
   """
-  Has the dataset been written to disk.  We assume the dataset has been
+  Has the dataset been written to disk?  Note, we assume the dataset has been
   written when an `END_WRITE` event is received from Observe.
   """
   isWritten: Boolean!
@@ -12413,9 +12435,9 @@ input WhereDataset {
   comment: WhereOptionString
 
   """
-  Matches whether the dataset has been written (or not). In particular, a
-  dataset is considered written when a corresponding `END_WRITE` dataset event
-  has been recieved.
+  If `true`, matches when the dataset has been written (or not). In particular, a dataset
+  is considered written when a corresponding `END_WRITE` dataset event has been
+  recieved.
   """
   isWritten: WhereBoolean
 }
