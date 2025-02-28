@@ -27,7 +27,6 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   private val service: AttachmentFileService[IO] = new AttachmentFileService[IO] {
     def getAttachment(
       user:         User,
-      programId:    Program.Id,
       attachmentId: Attachment.Id
     )(using NoTransaction[IO]): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
       val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
@@ -46,7 +45,6 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
     def updateAttachment(
       user: User,
-      programId: Program.Id,
       attachmentId: Attachment.Id,
       fileName: String,
       description: Option[NonEmptyString],
@@ -54,47 +52,47 @@ class attachmentRoutes extends AttachmentRoutesSuite {
     )(using NoTransaction[IO]): IO[Either[AttachmentException, Unit]] =
       getError(user).fold(().asRight.pure[IO])(_.asLeft.pure)
 
-    def deleteAttachment(user: User, programId: Program.Id, attachmentId: Attachment.Id)(using NoTransaction[IO]): IO[Either[AttachmentException, Unit]] =
+    def deleteAttachment(user: User, attachmentId: Attachment.Id)(using NoTransaction[IO]): IO[Either[AttachmentException, Unit]] =
       getError(user).fold(().asRight.pure[IO])(_.asLeft.pure)
 
-    def getPresignedUrl(user: User, programId: Program.Id, attachmentId: Attachment.Id)(using NoTransaction[IO]): IO[Either[AttachmentException, String]] =
+    def getPresignedUrl(user: User, attachmentId: Attachment.Id)(using NoTransaction[IO]): IO[Either[AttachmentException, String]] =
       getError(user).fold(presignedUrl.asRight.pure[IO])(_.asLeft.pure)
   }
 
   private val routes: HttpApp[IO] = AttachmentRoutes(service, ssoClient, 1).orNotFound
 
   test("GET requires authorization") {
-    val request = Request[IO](method = Method.GET, uri = uri"attachment/p-1/a-1")
+    val request = Request[IO](method = Method.GET, uri = uri"attachment/a-1")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("GETurl requires authorization") {
-    val request = Request[IO](method = Method.GET, uri = uri"attachment/url/p-1/a-1")
+    val request = Request[IO](method = Method.GET, uri = uri"attachment/url/a-1")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("POST requires authorization") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder"
+                              uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder"
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("PUT requires authorization") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/p-1/a-1?fileName=/file.txt"
+                              uri = uri"attachment/a-1?fileName=/file.txt"
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("DELETE requires authorization") {
-    val request = Request[IO](method = Method.DELETE, uri = uri"attachment/p-1/a-1")
+    val request = Request[IO](method = Method.DELETE, uri = uri"attachment/a-1")
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
 
   test("GET requires valid user") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/p-1/a-1",
+                              uri = uri"attachment/a-1",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -102,7 +100,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("GETurl requires valid user") {
     val request = Request[IO](method = Method.GET,
-                              uri = uri"attachment/url/p-1/a-1",
+                              uri = uri"attachment/url/a-1",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -110,7 +108,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST requires valid user") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -118,7 +116,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("PUT requires valid user") {
     val request = Request[IO](method = Method.PUT,
-                              uri = uri"attachment/p-1/a-1?fileName=/file.txt",
+                              uri = uri"attachment/a-1?fileName=/file.txt",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -126,7 +124,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("DELETE requires valid user") {
     val request = Request[IO](method = Method.DELETE,
-                              uri = uri"attachment/p-1/a-1",
+                              uri = uri"attachment/a-1",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -135,21 +133,21 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("valid GET returns file contents") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/p-1/a-1", headers = hs)
+        Request[IO](method = Method.GET, uri = uri"attachment/a-1", headers = hs)
       routes.run(request).assertResponse(Status.Ok, fileContents.some)
   }
 
   test("valid GETurl returns url") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/url/p-1/a-1", headers = hs)
+        Request[IO](method = Method.GET, uri = uri"attachment/url/a-1", headers = hs)
       routes.run(request).assertResponse(Status.Ok, presignedUrl.some)
   }
 
   test("valid POST returns attachment") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Ok, attachmentId.toString.some)
@@ -158,7 +156,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("valid PUT returns Ok") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/a-1?fileName=/file.txt",
+                                uri = uri"attachment/a-1?fileName=/file.txt",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Ok, none)
@@ -167,42 +165,28 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("valid DELETE returns Ok") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.DELETE, uri = uri"attachment/p-1/a-1", headers = hs)
+        Request[IO](method = Method.DELETE, uri = uri"attachment/a-1", headers = hs)
       routes.run(request).assertResponse(Status.Ok, none)
-  }
-
-  test("GET returns NotFound for invalid program id") {
-    headers(pi).flatMap: hs =>
-      val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/p1/a-1", headers = hs)
-      routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("GET returns NotFound for invalid attachment id") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/p-1/a-x1", headers = hs)
-      routes.run(request).assertResponse(Status.NotFound, notFound)
-  }
-
-  test("GETurl returns NotFound for invalid program id") {
-    headers(pi).flatMap: hs =>
-      val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/url/p1/a-1", headers = hs)
+        Request[IO](method = Method.GET, uri = uri"attachment/a-x1", headers = hs)
       routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("GETurl returns NotFound for invalid attachment id") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.GET, uri = uri"attachment/url/p-1/a-x1", headers = hs)
+        Request[IO](method = Method.GET, uri = uri"attachment/url/a-x1", headers = hs)
       routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("POST returns NotFound for invalid program id") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/a-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=a-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -211,7 +195,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound for missing fileName") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -220,16 +204,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound for missing attachmentType") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/",
-                                headers = hs
-      )
-      routes.run(request).assertResponse(Status.NotFound, notFound)
-  }
-
-  test("PUT returns NotFound for invalid program id") {
-    headers(pi).flatMap: hs =>
-      val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/z-1/a-1?fileName=/file.txt",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -238,7 +213,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("PUT returns NotFound for invalid attachment id") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/q-1?fileName=/file.txt",
+                                uri = uri"attachment/q-1?fileName=/file.txt",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -247,30 +222,23 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("PUT returns NotFound for missing fileName") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
-      routes.run(request).assertResponse(Status.NotFound, notFound)
-  }
-
-  test("DELETE returns NotFound for invalid program id") {
-    headers(pi).flatMap: hs =>
-      val request =
-        Request[IO](method = Method.DELETE, uri = uri"attachment/p/a-1", headers = hs)
       routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("DELETE returns NotFound for invalid attachment id") {
     headers(pi).flatMap: hs =>
       val request =
-        Request[IO](method = Method.DELETE, uri = uri"attachment/p-1/a", headers = hs)
+        Request[IO](method = Method.DELETE, uri = uri"attachment/a", headers = hs)
       routes.run(request).assertResponse(Status.NotFound, notFound)
   }
 
   test("GET returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -279,7 +247,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("GET returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -288,7 +256,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("GET returns BadRequest with message if service returns InvalidRequest") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -297,7 +265,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("GETurl returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/url/p-1/a-1",
+                                uri = uri"attachment/url/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -306,7 +274,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("GETurl returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/url/p-1/a-1",
+                                uri = uri"attachment/url/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -315,7 +283,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("GETurl returns BadRequest with message if service returns InvalidRequest") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.GET,
-                                uri = uri"attachment/url/p-1/a-1",
+                                uri = uri"attachment/url/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -324,7 +292,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -333,7 +301,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -342,7 +310,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns BadRequest with message if service returns FileNotFound") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -351,7 +319,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("PUT returns BadRequest with message if service returns InvalidRequest") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/a-1?fileName=/file.txt",
+                                uri = uri"attachment/a-1?fileName=/file.txt",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
@@ -360,7 +328,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("PUT returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/a-1?fileName=/file.txt",
+                                uri = uri"attachment/a-1?fileName=/file.txt",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -369,7 +337,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("PUT returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.PUT,
-                                uri = uri"attachment/p-1/a-1?fileName=/file.txt",
+                                uri = uri"attachment/a-1?fileName=/file.txt",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -378,7 +346,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("DELETE returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.DELETE,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -387,7 +355,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("DELETE returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.DELETE,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -396,7 +364,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("DELETE returns BadRequest with message if service returns InvalidRequest") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.DELETE,
-                                uri = uri"attachment/p-1/a-1",
+                                uri = uri"attachment/a-1",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)

@@ -343,7 +343,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid  <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
       _    <- assertObservation(pi, pid, oid, (aid1, mosMask), (aid2, finder))
-      _    <- deleteAttachment(pi, pid, aid1).expectOk
+      _    <- deleteAttachment(pi, aid1).expectOk
       _    <- assertObservation(pi, pid, oid, (aid2, finder))
     } yield ()
   }

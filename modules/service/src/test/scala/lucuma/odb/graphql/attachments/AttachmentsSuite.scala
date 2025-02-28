@@ -82,7 +82,8 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
         val uri =
-          (svr.baseUri / "attachment" / programId.toString)
+          (svr.baseUri / "attachment")
+            .withQueryParam("programId", programId.toString)
             .withQueryParam("fileName", ta.fileName)
             .withQueryParam("attachmentType", ta.attachmentType)
             .withOptionQueryParam("description", ta.description)
@@ -98,14 +99,13 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
   
   def updateAttachment(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id,
     ta:           TestAttachment
   ): Resource[IO, Response[IO]] =
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
         val uri =
-          (svr.baseUri / "attachment" / programId.toString / attachmentId.toString)
+          (svr.baseUri / "attachment" / attachmentId.toString)
             .withQueryParam("fileName", ta.fileName)
             .withOptionQueryParam("description", ta.description)
 
@@ -120,12 +120,11 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   def getAttachment(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
-        val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+        val uri     = svr.baseUri / "attachment" / attachmentId.toString
         val request = Request[IO](
           method = Method.GET,
           uri = uri,
@@ -148,12 +147,11 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   def getPresignedUrl(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
-        val uri     = svr.baseUri / "attachment" / "url" / programId.toString / attachmentId.toString
+        val uri     = svr.baseUri / "attachment" / "url" / attachmentId.toString
         val request = Request[IO](
           method = Method.GET,
           uri = uri,
@@ -165,12 +163,11 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   def deleteAttachment(
     user:         User,
-    programId:    Program.Id,
     attachmentId: Attachment.Id
   ): Resource[IO, Response[IO]] =
     Resource.eval(authorizationHeader(user)).flatMap: auth =>
       server.flatMap { svr =>
-        val uri     = svr.baseUri / "attachment" / programId.toString / attachmentId.toString
+        val uri     = svr.baseUri / "attachment" / attachmentId.toString
         val request = Request[IO](
           method = Method.DELETE,
           uri = uri,
