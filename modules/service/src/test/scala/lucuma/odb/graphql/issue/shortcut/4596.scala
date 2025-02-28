@@ -64,7 +64,7 @@ class ShortCut_4596 extends OdbSuite
     ).map: json =>
       json.hcursor.downFields("observation", "workflow", "state").require[ObservationWorkflowState]
 
-  def createExecutedObservation(p: Program.Id, state: ObservationWorkflowState): IO[Observation.Id] =
+  def createExecutedObservationWithTarget(p: Program.Id, state: ObservationWorkflowState): IO[(Observation.Id, Target.Id)] =
     for
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -79,7 +79,10 @@ class ShortCut_4596 extends OdbSuite
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
       _  <- computeItcResultAs(pi,o)
       _  <- assertIO(queryObservationWorkflowState(o), state)
-    yield o
+    yield (o, t)
+
+  def createExecutedObservation(p: Program.Id, state: ObservationWorkflowState): IO[Observation.Id] =
+    createExecutedObservationWithTarget(p, state).map(_._1)
 
   def tryUpdateSubtitleAs(
     user: User,
@@ -364,8 +367,48 @@ class ShortCut_4596 extends OdbSuite
         )
       )
  
-  test(s"Ongoing observations should not allow their asterism's targets to be edited".ignore):
-    ()
+  List(Ongoing, Completed).foreach: state =>
+    test(s"$state observations should not allow their asterisms' targets to be edited"):
+      val setup: IO[(Target.Id, Target.Id)] =
+        for 
+          pid     <- createProgramAs(pi)
+          (_, t1) <- createExecutedObservationWithTarget(pid, state)
+          t2      <- createTargetAs(pi, pid) // this one should be editable
+        yield (t1, t2)
+      setup.flatMap: (t1, t2) =>
+        expectIor(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  name: "beelzebubba"
+                }
+                WHERE: {
+                  id: { IN: ${List(t1, t2).asJson} }
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Ior.Both(
+            List(
+              s"Target $t1 is not eligible for this operation due to the workflow state of one or more associated observations."
+            ),
+            json"""
+              {
+                "updateTargets": {
+                  "targets": [
+                    { "id": $t2 }
+                  ]  
+                }
+              }
+            """
+          )
+        )
 
   List(Ongoing, Completed).foreach: state =>
     test(s"$state observations *should* be movable"):
@@ -500,13 +543,11 @@ class ShortCut_4596 extends OdbSuite
 
   // can't implement yet
   test("Ongoing observations should not allow acquisition time changes (PI)".ignore):
-    ()
-
+    fail("not implemented")
 
   // can't implement yet
   test("Ongoing observations *should* allow acquisition time changes (Staff)".ignore):
-    ()
-
+    fail("not implemented")
 
     
 }
