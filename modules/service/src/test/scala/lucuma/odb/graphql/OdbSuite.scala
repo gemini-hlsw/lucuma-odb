@@ -338,12 +338,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     FMain.singleSession(databaseConfig)
 
   private def transactionalClient(user: User)(svr: Server): IO[FetchClient[IO, Nothing]] =
-    authorizationHeader(user).flatMap: auth =>
+    authorizationHeader(user).flatMap { auth =>
       for {
         xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
         uri  = svr.baseUri / "odb"
         xc  <- Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(Async[IO], xbe, Logger[IO])
       } yield xc
+    }
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, WebSocketClient[IO, Nothing]] =
     Resource.eval(authorizationObject(user)).flatMap: ps =>
