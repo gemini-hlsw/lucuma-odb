@@ -26,10 +26,6 @@ import org.http4s.server.middleware.EntityLimiter
 import skunk.Session
 
 object AttachmentRoutes {
-  object ProgramId {
-    def unapply(str: String): Option[Program.Id] = Program.Id.parse(str)
-  }
-
   object AttachmentId {
     def unapply(str: String): Option[Attachment.Id] = Attachment.Id.parse(str)
   }
@@ -86,10 +82,16 @@ object AttachmentRoutes {
     def attachmentTypeFailure(s: String): ParseFailure =
       val msg = s"Invalid attachment type '$s'"
       ParseFailure(msg, msg)
+    def programIdFailure(s: String): ParseFailure =
+      val msg = s"Invalid program id '$s'"
+      ParseFailure(msg, msg)
 
     given QueryParamDecoder[AttachmentType] =
       QueryParamDecoder[String].emap(s => Enumerated[AttachmentType].fromTag(s.toLowerCase).fold(attachmentTypeFailure(s).asLeft)(_.asRight))
+    given QueryParamDecoder[Program.Id] =
+      QueryParamDecoder[String].emap(s => Program.Id.parse(s).fold(programIdFailure(s).asLeft)(_.asRight))
 
+    object ProgramIdMatcher      extends QueryParamDecoderMatcher[Program.Id]("programId")
     object FileNameMatcher       extends QueryParamDecoderMatcher[String]("fileName")
     object AttachmentTypeMatcher extends QueryParamDecoderMatcher[AttachmentType]("attachmentType")
     object DescriptionMatcher    extends OptionalQueryParamDecoderMatcher[String]("description")
@@ -103,8 +105,11 @@ object AttachmentRoutes {
           }
         }
 
-      case req @ POST -> Root / "attachment" / ProgramId(programId)
-          :? FileNameMatcher(fileName) +& AttachmentTypeMatcher(attachmentType) +& DescriptionMatcher(optDesc) =>
+      case req @ POST -> Root / "attachment"
+          :? ProgramIdMatcher(programId)
+          +& FileNameMatcher(fileName)
+          +& AttachmentTypeMatcher(attachmentType) 
+          +& DescriptionMatcher(optDesc) =>
         ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)

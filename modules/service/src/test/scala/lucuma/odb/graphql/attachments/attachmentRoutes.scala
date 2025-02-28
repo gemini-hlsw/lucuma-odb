@@ -73,7 +73,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST requires authorization") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder"
+                              uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder"
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
   }
@@ -108,7 +108,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("POST requires valid user") {
     val request = Request[IO](method = Method.POST,
-                              uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                              uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                               headers = Headers(invalidAuthHeader)
     )
     routes.run(request).assertResponse(Status.Forbidden, none)
@@ -147,7 +147,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("valid POST returns attachment") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Ok, attachmentId.toString.some)
@@ -186,7 +186,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound for invalid program id") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/a-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=a-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -195,7 +195,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound for missing fileName") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -204,7 +204,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound for missing attachmentType") {
     headers(pi).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, notFound)
@@ -292,7 +292,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns Forbidden if service returns Forbidden") {
     headers(forbiddenUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
@@ -301,7 +301,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns NotFound if service returns FileNotFound") {
     headers(fileNotFoundUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.NotFound, none)
@@ -310,7 +310,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
   test("POST returns BadRequest with message if service returns FileNotFound") {
     headers(invalidFileUser).flatMap: hs =>
       val request = Request[IO](method = Method.POST,
-                                uri = uri"attachment/p-1?fileName=/file.txt/&attachmentType=finder",
+                                uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.BadRequest, invalidFileName.some)
