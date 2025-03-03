@@ -31,6 +31,7 @@ import lucuma.core.math.LineWidthValue
 import lucuma.core.math.Wavelength
 import lucuma.core.math.dimensional.*
 import lucuma.core.math.units.KilometersPerSecond
+import lucuma.core.model.Attachment
 import lucuma.core.model.EmissionLine
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -52,7 +53,6 @@ import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 
 import scala.collection.immutable.SortedMap
-import lucuma.core.model.Attachment
 
 trait SourceProfileCodec {
 
