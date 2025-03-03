@@ -52,6 +52,7 @@ import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 
 import scala.collection.immutable.SortedMap
+import lucuma.core.model.Attachment
 
 trait SourceProfileCodec {
 
@@ -166,21 +167,22 @@ trait SourceProfileCodec {
       def decode[A: Enumerated](n: String)(f: A => UnnormalizedSED): Decoder.Result[UnnormalizedSED] =
         c.downField(n).as[A].map(f)
 
-      decode("stellarLibrary")(StellarLibrary(_))                                            orElse
-        decode("coolStar")(CoolStarModel(_))                                                 orElse
-        decode("galaxy")(Galaxy(_))                                                          orElse
-        decode("planet")(Planet(_))                                                          orElse
-        decode("quasar")(Quasar(_))                                                          orElse
-        decode("hiiRegion")(HIIRegion(_))                                                    orElse
-        decode("planetaryNebula")(PlanetaryNebula(_))                                        orElse
-        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                              orElse
-        c.downField("blackBodyTempK").as[PosInt].map { k => BlackBody(Quantity[Kelvin](k)) } orElse
+      decode("stellarLibrary")(StellarLibrary(_))                                              orElse
+        decode("coolStar")(CoolStarModel(_))                                                   orElse
+        decode("galaxy")(Galaxy(_))                                                            orElse
+        decode("planet")(Planet(_))                                                            orElse
+        decode("quasar")(Quasar(_))                                                            orElse
+        decode("hiiRegion")(HIIRegion(_))                                                      orElse
+        decode("planetaryNebula")(PlanetaryNebula(_))                                          orElse
+        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                                orElse
+        c.downField("blackBodyTempK").as[PosInt].map { k => BlackBody(Quantity[Kelvin](k)) }   orElse
         c.downField("fluxDensities")
          .values
          .toRight(DecodingFailure("fluxDensities should hold an array of values", c.history))
          .flatMap(_.toList.traverse(json => DecoderFluxDensityEntry(json.hcursor)).map(SortedMap.from))
          .flatMap(m => NonEmptyMap.fromMap(m).toRight(DecodingFailure("At least one flux density entry is required for a user defined SED", c.history)))
-         .map(UserDefined(_))                                                                orElse
+         .map(UserDefined(_))                                                                  orElse
+        c.downField("fluxDensitiesAttachment").as[Attachment.Id].map(UserDefinedAttachment(_)) orElse
         DecodingFailure(s"Could not decode SED: ${c.focus.map(_.spaces2)}", c.history).asLeft[UnnormalizedSED]
     }
 
