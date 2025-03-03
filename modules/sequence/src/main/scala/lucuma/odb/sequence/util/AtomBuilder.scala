@@ -77,7 +77,8 @@ object AtomBuilder:
                 protoStep.stepConfig,
                 protoStep.telescopeConfig,
                 estimate,
-                protoStep.observeClass
+                protoStep.observeClass,
+                protoStep.breakpoint
               )
             }
           )
