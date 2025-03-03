@@ -10713,256 +10713,796 @@ type SpectroscopyScienceRequirements {
 """
 Stellar library spectrum
 """
-enum StellarLibrarySpectrum {
-  """
-  StellarLibrarySpectrum O5V
+enum StellarLibrarySpectrum  {
+    """
+  StellarLibrarySpectrum O5_V
   """
   O5_V
 
   """
-  StellarLibrarySpectrum O8III
+  StellarLibrarySpectrum O8_III
   """
   O8_III
 
   """
-  StellarLibrarySpectrum B0V
+  StellarLibrarySpectrum O9_V_CALSPEC
+  """
+  O9_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum O9_5_V_CALSPEC
+  """
+  O9_5_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum B0_V
   """
   B0_V
 
   """
-  StellarLibrarySpectrum B5_7V
+  StellarLibrarySpectrum B0_5_V_CALSPEC
+  """
+  B0_5_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum B3_V_CALSPEC
+  """
+  B3_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum B5_7_V
   """
   B5_7_V
 
   """
-  StellarLibrarySpectrum B5III
+  StellarLibrarySpectrum B5_III
   """
   B5_III
 
   """
-  StellarLibrarySpectrum B5I
+  StellarLibrarySpectrum B5_I
   """
   B5_I
 
   """
-  StellarLibrarySpectrum A0V
+  StellarLibrarySpectrum B9_III_CALSPEC
   """
-  A0_V
+  B9_III_CALSPEC
 
   """
-  StellarLibrarySpectrum A0III
-  """
-  A0_III
-
-  """
-  StellarLibrarySpectrum A0I
+  StellarLibrarySpectrum A0_I
   """
   A0_I
 
   """
-  StellarLibrarySpectrum A5V
+  StellarLibrarySpectrum A0_III
   """
-  A5_V
+  A0_III
 
   """
-  StellarLibrarySpectrum A5III
+  StellarLibrarySpectrum A0_III_CALSPEC
+  """
+  A0_III_CALSPEC
+
+  """
+  StellarLibrarySpectrum A0_V
+  """
+  A0_V
+
+  """
+  StellarLibrarySpectrum A0_V_CALSPEC
+  """
+  A0_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A1_V_CALSPEC
+  """
+  A1_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A2_V_CALSPEC
+  """
+  A2_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A3_V_CALSPEC
+  """
+  A3_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A4_V_CALSPEC
+  """
+  A4_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A5_III
   """
   A5_III
 
   """
-  StellarLibrarySpectrum F0V
+  StellarLibrarySpectrum A5_V
   """
-  F0_V
+  A5_V
 
   """
-  StellarLibrarySpectrum F0III
+  StellarLibrarySpectrum A5_V_CALSPEC
   """
-  F0_III
+  A5_V_CALSPEC
 
   """
-  StellarLibrarySpectrum F0I
+  StellarLibrarySpectrum A6_V_CALSPEC
+  """
+  A6_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum A8_III_CALSPEC
+  """
+  A8_III_CALSPEC
+
+  """
+  StellarLibrarySpectrum F0_I
   """
   F0_I
 
   """
-  StellarLibrarySpectrum F5V
+  StellarLibrarySpectrum F0_I_PICKLES_IRTF
   """
-  F5_V
+  F0_I_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum F5V_w
+  StellarLibrarySpectrum F0_II_PICKLES_IRTF
   """
-  F5_V_W
+  F0_II_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum F6V_r
+  StellarLibrarySpectrum F0_III
   """
-  F6_V_R
+  F0_III
 
   """
-  StellarLibrarySpectrum F5III
+  StellarLibrarySpectrum F0_III_PICKLES_IRTF
   """
-  F5_III
+  F0_III_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum F5I
+  StellarLibrarySpectrum F0_IV_PICKLES_IRTF
+  """
+  F0_IV_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F0_V
+  """
+  F0_V
+
+  """
+  StellarLibrarySpectrum F0_V_PICKLES_IRTF
+  """
+  F0_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F2_II_PICKLES_IRTF
+  """
+  F2_II_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F2_III_PICKLES_IRTF
+  """
+  F2_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F2_V_PICKLES_IRTF
+  """
+  F2_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F4_V_CALSPEC
+  """
+  F4_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum F5_I
   """
   F5_I
 
   """
-  StellarLibrarySpectrum G0V
+  StellarLibrarySpectrum F5_I_PICKLES_IRTF
   """
-  G0_V
+  F5_I_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum G0V_w
+  StellarLibrarySpectrum F5_III
   """
-  G0_V_W
+  F5_III
 
   """
-  StellarLibrarySpectrum G0V_r
+  StellarLibrarySpectrum F5_III_PICKLES_IRTF
   """
-  G0_V_R
+  F5_III_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum G0III
+  StellarLibrarySpectrum F5_V
   """
-  G0_III
+  F5_V
 
   """
-  StellarLibrarySpectrum G0I
+  StellarLibrarySpectrum F5_V_PICKLES_IRTF
+  """
+  F5_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F5_V_W
+  """
+  F5_V_W
+
+  """
+  StellarLibrarySpectrum F6_V_R
+  """
+  F6_V_R
+
+  """
+  StellarLibrarySpectrum F7_V_CALSPEC
+  """
+  F7_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum F8_I_PICKLES_IRTF
+  """
+  F8_I_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum F8_IV_CALSPEC
+  """
+  F8_IV_CALSPEC
+
+  """
+  StellarLibrarySpectrum F8_V_PICKLES_IRTF
+  """
+  F8_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G0_I
   """
   G0_I
 
   """
-  StellarLibrarySpectrum G2V
+  StellarLibrarySpectrum G0_I_PICKLES_IRTF
+  """
+  G0_I_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G0_III
+  """
+  G0_III
+
+  """
+  StellarLibrarySpectrum G0_V
+  """
+  G0_V
+
+  """
+  StellarLibrarySpectrum G0_V_CALSPEC
+  """
+  G0_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum G0_V_W
+  """
+  G0_V_W
+
+  """
+  StellarLibrarySpectrum G0_V_R
+  """
+  G0_V_R
+
+  """
+  StellarLibrarySpectrum G1_V_CALSPEC
+  """
+  G1_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum G2_I_PICKLES_IRTF
+  """
+  G2_I_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G2_IV_PICKLES_IRTF
+  """
+  G2_IV_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G2_V
   """
   G2_V
 
   """
-  StellarLibrarySpectrum G5V
+  StellarLibrarySpectrum G2_V_CALSPEC
   """
-  G5_V
+  G2_V_CALSPEC
 
   """
-  StellarLibrarySpectrum G5V_w
+  StellarLibrarySpectrum G3_V_CALSPEC
   """
-  G5_V_W
+  G3_V_CALSPEC
 
   """
-  StellarLibrarySpectrum G5V_r
-  """
-  G5_V_R
-
-  """
-  StellarLibrarySpectrum G5III
-  """
-  G5_III
-
-  """
-  StellarLibrarySpectrum G5III_w
-  """
-  G5_III_W
-
-  """
-  StellarLibrarySpectrum G5III_r
-  """
-  G5_III_R
-
-  """
-  StellarLibrarySpectrum G5I
+  StellarLibrarySpectrum G5_I
   """
   G5_I
 
   """
-  StellarLibrarySpectrum K0V
+  StellarLibrarySpectrum G5_I_PICKLES_IRTF
   """
-  K0_V
+  G5_I_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum K0V_r
+  StellarLibrarySpectrum G5_III
   """
-  K0_V_R
+  G5_III
 
   """
-  StellarLibrarySpectrum K0III
+  StellarLibrarySpectrum G5_III_PICKLES_IRTF
+  """
+  G5_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G5_III_W
+  """
+  G5_III_W
+
+  """
+  StellarLibrarySpectrum G5_III_R
+  """
+  G5_III_R
+
+  """
+  StellarLibrarySpectrum G5_V
+  """
+  G5_V
+
+  """
+  StellarLibrarySpectrum G5_V_CALSPEC
+  """
+  G5_V_CALSPEC
+
+  """
+  StellarLibrarySpectrum G5_V_W
+  """
+  G5_V_W
+
+  """
+  StellarLibrarySpectrum G5_V_R
+  """
+  G5_V_R
+
+  """
+  StellarLibrarySpectrum G7_III_CALSPEC
+  """
+  G7_III_CALSPEC
+
+  """
+  StellarLibrarySpectrum G8_I_PICKLES_IRTF
+  """
+  G8_I_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G8_III_PICKLES_IRTF
+  """
+  G8_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum G8_V_PICKLES_IRTF
+  """
+  G8_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K0_III
   """
   K0_III
 
   """
-  StellarLibrarySpectrum K0III_w
+  StellarLibrarySpectrum K0_III_PICKLES_IRTF
+  """
+  K0_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K0_III_W
   """
   K0_III_W
 
   """
-  StellarLibrarySpectrum K0III_r
+  StellarLibrarySpectrum K0_III_R
   """
   K0_III_R
 
   """
-  StellarLibrarySpectrum K0_1II
+  StellarLibrarySpectrum K0_IV_PICKLES_IRTF
+  """
+  K0_IV_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K0_V
+  """
+  K0_V
+
+  """
+  StellarLibrarySpectrum K0_V_PICKLES_IRTF
+  """
+  K0_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K0_V_R
+  """
+  K0_V_R
+
+  """
+  StellarLibrarySpectrum K0_5_III_CALSPEC
+  """
+  K0_5_III_CALSPEC
+
+  """
+  StellarLibrarySpectrum K0_1_II
   """
   K0_1_II
 
   """
-  StellarLibrarySpectrum K4V
+  StellarLibrarySpectrum K1_5_III_CALSPEC
   """
-  K4_V
+  K1_5_III_CALSPEC
 
   """
-  StellarLibrarySpectrum K4III
+  StellarLibrarySpectrum K2_I_PICKLES_IRTF
   """
-  K4_III
+  K2_I_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum K4III_w
+  StellarLibrarySpectrum K2_III_PICKLES_IRTF
   """
-  K4_III_W
+  K2_III_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum K4III_r
+  StellarLibrarySpectrum K2_V_PICKLES_IRTF
   """
-  K4_III_R
+  K2_V_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum K4I
+  StellarLibrarySpectrum K3_II_PICKLES_IRTF
+  """
+  K3_II_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K3_III_PICKLES_IRTF
+  """
+  K3_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K3_V_PICKLES_IRTF
+  """
+  K3_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K4_I
   """
   K4_I
 
   """
-  StellarLibrarySpectrum M0V
+  StellarLibrarySpectrum K4_I_PICKLES_IRTF
   """
-  M0_V
+  K4_I_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum M0III
+  StellarLibrarySpectrum K4_III
+  """
+  K4_III
+
+  """
+  StellarLibrarySpectrum K4_III_PICKLES_IRTF
+  """
+  K4_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K4_III_W
+  """
+  K4_III_W
+
+  """
+  StellarLibrarySpectrum K4_III_R
+  """
+  K4_III_R
+
+  """
+  StellarLibrarySpectrum K4_V
+  """
+  K4_V
+
+  """
+  StellarLibrarySpectrum K5_III_PICKLES_IRTF
+  """
+  K5_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum K5_V_PICKLES_IRTF
+  """
+  K5_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M0_III
   """
   M0_III
 
   """
-  StellarLibrarySpectrum M3V
+  StellarLibrarySpectrum M0_III_PICKLES_IRTF
   """
-  M3_V
+  M0_III_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum M3III
+  StellarLibrarySpectrum M0_V
+  """
+  M0_V
+
+  """
+  StellarLibrarySpectrum M0_V_PICKLES_IRTF
+  """
+  M0_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M1_III_PICKLES_IRTF
+  """
+  M1_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M1_V_PICKLES_IRTF
+  """
+  M1_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M2_I_PICKLES_IRTF
+  """
+  M2_I_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M2_III_PICKLES_IRTF
+  """
+  M2_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M2_V_PICKLES_IRTF
+  """
+  M2_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M3_III
   """
   M3_III
 
   """
-  StellarLibrarySpectrum M6V
+  StellarLibrarySpectrum M3_III_PICKLES_IRTF
   """
-  M6_V
+  M3_III_PICKLES_IRTF
 
   """
-  StellarLibrarySpectrum M6III
+  StellarLibrarySpectrum M3_V
+  """
+  M3_V
+
+  """
+  StellarLibrarySpectrum M3_V_PICKLES_IRTF
+  """
+  M3_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M4_III_PICKLES_IRTF
+  """
+  M4_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M4_V_PICKLES_IRTF
+  """
+  M4_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M5_V_PICKLES_IRTF
+  """
+  M5_V_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M6_III
   """
   M6_III
 
   """
-  StellarLibrarySpectrum M9III
+  StellarLibrarySpectrum M6_III_PICKLES_IRTF
+  """
+  M6_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M6_V
+  """
+  M6_V
+
+  """
+  StellarLibrarySpectrum M7_III_PICKLES_IRTF
+  """
+  M7_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M8_III_PICKLES_IRTF
+  """
+  M8_III_PICKLES_IRTF
+
+  """
+  StellarLibrarySpectrum M9_III
   """
   M9_III
+
+  """
+  StellarLibrarySpectrum SD_B_CALSPEC
+  """
+  SD_B_CALSPEC
+
+  """
+  StellarLibrarySpectrum SD_F8_CALSPEC
+  """
+  SD_F8_CALSPEC
+
+  """
+  StellarLibrarySpectrum SD_O_CALSPEC
+  """
+  SD_O_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA08_CALSPEC
+  """
+  DA08_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA09_CALSPEC
+  """
+  DA09_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA12_CALSPEC
+  """
+  DA12_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA15_CALSPEC
+  """
+  DA15_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA18_CALSPEC
+  """
+  DA18_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA24_CALSPEC
+  """
+  DA24_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA28_CALSPEC
+  """
+  DA28_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA30_CALSPEC
+  """
+  DA30_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA31_CALSPEC
+  """
+  DA31_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA33_CALSPEC
+  """
+  DA33_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA36_CALSPEC
+  """
+  DA36_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA38_CALSPEC
+  """
+  DA38_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA48_CALSPEC
+  """
+  DA48_CALSPEC
+
+  """
+  StellarLibrarySpectrum DA57_CALSPEC
+  """
+  DA57_CALSPEC
+
+  """
+  StellarLibrarySpectrum DBQ40_CALSPEC
+  """
+  DBQ40_CALSPEC
+
+  """
+  StellarLibrarySpectrum DBQA50_CALSPEC
+  """
+  DBQA50_CALSPEC
+
+  """
+  StellarLibrarySpectrum DO20_CALSPEC
+  """
+  DO20_CALSPEC
+
+  """
+  StellarLibrarySpectrum T2800_K
+  """
+  T2800_K
+
+  """
+  StellarLibrarySpectrum T2600_K
+  """
+  T2600_K
+
+  """
+  StellarLibrarySpectrum T2400_K
+  """
+  T2400_K
+
+  """
+  StellarLibrarySpectrum T2200_K
+  """
+  T2200_K
+
+  """
+  StellarLibrarySpectrum T2000_K
+  """
+  T2000_K
+
+  """
+  StellarLibrarySpectrum T1800_K
+  """
+  T1800_K
+
+  """
+  StellarLibrarySpectrum T1600_K
+  """
+  T1600_K
+
+  """
+  StellarLibrarySpectrum T1400_K
+  """
+  T1400_K
+
+  """
+  StellarLibrarySpectrum T1200_K
+  """
+  T1200_K
+
+  """
+  StellarLibrarySpectrum T1000_K
+  """
+  T1000_K
+
+  """
+  StellarLibrarySpectrum T0900_K
+  """
+  T0900_K
+
+  """
+  StellarLibrarySpectrum T0800_K
+  """
+  T0800_K
+
+  """
+  StellarLibrarySpectrum T0600_K
+  """
+  T0600_K
+
+  """
+  StellarLibrarySpectrum T0400_K
+  """
+  T0400_K
 }
 
 """
