@@ -100,7 +100,10 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           input.flatMap(_.isWritten).forall(_ === e.isWritten)
         .map(e => Result(
           Environment(
-            Env("editType" -> e.editType),
+            Env(
+              "editType"  -> e.editType,
+              "datasetId" -> e.datasetId
+            ),
             Unique(Filter(Predicates.datasetEdit.value.id.eql(e.datasetId), child))
           )
         ))
