@@ -35,7 +35,7 @@ import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
-import lucuma.core.syntax.enumerated.*
+import lucuma.core.syntax.all.*
 import lucuma.core.util.Enumerated
 import monocle.Lens
 
@@ -133,9 +133,9 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
-    out.writeChars(grating.tag)
-    filter.foreach(f => out.writeChars(f.tag))
-    out.writeChars(fpu.tag)
+    out.writeChars(Enumerated[G].tag(grating))
+    filter.foreach(f => out.writeChars(Enumerated[L].tag(f)))
+    out.writeChars(Enumerated[U].tag(fpu))
     out.writeInt(centralWavelength.toPicometers.value.value)
     out.writeChars(xBin.tag)
     out.writeChars(yBin.tag)
