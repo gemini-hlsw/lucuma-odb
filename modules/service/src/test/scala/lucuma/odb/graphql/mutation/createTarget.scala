@@ -114,7 +114,8 @@ class createTarget extends OdbSuite {
                       "planetaryNebula" : null,
                       "powerLaw" : null,
                       "blackBodyTempK" : null,
-                      "fluxDensities" : null
+                      "fluxDensities" : null,
+                      "fluxDensitiesAttachment" : null
                     }
                   },
                   "emissionLines" : null
@@ -224,7 +225,8 @@ class createTarget extends OdbSuite {
                       "planetaryNebula" : null,
                       "powerLaw" : null,
                       "blackBodyTempK" : null,
-                      "fluxDensities" : null
+                      "fluxDensities" : null,
+                      "fluxDensitiesAttachment" : null
                     }
                   },
                   "emissionLines" : null
@@ -400,6 +402,7 @@ object createTarget {
                   }
                   density
                 }
+                fluxDensitiesAttachment
               }
             }
             emissionLines {
