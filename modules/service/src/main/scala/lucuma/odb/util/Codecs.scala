@@ -330,7 +330,7 @@ trait Codecs {
     enumerated[ImageQuality](Type.varchar)
 
   val _instrument: Codec[Arr[Instrument]] =
-    Codec.array(_.tag, s => Instrument.fromTag(s).toRight(s"Invalid Instrument tag: $s"), Type("_d_tag", List(Type("d_tag"))))
+    Codec.array(_.tag, s => Enumerated[Instrument].fromTag(s).toRight(s"Invalid Instrument tag: $s"), Type("_d_tag", List(Type("d_tag"))))
 
   val instrument: Codec[Instrument] =
     enumerated[Instrument](Type.varchar)
@@ -741,7 +741,7 @@ trait Codecs {
   val user_invitation_status: Codec[InvitationStatus] =
     enumerated(Type("e_invitation_status"))
 
-  val observation_workflow_state: Codec[ObservationWorkflowState] = 
+  val observation_workflow_state: Codec[ObservationWorkflowState] =
     enumerated[ObservationWorkflowState](Type("e_workflow_user_state"))
 
   val user_state: Codec[ObservationWorkflowService.UserState] =
