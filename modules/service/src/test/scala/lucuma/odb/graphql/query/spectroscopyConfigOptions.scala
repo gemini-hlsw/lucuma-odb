@@ -170,10 +170,10 @@ class spectroscopyConfigOptions extends OdbSuite {
         {
           "spectroscopyConfigOptions": [
             {
-              "name": "R831 0.25\""
+              "name": "B1200 0.25\""
             },
             {
-              "name": "B1200 0.25\""
+              "name": "R831 0.25\""
             }
           ]
         }
