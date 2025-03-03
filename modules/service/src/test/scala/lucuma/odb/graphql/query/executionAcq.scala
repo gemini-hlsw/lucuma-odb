@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -41,7 +42,7 @@ class executionAcq extends ExecutionTestSupport {
                     "steps": [
                       ${gmosNorthExpectedAcq(0,  0)},
                       ${gmosNorthExpectedAcq(1, 10)},
-                      ${gmosNorthExpectedAcq(2,  0)}
+                      ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
                     ]
                   },
                   "possibleFuture": [
@@ -49,7 +50,7 @@ class executionAcq extends ExecutionTestSupport {
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(2, 0)}
+                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
                       ]
                     }
                   ],
@@ -74,7 +75,7 @@ class executionAcq extends ExecutionTestSupport {
                     "description": "Fine Adjustments",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${gmosNorthExpectedAcq(2, 0)}
+                      ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
                     ]
                   },
                   "possibleFuture": [
@@ -82,7 +83,7 @@ class executionAcq extends ExecutionTestSupport {
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(2, 0)}
+                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
                       ]
                     }
                   ],
@@ -222,7 +223,7 @@ class executionAcq extends ExecutionTestSupport {
                           "observeClass": "ACQUISITION",
                           "steps": [
                             ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0)}
+                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -230,7 +231,7 @@ class executionAcq extends ExecutionTestSupport {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0)}
+                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
                             ]
                           }
                         ],
@@ -419,7 +420,7 @@ class executionAcq extends ExecutionTestSupport {
                           "observeClass": "ACQUISITION",
                           "steps": [
                             ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0)}
+                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -427,7 +428,7 @@ class executionAcq extends ExecutionTestSupport {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0)}
+                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
                             ]
                           }
                         ],
