@@ -12519,6 +12519,7 @@ type UnnormalizedSed {
   powerLaw: BigDecimal
   blackBodyTempK: PosInt
   fluxDensities: [FluxDensityEntry!]
+  fluxDensitiesAttachment: AttachmentId
 }
 
 scalar UserId
