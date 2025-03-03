@@ -194,3 +194,34 @@ class datasetEdit extends OdbSuite with SubscriptionUtils with DatasetSetupOpera
       ),
       expected  = allEvents
     )
+
+  test("datasetId in result works"):
+    import Group1._
+
+    def allEvents(did: Dataset.Id) = List(
+      json"""{ "datasetEdit":  { "datasetId": $did }}"""
+    )
+
+    val subscription = s"""
+      subscription {
+        datasetEdit {
+          datasetId
+        }
+      }
+    """
+
+    recordDatasets(ObservingModeType.GmosNorthLongSlit, pi, service, 8, 1, 1).flatTap {
+      case (oid, List((_, List(did)))) =>
+
+        subscriptionExpect(
+          user      = pi,
+          query     = subscription,
+          mutations = Right(
+            updateDatasets(staff, DatasetQaState.Pass, List(did)) >> IO.sleep(1.second)
+          ),
+          expected  = allEvents(did)
+        )
+
+      case _                           =>
+        sys.error("Expected a single dataset.")
+    }
