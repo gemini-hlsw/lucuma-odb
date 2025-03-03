@@ -366,8 +366,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CreateObservation: MutationField =
     MutationField("createObservation", CreateObservationInput.Binding): (input, child) =>
       services.useTransactionally:
-        observationService.createObservation(input).nestMap: oid =>
-          Unique(Filter(Predicates.observation.id.eql(oid), child))
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            observationService.createObservation(checked).nestMap: oid =>
+              Unique(Filter(Predicates.observation.id.eql(oid), child))
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>

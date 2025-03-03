@@ -15,7 +15,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
-import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
@@ -57,7 +56,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
-import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -89,7 +87,7 @@ sealed trait ObservationService[F[_]] {
   ): F[Result[Observation.Id]]
 
   def createObservation(
-    input: CreateObservationInput
+    input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
 
   def selectObservations(
@@ -239,7 +237,7 @@ object ObservationService {
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.option(af.argument).map {
                     case Some(oid) => Result(oid)
-                    case None      => OdbError.NotAuthorized(user.id).asFailure
+                    case None      => OdbError.NotAuthorized(user.id).asFailure // failed because user doesn't have access to the program
                   }
                 }.flatMap { rOid =>
 
@@ -311,50 +309,21 @@ object ObservationService {
       }
 
       override def createObservation(
-        input: CreateObservationInput
-      )(using Transaction[F]): F[Result[Observation.Id]] = {
-
-        // Extracts the observation creation properties, validating the band
-        // choice (if any), or else setting the band in the case of a single
-        // band allocation.
-        def observationProperties(pid: Program.Id): ResultT[F, ObservationPropertiesInput.Create] = {
-          val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
-
-          props.scienceBand.fold(
-
-            // No science band in the input, but if the proposal has a time
-            // allocation in single band select it.
-            ResultT(allocationService.selectScienceBands(pid).map { bands =>
-              bands.toList match {
-                case b :: Nil => ObservationPropertiesInput.Create.scienceBand.replace(b.some)(props).success
-                case _        => props.success
-              }
-            })
-
-          ) { band => ResultT(allocationService.validateBand(band, List(pid))).as(props) }
-        }
-
-        def create(pid: Program.Id): ResultT[F, Observation.Id] =
-          observationProperties(pid).flatMap { props =>
-            ResultT(createObservationImpl(pid, props))
-          }
-
-        def insertAsterism(pid: Program.Id, oid: Observation.Id): ResultT[F, Unit] =
-          input.asterism.toOption.fold(ResultT.unit) { a =>
-            ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
-          }
-
-        val go =
-          for
-            pid <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
-            oid <- create(pid)
-            _   <- insertAsterism(pid, oid)
-          yield oid
-
-        go.value.flatTap: r =>
-          transaction.rollback.unlessA(r.hasValue)
-
-      }
+        input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
+      )(using Transaction[F]): F[Result[Observation.Id]] =
+        input.foldWithId(
+          OdbError.InvalidArgument().asFailureF // typically handled by caller
+        ): (SET, pid) =>
+          ResultT(createObservationImpl(pid, SET))
+            .flatMap: oid =>
+              SET
+                .asterism
+                .traverse: a =>
+                  ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
+                .as(oid)
+            .value
+            .flatTap: r =>
+              transaction.rollback.unlessA(r.hasValue)
 
       override def selectObservations(
         which: AppliedFragment

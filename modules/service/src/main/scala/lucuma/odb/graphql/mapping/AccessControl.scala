@@ -12,12 +12,15 @@ import grackle.Predicate.*
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -330,5 +333,40 @@ trait AccessControl[F[_]] extends Predicates[F] {
             case Nil => Result(AccessControl.Checked.Empty)
             case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
             case _ => Result.internalError("Unpossible: got more than one oid back")
-    
+
+
+  def selectForUpdate(
+    input: CreateObservationInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]]] = {
+
+    val ensureWritable: F[Result[Program.Id]] =
+      // TODO: check access
+      programService.resolvePid(input.programId, input.proposalReference, input.programReference)
+
+    // Compute our ObservationPropertiesInput.Create and set/verify the science band
+    def createWithValidScienceBand(pid: Program.Id): F[Result[ObservationPropertiesInput.Create]] =
+      val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
+      props.scienceBand match
+        case None =>
+          allocationService
+            .selectScienceBands(pid)
+            .map(_.toList)
+            .map:
+              case List(b) => Result(props.copy(scienceBand = Some(b)))
+              case _       => Result(props)
+        case Some(band) =>
+          allocationService.validateBand(band, List(pid)).map(_.as(props))
+
+    val go: ResultT[F, AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]] =
+      for
+        pid    <- ResultT(ensureWritable)
+        create <- ResultT(createWithValidScienceBand(pid))
+      yield 
+        Services.asSuperUser:
+          AccessControl.unchecked(create, pid, program_id)
+      
+    go.value
+
+  }
+
 }
