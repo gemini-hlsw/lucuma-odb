@@ -5088,6 +5088,7 @@ input UnnormalizedSedInput {
   powerLaw: BigDecimal
   blackBodyTempK: PosInt
   fluxDensities: [FluxDensity!]
+  fluxDensitiesAttachment: AttachmentId
 }
 
 """

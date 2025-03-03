@@ -47,6 +47,7 @@ import lucuma.core.model.UnnormalizedSED.PowerLaw
 import lucuma.core.model.UnnormalizedSED.Quasar
 import lucuma.core.model.UnnormalizedSED.StellarLibrary
 import lucuma.core.model.UnnormalizedSED.UserDefined
+import lucuma.core.model.UnnormalizedSED.UserDefinedAttachment
 import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 
@@ -197,17 +198,19 @@ trait SourceProfileCodec {
         "powerLaw"       -> Json.Null, // one of these will be replaced
         "blackBodyTempK" -> Json.Null, // one of these will be replaced
         "fluxDensities"  -> Json.Null, // one of these will be replaced
+        "fluxDensitiesAttachment"  -> Json.Null, // one of these will be replaced
         a match {
-          case StellarLibrary(librarySpectrum)          => "stellarLibrary" -> librarySpectrum.asJson
-          case CoolStarModel(temperature)               => "coolStar"       -> temperature.asJson // todo: tag
-          case Galaxy(galaxySpectrum)                   => "galaxy"         -> galaxySpectrum.asJson
-          case Planet(planetSpectrum)                   => "planet"         -> planetSpectrum.asJson
-          case Quasar(quasarSpectrum)                   => "quasar"         -> quasarSpectrum.asJson
-          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"      -> hiiRegionSpectrum.asJson
-          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"-> planetaryNebulaSpectrum.asJson
-          case PowerLaw(index)                          => "powerLaw"       -> index.asJson
-          case BlackBody(temperature)                   => "blackBodyTempK" -> temperature.value.value.asJson
-          case UserDefined(fluxDensities)               => "fluxDensities"  -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+          case StellarLibrary(librarySpectrum)          => "stellarLibrary"          -> librarySpectrum.asJson
+          case CoolStarModel(temperature)               => "coolStar"                -> temperature.asJson // todo: tag
+          case Galaxy(galaxySpectrum)                   => "galaxy"                  -> galaxySpectrum.asJson
+          case Planet(planetSpectrum)                   => "planet"                  -> planetSpectrum.asJson
+          case Quasar(quasarSpectrum)                   => "quasar"                  -> quasarSpectrum.asJson
+          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"               -> hiiRegionSpectrum.asJson
+          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"         -> planetaryNebulaSpectrum.asJson
+          case PowerLaw(index)                          => "powerLaw"                -> index.asJson
+          case BlackBody(temperature)                   => "blackBodyTempK"          -> temperature.value.value.asJson
+          case UserDefined(fluxDensities)               => "fluxDensities"           -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+          case UserDefinedAttachment(attachmentId)      => "fluxDensitiesAttachment" -> attachmentId.asJson
         }
       )
     }
