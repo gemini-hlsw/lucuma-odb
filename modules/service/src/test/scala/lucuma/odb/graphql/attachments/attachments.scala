@@ -114,11 +114,11 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
-      _      <- deleteAttachment(pi, pid, aid).expectOk
+      _      <- getAttachment(pi, aid).expectBody(mosMask1A.content)
+      _      <- deleteAttachment(pi, aid).expectOk
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid)
-      _      <- getAttachment(pi, pid, aid).withExpectation(Status.NotFound)
+      _      <- getAttachment(pi, aid).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -130,7 +130,7 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      url    <- getPresignedUrl(pi, pid, aid).toNonEmptyString
+      url    <- getPresignedUrl(pi, aid).toNonEmptyString
       _      <- getViaPresignedUrl(url).expectBody(mosMask1A.content)
     } yield ()
   }
@@ -147,11 +147,11 @@ class attachments extends AttachmentsSuite {
       fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, mosMask2.content)
       _    <- assertAttachmentsGql(pi, pid, (aid2, mosMask2), (aid1, mosMask1A))
-      _    <- getAttachment(pi, pid, aid1).expectBody(mosMask1A.content)
-      _    <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
-      _    <- deleteAttachment(pi, pid, aid1).expectOk
-      _    <- getAttachment(pi, pid, aid1).withExpectation(Status.NotFound)
-      _    <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
+      _    <- getAttachment(pi, aid1).expectBody(mosMask1A.content)
+      _    <- getAttachment(pi, aid2).expectBody(mosMask2.content)
+      _    <- deleteAttachment(pi, aid1).expectOk
+      _    <- getAttachment(pi, aid1).withExpectation(Status.NotFound)
+      _    <- getAttachment(pi, aid2).expectBody(mosMask2.content)
       _    <- assertS3NotThere(fk1)
       _    <- assertS3(fk2, mosMask2.content)
       _    <- assertAttachmentsGql(pi, pid, (aid2, mosMask2))
@@ -232,15 +232,15 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
-      _      <- updateAttachment(pi, pid, aid, mosMask2).expectOk
+      _      <- getAttachment(pi, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(pi, aid, mosMask2).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, mosMask2.content)
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask2.copy(attachmentType = mosMask1A.attachmentType)))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask2.content)
+      _      <- getAttachment(pi, aid).expectBody(mosMask2.content)
     } yield ()
   }
 
@@ -252,15 +252,15 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
-      _      <- updateAttachment(pi, pid, aid, mosMask1B).expectOk
+      _      <- getAttachment(pi, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(pi, aid, mosMask1B).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, mosMask1B.content)
       _      <- assertS3NotThere(fileKey)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1B.copy(attachmentType = mosMask1A.attachmentType)))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1B.content)
+      _      <- getAttachment(pi, aid).expectBody(mosMask1B.content)
     } yield ()
   }
 
@@ -268,7 +268,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid  = Attachment.Id.fromLong(100L).get
-      _   <- updateAttachment(pi, pid, aid, mosMask1A).withExpectation(Status.NotFound)
+      _   <- updateAttachment(pi, aid, mosMask1A).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -283,7 +283,7 @@ class attachments extends AttachmentsSuite {
       _      <- insertAttachment(pi, pid, mosMask1B).withExpectation(Status.BadRequest, AttachmentFileService.DuplicateFileNameMsg)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- getAttachment(pi, pid, aid).expectBody(mosMask1A.content)
+      _      <- getAttachment(pi, aid).expectBody(mosMask1A.content)
     } yield ()
   }
 
@@ -297,9 +297,9 @@ class attachments extends AttachmentsSuite {
       path2  <- getRemotePathFromDb(aid2)
       fk2     = awsConfig.fileKey(path2)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
-      _      <- updateAttachment(pi, pid, aid2, mosMask1B).withExpectation(Status.BadRequest, AttachmentFileService.DuplicateFileNameMsg)
+      _      <- updateAttachment(pi, aid2, mosMask1B).withExpectation(Status.BadRequest, AttachmentFileService.DuplicateFileNameMsg)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A), (aid2, mosMask2))
-      _      <- getAttachment(pi, pid, aid2).expectBody(mosMask2.content)
+      _      <- getAttachment(pi, aid2).expectBody(mosMask2.content)
     } yield ()
   }
 
@@ -318,7 +318,7 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
-      _      <- updateAttachment(pi, pid, aid, emptyFile).withExpectation(Status.BadRequest, "File cannot be empty")
+      _      <- updateAttachment(pi, aid, emptyFile).withExpectation(Status.BadRequest, "File cannot be empty")
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
     } yield ()
@@ -349,7 +349,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, missingFileName).withExpectation(Status.BadRequest, "File name is required")
+      _   <- updateAttachment(pi, aid, missingFileName).withExpectation(Status.BadRequest, "File name is required")
     } yield ()
   }
 
@@ -364,7 +364,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, fileWithPath).withExpectation(Status.BadRequest, "File name cannot include a path")
+      _   <- updateAttachment(pi, aid, fileWithPath).withExpectation(Status.BadRequest, "File name cannot include a path")
     } yield ()
   }
 
@@ -379,7 +379,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, finderJPG).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+      _   <- updateAttachment(pi, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
     } yield ()
   }
 
@@ -394,7 +394,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, emptyMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+      _   <- updateAttachment(pi, aid, emptyMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
     } yield ()
   }
 
@@ -409,7 +409,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, finderJPG).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
+      _   <- updateAttachment(pi, aid, missingFinderExt).withExpectation(Status.BadRequest, invalidFinderMsg)
     } yield ()
   }
 
@@ -424,7 +424,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, invalidMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+      _   <- updateAttachment(pi, aid, invalidMosMaskExt).withExpectation(Status.BadRequest, invalidFitsMsg)
     } yield ()
   }
 
@@ -439,7 +439,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, preImaging).toAttachmentId
-      _   <- updateAttachment(pi, pid, aid, invalidPreImgExt).withExpectation(Status.BadRequest, invalidFitsMsg)
+      _   <- updateAttachment(pi, aid, invalidPreImgExt).withExpectation(Status.BadRequest, invalidFitsMsg)
     } yield ()
   }
 
@@ -473,7 +473,7 @@ class attachments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- updateAttachment(pi2, pid, aid, mosMask2).withExpectation(Status.Forbidden)
+      _   <- updateAttachment(pi2, aid, mosMask2).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -502,8 +502,8 @@ class attachments extends AttachmentsSuite {
       fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, mosMask2.content)
       _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask2))
-      _    <- getAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
-      _    <- getAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
+      _    <- getAttachment(pi, aid2).withExpectation(Status.NotFound)
+      _    <- getAttachment(pi2, aid1).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -521,8 +521,8 @@ class attachments extends AttachmentsSuite {
       fk2   = awsConfig.fileKey(pth2)
       _    <- assertS3(fk2, mosMask2.content)
       _    <- assertAttachmentsGql(pi2, pid2, (aid2, mosMask2))
-      _    <- deleteAttachment(pi, pid2, aid2).withExpectation(Status.Forbidden)
-      _    <- deleteAttachment(pi2, pid1, aid1).withExpectation(Status.Forbidden)
+      _    <- deleteAttachment(pi, aid2).withExpectation(Status.NotFound)
+      _    <- deleteAttachment(pi2, aid1).withExpectation(Status.NotFound)
     } yield ()
   }
 
@@ -534,14 +534,14 @@ class attachments extends AttachmentsSuite {
       fileKey = awsConfig.fileKey(path)
       _      <- assertS3(fileKey, mosMask1A.content)
       _      <- assertAttachmentsGql(service, pid, (aid, mosMask1A))
-      _      <- getAttachment(service, pid, aid).expectBody(mosMask1A.content)
-      _      <- updateAttachment(service, pid, aid, mosMask2).expectOk
+      _      <- getAttachment(service, aid).expectBody(mosMask1A.content)
+      _      <- updateAttachment(service, aid, mosMask2).expectOk
       path2  <- getRemotePathFromDb(aid)
       _       = assertNotEquals(path, path2)
       fk2     = awsConfig.fileKey(path2)
       _      <- assertS3(fk2, mosMask2.content)
       _      <- assertS3NotThere(fileKey)
-      _      <- deleteAttachment(service, pid, aid).expectOk
+      _      <- deleteAttachment(service, aid).expectOk
       _      <- assertS3NotThere(fk2)
       _      <- assertAttachmentsGql(service, pid)
     } yield ()
