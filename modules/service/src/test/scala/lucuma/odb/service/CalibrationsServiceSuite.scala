@@ -9,9 +9,8 @@ import lucuma.odb.data.Existence
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.input.TargetPropertiesInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
-import skunk.*
-import skunk.implicits.*
 
 import java.time.*
 
@@ -35,12 +34,16 @@ class CalibrationsServiceSuite extends OdbSuite:
     val roles = List(CalibrationRole.SpectroPhotometric)
     withServices(serviceUser): services =>
       assertIOBoolean:
-        services.transactionally:
-          for
-            before <- services.calibrationsService.calibrationTargets(roles, when)
-            _      <- services.targetService.updateTargets(
-               TargetPropertiesInput.Edit(none, none, none, Existence.Deleted.some),
-               sql"select $target_id"(before.head._1)
-            )
-            after  <- services.calibrationsService.calibrationTargets(roles, when)
-          yield before.tail === after
+        Services.asSuperUser:
+          services.transactionally:
+            for
+              before <- services.calibrationsService.calibrationTargets(roles, when)
+              _      <- services.targetService.updateTargets(
+                 AccessControl.unchecked(
+                   TargetPropertiesInput.Edit(none, none, none, Existence.Deleted.some),
+                   List(before.head._1),
+                   target_id
+                 )
+              )
+              after  <- services.calibrationsService.calibrationTargets(roles, when)
+            yield before.tail === after
