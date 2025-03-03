@@ -15,6 +15,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.parser.MiscParsers.posBigDecimal
 import lucuma.core.parser.MiscParsers.posInt
+import lucuma.core.util.Enumerated
 
 /*
 Instrument	Config	Focal Plane	fpu	slit width	slit length	disperser	filter	wave min	wave max	wave optimal	wave coverage	resolution	AO	capabilities	site
@@ -50,7 +51,7 @@ object SpectroscopyRow {
 
   val instrument: Parser[Instrument] =
     string.mapFilter { s =>
-      Instrument.all.find { inst =>
+      Enumerated[Instrument].all.find { inst =>
         inst.shortName === s || inst.longName === s || inst.tag === s
       }
     }
