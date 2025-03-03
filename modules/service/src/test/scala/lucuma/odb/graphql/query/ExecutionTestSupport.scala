@@ -13,6 +13,7 @@ import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
@@ -271,6 +272,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           guiding
         }
         observeClass
+        breakpoint
       }
     """
 
@@ -426,7 +428,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
-        "observeClass" : "PARTNER_CAL"
+        "observeClass" : "PARTNER_CAL",
+        "breakpoint": "DISABLED"
       }
     """
 
@@ -440,7 +443,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "arcs" : []
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
-        "observeClass" : "PARTNER_CAL"
+        "observeClass" : "PARTNER_CAL",
+        "breakpoint": "DISABLED"
       }
     """
 
@@ -450,17 +454,19 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthScience(ditherNm))},
         "stepConfig" : { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
-        "observeClass" : "SCIENCE"
+        "observeClass" : "SCIENCE",
+        "breakpoint": "DISABLED"
       }
     """
 
-  protected def gmosNorthExpectedAcq(step: Int, p: Int): Json =
+  protected def gmosNorthExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthAcq(step))},
         "stepConfig" : { "stepType":  "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
-        "observeClass" : "ACQUISITION"
+        "observeClass" : "ACQUISITION",
+        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
     """
 
