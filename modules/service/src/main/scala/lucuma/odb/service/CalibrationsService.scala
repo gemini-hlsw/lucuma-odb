@@ -477,6 +477,8 @@ object CalibrationsService extends CalibrationObservations {
             ON t_target.c_program_id=t_program.c_program_id
             WHERE t_program.c_calibration_role IN(${calibration_role.list(roles.length)})
               AND t_program.c_existence='present'
+              AND t_target.c_existence='present'
+            ORDER BY c_target_id
           """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
 
     val selectCalibrationTimeAndConf: Query[Observation.Id, (Observation.Id, CalibrationRole, Option[Timestamp], Option[ObservingModeType])] =

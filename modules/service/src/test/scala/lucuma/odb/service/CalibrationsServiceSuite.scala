@@ -1,0 +1,46 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.service
+
+import cats.syntax.all.*
+import lucuma.core.enums.CalibrationRole
+import lucuma.odb.data.Existence
+import lucuma.odb.graphql.OdbSuite
+import lucuma.odb.graphql.TestUsers
+import lucuma.odb.graphql.input.TargetPropertiesInput
+import lucuma.odb.util.Codecs.*
+import skunk.*
+import skunk.implicits.*
+
+import java.time.*
+
+class CalibrationsServiceSuite extends OdbSuite:
+  val serviceUser = TestUsers.service(nextId)
+  lazy val validUsers = List(serviceUser)
+
+  // Just a random fixed time.
+  val when = LocalDateTime.of(2025, Month.MARCH, 3, 23, 30, 0).atZone(ZoneId.of("America/Santiago")).toInstant
+
+  test("calibrationTargets smoke test"):
+    withServices(serviceUser): services =>
+      assertIOBoolean(
+        services
+          .calibrationsService
+          .calibrationTargets(List(CalibrationRole.SpectroPhotometric), when)
+          .map(_.sizeIs > 0)
+      )
+
+  test("calibrationTargets filter deleted"):
+    val roles = List(CalibrationRole.SpectroPhotometric)
+    withServices(serviceUser): services =>
+      assertIOBoolean:
+        services.transactionally:
+          for
+            before <- services.calibrationsService.calibrationTargets(roles, when)
+            _      <- services.targetService.updateTargets(
+               TargetPropertiesInput.Edit(none, none, none, Existence.Deleted.some),
+               sql"select $target_id"(before.head._1)
+            )
+            after  <- services.calibrationsService.calibrationTargets(roles, when)
+          yield before.tail === after
