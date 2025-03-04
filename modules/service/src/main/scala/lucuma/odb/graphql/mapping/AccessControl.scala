@@ -166,6 +166,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   }
 
+  /**
+   * Select and return the ids of programs that are editable by the current user and meet
+   * all the specified filters.
+   */
   private def selectForProgramUpdateImpl(
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
@@ -193,6 +197,9 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   }
 
+  /**
+   * Compute the subset of `pids` that identify programs which are editable by the current user.
+   */
   private def selectForProgramUpdateImpl(
     includeDeleted: Option[Boolean],
     pids:           List[Program.Id]

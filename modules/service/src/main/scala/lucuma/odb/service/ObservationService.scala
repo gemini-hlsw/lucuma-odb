@@ -232,10 +232,6 @@ object ObservationService {
               .flatTraverse { af =>
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
                   pq.unique(af.argument).map(Result.success)
-                  //  {
-                  //   case Some(oid) => Result(oid)
-                  //   case None      => OdbError.NotAuthorized(user.id).asFailure // failed because user doesn't have access to the program
-                  // }
                 }.flatMap { rOid =>
 
                   val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
