@@ -32,9 +32,8 @@ UPDATE t_gmos_north_dynamic
    SET c_grating_disperser = 'B600_G5307'
  WHERE c_grating_disperser = 'B600_G5303';
 
-UPDATE t_configuration_request
-   SET c_gmos_north_longslit_grating = 'B600_G5307'
- WHERE c_gmos_north_longslit_grating = 'B600_G5303';
+DELETE FROM t_configuration_request
+  WHERE c_gmos_north_longslit_grating = 'B600_G5303';
 
 DELETE FROM t_smart_gmos_north
   WHERE c_disperser = 'B600_G5303';
@@ -56,9 +55,8 @@ UPDATE t_gmos_north_dynamic
    SET c_grating_disperser = 'R150_G5308'
  WHERE c_grating_disperser = 'R150_G5306';
 
-UPDATE t_configuration_request
-   SET c_gmos_north_longslit_grating = 'R150_G5308'
- WHERE c_gmos_north_longslit_grating = 'R150_G5306';
+DELETE FROM t_configuration_request
+  WHERE c_gmos_north_longslit_grating = 'R150_G5306';
 
 DELETE FROM t_smart_gmos_north
   WHERE c_disperser = 'R150_G5306';
