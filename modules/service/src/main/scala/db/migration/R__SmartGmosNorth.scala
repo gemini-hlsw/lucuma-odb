@@ -14,12 +14,12 @@ import java.io.InputStream
  * Repeatable Smart GCal configuration loader for GMOS North.  Located,
  * instantiated and executed by flyway.
  */
-class R__SmartGmosNorth extends SmartGcalMigration("GMOS North") {
+class R__SmartGmosNorth extends SmartGcalMigration("GMOS North"):
+
+  override val importForcingVersion: Int = 1
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     gcalFilesFromClasspath("GMOS-N_ARC", "GMOS-N_FLAT")
 
   override def ioMigrate(ctx: Context, bc:  BaseConnection): IO[Unit] =
     SmartGmosLoader.North.load(bc, definitionFiles)
-
-}
