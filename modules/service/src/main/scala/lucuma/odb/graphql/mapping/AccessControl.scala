@@ -12,12 +12,15 @@ import grackle.Predicate.*
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
+import grackle.ResultT
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -163,6 +166,48 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   }
 
+  /**
+   * Select and return the ids of programs that are editable by the current user and meet
+   * all the specified filters.
+   */
+  private def selectForProgramUpdateImpl(
+    includeDeleted: Option[Boolean],
+    WHERE:          Option[Predicate]
+  )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =  {
+
+    val programIdWhereClause: Result[AppliedFragment] = {
+      val whereMrogram: Predicate =
+        and(List(
+          Predicates.program.isWritableBy(user),
+          Predicates.program.existence.includeDeleted(includeDeleted.getOrElse(false)),
+          WHERE.getOrElse(True)
+        ))
+      MappedQuery(
+        Filter(whereMrogram, Select("id", None, Query.Empty)),
+        Context(QueryType, List("programs"), List("programs"), List(ProgramType))
+      ).flatMap(_.fragment)
+    }
+
+    programIdWhereClause.flatTraverse: frag =>
+      session.prepareR(frag.fragment.query(program_id)).use: pq =>
+        pq.stream(frag.argument, 1024)
+          .compile
+          .toList
+          .map(Result.success)
+
+  }
+
+  /**
+   * Compute the subset of `pids` that identify programs which are editable by the current user.
+   */
+  private def selectForProgramUpdateImpl(
+    includeDeleted: Option[Boolean],
+    pids:           List[Program.Id]
+  )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =
+    selectForProgramUpdateImpl(
+      includeDeleted, 
+      Some(Predicates.program.id.in(pids))
+    )
 
   /**
    * Select and return the ids of targets that are editable by the current user and meet
@@ -330,5 +375,50 @@ trait AccessControl[F[_]] extends Predicates[F] {
             case Nil => Result(AccessControl.Checked.Empty)
             case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
             case _ => Result.internalError("Unpossible: got more than one oid back")
-    
+
+
+  def selectForUpdate(
+    input: CreateObservationInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]]] = {
+
+    val ensureWritable: F[Result[Option[Program.Id]]] =
+      programService
+        .resolvePid(input.programId, input.proposalReference, input.programReference)
+        .flatMap: r =>
+          r.flatTraverse: pid =>
+            selectForProgramUpdateImpl(None, List(pid))
+              .map: r =>
+                r.flatMap:
+                  case List(pid) => Result(Some(pid))
+                  case Nil       => Result(None)
+                  case _         => Result.internalError("Unpossible: selectForProgramUpdateImpl returned multiple ids")
+
+
+    // Compute our ObservationPropertiesInput.Create and set/verify the science band
+    def props(pid: Program.Id): F[Result[ObservationPropertiesInput.Create]] =
+      val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
+      props.scienceBand match
+        case None =>
+          allocationService
+            .selectScienceBands(pid)
+            .map(_.toList)
+            .map:
+              case List(b) => Result(props.copy(scienceBand = Some(b)))
+              case _       => Result(props)
+        case Some(band) =>
+          allocationService.validateBand(band, List(pid)).map(_.as(props))
+
+    // Put it together
+    ResultT(ensureWritable)
+      .flatMap:
+        case None => ResultT.pure(AccessControl.Checked.Empty)
+        case Some(pid) =>
+          ResultT(props(pid))
+            .map: props =>
+              Services.asSuperUser:
+                AccessControl.unchecked(props, pid, program_id)
+      .value
+
+  } 
+
 }

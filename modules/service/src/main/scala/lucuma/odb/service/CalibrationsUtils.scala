@@ -25,14 +25,15 @@ import lucuma.core.model.Target
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
-import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.util.Codecs
 import skunk.Transaction
 
 import java.time.Instant
@@ -150,39 +151,38 @@ trait CalibrationObservations {
     band:    Option[ScienceBand],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
-
       observationService.createObservation(
-        CreateObservationInput(
-          programId = pid.some,
-          proposalReference = none,
-          programReference = none,
-          SET = ObservationPropertiesInput.Create.Default.copy(
-                  scienceBand = band,
-                  targetEnvironment = TargetEnvironmentInput.Create(
-                    none,
-                    List(tid).some
-                  ).some,
-                  constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
-                  group = gid.some,
-                  posAngleConstraint = PosAngleConstraintInput(
-                    mode = PosAngleConstraintMode.AverageParallactic.some, none
-                  ).some,
-                  observingMode = obsMode.some,
-                  scienceRequirements =
-                    ScienceRequirementsInput(
-                      mode         = ScienceMode.Spectroscopy.some,
-                      spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                        exposureTimeMode = Nullable.orNull(wvAt).map: w =>
-                          ExposureTimeMode.SignalToNoiseMode(
-                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                            w
-                          )
-                      ).some
-                    ).some
+        Services.asSuperUser:
+          AccessControl.unchecked(
+            ObservationPropertiesInput.Create.Default.copy(
+              scienceBand = band,
+              targetEnvironment = TargetEnvironmentInput.Create(
+                none,
+                List(tid).some
+              ).some,
+              constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
+              group = gid.some,
+              posAngleConstraint = PosAngleConstraintInput(
+                mode = PosAngleConstraintMode.AverageParallactic.some, none
+              ).some,
+              observingMode = obsMode.some,
+              scienceRequirements =
+                ScienceRequirementsInput(
+                  mode         = ScienceMode.Spectroscopy.some,
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
+                    exposureTimeMode = Nullable.orNull(wvAt).map: w =>
+                      ExposureTimeMode.SignalToNoiseMode(
+                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                        w
+                      )
                   ).some
+                ).some
+              ),
+              pid,
+              Codecs.program_id
           )
       ).orError
-
+      
   def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
@@ -193,34 +193,34 @@ trait CalibrationObservations {
 
   private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
       observationService.createObservation(
-        CreateObservationInput(
-          programId = pid.some,
-          proposalReference = none,
-          programReference = none,
-          SET = ObservationPropertiesInput.Create.Default.copy(
-                  targetEnvironment = TargetEnvironmentInput.Create(
-                    none,
-                    List(tid).some
-                  ).some,
-                  constraintSet = roleConstraints(CalibrationRole.Twilight).some,
-                  group = gid.some,
-                  posAngleConstraint = PosAngleConstraintInput(
-                    mode = PosAngleConstraintMode.Fixed.some, Angle.Angle0.some
-                  ).some,
-                  observingMode = obsMode.some,
-                  scienceRequirements =
-                    ScienceRequirementsInput(
-                      mode = ScienceMode.Spectroscopy.some,
-                      spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                        exposureTimeMode = Nullable.NonNull(
-                          ExposureTimeMode.SignalToNoiseMode(
-                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                            cw
-                          )
-                        )
-                    ).some
+        Services.asSuperUser:
+          AccessControl.unchecked(
+            ObservationPropertiesInput.Create.Default.copy(
+              targetEnvironment = TargetEnvironmentInput.Create(
+                none,
+                List(tid).some
+              ).some,
+              constraintSet = roleConstraints(CalibrationRole.Twilight).some,
+              group = gid.some,
+              posAngleConstraint = PosAngleConstraintInput(
+                mode = PosAngleConstraintMode.Fixed.some, Angle.Angle0.some
+              ).some,
+              observingMode = obsMode.some,
+              scienceRequirements =
+                ScienceRequirementsInput(
+                  mode = ScienceMode.Spectroscopy.some,
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
+                    exposureTimeMode = Nullable.NonNull(
+                      ExposureTimeMode.SignalToNoiseMode(
+                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                        cw
+                      )
+                    )
                   ).some
                 ).some
-        )
+              ),
+              pid,
+              Codecs.program_id
+            )
       ).orError
 }
