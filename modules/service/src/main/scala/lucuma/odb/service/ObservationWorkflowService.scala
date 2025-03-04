@@ -598,7 +598,8 @@ object ObservationWorkflowService {
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
         services
           .transactionally:
-            observationService.selectObservations(which)
+            session.prepareR(which.fragment.query(observation_id)).use: pq =>
+              pq.stream(which.argument, chunkSize = 1024).compile.toList
           .flatMap: oids =>
             filterState(oids, states, commitHash, itcClient, ptc)
 
