@@ -51,14 +51,14 @@ trait GcalParsers:
       "none"         -> GcalFilter.None,
       "None"         -> GcalFilter.None,
       "ND1.0"        -> GcalFilter.Nd10,
-      "ND1.6"        -> GcalFilter.Nd16,
+      "ND1.6"        -> GcalFilter.Nd20,  // 1.6 was removed
       "ND2.0"        -> GcalFilter.Nd20,
       "ND3.0"        -> GcalFilter.Nd30,
       "ND4.0"        -> GcalFilter.Nd40,
       "ND4-5"        -> GcalFilter.Nd45,
-      "ND5.0"        -> GcalFilter.Nd50,
+      "ND5.0"        -> GcalFilter.Nd45, // 5.0 was removed
       "GMOS balance" -> GcalFilter.Gmos,
-      "HROS balance" -> GcalFilter.Hros,
+      "HROS balance" -> GcalFilter.Gmos, // Hros was removed
       "NIR balance"  -> GcalFilter.Nir
     ).withContext("Gcal filter")
 

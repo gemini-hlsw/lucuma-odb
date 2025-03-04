@@ -30,10 +30,7 @@ object GmosSpectroscopyRow {
     inst: Instrument,
     g:    G => String,
     l:    L => String,
-    u:    U => String,
-    gObs: G => Boolean,
-    lObs: L => Boolean
-
+    u:    U => String
   ): Parser[List[GmosSpectroscopyRow[G, L, U]]] =
     // NOTE: If any of the Enumerated instances for Grating (Disperser), Filter or Fpu are changed, the
     // file probably needs to be reimported (See `R__Phase0.importForcingVersion`), or the 
@@ -45,8 +42,8 @@ object GmosSpectroscopyRow {
       rs.traverse { r =>
         val gn = for {
           _ <- Either.raiseWhen(r.instrument =!= inst)(s"Cannot parse a ${r.instrument.tag} as ${inst.tag}")
-          g <- Enumerated[G].all.find(a => g(a) === r.disperser && !gObs(a)).toRight(s"Cannot find disperser: ${r.disperser}. Does a non-obsolete value exist in the Enumerated?")
-          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f && !lObs(a)).toRight(s"Cannot find filter: $f. Does a non-obsolete value exist in the Enumerated?") }
+          g <- Enumerated[G].all.find(a => g(a) === r.disperser).toRight(s"Cannot find disperser: ${r.disperser}. Does a value exist in the Enumerated?")
+          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f).toRight(s"Cannot find filter: $f. Does a value exist in the Enumerated?") }
           u <- Enumerated[U].all.find(a => u(a) === r.fpu).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
         } yield GmosSpectroscopyRow(r, g, l, u)
         gn.fold(Parser.failWith, Parser.pure)
@@ -54,9 +51,9 @@ object GmosSpectroscopyRow {
     }
 
   val gmosNorth: Parser[List[GmosNorth]] =
-    gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](Instrument.GmosNorth, _.shortName, _.shortName, _.shortName, _.obsolete, _.obsolete)
+    gmos[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](Instrument.GmosNorth, _.shortName, _.shortName, _.shortName)
 
   val gmosSouth: Parser[List[GmosSouth]] =
-    gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](Instrument.GmosSouth, _.shortName, _.shortName, _.shortName, _.obsolete, _.obsolete)
+    gmos[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu](Instrument.GmosSouth, _.shortName, _.shortName, _.shortName)
 
 }
