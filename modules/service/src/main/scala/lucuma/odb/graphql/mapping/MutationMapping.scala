@@ -48,6 +48,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.data.OdbErrorExtensions.asFailureF
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.DatasetPredicates
@@ -367,9 +368,12 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField("createObservation", CreateObservationInput.Binding): (input, child) =>
       services.useTransactionally:
         selectForUpdate(input).flatMap: r =>
-          r.flatTraverse: checked =>
-            observationService.createObservation(checked).nestMap: oid =>
-              Unique(Filter(Predicates.observation.id.eql(oid), child))
+          r.flatTraverse:
+            case AccessControl.Checked.Empty =>
+              OdbError.NotAuthorized(user.id).asFailureF
+            case other =>
+              observationService.createObservation(other).nestMap: oid =>
+                Unique(Filter(Predicates.observation.id.eql(oid), child))
 
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>

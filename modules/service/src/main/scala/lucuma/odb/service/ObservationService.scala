@@ -90,10 +90,6 @@ sealed trait ObservationService[F[_]] {
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
 
-  def selectObservations(
-    which: AppliedFragment
-  )(using Transaction[F]): F[List[Observation.Id]]
-
   def selectObservingModes(
     which: List[Observation.Id]
   )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
@@ -232,13 +228,14 @@ object ObservationService {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
             Statements
-              .insertObservationAs(user, programId, SET, ix)
+              .insertObservation(programId, SET, ix)
               .flatTraverse { af =>
                 session.prepareR(af.fragment.query(observation_id)).use { pq =>
-                  pq.option(af.argument).map {
-                    case Some(oid) => Result(oid)
-                    case None      => OdbError.NotAuthorized(user.id).asFailure // failed because user doesn't have access to the program
-                  }
+                  pq.unique(af.argument).map(Result.success)
+                  //  {
+                  //   case Some(oid) => Result(oid)
+                  //   case None      => OdbError.NotAuthorized(user.id).asFailure // failed because user doesn't have access to the program
+                  // }
                 }.flatMap { rOid =>
 
                   val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
@@ -324,13 +321,6 @@ object ObservationService {
             .value
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
-
-      override def selectObservations(
-        which: AppliedFragment
-      )(using Transaction[F]): F[List[Observation.Id]] =
-        session.prepareR(which.fragment.query(observation_id)).use { pq =>
-          pq.stream(which.argument, chunkSize = 1024).compile.toList
-        }
 
       override def selectObservingModes(
         which: List[Observation.Id]
@@ -538,7 +528,7 @@ object ObservationService {
 
     }
 
-  object Statements {
+  private object Statements {
 
     extension (m: ExposureTimeMode)
       def tpe: ExposureTimeModeType =
@@ -553,17 +543,13 @@ object ObservationService {
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
 
-    import ProgramUserService.Statements.whereUserWriteAccess
-
-    def insertObservationAs(
-      user:      User,
+    def insertObservation(
       programId: Program.Id,
       SET:       ObservationPropertiesInput.Create,
       groupIndex: NonNegShort,
     ): Result[AppliedFragment] =
       SET.constraintSet.traverse(_.create).map { cs =>
-        insertObservationAs(
-          user,
+        insertObservation(
           programId,
           SET.group,
           groupIndex,
@@ -581,8 +567,7 @@ object ObservationService {
         )
       }
 
-    def insertObservationAs(
-      user:                User,
+    private def insertObservation(
       programId:           Program.Id,
       groupId:             Option[Group.Id],
       groupIndex:          NonNegShort,
@@ -656,7 +641,7 @@ object ObservationService {
         void"RETURNING c_observation_id"
 
       // done!
-      insert |+| whereUserWriteAccess(user, programId) |+| returning
+      insert |+| returning
 
     }
 
