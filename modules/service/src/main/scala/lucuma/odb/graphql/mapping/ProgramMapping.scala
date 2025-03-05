@@ -109,6 +109,18 @@ trait ProgramMapping[F[_]]
           child
         )
 
+    case (ProgramType, "notes", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    )) =>
+      Elab.transformChild: child =>
+        rIncludeDeleted.map: includeDeleted =>
+          OrderBy(
+            OrderSelections(List(
+              OrderSelection[Short](ProgramNoteType / "index")
+            )),
+            Filter(Predicates.programNote.existence.includeDeleted(includeDeleted), child)
+          )
+
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
