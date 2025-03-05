@@ -9323,6 +9323,9 @@ type Program {
   "Program description / abstract."
   description: NonEmptyString
 
+  "Notes associated with the program, if any."
+  notes: [ProgramNote!]!
+
   "Program type"
   type: ProgramType!
 

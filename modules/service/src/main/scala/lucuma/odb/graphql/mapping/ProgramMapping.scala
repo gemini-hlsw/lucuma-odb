@@ -42,6 +42,7 @@ import table.*
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
+     with ProgramNoteTable[F]
      with ProgramUserTable[F]
      with ProposalView[F]
      with ObservationView[F]
@@ -66,6 +67,8 @@ trait ProgramMapping[F[_]]
       SqlField("existence", ProgramTable.Existence),
       SqlField("name", ProgramTable.Name),
       SqlField("description", ProgramTable.Description),
+
+      SqlObject("notes", Join(ProgramTable.Id, ProgramNoteTable.ProgramId)),
 
       SqlField("type", ProgramTable.ProgramType),
       SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
