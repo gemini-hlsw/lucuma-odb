@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProgramNoteTable
+import lucuma.odb.graphql.table.ProgramTable
 
 trait ProgramNoteMapping[F[_]] extends ProgramTable[F] with ProgramNoteTable[F]:
 
