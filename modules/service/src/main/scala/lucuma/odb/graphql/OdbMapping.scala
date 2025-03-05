@@ -187,6 +187,7 @@ object OdbMapping {
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
+          with ProgramNoteMapping[F]
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
@@ -388,6 +389,7 @@ object OdbMapping {
                 PosAngleConstraintMapping,
                 ProgramMapping,
                 ProgramEditMapping,
+                ProgramNoteMapping,
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
