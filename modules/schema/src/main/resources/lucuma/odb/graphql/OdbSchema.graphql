@@ -9356,7 +9356,7 @@ type Program {
   description: NonEmptyString
 
   "Notes associated with the program, if any."
-  notes: [ProgramNote!]!
+  notes(includeDeleted: Boolean! = false): [ProgramNote!]!
 
   "Program type"
   type: ProgramType!
