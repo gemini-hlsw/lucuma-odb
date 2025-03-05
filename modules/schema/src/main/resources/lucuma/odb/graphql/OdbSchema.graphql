@@ -3597,6 +3597,38 @@ input ProgramPropertiesInput {
 }
 
 """
+ProgramNote creation and edit properties.
+"""
+input ProgramNotePropertiesInput {
+
+  "The note title.  Required on creation."
+  title: NonEmptyString
+
+  "The note text, if any."
+  text: NonEmptyString
+
+  """
+  Whether the note is only available to Gemini staff.  This property is
+  available only to Gemini staff and defaults to false.
+  """
+  isPrivate: Boolean
+
+  """
+  To place a program note at a particular index in the sequence of notes,
+  specify the note id before which this note should be added or moved.  If
+  not specified on creation, the note is added at the end.  If not specified
+  on edit, the note is not moved.  If set to `null` the note is moved or added
+  at the end.
+  """
+  before: ProgramNoteId
+
+  "Whether the program is considered deleted (defaults to PRESENT)."
+  existence: Existence
+
+}
+
+
+"""
 Editable properties that define a program / user connection.
 """
 input ProgramUserPropertiesInput {
@@ -9472,7 +9504,11 @@ type ProgramNote {
   text: NonEmptyString
 
   "Whether the note is only available to Gemini staff."
-  isPrivate: Boolean
+  isPrivate: Boolean!
+
+  "DELETED or PRESENT"
+  existence: Existence!
+
 }
 
 "ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`

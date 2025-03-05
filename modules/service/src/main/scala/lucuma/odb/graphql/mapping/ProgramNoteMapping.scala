@@ -15,5 +15,6 @@ trait ProgramNoteMapping[F[_]] extends ProgramTable[F] with ProgramNoteTable[F]:
       SqlObject("program", Join(ProgramNoteTable.ProgramId, ProgramTable.Id)),
       SqlField("title", ProgramNoteTable.Title),
       SqlField("text", ProgramNoteTable.Text),
-      SqlField("isPrivate", ProgramNoteTable.Private)
+      SqlField("isPrivate", ProgramNoteTable.Private),
+      SqlField("existence", ProgramNoteTable.Existence)
     )
