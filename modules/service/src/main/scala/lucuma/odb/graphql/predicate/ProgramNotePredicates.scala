@@ -4,7 +4,9 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
+import lucuma.core.model.ProgramNote
 
 class ProgramNotePredicates(path: Path):
 
   lazy val existence = ExistencePredicates(path / "existence")
+  lazy val id        = LeafPredicates[ProgramNote.Id](path / "id")

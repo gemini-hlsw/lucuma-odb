@@ -138,6 +138,7 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
+          with CreateProgramNoteResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -342,6 +343,7 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
+                CreateProgramNoteResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,

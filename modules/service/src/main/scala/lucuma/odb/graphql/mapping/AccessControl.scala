@@ -17,13 +17,17 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.CreateObservationInput
+import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
+import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
@@ -376,23 +380,26 @@ trait AccessControl[F[_]] extends Predicates[F] {
             case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
             case _ => Result.internalError("Unpossible: got more than one oid back")
 
+  // Resolve to a Program.Id if the corresponding program is writable by the user.
+  def resolvePidWritable(
+    pid:  Option[Program.Id],
+    prop: Option[ProposalReference],
+    prog: Option[ProgramReference]
+  )(using Services[F]): F[Result[Option[Program.Id]]] =
+    programService
+      .resolvePid(pid, prop, prog)
+      .flatMap: r =>
+        r.flatTraverse: pid =>
+          selectForProgramUpdateImpl(None, List(pid))
+            .map: r =>
+              r.flatMap:
+                case List(pid) => Result(Some(pid))
+                case Nil       => Result(None)
+                case _         => Result.internalError("Unpossible: resovePidWritable returned multiple ids")
 
   def selectForUpdate(
     input: CreateObservationInput,
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]]] = {
-
-    val ensureWritable: F[Result[Option[Program.Id]]] =
-      programService
-        .resolvePid(input.programId, input.proposalReference, input.programReference)
-        .flatMap: r =>
-          r.flatTraverse: pid =>
-            selectForProgramUpdateImpl(None, List(pid))
-              .map: r =>
-                r.flatMap:
-                  case List(pid) => Result(Some(pid))
-                  case Nil       => Result(None)
-                  case _         => Result.internalError("Unpossible: selectForProgramUpdateImpl returned multiple ids")
-
 
     // Compute our ObservationPropertiesInput.Create and set/verify the science band
     def props(pid: Program.Id): F[Result[ObservationPropertiesInput.Create]] =
@@ -409,7 +416,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           allocationService.validateBand(band, List(pid)).map(_.as(props))
 
     // Put it together
-    ResultT(ensureWritable)
+    ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
       .flatMap:
         case None => ResultT.pure(AccessControl.Checked.Empty)
         case Some(pid) =>
@@ -420,5 +427,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
   } 
+
+  def selectForUpdate(
+    input: CreateProgramNoteInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[ProgramNotePropertiesInput.Create, Program.Id]]] =
+    (
+      if input.SET.isPrivate && user.role.access < Access.Staff then
+        ResultT.pure(AccessControl.Checked.Empty)
+      else
+        ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
+          .flatMap:
+            case None      => ResultT.pure(AccessControl.Checked.Empty)
+            case Some(pid) =>
+              Services.asSuperUser:
+                ResultT.pure(AccessControl.unchecked(input.SET, pid, program_id))
+    ).value
 
 }

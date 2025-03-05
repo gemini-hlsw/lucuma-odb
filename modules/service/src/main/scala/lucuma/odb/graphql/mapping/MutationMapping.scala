@@ -89,6 +89,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       CreateGroup,
       CreateObservation,
       CreateProgram,
+      CreateProgramNote,
       CreateProposal,
       CreateTarget,
       CreateUserInvitation,
@@ -382,6 +383,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
+
+  private lazy val CreateProgramNote =
+    MutationField("createProgramNote", CreateProgramNoteInput.Binding): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse:
+            case AccessControl.Checked.Empty =>
+              OdbError.NotAuthorized(user.id).asFailureF
+            case other =>
+              programNoteService.createNote(other).nestMap: nid =>
+                Unique(Filter(Predicates.programNote.id.eql(nid), child))
 
   private lazy val CreateProposal =
     MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>
