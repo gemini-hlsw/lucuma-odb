@@ -1,6 +1,6 @@
 CREATE DOMAIN d_program_note_id AS varchar
   CHECK (VALUE ~ '^n-[1-9a-f][0-9a-f]*$');
-COMMENT ON DOMAIN d_program_note_id IS 'GID type for program notes.'
+COMMENT ON DOMAIN d_program_note_id IS 'GID type for program notes.';
 
 CREATE SEQUENCE s_program_note_id START WITH 256;
 

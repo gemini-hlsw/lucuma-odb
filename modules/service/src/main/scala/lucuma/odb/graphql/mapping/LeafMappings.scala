@@ -37,6 +37,7 @@ import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
@@ -159,6 +160,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
+      LeafMapping[ProgramNote.Id](ProgramNoteIdType),
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUser.Id](ProgramUserIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),

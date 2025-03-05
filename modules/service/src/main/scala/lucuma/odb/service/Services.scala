@@ -144,6 +144,9 @@ trait Services[F[_]]:
   /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
 
+  /** The `ProgramNoteService`. */
+  def programNoteService: ProgramNoteService[F]
+
   /** The `ProgramService`. */
   def programService: ProgramService[F]
 
@@ -269,6 +272,7 @@ object Services:
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
+      lazy val programNoteService = ProgramNoteService.instantiate
       lazy val programService = ProgramService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
       lazy val proposalService = ProposalService.instantiate
@@ -320,6 +324,7 @@ object Services:
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
+    def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
     def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService

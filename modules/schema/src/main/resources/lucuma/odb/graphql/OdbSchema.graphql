@@ -911,6 +911,18 @@ input CreateProgramInput {
   SET: ProgramPropertiesInput
 }
 
+input CreateProgramNoteInput {
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
+  SET: ProgramNotePropertiesInput!
+}
+
+type CreateProgramNoteResult {
+  "The newly create program note."
+  programNote: ProgramNote!
+}
+
 """
 The result of creating a new program.
 """
@@ -2925,6 +2937,13 @@ type Mutation {
     """
     input: CreateProgramInput!
   ): CreateProgramResult!
+
+  """
+  Creates a new program note according to provided parameters
+  """
+  createProgramNote(
+    input: CreateProgramNoteInput!
+  ): CreateProgramNoteResult!
 
   """
   Creates a new proposal according to the provided properties
@@ -9511,7 +9530,7 @@ type ProgramNote {
 
 }
 
-"ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`
+"ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`"
 scalar ProgramNoteId
 
 """
