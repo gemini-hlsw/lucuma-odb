@@ -6,7 +6,6 @@ package input
 
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.model.ProgramNote
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -18,7 +17,6 @@ object ProgramNotePropertiesInput:
     title:     NonEmptyString,
     text:      Option[NonEmptyString],
     isPrivate: Boolean,
-    before:    Option[ProgramNote.Id],
     existence: Existence
   )
 
@@ -30,15 +28,13 @@ object ProgramNotePropertiesInput:
           NonEmptyStringBinding("title", rTitle),
           NonEmptyStringBinding.Option("text", rText),
           BooleanBinding.Option("isPrivate", rIsPrivate),
-          ProgramNoteIdBinding.Option("before", rBefore),
           ExistenceBinding.Option("existence", rExistence)
         ) =>
-          (rTitle, rText, rIsPrivate, rBefore, rExistence).parMapN: (title, text, isPrivate, before, existence) =>
+          (rTitle, rText, rIsPrivate, rExistence).parMapN: (title, text, isPrivate, existence) =>
             Create(
               title,
               text,
               isPrivate.getOrElse(false),
-              before,
               existence.getOrElse(Existence.Present)
             )
 
@@ -46,7 +42,6 @@ object ProgramNotePropertiesInput:
     title:     Option[NonEmptyString],
     text:      Nullable[NonEmptyString],
     isPrivate: Option[Boolean],
-    before:    Nullable[ProgramNote.Id],
     existence: Option[Existence]
   )
 
@@ -58,7 +53,6 @@ object ProgramNotePropertiesInput:
           NonEmptyStringBinding.Option("title", rTitle),
           NonEmptyStringBinding.Nullable("text", rText),
           BooleanBinding.Option("isPrivate", rIsPrivate),
-          ProgramNoteIdBinding.Nullable("before", rBefore),
           ExistenceBinding.Option("existence", rExistence)
         ) =>
-          (rTitle, rText, rIsPrivate, rBefore, rExistence).parMapN(Edit.apply)
+          (rTitle, rText, rIsPrivate, rExistence).parMapN(Edit.apply)

@@ -9,13 +9,11 @@ CREATE TABLE t_program_note (
   c_program_note_id d_program_note_id PRIMARY KEY DEFAULT 'n-' || to_hex(nextval('s_program_note_id')),
   c_program_id      d_program_id      NOT NULL REFERENCES t_program(c_program_id) ON DELETE CASCADE,
   c_existence       e_existence       NOT NULL DEFAULT 'present',
-  c_index           smallint          NOT NULL,
 
   c_title           text              NOT NULL CHECK (length(c_title) > 0),
   c_text            text              CHECK (c_text IS NULL OR length(c_text) > 0),
-  c_private         boolean           NOT NULL DEFAULT false,
+  c_private         boolean           NOT NULL DEFAULT false
 
-  UNIQUE (c_program_id, c_index)
 );
 
 -- Trigger function, same as ch_program_edit but maybe it's better for each

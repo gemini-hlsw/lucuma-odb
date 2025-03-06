@@ -50,7 +50,6 @@ object ProgramNoteService:
         INSERT INTO t_program_note (
           c_program_id,
           c_existence,
-          c_index,
           c_title,
           c_text,
           c_private
@@ -58,7 +57,6 @@ object ProgramNoteService:
         VALUES (
           $program_id,
           $existence,
-          COALESCE((SELECT MAX(c_index) FROM t_program_note WHERE c_program_id = $program_id), 0) + 1,
           $text_nonempty,
           ${text_nonempty.opt},
           $bool
@@ -68,7 +66,6 @@ object ProgramNoteService:
         (
           pid,
           input.existence,
-          pid,
           input.title,
           input.text,
           input.isPrivate

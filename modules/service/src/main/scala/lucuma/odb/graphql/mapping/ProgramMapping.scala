@@ -23,6 +23,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
@@ -116,7 +117,7 @@ trait ProgramMapping[F[_]]
         rIncludeDeleted.map: includeDeleted =>
           OrderBy(
             OrderSelections(List(
-              OrderSelection[Short](ProgramNoteType / "index")
+              OrderSelection[ProgramNote.Id](ProgramNoteType / "id")
             )),
             Filter(
               Predicate.And(
