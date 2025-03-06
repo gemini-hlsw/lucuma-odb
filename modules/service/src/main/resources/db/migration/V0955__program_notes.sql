@@ -17,3 +17,22 @@ CREATE TABLE t_program_note (
 
   UNIQUE (c_program_id, c_index)
 );
+
+-- Trigger function, same as ch_program_edit but maybe it's better for each
+-- trigger to have its own function?
+CREATE OR REPLACE FUNCTION ch_program_edit_note()
+  RETURNS trigger AS $$
+DECLARE
+BEGIN
+  IF ROW(NEW.*) IS DISTINCT FROM ROW(OLD.*) THEN
+    PERFORM pg_notify('ch_program_edit',  NEW.c_program_id || ',' || TG_OP);
+  END IF;
+  RETURN NEW; -- n.b. doesn't matter, it's an AFTER trigger
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_program_edit_note_trigger
+  AFTER INSERT OR UPDATE ON t_program_note
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE ch_program_edit_note();
