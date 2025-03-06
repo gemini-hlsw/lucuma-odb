@@ -42,6 +42,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.syntax.stringcontext.*
+import lucuma.odb.graphql.input.CloneObservationInput
 
 object AccessControl:
 
@@ -163,6 +164,46 @@ trait AccessControl[F[_]] extends Predicates[F] {
             itcClient,
             timeEstimateCalculator
           )
+
+  }
+
+  /**
+   * Select and return the ids of observations that are clonable by the current user and meet
+   * all the specified filters.
+   */
+  private def selectForObservationCloneImpl(
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean,
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =  {
+
+    def observationIdWhereClause(
+      includeDeleted:      Option[Boolean],
+      WHERE:               Option[Predicate],
+      includeCalibrations: Boolean
+    ): Result[AppliedFragment] = {
+      val whereObservation: Predicate =
+        and(List(
+          Predicates.observation.program.isWritableBy(user),
+          Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
+          if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
+          WHERE.getOrElse(True)
+        ))
+      MappedQuery(
+        Filter(whereObservation, Select("id", None, Query.Empty)),
+        Context(QueryType, List("observations"), List("observations"), List(ObservationType))
+      ).flatMap(_.fragment)
+    }
+
+    observationIdWhereClause(includeDeleted, WHERE, includeCalibrations)
+      .flatTraverse: af =>
+        session
+          .prepareR(af.fragment.query(observation_id))
+          .use: pq =>
+            pq.stream(af.argument, 1024)
+              .compile
+              .toList
+              .map(Result.success)
 
   }
 
@@ -420,5 +461,32 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
   } 
+
+  def selectForClone(
+    input: CloneObservationInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] = {
+
+    val ensureWritable: F[Result[Option[Observation.Id]]] =
+      observationService
+        .resolveOid(input.observationId, input.observationRef)
+        .flatMap: r =>
+          r.flatTraverse: oid =>
+            selectForObservationCloneImpl(
+              includeDeleted = None,
+              WHERE = Some(Predicates.observation.id.eql(oid)),
+              includeCalibrations = false
+            ).map: res =>
+              res.flatMap:
+                case List(oid) => Result(Some(oid))
+                case Nil       => Result(None)
+                case _         => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids")
+
+    ensureWritable.nestMap:
+      case None      => AccessControl.Checked.Empty
+      case Some(oid) =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, oid, observation_id)
+
+  }
 
 }
