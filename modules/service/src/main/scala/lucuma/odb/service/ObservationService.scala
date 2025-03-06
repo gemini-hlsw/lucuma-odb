@@ -454,7 +454,7 @@ object ObservationService {
         val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
         session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.unique(observationId)).flatMap {
 
-          case (pid, observingMode, gid, gix, None) =>
+          case (pid, observingMode, gid, gix) =>
 
             // Desired group index is gix + 1
             val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
