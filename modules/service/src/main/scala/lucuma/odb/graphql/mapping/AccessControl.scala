@@ -54,6 +54,9 @@ object AccessControl:
    */
   sealed trait Checked[+A]:
     
+    def isEmpty: Boolean =
+      fold(true)((_, _) => false)
+
     def fold[B](ifEmpty: => B)(ifNonEmpty: (A, AppliedFragment) => B): B =
       this match
         case Checked.Empty => ifEmpty
