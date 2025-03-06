@@ -3632,15 +3632,6 @@ input ProgramNotePropertiesInput {
   """
   isPrivate: Boolean
 
-  """
-  To place a program note at a particular index in the sequence of notes,
-  specify the note id before which this note should be added or moved.  If
-  not specified on creation, the note is added at the end.  If not specified
-  on edit, the note is not moved.  If set to `null` the note is moved or added
-  at the end.
-  """
-  before: ProgramNoteId
-
   "Whether the program is considered deleted (defaults to PRESENT)."
   existence: Existence
 
