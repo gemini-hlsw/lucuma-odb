@@ -32,7 +32,7 @@ class createProgramNote extends OdbSuite:
       s"""title: "$title"""".some,
       text.map(t => s"""text: "$t""""),
       isPrivate.map(b => s"isPrivate: $b"),
-      existence.map(e => s"""existence: "${e.tag.toUpperCase}" """)
+      existence.map(e => s"""existence: ${e.tag.toUpperCase}""")
     ).flatten.mkString("{\n", "\n", "}\n")
 
     expect(
@@ -68,13 +68,13 @@ class createProgramNote extends OdbSuite:
       """.asRight
     )
 
-  def listNotesAs(user: User, pid: Program.Id): IO[List[String]] =
+  def listNotesAs(user: User, pid: Program.Id, includeDeleted: Option[Boolean] = none): IO[List[String]] =
     query(
       user  = user,
       query = s"""
         query {
           program(programId: "$pid") {
-            notes { title }
+            notes${includeDeleted.fold("")(b => s"(includeDeleted: $b)")} { title }
           }
         }
       """
@@ -175,3 +175,13 @@ class createProgramNote extends OdbSuite:
     createProgramAs(pi).flatMap: pid =>
       createNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
       assertIO(listNotesAs(pi, pid), Nil)
+
+  test("deleted notes are not listed by default"):
+    createProgramAs(pi).flatMap: pid =>
+      createNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
+      assertIO(listNotesAs(pi, pid), Nil)
+
+  test("deleted notes are listed when requested"):
+    createProgramAs(pi).flatMap: pid =>
+      createNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
+      assertIO(listNotesAs(pi, pid, includeDeleted = true.some), List("Foo"))
