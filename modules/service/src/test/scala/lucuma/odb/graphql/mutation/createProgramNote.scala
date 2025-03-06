@@ -68,69 +68,31 @@ class createProgramNote extends OdbSuite:
       """.asRight
     )
 
+  def listNotesAs(user: User, pid: Program.Id): IO[List[String]] =
+    query(
+      user  = user,
+      query = s"""
+        query {
+          program(programId: "$pid") {
+            notes { title }
+          }
+        }
+      """
+    ).map: json =>
+      json.hcursor.downFields("program", "notes").values.toList.flatMap(_.toList).map: json =>
+        json.hcursor.downField("title").require[String]
+
+
   test("one note"):
     createProgramAs(pi).flatMap: pid =>
       createNoteAs(pi, pid, "Foo", "Bar".some) *>
-      expect(
-        user  = pi,
-        query = s"""
-          query {
-            program(programId: "$pid") {
-              notes {
-                title
-                text
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "program": {
-              "notes": [
-                {
-                  "title": "Foo",
-                  "text": "Bar"
-                }
-              ]
-            }
-          }
-        """.asRight
-      )
+      assertIO(listNotesAs(pi, pid), List("Foo"))
 
   test("two notes"):
     createProgramAs(pi).flatMap: pid =>
       createNoteAs(pi, pid, "Foo", "Bar".some) *>
       createNoteAs(pi, pid, "Baz", "Buz".some) *>
-      expect(
-        user  = pi,
-        query = s"""
-          query {
-            program(programId: "$pid") {
-              notes {
-                title
-                text
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "program": {
-              "notes": [
-                {
-                  "title": "Foo",
-                  "text": "Bar"
-                },
-                {
-                  "title": "Baz",
-                  "text": "Buz"
-                }
-              ]
-            }
-          }
-        """.asRight
-      )
-
+      assertIO(listNotesAs(pi, pid), List("Foo", "Baz"))
 
   test("missing title is disallowed"):
     createProgramAs(pi).flatMap: pid =>
@@ -204,37 +166,12 @@ class createProgramNote extends OdbSuite:
         ).asLeft
       )
 
-  test("staff can create a private note"):
+  test("staff can create and see a private note"):
     createProgramAs(pi).flatMap: pid =>
-      expect(
-        user  = staff,
-        query = s"""
-          mutation {
-            createProgramNote(
-              input: {
-                programId: "$pid"
-                SET: {
-                  title: "Foo"
-                  text: "Bar"
-                  isPrivate: true
-                }
-              }
-            ) {
-              programNote {
-                title
-                isPrivate
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "createProgramNote": {
-              "programNote": {
-                "title": "Foo",
-                "isPrivate": ${true.asJson}
-              }
-            }
-          }
-        """.asRight
-      )
+      createNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
+      assertIO(listNotesAs(staff, pid), List("Foo"))
+
+  test("pi cannot see a private note"):
+    createProgramAs(pi).flatMap: pid =>
+      createNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
+      assertIO(listNotesAs(pi, pid), Nil)

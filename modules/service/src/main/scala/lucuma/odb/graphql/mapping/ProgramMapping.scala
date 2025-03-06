@@ -118,7 +118,13 @@ trait ProgramMapping[F[_]]
             OrderSelections(List(
               OrderSelection[Short](ProgramNoteType / "index")
             )),
-            Filter(Predicates.programNote.existence.includeDeleted(includeDeleted), child)
+            Filter(
+              Predicate.And(
+                Predicates.programNote.existence.includeDeleted(includeDeleted),
+                Predicates.programNote.isVisibleTo(user)
+              ),
+              child
+            )
           )
 
     case (ProgramType, "observations", List(
