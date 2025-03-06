@@ -138,6 +138,7 @@ object OdbMapping {
           with CreateCallForProposalsResultMapping[F]
           with CreateGroupResultMapping[F]
           with CreateObservationResultMapping[F]
+          with CreateProgramNoteResultMapping[F]
           with CreateProgramResultMapping[F]
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
@@ -187,6 +188,7 @@ object OdbMapping {
           with PosAngleConstraintMapping[F]
           with ProgramEditMapping[F]
           with ProgramMapping[F]
+          with ProgramNoteMapping[F]
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
@@ -341,6 +343,7 @@ object OdbMapping {
                 CreateCallForProposalsResultMapping,
                 CreateGroupResultMapping,
                 CreateObservationResultMapping,
+                CreateProgramNoteResultMapping,
                 CreateProgramResultMapping,
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,
@@ -388,6 +391,7 @@ object OdbMapping {
                 PosAngleConstraintMapping,
                 ProgramMapping,
                 ProgramEditMapping,
+                ProgramNoteMapping,
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
