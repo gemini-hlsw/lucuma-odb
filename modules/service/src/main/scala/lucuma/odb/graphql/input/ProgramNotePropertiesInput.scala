@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.option.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.model.ProgramNote
@@ -24,9 +23,6 @@ object ProgramNotePropertiesInput:
   )
 
   object Create:
-
-    def default(title: NonEmptyString): Create =
-      Create(title, text = none, isPrivate = false, before = none, existence = Existence.Present)
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
