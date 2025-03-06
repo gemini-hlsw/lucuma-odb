@@ -8,6 +8,8 @@ package mapping
 import cats.Order.catsKernelOrderingForOrder
 import cats.effect.Resource
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Context
 import grackle.Env
 import grackle.Path
@@ -24,6 +26,7 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model
 import lucuma.core.model.Access
@@ -739,7 +742,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       )) =>
         Elab.transformChild { child =>
           rWHERE.map { where =>
-            Filter(where.getOrElse(True), child)
+            OrderBy(
+              OrderSelections(List(
+                OrderSelection[Instrument](SpectroscopyConfigOptionType / "instrument"),
+                OrderSelection[NonEmptyString](SpectroscopyConfigOptionType / "name")
+              )),
+              Filter(where.getOrElse(True), child)
+            )
           }
         }
     }

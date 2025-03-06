@@ -31,6 +31,7 @@ import lucuma.core.math.LineWidthValue
 import lucuma.core.math.Wavelength
 import lucuma.core.math.dimensional.*
 import lucuma.core.math.units.KilometersPerSecond
+import lucuma.core.model.Attachment
 import lucuma.core.model.EmissionLine
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -47,6 +48,7 @@ import lucuma.core.model.UnnormalizedSED.PowerLaw
 import lucuma.core.model.UnnormalizedSED.Quasar
 import lucuma.core.model.UnnormalizedSED.StellarLibrary
 import lucuma.core.model.UnnormalizedSED.UserDefined
+import lucuma.core.model.UnnormalizedSED.UserDefinedAttachment
 import lucuma.core.util.*
 import lucuma.core.util.Enumerated
 
@@ -165,21 +167,22 @@ trait SourceProfileCodec {
       def decode[A: Enumerated](n: String)(f: A => UnnormalizedSED): Decoder.Result[UnnormalizedSED] =
         c.downField(n).as[A].map(f)
 
-      decode("stellarLibrary")(StellarLibrary(_))                                            orElse
-        decode("coolStar")(CoolStarModel(_))                                                 orElse
-        decode("galaxy")(Galaxy(_))                                                          orElse
-        decode("planet")(Planet(_))                                                          orElse
-        decode("quasar")(Quasar(_))                                                          orElse
-        decode("hiiRegion")(HIIRegion(_))                                                    orElse
-        decode("planetaryNebula")(PlanetaryNebula(_))                                        orElse
-        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                              orElse
-        c.downField("blackBodyTempK").as[PosInt].map { k => BlackBody(Quantity[Kelvin](k)) } orElse
+      decode("stellarLibrary")(StellarLibrary(_))                                              orElse
+        decode("coolStar")(CoolStarModel(_))                                                   orElse
+        decode("galaxy")(Galaxy(_))                                                            orElse
+        decode("planet")(Planet(_))                                                            orElse
+        decode("quasar")(Quasar(_))                                                            orElse
+        decode("hiiRegion")(HIIRegion(_))                                                      orElse
+        decode("planetaryNebula")(PlanetaryNebula(_))                                          orElse
+        c.downField("powerLaw").as[BigDecimal].map(PowerLaw(_))                                orElse
+        c.downField("blackBodyTempK").as[PosInt].map { k => BlackBody(Quantity[Kelvin](k)) }   orElse
         c.downField("fluxDensities")
          .values
          .toRight(DecodingFailure("fluxDensities should hold an array of values", c.history))
          .flatMap(_.toList.traverse(json => DecoderFluxDensityEntry(json.hcursor)).map(SortedMap.from))
          .flatMap(m => NonEmptyMap.fromMap(m).toRight(DecodingFailure("At least one flux density entry is required for a user defined SED", c.history)))
-         .map(UserDefined(_))                                                                orElse
+         .map(UserDefined(_))                                                                  orElse
+        c.downField("fluxDensitiesAttachment").as[Attachment.Id].map(UserDefinedAttachment(_)) orElse
         DecodingFailure(s"Could not decode SED: ${c.focus.map(_.spaces2)}", c.history).asLeft[UnnormalizedSED]
     }
 
@@ -197,17 +200,19 @@ trait SourceProfileCodec {
         "powerLaw"       -> Json.Null, // one of these will be replaced
         "blackBodyTempK" -> Json.Null, // one of these will be replaced
         "fluxDensities"  -> Json.Null, // one of these will be replaced
+        "fluxDensitiesAttachment"  -> Json.Null, // one of these will be replaced
         a match {
-          case StellarLibrary(librarySpectrum)          => "stellarLibrary" -> librarySpectrum.asJson
-          case CoolStarModel(temperature)               => "coolStar"       -> temperature.asJson // todo: tag
-          case Galaxy(galaxySpectrum)                   => "galaxy"         -> galaxySpectrum.asJson
-          case Planet(planetSpectrum)                   => "planet"         -> planetSpectrum.asJson
-          case Quasar(quasarSpectrum)                   => "quasar"         -> quasarSpectrum.asJson
-          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"      -> hiiRegionSpectrum.asJson
-          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"-> planetaryNebulaSpectrum.asJson
-          case PowerLaw(index)                          => "powerLaw"       -> index.asJson
-          case BlackBody(temperature)                   => "blackBodyTempK" -> temperature.value.value.asJson
-          case UserDefined(fluxDensities)               => "fluxDensities"  -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+          case StellarLibrary(librarySpectrum)          => "stellarLibrary"          -> librarySpectrum.asJson
+          case CoolStarModel(temperature)               => "coolStar"                -> temperature.asJson // todo: tag
+          case Galaxy(galaxySpectrum)                   => "galaxy"                  -> galaxySpectrum.asJson
+          case Planet(planetSpectrum)                   => "planet"                  -> planetSpectrum.asJson
+          case Quasar(quasarSpectrum)                   => "quasar"                  -> quasarSpectrum.asJson
+          case HIIRegion(hiiRegionSpectrum)             => "hiiRegion"               -> hiiRegionSpectrum.asJson
+          case PlanetaryNebula(planetaryNebulaSpectrum) => "planetaryNebula"         -> planetaryNebulaSpectrum.asJson
+          case PowerLaw(index)                          => "powerLaw"                -> index.asJson
+          case BlackBody(temperature)                   => "blackBodyTempK"          -> temperature.value.value.asJson
+          case UserDefined(fluxDensities)               => "fluxDensities"           -> fluxDensities.toSortedMap.toList.map(EncoderFluxDensityEntry.apply).asJson
+          case UserDefinedAttachment(attachmentId)      => "fluxDensitiesAttachment" -> attachmentId.asJson
         }
       )
     }

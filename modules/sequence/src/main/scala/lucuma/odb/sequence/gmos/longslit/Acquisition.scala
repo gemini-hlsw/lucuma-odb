@@ -18,6 +18,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
@@ -130,6 +131,7 @@ object Acquisition:
 
           _  <- optics.exposure      := lastExpTime(exposureTime)
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
+                  .map(ProtoStep.breakpoint.replace(Breakpoint.Enabled))
 
         } yield Acquisition.Steps(s0, s1, s2)
       }
