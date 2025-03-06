@@ -38,32 +38,36 @@ object UnnormalizedSedInput {
         BigDecimalBinding.Option("powerLaw", rPowerLaw),
         IntBinding.Option("blackBodyTempK", rBlackBodyTempK),
         FluxDensityInput.Binding.List.Option("fluxDensities", rFluxDensities),
+        AttachmentIdBinding.Option("fluxDensitiesAttachment", rFluxDensitiesAttachment)
       ) =>
-        (rStellarLibrary, rCoolStar, rGalaxy, rPlanet, rQuasar, rHiiRegion, rPlanetaryNebula, rPowerLaw, rBlackBodyTempK, rFluxDensities).parTupled.flatMap {
+        (rStellarLibrary, rCoolStar, rGalaxy, rPlanet, rQuasar, rHiiRegion, rPlanetaryNebula, rPowerLaw, rBlackBodyTempK, rFluxDensities, rFluxDensitiesAttachment).parTupled.flatMap {
 
-          case (Some(v), None, None, None, None, None, None, None, None, None) => Result(UnnormalizedSED.StellarLibrary(v))
-          case (None, Some(v), None, None, None, None, None, None, None, None) => Result(UnnormalizedSED.CoolStarModel(v))
-          case (None, None, Some(v), None, None, None, None, None, None, None) => Result(UnnormalizedSED.Galaxy(v))
-          case (None, None, None, Some(v), None, None, None, None, None, None) => Result(UnnormalizedSED.Planet(v))
-          case (None, None, None, None, Some(v), None, None, None, None, None) => Result(UnnormalizedSED.Quasar(v))
-          case (None, None, None, None, None, Some(v), None, None, None, None) => Result(UnnormalizedSED.HIIRegion(v))
-          case (None, None, None, None, None, None, Some(v), None, None, None) => Result(UnnormalizedSED.PlanetaryNebula(v))
-          case (None, None, None, None, None, None, None, Some(v), None, None) => Result(UnnormalizedSED.PowerLaw(v))
+          case (Some(v), None, None, None, None, None, None, None, None, None, None) => Result(UnnormalizedSED.StellarLibrary(v))
+          case (None, Some(v), None, None, None, None, None, None, None, None, None) => Result(UnnormalizedSED.CoolStarModel(v))
+          case (None, None, Some(v), None, None, None, None, None, None, None, None) => Result(UnnormalizedSED.Galaxy(v))
+          case (None, None, None, Some(v), None, None, None, None, None, None, None) => Result(UnnormalizedSED.Planet(v))
+          case (None, None, None, None, Some(v), None, None, None, None, None, None) => Result(UnnormalizedSED.Quasar(v))
+          case (None, None, None, None, None, Some(v), None, None, None, None, None) => Result(UnnormalizedSED.HIIRegion(v))
+          case (None, None, None, None, None, None, Some(v), None, None, None, None) => Result(UnnormalizedSED.PlanetaryNebula(v))
+          case (None, None, None, None, None, None, None, Some(v), None, None, None) => Result(UnnormalizedSED.PowerLaw(v))
 
-          case (None, None, None, None, None, None, None, None, Some(v), None) =>
+          case (None, None, None, None, None, None, None, None, Some(v), None, None) =>
             numeric.PosInt.from(v) match {
               case Left(err)  => Matcher.validationFailure(err)
               case Right(pbd) => Result(UnnormalizedSED.BlackBody(Quantity(pbd)))
             }
 
-          case (None, None, None, None, None, None, None, None, None, Some(v)) =>
+          case (None, None, None, None, None, None, None, None, None, Some(v), None) =>
             v match {
               case Nil => Matcher.validationFailure("fluxDensities cannot be empty")
               case h :: t => Result(UnnormalizedSED.UserDefined(NonEmptyMap.of(h, t*)))
             }
 
+          case (None, None, None, None, None, None, None, None, None, None, Some(v)) =>
+            Result(UnnormalizedSED.UserDefinedAttachment(v))
+
           case _ =>
-            Matcher.validationFailure("Exactly one of stellarLibrary, coolStar, galaxy, planet, quasar, hiiRegion, planetaryNebula, powerLaw, blackBodyTempK, fluxDensities must be specified.")
+            Matcher.validationFailure("Exactly one of stellarLibrary, coolStar, galaxy, planet, quasar, hiiRegion, planetaryNebula, powerLaw, blackBodyTempK, fluxDensities, fluxDensitiesAttachment must be specified.")
 
         }
     }

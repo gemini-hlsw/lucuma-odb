@@ -14,6 +14,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.model.Observation
+import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.syntax.instrument.*
 
@@ -28,7 +29,7 @@ object WhereObservation {
       val instrumentPath = path / "instrument"
 
       def instrumentsForSite(site: Site): List[Instrument] =
-        Instrument.all.filter(_.site.contains(site))
+        Enumerated[Instrument].all.filter(_.site.contains(site))
 
       def instrumentsForSites(sites: List[Site]): List[Instrument] =
         sites.flatMap(instrumentsForSite).distinct
