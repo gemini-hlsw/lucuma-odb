@@ -54,7 +54,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
-import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -103,7 +102,7 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
-    input: CloneObservationInput
+    input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
   def deleteCalibrationObservations(
@@ -452,15 +451,10 @@ object ObservationService {
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
-        val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index, c_calibration_role from t_observation where c_observation_id = $observation_id"
-        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg *: calibration_role.opt)).use(_.option(observationId)).flatMap {
+        val selPid = sql"select c_program_id, c_observing_mode_type, c_group_id, c_group_index from t_observation where c_observation_id = $observation_id"
+        session.prepareR(selPid.query(program_id *: observing_mode_type.opt *: group_id.opt *: int2_nonneg)).use(_.unique(observationId)).flatMap {
 
-          case None => Result.failure(s"No such observation: $observationId").pure[F]
-
-          case Some((_, _, _, _, Some(_))) =>
-            Result.failure(s"Cannot clone calibration observations: $observationId").pure[F]
-
-          case Some((pid, observingMode, gid, gix, None)) =>
+          case (pid, observingMode, gid, gix) =>
 
             // Desired group index is gix + 1
             val destGroupIndex = NonNegShort.unsafeFrom((gix.value + 1).toShort)
@@ -514,13 +508,14 @@ object ObservationService {
       }
 
       def cloneObservation(
-        input: CloneObservationInput
-      )(using Transaction[F]): F[Result[CloneIds]] =
-        (for
-          origOid       <- ResultT(resolveOid(input.observationId, input.observationRef))
-          (pid, newOid) <- ResultT(cloneObservationImpl(origOid, input.SET))
-          _             <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), input.asterism))
-        yield CloneIds(origOid, newOid)).value
+        input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+      )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
+          cloneObservationImpl(origOid, oSET).flatMap: res =>
+            res.flatTraverse: (pid, newOid) =>
+              asterismService
+                .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
+                .map(_.as(CloneIds(origOid, newOid)))
 
     }
 

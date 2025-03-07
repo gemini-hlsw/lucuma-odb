@@ -22,6 +22,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
@@ -57,6 +58,9 @@ object AccessControl:
    */
   sealed trait Checked[+A]:
     
+    def isEmpty: Boolean =
+      fold(true)((_, _) => false)
+
     def fold[B](ifEmpty: => B)(ifNonEmpty: (A, AppliedFragment) => B): B =
       this match
         case Checked.Empty => ifEmpty
@@ -129,6 +133,29 @@ trait AccessControl[F[_]] extends Predicates[F] {
     def nestAs[B](b: B): F[G[B]] = fga.map(_.as(b))
 
   /**
+   * Construct an `AppliedFragment` that selects the ids of observations that are writable
+   * by the current user and satisfy the supplied filters *without regard to workflow state*.
+   */
+  def writableOids(
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean
+  ): Result[AppliedFragment] = {
+    val whereObservation: Predicate =
+      and(List(
+        Predicates.observation.program.isWritableBy(user),
+        Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
+        if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
+        WHERE.getOrElse(True)
+      ))
+    MappedQuery(
+      Filter(whereObservation, Select("id", None, Query.Empty)),
+      Context(QueryType, List("observations"), List("observations"), List(ObservationType))
+    ).flatMap(_.fragment)
+  }
+
+
+  /**
    * Select and return the ids of observations that are editable by the current user and meet
    * all the specified filters.
    */
@@ -137,28 +164,9 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState]
-  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =  {
-
-    def observationIdWhereClause(
-      includeDeleted:      Option[Boolean],
-      WHERE:               Option[Predicate],
-      includeCalibrations: Boolean
-    ): Result[AppliedFragment] = {
-      val whereObservation: Predicate =
-        and(List(
-          Predicates.observation.program.isWritableBy(user),
-          Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-          if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
-          WHERE.getOrElse(True)
-        ))
-      MappedQuery(
-        Filter(whereObservation, Select("id", None, Query.Empty)),
-        Context(QueryType, List("observations"), List("observations"), List(ObservationType))
-      ).flatMap(_.fragment)
-    }
-
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      observationIdWhereClause(includeDeleted, WHERE, includeCalibrations)
+      writableOids(includeDeleted, WHERE, includeCalibrations)
         .flatTraverse: which =>
           observationWorkflowService.filterState(
             which, 
@@ -168,7 +176,24 @@ trait AccessControl[F[_]] extends Predicates[F] {
             timeEstimateCalculator
           )
 
-  }
+  /**
+   * Select and return the ids of observations that are clonable by the current user and meet
+   * all the specified filters.
+   */
+  private def selectForObservationCloneImpl(
+    includeDeleted:      Option[Boolean],
+    WHERE:               Option[Predicate],
+    includeCalibrations: Boolean,
+  )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
+    writableOids(includeDeleted, WHERE, includeCalibrations)
+      .flatTraverse: af =>
+        session
+          .prepareR(af.fragment.query(observation_id))
+          .use: pq =>
+            pq.stream(af.argument, 1024)
+              .compile
+              .toList
+              .map(Result.success)
 
   /**
    * Select and return the ids of programs that are editable by the current user and meet
@@ -180,14 +205,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =  {
 
     val programIdWhereClause: Result[AppliedFragment] = {
-      val whereMrogram: Predicate =
+      val whereProgram: Predicate =
         and(List(
           Predicates.program.isWritableBy(user),
           Predicates.program.existence.includeDeleted(includeDeleted.getOrElse(false)),
           WHERE.getOrElse(True)
         ))
       MappedQuery(
-        Filter(whereMrogram, Select("id", None, Query.Empty)),
+        Filter(whereProgram, Select("id", None, Query.Empty)),
         Context(QueryType, List("programs"), List("programs"), List(ProgramType))
       ).flatMap(_.fragment)
     }
@@ -428,6 +453,33 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   } 
 
+  def selectForClone(
+    input: CloneObservationInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] = {
+
+    val ensureWritable: F[Result[Option[Observation.Id]]] =
+      observationService
+        .resolveOid(input.observationId, input.observationRef)
+        .flatMap: r =>
+          r.flatTraverse: oid =>
+            selectForObservationCloneImpl(
+              includeDeleted = None,
+              WHERE = Some(Predicates.observation.id.eql(oid)),
+              includeCalibrations = false
+            ).map: res =>
+              res.flatMap:
+                case List(oid) => Result(Some(oid))
+                case Nil       => Result(None)
+                case _         => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids")
+
+    ensureWritable.nestMap:
+      case None      => AccessControl.Checked.Empty
+      case Some(oid) =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, oid, observation_id)
+
+  }
+  
   def selectForUpdate(
     input: CreateProgramNoteInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[ProgramNotePropertiesInput.Create, Program.Id]]] =
