@@ -50,6 +50,7 @@ import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
+import lucuma.odb.graphql.input.WhereProgramNote
 import lucuma.odb.graphql.input.WhereProgramUser
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
 import lucuma.odb.graphql.input.WhereTarget
@@ -95,6 +96,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("observingModeGroup"),
       SqlObject("program"),
       SqlObject("programs"),
+      SqlObject("programNote"),
+      SqlObject("programNotes"),
       SqlObject("programUsers"),
       SqlObject("proposalStatusMeta"),
       SqlObject("spectroscopyConfigOptions"),
@@ -122,6 +125,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ObservingModeGroup,
       Program,
       Programs,
+      ProgramNote,
+      ProgramNotes,
       ProgramUsers,
       ProposalStatusMeta,
       SpectroscopyConfigOptions,
@@ -697,6 +702,48 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         }
     }
   }
+
+  private lazy val ProgramNote: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (QueryType, "programNote", List(
+      ProgramNoteIdBinding("programNoteId", rNid)
+    )) =>
+      Elab.transformChild: child =>
+        rNid.map: nid =>
+          Unique(
+            Filter(And(Predicates.programNote.id.eql(nid), Predicates.programNote.isVisibleTo(user)), child)
+          )
+  }
+
+  private lazy val ProgramNotes: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereProgramNoteBinding = WhereProgramNote.binding(Path.from(ProgramNoteType))
+    {
+      case (QueryType, "programNotes", List(
+        WhereProgramNoteBinding.Option("WHERE", rWHERE),
+        ProgramNoteIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      )) =>
+        Elab.transformChild: child =>
+          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap: (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit): q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(
+                  and(List(
+                    OFFSET.map(Predicates.programNote.id.gtEql).getOrElse(True),
+                    Predicates.programNote.existence.includeDeleted(includeDeleted),
+                    Predicates.programNote.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))
+                ),
+                oss = Some(List(
+                  OrderSelection[lucuma.core.model.ProgramNote.Id](ProgramNoteType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+    }
 
   private lazy val ProgramUsers: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     val WhereProgramUserBinding = WhereProgramUser.binding(Path.from(ProgramUserType))

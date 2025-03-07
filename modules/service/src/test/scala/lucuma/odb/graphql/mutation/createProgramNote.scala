@@ -7,8 +7,6 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import io.circe.literal.*
-import io.circe.syntax.*
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.data.Existence
@@ -19,54 +17,6 @@ class createProgramNote extends OdbSuite:
   val staff = TestUsers.Standard.staff(3, 103)
 
   val validUsers = List(pi, staff)
-
-  def createNoteAs(
-    user:      User,
-    pid:       Program.Id,
-    title:     String,
-    text:      Option[String]    = none,
-    isPrivate: Option[Boolean]   = none,
-    existence: Option[Existence] = none
-  ): IO[Unit] =
-    val props = List(
-      s"""title: "$title"""".some,
-      text.map(t => s"""text: "$t""""),
-      isPrivate.map(b => s"isPrivate: $b"),
-      existence.map(e => s"""existence: ${e.tag.toUpperCase}""")
-    ).flatten.mkString("{\n", "\n", "}\n")
-
-    expect(
-      user  = user,
-      query = s"""
-        mutation {
-          createProgramNote(
-            input: {
-              programId: "$pid"
-              SET: $props
-            }
-          ) {
-            programNote {
-              title
-              text
-              isPrivate
-              existence
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createProgramNote": {
-            "programNote": {
-              "title": ${title.asJson},
-              "text": ${text.getOrElse("").asJson},
-              "isPrivate": ${isPrivate.getOrElse(false).asJson},
-              "existence": ${existence.getOrElse(Existence.Present).asJson}
-            }
-          }
-        }
-      """.asRight
-    )
 
   def listNotesAs(user: User, pid: Program.Id, includeDeleted: Option[Boolean] = none): IO[List[String]] =
     query(
@@ -85,13 +35,13 @@ class createProgramNote extends OdbSuite:
 
   test("one note"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(pi, pid, "Foo", "Bar".some) *>
+      createProgramNoteAs(pi, pid, "Foo", "Bar".some) *>
       assertIO(listNotesAs(pi, pid), List("Foo"))
 
   test("two notes"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(pi, pid, "Foo", "Bar".some) *>
-      createNoteAs(pi, pid, "Baz", "Buz".some) *>
+      createProgramNoteAs(pi, pid, "Foo", "Bar".some) *>
+      createProgramNoteAs(pi, pid, "Baz", "Buz".some) *>
       assertIO(listNotesAs(pi, pid), List("Foo", "Baz"))
 
   test("missing title is disallowed"):
@@ -168,20 +118,20 @@ class createProgramNote extends OdbSuite:
 
   test("staff can create and see a private note"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
+      createProgramNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
       assertIO(listNotesAs(staff, pid), List("Foo"))
 
   test("pi cannot see a private note"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
+      createProgramNoteAs(staff, pid, "Foo", "Bar".some, isPrivate = true.some) *>
       assertIO(listNotesAs(pi, pid), Nil)
 
   test("deleted notes are not listed by default"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
+      createProgramNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
       assertIO(listNotesAs(pi, pid), Nil)
 
   test("deleted notes are listed when requested"):
     createProgramAs(pi).flatMap: pid =>
-      createNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
+      createProgramNoteAs(pi, pid, "Foo", "Bar".some, existence = Existence.Deleted.some) *>
       assertIO(listNotesAs(pi, pid, includeDeleted = true.some), List("Foo"))

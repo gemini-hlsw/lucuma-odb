@@ -47,6 +47,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
@@ -130,6 +131,63 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createProgramNoteAs(
+    user:      User,
+    pid:       Program.Id,
+    title:     String,
+    text:      Option[String]    = none,
+    isPrivate: Option[Boolean]   = none,
+    existence: Option[Existence] = none
+  ): IO[ProgramNote.Id] =
+    val props = List(
+      s"""title: "$title"""".some,
+      text.map(t => s"""text: "$t""""),
+      isPrivate.map(b => s"isPrivate: $b"),
+      existence.map(e => s"""existence: ${e.tag.toUpperCase}""")
+    ).flatten.mkString("{\n", "\n", "}\n")
+
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          createProgramNote(
+            input: {
+              programId: "$pid"
+              SET: $props
+            }
+          ) {
+            programNote {
+              id
+              title
+              text
+              isPrivate
+              existence
+            }
+          }
+        }
+      """
+    ).flatMap: json =>
+      val c = json.hcursor.downFields("createProgramNote", "programNote")
+      (
+        for
+          i <- c.downField("id").as[ProgramNote.Id]
+          t <- c.downField("title").as[String]
+          x <- c.downField("text").as[String]
+          p <- c.downField("isPrivate").as[Boolean]
+          e <- c.downField("existence").as[Existence]
+        yield (i, (t, x, p, e))
+      )
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+        .flatTap: (_, res) =>
+          assertEquals(
+            res,
+            (title, text.orNull, isPrivate.getOrElse(false), existence.getOrElse(Existence.Present))
+          ).pure
+        .map(_._1)
+
+
 
   def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
