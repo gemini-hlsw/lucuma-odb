@@ -407,6 +407,9 @@ trait Codecs {
   val program_id: Codec[Program.Id] =
     gid[Program.Id]
 
+  val program_note_id: Codec[ProgramNote.Id] =
+    gid[ProgramNote.Id]
+
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
 

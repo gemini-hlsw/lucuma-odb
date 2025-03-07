@@ -23,6 +23,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
@@ -42,6 +43,7 @@ import table.*
 trait ProgramMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
+     with ProgramNoteTable[F]
      with ProgramUserTable[F]
      with ProposalView[F]
      with ObservationView[F]
@@ -66,6 +68,8 @@ trait ProgramMapping[F[_]]
       SqlField("existence", ProgramTable.Existence),
       SqlField("name", ProgramTable.Name),
       SqlField("description", ProgramTable.Description),
+
+      SqlObject("notes", Join(ProgramTable.Id, ProgramNoteTable.ProgramId)),
 
       SqlField("type", ProgramTable.ProgramType),
       SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
@@ -105,6 +109,24 @@ trait ProgramMapping[F[_]]
           limit  = none,
           child
         )
+
+    case (ProgramType, "notes", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    )) =>
+      Elab.transformChild: child =>
+        rIncludeDeleted.map: includeDeleted =>
+          OrderBy(
+            OrderSelections(List(
+              OrderSelection[ProgramNote.Id](ProgramNoteType / "id")
+            )),
+            Filter(
+              Predicate.And(
+                Predicates.programNote.existence.includeDeleted(includeDeleted),
+                Predicates.programNote.isVisibleTo(user)
+              ),
+              child
+            )
+          )
 
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),

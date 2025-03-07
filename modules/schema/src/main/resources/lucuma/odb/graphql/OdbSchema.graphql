@@ -911,6 +911,18 @@ input CreateProgramInput {
   SET: ProgramPropertiesInput
 }
 
+input CreateProgramNoteInput {
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
+  SET: ProgramNotePropertiesInput!
+}
+
+type CreateProgramNoteResult {
+  "The newly create program note."
+  programNote: ProgramNote!
+}
+
 """
 The result of creating a new program.
 """
@@ -2927,6 +2939,13 @@ type Mutation {
   ): CreateProgramResult!
 
   """
+  Creates a new program note according to provided parameters
+  """
+  createProgramNote(
+    input: CreateProgramNoteInput!
+  ): CreateProgramNoteResult!
+
+  """
   Creates a new proposal according to the provided properties
   """
   createProposal(
@@ -3595,6 +3614,29 @@ input ProgramPropertiesInput {
   """
   activeEnd: Date
 }
+
+"""
+ProgramNote creation and edit properties.
+"""
+input ProgramNotePropertiesInput {
+
+  "The note title.  Required on creation."
+  title: NonEmptyString
+
+  "The note text, if any."
+  text: NonEmptyString
+
+  """
+  Whether the note is only available to Gemini staff.  This property is
+  available only to Gemini staff and defaults to false.
+  """
+  isPrivate: Boolean
+
+  "Whether the program is considered deleted (defaults to PRESENT)."
+  existence: Existence
+
+}
+
 
 """
 Editable properties that define a program / user connection.
@@ -9323,6 +9365,9 @@ type Program {
   "Program description / abstract."
   description: NonEmptyString
 
+  "Notes associated with the program, if any."
+  notes(includeDeleted: Boolean! = false): [ProgramNote!]!
+
   "Program type"
   type: ProgramType!
 
@@ -9449,6 +9494,35 @@ type Program {
 ProgramId id formatted as `p-[1-9a-f][0-9a-f]*`
 """
 scalar ProgramId
+
+"""
+Program notes are arbitrary titled text messages associated with a particular
+program.  Notes may be private, in which case they are only visible to staff.
+"""
+type ProgramNote {
+
+  "This note's unique id."
+  id: ProgramNoteId!
+
+  "The program with which this note is associated."
+  program: Program!
+
+  "The note title."
+  title: NonEmptyString!
+
+  "The note text, if any."
+  text: NonEmptyString
+
+  "Whether the note is only available to Gemini staff."
+  isPrivate: Boolean!
+
+  "DELETED or PRESENT"
+  existence: Existence!
+
+}
+
+"ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`"
+scalar ProgramNoteId
 
 """
 Defines the category of program references, where specific implementations exist
