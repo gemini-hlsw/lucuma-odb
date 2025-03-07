@@ -843,7 +843,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                     }
                   }
                 """,
-                expected = List(s"Cannot clone calibration observations: $cid").asLeft
+                expected = List(s"User ${pi.id} is not authorized to perform this operation.").asLeft
               )
     } yield ()
   }

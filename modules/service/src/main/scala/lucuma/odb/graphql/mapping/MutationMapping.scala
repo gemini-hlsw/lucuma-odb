@@ -322,11 +322,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
       services.useTransactionally:
-        observationService.cloneObservation(input).nestMap: ids =>
-          Filter(And(
-            Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
-            Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
-          ), child)
+        selectForClone(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            if checked.isEmpty then 
+              OdbError.NotAuthorized(user.id).asFailureF
+            else 
+              observationService.cloneObservation(checked).nestMap: ids =>
+                Filter(And(
+                  Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
+                  Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
+                ), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>

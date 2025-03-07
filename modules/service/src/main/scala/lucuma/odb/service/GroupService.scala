@@ -19,7 +19,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CloneGroupInput
-import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -80,15 +79,16 @@ object GroupService {
       private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
         ResultT(
           observationService.cloneObservation(
-            CloneObservationInput(
-              observationId  = Some(oid),
-              observationRef = None,
-              SET = Some(
-                ObservationPropertiesInput.Edit.Empty.copy(
-                  group = Nullable.orNull(dest)
-                )
+            Services.asSuperUser:
+              AccessControl.unchecked(
+                Some(
+                  ObservationPropertiesInput.Edit.Empty.copy(
+                    group = Nullable.orNull(dest)
+                  )
+                ),
+                oid,
+                observation_id
               )
-            )
           )
         ).map(_.cloneId)
 
