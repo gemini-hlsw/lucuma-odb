@@ -9598,6 +9598,16 @@ where 2024B refers to the associated semester.
 """
 scalar ProgramReferenceLabel
 
+type ProgramNoteSelectResult {
+
+  "Matching notes up to the return size limit of 1000."
+  matches: [ProgramNote!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+
+}
+
 """
 The matching program results, limited to a maximum of 1000 entries.
 """
@@ -10063,6 +10073,29 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ProgramSelectResult!
+
+  "Selects the program note with the given id, if any."
+  programNote(
+    programNoteId: ProgramNoteId!
+  ): ProgramNote
+
+  """
+  Selects the first `LIMIT` matching program notes based on the provided `WHERE`
+  parameter, if any.
+  """
+  programNotes(
+    "Filters the select of program notes."
+    WHERE: WhereProgramNote
+
+    "Starts the result set at (or after if no existent) the given note id."
+    OFFSET: ProgramNoteId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted values."
+    includeDeleted: Boolean! = false
+  ): ProgramNoteSelectResult!
 
   """
   Selects the first `LIMIT` matching program users based on the provided `WHERE`
@@ -14747,6 +14780,37 @@ input WhereOrderProgramId {
 }
 
 """
+Filters on equality or order comparisons of the program note Id. All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderProgramNoteId {
+
+  "Matches if the program note id is exactly the supplied value."
+  EQ: ProgramNoteId
+
+  "Matches if the program note id is not the supplied value."
+  NEQ: ProgramNoteId
+
+  "Matches if the program note id is any of the supplied options."
+  IN: [ProgramNoteId!]
+
+  "Matches if the program note id is none of the supplied values."
+  NIN: [ProgramNoteId!]
+
+  "Matches if the program note id is ordered after (>) the supplied value."
+  GT: ProgramNoteId
+
+  "Matches if the program note is ordered before (<) the supplied value."
+  LT: ProgramNoteId
+
+  "Matches if the program note id is ordered after or equal (>=) the supplied value."
+  GTE: ProgramNoteId
+
+  "Matches if the program note id is ordered before or equal (<=) the supplied value."
+  LTE: ProgramNoteId
+}
+
+"""
 Filters on equality or order comparisons of the program user id.  All supplied
 criteria must match, but usually only one is selected.
 """
@@ -15301,6 +15365,46 @@ input WhereProgramReference {
 
   "Matches the science subtype in the program reference, if any."
   scienceSubtype: WhereEqScienceSubtype
+}
+
+"""
+Program note filter options.  All specified items must match.
+"""
+input WhereProgramNote {
+
+  """
+  A list of nested program note filters that all must match in order for the
+  AND group as a whole to match.
+  """
+  AND: [WhereProgramNote!]
+
+  """
+  A list of nested program note filters where any one match causes the entire
+  OR group as a whole to match.
+  """
+  OR: [WhereProgramNote!]
+
+  """
+  A nested program note filter that must not match in order for the NOT itself
+  to match.
+  """
+  NOT: WhereProgramNote
+
+  "Matches the program note ID."
+  id: WhereOrderProgramNoteId
+
+  "Matches the program."
+  program: WhereProgram
+
+  "Matches the program note title."
+  title: WhereString
+
+  "Mathces the program note text."
+  text: WhereOptionString
+
+  "Matches the private status."
+  isPrivate: WhereBoolean
+
 }
 
 """
