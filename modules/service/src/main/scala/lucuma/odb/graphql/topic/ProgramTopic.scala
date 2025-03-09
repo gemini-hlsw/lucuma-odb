@@ -3,6 +3,8 @@
 
 package lucuma.odb.graphql.topic
 
+import cats.Eq
+import cats.derived.*
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
@@ -24,8 +26,8 @@ object ProgramTopic:
   case class Element(
     programId: Program.Id,
     editType:  EditType,
-    users:     List[User.Id],
-  ) extends TopicElement
+    users:     List[User.Id]
+  ) extends TopicElement derives Eq
 
   private val topic =
     OdbTopic.define[(Program.Id, EditType), Element](
