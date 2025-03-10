@@ -19,7 +19,6 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -51,8 +50,7 @@ class executionSci extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   def adjustment(Δλnm: Int, qArcsec: Int): Science.Adjustment =

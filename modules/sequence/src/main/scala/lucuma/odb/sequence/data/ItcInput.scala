@@ -9,10 +9,10 @@ import cats.Order.given
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import lucuma.core.model.Target
-import lucuma.itc.client.ImagingIntegrationTimeInput
-import lucuma.itc.client.ImagingIntegrationTimeParameters
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
-import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.ImagingInput
+import lucuma.itc.client.ImagingParameters
+import lucuma.itc.client.SpectroscopyInput
+import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
@@ -24,15 +24,15 @@ import scala.collection.mutable.ArrayBuilder
  * observation when everything necessary is present and defined.
  */
 case class ItcInput(
-  imaging:      ImagingIntegrationTimeParameters,
-  spectroscopy: SpectroscopyIntegrationTimeParameters,
+  imaging:      ImagingParameters,
+  spectroscopy: SpectroscopyParameters,
   targets:      NonEmptyList[(Target.Id, TargetInput)]
 ):
-  lazy val imagingInput: ImagingIntegrationTimeInput =
-    ImagingIntegrationTimeInput(imaging, targets.map(_._2))
+  lazy val imagingInput: ImagingInput =
+    ImagingInput(imaging, targets.map(_._2))
 
-  lazy val spectroscopyInput: SpectroscopyIntegrationTimeInput =
-    SpectroscopyIntegrationTimeInput(spectroscopy, targets.map(_._2))
+  lazy val spectroscopyInput: SpectroscopyInput =
+    SpectroscopyInput(spectroscopy, targets.map(_._2))
 
   lazy val targetVector: NonEmptyVector[(Target.Id, TargetInput)] =
     targets.toNev
@@ -43,9 +43,9 @@ object ItcInput:
     Eq.by { a => (a.imaging, a.spectroscopy, a.targets) }
 
   given HashBytes[ItcInput] with
-    given HashBytes[TargetInput]                           = HashBytes.forJsonEncoder
-    given HashBytes[ImagingIntegrationTimeParameters]      = HashBytes.forJsonEncoder
-    given HashBytes[SpectroscopyIntegrationTimeParameters] = HashBytes.forJsonEncoder
+    given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
+    given HashBytes[ImagingParameters]      = HashBytes.forJsonEncoder
+    given HashBytes[SpectroscopyParameters] = HashBytes.forJsonEncoder
 
     def hashBytes(a: ItcInput): Array[Byte] =
       def targetsBytes(
