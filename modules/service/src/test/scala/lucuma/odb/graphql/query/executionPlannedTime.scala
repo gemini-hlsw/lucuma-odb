@@ -12,7 +12,6 @@ import io.circe.syntax.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
@@ -23,8 +22,7 @@ class executionPlannedTime extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   extension (s: String)

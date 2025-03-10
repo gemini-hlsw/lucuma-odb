@@ -34,7 +34,6 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -69,8 +68,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(3),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(3)
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
