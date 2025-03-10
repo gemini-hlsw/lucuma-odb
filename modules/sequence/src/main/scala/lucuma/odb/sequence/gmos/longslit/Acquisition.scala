@@ -18,7 +18,6 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
-import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
@@ -87,7 +86,7 @@ object Acquisition:
     slit: ProtoStep[D]
   ):
     val initialAtom: NonEmptyList[ProtoStep[D]] =
-      NonEmptyList.of(ccd2, p10, slit)
+      NonEmptyList.of(ccd2, p10, slit.withBreakpoint)
 
     val repeatingAtom: NonEmptyList[ProtoStep[D]] =
       NonEmptyList.of(slit)
@@ -111,8 +110,8 @@ object Acquisition:
         Acquisition.MaxExpTimeLastStep min
           TimeSpan.unsafeFromMicroseconds(exposureTime.toMicroseconds * 3)
 
-      eval {
-        for {
+      eval:
+        for
           _  <- optics.exposure      := exposureTime
           _  <- optics.filter        := filter.some
           _  <- optics.fpu           := none[GmosFpuMask[U]]
@@ -131,10 +130,7 @@ object Acquisition:
 
           _  <- optics.exposure      := lastExpTime(exposureTime)
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
-                  .map(ProtoStep.breakpoint.replace(Breakpoint.Enabled))
-
-        } yield Acquisition.Steps(s0, s1, s2)
-      }
+        yield Acquisition.Steps(s0, s1, s2)
 
     end compute
   end StepComputer
@@ -264,7 +260,7 @@ object Acquisition:
     case class ExpectP10[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends AcquisitionState[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
-        gen(builder, NonEmptyList.of(steps.p10, steps.slit).some, steps.slit, calcState, tracker)
+        gen(builder, NonEmptyList.of(steps.p10, steps.slit.withBreakpoint).some, steps.slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
         copy(calcState = calcState, tracker = tracker)
@@ -278,7 +274,7 @@ object Acquisition:
     case class ExpectSlit[D](visitId: Visit.Id, calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D], initialAtom: Boolean) extends AcquisitionState[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
-        gen(builder, Option.when(initialAtom)(NonEmptyList.one(steps.slit)), steps.slit, calcState, tracker)
+        gen(builder, Option.when(initialAtom)(NonEmptyList.one(steps.slit.withBreakpoint)), steps.slit, calcState, tracker)
 
       override def updateTracker(calcState: TimeEstimateCalculator.Last[D], tracker: IndexTracker): AcquisitionState[D] =
         copy(calcState = calcState, tracker = tracker)
