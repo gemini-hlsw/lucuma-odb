@@ -35,11 +35,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.GmosFpu
-import lucuma.itc.client.ImagingIntegrationTimeParameters
+import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
-import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.json.sourceprofile.given
@@ -248,12 +248,12 @@ object GeneratorParamsService {
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (exposureTimeMode, targets) =>
           ItcInput(
-            ImagingIntegrationTimeParameters(
+            ImagingParameters(
               ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
               obsParams.constraints,
               mode.asImaging(exposureTimeMode.at)
             ),
-            SpectroscopyIntegrationTimeParameters(
+            SpectroscopyParameters(
               exposureTimeMode,
               obsParams.constraints,
               mode
@@ -266,7 +266,7 @@ object GeneratorParamsService {
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput)] = {
         val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
-        val brightnesses = 
+        val brightnesses =
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
               .map(_.nonEmpty)

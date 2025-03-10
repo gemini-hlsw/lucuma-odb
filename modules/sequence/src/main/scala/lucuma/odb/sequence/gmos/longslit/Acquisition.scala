@@ -63,8 +63,9 @@ object Acquisition:
 
   val DefaultIntegrationTime: TargetIntegrationTime =
     TargetIntegrationTime(
-      Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined, AcquisitionSN)),
-      Band.R.asLeft // Band is meaningless here, but we need to provide one
+      Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined)),
+      Band.R.asLeft, // Band is meaningless here, but we need to provide one
+      None // Imaging doesn't return signal-to-noise at
     )
 
   val MinExposureTime    =   1.secondTimeSpan

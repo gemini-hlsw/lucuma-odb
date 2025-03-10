@@ -11,7 +11,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
@@ -32,8 +31,7 @@ class executionTwilight extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   case class Calibrations(

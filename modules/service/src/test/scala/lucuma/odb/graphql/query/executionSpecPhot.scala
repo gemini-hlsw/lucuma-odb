@@ -11,7 +11,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -21,8 +20,7 @@ class executionSpecPhot extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   test("spec phot") {

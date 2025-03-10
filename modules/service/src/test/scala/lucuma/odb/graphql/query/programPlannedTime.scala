@@ -14,7 +14,6 @@ import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -35,8 +34,7 @@ class programPlannedTime extends ExecutionTestSupport:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   val user: User = serviceUser

@@ -39,7 +39,6 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.sequence.Atom
@@ -757,7 +756,7 @@ object Science:
 
         case Some(CalibrationRole.Twilight)           =>
           val configʹ = calibrationObservationConfig(config)
-          val timeʹ   = IntegrationTime(TwilightExposureTime, NonNegInt.unsafeFrom(configʹ.wavelengthDithers.length), SignalToNoise.Min)
+          val timeʹ   = IntegrationTime(TwilightExposureTime, NonNegInt.unsafeFrom(configʹ.wavelengthDithers.length))
           (configʹ, timeʹ).asRight[String]
 
         case Some(c)                                  =>

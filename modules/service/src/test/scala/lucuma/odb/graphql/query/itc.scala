@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -82,8 +83,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-    
-  def successfulItcResult(oid: Observation.Id, tid: Target.Id): Json = 
+
+  def successfulItcResult(oid: Observation.Id, tid: Target.Id): Json =
     json"""
       {
         "observation": {
@@ -96,7 +97,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   "seconds": 10.000000
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
-                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+                "signalToNoise": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(500).get).total.value.toBigDecimal}
               },
               "all": [
                 {
@@ -111,7 +112,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   "seconds": 10.000000
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
-                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+                "signalToNoise": null
               },
               "all": [
                 {

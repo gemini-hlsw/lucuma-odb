@@ -13,7 +13,6 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
@@ -35,8 +34,7 @@ class setObservationWorkflowState
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(2),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(2)
     )
 
   def approveConfigurationRequest(req: ConfigurationRequest.Id): IO[Unit] =
