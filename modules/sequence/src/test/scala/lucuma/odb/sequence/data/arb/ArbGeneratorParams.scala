@@ -12,9 +12,9 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Target
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
-import lucuma.itc.client.ImagingIntegrationTimeParameters
+import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
-import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.itc.client.arb.ArbInstrumentMode
 import lucuma.itc.client.arb.ArbIntegrationTimeInput
@@ -34,8 +34,8 @@ trait ArbGeneratorParams:
 
   private def genItcInput(mo: InstrumentMode): Gen[ItcInput] =
     for
-      im <- arbitrary[ImagingIntegrationTimeParameters]
-      sm <- arbitrary[SpectroscopyIntegrationTimeParameters]
+      im <- arbitrary[ImagingParameters]
+      sm <- arbitrary[SpectroscopyParameters]
       s  <- Gen.choose(1, 4)
       t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput)]).map(NonEmptyList.fromListUnsafe)
     yield ItcInput(im.copy(mode = mo), sm.copy(mode = mo), t)

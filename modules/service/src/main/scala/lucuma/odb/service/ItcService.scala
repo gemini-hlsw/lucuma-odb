@@ -42,7 +42,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
-import lucuma.itc.client.IntegrationTimeResult
+import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.sequence.data.GeneratorParams
@@ -130,7 +130,7 @@ object ItcService {
       problems: NonEmptyList[(Option[Target.Id], String)]
     ) extends Error:
       def format: String =
-        val ps = problems.map { 
+        val ps = problems.map {
           case (None, msg)      => s"Asterism: $msg"
           case (Some(tid), msg) => s"Target '$tid': $msg"
         }
@@ -141,7 +141,7 @@ object ItcService {
         s"ITC provided conflicting results"
   end Error
 
-  case class TargetResult(targetId: Target.Id, value: IntegrationTime) {
+  case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoise]) {
     def totalTime: Option[TimeSpan] = {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
       Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
@@ -160,7 +160,8 @@ object ItcService {
           "targetId"      -> s.targetId.asJson,
           "exposureTime"  -> s.value.exposureTime.asJson,
           "exposureCount" -> s.value.exposureCount.value.asJson,
-          "signalToNoise" -> s.value.signalToNoise.asJson
+          // TODO: Use both single and total signal to noise
+          "signalToNoise" -> s.signalToNoise.asJson
         )
       }
 
@@ -170,8 +171,8 @@ object ItcService {
           targetId      <- c.downField("targetId").as[Target.Id]
           exposureTime  <- c.downField("exposureTime").as[TimeSpan]
           exposureCount <- c.downField("exposureCount").as[NonNegInt]
-          signalToNoise <- c.downField("signalToNoise").as[SignalToNoise]
-        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount, signalToNoise))
+          signalToNoise <- c.downField("signalToNoise").as[Option[SignalToNoise]]
+        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoise)
       }
   }
 
@@ -284,7 +285,7 @@ object ItcService {
       override def selectAll(
         pid:    Program.Id,
         params: Map[Observation.Id, GeneratorParams]
-      )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]] = 
+      )(using Transaction[F]): F[Map[Observation.Id, AsterismResults]] =
         session
           .execute(Statements.SelectAllItcResults)(pid)
           .map: (rows: List[(Observation.Id, Md5Hash, AsterismResults)]) =>
@@ -305,7 +306,7 @@ object ItcService {
             .map: rows =>
               rows
                 .flatMap: (oid, hash, results) =>
-                  for 
+                  for
                     params <- params.get(oid)
                     input  <- params.itcInput.toOption
                     inhash  = Md5Hash.unsafeFromByteArray(input.md5)
@@ -325,21 +326,21 @@ object ItcService {
             _.targetTimes.modifyValue:
               _.map:
                 _.modifyValue:
-                  case Left(lucuma.itc.Error.SourceTooBright(_)) => 
+                  case Left(lucuma.itc.Error.SourceTooBright(_)) =>
                     Acquisition.DefaultIntegrationTime.asRight
-                  case Right(r) if r.times.focus.exposureTime > Acquisition.MaxExposureTime => 
+                  case Right(r) if r.times.focus.exposureTime > Acquisition.MaxExposureTime =>
                     r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MaxExposureTime))).asRight
-                  case Right(r) if r.times.focus.exposureTime < Acquisition.MinExposureTime => 
+                  case Right(r) if r.times.focus.exposureTime < Acquisition.MinExposureTime =>
                     r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MinExposureTime))).asRight
                   case other => other
             .partitionErrors
             .leftMap(convertRemoteErrors(targets))
-          
+
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
-          case (imgResult, IntegrationTimeResult(_, specOutcomes)) =>
+          case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
             val specResult = specOutcomes.partitionErrors.leftMap(convertRemoteErrors(targets))
 
             for
@@ -347,18 +348,18 @@ object ItcService {
               spec   <- specResult
               result <-
                 AsterismResults.fromResults(
-                  img.value.zipWithIndex.map { case (targetIntegrationTime, index) => 
+                  img.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus)
+                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt.map(_.total.value))
                   },
-                  spec.value.zipWithIndex.map { case (targetIntegrationTime, index) => 
+                  spec.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus)
+                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt.map(_.total.value))
                   },
                 ).toRight[Error](Error.TargetMismatch)
             yield result
         }
-        .handleError: t => 
+        .handleError: t =>
           RemoteServiceErrors(NonEmptyList.one(None, t.getMessage)).asLeft
 
       private def insertOrUpdate(
@@ -426,7 +427,7 @@ object ItcService {
       Md5Hash,
       AsterismResults,
       Md5Hash,
-      AsterismResults      
+      AsterismResults
     )] =
       sql"""
         INSERT INTO t_itc_result (
