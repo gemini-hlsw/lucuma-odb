@@ -18,7 +18,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepStage
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Visit
@@ -39,7 +38,6 @@ class executionDigest extends ExecutionTestSupport {
     IntegrationTime(
       20.minTimeSpan,
       NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   // * Arc:

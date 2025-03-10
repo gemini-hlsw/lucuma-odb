@@ -10,7 +10,6 @@ import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -25,8 +24,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       1.hrTimeSpan,
-      NonNegInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1)
     )
 
   test("forever sequence") {

@@ -8636,7 +8636,9 @@ type ItcResult {
   targetId:      TargetId!
   exposureTime:  TimeSpan!
   exposureCount: NonNegInt!
-  signalToNoise: SignalToNoise!
+  # TODO This needs to include two values
+  # It is nullable as imaging doesn't return a signal to noise value yet
+  signalToNoise: SignalToNoise
 }
 
 type LineFluxIntegrated {
