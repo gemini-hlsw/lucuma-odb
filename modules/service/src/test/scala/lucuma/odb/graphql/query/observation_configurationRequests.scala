@@ -150,9 +150,9 @@ class observation_configurationRequests
   test("request should not apply for different observing mode"):
     for
       oid  <- setup
-      _    <- updateGratingAs(pi, oid, GmosNorthGrating.B600_G5307)
+      _    <- updateGratingAs(pi, oid, GmosNorthGrating.B480_G5309)
       mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5306)
+      _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5308)
       _    <- expectRequests(pi, oid, Nil)
     yield ()
 
