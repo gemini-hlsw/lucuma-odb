@@ -41,7 +41,7 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
-ThisBuild / githubWorkflowBuild +=
+ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
@@ -49,7 +49,7 @@ ThisBuild / githubWorkflowBuild +=
     cond = Some("github.event_name == 'pull_request'")
   )
 
-ThisBuild / githubWorkflowBuild +=
+ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
     name = Some("Validate GraphQL schema changes"),
