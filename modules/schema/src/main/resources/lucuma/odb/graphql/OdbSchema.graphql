@@ -7410,11 +7410,6 @@ enum GmosNorthGrating {
   B600_G5303
 
   """
-  GmosNorthGrating B600_G5307
-  """
-  B600_G5307
-
-  """
   GmosNorthGrating R600_G5304
   """
   R600_G5304

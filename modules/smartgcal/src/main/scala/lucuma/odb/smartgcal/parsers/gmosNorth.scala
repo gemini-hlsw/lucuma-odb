@@ -17,7 +17,7 @@ trait GmosNorthParsers extends GmosCommonParsers {
   import util.*
 
   val filter: Parser[NonEmptyList[Option[GmosNorthFilter]]] =
-    Parser.string("none").as(NonEmptyList.one(none[GmosNorthFilter])) |   // "none" found in existing .csv files
+    Parser.string("none").as(NonEmptyList.one(none[GmosNorthFilter])) | // "none" found in existing .csv files
       manyOfOption("None",
         "g_G0301"                   -> GmosNorthFilter.GPrime,
         "r_G0303"                   -> GmosNorthFilter.RPrime,
@@ -46,8 +46,8 @@ trait GmosNorthParsers extends GmosCommonParsers {
         "g_G0301 + OG515_G0306"     -> GmosNorthFilter.GPrime_OG515,
         "r_G0303 + RG610_G0307"     -> GmosNorthFilter.RPrime_RG610,
         "i_G0302 + CaT_G0309"       -> GmosNorthFilter.IPrime_CaT,
-        "z_G0304 + CaT_G0309"       -> GmosNorthFilter.ZPrime_CaT,
-        "u_G0308"                   -> GmosNorthFilter.UPrime
+        "z_G0304 + CaT_G0309"       -> GmosNorthFilter.ZPrime_CaT
+//        "u_G0308"                   -> GmosNorthFilter.GPrime  // u' was removed
       ).withContext("GMOS North filter")
 
   val fpu: Parser[NonEmptyList[Option[GmosNorthFpu]]] =
