@@ -18,28 +18,38 @@ DELETE FROM t_smart_gmos_north
 DELETE FROM t_gmos_north_filter
   WHERE c_tag = 'UPrime';
 
--- Remove GMOS North B600_G5303 grating and replace with B600_G5307.
+-- Remove GMOS North B600_G5303 and B600_G5307 grating and replace with B600_G5307.
+
+DELETE FROM t_spectroscopy_config_option_gmos_north
+  WHERE c_grating = 'B600_G5303'
+     OR c_grating = 'B600_G5307';
 
 UPDATE t_gmos_north_long_slit
-   SET c_grating = 'B600_G5307'
- WHERE c_grating = 'B600_G5303';
+   SET c_grating = 'B480_G5309'
+ WHERE c_grating = 'B600_G5303'
+    OR c_grating = 'B600_G5307';
 
 UPDATE t_gmos_north_long_slit
-   SET c_initial_grating = 'B600_G5307'
- WHERE c_initial_grating = 'B600_G5303';
+   SET c_initial_grating = 'B480_G5309'
+ WHERE c_initial_grating = 'B600_G5303'
+    OR c_initial_grating = 'B600_G5307';
 
 UPDATE t_gmos_north_dynamic
-   SET c_grating_disperser = 'B600_G5307'
- WHERE c_grating_disperser = 'B600_G5303';
+   SET c_grating_disperser = 'B480_G5309'
+ WHERE c_grating_disperser = 'B600_G5303'
+    OR c_grating_disperser = 'B600_G5307';
 
 DELETE FROM t_configuration_request
-  WHERE c_gmos_north_longslit_grating = 'B600_G5303';
+  WHERE c_gmos_north_longslit_grating = 'B600_G5303'
+     OR c_gmos_north_longslit_grating = 'B600_G5307';
 
 DELETE FROM t_smart_gmos_north
-  WHERE c_disperser = 'B600_G5303';
+  WHERE c_disperser = 'B600_G5303'
+     OR c_disperser = 'B600_G5307';
 
 DELETE FROM t_gmos_north_disperser
-  WHERE c_tag = 'B600_G5303';
+  WHERE c_tag = 'B600_G5303'
+     OR c_tag = 'B600_G5307';
 
 -- Remove GMOS North R150_G5306 grating and replace with R150_G5308.
 

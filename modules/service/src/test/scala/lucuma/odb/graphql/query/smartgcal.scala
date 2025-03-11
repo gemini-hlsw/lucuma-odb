@@ -262,13 +262,13 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           _ <- defineF2(2, 1, expTimeSec = 1, count = 1, tableRow = tableRowArcF2)
 
           // multi steps
-          _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-          _ <- defineGmosN(6, tableRowFlatGmosN, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
-          _ <- defineGmosN(7, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 1)
+          _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.B480_G5309, expTimeSec = 4)
+          _ <- defineGmosN(6, tableRowFlatGmosN, stepOrder =  9, disperser = GmosNorthGrating.B480_G5309, expTimeSec = 5)
+          _ <- defineGmosN(7, tableRowArcGmosN, disperser = GmosNorthGrating.B480_G5309, expTimeSec = 1)
 
           // step count
-          _ <- defineGmosN(8, tableRowFlatGmosN, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
-          _ <- defineGmosN(9, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5307, expTimeSec = 1)
+          _ <- defineGmosN(8, tableRowFlatGmosN, disperser = GmosNorthGrating.B480_G5309, count = 2, expTimeSec = 6)
+          _ <- defineGmosN(9, tableRowArcGmosN, disperser = GmosNorthGrating.B480_G5309, expTimeSec = 1)
 
         } yield ()
       }
@@ -677,7 +677,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithModeAs(user, p, List(t),
           """
             gmosNorthLongSlit: {
-              grating: B600_G5307,
+              grating: B480_G5309,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
