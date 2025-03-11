@@ -377,7 +377,7 @@ class recordStep extends OdbSuite {
         },
         dtax: TWO,
         roi: FULL_FRAME,
-        filter: U_PRIME,
+        filter: G_PRIME,
         fpu: {
           builtin: LONG_SLIT_0_50
         }
@@ -426,9 +426,9 @@ class recordStep extends OdbSuite {
                   "seconds": 1200.000000
                 },
                 "gratingConfig": null,
-                "filter": "U_PRIME",
+                "filter": "G_PRIME",
                 "centralWavelength": {
-                  "nanometers": 350.000
+                  "nanometers": 475.000
                 }
               }
             }

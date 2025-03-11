@@ -1285,7 +1285,7 @@ class updateObservations extends OdbSuite
           explicitYBin: ONE
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
-          explicitRoi: TOP_SPECTRUM
+          explicitRoi: CENTRAL_SPECTRUM
           explicitWavelengthDithers: [
             { nanometers: -10 },
             { nanometers:  10 }
@@ -1318,7 +1318,7 @@ class updateObservations extends OdbSuite
                   "explicitYBin": "ONE",
                   "explicitAmpReadMode": "SLOW",
                   "explicitAmpGain": "LOW",
-                  "explicitRoi": "TOP_SPECTRUM",
+                  "explicitRoi": "CENTRAL_SPECTRUM",
                   "explicitWavelengthDithers": [
                     { "picometers": -10000 },
                     { "picometers":  10000 }
