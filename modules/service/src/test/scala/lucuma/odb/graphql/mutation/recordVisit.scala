@@ -87,7 +87,7 @@ class recordVisit extends OdbSuite {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
             gmosSouth: {
-              stageMode: FOLLOW_XY
+              stageMode: FOLLOW_XYZ
             }
           }) {
             visit {
@@ -105,7 +105,7 @@ class recordVisit extends OdbSuite {
         "recordGmosSouthVisit": {
           "visit": {
             "gmosSouth": {
-              "stageMode": "FOLLOW_XY",
+              "stageMode": "FOLLOW_XYZ",
               "detector": "HAMAMATSU",
               "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING"
             }
@@ -127,7 +127,7 @@ class recordVisit extends OdbSuite {
           recordGmosSouthVisit(input: {
             observationId: "$oid",
             gmosSouth: {
-              stageMode: FOLLOW_XY,
+              stageMode: FOLLOW_XYZ,
               detector: HAMAMATSU,
               mosPreImaging: IS_NOT_MOS_PRE_IMAGING
             }
