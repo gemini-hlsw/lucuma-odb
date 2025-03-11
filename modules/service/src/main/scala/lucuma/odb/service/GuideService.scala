@@ -791,7 +791,7 @@ object GuideService {
                            )
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
-                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
+                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, duration.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
