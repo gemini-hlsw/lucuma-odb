@@ -147,69 +147,6 @@ $R400.*,$.*,IFU *,4,1,950-1200,1,Low,,,,1,        GMOS balance,Visible,CuAr arc,
 #,,,,,,,,,,,,,,,,,,Day
 # ,,,,,,,,,,,,,,,,,,Day
 #,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,90,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,350 - 525,1,Low,,,,1,        None,Visible,CuAr arc,Closed,6,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,350 - 555,1,Low,,,,1,         None,Visible,CuAr arc,Closed,240,1,Day
-$B600.*,$.*,IFU *,2,1,350 - 555,1,Low,,,,1,         None,Visible,CuAr arc,Closed,240,1,Day
-$B600.*,$.*,IFU *,4,1,350 - 555,1,Low,,,,1,         None,Visible,CuAr arc,Closed,180,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,160,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,80,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,80,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,40,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,40,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,40,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,20,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,20,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,525 - 610,1,Low,,,,1,      GMOS balance,Visible,CuAr arc,Closed,10,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,555 - 690,1,Low,,,,1,         None,Visible,CuAr arc,Closed,15,1,Day
-$B600.*,$.*,IFU *,2,1,555 - 690,1,Low,,,,1,         None,Visible,CuAr arc,Closed,7,1,Day
-$B600.*,$.*,IFU *,4,1,555 - 690,1,Low,,,,1,         None,Visible,CuAr arc,Closed,3,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,70,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,35,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,35,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,17,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,17,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,17,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,9,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,9,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,610 - 815,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,4,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,690 - 800,1,Low,,,,1,         None,Visible,CuAr arc,Closed,7,1,Day
-$B600.*,$.*,IFU *,2,1,690 - 800,1,Low,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,4,1,690 - 800,1,Low,,,,1,         None,Visible,CuAr arc,Closed,2,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,6,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,6,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,815 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,3,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,800 - 860,1,Low,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,2,1,800 - 860,1,Low,,,,1,         None,Visible,CuAr arc,Closed,2,1,Day
-$B600.*,$.*,IFU *,4,1,800 - 860,1,Low,,,,1,        GMOS balance,Visible,CuAr arc,Closed,16,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,860 - 1000,1,Low,,,,1,         None,Visible,CuAr arc,Closed,3,1,Day
-$B600.*,$.*,IFU *,2,1,860 - 1000,1,Low,,,,1,         None,Visible,CuAr arc,Closed,2,1,Day
-$B600.*,$.*,IFU *,4,1,860 - 1000,1,Low,,,,1,        GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,1000 - 1200,1,Low,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,2,1,1000 - 1200,1,Low,,,,1,         None,Visible,CuAr arc,Closed,2,1,Day
-$B600.*,$.*,IFU *,4,1,1000 - 1200,1,Low,,,,1,       GMOS balance,Visible,CuAr arc,Closed,24,1,Day
 #,,,,,,,,,,,,,,,,,,Day
 # ,,,,,,,,,,,,,,,,,,Day
 #,,,,,,,,,,,,,,,,,,Day
@@ -557,69 +494,6 @@ $R400.*,$.*,IFU *,4,1,950-1200,1,High,,,,1,        GMOS balance,Visible,CuAr arc
 #,,,,,,,,,,,,,,,,,,Day
 # ,,,,,,,,,,,,,,,,,,Day
 #,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,180,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,100,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,100,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,24,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,24,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,350 - 525,1,High,,,,1,        None,Visible,CuAr arc,Closed,12,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,350 - 555,1,High,,,,1,         None,Visible,CuAr arc,Closed,480,1,Day
-$B600.*,$.*,IFU *,2,1,350 - 555,1,High,,,,1,         None,Visible,CuAr arc,Closed,480,1,Day
-$B600.*,$.*,IFU *,4,1,350 - 555,1,High,,,,1,         None,Visible,CuAr arc,Closed,360,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,320,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,160,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,160,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,80,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,80,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,80,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,40,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,40,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,525 - 610,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,20,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,555 - 690,1,High,,,,1,         None,Visible,CuAr arc,Closed,30,1,Day
-$B600.*,$.*,IFU *,2,1,555 - 690,1,High,,,,1,         None,Visible,CuAr arc,Closed,15,1,Day
-$B600.*,$.*,IFU *,4,1,555 - 690,1,High,,,,1,         None,Visible,CuAr arc,Closed,7,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,140,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,70,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,70,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,34,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,34,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,34,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,18,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,18,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,610 - 815,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,8,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,690 - 800,1,High,,,,1,         None,Visible,CuAr arc,Closed,14,1,Day
-$B600.*,$.*,IFU *,2,1,690 - 800,1,High,,,,1,         None,Visible,CuAr arc,Closed,8,1,Day
-$B600.*,$.*,IFU *,4,1,690 - 800,1,High,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,1,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,100,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,1,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,2,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,50,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,2,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,1,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,1,4,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,25,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,2,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,2,4,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,12,1,Day
-$B600.*,$.*one|.*G.*,$.*arcsec.*|Custom Mask,4,4,815 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,6,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,800 - 860,1,High,,,,1,         None,Visible,CuAr arc,Closed,8,1,Day
-$B600.*,$.*,IFU *,2,1,800 - 860,1,High,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,4,1,800 - 860,1,High,,,,1,        GMOS balance,Visible,CuAr arc,Closed,32,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,860 - 1000,1,High,,,,1,         None,Visible,CuAr arc,Closed,6,1,Day
-$B600.*,$.*,IFU *,2,1,860 - 1000,1,High,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,4,1,860 - 1000,1,High,,,,1,        GMOS balance,Visible,CuAr arc,Closed,24,1,Day
-#,,,,,,,,,,,,,,,,,,Day
-$B600.*,$.*,IFU *,1,1,1000 - 1200,1,High,,,,1,         None,Visible,CuAr arc,Closed,8,1,Day
-$B600.*,$.*,IFU *,2,1,1000 - 1200,1,High,,,,1,         None,Visible,CuAr arc,Closed,4,1,Day
-$B600.*,$.*,IFU *,4,1,1000 - 1200,1,High,,,,1,       GMOS balance,Visible,CuAr arc,Closed,48,1,Day
 #,,,,,,,,,,,,,,,,,,Day
 # ,,,,,,,,,,,,,,,,,,Day
 #,,,,,,,,,,,,,,,,,,Day
