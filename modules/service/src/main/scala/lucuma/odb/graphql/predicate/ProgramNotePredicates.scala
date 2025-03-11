@@ -25,3 +25,6 @@ class ProgramNotePredicates(path: Path):
         if user.role.access >= Staff then True else False
       )
     )
+
+  def isWritableBy(user: User): Predicate =
+    isVisibleTo(user)

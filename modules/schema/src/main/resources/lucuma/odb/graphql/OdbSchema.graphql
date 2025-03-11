@@ -3130,6 +3130,15 @@ type Mutation {
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
 
+  "Updates existing program notes."
+  updateProgramNotes(
+    """
+    Parameters for identifying program notes to update along with the changes to
+    make.
+    """
+    input: UpdateProgramNotesInput!
+  ): UpdateProgramNotesResult!
+
   "Updates existing program users."
   updateProgramUsers(
 
@@ -5461,6 +5470,51 @@ type UpdateProgramUsersResult {
   programUsers: [ProgramUser!]!
 
   "Whether there were additional updated program users that were not returned."
+  hasMore: Boolean!
+}
+
+"""
+Program note selection and update description.  Use `SET" to specify the changes,
+`WHERE` to select the programs to update, and `LIMIT` to control the size of the
+return value.
+"""
+input UpdateProgramNotesInput {
+
+  "Describes the program note values to modify."
+  SET: ProgramNotePropertiesInput!
+
+  """
+  Filters the program notes to be updated according to those that match the
+  given constraints.
+  """
+  WHERE: WhereProgramNote
+
+  """
+  Caps the number of results returned to the given value (if additional notes
+  match the WHERE clause they will be updated but not returned).
+  """
+  LIMIT: NonNegInt
+
+  """
+  Set to `true` to include deleted notes.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
+The result of updating the selected notes, up to `LIMIT` or the maximum of
+(1000).  If `hasMore` is true, additional notes were modified and not included
+here.
+"""
+type UpdateProgramNotesResult {
+  """
+  The edited notes, up to the specified LIMIT or the default maximum of 1000.
+  """
+  programNotes: [ProgramNote!]!
+
+  """
+  `true` when there were additional edits that were not returned.
+  """
   hasMore: Boolean!
 }
 
