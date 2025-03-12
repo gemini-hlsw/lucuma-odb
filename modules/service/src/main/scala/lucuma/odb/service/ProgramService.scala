@@ -65,8 +65,7 @@ trait ProgramService[F[_]] {
    */
   def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id]
 
-  /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
+  def updatePrograms(input: AccessControl.Checked[ProgramPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Program.Id]]]
 
 }
 
@@ -217,7 +216,10 @@ object ProgramService {
 
           def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
             val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
-            updatePrograms(edit, sql"select $program_id"(p)).map(_.void)
+            updatePrograms(
+              Services.asSuperUser:
+                AccessControl.unchecked(edit, p, program_id)
+            ).map(_.void)
 
           (for {
             _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
@@ -235,36 +237,36 @@ object ProgramService {
           session.prepareR(Statements.InsertCalibrationProgram).use(_.unique(SETʹ.name, calibrationRole, description.value))
         }
 
-      def updatePrograms(
-        SET:   ProgramPropertiesInput.Edit,
-        where: AppliedFragment
-      )(using Transaction[F]): F[Result[List[Program.Id]]] =
+      override def updatePrograms(input: AccessControl.Checked[ProgramPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Program.Id]]] = {
+        input.fold(Result(Nil).pure[F]): (SET, where) =>
 
-        // Create the temp table with the programs we're updating. We will join with this
-        // several times later on in the transaction.
-        val setup: F[Unit] =
-          val af = Statements.createProgramUpdateTempTable(where)
-          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+          // Create the temp table with the programs we're updating. We will join with this
+          // several times later on in the transaction.
+          val setup: F[Unit] =
+            val af = Statements.createProgramUpdateTempTable(where)
+            session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        // Update programs
-        val updatePrograms: F[Result[List[Program.Id]]] =
-          Statements.updatePrograms(SET).fold(Nil.success.pure[F]): af =>
-            session.prepareR(af.fragment.query(program_id)).use: ps =>
-              ps.stream(af.argument, 1024)
-                .compile
-                .toList
-                .map(_.success)
-                .recover {
-                  case SqlState.CheckViolation(e) if e.constraintName.contains("active_dates_check") =>
-                    OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
-                }
+          // Update programs
+          val updatePrograms: F[Result[List[Program.Id]]] =
+            Statements.updatePrograms(SET).fold(Nil.success.pure[F]): af =>
+              session.prepareR(af.fragment.query(program_id)).use: ps =>
+                ps.stream(af.argument, 1024)
+                  .compile
+                  .toList
+                  .map(_.success)
+                  .recover {
+                    case SqlState.CheckViolation(e) if e.constraintName.contains("active_dates_check") =>
+                      OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+                  }
 
-        (for
-          _   <- ResultT.liftF(setup)
-          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-          ids <- ResultT(updatePrograms)
-        yield ids).value
+          (for
+            _   <- ResultT.liftF(setup)
+            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+            ids <- ResultT(updatePrograms)
+          yield ids).value
+
+      }
 
     }
 

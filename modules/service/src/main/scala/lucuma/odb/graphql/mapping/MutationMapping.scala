@@ -259,7 +259,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       child
     )
 
-  def programUsersResultSubquery(ids: List[ProgramUser.Id], limit: Option[NonNegInt], child: Query) =
+  def programUsersResultSubquery(ids: List[ProgramUser.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     val pred   = Predicates.programUser.id.in(ids)
     val order  = List(
       OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
@@ -825,28 +825,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               )
 
   private lazy val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
-      services.useTransactionally {
-        // Our predicate for selecting programs to update
-        val filterPredicate = and(List(
-          Predicates.program.isWritableBy(user),
-          Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-          input.WHERE.getOrElse(True)
-        ))
-
-        // An applied fragment that selects all program ids that satisfy `filterPredicate`
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
-
-        // Update the specified programs and then return a query for the affected programs.
-        idSelect.flatTraverse { which =>
-          programService.updatePrograms(input.SET, which)
-           .map(
-              _.flatMap(programResultSubquery(_, input.LIMIT, child))
-            )
-        }
-      }
-    }
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>      
+      services.useTransactionally:
+        (for
+          checked <- ResultT(selectForUpdate(input))
+          pids    <- ResultT(programService.updatePrograms(checked))
+          query   <- ResultT.fromResult(programResultSubquery(pids, input.LIMIT, child))
+        yield query).value
 
   private lazy val UpdateProposal =
     MutationField("updateProposal", UpdateProposalInput.Binding) { (input, child) =>
