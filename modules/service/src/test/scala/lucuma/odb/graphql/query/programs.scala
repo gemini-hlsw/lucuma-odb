@@ -17,6 +17,7 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.service.Services
 
 import java.time.LocalDate
 
@@ -107,12 +108,13 @@ class programs extends OdbSuite {
   test("calibration program selection") {
     for {
       pid  <- withServices(service) { s =>
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.Telluric,
-                      Description.unsafeFrom("TELLURIC2"))(using xa)
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.Telluric,
+                        Description.unsafeFrom("TELLURIC2"))(using xa)
                 }
               }
       _    <- expect(
