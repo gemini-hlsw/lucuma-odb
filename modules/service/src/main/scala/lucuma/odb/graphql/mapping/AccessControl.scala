@@ -29,7 +29,9 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
+import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
@@ -46,6 +48,7 @@ import lucuma.odb.syntax.observationWorkflowState.*
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Encoder
+import skunk.Transaction
 import skunk.syntax.stringcontext.*
 
 object AccessControl:
@@ -494,5 +497,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
               Services.asSuperUser:
                 ResultT.pure(AccessControl.unchecked(input.SET, pid, program_id))
     ).value
+
+  def selectForUpdate(
+    input: SetProgramReferenceInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]]] =
+    programService
+      .resolvePid(input.programId, input.proposalReference, input.programReference)
+      .flatMap: r =>
+        r.flatTraverse: pid =>
+          requireStaffAccess: // this is the only access control check
+            Services.asSuperUser:
+              Result(AccessControl.unchecked(input.SET, pid, program_id)).pure[F]
 
 }

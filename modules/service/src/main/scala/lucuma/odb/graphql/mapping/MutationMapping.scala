@@ -620,9 +620,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
       services.useTransactionally:
-        requireStaffAccess:
-          programService.setProgramReference(input).nestMap: (pid, _) =>
-            Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            programService.setProgramReference(checked).nestMap: (pid, _) =>
+              Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
