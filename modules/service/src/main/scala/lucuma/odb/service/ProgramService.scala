@@ -27,7 +27,7 @@ import lucuma.odb.data.*
 import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
-import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -51,7 +51,7 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]]
+  def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -161,22 +161,19 @@ object ProgramService {
                 .failure
           }
 
-      override def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]] = {
-        def validateProposal(pid: Program.Id): F[Result[Unit]] =
-          proposalService.hasProposal(pid).map { hasProposal =>
-            OdbError
-              .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${input.SET.programType.abbreviation} until its proposal is removed.".some)
-              .asFailure
-              .whenA(hasProposal && input.SET.programType != ProgramType.Science)
-          }
-
-        programService.resolvePid(input.programId,input.proposalReference, input.programReference).flatMap: r =>
-          r.flatTraverse: pid =>
-            (for {
-              _ <- ResultT(validateProposal(pid))
-              r <- ResultT(setProgramReferenceImpl(pid, input.SET).map(_.map((pid, _))))
-            } yield r).value
-      }
+      override def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]] = 
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (props, pid) =>
+          def validateProposal(pid: Program.Id): F[Result[Unit]] =
+            proposalService.hasProposal(pid).map { hasProposal =>
+              OdbError
+                .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${props.programType.abbreviation} until its proposal is removed.".some)
+                .asFailure
+                .whenA(hasProposal && props.programType != ProgramType.Science)
+            }
+          (for {
+            _ <- ResultT(validateProposal(pid))
+            r <- ResultT(setProgramReferenceImpl(pid, props).map(_.map((pid, _))))
+          } yield r).value
 
       def validateActivePeriodUpdate[A](active: Option[A]): Result[Unit] =
         OdbError
