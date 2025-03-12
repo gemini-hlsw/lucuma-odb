@@ -289,7 +289,7 @@ class guideEnvironments extends ExecutionTestSupport {
           "guideEnvironments": [
             {
               "posAngle": {
-                "degrees": 160.000000
+                "degrees": 180.000000
               },
               "guideTargets": [
                 {
@@ -411,7 +411,7 @@ class guideEnvironments extends ExecutionTestSupport {
             },
             {
               "posAngle": {
-                "degrees": 50.000000
+                "degrees": 100.000000
               },
               "guideTargets": [
                 {
