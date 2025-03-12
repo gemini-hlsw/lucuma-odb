@@ -12,6 +12,7 @@ import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.service.Services
 
 class targets extends OdbSuite {
 
@@ -180,13 +181,14 @@ class targets extends OdbSuite {
   test("target selection with calibration role") {
     for {
       pid <- withServices(service) { s =>
-              s.session.transaction.use { xa =>
-                s.programService
-                  .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create.Default.some,
-                    CalibrationRole.Telluric,
-                    Description.unsafeFrom("TELLURIC1"))(using xa)
-              }
+              Services.asSuperUser:
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create.Default.some,
+                      CalibrationRole.Telluric,
+                      Description.unsafeFrom("TELLURIC1"))(using xa)
+                }
             }
       tids <- createTargetAs(service, pid).replicateA(5)
       _ <- expect(
@@ -230,13 +232,14 @@ class targets extends OdbSuite {
   test("target selection with mulitple calibration roles") {
     for {
       pid <- withServices(service) { s =>
-              s.session.transaction.use { xa =>
-                s.programService
-                  .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create.Default.some,
-                    CalibrationRole.Photometric,
-                    Description.unsafeFrom("PHOTO"))(using xa)
-              }
+              Services.asSuperUser:
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create.Default.some,
+                      CalibrationRole.Photometric,
+                      Description.unsafeFrom("PHOTO"))(using xa)
+                }
             }
       tids <- createTargetAs(service, pid).replicateA(5)
       _    <-
@@ -281,13 +284,14 @@ class targets extends OdbSuite {
   test("target selection without a specific calibration role") {
     for {
       pid  <- withServices(service) { s =>
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.Telluric,
-                      Description.unsafeFrom("TELLURIC2"))(using xa)
-                }
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.Telluric,
+                        Description.unsafeFrom("TELLURIC2"))(using xa)
+                  }
               }
       tids <- createTargetAs(service, pid).replicateA(5)
       _    <- expect(

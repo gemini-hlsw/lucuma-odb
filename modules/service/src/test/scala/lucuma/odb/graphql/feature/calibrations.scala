@@ -39,6 +39,8 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
 
@@ -566,13 +568,14 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   test("select calibration target") {
     for {
-      tpid <- withServices(service) { s =>
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.SpectroPhotometric,
-                      Description.unsafeFrom("SPECTROTEST"))(using xa)
+      tpid <- withServices(service) { s =>                
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                      s.programService
+                        .insertCalibrationProgram(
+                          ProgramPropertiesInput.Create.Default.some,
+                          CalibrationRole.SpectroPhotometric,
+                          Description.unsafeFrom("SPECTROTEST"))(using xa)
                 }
               }
       // PI program

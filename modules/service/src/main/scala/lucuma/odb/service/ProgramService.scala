@@ -28,6 +28,7 @@ import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -40,11 +41,6 @@ import OdbErrorExtensions.*
 import Services.Syntax.*
 
 trait ProgramService[F[_]] {
-
-  /**
-   * Find the program id matching the given reference, if any.
-   */
-  def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
 
   /**
    * Convenience method. Find the program id consistent with the provided ids (if any).
@@ -65,8 +61,9 @@ trait ProgramService[F[_]] {
 
   /**
    * Insert a new calibration program, PI is left empty.
+   * N.B. Calibration programs are created as part of the database schema; this method is only called from tests.
    */
-  def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id]
+  def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id]
 
   /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
   def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
@@ -234,7 +231,7 @@ object ProgramService {
         }
 
 
-      def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id] =
+      def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id] =
         Trace[F].span("insertCalibrationProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
