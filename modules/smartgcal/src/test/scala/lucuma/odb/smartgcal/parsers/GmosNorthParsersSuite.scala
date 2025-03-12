@@ -52,7 +52,10 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
       )
 
     assertEquals(
-      gmosNorth.fileKey.parseAll(definition).map(_.tableKeys),
+      gmosNorth.fileKey.parseAll(definition).map {
+        case Availability.Current(a) => a.tableKeys
+        case _                       => sys.error("Not expecting obsolete value here.")
+      },
       Right(expected)
     )
 
@@ -81,7 +84,10 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
       )
 
     assertEquals(
-      gmosNorth.fileKey.parseAll(definition).map(_.tableKeys),
+      gmosNorth.fileKey.parseAll(definition).map {
+        case Availability.Current(a) => a.tableKeys
+        case _                       => sys.error("Not expecting obsolete value here")
+      },
       Right(expected)
     )
 
