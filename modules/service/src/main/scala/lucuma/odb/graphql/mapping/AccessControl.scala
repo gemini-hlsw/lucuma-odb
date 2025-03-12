@@ -29,6 +29,7 @@ import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
+import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
@@ -36,6 +37,7 @@ import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -508,5 +510,19 @@ trait AccessControl[F[_]] extends Predicates[F] {
           requireStaffAccess: // this is the only access control check
             Services.asSuperUser:
               Result(AccessControl.unchecked(input.SET, pid, program_id)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateProgramsInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.Checked[ProgramPropertiesInput.Edit]]] =
+    MappedQuery(Filter(and(List(
+      Predicates.program.isWritableBy(user),
+      Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+      input.WHERE.getOrElse(True)
+    )), Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType)))
+      .flatMap(_.fragment)
+      .map: frag =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, frag)
+      .pure[F]
 
 }
