@@ -528,7 +528,7 @@ object GuideService {
       extension (usable: AgsAnalysis.Usable)
         def toGuideEnvironment: GuideEnvironment =
           val target = GuideStarCandidate.siderealTarget.reverseGet(usable.target)
-          GuideEnvironment(usable.vignetting.head._1, List(GuideTarget(usable.guideProbe, target)))
+          GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
         pid: Program.Id,
@@ -570,7 +570,6 @@ object GuideService {
                        candidates
           )
           .sortUsablePositions
-          .collect { case usable: AgsAnalysis.Usable => usable }
       
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
@@ -591,7 +590,6 @@ object GuideService {
                        candidates.toList
           )
           .sortUsablePositions
-          .collect { case usable: AgsAnalysis.Usable => usable }
           .headOption
 
       def buildAvailabilityAndCache(
@@ -722,7 +720,7 @@ object GuideService {
           .collect { case u: AgsAnalysis.Usable => u }
           .scan(SortedMap.empty[Angle, Timestamp]){ (map, usable) =>
             val invalidDate = usable.target.tracking.invalidDate(start)
-            val angle       = usable.vignetting.head._1
+            val angle       = usable.posAngle
             // Always keep the oldest invalidation date for each angle
             map.updatedWith(angle)(_.fold(invalidDate)(_.max(invalidDate)).some)
           }
