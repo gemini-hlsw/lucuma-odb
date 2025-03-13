@@ -4,7 +4,6 @@
 package lucuma.odb.sequence
 
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepConfig

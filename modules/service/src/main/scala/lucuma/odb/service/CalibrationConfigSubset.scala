@@ -22,7 +22,6 @@ import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.gmos.longslit.Config
-import lucuma.odb.service.Services.Syntax.*
 
 sealed trait CalibrationConfigSubset derives Eq
 

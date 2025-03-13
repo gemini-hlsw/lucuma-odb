@@ -16,10 +16,10 @@ trait GmosCommonParsers {
   import util.*
 
   val xBinning: Parser[GmosXBinning] =
-    oneOf(GmosXBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
+    oneOf(GmosXBinning.values.toList.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
 
   val yBinning: Parser[GmosYBinning] =
-    oneOf(GmosYBinning.all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
+    oneOf(GmosYBinning.values.toList.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
 
   val order: Parser[NonEmptyList[GmosGratingOrder]] =
     manyOf(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")

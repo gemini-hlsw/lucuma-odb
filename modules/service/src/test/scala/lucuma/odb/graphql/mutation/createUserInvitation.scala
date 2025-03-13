@@ -23,7 +23,6 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import org.http4s.Charset
 import org.http4s.UrlForm
