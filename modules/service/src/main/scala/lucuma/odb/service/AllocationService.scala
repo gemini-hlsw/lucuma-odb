@@ -15,7 +15,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
-import lucuma.odb.graphql.input.SetAllocationsInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -30,7 +30,7 @@ trait AllocationService[F[_]] {
    */
   def selectScienceBands(pid: Program.Id): F[Set[ScienceBand]]
 
-  def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]]
+  def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Unit]]
 
   /**
    * Validates that the given `band` may be assigned to observations in the
@@ -57,15 +57,18 @@ object AllocationService {
           }
         }
 
-      def setAllocations(input: SetAllocationsInput)(using Transaction[F], Services.StaffAccess): F[Result[Unit]] =
-        deleteAllocations(input.programId) *>
-        NonEmptyList.fromList(input.allocations).traverse_ { lst =>
-          session.execute(Statements.setAllocations(lst))((input.programId, lst))
-        }                                  *>
-        session
-          .execute(Statements.SetScienceBandWhereNull)(input.programId, input.bands.head)
-          .whenA(input.bands.sizeIs == 1)  *>
-        validateObservations(input)
+      override def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Unit]] =
+        input.foldWithId(OdbError.InvalidArgument().asFailureF) { (allocations, pid) =>
+          val bands = allocations.map(_.scienceBand).toSet
+          deleteAllocations(pid) *>
+          NonEmptyList.fromList(allocations).traverse_ { lst =>
+            session.execute(Statements.setAllocations(lst))((pid, lst))
+          }                                  *>
+          session
+            .execute(Statements.SetScienceBandWhereNull)(pid, bands.head)
+            .whenA(bands.sizeIs == 1)  *>
+          validateObservations(bands, pid)
+        }
 
       private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
         session.execute(Statements.DeleteAllocations)(pid).void
@@ -73,10 +76,10 @@ object AllocationService {
       // If any observations have already been assigned bands which are not in
       // the given SetAllocationsInput, then generate a warning result listing
       // them.
-      private def validateObservations(input: SetAllocationsInput)(using Transaction[F]): F[Result[Unit]] =
-        val noneBands  = session.execute(Statements.ObservationsWithNonNullBand)(input.programId)
-        NonEmptyList.fromList(input.bands.toList).fold(noneBands) { nel =>
-          session.execute(Statements.invalidObservationsForBands(nel))(input.programId, nel)
+      private def validateObservations(bands: Set[ScienceBand], pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
+        val noneBands  = session.execute(Statements.ObservationsWithNonNullBand)(pid)
+        NonEmptyList.fromList(bands.toList).fold(noneBands) { nel =>
+          session.execute(Statements.invalidObservationsForBands(nel))(pid, nel)
         }.map {
           case Nil => Result.unit
           case os  => OdbError.InvalidArgument(s"The following observations now have a science band for which no time is allocated: ${os.mkString(", ")}".some).asWarning(())
