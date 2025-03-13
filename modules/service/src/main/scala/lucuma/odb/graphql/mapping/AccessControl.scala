@@ -22,6 +22,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -32,6 +33,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
@@ -531,5 +533,12 @@ trait AccessControl[F[_]] extends Predicates[F] {
   ): F[Result[AccessControl.Checked[Option[ProgramPropertiesInput.Create]]]] =
     Services.asSuperUser:
       Result(AccessControl.unchecked(input.SET, AppliedFragment.empty)).pure[F] // always ok, for now
+
+  def selectForUpdate(
+    input: SetAllocationsInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[List[AllocationInput], Program.Id]]] =
+    requireStaffAccess: // this is the only check
+      Services.asSuperUser:
+        Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
 
 }

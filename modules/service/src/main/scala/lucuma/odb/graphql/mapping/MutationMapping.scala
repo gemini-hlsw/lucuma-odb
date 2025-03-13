@@ -594,11 +594,11 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetAllocations =
     MutationField("setAllocations", SetAllocationsInput.Binding): (input, child) =>
       services.useTransactionally:
-        requireStaffAccess:
-          allocationService.setAllocations(input).map(_ *>
-            allocationResultSubquery(input.programId, child)
-          )
-
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            allocationService.setAllocations(checked).map(_ *>
+              allocationResultSubquery(input.programId, child)
+            )
 
   private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
