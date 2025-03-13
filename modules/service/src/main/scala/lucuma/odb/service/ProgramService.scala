@@ -51,13 +51,17 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
+  def setProgramReference(
+    input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]
+  )(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]]
+  def insertProgram(
+    input: AccessControl.Checked[Option[ProgramPropertiesInput.Create]]
+  )(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Insert a new calibration program, PI is left empty.
@@ -65,7 +69,9 @@ trait ProgramService[F[_]] {
    */
   def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id]
 
-  def updatePrograms(input: AccessControl.Checked[ProgramPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Program.Id]]]
+  def updatePrograms(
+    input: AccessControl.Checked[ProgramPropertiesInput.Edit]
+  )(using Transaction[F]): F[Result[List[Program.Id]]]
 
 }
 
@@ -194,40 +200,46 @@ object ProgramService {
               case _                                            => period.isEmpty
           )
 
-      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]] =
-        Trace[F].span("insertProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
+      def insertProgram(
+        input: AccessControl.Checked[Option[ProgramPropertiesInput.Create]]
+      )(using Transaction[F]): F[Result[Program.Id]] =
+        input.fold(OdbError.InvalidArgument().asFailureF): (SET, _) =>
+          Trace[F].span("insertProgram") {
+            val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
-          val create =
-            session
-              .prepareR(Statements.InsertProgram)
-              .use(_.unique(SETʹ))
-              .flatTap: pid =>
-                user match
-                  case ServiceUser(_, _) =>
-                    Concurrent[F].unit
-                  case nonServiceUser    =>
-                    // Link the PI to the program.
-                    programUserService.addAndLinkPi(pid).void
-              .map(_.success)
+            val create =
+              session
+                .prepareR(Statements.InsertProgram)
+                .use(_.unique(SETʹ))
+                .flatTap: pid =>
+                  user match
+                    case ServiceUser(_, _) =>
+                      Concurrent[F].unit
+                    case nonServiceUser    =>
+                      // Link the PI to the program.
+                      programUserService.addAndLinkPi(pid).void
+                .map(_.success)
 
-          val proprietaryMonths =
-            SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
+            val proprietaryMonths =
+              SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
 
-          def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
-            val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
-            updatePrograms(
-              Services.asSuperUser:
-                AccessControl.unchecked(edit, p, program_id)
-            ).map(_.void)
+            def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
+              val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
+              updatePrograms(
+                Services.asSuperUser:
+                  // Irritating, we need to reign in the bare AppliedFragments because there's no 
+                  // way to know what form they should take. Sometimes it's IN (frag), other
+                  // times (as below) it's FROM (frag) and you need a SELECT in there.
+                  AccessControl.unchecked(edit, sql"select $program_id".apply(p))
+              ).map(_.void)
 
-          (for {
-            _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
-            _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
-            p <- ResultT(create)
-            _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
-          } yield p).value
-        }
+            (for {
+              _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
+              _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
+              p <- ResultT(create)
+              _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
+            } yield p).value
+          }
 
 
       def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id] =
