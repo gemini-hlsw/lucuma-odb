@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
 case class LinkUserInput(

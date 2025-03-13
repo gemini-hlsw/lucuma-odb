@@ -35,7 +35,6 @@ import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
-import lucuma.core.syntax.all.*
 import lucuma.core.util.Enumerated
 import monocle.Lens
 

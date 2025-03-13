@@ -6869,11 +6869,6 @@ enum Flamingos2Filter {
   Y
 
   """
-  Flamingos2Filter F1056 (1.056 um)
-  """
-  F1056
-
-  """
   Flamingos2Filter J (1.25 um)
   """
   J
@@ -6909,24 +6904,9 @@ enum Flamingos2Filter {
   K_SHORT
 
   """
-  Flamingos2Filter F1063 (1.063 um)
-  """
-  F1063
-
-  """
   Flamingos2Filter K-blue (2.06 um)
   """
   K_BLUE
-
-  """
-  Flamingos2Filter Open
-  """
-  OPEN
-
-  """
-  Flamingos2Filter Dark
-  """
-  DARK
 
 }
 
