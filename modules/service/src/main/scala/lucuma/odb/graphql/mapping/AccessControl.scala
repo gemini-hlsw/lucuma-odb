@@ -52,6 +52,7 @@ import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Transaction
 import skunk.syntax.stringcontext.*
+import lucuma.odb.graphql.input.CreateProgramInput
 
 object AccessControl:
 
@@ -524,5 +525,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, frag)
       .pure[F]
+
+  def selectForUpdate(
+    input: CreateProgramInput
+  ): F[Result[AccessControl.Checked[Option[ProgramPropertiesInput.Create]]]] =
+    Services.asSuperUser:
+      Result(AccessControl.unchecked(input.SET, AppliedFragment.empty)).pure[F] // always ok, for now
 
 }
