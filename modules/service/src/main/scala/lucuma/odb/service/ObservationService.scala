@@ -66,8 +66,6 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Codecs.group_id
-import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException

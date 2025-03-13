@@ -25,7 +25,6 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -38,7 +37,7 @@ import binding.*
 import table.*
 
 trait TargetEnvironmentMapping[F[_]: Temporal]
-  extends ObservationEffectHandler[F] 
+  extends ObservationEffectHandler[F]
      with AsterismTargetTable[F]
      with ObservationView[F]
      with Predicates[F]
@@ -129,7 +128,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
             .getObjectTracking(pid, oid)
             .map(_.map(_.at(obsTime.toInstant).map(_.value)))
         }
-    
+
     effectHandler(readEnv, calculate)
   }
 

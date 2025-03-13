@@ -19,7 +19,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.json.coordinates.query.given
@@ -59,7 +58,7 @@ trait ConfigurationMapping[F[_]]
       // N.B. the reference time here has no zone information, so it's interpreted as UTC. This will
       // almost certainly never matter, but if it does matter at some point then we can change it
       // to use the timezone of the site associated with the instrument. In any case this value is
-      // a computed column in the view and is the midpoint of the active period for the observation's 
+      // a computed column in the view and is the midpoint of the active period for the observation's
       // associated CFP (if any). The reference time is used when computing coordintes for approved
       // configurations; it is not related to visualization time.
       SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
@@ -71,7 +70,7 @@ trait ConfigurationMapping[F[_]]
 
   // Use GuideService.getObjectTrackikng to compute thet location of this observation's asterism at the middle
   // of the CFP's active period (if we can).
-  def referencePositionQueryHandler: EffectHandler[F] = 
+  def referencePositionQueryHandler: EffectHandler[F] =
 
     // N.B. we can't use ObservationEffectHandler here because it doesn't gather all the infomation we need from
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
@@ -79,11 +78,11 @@ trait ConfigurationMapping[F[_]]
 
       def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Coordinates]]] =
         oRefTime match
-          case None     => 
+          case None     =>
             // If there is no reference time then we can't compute the reference coordinates in general,
             // although we could do it for sidereal asterisms with no proper motion. At this point I don't
             // think it's worthwhile; this computation is only meaningful for fully-defined programs.
-            Result(None).pure[F]                                              
+            Result(None).pure[F]
           case Some(refTime) =>
             services.use { implicit s =>
               s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)

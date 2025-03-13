@@ -16,16 +16,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CallForProposalsType
-import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.EducationalStatus
-import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.PartnerLinkType
-import lucuma.core.enums.ProgramUserRole
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
