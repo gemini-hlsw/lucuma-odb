@@ -282,7 +282,7 @@ object ProgramService {
 
     }
 
-  object Statements {
+  private object Statements {
 
     def selectPid(ref: Ior[ProposalReference, ProgramReference]): AppliedFragment =
       void"""
