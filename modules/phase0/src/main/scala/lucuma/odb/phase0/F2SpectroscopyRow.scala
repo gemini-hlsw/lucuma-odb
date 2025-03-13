@@ -29,7 +29,7 @@ object F2SpectroscopyRow:
           l <- r.filter
                  .toRight("Flamingos 2 spectroscopy requires a filter")
                  .flatMap: f =>
-                    Enumerated[F2Filter].all.find(a => a.shortName === f && !a.obsolete)
+                    Enumerated[F2Filter].all.find(a => a.shortName === f)
                       .toRight(s"Cannot find filter: $f. Does a non-obsolete value exist in the Enumerated?")
           u <- Enumerated[F2Fpu].all.find(_.shortName === r.fpu).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
         } yield F2SpectroscopyRow(r, g, l, u)

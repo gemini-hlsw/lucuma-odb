@@ -24,7 +24,6 @@ import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.*
-import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CreateProposalInput
 import lucuma.odb.graphql.input.DeleteProposalInput
@@ -426,10 +425,10 @@ object ProposalService {
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
                     yield pid
-                  go2.value 
+                  go2.value
           .value
 
-      }                
+      }
     }
 
   private object Statements {

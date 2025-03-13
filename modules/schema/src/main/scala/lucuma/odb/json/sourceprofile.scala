@@ -50,7 +50,6 @@ import lucuma.core.model.UnnormalizedSED.StellarLibrary
 import lucuma.core.model.UnnormalizedSED.UserDefined
 import lucuma.core.model.UnnormalizedSED.UserDefinedAttachment
 import lucuma.core.util.*
-import lucuma.core.util.Enumerated
 
 import scala.collection.immutable.SortedMap
 

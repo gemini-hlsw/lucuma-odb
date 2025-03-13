@@ -19,14 +19,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CallForProposalsType
-import lucuma.core.enums.EmailStatus
-import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.PartnerLinkType
-import lucuma.core.enums.ProgramUserRole
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Declination
@@ -38,12 +30,8 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ElevationRange.AirMass
 import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.core.model.PartnerLink
-import lucuma.core.model.ProgramUser
-import lucuma.core.model.UserInvitation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset

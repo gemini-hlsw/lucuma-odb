@@ -15,7 +15,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import munit.Location
 import munit.ScalaCheckSuite
-import org.scalacheck.Prop.*
 
 class ScienceSuite extends ScalaCheckSuite {
 
