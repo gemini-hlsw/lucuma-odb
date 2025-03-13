@@ -24,6 +24,7 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateObservationInput
+import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -52,7 +53,6 @@ import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Transaction
 import skunk.syntax.stringcontext.*
-import lucuma.odb.graphql.input.CreateProgramInput
 
 object AccessControl:
 
