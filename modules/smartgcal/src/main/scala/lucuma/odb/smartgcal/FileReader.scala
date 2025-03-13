@@ -10,6 +10,8 @@ import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
 import fs2.text
+import lucuma.odb.smartgcal.parsers.Availability
+import lucuma.odb.smartgcal.parsers.Availability.*
 
 object FileReader {
 
@@ -33,19 +35,18 @@ object FileReader {
      .drop(2)                               // drop version and header
   }
 
-  def read[F[_], A](n: String, p: Parser[A])(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, A)] =
+  def read[F[_], A](n: String, p: Parser[Availability[A]])(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, A)] =
     _.through(entryLines)
-     .flatMap { case (lineNumber, s) =>
-       p.parseAll(s) match {
-         case Left(e)  => Stream.raiseError[F](new ReadException(n, lineNumber, e))
-         case Right(a) => Stream.emit[F, (PosLong, A)](lineNumber -> a)
-       }
-     }
+     .flatMap: (lineNumber, s) =>
+       p.parseAll(s) match
+         case Left(e)           => Stream.raiseError[F](new ReadException(n, lineNumber, e))
+         case Right(Obsolete)   => Stream.empty
+         case Right(Current(a)) => Stream.emit[F, (PosLong, A)](lineNumber -> a)
 
   def gmosNorth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.North)] =
     read(fileName, parsers.gmosNorth.fileEntry)
 
   def gmosSouth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.South)] =
-    read(fileName, parsers.gmosSouth.fileEntry)
+    read(fileName, parsers.gmosSouth.fileEntry.map(Current.apply))
 
 }
