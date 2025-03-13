@@ -730,24 +730,14 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateAttachments =
-    MutationField("updateAttachments", UpdateAttachmentsInput.binding(Path.from(AttachmentType))) { (input, child) =>
-      services.useTransactionally {
-        val filterPredicate = and(List(
-          Predicates.attachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
-
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(
-            Filter(filterPredicate, Select("id", Empty)),
-            Context(QueryType, List("attachments"), List("attachments"), List(AttachmentType))
-          ).flatMap(_.fragment)
-
-        idSelect.flatTraverse { which =>
-          attachmentMetadataService.updateAttachments(input.SET, which).map(attachmentResultSubquery(_, input.LIMIT, child))
-        }
-      }
-    }
+    MutationField("updateAttachments", UpdateAttachmentsInput.binding(Path.from(AttachmentType))): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            attachmentMetadataService
+              .updateAttachments(checked)
+              .map: r =>
+                r.flatMap(attachmentResultSubquery(_, input.LIMIT, child))
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>

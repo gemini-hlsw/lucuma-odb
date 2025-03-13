@@ -23,6 +23,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
@@ -38,6 +39,7 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateAttachmentsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
@@ -540,5 +542,19 @@ trait AccessControl[F[_]] extends Predicates[F] {
     requireStaffAccess: // this is the only check
       Services.asSuperUser:
         Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateAttachmentsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =
+    MappedQuery(
+      Filter(and(List(
+        Predicates.attachment.program.isWritableBy(user),
+        input.WHERE.getOrElse(True)
+      )), Select("id", Empty)),
+      Context(QueryType, List("attachments"), List("attachments"), List(AttachmentType))
+    ) .flatMap(_.fragment)
+      .traverse: af =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, af).pure[F]
 
 }
