@@ -278,17 +278,17 @@ object ObservationWorkflowService {
                     oid -> info.copy(programAllocations = result.get(info.pid))
 
         def addItcResults(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-            itcService(itcClient)
-              .selectAll:
-                input
-                  .view
-                  .mapValues(_.generatorParams)
-                  .collect:
-                    case (id, Some(Right(params))) => id -> params
-                  .toMap
-              .map: results =>
-                input.map: (oid, info) =>
-                  oid -> info.copy(itcResults = results.get(oid))
+          itcService(itcClient)
+            .selectAll:
+              input
+                .view
+                .mapValues(_.generatorParams)
+                .collect:
+                  case (id, Some(Right(params))) => id -> params
+                .toMap
+            .map: results =>
+              input.map: (oid, info) =>
+                oid -> info.copy(itcResults = results.get(oid))
 
         ResultT.liftF:
           NonEmptyList.fromList(oids) match
