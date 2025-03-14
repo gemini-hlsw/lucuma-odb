@@ -27,6 +27,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val CalibrationRole: ColumnRef     = col("c_calibration_role",     calibration_role.opt)
       val ObserverNotes: ColumnRef       = col("c_observer_notes",       text_nonempty.opt)
       val ReferenceTime: ColumnRef       = col("c_reference_time",       core_timestamp.opt)
+      val DeclaredComplete: ColumnRef    = col("c_declared_complete",    bool)
 
       object PlannedTime {
         val Pi        = col("c_pts_pi", time_span)

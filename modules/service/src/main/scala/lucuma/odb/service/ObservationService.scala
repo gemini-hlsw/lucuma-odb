@@ -68,6 +68,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -259,20 +260,9 @@ object ObservationService {
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] = {
-        val existenceOff = ObservationPropertiesInput.Edit(
-          Nullable.Absent,
-          Nullable.Absent,
-          None,
-          None,
-          None,
-          Nullable.Absent,
-          Nullable.Absent,
-          None,
-          Nullable.Absent,
-          Some(Existence.Deleted),
-          Nullable.Null,
-          None,
-          Nullable.Absent,
+        val existenceOff = ObservationPropertiesInput.Edit.Empty.copy(
+          existence = Existence.Deleted.some,
+          group     = Nullable.Null
         )
 
         // delete targets, asterisms and observations
@@ -552,7 +542,8 @@ object ObservationService {
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
-          SET.observerNotes
+          SET.observerNotes,
+          SET.declaredComplete.getOrElse(false)
         )
       }
 
@@ -570,7 +561,8 @@ object ObservationService {
       scienceRequirements: Option[ScienceRequirementsInput],
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
-      observerNotes:       Option[NonEmptyString]
+      observerNotes:       Option[NonEmptyString],
+      declaredComplete:    Boolean
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -622,7 +614,8 @@ object ObservationService {
            spectroscopy.flatMap(_.capability.toOption)                              ,
            modeType                                                                 ,
            instrument                                                               ,
-           observerNotes
+           observerNotes                                                            ,
+           declaredComplete
         )
       }
 
@@ -667,7 +660,8 @@ object ObservationService {
       Option[SpectroscopyCapabilities] ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
-      Option[NonEmptyString]
+      Option[NonEmptyString]           ,
+      Boolean
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -703,7 +697,8 @@ object ObservationService {
           c_spec_capability,
           c_observing_mode_type,
           c_instrument,
-          c_observer_notes
+          c_observer_notes,
+          c_declared_complete
         )
         SELECT
           $program_id,
@@ -738,7 +733,8 @@ object ObservationService {
           ${spectroscopy_capabilities.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
-          ${text_nonempty.opt}
+          ${text_nonempty.opt},
+          $bool
       """
 
     def selectObservingModes(
@@ -865,6 +861,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upDeclaredComplete  = sql"c_declared_complete = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -872,6 +869,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
+          SET.declaredComplete.map(upDeclaredComplete)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
