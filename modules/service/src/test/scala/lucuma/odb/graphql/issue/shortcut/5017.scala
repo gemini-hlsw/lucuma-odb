@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.effect.std.AtomicCell
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
@@ -116,6 +117,24 @@ class ShortCut_5017 extends ExecutionTestSupport:
       }
     """
 
+    def cacheItc(o: Observation.Id): IO[Unit] =
+      query(
+        user  = pi,
+        query = s"""
+          query {
+            observation(observationId: "$o") {
+              itc {
+                science {
+                  selected {
+                    exposureTime { seconds }
+                  }
+                }
+              }
+            }
+          }
+        """
+      ).void
+
     // workflow state and remaining time (microseconds)
     def currentState(o: Observation.Id): IO[(ObservationWorkflowState, Long)] =
       query(
@@ -128,11 +147,24 @@ class ShortCut_5017 extends ExecutionTestSupport:
           t <- c.downFields("execution", "digest", "science", "timeEstimate", "total", "microseconds").as[Long]
         yield (s, t)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
-    val obtained =
+    val result =
       for
-        init     <- setup
-        executed <- currentState(init._1)
-        // TODO: mark a dataset failed, sample current state again, expect ONGOING with time left
-      yield executed
+        // Execute the observation completely and ask for the current state
+        init      <- setup
+        obs        = init._1
+        _         <- cacheItc(obs) // required for workflow computation
+        completed <- currentState(obs)
 
-    assertIO(obtained, (ObservationWorkflowState.Completed, 0L))
+        // Now mark a dataset failed and ask for the state again
+        dataset    = init._2._2.map(_._2).last  // last science dataset
+        _         <- setQaState(dataset, DatasetQaState.Fail)
+        ongoing   <- currentState(obs)
+      yield (completed, ongoing)
+
+    assertIOBoolean(
+      result.map: (completed, ongoing) =>
+        completed._1 === ObservationWorkflowState.Completed &&
+        ongoing._1   === ObservationWorkflowState.Ongoing   &&
+        completed._2 === 0L  /* no time remaining */        &&
+        ongoing._2   >   0L  // some time remaining
+    )
