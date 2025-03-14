@@ -86,6 +86,7 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       EffectField("workflow", workflowQueryHandler, List("id", "programId")),
+      SqlField("declaredComplete", ObservationView.DeclaredComplete)
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

@@ -60,6 +60,7 @@ object WhereObservation {
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
     val InstrumentBinding = WhereOptionEq.binding(path / "instrument", enumeratedBinding[Instrument])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
+    val DeclaredCompleteBinding = WhereBoolean.binding(path / "declaredComplete", BooleanBinding)
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -73,10 +74,11 @@ object WhereObservation {
         SubtitleBinding.Option("subtitle", rSubtitle),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
         InstrumentBinding.Option("instrument", rInstrument),
-        SiteBinding.Option("site", rSite)
+        SiteBinding.Option("site", rSite),
+        DeclaredCompleteBinding.Option("declaredComplete", rComplete)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rSite).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, site) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rSite, rComplete).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, site, complete) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -87,7 +89,8 @@ object WhereObservation {
               subtitle,
               scienceBand,
               instrument,
-              site
+              site,
+              complete
             ).flatten)
         }
     }

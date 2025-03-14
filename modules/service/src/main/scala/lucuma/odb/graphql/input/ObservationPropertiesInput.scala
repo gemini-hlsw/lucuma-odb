@@ -48,6 +48,7 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
+    declaredComplete:    Option[Boolean]
   ) extends AsterismInput
 
   object Create {
@@ -70,6 +71,7 @@ object ObservationPropertiesInput {
         group               = None,
         groupIndex          = None,
         observerNotes       = None,
+        declaredComplete    = false.some
       )
 
     val Binding: Matcher[Create] =
@@ -88,6 +90,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
+          BooleanBinding.Option("declaredComplete", rComplete)
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -102,6 +105,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rComplete
           ).parMapN(Create.apply)
       }
 
@@ -121,6 +125,7 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
+    declaredComplete:    Option[Boolean]
   ) extends AsterismInput
 
   object Edit {
@@ -140,6 +145,7 @@ object ObservationPropertiesInput {
         group =               Nullable.Absent,
         groupIndex =          None,
         observerNotes =       Nullable.Absent,
+        declaredComplete =    None
       )
 
     val Binding: Matcher[Edit] =
@@ -158,6 +164,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
+          BooleanBinding.Option("declaredComplete", rComplete)
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -172,6 +179,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rComplete
           ).parMapN(apply)
       }
   }

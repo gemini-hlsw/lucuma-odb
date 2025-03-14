@@ -532,6 +532,29 @@ trait DatabaseOperations { this: OdbSuite =>
     )
 
 
+  def setDeclaredComplete(user: User, oid: Observation.Id, declaredComplete: Boolean = true): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateObservations(
+            input: {
+              SET: {
+                declaredComplete: $declaredComplete
+              }
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }
+          ) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
   def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
     query(
       user,

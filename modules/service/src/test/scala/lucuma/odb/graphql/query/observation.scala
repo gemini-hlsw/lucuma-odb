@@ -57,6 +57,7 @@ class observation extends OdbSuite {
                       centralWavelength: { nanometers: 500 }
                     }
                   }
+                  declaredComplete: false
                 }
               }
             ) {
