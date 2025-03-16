@@ -1,6 +1,6 @@
 val catsParseVersion           = "1.1.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.10"
+val circeVersion               = "0.14.11"
 val circeRefinedVersion        = "0.15.1"
 val cirisVersion               = "3.7.0"
 val clueVersion                = "0.43.1"
