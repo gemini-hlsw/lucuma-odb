@@ -335,6 +335,7 @@ object ObservationWorkflowService {
               .collect[(Observation.Id, ExecutionState)]:
                 case (oid, ExecutionState.Ongoing) => oid -> Ongoing
                 case (oid, ExecutionState.Completed) => oid -> Completed
+                case (oid, ExecutionState.DeclaredComplete) => oid -> Completed
               .toMap
 
       // Compute the observation status, as well as a list of legal transitions,
@@ -414,9 +415,9 @@ object ObservationWorkflowService {
 
         val generatorValidator: Validator = info =>
           info.generatorParams.foldMap:
-            case Left(error)                              => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(Left(m), _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                => ObservationValidationMap.empty
+            case Left(error)                                 => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(Left(m), _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                   => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>

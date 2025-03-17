@@ -9,6 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
@@ -145,7 +146,10 @@ sealed trait Generator[F[_]] {
     observationId: Observation.Id
   )(using NoTransaction[F]): F[ExecutionState]
 
-  /** Equivalent to executionState above, but uses provided asterism results and generator params rather than computing them. */
+  /**
+   * Equivalent to executionState above, but uses provided asterism results and
+   * generator params rather than computing them.
+   */
   def executionState(
     pid:    Program.Id,
     oid:    Observation.Id,
@@ -153,7 +157,7 @@ sealed trait Generator[F[_]] {
     params: GeneratorParams,
   ): F[ExecutionState]
 
-  /** Equivalent to executionStates above, but computes many results. */
+  /** Equivalent to executionState above, but computes many results. */
   def executionStates(
     input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
   )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]]
@@ -368,19 +372,22 @@ object Generator {
       type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
       private def protoExecutionConfig[S, D](
-        oid:      Observation.Id,
+        ctx:      Context,
         gen:      ExecutionConfigGenerator[S, D],
         steps:    Stream[F, StepRecord[D]],
         resetAcq: Boolean,
         when:     Option[Timestamp]
       )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
-        val visits = services.visitService.selectAll(oid)
-        EitherT.liftF(services.transactionally {
-          for {
-            t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
-            p <- gen.executionConfig(visits, steps, resetAcq, t)
-          } yield p
-        })
+        if ctx.params.declaredComplete then
+          EitherT.pure((ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete))
+        else
+          val visits = services.visitService.selectAll(ctx.oid)
+          EitherT.liftF(services.transactionally {
+            for {
+              t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
+              p <- gen.executionConfig(visits, steps, resetAcq, t)
+            } yield p
+          })
 
       private def gmosNorthLongSlit(
         ctx:      Context,
@@ -393,7 +400,7 @@ object Generator {
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
-          p <- protoExecutionConfig(ctx.oid, g, srs, resetAcq, when)
+          p <- protoExecutionConfig(ctx, g, srs, resetAcq, when)
         } yield p
 
       private def gmosSouthLongSlit(
@@ -407,7 +414,7 @@ object Generator {
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
-          p <- protoExecutionConfig(ctx.oid, g, srs, resetAcq, when)
+          p <- protoExecutionConfig(ctx, g, srs, resetAcq, when)
         } yield p
 
       private def calcDigestFromContext(
@@ -418,11 +425,11 @@ object Generator {
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete) =>
             gmosNorthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete) =>
             gmosSouthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
         )
@@ -446,11 +453,11 @@ object Generator {
         when:     Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _) =>
             gmosNorthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _) =>
             gmosSouthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 
@@ -460,28 +467,36 @@ object Generator {
         setupTime: SetupTime
       ): Either[Error, ExecutionDigest] =
 
-        // Compute the sequence digest from the stream by folding over the steps.
-        def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
-          s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
-            eDigest.flatMap: digest =>
-              digest
-                .incrementAtomCount
-                .filter(_.atomCount.value <= SequenceAtomLimit)
-                .toRight(SequenceTooLong)
-                .map: incDigest =>
-                  atom.steps.foldLeft(incDigest) { case (d, s) =>
-                    d.add(s.observeClass)
-                     .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
-                     .add(s.telescopeConfig.offset)
-                     .copy(executionState = execState)
-                  }
-          }.toList.head
+        if execState === ExecutionState.DeclaredComplete then
+          ExecutionDigest(
+            SetupTime.Zero,
+            SequenceDigest.Zero.copy(executionState = execState),
+            SequenceDigest.Zero.copy(executionState = execState)
+          ).asRight
+        else
+          // Compute the sequence digest from the stream by folding over the steps.
+          def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
+            s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
+              eDigest.flatMap: digest =>
+                digest
+                  .incrementAtomCount
+                  .filter(_.atomCount.value <= SequenceAtomLimit)
+                  .toRight(SequenceTooLong)
+                  .map: incDigest =>
+                    atom.steps.foldLeft(incDigest) { case (d, s) =>
+                      d.add(s.observeClass)
+                       .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
+                       .add(s.telescopeConfig.offset)
+                       .copy(executionState = execState)
+                    }
+            }.toList.head
 
-        // Compute the SequenceDigests.
-        for
-          a <- sequenceDigest(proto.acquisition)
-          s <- sequenceDigest(proto.science)
-        yield ExecutionDigest(setupTime, a, s)
+          // Compute the SequenceDigests.
+          for
+            a <- sequenceDigest(proto.acquisition)
+            s <- sequenceDigest(proto.science)
+          yield ExecutionDigest(setupTime, a, s)
+        end if
 
       private def executionConfig[S, D](
         proto:       ProtoExecutionConfig[S, Atom[D]],
