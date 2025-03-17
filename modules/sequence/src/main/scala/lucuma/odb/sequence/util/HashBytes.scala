@@ -71,6 +71,10 @@ object HashBytes {
       toByteArray(BigInt(a), 2)
   }
 
+  given HashBytes[Boolean] with
+    def hashBytes(a: Boolean): Array[Byte] =
+      HashBytes[Int].hashBytes(a.hashCode)
+
   given given_HashBytes_Gid[A: Gid]: HashBytes[A] with {
     def hashBytes(a: A): Array[Byte] =
       Array.concat(

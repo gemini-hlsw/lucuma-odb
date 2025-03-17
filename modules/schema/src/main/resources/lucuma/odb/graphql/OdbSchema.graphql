@@ -9015,6 +9015,8 @@ enum ExecutionState {
   "No more data is expected."
   COMPLETED
 
+  "User marked the observation complete regardless of any remaining steps."
+  DECLARED_COMPLETE
 }
 
 
