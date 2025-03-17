@@ -53,6 +53,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import GeneratorParamsService.Error
@@ -156,7 +157,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _) => (oid, om) }.distinct
           m          <- observingModeServices.selectObservingMode(oms)
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -228,7 +229,7 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete)
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
               cw,
@@ -238,7 +239,7 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete)
 
       private def itcObsParams(
         obsParams:  ObsParams,
@@ -295,7 +296,8 @@ object GeneratorParamsService {
     scienceBand:      Option[ScienceBand],
     targetId:         Option[Target.Id],
     radialVelocity:   Option[RadialVelocity],
-    sourceProfile:    Option[SourceProfile]
+    sourceProfile:    Option[SourceProfile],
+    declaredComplete: Boolean
   )
 
   case class TargetParams(
@@ -311,7 +313,8 @@ object GeneratorParamsService {
     exposureTimeMode: Option[ExposureTimeMode],
     observingMode:    Option[ObservingModeType],
     scienceBand:      Option[ScienceBand],
-    targets:          NonEmptyList[TargetParams]
+    targets:          NonEmptyList[TargetParams],
+    declaredComplete: Boolean
   )
 
   object ObsParams {
@@ -325,7 +328,8 @@ object GeneratorParamsService {
           oParams.head.observingMode,
           oParams.head.scienceBand,
           oParams.map: r =>
-            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile)
+            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile),
+          oParams.head.declaredComplete
         )
       .toMap
   }
@@ -373,7 +377,8 @@ object GeneratorParamsService {
        science_band.opt        *:
        target_id.opt           *:
        radial_velocity.opt     *:
-       source_profile.opt
+       source_profile.opt      *:
+       bool
       ).to[ParamsRow]
 
     private def ParamColumns(tab: String): String =
@@ -397,7 +402,8 @@ object GeneratorParamsService {
         $tab.c_science_band,
         $tab.c_target_id,
         $tab.c_sid_rv,
-        $tab.c_source_profile
+        $tab.c_source_profile,
+        $tab.c_declared_complete
       """
 
     def selectManyParams(

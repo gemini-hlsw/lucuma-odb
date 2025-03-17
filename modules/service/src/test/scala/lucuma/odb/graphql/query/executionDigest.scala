@@ -556,6 +556,78 @@ class executionDigest extends ExecutionTestSupport {
         expected = expectedExecutionState(ExecutionState.Ongoing).asRight
       )
 
+  test("executionState - DECLARED_COMPLETE"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _  <- setDeclaredComplete(pi, o, declaredComplete = true)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ExecutionState.DeclaredComplete).asRight
+      )
+
+  test("digest: declared complete"):
+
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        _  <- setDeclaredComplete(pi, o, declaredComplete = true)
+      yield (p, o)
+
+    setup.flatMap: (_, oid) =>
+      expect(
+        user     = pi,
+        query    = digestQuery(oid),
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "digest": {
+                    "setup" : {
+                      "full" : {
+                        "seconds" : 0.000000
+                      },
+                      "reacquisition" : {
+                        "seconds" : 0.000000
+                      }
+                    },
+                    "science" : {
+                      "observeClass" : "DAY_CAL",
+                      "timeEstimate" : {
+                        "program" : {
+                          "seconds" : 0.000000
+                        },
+                        "partner" : {
+                          "seconds" : 0.000000
+                        },
+                        "nonCharged" : {
+                          "seconds" : 0.000000
+                        },
+                        "total" : {
+                          "seconds" : 0.000000
+                        }
+                      },
+                      "offsets" : [],
+                      "atomCount": 0
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+
   def gcalTelescopeConfig(q: Int): TelescopeConfig =
     telescopeConfig(0, q, StepGuideState.Disabled)
 
