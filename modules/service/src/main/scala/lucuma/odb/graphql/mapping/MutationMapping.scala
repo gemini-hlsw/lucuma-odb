@@ -343,15 +343,12 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           ), child)
 
   private lazy val CreateCallForProposals: MutationField =
-    MutationField("createCallForProposals", CreateCallForProposalsInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        requireStaffAccess {
-          callForProposalsService.createCallForProposals(input).nestMap { gid =>
-            Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
-          }
-        }
-      }
-    }
+    MutationField("createCallForProposals", CreateCallForProposalsInput.Binding): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            callForProposalsService.createCallForProposals(checked).nestMap: gid =>
+              Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
 
   private lazy val CreateConfigurationRequest: MutationField =
     MutationField("createConfigurationRequest", CreateConfigurationRequestInput.Binding) { (input, child) =>
@@ -662,28 +659,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
-    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))) { (input, child) =>
-      services.useTransactionally {
-        requireStaffAccess {
-          val p = and(List(
-            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-            input.WHERE.getOrElse(True)
-          ))
-
-          val idSelect: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(p, Select("id", None, Empty)),
-              Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
-            ).flatMap(_.fragment)
-
-          idSelect.flatTraverse { which =>
+    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
             callForProposalsService
-              .updateCallsForProposals(input.SET, which)
+              .updateCallsForProposals(checked)
               .map(_.flatMap(callForProposalsResultSubquery(_, input.LIMIT, child)))
-          }
-        }
-      }
-    }
 
   private lazy val UpdateConfigurationRequests: MutationField =
     MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
