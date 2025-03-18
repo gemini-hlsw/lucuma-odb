@@ -594,15 +594,14 @@ trait Codecs {
     }
 
   val categorized_time: Codec[CategorizedTime] =
-    (time_span *: time_span *: time_span).imap {
-      case (non_charged, partner_time, program_time) =>
+    (time_span *: time_span).imap {
+      case (non_charged, program_time) =>
         CategorizedTime(
           ChargeClass.NonCharged -> non_charged,
-          ChargeClass.Partner    -> partner_time,
           ChargeClass.Program    -> program_time
         )
     } { ct =>
-      (ct(ChargeClass.NonCharged), ct(ChargeClass.Partner), ct(ChargeClass.Program))
+      (ct(ChargeClass.NonCharged), ct(ChargeClass.Program))
     }
 
   val constraint_set: Codec[ConstraintSet] =

@@ -284,7 +284,7 @@ type BandedTime {
   "ScienceBand associated with the time, if any."
   band: ScienceBand
 
-  "Time distributed across the program, partner, and non-charged categories."
+  "Time distributed across the program and non-charged categories."
   time: CategorizedTime!
 
 }
@@ -641,13 +641,10 @@ type CategorizedTime {
   "Time charged to the program / PI."
   program: TimeSpan!
 
-  "Time charged to the partner."
-  partner: TimeSpan!
-
   "Execution time that is not charged."
   nonCharged: TimeSpan!
 
-  "Total of program, partner and uncharged times."
+  "Total of program and uncharged times."
   total: TimeSpan!
 
 }
@@ -6117,11 +6114,6 @@ enum ChargeClass {
   NON_CHARGED
 
   """
-  Time charged to a partner country / entity.
-  """
-  PARTNER
-
-  """
   Time charged to the science program.
   """
   PROGRAM
@@ -9193,19 +9185,9 @@ enum ObserveClass {
   PROGRAM_CAL
 
   """
-  Nighttime calibration, charged to the partner.
-  """
-  PARTNER_CAL
-
-  """
   Acquisition, charged to the program.
   """
   ACQUISITION
-
-  """
-  Acquisition calibration, charged to the program.
-  """
-  ACQUISITION_CAL
 
   """
   Daytime calibration, charged to the observatory.
@@ -12372,17 +12354,13 @@ enum TimeChargeCorrectionOp {
 }
 
 """
-Describes a time charge discount, broken out by charge class (program vs.
-partner).  For each class, the associated time is subtracted and then added to
-uncharged.
+Describes a time charge discount, broken out by charge class.  For each class,
+the associated time is subtracted and then added to uncharged.
 """
 interface TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!
@@ -12401,9 +12379,6 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!
@@ -12424,9 +12399,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
 
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
-
   "Time amount to discount from the program."
   program: TimeSpan!
 
@@ -12438,9 +12410,6 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!

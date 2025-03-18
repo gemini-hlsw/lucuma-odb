@@ -98,7 +98,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                 timeChargeInvoice {
                   executionTime {
                     program { seconds }
-                    partner { seconds }
                     nonCharged { seconds }
                     total { seconds }
                   }
@@ -108,7 +107,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                       end
                     }
                     program { seconds }
-                    partner { seconds }
                     comment
                     ... on TimeChargeDaylightDiscount {
                       site
@@ -128,7 +126,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                   }
                   finalCharge {
                     program { seconds }
-                    partner { seconds }
                     nonCharged { seconds }
                     total { seconds }
                   }
@@ -157,9 +154,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       {
         "program": {
           "seconds": ${ct.programTime.toSeconds}
-        },
-        "partner": {
-          "seconds": ${ct.partnerTime.toSeconds}
         },
         "nonCharged": {
           "seconds": ${ct.nonCharged.toSeconds}
@@ -198,9 +192,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
         },
         "program": {
           "seconds": ${d.discount.program.toSeconds}
-        },
-        "partner": {
-          "seconds": ${d.discount.partner.toSeconds}
         },
         "comment": ${d.discount.comment}
       }
@@ -509,7 +500,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expExecution   = CategorizedTime(ChargeClass.Program -> 2.sec)
     val discount       = TimeCharge.Discount(
       TimestampInterval.between(t0, tbnStart),
-      TimeSpan.Zero,
       1.sec,
       TimeAccounting.comment.PreDusk
     )
@@ -536,7 +526,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expExecution = CategorizedTime(ChargeClass.Program -> 10.sec)
     val discount     = TimeCharge.Discount(
       TimestampInterval.between(t00, t10),
-      TimeSpan.Zero,
       10.sec,
       TimeAccounting.comment.NoData
     )
@@ -587,7 +576,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expExecution   = CategorizedTime(ChargeClass.Program -> 11.sec)
     val discount       = TimeCharge.Discount(
       TimestampInterval.between(ts(6), ts(11)),
-      TimeSpan.Zero,
       5.sec,
       TimeAccounting.comment.Qa
     )
@@ -729,7 +717,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           execution {
             timeCharge {
               program { seconds }
-              partner { seconds }
               nonCharged { seconds }
               total { seconds }
             }
@@ -851,7 +838,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
             band
             time {
               program { seconds }
-              partner { seconds }
               nonCharged { seconds }
               total { seconds }
             }
