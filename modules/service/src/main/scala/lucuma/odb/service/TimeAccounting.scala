@@ -24,7 +24,6 @@ object TimeAccounting {
   val CategorizedTimeMax: CategorizedTime =
     CategorizedTime(
       ChargeClass.NonCharged -> TimeSpan.Max,
-      ChargeClass.Partner    -> TimeSpan.Max,
       ChargeClass.Program    -> TimeSpan.Max
     )
 

@@ -78,13 +78,15 @@ class executionDigest extends ExecutionTestSupport {
       BigDecimal(s).setScale(6)
 
   // 4 atoms, each with an arc and a flat
-  def PartnerTime: BigDecimal =
+  val CalibrationTime: BigDecimal =
     ("67.1".sec * 4) + ("57.1".sec * 4)
 
   // 4 atoms, all of which incur the 1266.1 cost including the science fold
   // move, 3 of them have an additional 2 steps each of 1251.1
-  def ProgramTime: BigDecimal =
+  val ScienceTime: BigDecimal =
     ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
+
+  val ProgramTime: BigDecimal = CalibrationTime + ScienceTime
 
   def digestQuery(oid: Observation.Id): String =
     s"""
@@ -100,7 +102,6 @@ class executionDigest extends ExecutionTestSupport {
                 observeClass
                 timeEstimate {
                   program { seconds }
-                  partner { seconds }
                   nonCharged { seconds }
                   total { seconds }
                 }
@@ -136,14 +137,11 @@ class executionDigest extends ExecutionTestSupport {
                   "program" : {
                     "seconds" : ${ProgramTime.asJson}
                   },
-                  "partner" : {
-                    "seconds" : ${PartnerTime.asJson}
-                  },
                   "nonCharged" : {
                     "seconds" : 0.000000
                   },
                   "total" : {
-                    "seconds" : ${(ProgramTime + PartnerTime).asJson}
+                    "seconds" : ${ProgramTime.asJson}
                   }
                 },
                 "offsets" : [
@@ -568,9 +566,9 @@ class executionDigest extends ExecutionTestSupport {
     def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.ProgramCal)
         _ <- addEndStepEvent(c)
-        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.ProgramCal)
         _ <- addEndStepEvent(f)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(3)
         _ <- s.traverse(addEndStepEvent)

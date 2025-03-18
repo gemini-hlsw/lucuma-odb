@@ -255,7 +255,6 @@ class executionTwilight extends ExecutionTestSupport {
                     observeClass
                     timeEstimate {
                       program { seconds }
-                      partner { seconds }
                       nonCharged { seconds }
                       total { seconds }
                     }
@@ -274,7 +273,6 @@ class executionTwilight extends ExecutionTestSupport {
                     "observeClass": "DAY_CAL",
                     "timeEstimate": {
                       "program": { "seconds":  0.000000 },
-                      "partner": { "seconds":  0.000000 },
                       "nonCharged": { "seconds":  50.700000 },
                       "total": { "seconds":  50.700000 }
                     }
@@ -296,7 +294,6 @@ class executionTwilight extends ExecutionTestSupport {
             timeEstimateRange {
               maximum {
                 program { seconds }
-                partner { seconds }
                 nonCharged { seconds }
                 total { seconds }
               }
@@ -324,7 +321,6 @@ class executionTwilight extends ExecutionTestSupport {
                   observeClass
                   timeEstimate {
                     program { seconds }
-                    partner { seconds }
                     nonCharged { seconds }
                     total { seconds }
                   }

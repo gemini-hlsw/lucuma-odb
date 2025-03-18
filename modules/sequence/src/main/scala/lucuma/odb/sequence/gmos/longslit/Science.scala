@@ -309,8 +309,8 @@ object Science:
               _ <- setup(config, time)
               _ <- optics.wavelength := λ.offset(g.adjustment.Δλ).getOrElse(λ)
               o  = Offset(Offset.P.Zero, g.adjustment.q)
-              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.PartnerCal)
-              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.PartnerCal)
+              a <- arcStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.ProgramCal)
+              f <- flatStep(TelescopeConfig(o, StepGuideState.Disabled), if isTwilight then ObserveClass.DayCal else ObserveClass.ProgramCal)
               s <- scienceStep(TelescopeConfig(o, StepGuideState.Enabled), if isTwilight then ObserveClass.DayCal else ObserveClass.Science)
             } yield (a, f, s)
           }
