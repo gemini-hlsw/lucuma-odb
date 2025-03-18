@@ -24,7 +24,9 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
+import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CloneObservationInput
+import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
@@ -40,6 +42,7 @@ import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateAttachmentsInput
+import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
@@ -556,5 +559,30 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .traverse: af =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, af).pure[F]
+
+  def selectForUpdate(
+    input: CreateCallForProposalsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Create]]] =
+    requireStaffAccess: // this is the only check
+      Services.asSuperUser:
+        Result(AccessControl.unchecked(input.SET, AppliedFragment.empty)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateCallsForProposalsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Edit]]] =
+    requireStaffAccess: // this is the only check
+      MappedQuery(
+        Filter(
+          and(List(
+            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True)
+          )), 
+          Select("id", None, Empty)
+        ),
+        Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
+      ) .flatMap(_.fragment)
+        .flatTraverse: which =>
+          Services.asSuperUser:
+            Result(AccessControl.unchecked(input.SET, which)).pure[F]
 
 }
