@@ -198,11 +198,19 @@ object GeneratorParamsService {
         params: NonEmptyList[TargetParams],
         config: Option[SourceProfile => ObservingMode]
       ): Either[Error, ObservingMode] =
+        // If emission line, SED not required, otherwhise must be defined
+        def hasITCRequiredSEDParam(sp: SourceProfile): Boolean =
+          SourceProfile.unnormalizedSED.getOption(sp).flatten.isDefined ||
+          SourceProfile.integratedEmissionLinesSpectralDefinition.getOption(sp).isDefined ||
+          SourceProfile.surfaceEmissionLinesSpectralDefinition.getOption(sp).isDefined
+
         val configs: EitherNel[MissingParam, NonEmptyList[ObservingMode]] =
           params.traverse: p =>
             for
               t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
               s <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
+              _ <- p.sourceProfile.filter(hasITCRequiredSEDParam)
+                     .toRightNel(MissingParam.forTarget(t, "SED"))
               f <- config.toRightNel(MissingParam.forObservation("observing mode"))
             yield f(s)
 
