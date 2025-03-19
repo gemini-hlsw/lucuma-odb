@@ -203,6 +203,8 @@ object GeneratorParamsService {
             for
               t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
               s <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
+              _ <- p.sourceProfile.flatMap(SourceProfile.unnormalizedSED.getOption).flatten
+                     .toRightNel(MissingParam.forTarget(t, "SED"))
               f <- config.toRightNel(MissingParam.forObservation("observing mode"))
             yield f(s)
 
