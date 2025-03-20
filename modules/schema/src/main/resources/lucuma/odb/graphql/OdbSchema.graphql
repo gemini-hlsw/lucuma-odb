@@ -9182,7 +9182,7 @@ enum ObserveClass {
   """
   Nighttime calibration, charged to the program.
   """
-  PROGRAM_CAL
+  NIGHT_CAL
 
   """
   Acquisition, charged to the program.
