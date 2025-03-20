@@ -566,9 +566,9 @@ class executionDigest extends ExecutionTestSupport {
     def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.ProgramCal)
+        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(c)
-        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.ProgramCal)
+        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(f)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(3)
         _ <- s.traverse(addEndStepEvent)
