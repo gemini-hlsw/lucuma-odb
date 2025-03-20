@@ -2071,19 +2071,9 @@ enum GmosNorthStageMode {
   NO_FOLLOW
 
   """
-  GmosNorthStageMode FollowXyz
-  """
-  FOLLOW_XYZ
-
-  """
   GmosNorthStageMode FollowXy
   """
   FOLLOW_XY
-
-  """
-  GmosNorthStageMode FollowZ
-  """
-  FOLLOW_Z
 }
 
 """
@@ -2486,11 +2476,6 @@ enum GmosSouthStageMode {
   GmosSouthStageMode FollowXyz
   """
   FOLLOW_XYZ
-
-  """
-  GmosSouthStageMode FollowXy
-  """
-  FOLLOW_XY
 
   """
   GmosSouthStageMode FollowZ
@@ -7364,10 +7349,6 @@ enum GmosNorthFilter {
   """
   Z_PRIME_CA_T
 
-  """
-  GmosNorthFilter UPrime
-  """
-  U_PRIME
 }
 
 """
@@ -7385,11 +7366,6 @@ enum GmosNorthGrating {
   R831_G5302
 
   """
-  GmosNorthGrating B600_G5303
-  """
-  B600_G5303
-
-  """
   GmosNorthGrating R600_G5304
   """
   R600_G5304
@@ -7403,11 +7379,6 @@ enum GmosNorthGrating {
   GmosNorthGrating R400_G5305
   """
   R400_G5305
-
-  """
-  GmosNorthGrating R150_G5306
-  """
-  R150_G5306
 
   """
   GmosNorthGrating R150_G5308
@@ -7614,16 +7585,6 @@ enum GmosRoi {
   GmosRoi CentralStamp
   """
   CENTRAL_STAMP
-
-  """
-  GmosRoi TopSpectrum
-  """
-  TOP_SPECTRUM
-
-  """
-  GmosRoi BottomSpectrum
-  """
-  BOTTOM_SPECTRUM
 
   """
   GmosRoi Custom
@@ -7880,10 +7841,6 @@ enum GmosSouthFilter {
   """
   HE_IIC
 
-  """
-  GmosSouthFilter Lya395
-  """
-  LYA395
 }
 
 """
