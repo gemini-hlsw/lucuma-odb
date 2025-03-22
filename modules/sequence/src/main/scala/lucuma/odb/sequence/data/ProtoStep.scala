@@ -38,7 +38,7 @@ case class ProtoStep[A](
 object ProtoStep:
 
   def smartGcal[A](a: A, s: SmartGcalType, t: TelescopeConfig): ProtoStep[A] =
-    ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.PartnerCal)
+    ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.NightCal)
 
   def smartArc[A](a: A, t: TelescopeConfig): ProtoStep[A]  = smartGcal(a, SmartGcalType.Arc, t)
   def smartFlat[A](a: A, t: TelescopeConfig): ProtoStep[A] = smartGcal(a, SmartGcalType.Flat, t)

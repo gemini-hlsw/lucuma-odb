@@ -9,7 +9,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
+trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
@@ -17,7 +17,6 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
           TimeChargeInvoiceType / "executionTime",      
           VisitTable.Id,
           VisitTable.Raw.NonChargedTime,
-          VisitTable.Raw.PartnerTime,
           VisitTable.Raw.ProgramTime
         ),
 
@@ -25,7 +24,6 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
           TimeChargeInvoiceType / "finalCharge",      
           VisitTable.Id,
           VisitTable.Final.NonChargedTime,
-          VisitTable.Final.PartnerTime,
           VisitTable.Final.ProgramTime
         )
       )
@@ -34,7 +32,6 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
     path:       Path,
     key:        ColumnRef,
     nonCharged: ColumnRef,
-    partner:    ColumnRef,
     program:    ColumnRef
   ): ObjectMapping =
     ObjectMapping(path)(
@@ -42,9 +39,6 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
 
       SqlObject("nonCharged"),
       SqlField("nonChargedTs", nonCharged, hidden = true),
-
-      SqlObject("partner"),
-      SqlField("partnerTs", partner, hidden = true),
 
       SqlObject("program"),
       SqlField("programTs", program, hidden = true),
@@ -55,13 +49,9 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F] {
           for {
             n   <- cursor.field("nonChargedTs", None)
             nts <- n.as[TimeSpan]
-            a   <- cursor.field("partnerTs", None)
-            ats <- a.as[TimeSpan]
             r   <- cursor.field("programTs", None)
             rts <- r.as[TimeSpan]
-          } yield (nts +| ats +| rts).asJson,
-        List("nonChargedTs", "partnerTs", "programTs")
+          } yield (nts +| rts).asJson,
+        List("nonChargedTs", "programTs")
       )
     )
-
-}

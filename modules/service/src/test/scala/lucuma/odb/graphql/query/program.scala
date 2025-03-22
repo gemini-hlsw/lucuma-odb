@@ -279,7 +279,6 @@ class program extends OdbSuite {
                 timeCharge {
                   time {
                     program { seconds }
-                    partner { seconds }
                     nonCharged { seconds }
                     total { seconds }
                   }
