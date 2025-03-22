@@ -113,7 +113,7 @@ class executionSpecPhot extends ExecutionTestSupport {
                           "observeClass": "SCIENCE",
                           "steps": [
                             {
-                              "observeClass": "PARTNER_CAL",
+                              "observeClass": "NIGHT_CAL",
                               "instrumentConfig": {
                                 "exposure": {
                                   "seconds": 1.000000
@@ -295,7 +295,7 @@ class executionSpecPhot extends ExecutionTestSupport {
                         "nextAtom": {
                           "steps": [
                             {
-                              "observeClass": "PARTNER_CAL",
+                              "observeClass": "NIGHT_CAL",
                               "instrumentConfig": {
                                 "gratingConfig": {
                                   "wavelength" : {
@@ -416,7 +416,7 @@ class executionSpecPhot extends ExecutionTestSupport {
                         "nextAtom": {
                           "steps": [
                             {
-                              "observeClass": "PARTNER_CAL",
+                              "observeClass": "NIGHT_CAL",
                               "instrumentConfig": {
                                 "gratingConfig": {
                                   "wavelength" : {
@@ -441,7 +441,7 @@ class executionSpecPhot extends ExecutionTestSupport {
                           {
                             "steps": [
                               {
-                                "observeClass": "PARTNER_CAL",
+                                "observeClass": "NIGHT_CAL",
                                 "instrumentConfig": {
                                   "gratingConfig": {
                                     "wavelength" : {

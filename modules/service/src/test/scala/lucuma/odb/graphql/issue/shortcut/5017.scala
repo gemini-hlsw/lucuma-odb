@@ -79,9 +79,9 @@ class ShortCut_5017 extends ExecutionTestSupport:
     def executeAtom(c: AtomicCell[IO, Int], v: Visit.Id, ditherNm: Int, q: Int, stepCount: Int): IO[(Atom.Id, List[(Step.Id, Dataset.Id)])] =
       for
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        sa <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        sa <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         da <- executeStep(c, sa)
-        sf <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        sf <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         df <- executeStep(c, sf)
         ss <- recordAndExecuteScienceStep(c, a, ditherNm, q).replicateA(stepCount)
       yield (a, (sa, da) :: (sf, df) :: ss)
