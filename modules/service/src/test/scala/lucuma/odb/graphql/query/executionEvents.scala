@@ -161,14 +161,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId)") {
+  test("query -> events (WHERE observation id)") {
     recordAll(pi, service, mode, offset = 300, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               }
             }
           ) {
@@ -193,14 +193,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + eventType SEQUENCE)") {
+  test("query -> events (WHERE observation id + eventType SEQUENCE)") {
     recordAll(pi, service, mode, offset = 400, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               eventType: {
                 EQ: SEQUENCE
@@ -229,14 +229,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + eventType SLEW)") {
+  test("query -> events (WHERE observation id + eventType SLEW)") {
     recordAll(pi, service, mode, offset = 450, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               eventType: {
                 EQ: SLEW
@@ -265,7 +265,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + received)") {
+  test("query -> events (WHERE observation id + received)") {
     recordAll(pi, service, mode, offset = 500).flatMap { on =>
       val start: Timestamp = on.allEvents.head.received
       val end: Timestamp   = on.allEvents.last.received
@@ -274,8 +274,8 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               received: {
                 GT: "$start",
@@ -371,14 +371,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + sequenceEvent command)") {
+  test("query -> events (WHERE observation id + sequenceEvent command)") {
     recordAll(pi, service, mode, offset = 800, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               sequenceCommand: {
                 EQ: START
@@ -407,7 +407,7 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + stepEvent stepId)") {
+  test("query -> events (WHERE observation id + stepEvent stepId)") {
     recordAll(pi, service, mode, offset = 900, stepCount = 2).flatMap { on =>
       val sid = on.visits.head.atoms.head.steps.head.id
 
@@ -415,8 +415,8 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               eventType: {
                 EQ: STEP
@@ -460,14 +460,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + stepEvent stepStage)") {
+  test("query -> events (WHERE observation + stepEvent stepStage)") {
     recordAll(pi, service, mode, offset = 1000, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               stepStage: {
                 EQ: END_STEP
@@ -531,14 +531,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + datasetStage)") {
+  test("query -> events (WHERE observation id + datasetStage)") {
     recordAll(pi, service, mode, offset = 1200, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               datasetStage: {
                 EQ: END_WRITE
@@ -567,14 +567,14 @@ class executionEvents extends OdbSuite with ExecutionQuerySetupOperations {
     }
   }
 
-  test("query -> events (WHERE observationId + slewEvent slewStage)") {
+  test("query -> events (WHERE observation id + slewEvent slewStage)") {
     recordAll(pi, service, mode, offset = 1300, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           events(
             WHERE: {
-              observationId: {
-                EQ: "${on.id}"
+              observation: {
+                id: { EQ: "${on.id}" }
               },
               slewStage: {
                 EQ: END_SLEW
