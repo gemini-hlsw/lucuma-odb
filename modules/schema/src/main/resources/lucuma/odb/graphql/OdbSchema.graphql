@@ -13546,8 +13546,8 @@ input WhereExecutionEvent {
   "Matches on the visit id"
   visitId: WhereEqVisitId
 
-  "Matches on observation id"
-  observationId: WhereOrderObservationId
+  "Matches on observation"
+  observation: WhereObservation
 
   "Matches on event reception time"
   received: WhereOrderTimestamp
