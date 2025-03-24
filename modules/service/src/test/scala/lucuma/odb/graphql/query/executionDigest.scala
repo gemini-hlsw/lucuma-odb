@@ -608,9 +608,6 @@ class executionDigest extends ExecutionTestSupport {
                         "program" : {
                           "seconds" : 0.000000
                         },
-                        "partner" : {
-                          "seconds" : 0.000000
-                        },
                         "nonCharged" : {
                           "seconds" : 0.000000
                         },
