@@ -65,7 +65,7 @@ class ShortCut_5098 extends ExecutionTestSupport:
            """,
         expected = {
           case OdbError.SequenceUnavailable(
-            Some(s"Could not generate a sequence for the observation $oid target $tid is missing SED")
+            Some(s"Could not generate a sequence for the observation $oid: GMOS Long Slit acquisition requires a valid target: target $tid is missing SED")
           ) => // expected
         }
       )
