@@ -537,6 +537,57 @@ class createObservation extends OdbSuite {
     }
   }
 
+  test("[general] new observation without declaredComplete should be false"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                declaredComplete
+              }
+            }
+          }
+          """
+        ).flatMap: js =>
+          val get = js.hcursor
+            .downField("createObservation")
+            .downField("observation")
+            .downField("declaredComplete")
+            .as[Boolean]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+          assertIOBoolean(get.map(declaredComplete => !declaredComplete))
+
+  test("[general] new observation should respect declaredComplete"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                declaredComplete: true
+              }
+            }) {
+              observation {
+                declaredComplete
+              }
+            }
+          }
+          """
+        ).flatMap: js =>
+          val get = js.hcursor
+            .downField("createObservation")
+            .downField("observation")
+            .downField("declaredComplete")
+            .as[Boolean]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+          assertIOBoolean(get)
+
   test("[general] created observation has no explicit base by default") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,

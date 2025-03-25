@@ -13,10 +13,11 @@ import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
 case class GeneratorParams(
-  itcInput:        Either[MissingParamSet, ItcInput],
-  scienceBand:     Option[ScienceBand],
-  observingMode:   ObservingMode,
-  calibrationRole: Option[CalibrationRole]
+  itcInput:         Either[MissingParamSet, ItcInput],
+  scienceBand:      Option[ScienceBand],
+  observingMode:    ObservingMode,
+  calibrationRole:  Option[CalibrationRole],
+  declaredComplete: Boolean
 )
 
 object GeneratorParams:
@@ -27,7 +28,8 @@ object GeneratorParams:
         a.itcInput,
         a.scienceBand,
         a.observingMode,
-        a.calibrationRole
+        a.calibrationRole,
+        a.declaredComplete
       )
 
   given HashBytes[GeneratorParams] with
@@ -36,5 +38,6 @@ object GeneratorParams:
         a.itcInput.bimap(_.hashBytes, _.hashBytes).merge,
         a.scienceBand.hashBytes,
         a.observingMode.hashBytes,
-        a.calibrationRole.hashBytes
+        a.calibrationRole.hashBytes,
+        a.declaredComplete.hashBytes
       )
