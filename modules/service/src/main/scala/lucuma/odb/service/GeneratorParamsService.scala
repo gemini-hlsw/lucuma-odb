@@ -265,6 +265,12 @@ object GeneratorParamsService {
         .toEither
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput)] = {
+        // If emission line, SED not required, otherwhise must be defined
+        def hasITCRequiredSEDParam(sp: SourceProfile): Boolean =
+          SourceProfile.unnormalizedSED.getOption(sp).flatten.isDefined ||
+          SourceProfile.integratedEmissionLinesSpectralDefinition.getOption(sp).isDefined ||
+          SourceProfile.surfaceEmissionLinesSpectralDefinition.getOption(sp).isDefined
+
         val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
         val brightnesses =
           sourceProf.flatMap: sp =>
@@ -275,12 +281,14 @@ object GeneratorParamsService {
             SourceProfile.integratedWavelengthLines.getOption(sp).orElse(SourceProfile.surfaceWavelengthLines.getOption(sp))
               .map(_.nonEmpty)
         val validBrightness = brightnesses.orElse(wavelengthLines).getOrElse(false)
+        val sed = sourceProf.filter(hasITCRequiredSEDParam)
 
         targetParams.targetId.toValidNel(MissingParam.forObservation("target")).andThen: tid =>
           (sourceProf.toValidNel(MissingParam.forTarget(tid, "source profile")),
+           sed.toValidNel(MissingParam.forTarget(tid, "SED")),
            Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
            targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity"))
-          ).mapN: (sp,_, rv) =>
+          ).mapN: (sp,_, _, rv) =>
             tid -> TargetInput(sp, rv)
       }
 
