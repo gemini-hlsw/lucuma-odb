@@ -241,33 +241,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
         .liftTo[IO]
      }
 
-  def unsetSED(tid: Target.Id): IO[Json] =
-    query(
-      pi,
-      s"""
-          mutation {
-            updateTargets(input: {
-              SET: {
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: null
-                    }
-                  }
-                }
-              }
-              WHERE: {
-                id: { EQ: "$tid"}
-              }
-            }) {
-              targets {
-                id
-              }
-            }
-          }
-      """
-    )
-
   def formatLD(ld: LocalDate): String = {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
     ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
