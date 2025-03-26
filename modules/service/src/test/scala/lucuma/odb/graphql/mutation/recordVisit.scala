@@ -13,7 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 
-class recordVisit extends OdbSuite {
+class recordVisit extends OdbSuite:
 
   val service: User = TestUsers.service(nextId)
 
@@ -25,15 +25,15 @@ class recordVisit extends OdbSuite {
     query:    Observation.Id => String,
     expected: Either[Observation.Id => String, Json]
   ): IO[Unit] =
-    for {
+    for
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
       _   <- expectSuccessOrOdbError(user, query(oid), expected.leftMap: f =>
         case OdbError.InvalidObservation(_, Some(d)) if d === f(oid) => ()
       ) 
-    } yield ()
+    yield ()
 
-  test("recordGmosNorthVisit") {
+  test("recordGmosNorthVisit"):
 
     recordVisitTest(
       ObservingModeType.GmosNorthLongSlit,
@@ -75,9 +75,7 @@ class recordVisit extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("recordGmosSouthVisit") {
+  test("recordGmosSouthVisit"):
 
     recordVisitTest(
       ObservingModeType.GmosSouthLongSlit,
@@ -115,9 +113,7 @@ class recordVisit extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("record visit cross site") {
+  test("record visit cross site"):
 
     recordVisitTest(
       ObservingModeType.GmosNorthLongSlit,
@@ -142,6 +138,3 @@ class recordVisit extends OdbSuite {
       """,
       ((oid: Observation.Id) => s"Observation '$oid' not found or is not a GMOS South observation").asLeft
     )
-
-  }
-}
