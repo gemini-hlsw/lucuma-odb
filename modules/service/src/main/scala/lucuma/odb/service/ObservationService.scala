@@ -503,7 +503,6 @@ object ObservationService {
               asterismService
                 .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
                 .map(_.as(CloneIds(origOid, newOid)))
-
     }
 
   private object Statements {

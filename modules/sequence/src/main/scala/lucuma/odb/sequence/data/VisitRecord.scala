@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.data
 
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.util.Timestamp
@@ -12,5 +13,7 @@ case class VisitRecord(
   visitId:       Visit.Id,
   observationId: Observation.Id,
   instrument:    Instrument,
-  created:       Timestamp
+  created:       Timestamp,
+  site:          Site,
+  chargeable:    Boolean
 )

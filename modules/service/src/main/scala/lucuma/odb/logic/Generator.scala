@@ -264,7 +264,7 @@ object Generator {
 
         def checkCache(using NoTransaction[F]): EitherT[F, Error, Option[ExecutionDigest]] =
           EitherT.right(services.transactionally {
-            executionDigestService.selectOne(pid, oid, hash)
+            executionDigestService.selectOne(oid, hash)
           })
 
         def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, Error, Unit] =
