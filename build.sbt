@@ -16,11 +16,10 @@ val http4sJdkHttpClientVersion = "0.9.2"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.17"
 val log4catsVersion            = "2.7.0"
-val lucumaCatalogVersion       = "0.50.2"
-val lucumaItcVersion           = "0.32.0"
-val lucumaCoreVersion          = "0.119.1"
+val lucumaItcVersion           = "0.32.1"
+val lucumaCoreVersion          = "0.120.0"
 val lucumaGraphQLRoutesVersion = "0.8.17"
-val lucumaSsoVersion           = "0.8.6"
+val lucumaSsoVersion           = "0.8.7"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -124,8 +123,8 @@ lazy val service = project
       "com.monovore"             %% "decline"                            % declineVersion,
       "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
       "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
-      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCatalogVersion,
-      "edu.gemini"               %% "lucuma-ags"                         % lucumaCatalogVersion,
+      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
       "edu.gemini"               %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
       "is.cir"                   %% "ciris"                              % cirisVersion,
@@ -151,7 +150,7 @@ lazy val service = project
       "org.scalameta"            %% "munit"                              % munitVersion               % Test,
       "org.scalameta"            %% "munit-scalacheck"                   % munitVersion               % Test,
       "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
-      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCatalogVersion       % Test,
+      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
       "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,

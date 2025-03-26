@@ -7,6 +7,7 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
 import cats.Parallel
+import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
 import cats.effect.{Unique as _, *}
 import cats.syntax.all.*
@@ -79,7 +80,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Async: Parallel: Trace: Logger](
+  def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
