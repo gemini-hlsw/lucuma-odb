@@ -505,7 +505,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val AddSlewEvent: MutationField =
     addEvent("addSlewEvent", AddSlewEventInput.Binding, Predicates.slewEvent) { input =>
-      executionEventService.insertSlewEvent(input.visitId, input.slewStage)
+      executionEventService.insertSlewEvent(input.observationId, input.slewStage)
     }
 
   private lazy val AddStepEvent: MutationField =

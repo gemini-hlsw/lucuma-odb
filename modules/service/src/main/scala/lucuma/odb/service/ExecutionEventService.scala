@@ -64,8 +64,8 @@ trait ExecutionEventService[F[_]] {
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertSlewEvent(
-    visitId:   Visit.Id,
-    slewStage: SlewStage
+    observationId: Observation.Id,
+    slewStage:     SlewStage
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
@@ -188,27 +188,15 @@ object ExecutionEventService {
       }
 
       override def insertSlewEvent(
-        visitId:   Visit.Id,
-        slewStage: SlewStage
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
-
-        def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
-
-        val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
-          session
-            .option(Statements.InsertSlewEvent)(visitId, slewStage)
-            .map(_.toResult(invalidVisit.asProblem))
-            .recoverWith {
-              case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
-            }
-
-        (for {
-          e <- ResultT(insert)
-          (eid, time, oid) = e
-          _ <- ResultT.liftF(timeAccountingService.update(visitId))
-        } yield SlewEvent(eid, time, oid, visitId, slewStage)).value
-      }
+        observationId: Observation.Id,
+        slewStage:     SlewStage
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
+        (for
+          v <- ResultT(visitService.lookupOrInsert(observationId))
+          e <- ResultT.liftF(session.unique(Statements.InsertSlewEvent)(v, slewStage))
+          (eid, time) = e
+          _ <- ResultT.liftF(timeAccountingService.update(v))
+        yield SlewEvent(eid, time, observationId, v, slewStage)).value
 
       override def insertStepEvent(
         stepId:       Step.Id,
@@ -378,7 +366,7 @@ object ExecutionEventService {
       """.query(execution_event_id *: core_timestamp *: observation_id)
          .contramap((v, s) => (v, s, v))
 
-    val InsertSlewEvent: Query[(Visit.Id, SlewStage), (Id, Timestamp, Observation.Id)] =
+    val InsertSlewEvent: Query[(Visit.Id, SlewStage), (Id, Timestamp)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -401,9 +389,8 @@ object ExecutionEventService {
           v.c_visit_id = $visit_id
         RETURNING
           c_execution_event_id,
-          c_received,
-          c_observation_id
-      """.query(execution_event_id *: core_timestamp *: observation_id)
+          c_received
+      """.query(execution_event_id *: core_timestamp)
          .contramap((v, s) => (v, s, v))
 
     val InsertStepEvent: Query[(Step.Id, StepStage), (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =

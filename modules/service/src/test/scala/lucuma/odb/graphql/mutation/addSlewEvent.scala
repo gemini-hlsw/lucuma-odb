@@ -9,53 +9,50 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.SlewStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.core.model.Visit
 
-class addSlewEvent extends OdbSuite {
+class addSlewEvent extends OdbSuite:
 
+  val pi: User      = TestUsers.Standard.pi(nextId, nextId)
   val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(service)
+  override lazy val validUsers: List[User] = List(pi, service)
 
-  private def recordVisit(
+  private def createObservation(
     mode: ObservingModeType,
     user: User
-  ):IO[(Observation.Id, Visit.Id)] =
-    for {
+  ):IO[Observation.Id] =
+    for
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-    } yield (oid, vid)
+    yield oid
 
   private def addSlewEventTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Visit.Id => String,
-    expected: (Observation.Id, Visit.Id) => Either[String, Json]
-  ): IO[Unit] = {
-    for {
-      ids <- recordVisit(mode, user)
-      (oid, vid) = ids
-      _   <- expect(user, query(vid), expected(oid, vid).leftMap(s => List(s)))
-    } yield ()
-}
+    query:    Observation.Id => String,
+    expected: Observation.Id => Either[String, Json]
+  ): IO[Unit] =
+    for
+      oid <- createObservation(mode, user)
+      _   <- expect(user, query(oid), expected(oid).leftMap(s => List(s)))
+    yield ()
 
-  test("addSlewEvent") {
-    def query(vid: Visit.Id): String =
+  test("addSlewEvent"):
+    def query(oid: Observation.Id): String =
       s"""
         mutation {
           addSlewEvent(input: {
-            visitId: "$vid",
+            observationId: "$oid",
             slewStage: START_SLEW
           }) {
             event {
               eventType
-              visit {
-                id
-              }
               observation {
                 id
               }
@@ -70,15 +67,12 @@ class addSlewEvent extends OdbSuite {
     addSlewEventTest(
       ObservingModeType.GmosNorthLongSlit,
       service,
-      vid => query(vid),
-      (oid, vid) => json"""
+      oid => query(oid),
+      oid => json"""
       {
         "addSlewEvent": {
           "event": {
             "eventType": "SLEW",
-            "visit": {
-              "id": $vid
-            },
             "observation": {
               "id": $oid
             },
@@ -89,20 +83,15 @@ class addSlewEvent extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("addSlewEvent - unknown visit") {
+  test("addSlewEvent - unknown visit"):
     def query: String =
       s"""
         mutation {
           addSlewEvent(input: {
-            visitId: "v-42",
+            observationId: "o-42",
             slewStage: START_SLEW
           }) {
             event {
-              visit {
-                id
-              }
               observation {
                 id
               }
@@ -115,10 +104,27 @@ class addSlewEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       service,
       _ => query,
-      (_, _) => s"Visit 'v-42' not found".asLeft
+      _ => s"Observation 'o-42' not found.".asLeft
     )
 
-  }
+  test("slew then record visit"):
+    val vid = for
+      o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
+      s0 <- addSlewEventAs(service, o, SlewStage.StartSlew)
+      v  <- recordVisitAs(service, Instrument.GmosNorth, o)
+      s1 <- addSlewEventAs(service, o, SlewStage.EndSlew)
+      e  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+    yield Set(v, s0._4, s1._4, e._4)
 
+    assertIOBoolean(vid.map(_.sizeIs == 1))
 
-}
+  test("record visit then slew"):
+    val vid = for
+      o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
+      v  <- recordVisitAs(service, Instrument.GmosNorth, o)
+      s0 <- addSlewEventAs(service, o, SlewStage.StartSlew)
+      s1 <- addSlewEventAs(service, o, SlewStage.EndSlew)
+      e  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+    yield Set(v, s0._4, s1._4, e._4)
+
+    assertIOBoolean(vid.map(_.sizeIs == 1))

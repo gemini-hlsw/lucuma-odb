@@ -77,7 +77,7 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
           }
         """,
         mutations = Right(
-          addSlewEventAs(service, vid, SlewStage.StartSlew)
+          addSlewEventAs(service, oid, SlewStage.StartSlew)
         ),
         expected = List(
           eventJson(pid, oid, vid, ExecutionEventType.Slew)
@@ -98,8 +98,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
         mutations = Right(
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
-              addSlewEventAs(service, vid, SlewStage.StartSlew)       >>
-              addSlewEventAs(service, vid, SlewStage.EndSlew)         >>
+              addSlewEventAs(service, oid, SlewStage.StartSlew)       >>
+              addSlewEventAs(service, oid, SlewStage.EndSlew)         >>
               addSequenceEventAs(service, vid, SequenceCommand.Start) >>
               addAtomEventAs(service, aid, AtomStage.StartAtom)       >>
               addStepEventAs(service, sid, StepStage.StartStep)
@@ -121,8 +121,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
         mutations = Right(
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
-              addSlewEventAs(service, vid, SlewStage.StartSlew)       >>
-              addSlewEventAs(service, vid, SlewStage.EndSlew)         >>
+              addSlewEventAs(service, oid, SlewStage.StartSlew)       >>
+              addSlewEventAs(service, oid, SlewStage.EndSlew)         >>
               addSequenceEventAs(service, vid, SequenceCommand.Start) >>
               addAtomEventAs(service, aid, AtomStage.StartAtom)       >>
               addStepEventAs(service, sid, StepStage.StartStep)
@@ -149,8 +149,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
               recordDatasetAs(service, sid, "N20250103S0001.fits").flatMap: did =>
-                addSlewEventAs(service, vid, SlewStage.StartSlew)         >>
-                addSlewEventAs(service, vid, SlewStage.EndSlew)           >>
+                addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
+                addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>
                 addAtomEventAs(service, aid, AtomStage.StartAtom)         >>
                 addStepEventAs(service, sid, StepStage.StartStep)         >>
@@ -179,8 +179,8 @@ class executionEventAdded extends OdbSuite with SubscriptionUtils:
           recordAtomAs(service, mode.instrument, vid).flatMap: aid =>
             recordStepAs(service, mode.instrument, aid).flatMap: sid =>
               recordDatasetAs(service, sid, "N20250103S0002.fits").flatMap: did =>
-                addSlewEventAs(service, vid, SlewStage.StartSlew)         >>
-                addSlewEventAs(service, vid, SlewStage.EndSlew)           >>
+                addSlewEventAs(service, oid, SlewStage.StartSlew)         >>
+                addSlewEventAs(service, oid, SlewStage.EndSlew)           >>
                 addSequenceEventAs(service, vid, SequenceCommand.Start)   >>
                 addAtomEventAs(service, aid, AtomStage.StartAtom)         >>
                 addStepEventAs(service, sid, StepStage.StartStep)         >>

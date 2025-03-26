@@ -71,8 +71,8 @@ type AddSequenceEventResult {
 
 "SlewEvent creation parameters."
 input AddSlewEventInput {
-  visitId:   VisitId!
-  slewStage: SlewStage!
+  observationId: ObservationId!
+  slewStage:     SlewStage!
 }
 
 "The result of adding a slew event."
