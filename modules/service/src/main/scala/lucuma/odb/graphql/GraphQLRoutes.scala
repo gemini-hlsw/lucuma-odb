@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import cats.Parallel
 import cats.data.OptionT
 import cats.effect.*
+import cats.effect.std.SecureRandom
 import cats.implicits.*
 import cats.kernel.Order
 import grackle.Operation
@@ -51,7 +52,7 @@ object GraphQLRoutes {
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
-  def apply[F[_]: Async: Parallel: Trace: Logger](
+  def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
     itcClient:    ItcClient[F],
     commitHash:   CommitHash,
     goaUsers:     Set[User.Id],

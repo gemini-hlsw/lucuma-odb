@@ -97,7 +97,7 @@ object OdbSuite:
 
   // a runtime that is constructed the same as global, but lets us see unhandled errors (above)
   val runtime: IORuntime =
-    val (compute, _) = IORuntime.createWorkStealingComputeThreadPool(reportFailure = reportFailure)
+    val (compute, _, _) = IORuntime.createWorkStealingComputeThreadPool(reportFailure = reportFailure)
     val (blocking, _) = IORuntime.createDefaultBlockingExecutionContext()
     val (scheduler, _) = IORuntime.createDefaultScheduler()
     IORuntime(compute, blocking, scheduler, () => (), IORuntimeConfig())

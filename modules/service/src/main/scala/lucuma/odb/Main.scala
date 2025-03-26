@@ -8,6 +8,7 @@ import cats.data.Kleisli
 import cats.effect.*
 import cats.effect.std.AtomicCell
 import cats.effect.std.Console
+import cats.effect.std.SecureRandom
 import cats.implicits.*
 import com.comcast.ip4s.Port
 import com.monovore.decline.*
@@ -198,7 +199,7 @@ object FMain extends MainParams {
     }
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console](
+  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -217,7 +218,7 @@ object FMain extends MainParams {
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console](
+  def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -309,7 +310,7 @@ object FMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Console: Network](
+  def server[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): Resource[F, ExitCode] =
@@ -325,7 +326,7 @@ object FMain extends MainParams {
     } yield ExitCode.Success
 
   /** Our logical entry point. */
-  def runF[F[_]: Async: Parallel: Logger: Console: Network](
+  def runF[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
   ): F[ExitCode] =
