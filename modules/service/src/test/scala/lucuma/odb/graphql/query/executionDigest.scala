@@ -30,6 +30,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
+import lucuma.core.enums.ObservationWorkflowState
 
 
 class executionDigest extends ExecutionTestSupport {
@@ -562,8 +563,16 @@ class executionDigest extends ExecutionTestSupport {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _  <- setDeclaredComplete(pi, o, declaredComplete = true)
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s1)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+        _  <- computeItcResultAs(pi, o)
+        _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
       yield o
 
     setup.flatMap: oid =>
@@ -580,8 +589,16 @@ class executionDigest extends ExecutionTestSupport {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _  <- setDeclaredComplete(pi, o, declaredComplete = true)
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s1)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+        _  <- computeItcResultAs(pi, o)
+        _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
       yield (p, o)
 
     setup.flatMap: (_, oid) =>

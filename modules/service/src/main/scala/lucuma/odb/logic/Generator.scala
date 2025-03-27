@@ -247,8 +247,8 @@ object Generator {
         val hash: Md5Hash = {
           val md5 = MessageDigest.getInstance("MD5")
 
-          // Observing Mode
-          md5.update(params.observingMode.hashBytes)
+          // Generator Params
+          md5.update(params.hashBytes)
 
           // Integration Time
           List(acquisitionIntegrationTime, scienceIntegrationTime).foreach { ving =>
@@ -258,9 +258,6 @@ object Generator {
 
           // Commit Hash
           md5.update(commitHash.hashBytes)
-
-          // Completion Declaration
-          md5.update(params.declaredComplete.hashBytes)
 
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
