@@ -584,7 +584,9 @@ object ObservationWorkflowService {
           .value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
-        (wf.state :: wf.validTransitions).forall(states.contains)
+        // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
+        // even though editing will be disabled if the transition is taken.
+        (wf.state :: wf.validTransitions.filterNot(_ === ObservationWorkflowState.Completed)).forall(states.contains)
 
       override def filterState(
         oids: List[Observation.Id], 

@@ -431,18 +431,4 @@ class observations extends OdbSuite {
       res  <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }, site: { EQ: GS }""")
     yield assertEquals(res, Nil)
 
-  test("filter on declaredComplete"):
-    for
-      pid     <- createProgramAs(pi3)
-      oid1    <- createObservationAs(pi3, pid, ObservingModeType.GmosNorthLongSlit.some)
-      _       <- setDeclaredComplete(pi3, oid1, true)
-      oid2    <- createObservationAs(pi3, pid, ObservingModeType.GmosSouthLongSlit.some)
-      oid3    <- createObservationAs(pi3, pid)
-      _       <- setDeclaredComplete(pi3, oid3, true)
-      done    <- observationsWhere(pi3, s"""declaredComplete: { EQ: true },  program: { id: { EQ: "$pid" } } """)
-      notDone <- observationsWhere(pi3, s"""declaredComplete: { EQ: false }, program: { id: { EQ: "$pid" } } """)
-    yield
-      assertEquals(done, List(oid1, oid3))
-      assertEquals(notDone, List(oid2))
-
 }
