@@ -248,7 +248,7 @@ class targetEdit extends OdbSuite {
               .flatMap(pid => withServices(service) {services =>
                 services.session.transaction.use { xa =>
                   services.targetService.deleteOrphanCalibrationTargets(pid)(using xa)
-                }.onError(r => IO(r.printStackTrace()))
+                }.onError { case r => IO(r.printStackTrace()) }
               })
           ),
         expectedF = ref.get.map(i =>

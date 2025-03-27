@@ -51,7 +51,6 @@ trait GmosSouthParsers extends GmosCommonParsers {
 
   val fpu: Parser[NonEmptyList[Option[GmosSouthFpu]]] =
     manyOfOption("None",
-      "bHROS"                -> GmosSouthFpu.Bhros,
       "N and S 0.50 arcsec"  -> GmosSouthFpu.Ns1,
       "N and S 0.75 arcsec"  -> GmosSouthFpu.Ns2,
       "N and S 1.00 arcsec"  -> GmosSouthFpu.Ns3,

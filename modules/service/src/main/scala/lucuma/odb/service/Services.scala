@@ -8,6 +8,7 @@ import cats.Parallel
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
+import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Mapping
@@ -210,7 +211,7 @@ object Services:
    * lazily.
    */
   def forUser[F[_]](u: User, e: Enums, m: Option[Mapping[F]])(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F]
+    using tf: Trace[F], uf: UUIDGen[F], sr: SecureRandom[F], cf: Concurrent[F], par: Parallel[F]
   ): Services[F[_]] =
     new Services[F]:
       val user = u

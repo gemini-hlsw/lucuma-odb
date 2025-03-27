@@ -115,5 +115,6 @@ class introspection extends OdbSuite:
           }
         }      
       """
-    ).onError: t =>
+    ).onError { case t =>
       fail("\n🐞🐞🐞\n🐞🐞🐞 Schema introspection failed!\n🐞🐞🐞\n", t)
+    }
