@@ -14,6 +14,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
@@ -30,7 +31,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
-import lucuma.core.enums.ObservationWorkflowState
 
 
 class executionDigest extends ExecutionTestSupport {
