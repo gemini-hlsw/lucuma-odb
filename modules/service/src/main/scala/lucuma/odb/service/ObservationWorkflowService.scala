@@ -49,6 +49,7 @@ import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.boolean.*
 import skunk.implicits.*
 
 import java.time.Instant
@@ -122,6 +123,7 @@ case class ObservationValidationInfo(
   dec: Option[Declination],
   role: Option[CalibrationRole],
   userState: Option[ObservationWorkflowService.UserState],
+  declaredComplete: Boolean,
   proposalStatus: Tag,
   cfpid: Option[CallForProposals.Id],
   scienceBand: Option[ScienceBand],
@@ -195,6 +197,9 @@ object ObservationWorkflowService {
       case Inactive => Some(Inactive)
       case Ready    => Some(Ready)
       case _        => None
+
+  extension (ws: ObservationWorkflowState) def isUserState: Boolean =
+    ws.asUserState.isDefined
 
   extension [A,B,C](m: Map[A, Either[B, C]]) def separateValues: (Map[A, B], Map[A, C]) =
     m.foldLeft((Map.empty[A,B], Map.empty[A,C])):
@@ -383,7 +388,6 @@ object ObservationWorkflowService {
             (executionState, userStatus(validationStatus)) match
               case (None, None)     => validationStatus
               case (None, Some(us)) => us
-              case (Some(es), None) => es
               case (Some(Ongoing), Some(Inactive)) => Inactive
               case (Some(es), _)    => es
 
@@ -395,8 +399,8 @@ object ObservationWorkflowService {
               case Unapproved => List(Inactive)
               case Defined    => List(Inactive) ++ Option.when(isAccepted || info.tpe =!= ProgramType.Science)(Ready)
               case Ready      => List(Inactive, validationStatus)
-              case Ongoing    => List(Inactive)
-              case Completed  => Nil
+              case Ongoing    => List(Inactive, Completed)
+              case Completed  => if info.declaredComplete then List(Ongoing) else Nil
 
           (state, allowedTransitions)
 
@@ -559,11 +563,24 @@ object ObservationWorkflowService {
             if w.state === state then ResultT.success(w)
             else if !w.validTransitions.contains(state)
             then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
-            else ResultT:
-              services.transactionally:
-                session.prepareR(Statements.UpdateUserState).use: pc =>
-                  pc.execute(state.asUserState, oid)
-                    .as(Result(w.copy(state = state)))
+            else ResultT: 
+              // If we're transitioning to or from a UserState, just update that column
+              if w.state.isUserState || state.isUserState then
+                services.transactionally:
+                  session.prepareR(Statements.UpdateUserState).use: pc =>
+                    pc.execute(state.asUserState, oid)
+                      .as(Result(w.copy(state = state)))
+              else // we must be declaring completion (or revoking that declaration)
+                import ObservationWorkflowState.*
+                (w.state, state) match
+                  case (Ongoing, Completed) | (Completed, Ongoing) => 
+                    services.transactionally:
+                      session.prepareR(Statements.UpdateDeclaredCompletion).use: pc =>
+                        pc.execute(state === Completed, oid)
+                          .as(Result(w.copy(state = state)))
+                  case _ => 
+                    // This should never happen but I want to check for it anyway.
+                    Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]                
           .value
 
       extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
@@ -649,6 +666,7 @@ object ObservationWorkflowService {
           o.c_explicit_dec,
           o.c_calibration_role,
           o.c_workflow_user_state,
+          o.c_declared_complete,
           p.c_proposal_status,
           x.c_cfp_id,
           o.c_science_band
@@ -657,10 +675,10 @@ object ObservationWorkflowService {
         LEFT JOIN t_proposal x ON o.c_program_id = x.c_program_id
         WHERE c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: tag *: cfp_id.opt *: science_band.opt)
+      .query(program_id *: program_type *: observation_id *: instrument.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: bool *: tag *: cfp_id.opt *: science_band.opt)
       .map:
-        case (pid, tpe, oid, inst, ra, dec, cal, state, tag, cfp, sci) =>
-          ObservationValidationInfo(pid, tpe, oid, inst, ra, dec, cal, state, tag, cfp, sci, Nil)
+        case (pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci) =>
+          ObservationValidationInfo(pid, tpe, oid, inst, ra, dec, cal, state, dc, tag, cfp, sci, Nil)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
@@ -701,6 +719,13 @@ object ObservationWorkflowService {
       sql"""
         UPDATE t_observation
         SET c_workflow_user_state = ${user_state.opt}
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val UpdateDeclaredCompletion: Command[(Boolean, Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+        SET c_declared_complete = $bool
         WHERE c_observation_id = $observation_id
       """.command
 
