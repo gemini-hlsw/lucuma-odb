@@ -35,13 +35,17 @@ import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.SignalToNoiseAt
+import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
+import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
@@ -141,7 +145,7 @@ object ItcService {
         s"ITC provided conflicting results"
   end Error
 
-  case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoise]) {
+  case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoiseAt]) {
     def totalTime: Option[TimeSpan] = {
       val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
       Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
@@ -153,26 +157,33 @@ object ItcService {
       Order.by { s => (s.totalTime, s.targetId) }
 
     import lucuma.odb.json.time.query.given
+    import lucuma.odb.json.wavelength.query.given
 
-    given Encoder[TargetResult] =
-      Encoder.instance { s =>
-        Json.obj(
-          "targetId"      -> s.targetId.asJson,
-          "exposureTime"  -> s.value.exposureTime.asJson,
-          "exposureCount" -> s.value.exposureCount.value.asJson,
-          // TODO: Use both single and total signal to noise
-          "signalToNoise" -> s.signalToNoise.asJson
-        )
-      }
+    given Decoder[SignalToNoiseAt] = c =>
+      for {
+        w <- c.downField("wavelength").as[Wavelength]
+        s <- c.downField("single").as[SignalToNoise]
+        t <- c.downField("total").as[SignalToNoise]
+      } yield SignalToNoiseAt(w, SingleSN(s), TotalSN(t))
 
     given Decoder[TargetResult] =
       Decoder.instance { c =>
         for {
-          targetId      <- c.downField("targetId").as[Target.Id]
-          exposureTime  <- c.downField("exposureTime").as[TimeSpan]
-          exposureCount <- c.downField("exposureCount").as[NonNegInt]
-          signalToNoise <- c.downField("signalToNoise").as[Option[SignalToNoise]]
-        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoise)
+          targetId        <- c.downField("targetId").as[Target.Id]
+          exposureTime    <- c.downField("exposureTime").as[TimeSpan]
+          exposureCount   <- c.downField("exposureCount").as[NonNegInt]
+          signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
+        } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
+      }
+
+    given Encoder[TargetResult] =
+      Encoder.instance { s =>
+        Json.obj(
+          "targetId"        -> s.targetId.asJson,
+          "exposureTime"    -> s.value.exposureTime.asJson,
+          "exposureCount"   -> s.value.exposureCount.value.asJson,
+          "signalToNoiseAt" -> s.signalToNoise.asJson
+        )
       }
   }
 
@@ -350,11 +361,11 @@ object ItcService {
                 AsterismResults.fromResults(
                   img.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt.map(_.total.value))
+                    TargetResult(targetId, /*(targets.imaging, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
                   },
                   spec.value.zipWithIndex.map { case (targetIntegrationTime, index) =>
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
-                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt.map(_.total.value))
+                    TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
                   },
                 ).toRight[Error](Error.TargetMismatch)
             yield result
