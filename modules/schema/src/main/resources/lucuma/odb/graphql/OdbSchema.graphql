@@ -7596,11 +7596,6 @@ GMOS South FPU
 """
 enum GmosSouthBuiltinFpu {
   """
-  GmosSouthBuiltinFpu Bhros
-  """
-  BHROS
-
-  """
   GmosSouthBuiltinFpu Ns1
   """
   NS1
@@ -8436,11 +8431,6 @@ enum Instrument {
   ACQ_CAM
 
   """
-  Instrument Bhros
-  """
-  BHROS
-
-  """
   Instrument Flamingos2
   """
   FLAMINGOS2
@@ -8476,34 +8466,9 @@ enum Instrument {
   GSAOI
 
   """
-  Instrument Michelle
-  """
-  MICHELLE
-
-  """
-  Instrument Nici
-  """
-  NICI
-
-  """
-  Instrument Nifs
-  """
-  NIFS
-
-  """
   Instrument Niri
   """
   NIRI
-
-  """
-  Instrument Phoenix
-  """
-  PHOENIX
-
-  """
-  Instrument Trecs
-  """
-  TRECS
 
   """
   Instrument Visitor

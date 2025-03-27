@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import cats.Parallel
 import cats.effect.*
+import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -31,7 +32,7 @@ object AttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Parallel: Trace](
+  def apply[F[_]: Async: Parallel: Trace: SecureRandom](
     pool:                  Resource[F, Session[F]],
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],
@@ -45,7 +46,7 @@ object AttachmentRoutes {
     )
 
   // used by tests
-  def apply[F[_]: Async: Trace](
+  def apply[F[_]: Async: Trace: SecureRandom](
     service:     AttachmentFileService[F],
     ssoClient:   SsoClient[F, User],
     maxUploadMb: Int,
