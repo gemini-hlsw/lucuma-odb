@@ -28,35 +28,54 @@ class executionAcq extends ExecutionTestSupport {
   def acqTelescopeConfig(p: Int): TelescopeConfig =
     telescopeConfig(p, 0, StepGuideState.Enabled)
 
+  val InitialInstrumentAcquisition: Json =
+    json"""
+      {
+        "acquisition": {
+          "nextAtom": {
+            "description": "Initial Acquisition",
+            "observeClass": "ACQUISITION",
+            "steps": [
+              ${gmosNorthExpectedAcq(0,  0)},
+              ${gmosNorthExpectedAcq(1, 10)},
+              ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+            ]
+          },
+          "possibleFuture": [
+            {
+              "description": "Fine Adjustments",
+              "observeClass": "ACQUISITION",
+              "steps": [
+                ${gmosNorthExpectedAcq(2, 0)}
+              ]
+            }
+          ],
+          "hasMore": false
+        }
+      }
+    """
+
   val InitialAcquisition: Json =
     json"""
       {
         "observation": {
           "execution": {
             "config": {
-              "gmosNorth": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${gmosNorthExpectedAcq(0,  0)},
-                      ${gmosNorthExpectedAcq(1, 10)},
-                      ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${gmosNorthExpectedAcq(2, 0)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
-                }
-              }
+              "gmosNorth": $InitialInstrumentAcquisition
+            }
+          }
+        }
+      }
+    """
+
+  val InitialTwoInstrumentAcquisition: Json =
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "config": {
+              "gmosNorth": $InitialInstrumentAcquisition,
+              "gmosSouth": null
             }
           }
         }
@@ -146,6 +165,34 @@ class executionAcq extends ExecutionTestSupport {
              }
            """,
         expected = InitialAcquisition.asRight
+      )
+
+  test("execute first step only, reset with another instrument non-reset query"):
+    val setup: IO[Observation.Id] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+
+        // Record the first atom and one of its steps
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        _  <- addEndStepEvent(s0)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 ${excutionConfigQuery(List("gmosNorth" -> "acquisition(reset: true)", "gmosSouth" -> "acquisition"), GmosAtomQuery, None)}
+               }
+             }
+           """,
+        expected = InitialTwoInstrumentAcquisition.asRight
       )
 
   test("execute first atom - repeat of last acq step") {

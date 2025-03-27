@@ -276,24 +276,33 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-  def excutionConfigQuery(inst: String, sequenceType: String, atomQuery: String, futureLimit: Option[Int]): String =
+  private def instExcutionConfigQuery(inst: String, sequenceType: String, atomQuery: String): String =
     s"""
-      execution {
-        config${futureLimit.fold("")(lim => s"(futureLimit: $lim)")} {
-          $inst {
-            $sequenceType {
-              nextAtom {
-                $atomQuery
-              }
-              possibleFuture {
-                $atomQuery
-              }
-              hasMore
-            }
+      $inst {
+        $sequenceType {
+          nextAtom {
+            $atomQuery
           }
+          possibleFuture {
+            $atomQuery
+          }
+          hasMore
         }
       }
     """
+
+  def excutionConfigQuery(instsAndSeqTypes: List[(String, String)], atomQuery: String, futureLimit: Option[Int]): String =
+    s"""
+      execution {
+        config${futureLimit.fold("")(lim => s"(futureLimit: $lim)")} {
+          ${instsAndSeqTypes.map((inst, sequenceType) => instExcutionConfigQuery(inst, sequenceType, atomQuery)).mkString} 
+        }
+      }
+    """
+
+  def excutionConfigQuery(inst: String, sequenceType: String, atomQuery: String, futureLimit: Option[Int]): String =
+    excutionConfigQuery(List((inst, sequenceType)), atomQuery, futureLimit)
+
 
   def gmosNorthAcquisitionQuery(futureLimit: Option[Int]): String =
     excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
