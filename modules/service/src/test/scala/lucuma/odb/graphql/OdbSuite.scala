@@ -66,8 +66,8 @@ import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
-import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -337,10 +337,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def server: Resource[IO, Server] =
     for {
       a <- httpApp
-      s <- BlazeServerBuilder[IO]
+      s <- EmberServerBuilder.default[IO]
              .withHttpWebSocketApp(a)
-             .bindAny()
-             .resource
+             .build
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
