@@ -63,7 +63,9 @@ class setObservationWorkflowState
   def testTransition(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     queryObservationWorkflowState(oid).flatMap: current =>
       setObservationWorkflowState(pi, oid, state) >>
-      setObservationWorkflowState(pi, oid, current).void
+      assertIO(queryObservationWorkflowState(oid), state) >>
+      setObservationWorkflowState(pi, oid, current) >>
+      assertIO(queryObservationWorkflowState(oid), current)
 
   /** Test that we can change to the specified states and back, and CANNOT change to anything else. */
   def testTransitions(oid: Observation.Id, allowedTransitions: ObservationWorkflowState*): IO[Unit] =
@@ -135,7 +137,7 @@ class setObservationWorkflowState
     } yield ()
 
   // (see executionState.scala)
-  test("Ongoing    <-> Inactive"):
+  test("Ongoing    <-> Inactive, Completed"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -150,11 +152,11 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s2)
       _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _  <- testTransitions(o, Ongoing, Inactive)
+      _  <- testTransitions(o, Ongoing, Inactive, Completed)
     yield ()
 
 // (see executionState.scala)
-  test("Completed  <->"):
+  test("Completed  <-> <none> if naturally complete"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -174,6 +176,26 @@ class setObservationWorkflowState
       _  <- testTransitions(o, Completed)
     yield ()
 
+  test("Completed  <-> Ongoing, if explicitly declared complete"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+      a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+      _  <- addEndStepEvent(s0)
+      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+      _  <- addEndStepEvent(s1)
+      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
+      _  <- addEndStepEvent(s2)
+      _  <- computeItcResultAs(pi, o)
+      _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _  <- setObservationWorkflowState(pi, o, Completed)
+      _  <- assertIO(queryObservationWorkflowState(o), Completed)
+      _  <- testTransitions(o, Completed, Ongoing)
+    yield ()
+
   test("[Eng] Defined   <-> Inactive, Ready"):
     for {
       pid <- createProgramAs(pi)
@@ -183,7 +205,7 @@ class setObservationWorkflowState
       _   <- testTransitions(oid, Defined, Inactive, Ready)
     } yield ()
 
-  test("[Eng] Ongoing   <-> Inactive"):
+  test("[Eng] Ongoing   <-> Inactive, Completed"):
     for
       p <- createProgram
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -199,7 +221,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s2)
       _  <- computeItcResultAs(pi, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _  <- testTransitions(o, Ongoing, Inactive)
+      _  <- testTransitions(o, Ongoing, Inactive, Completed)
     yield ()
 
   test("[Eng] Completed <->"):
