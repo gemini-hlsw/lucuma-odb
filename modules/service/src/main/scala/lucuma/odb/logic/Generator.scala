@@ -259,6 +259,9 @@ object Generator {
           // Commit Hash
           md5.update(commitHash.hashBytes)
 
+          // Completion Declaration
+          md5.update(params.declaredComplete.hashBytes)
+
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
