@@ -11,6 +11,7 @@ import cats.effect.std.Console
 import cats.effect.std.SecureRandom
 import cats.implicits.*
 import com.comcast.ip4s.Port
+import com.comcast.ip4s.host
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
@@ -38,8 +39,8 @@ import natchez.http4s.implicits.*
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
-import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.implicits.*
 import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
@@ -178,15 +179,15 @@ object FMain extends MainParams {
           .onFinalize(cell.updateAndGet(_ + 1).flatMap(n => Logger[F].debug(s"released session (should be $n remaining)")))
 
   /** A resource that yields a running HTTP server. */
-  def serverResource[F[_]: Async](
+  def serverResource[F[_]: Async: Network](
     port: Port,
     app:  WebSocketBuilder2[F] => HttpApp[F]
   ): Resource[F, Server] =
-    BlazeServerBuilder
-      .apply[F]
-      .bindHttp(port.value, "0.0.0.0")
+    EmberServerBuilder.default[F]
+      .withPort(port)
+      .withHost(host"0.0.0.0")
       .withHttpWebSocketApp(app)
-      .resource
+      .build
 
   /** A resource that yields a Natchez tracing entry point. */
   def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
@@ -333,4 +334,3 @@ object FMain extends MainParams {
     server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
 
 }
-
