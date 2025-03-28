@@ -120,7 +120,7 @@ class executionAcq extends ExecutionTestSupport {
     }
   }
 
-  test("execute first step only, reset"):
+  test("execute first step only, reset (and reset persists)"):
     val setup: IO[Observation.Id] =
       for
         p  <- createProgram
@@ -146,7 +146,19 @@ class executionAcq extends ExecutionTestSupport {
              }
            """,
         expected = InitialAcquisition.asRight
-      )
+      ).flatMap: _ =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              query {
+                observation(observationId: "$oid") {
+                  ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                }
+              }
+            """,
+          expected = InitialAcquisition.asRight
+        )
 
   test("execute first atom - repeat of last acq step") {
     val setup: IO[Observation.Id] =
