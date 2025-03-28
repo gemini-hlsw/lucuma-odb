@@ -30,7 +30,7 @@ jobs:
         os: [ubuntu-22.04]
         scala: [3]
         java: [temurin@17]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -75,25 +75,25 @@ jobs:
         run: sbt -v -J-Xmx6g githubWorkflowCheck
 
       - name: Check headers and formatting
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '1'
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
 
       - name: Check scalafix lints
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '1'
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: Test
         env:
-          TEST_SHARD_COUNT: 12
+          TEST_SHARD_COUNT: 8
           TEST_SHARD: ${{ matrix.shard }}
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
       - name: Check binary compatibility
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '1'
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' mimaReportBinaryIssues
 
       - name: Generate API documentation
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '1'
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' doc
 
       - name: Aggregate coverage reports
