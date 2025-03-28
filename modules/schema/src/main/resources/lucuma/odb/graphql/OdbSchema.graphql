@@ -3335,13 +3335,6 @@ input ObservationPropertiesInput {
   """
   observerNotes: NonEmptyString
 
-  """
-  Set to `true` to mark the observation as complete regardless of how many steps
-  may remain.  Set to `false` (the default) to allow all prescribed steps to
-  execute before considering the observation complete.
-  """
-  declaredComplete: Boolean
-
 }
 
 """
@@ -8952,12 +8945,6 @@ type Observation {
 
   workflow: ObservationWorkflow!
 
-  """
-  When true, a user has taken action to explicitly mark the observation complete
-  regardless of how many steps have been executed and which steps may remain.
-  """
-  declaredComplete: Boolean!
-
 }
 
 enum ExecutionState {
@@ -13608,11 +13595,6 @@ input WhereObservation {
   Matches on the site associated with the observation's instrument, if any.
   """
   site: WhereOptionEqSite
-
-  """
-  Matches on whether the observation has been marked explicitly complete.
-  """
-  declaredComplete: WhereBoolean
 
 }
 
