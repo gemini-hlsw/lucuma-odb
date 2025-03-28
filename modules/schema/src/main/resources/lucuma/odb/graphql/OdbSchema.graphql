@@ -8572,6 +8572,18 @@ type ItcResultSet {
   index:    NonNegInt!
 }
 
+"""Calculated signal to noise at a specific wavelength"""
+type SignalToNoiseAt {
+  """Single exposure signal to noise"""
+  single: SignalToNoise!
+
+  """Total exposure signal to noise"""
+  total: SignalToNoise!
+
+  """Wavelength sn was calculated at"""
+  wavelength: Wavelength!
+}
+
 """
 A single ITC call result.
 """
@@ -8579,9 +8591,7 @@ type ItcResult {
   targetId:      TargetId!
   exposureTime:  TimeSpan!
   exposureCount: NonNegInt!
-  # TODO This needs to include two values and a wavelength
-  # It is nullable as imaging doesn't return a signal to noise value yet
-  signalToNoise: SignalToNoise
+  signalToNoiseAt: SignalToNoiseAt
 }
 
 type LineFluxIntegrated {
