@@ -342,6 +342,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
              .default[IO]
              .withPort(port"0")
              .withHttpWebSocketApp(a)
+             .withShutdownTimeout(Duration.Zero)
              .build
     } yield s
 
