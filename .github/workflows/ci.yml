@@ -30,7 +30,7 @@ jobs:
         os: [ubuntu-22.04]
         scala: [3]
         java: [temurin@17]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -84,7 +84,7 @@ jobs:
 
       - name: Test
         env:
-          TEST_SHARD_COUNT: 8
+          TEST_SHARD_COUNT: 12
           TEST_SHARD: ${{ matrix.shard }}
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
