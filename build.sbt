@@ -38,8 +38,7 @@ ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
-// TODO: remove this again. Just for testing purposes
-ThisBuild / githubWorkflowBuildTimeoutMinutes := Some(120)
+
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
