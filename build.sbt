@@ -59,7 +59,7 @@ ThisBuild / githubWorkflowBuildPreamble +=
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
 
-val shards = 8
+val shards = 12
 
 ThisBuild / githubWorkflowBuildMatrixAdditions += (
   "shard" -> ((1 to shards).map(_.toString).toList)
