@@ -59,12 +59,14 @@ ThisBuild / githubWorkflowBuildPreamble +=
     cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
 
+val shards = 8
+
 ThisBuild / githubWorkflowBuildMatrixAdditions += (
-  "shard" -> List("1", "2", "3", "4")
+  "shard" -> ((1 to shards).map(_.toString).toList)
 )
 ThisBuild / githubWorkflowBuild ~= (_.map(step =>
   if (step.name.contains("Test"))
-    step.withEnv(Map("TEST_SHARD_COUNT" -> "4", "TEST_SHARD" -> "${{ matrix.shard }}"))
+    step.withEnv(Map("TEST_SHARD_COUNT" -> shards.toString(), "TEST_SHARD" -> "${{ matrix.shard }}"))
   else step
 ))
 
