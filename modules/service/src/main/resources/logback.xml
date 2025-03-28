@@ -5,11 +5,6 @@
     </encoder>
   </appender>
 
-  <!-- Suppress reporting of https://github.com/http4s/http4s/issues/2835 -->
-  <logger name="org.http4s.blaze" level="OFF" />
-  <logger name="org.http4s.blazecore.IdleTimeoutStage" level="OFF" />
-  <logger name="org.http4s.blazecore.websocket.Http4sWSStage" level="OFF" />
-
   <logger name="lucuma-odb" level="INFO" />
   <logger name="lucuma-odb-container" level="DEBUG" />
   <logger name="lucuma-odb-test" level="ERROR" />
