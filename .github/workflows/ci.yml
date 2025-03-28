@@ -31,7 +31,7 @@ jobs:
         scala: [3]
         java: [temurin@17]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout current branch (full)
         uses: actions/checkout@v4
