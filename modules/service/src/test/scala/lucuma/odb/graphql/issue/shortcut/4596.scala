@@ -207,7 +207,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(ongoing, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $ongoing is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+            s"Observation $ongoing is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ),
           json"""
           {
@@ -333,7 +333,7 @@ class ShortCut_4596 extends OdbSuite
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
-          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."),
+          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."),
           json"""
             {
               "updateAsterisms": {
@@ -459,7 +459,7 @@ class ShortCut_4596 extends OdbSuite
             }
           """,
           expected = Ior.Left(List(
-            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ))
         )  
 
@@ -504,7 +504,7 @@ class ShortCut_4596 extends OdbSuite
           expected = 
             Ior.Both(
               List(
-                s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+                s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
               ),
               json"""
                 {
