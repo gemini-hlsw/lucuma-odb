@@ -45,18 +45,28 @@ ThisBuild / githubWorkflowBuildPreamble +=
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-    cond = Some("github.event_name == 'pull_request'")
+    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
   )
 
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
     name = Some("Validate GraphQL schema changes"),
-    params = Map("schema"           -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-                 "approve-label"    -> "expected-breaking-change"
-    ),
-    cond = Some("github.event_name == 'pull_request'")
+    params =
+      Map("schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+          "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
+
+ThisBuild / githubWorkflowBuildMatrixAdditions += (
+  "shard" -> List("1", "2", "3", "4")
+)
+ThisBuild / githubWorkflowBuild ~= (_.map(step =>
+  if (step.name.contains("Test"))
+    step.withEnv(Map("TEST_SHARD_COUNT" -> "4", "TEST_SHARD" -> "${{ matrix.shard }}"))
+  else step
+))
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)

@@ -13,7 +13,10 @@ pull_request_rules:
     - body~=labels:.*early-semver-patch
     - body~=labels:.*early-semver-minor
     - 'title=flake.lock: Update'
-  - status-success=Test (ubuntu-22.04, 3, temurin@17)
+  - status-success=Test (ubuntu-22.04, 3, temurin@17, 1)
+  - status-success=Test (ubuntu-22.04, 3, temurin@17, 2)
+  - status-success=Test (ubuntu-22.04, 3, temurin@17, 3)
+  - status-success=Test (ubuntu-22.04, 3, temurin@17, 4)
   actions:
     merge: {}
 - name: Label calibrations PRs
