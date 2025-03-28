@@ -20,6 +20,7 @@ import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
+import com.comcast.ip4s.port
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -337,7 +338,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def server: Resource[IO, Server] =
     for {
       a <- httpApp
-      s <- EmberServerBuilder.default[IO]
+      s <- EmberServerBuilder
+             .default[IO]
+             .withPort(port"0")
              .withHttpWebSocketApp(a)
              .build
     } yield s
