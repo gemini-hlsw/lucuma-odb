@@ -8,6 +8,7 @@ enum SeeingTrend { DUMMY }
 enum ConditionsExpectationType { DUMMY }
 enum FilterType { DUMMY }
 enum ProposalStatus { DUMMY }
+enum ToOActivation { DUMMY }
 
 """Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
 scalar EmailAddress
@@ -12514,25 +12515,25 @@ type TimestampInterval {
 
 }
 
-"""
-ToO Activation
-"""
-enum ToOActivation {
-  """
-  ToOActivation None
-  """
-  NONE
+# """
+# ToO Activation
+# """
+# enum ToOActivation {
+#   """
+#   ToOActivation None
+#   """
+#   NONE
 
-  """
-  ToOActivation Standard
-  """
-  STANDARD
+#   """
+#   ToOActivation Standard
+#   """
+#   STANDARD
 
-  """
-  ToOActivation Rapid
-  """
-  RAPID
-}
+#   """
+#   ToOActivation Rapid
+#   """
+#   RAPID
+# }
 
 input UnlinkUserInput {
 
