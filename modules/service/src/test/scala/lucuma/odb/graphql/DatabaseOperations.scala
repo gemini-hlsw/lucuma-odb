@@ -1769,7 +1769,9 @@ trait DatabaseOperations { this: OdbSuite =>
     obsDuration: Option[TimeSpan]
   ): IO[Unit] = {
     val time = obsTime.fold("null")(ts => s"\"${ts.isoFormat}\"")
-    val duration = obsDuration.fold("null")(ts => s"{ microseconds: ${ts.toMicroseconds} }")
+    // microseconds can be bigger than max int. The schema is a Long but values outside of
+    // the Int range must be a string.
+    val duration = obsDuration.fold("null")(ts => s"{ microseconds: \"${ts.toMicroseconds}\" }")
     val q = s"""
       mutation {
         updateObservationsTimes(input: {
