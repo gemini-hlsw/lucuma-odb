@@ -29,7 +29,6 @@ import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.codec.temporal.timestamp
-import skunk.codec.temporal.timestamptz
 import skunk.implicits.*
 
 import java.time.LocalDateTime
@@ -136,7 +135,7 @@ object VisitService:
 
         (for
           d  <- obsDescription(observationId)
-          n  <- ResultT.liftF(session.unique(Statements.selectObservingNight(d.site)))
+          n  <- ResultT.liftF(timeService.currentObservingNight(d.site))
           _  <- lockCreation
           v  <- lookupVisit(d, n)
           vʹ <- v.fold(insertNewVisit(d))(ResultT.pure)
@@ -236,11 +235,6 @@ object VisitService:
         FROM t_visit
         WHERE c_observation_id = $observation_id
       """.query(visit_record)
-
-    def selectObservingNight(site: Site): Query[Void, ObservingNight] =
-      sql"""SELECT NOW()"""
-        .query(timestamptz)
-        .map(t => ObservingNight.fromSiteAndInstant(site, t.toInstant))
 
     val SelectChargeableVisit: Query[ObservingNight, VisitRecord] =
       sql"""
