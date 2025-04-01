@@ -22,6 +22,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.{site as _, *}
@@ -50,14 +51,12 @@ trait VisitService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
-  def insertGmosNorth(
-    observationId: Observation.Id,
-    static:        GmosNorth
+  def recordGmosNorth(
+    input: RecordGmosVisitInput[GmosNorth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
-  def insertGmosSouth(
-    observationId: Observation.Id,
-    static:        GmosSouth
+  def recordGmosSouth(
+    input: RecordGmosVisitInput[GmosSouth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 
@@ -104,15 +103,19 @@ object VisitService:
           session.option(Statements.SelectObsDescription)(observationId).map: od =>
             Result.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found.".some).asProblem)
 
+
       override def lookupOrInsert(
         observationId: Observation.Id
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+
+        def obsNight(site: Site): ResultT[F, ObservingNight] =
+          ResultT.liftF(timeService.currentObservingNight(site))
 
         // Application transaction advisory lock on visit creation. The idea is
         // to prevent two callers (Observe and Navigate) from doing a lookup
         // simultaneously and coming to the conclusion to each create a new
         // visit.
-        val lockCreation: ResultT[F, Unit] =
+        val lockVisitCreation: ResultT[F, Unit] =
           ResultT.liftF:
             session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
 
@@ -135,13 +138,13 @@ object VisitService:
 
         (for
           d  <- obsDescription(observationId)
-          n  <- ResultT.liftF(timeService.currentObservingNight(d.site))
-          _  <- lockCreation
+          n  <- obsNight(d.site)
+          _  <- lockVisitCreation
           v  <- lookupVisit(d, n)
           vʹ <- v.fold(insertNewVisit(d))(ResultT.pure)
         yield vʹ).value
 
-      private def insertStaticConfig[A](
+      private def insertWithStaticConfig[A](
         observationId: Observation.Id,
         static:        A,
         instrument:    Instrument,
@@ -171,25 +174,23 @@ object VisitService:
             case SqlState.ForeignKeyViolation(_) =>
               OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
 
-      override def insertGmosNorth(
-        observationId: Observation.Id,
-        static:        GmosNorth
+      override def recordGmosNorth(
+        input: RecordGmosVisitInput[GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        insertStaticConfig(
-          observationId,
-          static,
+        insertWithStaticConfig(
+          input.observationId,
+          input.static,
           Instrument.GmosNorth,
           gmosSequenceService.selectGmosNorthStatic,
           gmosSequenceService.insertGmosNorthStatic
         )
 
-      override def insertGmosSouth(
-        observationId: Observation.Id,
-        static:        GmosSouth
+      override def recordGmosSouth(
+        input: RecordGmosVisitInput[GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        insertStaticConfig(
-          observationId,
-          static,
+        insertWithStaticConfig(
+          input.observationId,
+          input.static,
           Instrument.GmosSouth,
           gmosSequenceService.selectGmosSouthStatic,
           gmosSequenceService.insertGmosSouthStatic
