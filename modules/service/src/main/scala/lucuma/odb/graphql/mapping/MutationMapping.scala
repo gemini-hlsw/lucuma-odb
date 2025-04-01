@@ -490,27 +490,27 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val AddAtomEvent: MutationField =
     addEvent("addAtomEvent", AddAtomEventInput.Binding, Predicates.atomEvent) { input =>
-      executionEventService.insertAtomEvent(input.atomId, input.atomStage)
+      executionEventService.insertAtomEvent(input)
     }
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>
-      executionEventService.insertDatasetEvent(input.datasetId, input.datasetStage)
+      executionEventService.insertDatasetEvent(input)
     }
 
   private lazy val AddSequenceEvent: MutationField =
     addEvent("addSequenceEvent", AddSequenceEventInput.Binding, Predicates.sequenceEvent) { input =>
-      executionEventService.insertSequenceEvent(input.visitId, input.command)
+      executionEventService.insertSequenceEvent(input)
     }
 
   private lazy val AddSlewEvent: MutationField =
     addEvent("addSlewEvent", AddSlewEventInput.Binding, Predicates.slewEvent) { input =>
-      executionEventService.insertSlewEvent(input.observationId, input.slewStage)
+      executionEventService.insertSlewEvent(input)
     }
 
   private lazy val AddStepEvent: MutationField =
     addEvent("addStepEvent", AddStepEventInput.Binding, Predicates.stepEvent) { input =>
-      executionEventService.insertStepEvent(input.stepId, input.stepStage)
+      executionEventService.insertStepEvent(input)
     }
 
   private def recordAtom(
@@ -571,7 +571,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.insertGmosNorth(input.observationId, input.static),
+            visitService.recordGmosNorth(input),
             Predicates.visit.id,
             child
           )
@@ -581,7 +581,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.insertGmosSouth(input.observationId, input.static),
+            visitService.recordGmosSouth(input),
             Predicates.visit.id,
             child
           )
