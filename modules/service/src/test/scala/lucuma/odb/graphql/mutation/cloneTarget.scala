@@ -121,7 +121,7 @@ class cloneTarget extends OdbSuite {
           }
         }
       """,
-      expected = Left(List("No such target: t-ffff"))
+          expected = Left(List(s"Target t-ffff does not exist, is not visible, or is ineligible for the requested operation."))
     )
   }
 
@@ -169,7 +169,7 @@ class cloneTarget extends OdbSuite {
               }
             }
           """,
-          expected = Left(List(s"No such target: $tid"))
+          expected = Left(List(s"Target $tid does not exist, is not visible, or is ineligible for the requested operation."))
         )
       }
     }

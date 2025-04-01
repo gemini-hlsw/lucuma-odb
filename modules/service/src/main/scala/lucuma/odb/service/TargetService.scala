@@ -15,16 +15,9 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.ProperMotion
 import lucuma.core.model.EphemerisKey
-import lucuma.core.model.GuestUser
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.ServiceUser
 import lucuma.core.model.SourceProfile
-import lucuma.core.model.StandardRole.Admin
-import lucuma.core.model.StandardRole.Ngo
-import lucuma.core.model.StandardRole.Pi
-import lucuma.core.model.StandardRole.Staff
-import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.Nullable
@@ -32,10 +25,10 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
-import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.json.wavelength.query.given
@@ -54,12 +47,11 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait TargetService[F[_]] {
-  def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]]
+  def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] 
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
-  def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
+  def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F]): F[Result[Unit]]
-
 }
 
 object TargetService {
@@ -89,29 +81,13 @@ object TargetService {
   def instantiate[F[_]: Concurrent](using Services[F]): TargetService[F] =
     new TargetService[F] {
 
-      private def createTargetImpl(pid: Program.Id, input: TargetPropertiesInput.Create)(using Transaction[F]): F[CreateTargetResponse] = {
-        val insert: AppliedFragment =
-          input.tracking match {
+      override def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] =
+        input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
+          val af = input.tracking match
             case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
             case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
-          }
-        val where = Statements.whereFragment(pid, user)
-        val appl  = insert |+| void" " |+| where
-        session.prepareR(appl.fragment.query(target_id)).use { ps =>
-          ps.option(appl.argument).map {
-            case Some(tid) => Success(tid)
-            case None      => NotAuthorized(user)
-          } // todo: catch key violation to indicate ProgramNotFound
-        }
-      }
-
-      override def createTarget(input: CreateTargetInput)(using Transaction[F]): F[Result[Target.Id]] =
-        programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
-          r.flatTraverse: pid =>
-            createTargetImpl(pid, input.SET).map:
-              case NotAuthorized(user)  => OdbError.NotAuthorized(user.id).asFailure
-              case ProgramNotFound(pid) => OdbError.InvalidProgram(pid, Some(s"Program ${pid} was not found")).asFailure
-              case Success(id)          => Result(id)
+          session.prepareR(af.fragment.query(target_id)).use: ps =>
+            ps.unique(af.argument).map(Result.success)
 
       override def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]] =
         checked.fold(Result(Nil).pure[F]): (props, which) =>
@@ -167,44 +143,29 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      private def clone(targetId: Target.Id, pid: Program.Id): F[Option[Target.Id]] =
+      private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
         val stmt = Statements.cloneTarget(pid, targetId, user)
-        session.prepareR(stmt.fragment.query(target_id)).use(_.option(stmt.argument))
+        session.prepareR(stmt.fragment.query(target_id)).use(_.unique(stmt.argument))
 
-      private def cloneTargetImpl(input: CloneTargetInput)(using Transaction[F]): F[CloneTargetResponse] =
-        import CloneTargetResponse.*
+      override def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
+        input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
+          import CloneTargetResponse.*
+          def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
+            input.SET.traverse(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid)))
 
-        val pid: F[Option[Program.Id]] =
-          session.prepareR(sql"select c_program_id from t_target where c_target_id = $target_id".query(program_id)).use { ps =>
-            ps.option(input.targetId)
-          }
-
-        def update(tid: Target.Id): F[Option[UpdateTargetsResponse]] =
-          input.SET.traverse(updateTargetsImpl(_, sql"SELECT $target_id".apply(tid)))
-
-        def replaceIn(tid: Target.Id): F[Unit] =
-          input.REPLACE_IN.traverse_ { which =>
-            val s1 = Statements.dropItcCache(which)
-            val s2 = Statements.replaceTargetIn(which, input.targetId, tid)
-            session.prepareR(s1.fragment.command).use(_.execute(s1.argument)) >>
-            session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
-          }
-
-        pid.flatMap {
-          case None => NoSuchTarget(input.targetId).pure[F] // doesn't exist at all
-          case Some(pid) =>
-            clone(input.targetId, pid).flatMap {
-              case None => NoSuchTarget(input.targetId).pure[F] // not authorized
-              case Some(tid) =>
-                update(tid).flatMap {
-                  case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
-                  case _ => replaceIn(tid) as Success(input.targetId, tid)
-                }
+          def replaceIn(tid: Target.Id): F[Unit] =
+            input.REPLACE_IN.traverse_ { which =>
+              val s1 = Statements.dropItcCache(which)
+              val s2 = Statements.replaceTargetIn(which, input.targetId, tid)
+              session.prepareR(s1.fragment.command).use(_.execute(s1.argument)) >>
+              session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
             }
-        }
 
-      override def cloneTarget(input: CloneTargetInput)(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
-        cloneTargetImpl(input).map(cloneResultTranslation)
+          clone(input.targetId, pid).flatMap: tid =>
+            update(tid).flatMap {
+              case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
+              case _ => replaceIn(tid) as Success(input.targetId, tid)
+            }.map(cloneResultTranslation)
 
       private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
@@ -218,10 +179,8 @@ object TargetService {
         pid.flatMap {
           case None      => NoSuchProgram(programId).pure[F]
           case Some(pid) =>
-            clone(targetId, pid).flatMap {
-              case None      => NoSuchTarget(targetId).pure[F] // not authorized
-              case Some(tid) => Success(targetId, tid).pure[F]
-            }
+            clone(targetId, pid).flatMap: tid =>
+              Success(targetId, tid).pure[F]
         }
       }
 
@@ -246,8 +205,6 @@ object TargetService {
     }
 
   object Statements {
-
-    import ProgramUserService.Statements.{ existsUserAsPi, existsUserAsCoi, existsAllocationForPartner }
 
     def insertSiderealFragment(
       pid:           Program.Id,
@@ -287,6 +244,7 @@ object TargetService {
           ${text_nonempty.opt},
           ${text_nonempty.opt},
           $json
+        returning c_target_id
       """.apply(
         pid,
         name,
@@ -328,6 +286,7 @@ object TargetService {
           ${ephemeris_key_type},
           ${text_nonempty},
           $json
+        returning c_target_id
       """.apply(
         pid,
         name,
@@ -336,22 +295,6 @@ object TargetService {
         NonEmptyString.from(EphemerisKey.fromString.reverseGet(ek)).toOption.get, // we know this is never empty
         sourceProfile,
       )
-    }
-
-    def whereFragment(pid: Program.Id, user: User): AppliedFragment = {
-      val insert =
-        user match {
-          case GuestUser(id)                => void"WHERE " |+| existsUserAsPi(pid, id)
-          case ServiceUser(_, _)            => void""
-          case StandardUser(id, role, _, _) =>
-            role match {
-              case Admin(_)        => void""
-              case Ngo(_, partner) => void"WHERE " |+| existsAllocationForPartner(pid, partner)
-              case Pi(_)           => void"WHERE " |+| existsUserAsPi(pid, id) |+| void" OR " |+| existsUserAsCoi(pid, id)
-              case Staff(_)        => void""
-            }
-        }
-      insert |+| void" RETURNING c_target_id"
     }
 
     extension [A](n: Nullable[A]) def asUpdate(column: String, e: Encoder[A]): Option[AppliedFragment] =
@@ -495,11 +438,8 @@ object TargetService {
           c_calibration_role
         FROM t_target
         WHERE c_target_id = $target_id
-      """.apply(pid, tid) |+|
-      ProgramUserService.Statements.existsUserWriteAccess(user, pid).foldMap(void"AND " |+| _) |+|
-      void"""
         RETURNING c_target_id
-      """
+      """.apply(pid, tid)
 
     def dropItcCache(which: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
