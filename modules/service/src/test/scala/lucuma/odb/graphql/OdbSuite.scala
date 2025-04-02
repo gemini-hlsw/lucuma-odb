@@ -26,6 +26,10 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import fs2.text.utf8
 import grackle.Mapping
+import grackle.Result
+import grackle.Result.Failure
+import grackle.Result.Success
+import grackle.Result.Warning
 import grackle.skunk.SkunkMonitor
 import io.circe.Decoder
 import io.circe.Encoder
@@ -39,6 +43,7 @@ import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.AsterismIntegrationTimeOutcomes
@@ -62,6 +67,9 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.S3FileService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
@@ -607,7 +615,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
 
-  import lucuma.odb.service.Services
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use { s =>
       Enums.load(s).flatMap(e =>
@@ -615,4 +622,21 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       )
     }
 
+  extension [A](r: Result[A]) def get: IO[A] =
+    r match
+      case Success(value) => value.pure
+      case Warning(problems, value) => value.pure
+      case Failure(problems) => IO.raiseError(new RuntimeException(problems.foldMap(_.toString))) // meh
+      case grackle.Result.InternalError(error) => IO.raiseError(error)
+
+  // RCN: We had a lot of calls in the calibrations tests that now require ServiceAcces, so
+  // instead of changing all the callsites I added this overload.
+  def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
+    Resource.eval(IO(sessionFixture())).use: s =>
+      Enums.load(s).flatMap: e =>
+        given services: Services[IO] = Services.forUser(u, e, None)(s)
+        requireServiceAccess:
+          f(services).map(Result.success)
+        .flatMap(_.get)
+            
 }

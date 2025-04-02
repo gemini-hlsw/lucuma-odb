@@ -74,7 +74,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   val pi: User          = TestUsers.Standard.pi(1, 30)
   val pi2: User         = TestUsers.Standard.pi(2, 32)
-  val serviceUser: User = TestUsers.service(3)
+  val serviceUser       = TestUsers.service(3)
   val staff: User       = TestUsers.Standard.staff(4, 33)
 
   override val validUsers: List[User] =
