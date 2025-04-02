@@ -1198,19 +1198,19 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def addSlewEventAs(
     user: User,
-    vid:  Visit.Id,
+    oid:  Observation.Id,
     stg:  SlewStage
   ): IO[SlewEvent] = {
     val q = s"""
       mutation {
         addSlewEvent(input: {
-          visitId: "$vid",
+          observationId: "$oid",
           slewStage: ${stg.tag.toUpperCase}
         }) {
           event {
             id
             received
-            observation { id }
+            visit { id }
           }
         }
       }
@@ -1221,8 +1221,8 @@ trait DatabaseOperations { this: OdbSuite =>
       val e = for {
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
-        o <- c.downFields("observation", "id").as[Observation.Id]
-      } yield SlewEvent(i, r, o, vid, stg)
+        v <- c.downFields("visit", "id").as[Visit.Id]
+      } yield SlewEvent(i, r, oid, v, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }

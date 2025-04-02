@@ -166,6 +166,9 @@ trait Services[F[_]]:
   /** The `TargetService`. */
   def targetService: TargetService[F]
 
+  /** The `TimeService`. */
+  def timeService: TimeService[F]
+
   /** The `TimingWindowService`. */
   def timingWindowService: TimingWindowService[F]
 
@@ -281,6 +284,7 @@ object Services:
       lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timeAccountingService = TimeAccountingService.instantiate
+      lazy val timeService = TimeService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
       lazy val visitService = VisitService.instantiate
 
@@ -333,6 +337,7 @@ object Services:
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def timeAccountingService[F[_]](using Services[F]): TimeAccountingService[F] = summon[Services[F]].timeAccountingService
+    def timeService[F[_]](using Services[F]): TimeService[F] = summon[Services[F]].timeService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)

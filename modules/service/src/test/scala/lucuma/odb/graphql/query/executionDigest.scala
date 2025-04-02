@@ -31,6 +31,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.graphql.input.AddStepEventInput
 
 
 class executionDigest extends ExecutionTestSupport {
@@ -490,8 +491,8 @@ class executionDigest extends ExecutionTestSupport {
         services.session.transaction.use { xa =>
           for {
             _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa, ().asInstanceOf) // shhh
-            d <- services.executionDigestService.selectOne(p, o, Md5Hash.Zero)(using xa)
+            _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+            d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
           } yield d.isEmpty
         }
       }

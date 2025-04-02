@@ -44,7 +44,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
     } yield (oid, aid)
 
   test("observation -> execution -> atomRecords") {
-    recordAll(pi, serviceUser, mode, offset = 0, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 0, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -59,7 +59,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { a =>
+      val matches = on.visit.atoms.map { a =>
         Json.obj("id" -> a.id.asJson)
       }
 
@@ -80,7 +80,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
   }
 
   test("observation -> execution -> atomRecords -> interval") {
-    recordAll(pi, serviceUser, mode, offset = 50, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 50, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -99,7 +99,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { atom =>
+      val matches = on.visit.atoms.map { atom =>
         val inv = for {
           s <- atom.allEvents.headOption.map(_.received)
           e <- atom.allEvents.lastOption.map(_.received)
@@ -135,7 +135,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
   }
 
   test("observation -> execution -> atomRecords -> steps") {
-    recordAll(pi, serviceUser, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 100, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -154,7 +154,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { a =>
+      val matches = on.visit.atoms.map { a =>
         Json.obj(
           "steps" -> Json.obj(
             "matches" -> a.steps.map(s => Json.obj("id" -> s.id.asJson)).asJson
@@ -179,7 +179,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
   }
 
   test("observation -> execution -> atomRecords -> steps -> interval") {
-    recordAll(pi, serviceUser, mode, offset = 150, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, serviceUser, mode, offset = 150, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -202,7 +202,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { atom =>
+      val matches = on.visit.atoms.map { atom =>
         val stepMatches = atom.steps.map { step =>
           val inv = for {
             s <- step.allEvents.headOption.map(_.received)
@@ -269,7 +269,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { a =>
+      val matches = on.visit.atoms.map { a =>
         Json.obj(
           "steps" -> Json.obj(
             "matches" -> a.steps.map { s =>
@@ -325,7 +325,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { a =>
+      val matches = on.visit.atoms.map { a =>
         Json.obj(
           "steps" -> Json.obj(
             "matches" -> a.steps.map { s =>
@@ -381,7 +381,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         }
       """
 
-      val matches = on.visits.flatMap(_.atoms).map { a =>
+      val matches = on.visit.atoms.map { a =>
         Json.obj(
           "steps" -> Json.obj(
             "matches" ->
