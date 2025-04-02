@@ -4,10 +4,9 @@
 package lucuma.odb.graphql.enums
 
 import cats.Monad
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import cats.syntax.flatMap.*
-import cats.syntax.functor.*
-import cats.syntax.traverse.*
+import cats.syntax.all.*
 import grackle.DirectiveDef
 import grackle.EnumType
 import grackle.NamedType
@@ -15,11 +14,16 @@ import grackle.Schema
 import grackle.SchemaExtension
 import grackle.TypeExtension
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ToOActivation
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
+import skunk.Codec
+import skunk.Fragment
 import skunk.Session
+import skunk.data.Arr
+import skunk.data.Type
 
 /**
  * Enums loaded from the database on startup.  These fall into two categories:
@@ -113,7 +117,7 @@ final class Enums(
       def pos: SourcePos = SourcePos.instance
       def baseTypes: List[NamedType] = 
         Enumerated[ProposalStatus].toEnumType("ProposalStatus", "Enumerated type of ProposalStatus")(_.name) ::
-          enumMeta.unreferencedTypes
+          enumMeta.unreferencedTypes ++ enumMeta.scalaEnumTypes
       def directives: List[DirectiveDef] = Nil
       def schemaExtensions: List[SchemaExtension] = Nil
       def typeExtensions: List[TypeExtension] = Nil
@@ -122,15 +126,27 @@ final class Enums(
 }
 
 object Enums {
+  case class ScalaEnum(
+    postgresName: String,
+    enumType: EnumType
+  )
+
+  // enums defined in scala for which we want to validate the postgres enums and add to the schema
+  val scalaEnums: List[ScalaEnum] =
+    List(
+      ScalaEnum("e_too_activation", Enumerated[ToOActivation].toEnumType("ToOActivation", "Target of Opportunity Activation")(_.label))
+    )
 
   case class Meta(
     timeEstimate:      Map[String, TimeEstimateMeta],
     proposalStatus:    Map[(String, Short), ProposalStatusMeta],
-    unreferencedTypes: List[EnumType]
+    unreferencedTypes: List[EnumType],
+    scalaEnumTypes:    List[EnumType]
   )
 
-  def load[F[_]: Monad: Logger](s: Session[F]): F[Enums] =
+  def load[F[_]: MonadThrow: Logger](s: Session[F]): F[Enums] =
     for {
+      _   <- scalaEnums.traverse(se => validateScalaEnums(s, se))
       te  <- TimeEstimateMeta.select(s)
       ps  <- ProposalStatusMeta.select(s)
       un  <- List(
@@ -141,6 +157,19 @@ object Enums {
                ConditionsMeasurementSourceEnumType.fetch(s),
                SeeingTrendEnumType.fetch(s),
              ).sequence
-    } yield Enums(Meta(te, ps, un))
+    } yield Enums(Meta(te, ps, un, scalaEnums.map(_.enumType)))
+
+  def validateScalaEnums[F[_]: MonadThrow: Logger](s: Session[F], scalaEnum: ScalaEnum): F[Unit] =
+      val _text_enum: Codec[List[String]] = 
+        Codec.array[String](_.toString, _.asRight[String], Type(s"_${scalaEnum.postgresName}", List(Type(scalaEnum.postgresName))))
+          .imap(_.toList)(l => Arr.fromFoldable(l))
+      // This is probably abusing skunk - is there a better way?
+      val query = Fragment(List(Left(s"select enum_range(null::${scalaEnum.postgresName})")), skunk.Void.codec, skunk.util.Origin.unknown)
+      val scalaValues = scalaEnum.enumType.enumValues.map(_.name.toLowerCase)
+      s.unique(query.query(_text_enum)).flatMap(l =>
+        // May need to allow for different ordering and conversions
+        if (l === scalaValues) Monad[F].unit
+        else MonadThrow[F].raiseError(Exception(s"Enumeration ${scalaEnum.postgresName} with values $l does not match Scala Enumerated with values $scalaValues"))
+      )
 
 }
