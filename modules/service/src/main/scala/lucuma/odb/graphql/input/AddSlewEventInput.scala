@@ -5,25 +5,21 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.SlewStage
-import lucuma.core.model.Visit
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.*
 
 case class AddSlewEventInput(
-  visitId:   Visit.Id,
-  slewStage: SlewStage
+  observationId: Observation.Id,
+  slewStage:     SlewStage
 )
 
-object AddSlewEventInput {
+object AddSlewEventInput:
 
   val Binding: Matcher[AddSlewEventInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
-        VisitIdBinding("visitId", rVisitId),
+        ObservationIdBinding("observationId", rObsId),
         SlewStageBinding("slewStage", rStage)
       ) =>
-        (rVisitId, rStage).parMapN { (vid, stg) =>
-          AddSlewEventInput(vid, stg)
-        }
-    }
-
-}
+        (rObsId, rStage).parMapN: (oid, stg) =>
+          AddSlewEventInput(oid, stg)

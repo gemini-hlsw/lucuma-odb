@@ -36,7 +36,6 @@ import scala.collection.immutable.SortedSet
 sealed trait ExecutionDigestService[F[_]] {
 
   def selectOne(
-    programId:     Program.Id,
     observationId: Observation.Id,
     hash:          Md5Hash
   )(using Transaction[F]): F[Option[ExecutionDigest]]
@@ -64,12 +63,11 @@ object ExecutionDigestService {
     new ExecutionDigestService[F] {
 
       override def selectOne(
-        pid:  Program.Id,
         oid:  Observation.Id,
         hash: Md5Hash
       )(using Transaction[F]): F[Option[ExecutionDigest]] =
         session
-          .option(Statements.SelectOneExecutionDigest)(pid, oid)
+          .option(Statements.SelectOneExecutionDigest)(oid)
           .map(_.collect { case (h, d) if h === hash => d })
 
       override def selectMany(
@@ -206,15 +204,13 @@ object ExecutionDigestService {
         c_sci_execution_state
       """
 
-    val SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
+    val SelectOneExecutionDigest: Query[Observation.Id, (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
           #$DigestColumns
         FROM t_execution_digest
-        WHERE
-          c_program_id     = $program_id     AND
-          c_observation_id = $observation_id
+        WHERE c_observation_id = $observation_id
       """.query(md5_hash *: execution_digest)
 
     val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =

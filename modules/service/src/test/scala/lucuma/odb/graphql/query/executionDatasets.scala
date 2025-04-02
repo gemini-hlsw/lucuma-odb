@@ -23,7 +23,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("observation -> execution -> datasets") {
-    recordAll(pi, service, mode, offset = 0, visitCount = 2, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 0, atomCount = 2, stepCount = 3, datasetCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -76,7 +76,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val List(s0, s1) = on.visits.head.atoms.head.steps
+      val List(s0, s1) = on.visit.atoms.head.steps
       val matches      = (s0.datasets ++ s1.datasets).map { d =>
         Json.obj("events" -> Json.obj("matches" -> d.allEvents.map(e => Json.obj("id" -> e.id.asJson)).asJson))
       }
@@ -134,7 +134,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> datasets -> visit") {
-    recordAll(pi, service, mode, offset = 300, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 300).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -151,8 +151,6 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val List(v0, v1) = on.visits
-
       val e = json"""
       {
         "observation": {
@@ -161,12 +159,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
               "matches": [
                 {
                   "visit": {
-                    "id": ${v0.id}
-                  }
-                },
-                {
-                  "visit": {
-                    "id": ${v1.id}
+                    "id": ${on.visit.id}
                   }
                 }
               ]

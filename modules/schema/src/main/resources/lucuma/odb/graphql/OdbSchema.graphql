@@ -71,8 +71,8 @@ type AddSequenceEventResult {
 
 "SlewEvent creation parameters."
 input AddSlewEventInput {
-  visitId:   VisitId!
-  slewStage: SlewStage!
+  observationId: ObservationId!
+  slewStage:     SlewStage!
 }
 
 "The result of adding a slew event."
@@ -12615,6 +12615,9 @@ type Visit {
 
   "Created by Observe at time."
   created: Timestamp!
+
+  "Site of the visit."
+  site: Site!
 
   "Time interval during which this visit executed."
   interval: TimestampInterval
