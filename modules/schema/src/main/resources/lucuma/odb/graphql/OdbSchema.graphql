@@ -12616,6 +12616,9 @@ type Visit {
   "Created by Observe at time."
   created: Timestamp!
 
+  "Site of the visit."
+  site: Site!
+
   "Time interval during which this visit executed."
   interval: TimestampInterval
 
