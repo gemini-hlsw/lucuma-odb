@@ -558,7 +558,6 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     pid:      Program.Id,
     oid:      Observation.Id,
     limit:    Option[Int]       = None,  // [0, 100]
-    resetAcq: Boolean           = false,
     when:     Option[Timestamp] = None
   ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
     withSession: session =>
@@ -568,7 +567,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
         srv     = Services.forUser(serviceUser, enums, None)(session)
         gen     = srv.generator(CommitHash.Zero, itcClient, tec)
-        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), resetAcq, when)
+        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
       yield res
 
   /**
@@ -582,10 +581,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     pid:      Program.Id,
     oid:      Observation.Id,
     limit:    Option[Int]       = None,  // [0, 100]
-    resetAcq: Boolean           = false,
     when:     Option[Timestamp] = None
   ): IO[InstrumentExecutionConfig] =
-    generate(pid, oid, limit, resetAcq, when).flatMap: res =>
+    generate(pid, oid, limit, when).flatMap: res =>
       IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
 
   /**
