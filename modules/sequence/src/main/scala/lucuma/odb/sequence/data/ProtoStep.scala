@@ -29,10 +29,16 @@ case class ProtoStep[A](
     stepConfig      === step.stepConfig       &&
     telescopeConfig === step.telescopeConfig
 
+  def withoutBreakpoint: ProtoStep[A] =
+    copy(breakpoint = Breakpoint.Disabled)
+
+  def withBreakpoint: ProtoStep[A] =
+    copy(breakpoint = Breakpoint.Enabled)
+
 object ProtoStep:
 
   def smartGcal[A](a: A, s: SmartGcalType, t: TelescopeConfig): ProtoStep[A] =
-    ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.PartnerCal)
+    ProtoStep(a, StepConfig.SmartGcal(s), t, ObserveClass.NightCal)
 
   def smartArc[A](a: A, t: TelescopeConfig): ProtoStep[A]  = smartGcal(a, SmartGcalType.Arc, t)
   def smartFlat[A](a: A, t: TelescopeConfig): ProtoStep[A] = smartGcal(a, SmartGcalType.Flat, t)

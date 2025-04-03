@@ -29,7 +29,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   val validUsers = List(pi, pi2, service).toList
 
   test("observation -> execution -> visits") {
-    recordAll(pi, service, mode, offset = 0, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 0).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -44,14 +44,14 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val visits = on.visits.map(_.id).map(id => Json.obj("id" -> id.asJson))
+      val _match = Json.obj("id" -> on.visit.id.asJson)
 
       val e = json"""
       {
         "observation": {
           "execution": {
             "visits": {
-              "matches": $visits
+              "matches": ${List(_match)}
             }
           }
         }
@@ -63,7 +63,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> datasets") {
-    recordAll(pi, service, mode, offset = 100, visitCount = 2, stepCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 100, stepCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -82,20 +82,19 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.visits.map { v =>
+      val _match =
         Json.obj(
           "datasets" -> Json.obj(
-            "matches" -> v.allDatasets.map(did => Json.obj("id" -> did.asJson)).asJson
+            "matches" -> on.visit.allDatasets.map(did => Json.obj("id" -> did.asJson)).asJson
           )
         )
-      }
 
       val e = json"""
       {
         "observation": {
           "execution": {
             "visits": {
-              "matches": $matches
+              "matches": ${List(_match)}
             }
           }
         }
@@ -107,7 +106,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> events") {
-    recordAll(pi, service, mode, offset = 200, visitCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 200).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -126,20 +125,19 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.visits.map { v =>
+      val _match =
         Json.obj(
           "events" -> Json.obj(
-            "matches" -> v.allEvents.map(e => Json.obj("id" -> e.id.asJson)).asJson
+            "matches" -> on.visit.allEvents.map(e => Json.obj("id" -> e.id.asJson)).asJson
           )
         )
-      }
 
       val e = json"""
       {
         "observation": {
           "execution": {
             "visits": {
-              "matches": $matches
+              "matches": ${List(_match)}
             }
           }
         }
@@ -151,7 +149,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> atomRecords") {
-    recordAll(pi, service, mode, offset = 300, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 300, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -170,13 +168,13 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.visits.map { v =>
+      val matches = List(
         Json.obj(
           "atomRecords" -> Json.obj(
-            "matches" -> v.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
+            "matches" -> on.visit.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
           )
         )
-      }
+      )
 
       val e = json"""
       {
@@ -213,23 +211,22 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.visits.map { v =>
+      val _match =
         Json.obj(
           "gmosNorth" -> Json.obj(
             "stageMode" -> "FOLLOW_XY".asJson,
           ),
           "atomRecords" -> Json.obj(
-            "matches" -> v.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
+            "matches" -> on.visit.atoms.map(a => Json.obj("id" -> a.id.asJson)).asJson
           )
         )
-      }
 
       val e = json"""
       {
         "observation": {
           "execution": {
             "visits": {
-              "matches": $matches
+              "matches": ${List(_match)}
             }
           }
         }
@@ -255,7 +252,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
   }
 
   test("observation -> execution -> visits -> interval") {
-    recordAll(pi, service, mode, offset = 550, visitCount = 2, atomCount = 2).flatMap { on =>
+    recordAll(pi, service, mode, offset = 550, atomCount = 2).flatMap { on =>
       val q = s"""
         query {
           observation(observationId: "${on.id}") {
@@ -274,13 +271,13 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.visits.map { v =>
-        val inv = for {
-          s <- v.allEvents.headOption.map(_.received)
-          e <- v.allEvents.lastOption.map(_.received)
-        } yield TimestampInterval.between(s, e)
+      val matches =
+        val inv = for
+          s <- on.visit.allEvents.headOption.map(_.received)
+          e <- on.visit.allEvents.lastOption.map(_.received)
+        yield TimestampInterval.between(s, e)
 
-        inv.fold(Json.Null) { i =>
+        List(inv.fold(Json.Null) { i =>
           Json.obj(
             "interval" -> Json.obj(
               "start"    -> i.start.asJson,
@@ -290,8 +287,7 @@ class executionVisits extends OdbSuite with ExecutionQuerySetupOperations {
               )
             )
           )
-        }
-      }
+        })
 
       val e = json"""
       {

@@ -11,7 +11,6 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
@@ -32,8 +31,7 @@ class executionTwilight extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   case class Calibrations(
@@ -257,7 +255,6 @@ class executionTwilight extends ExecutionTestSupport {
                     observeClass
                     timeEstimate {
                       program { seconds }
-                      partner { seconds }
                       nonCharged { seconds }
                       total { seconds }
                     }
@@ -276,7 +273,6 @@ class executionTwilight extends ExecutionTestSupport {
                     "observeClass": "DAY_CAL",
                     "timeEstimate": {
                       "program": { "seconds":  0.000000 },
-                      "partner": { "seconds":  0.000000 },
                       "nonCharged": { "seconds":  50.700000 },
                       "total": { "seconds":  50.700000 }
                     }
@@ -298,7 +294,6 @@ class executionTwilight extends ExecutionTestSupport {
             timeEstimateRange {
               maximum {
                 program { seconds }
-                partner { seconds }
                 nonCharged { seconds }
                 total { seconds }
               }
@@ -326,7 +321,6 @@ class executionTwilight extends ExecutionTestSupport {
                   observeClass
                   timeEstimate {
                     program { seconds }
-                    partner { seconds }
                     nonCharged { seconds }
                     total { seconds }
                   }

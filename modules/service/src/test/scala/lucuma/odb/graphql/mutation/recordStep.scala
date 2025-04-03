@@ -11,7 +11,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -377,7 +376,7 @@ class recordStep extends OdbSuite {
         },
         dtax: TWO,
         roi: FULL_FRAME,
-        filter: U_PRIME,
+        filter: G_PRIME,
         fpu: {
           builtin: LONG_SLIT_0_50
         }
@@ -426,9 +425,9 @@ class recordStep extends OdbSuite {
                   "seconds": 1200.000000
                 },
                 "gratingConfig": null,
-                "filter": "U_PRIME",
+                "filter": "G_PRIME",
                 "centralWavelength": {
-                  "nanometers": 350.000
+                  "nanometers": 475.000
                 }
               }
             }

@@ -47,6 +47,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
@@ -130,6 +131,63 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createProgramNoteAs(
+    user:      User,
+    pid:       Program.Id,
+    title:     String,
+    text:      Option[String]    = none,
+    isPrivate: Option[Boolean]   = none,
+    existence: Option[Existence] = none
+  ): IO[ProgramNote.Id] =
+    val props = List(
+      s"""title: "$title"""".some,
+      text.map(t => s"""text: "$t""""),
+      isPrivate.map(b => s"isPrivate: $b"),
+      existence.map(e => s"""existence: ${e.tag.toUpperCase}""")
+    ).flatten.mkString("{\n", "\n", "}\n")
+
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          createProgramNote(
+            input: {
+              programId: "$pid"
+              SET: $props
+            }
+          ) {
+            programNote {
+              id
+              title
+              text
+              isPrivate
+              existence
+            }
+          }
+        }
+      """
+    ).flatMap: json =>
+      val c = json.hcursor.downFields("createProgramNote", "programNote")
+      (
+        for
+          i <- c.downField("id").as[ProgramNote.Id]
+          t <- c.downField("title").as[String]
+          x <- c.downField("text").as[String]
+          p <- c.downField("isPrivate").as[Boolean]
+          e <- c.downField("existence").as[Existence]
+        yield (i, (t, x, p, e))
+      )
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+        .flatTap: (_, res) =>
+          assertEquals(
+            res,
+            (title, text.orNull, isPrivate.getOrElse(false), existence.getOrElse(Existence.Present))
+          ).pure
+        .map(_._1)
+
+
 
   def fetchPid(user: User, pro: ProposalReference): IO[Program.Id] =
     query(user, s"""
@@ -473,6 +531,29 @@ trait DatabaseOperations { this: OdbSuite =>
       )
     )
 
+
+  // def setDeclaredComplete(user: User, oid: Observation.Id, declaredComplete: Boolean = true): IO[Unit] =
+  //   query(
+  //     user,
+  //     s"""
+  //       mutation {
+  //         updateObservations(
+  //           input: {
+  //             SET: {
+  //               declaredComplete: $declaredComplete
+  //             }
+  //             WHERE: {
+  //               id: { EQ: "$oid" }
+  //             }
+  //           }
+  //         ) {
+  //           observations {
+  //             id
+  //           }
+  //         }
+  //       }
+  //     """
+  //   ).void
 
   def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
     query(
@@ -1117,19 +1198,19 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def addSlewEventAs(
     user: User,
-    vid:  Visit.Id,
+    oid:  Observation.Id,
     stg:  SlewStage
   ): IO[SlewEvent] = {
     val q = s"""
       mutation {
         addSlewEvent(input: {
-          visitId: "$vid",
+          observationId: "$oid",
           slewStage: ${stg.tag.toUpperCase}
         }) {
           event {
             id
             received
-            observation { id }
+            visit { id }
           }
         }
       }
@@ -1140,8 +1221,8 @@ trait DatabaseOperations { this: OdbSuite =>
       val e = for {
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
-        o <- c.downFields("observation", "id").as[Observation.Id]
-      } yield SlewEvent(i, r, o, vid, stg)
+        v <- c.downFields("visit", "id").as[Visit.Id]
+      } yield SlewEvent(i, r, oid, v, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1688,7 +1769,9 @@ trait DatabaseOperations { this: OdbSuite =>
     obsDuration: Option[TimeSpan]
   ): IO[Unit] = {
     val time = obsTime.fold("null")(ts => s"\"${ts.isoFormat}\"")
-    val duration = obsDuration.fold("null")(ts => s"{ microseconds: ${ts.toMicroseconds} }")
+    // microseconds can be bigger than max int. The schema is a Long but values outside of
+    // the Int range must be a string.
+    val duration = obsDuration.fold("null")(ts => s"{ microseconds: \"${ts.toMicroseconds}\" }")
     val q = s"""
       mutation {
         updateObservationsTimes(input: {

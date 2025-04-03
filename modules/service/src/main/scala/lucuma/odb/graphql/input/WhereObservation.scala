@@ -73,7 +73,7 @@ object WhereObservation {
         SubtitleBinding.Option("subtitle", rSubtitle),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
         InstrumentBinding.Option("instrument", rInstrument),
-        SiteBinding.Option("site", rSite)
+        SiteBinding.Option("site", rSite),
       ) =>
         (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rSite).parMapN {
           (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, site) =>
@@ -87,7 +87,7 @@ object WhereObservation {
               subtitle,
               scienceBand,
               instrument,
-              site
+              site,
             ).flatten)
         }
     }

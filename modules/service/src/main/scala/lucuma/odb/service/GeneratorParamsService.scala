@@ -35,11 +35,11 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.GmosFpu
-import lucuma.itc.client.ImagingIntegrationTimeParameters
+import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
-import lucuma.itc.client.SpectroscopyIntegrationTimeParameters
+import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.json.sourceprofile.given
@@ -53,6 +53,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import GeneratorParamsService.Error
@@ -156,7 +157,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _) => (oid, om) }.distinct
           m          <- observingModeServices.selectObservingMode(oms)
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -228,7 +229,7 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete)
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
               cw,
@@ -238,7 +239,7 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete)
 
       private def itcObsParams(
         obsParams:  ObsParams,
@@ -248,12 +249,12 @@ object GeneratorParamsService {
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (exposureTimeMode, targets) =>
           ItcInput(
-            ImagingIntegrationTimeParameters(
+            ImagingParameters(
               ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
               obsParams.constraints,
               mode.asImaging(exposureTimeMode.at)
             ),
-            SpectroscopyIntegrationTimeParameters(
+            SpectroscopyParameters(
               exposureTimeMode,
               obsParams.constraints,
               mode
@@ -265,8 +266,14 @@ object GeneratorParamsService {
         .toEither
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput)] = {
+        // If emission line, SED not required, otherwhise must be defined
+        def hasITCRequiredSEDParam(sp: SourceProfile): Boolean =
+          SourceProfile.unnormalizedSED.getOption(sp).flatten.isDefined ||
+          SourceProfile.integratedEmissionLinesSpectralDefinition.getOption(sp).isDefined ||
+          SourceProfile.surfaceEmissionLinesSpectralDefinition.getOption(sp).isDefined
+
         val sourceProf   = targetParams.sourceProfile.map(_.gaiaFree)
-        val brightnesses = 
+        val brightnesses =
           sourceProf.flatMap: sp =>
             SourceProfile.integratedBrightnesses.getOption(sp).orElse(SourceProfile.surfaceBrightnesses.getOption(sp))
               .map(_.nonEmpty)
@@ -275,12 +282,14 @@ object GeneratorParamsService {
             SourceProfile.integratedWavelengthLines.getOption(sp).orElse(SourceProfile.surfaceWavelengthLines.getOption(sp))
               .map(_.nonEmpty)
         val validBrightness = brightnesses.orElse(wavelengthLines).getOrElse(false)
+        val sed = sourceProf.filter(hasITCRequiredSEDParam)
 
         targetParams.targetId.toValidNel(MissingParam.forObservation("target")).andThen: tid =>
           (sourceProf.toValidNel(MissingParam.forTarget(tid, "source profile")),
+           sed.toValidNel(MissingParam.forTarget(tid, "SED")),
            Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
            targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity"))
-          ).mapN: (sp,_, rv) =>
+          ).mapN: (sp,_, _, rv) =>
             tid -> TargetInput(sp, rv)
       }
 
@@ -295,7 +304,8 @@ object GeneratorParamsService {
     scienceBand:      Option[ScienceBand],
     targetId:         Option[Target.Id],
     radialVelocity:   Option[RadialVelocity],
-    sourceProfile:    Option[SourceProfile]
+    sourceProfile:    Option[SourceProfile],
+    declaredComplete: Boolean
   )
 
   case class TargetParams(
@@ -311,7 +321,8 @@ object GeneratorParamsService {
     exposureTimeMode: Option[ExposureTimeMode],
     observingMode:    Option[ObservingModeType],
     scienceBand:      Option[ScienceBand],
-    targets:          NonEmptyList[TargetParams]
+    targets:          NonEmptyList[TargetParams],
+    declaredComplete: Boolean
   )
 
   object ObsParams {
@@ -325,7 +336,8 @@ object GeneratorParamsService {
           oParams.head.observingMode,
           oParams.head.scienceBand,
           oParams.map: r =>
-            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile)
+            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile),
+          oParams.head.declaredComplete
         )
       .toMap
   }
@@ -373,7 +385,8 @@ object GeneratorParamsService {
        science_band.opt        *:
        target_id.opt           *:
        radial_velocity.opt     *:
-       source_profile.opt
+       source_profile.opt      *:
+       bool
       ).to[ParamsRow]
 
     private def ParamColumns(tab: String): String =
@@ -397,7 +410,8 @@ object GeneratorParamsService {
         $tab.c_science_band,
         $tab.c_target_id,
         $tab.c_sid_rv,
-        $tab.c_source_profile
+        $tab.c_source_profile,
+        $tab.c_declared_complete
       """
 
     def selectManyParams(

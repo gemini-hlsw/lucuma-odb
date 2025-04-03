@@ -71,8 +71,8 @@ type AddSequenceEventResult {
 
 "SlewEvent creation parameters."
 input AddSlewEventInput {
-  visitId:   VisitId!
-  slewStage: SlewStage!
+  observationId: ObservationId!
+  slewStage:     SlewStage!
 }
 
 "The result of adding a slew event."
@@ -284,7 +284,7 @@ type BandedTime {
   "ScienceBand associated with the time, if any."
   band: ScienceBand
 
-  "Time distributed across the program, partner, and non-charged categories."
+  "Time distributed across the program and non-charged categories."
   time: CategorizedTime!
 
 }
@@ -641,13 +641,10 @@ type CategorizedTime {
   "Time charged to the program / PI."
   program: TimeSpan!
 
-  "Time charged to the partner."
-  partner: TimeSpan!
-
   "Execution time that is not charged."
   nonCharged: TimeSpan!
 
-  "Total of program, partner and uncharged times."
+  "Total of program and uncharged times."
   total: TimeSpan!
 
 }
@@ -2071,19 +2068,9 @@ enum GmosNorthStageMode {
   NO_FOLLOW
 
   """
-  GmosNorthStageMode FollowXyz
-  """
-  FOLLOW_XYZ
-
-  """
   GmosNorthStageMode FollowXy
   """
   FOLLOW_XY
-
-  """
-  GmosNorthStageMode FollowZ
-  """
-  FOLLOW_Z
 }
 
 """
@@ -2486,11 +2473,6 @@ enum GmosSouthStageMode {
   GmosSouthStageMode FollowXyz
   """
   FOLLOW_XYZ
-
-  """
-  GmosSouthStageMode FollowXy
-  """
-  FOLLOW_XY
 
   """
   GmosSouthStageMode FollowZ
@@ -3129,6 +3111,15 @@ type Mutation {
     """
     input: UpdateProgramsInput!
   ): UpdateProgramsResult!
+
+  "Updates existing program notes."
+  updateProgramNotes(
+    """
+    Parameters for identifying program notes to update along with the changes to
+    make.
+    """
+    input: UpdateProgramNotesInput!
+  ): UpdateProgramNotesResult!
 
   "Updates existing program users."
   updateProgramUsers(
@@ -5465,6 +5456,51 @@ type UpdateProgramUsersResult {
 }
 
 """
+Program note selection and update description.  Use `SET" to specify the changes,
+`WHERE` to select the programs to update, and `LIMIT` to control the size of the
+return value.
+"""
+input UpdateProgramNotesInput {
+
+  "Describes the program note values to modify."
+  SET: ProgramNotePropertiesInput!
+
+  """
+  Filters the program notes to be updated according to those that match the
+  given constraints.
+  """
+  WHERE: WhereProgramNote
+
+  """
+  Caps the number of results returned to the given value (if additional notes
+  match the WHERE clause they will be updated but not returned).
+  """
+  LIMIT: NonNegInt
+
+  """
+  Set to `true` to include deleted notes.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
+The result of updating the selected notes, up to `LIMIT` or the maximum of
+(1000).  If `hasMore` is true, additional notes were modified and not included
+here.
+"""
+type UpdateProgramNotesResult {
+  """
+  The edited notes, up to the specified LIMIT or the default maximum of 1000.
+  """
+  programNotes: [ProgramNote!]!
+
+  """
+  `true` when there were additional edits that were not returned.
+  """
+  hasMore: Boolean!
+}
+
+"""
 Program selection and update description.  Use `SET` to specify the changes, `WHERE` to select the programs to update, and `LIMIT` to control the size of the return value.
 """
 input UpdateProgramsInput {
@@ -6076,11 +6112,6 @@ enum ChargeClass {
   Time that is not charged.
   """
   NON_CHARGED
-
-  """
-  Time charged to a partner country / entity.
-  """
-  PARTNER
 
   """
   Time charged to the science program.
@@ -6815,11 +6846,6 @@ enum Flamingos2Filter {
   Y
 
   """
-  Flamingos2Filter F1056 (1.056 um)
-  """
-  F1056
-
-  """
   Flamingos2Filter J (1.25 um)
   """
   J
@@ -6855,24 +6881,9 @@ enum Flamingos2Filter {
   K_SHORT
 
   """
-  Flamingos2Filter F1063 (1.063 um)
-  """
-  F1063
-
-  """
   Flamingos2Filter K-blue (2.06 um)
   """
   K_BLUE
-
-  """
-  Flamingos2Filter Open
-  """
-  OPEN
-
-  """
-  Flamingos2Filter Dark
-  """
-  DARK
 
 }
 
@@ -7330,10 +7341,6 @@ enum GmosNorthFilter {
   """
   Z_PRIME_CA_T
 
-  """
-  GmosNorthFilter UPrime
-  """
-  U_PRIME
 }
 
 """
@@ -7351,16 +7358,6 @@ enum GmosNorthGrating {
   R831_G5302
 
   """
-  GmosNorthGrating B600_G5303
-  """
-  B600_G5303
-
-  """
-  GmosNorthGrating B600_G5307
-  """
-  B600_G5307
-
-  """
   GmosNorthGrating R600_G5304
   """
   R600_G5304
@@ -7374,11 +7371,6 @@ enum GmosNorthGrating {
   GmosNorthGrating R400_G5305
   """
   R400_G5305
-
-  """
-  GmosNorthGrating R150_G5306
-  """
-  R150_G5306
 
   """
   GmosNorthGrating R150_G5308
@@ -7587,16 +7579,6 @@ enum GmosRoi {
   CENTRAL_STAMP
 
   """
-  GmosRoi TopSpectrum
-  """
-  TOP_SPECTRUM
-
-  """
-  GmosRoi BottomSpectrum
-  """
-  BOTTOM_SPECTRUM
-
-  """
   GmosRoi Custom
   """
   CUSTOM
@@ -7606,11 +7588,6 @@ enum GmosRoi {
 GMOS South FPU
 """
 enum GmosSouthBuiltinFpu {
-  """
-  GmosSouthBuiltinFpu Bhros
-  """
-  BHROS
-
   """
   GmosSouthBuiltinFpu Ns1
   """
@@ -7851,10 +7828,6 @@ enum GmosSouthFilter {
   """
   HE_IIC
 
-  """
-  GmosSouthFilter Lya395
-  """
-  LYA395
 }
 
 """
@@ -8451,11 +8424,6 @@ enum Instrument {
   ACQ_CAM
 
   """
-  Instrument Bhros
-  """
-  BHROS
-
-  """
   Instrument Flamingos2
   """
   FLAMINGOS2
@@ -8491,34 +8459,9 @@ enum Instrument {
   GSAOI
 
   """
-  Instrument Michelle
-  """
-  MICHELLE
-
-  """
-  Instrument Nici
-  """
-  NICI
-
-  """
-  Instrument Nifs
-  """
-  NIFS
-
-  """
   Instrument Niri
   """
   NIRI
-
-  """
-  Instrument Phoenix
-  """
-  PHOENIX
-
-  """
-  Instrument Trecs
-  """
-  TRECS
 
   """
   Instrument Visitor
@@ -8629,6 +8572,18 @@ type ItcResultSet {
   index:    NonNegInt!
 }
 
+"""Calculated signal to noise at a specific wavelength"""
+type SignalToNoiseAt {
+  """Single exposure signal to noise"""
+  single: SignalToNoise!
+
+  """Total exposure signal to noise"""
+  total: SignalToNoise!
+
+  """Wavelength sn was calculated at"""
+  wavelength: Wavelength!
+}
+
 """
 A single ITC call result.
 """
@@ -8636,7 +8591,7 @@ type ItcResult {
   targetId:      TargetId!
   exposureTime:  TimeSpan!
   exposureCount: NonNegInt!
-  signalToNoise: SignalToNoise!
+  signalToNoiseAt: SignalToNoiseAt
 }
 
 type LineFluxIntegrated {
@@ -9022,6 +8977,8 @@ enum ExecutionState {
   "No more data is expected."
   COMPLETED
 
+  "User marked the observation complete regardless of any remaining steps."
+  DECLARED_COMPLETE
 }
 
 
@@ -9202,22 +9159,12 @@ enum ObserveClass {
   """
   Nighttime calibration, charged to the program.
   """
-  PROGRAM_CAL
-
-  """
-  Nighttime calibration, charged to the partner.
-  """
-  PARTNER_CAL
+  NIGHT_CAL
 
   """
   Acquisition, charged to the program.
   """
   ACQUISITION
-
-  """
-  Acquisition calibration, charged to the program.
-  """
-  ACQUISITION_CAL
 
   """
   Daytime calibration, charged to the observatory.
@@ -9597,6 +9544,16 @@ Program has format G-YYYY[AB]-NNNN+-[CDLFSV]. For example, G-2024B-1234-Q
 where 2024B refers to the associated semester.
 """
 scalar ProgramReferenceLabel
+
+type ProgramNoteSelectResult {
+
+  "Matching notes up to the return size limit of 1000."
+  matches: [ProgramNote!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+
+}
 
 """
 The matching program results, limited to a maximum of 1000 entries.
@@ -10063,6 +10020,29 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ProgramSelectResult!
+
+  "Selects the program note with the given id, if any."
+  programNote(
+    programNoteId: ProgramNoteId!
+  ): ProgramNote
+
+  """
+  Selects the first `LIMIT` matching program notes based on the provided `WHERE`
+  parameter, if any.
+  """
+  programNotes(
+    "Filters the select of program notes."
+    WHERE: WhereProgramNote
+
+    "Starts the result set at (or after if no existent) the given note id."
+    OFFSET: ProgramNoteId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted values."
+    includeDeleted: Boolean! = false
+  ): ProgramNoteSelectResult!
 
   """
   Selects the first `LIMIT` matching program users based on the provided `WHERE`
@@ -12351,17 +12331,13 @@ enum TimeChargeCorrectionOp {
 }
 
 """
-Describes a time charge discount, broken out by charge class (program vs.
-partner).  For each class, the associated time is subtracted and then added to
-uncharged.
+Describes a time charge discount, broken out by charge class.  For each class,
+the associated time is subtracted and then added to uncharged.
 """
 interface TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!
@@ -12380,9 +12356,6 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!
@@ -12403,9 +12376,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
 
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
-
   "Time amount to discount from the program."
   program: TimeSpan!
 
@@ -12417,9 +12387,6 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
 
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the partner."
-  partner: TimeSpan!
 
   "Time amount to discount from the program."
   program: TimeSpan!
@@ -12648,6 +12615,9 @@ type Visit {
 
   "Created by Observe at time."
   created: Timestamp!
+
+  "Site of the visit."
+  site: Site!
 
   "Time interval during which this visit executed."
   interval: TimestampInterval
@@ -13556,8 +13526,8 @@ input WhereExecutionEvent {
   "Matches on the visit id"
   visitId: WhereEqVisitId
 
-  "Matches on observation id"
-  observationId: WhereOrderObservationId
+  "Matches on observation"
+  observation: WhereObservation
 
   "Matches on event reception time"
   received: WhereOrderTimestamp
@@ -14747,6 +14717,37 @@ input WhereOrderProgramId {
 }
 
 """
+Filters on equality or order comparisons of the program note Id. All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderProgramNoteId {
+
+  "Matches if the program note id is exactly the supplied value."
+  EQ: ProgramNoteId
+
+  "Matches if the program note id is not the supplied value."
+  NEQ: ProgramNoteId
+
+  "Matches if the program note id is any of the supplied options."
+  IN: [ProgramNoteId!]
+
+  "Matches if the program note id is none of the supplied values."
+  NIN: [ProgramNoteId!]
+
+  "Matches if the program note id is ordered after (>) the supplied value."
+  GT: ProgramNoteId
+
+  "Matches if the program note is ordered before (<) the supplied value."
+  LT: ProgramNoteId
+
+  "Matches if the program note id is ordered after or equal (>=) the supplied value."
+  GTE: ProgramNoteId
+
+  "Matches if the program note id is ordered before or equal (<=) the supplied value."
+  LTE: ProgramNoteId
+}
+
+"""
 Filters on equality or order comparisons of the program user id.  All supplied
 criteria must match, but usually only one is selected.
 """
@@ -15301,6 +15302,46 @@ input WhereProgramReference {
 
   "Matches the science subtype in the program reference, if any."
   scienceSubtype: WhereEqScienceSubtype
+}
+
+"""
+Program note filter options.  All specified items must match.
+"""
+input WhereProgramNote {
+
+  """
+  A list of nested program note filters that all must match in order for the
+  AND group as a whole to match.
+  """
+  AND: [WhereProgramNote!]
+
+  """
+  A list of nested program note filters where any one match causes the entire
+  OR group as a whole to match.
+  """
+  OR: [WhereProgramNote!]
+
+  """
+  A nested program note filter that must not match in order for the NOT itself
+  to match.
+  """
+  NOT: WhereProgramNote
+
+  "Matches the program note ID."
+  id: WhereOrderProgramNoteId
+
+  "Matches the program."
+  program: WhereProgram
+
+  "Matches the program note title."
+  title: WhereString
+
+  "Mathces the program note text."
+  text: WhereOptionString
+
+  "Matches the private status."
+  isPrivate: WhereBoolean
+
 }
 
 """

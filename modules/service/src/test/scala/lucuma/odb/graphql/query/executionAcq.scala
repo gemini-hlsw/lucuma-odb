@@ -50,7 +50,7 @@ class executionAcq extends ExecutionTestSupport {
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                        ${gmosNorthExpectedAcq(2, 0)}
                       ]
                     }
                   ],
@@ -75,7 +75,7 @@ class executionAcq extends ExecutionTestSupport {
                     "description": "Fine Adjustments",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                      ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
                     ]
                   },
                   "possibleFuture": [
@@ -83,7 +83,7 @@ class executionAcq extends ExecutionTestSupport {
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
                       ]
                     }
                   ],
@@ -231,7 +231,7 @@ class executionAcq extends ExecutionTestSupport {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
                             ]
                           }
                         ],
@@ -428,7 +428,7 @@ class executionAcq extends ExecutionTestSupport {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Enabled)}
+                              ${gmosNorthExpectedAcq(2, 0)}
                             ]
                           }
                         ],

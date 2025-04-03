@@ -5,20 +5,20 @@ package lucuma.odb.smartgcal.parsers
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
-import cats.syntax.option.*
+import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.odb.smartgcal.data.Gmos.FileEntry
 import lucuma.odb.smartgcal.data.Gmos.FileKey
 
-trait GmosNorthParsers extends GmosCommonParsers {
+trait GmosNorthParsers extends GmosCommonParsers:
   import common.*
   import util.*
 
-  val filter: Parser[NonEmptyList[Option[GmosNorthFilter]]] =
-    Parser.string("none").as(NonEmptyList.one(none[GmosNorthFilter])) |   // "none" found in existing .csv files
-      manyOfOption("None",
+  val filter: Parser[Availability[NonEmptyList[Option[GmosNorthFilter]]]] =
+    Parser.string("none").as(NonEmptyList.one(none[GmosNorthFilter]).pure[Availability]) | // "none" found in existing .csv files
+      manyOfObsoletableOption("None", Set("u_G0309"),
         "g_G0301"                   -> GmosNorthFilter.GPrime,
         "r_G0303"                   -> GmosNorthFilter.RPrime,
         "i_G0302"                   -> GmosNorthFilter.IPrime,
@@ -46,8 +46,7 @@ trait GmosNorthParsers extends GmosCommonParsers {
         "g_G0301 + OG515_G0306"     -> GmosNorthFilter.GPrime_OG515,
         "r_G0303 + RG610_G0307"     -> GmosNorthFilter.RPrime_RG610,
         "i_G0302 + CaT_G0309"       -> GmosNorthFilter.IPrime_CaT,
-        "z_G0304 + CaT_G0309"       -> GmosNorthFilter.ZPrime_CaT,
-        "u_G0308"                   -> GmosNorthFilter.UPrime
+        "z_G0304 + CaT_G0309"       -> GmosNorthFilter.ZPrime_CaT
       ).withContext("GMOS North filter")
 
   val fpu: Parser[NonEmptyList[Option[GmosNorthFpu]]] =
@@ -70,10 +69,10 @@ trait GmosNorthParsers extends GmosCommonParsers {
       "N and S 2.00 arcsec"  -> GmosNorthFpu.Ns5
     ).withContext("GMOS North FPU")
 
-  val grating: Parser[NonEmptyList[Option[GmosNorthGrating]]] =
-    manyOfOptionEnumerated[GmosNorthGrating]("Mirror").withContext("GMOS North grating")
+  val grating: Parser[Availability[NonEmptyList[Option[GmosNorthGrating]]]] =
+    manyOfObsoletableOptionEnumerated[GmosNorthGrating]("Mirror", Set("B600_G5303", "B600_G5307", "R150_G5306")).withContext("GMOS North grating")
 
-  val fileKey: Parser[FileKey.North] =
+  val fileKey: Parser[Availability[FileKey.North]] =
     (
       (grating           <* columnSep) ~
       (filter            <* columnSep) ~
@@ -84,14 +83,12 @@ trait GmosNorthParsers extends GmosCommonParsers {
       (order             <* columnSep) ~
       gain
     ).map { case (((((((grating, filter), fpu), xBin), yBin), range), order), gain) =>
-      FileKey(grating, filter, fpu, xBin, yBin, range, order, gain)
+      (grating, filter).mapN((g, f) => FileKey(g, f, fpu, xBin, yBin, range, order, gain))
     }
 
-  def fileEntry: Parser[FileEntry.North] =
+  def fileEntry: Parser[Availability[FileEntry.North]] =
     ((fileKey <* file.keyValueSep) ~ file.legacyValue).map { case (k, v) =>
-      FileEntry(k, v)
+      k.map(k => FileEntry(k, v))
     }
-
-}
 
 object gmosNorth extends GmosNorthParsers

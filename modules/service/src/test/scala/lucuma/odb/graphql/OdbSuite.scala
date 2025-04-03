@@ -44,12 +44,15 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcVersions
+import lucuma.itc.SignalToNoiseAt
+import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
-import lucuma.itc.client.ImagingIntegrationTimeInput
-import lucuma.itc.client.IntegrationTimeResult
+import lucuma.itc.TotalSN
+import lucuma.itc.client.ClientCalculationResult
+import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.data.OdbError
@@ -94,7 +97,7 @@ object OdbSuite:
 
   // a runtime that is constructed the same as global, but lets us see unhandled errors (above)
   val runtime: IORuntime =
-    val (compute, _) = IORuntime.createWorkStealingComputeThreadPool(reportFailure = reportFailure)
+    val (compute, _, _) = IORuntime.createWorkStealingComputeThreadPool(reportFailure = reportFailure)
     val (blocking, _) = IORuntime.createDefaultBlockingExecutionContext()
     val (scheduler, _) = IORuntime.createDefaultScheduler()
     IORuntime(compute, blocking, scheduler, () => (), IORuntimeConfig())
@@ -165,7 +168,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     IntegrationTime(
       10.secTimeSpan,
       NonNegInt.unsafeFrom(6),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
@@ -175,24 +177,31 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def fakeItcSpectroscopyResult: IntegrationTime =
     FakeItcResult
 
+  def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
+    SignalToNoiseAt(
+      w,
+      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(6)),
+      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(7))
+    )
+
   protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
-      override def imaging(input: ImagingIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] =
-        IntegrationTimeResult(
+      override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
+        ClientCalculationResult(
           FakeItcVersions,
           AsterismIntegrationTimeOutcomes(
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None).asRight
                 )
               )
             ).get
           )
         ).pure[IO]
 
-      override def spectroscopy(input: SpectroscopyIntegrationTimeInput, useCache: Boolean): IO[IntegrationTimeResult] = {
+      override def spectroscopy(input: SpectroscopyInput, useCache: Boolean): IO[ClientCalculationResult] = {
         val signal = lucuma.core.math.Wavelength.fromIntNanometers(666).get
         val wavelength = input.mode match
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _) => w
@@ -206,15 +215,15 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResult
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-                IntegrationTime(t, c, fakeItcSpectroscopyResult.signalToNoise)
+                IntegrationTime(t, c)
 
-           IntegrationTimeResult(
+          ClientCalculationResult(
             FakeItcVersions,
             AsterismIntegrationTimeOutcomes(
               NonEmptyChain.fromSeq(
                 List.fill(input.asterism.length)(
                   TargetIntegrationTimeOutcome(
-                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine).asRight
+                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some).asRight
                   )
                 )
               ).get
@@ -509,7 +518,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   ): IO[Unit] =
     queryIor(user, query, variables, client).map: ior =>
       assertEquals(ior.leftMap(_.toList.map(_.message)), expected)
-        
+
   def query(
     user:      User,
     query:     String,

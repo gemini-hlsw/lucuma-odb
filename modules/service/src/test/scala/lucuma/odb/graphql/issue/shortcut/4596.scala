@@ -19,7 +19,6 @@ import lucuma.core.enums.ObservationWorkflowState.Ongoing
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -45,8 +44,7 @@ class ShortCut_4596 extends OdbSuite
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(2),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(2)
     )
 
   def queryObservationWorkflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
@@ -70,9 +68,9 @@ class ShortCut_4596 extends OdbSuite
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
       a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
+      s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
       _  <- addEndStepEvent(s0)
-      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.PartnerCal)
+      s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
       _  <- addEndStepEvent(s1)
       s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
       _  <- addEndStepEvent(s2)
@@ -209,7 +207,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(ongoing, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $ongoing is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+            s"Observation $ongoing is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ),
           json"""
           {
@@ -335,7 +333,7 @@ class ShortCut_4596 extends OdbSuite
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
-          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."),
+          List(s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."),
           json"""
             {
               "updateAsterisms": {
@@ -461,7 +459,7 @@ class ShortCut_4596 extends OdbSuite
             }
           """,
           expected = Ior.Left(List(
-            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+            s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ))
         )  
 
@@ -506,7 +504,7 @@ class ShortCut_4596 extends OdbSuite
           expected = 
             Ior.Both(
               List(
-                s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive)."
+                s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
               ),
               json"""
                 {

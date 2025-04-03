@@ -43,6 +43,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlField("instrument",   VisitTable.Instrument, discriminator = true),
       SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
       SqlField("created",      VisitTable.Created),
+      SqlField("site",         VisitTable.Site),
       EffectField("interval", intervalHandler, List("id")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),

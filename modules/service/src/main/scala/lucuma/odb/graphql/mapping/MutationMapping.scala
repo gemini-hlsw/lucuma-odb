@@ -37,6 +37,7 @@ import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -118,6 +119,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       UpdateGroups,
       UpdateObservations,
       UpdateObservationsTimes,
+      UpdateProgramNotes,
       UpdatePrograms,
       UpdateProgramUsers,
       UpdateProposal,
@@ -247,6 +249,15 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       order = OrderSelection[Observation.Id](ObservationType / "id"),
       limit = limit,
       collectionField = "observations",
+      child
+    )
+
+  def programNoteResultSubquery(nids: List[ProgramNote.Id], limit: Option[NonNegInt], child: Query) =
+    mutationResultSubquery(
+      predicate       = Predicates.programNote.id.in(nids),
+      order           = OrderSelection[ProgramNote.Id](ProgramNoteType / "id"),
+      limit           = limit,
+      collectionField = "programNotes",
       child
     )
 
@@ -478,27 +489,27 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val AddAtomEvent: MutationField =
     addEvent("addAtomEvent", AddAtomEventInput.Binding, Predicates.atomEvent) { input =>
-      executionEventService.insertAtomEvent(input.atomId, input.atomStage)
+      executionEventService.insertAtomEvent(input)
     }
 
   private lazy val AddDatasetEvent: MutationField =
     addEvent("addDatasetEvent", AddDatasetEventInput.Binding, Predicates.datasetEvent) { input =>
-      executionEventService.insertDatasetEvent(input.datasetId, input.datasetStage)
+      executionEventService.insertDatasetEvent(input)
     }
 
   private lazy val AddSequenceEvent: MutationField =
     addEvent("addSequenceEvent", AddSequenceEventInput.Binding, Predicates.sequenceEvent) { input =>
-      executionEventService.insertSequenceEvent(input.visitId, input.command)
+      executionEventService.insertSequenceEvent(input)
     }
 
   private lazy val AddSlewEvent: MutationField =
     addEvent("addSlewEvent", AddSlewEventInput.Binding, Predicates.slewEvent) { input =>
-      executionEventService.insertSlewEvent(input.visitId, input.slewStage)
+      executionEventService.insertSlewEvent(input)
     }
 
   private lazy val AddStepEvent: MutationField =
     addEvent("addStepEvent", AddStepEventInput.Binding, Predicates.stepEvent) { input =>
-      executionEventService.insertStepEvent(input.stepId, input.stepStage)
+      executionEventService.insertStepEvent(input)
     }
 
   private def recordAtom(
@@ -559,7 +570,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.insertGmosNorth(input.observationId, input.static),
+            visitService.recordGmosNorth(input),
             Predicates.visit.id,
             child
           )
@@ -569,7 +580,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
-            visitService.insertGmosSouth(input.observationId, input.static),
+            visitService.recordGmosSouth(input),
             Predicates.visit.id,
             child
           )
@@ -720,6 +731,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               .updateAttachments(checked)
               .map: r =>
                 r.flatMap(attachmentResultSubquery(_, input.LIMIT, child))
+
+  private lazy val UpdateProgramNotes: MutationField =
+    MutationField("updateProgramNotes", UpdateProgramNotesInput.binding(Path.from(ProgramNoteType))): (input, child) =>
+      services.useTransactionally:
+        ResultT(selectForUpdate(input)).flatMap: checked =>
+          ResultT:
+            programNoteService
+              .updateNotes(checked).map: nids =>
+                programNoteResultSubquery(nids, input.LIMIT, child)
+        .value
 
   private lazy val UpdateObservations: MutationField =
     MutationField("updateObservations", UpdateObservationsInput.binding(Path.from(ObservationType))) { (input, child) =>

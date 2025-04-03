@@ -14,11 +14,11 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepStage
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Visit
@@ -31,6 +31,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.graphql.input.AddStepEventInput
 
 
 class executionDigest extends ExecutionTestSupport {
@@ -39,7 +40,6 @@ class executionDigest extends ExecutionTestSupport {
     IntegrationTime(
       20.minTimeSpan,
       NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
     )
 
   // * Arc:
@@ -80,13 +80,15 @@ class executionDigest extends ExecutionTestSupport {
       BigDecimal(s).setScale(6)
 
   // 4 atoms, each with an arc and a flat
-  def PartnerTime: BigDecimal =
+  val CalibrationTime: BigDecimal =
     ("67.1".sec * 4) + ("57.1".sec * 4)
 
   // 4 atoms, all of which incur the 1266.1 cost including the science fold
   // move, 3 of them have an additional 2 steps each of 1251.1
-  def ProgramTime: BigDecimal =
+  val ScienceTime: BigDecimal =
     ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
+
+  val ProgramTime: BigDecimal = CalibrationTime + ScienceTime
 
   def digestQuery(oid: Observation.Id): String =
     s"""
@@ -102,7 +104,6 @@ class executionDigest extends ExecutionTestSupport {
                 observeClass
                 timeEstimate {
                   program { seconds }
-                  partner { seconds }
                   nonCharged { seconds }
                   total { seconds }
                 }
@@ -138,14 +139,11 @@ class executionDigest extends ExecutionTestSupport {
                   "program" : {
                     "seconds" : ${ProgramTime.asJson}
                   },
-                  "partner" : {
-                    "seconds" : ${PartnerTime.asJson}
-                  },
                   "nonCharged" : {
                     "seconds" : 0.000000
                   },
                   "total" : {
-                    "seconds" : ${(ProgramTime + PartnerTime).asJson}
+                    "seconds" : ${ProgramTime.asJson}
                   }
                 },
                 "offsets" : [
@@ -493,8 +491,8 @@ class executionDigest extends ExecutionTestSupport {
         services.session.transaction.use { xa =>
           for {
             _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa, ().asInstanceOf) // shhh
-            d <- services.executionDigestService.selectOne(p, o, Md5Hash.Zero)(using xa)
+            _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+            d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
           } yield d.isEmpty
         }
       }
@@ -560,6 +558,91 @@ class executionDigest extends ExecutionTestSupport {
         expected = expectedExecutionState(ExecutionState.Ongoing).asRight
       )
 
+  test("executionState - DECLARED_COMPLETE"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s1)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+        _  <- computeItcResultAs(pi, o)
+        _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = executionStateQuery(oid),
+        expected = expectedExecutionState(ExecutionState.DeclaredComplete).asRight
+      )
+
+  test("digest: declared complete"):
+
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s0)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _  <- addEndStepEvent(s1)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
+        _  <- addEndStepEvent(s2)
+        _  <- computeItcResultAs(pi, o)
+        _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
+      yield (p, o)
+
+    setup.flatMap: (_, oid) =>
+      expect(
+        user     = pi,
+        query    = digestQuery(oid),
+        expected =
+          json"""
+            {
+              "observation": {
+                "execution": {
+                  "digest": {
+                    "setup" : {
+                      "full" : {
+                        "seconds" : 0.000000
+                      },
+                      "reacquisition" : {
+                        "seconds" : 0.000000
+                      }
+                    },
+                    "science" : {
+                      "observeClass" : "DAY_CAL",
+                      "timeEstimate" : {
+                        "program" : {
+                          "seconds" : 0.000000
+                        },
+                        "nonCharged" : {
+                          "seconds" : 0.000000
+                        },
+                        "total" : {
+                          "seconds" : 0.000000
+                        }
+                      },
+                      "offsets" : [],
+                      "atomCount": 0
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+        )
+
   def gcalTelescopeConfig(q: Int): TelescopeConfig =
     telescopeConfig(0, q, StepGuideState.Disabled)
 
@@ -570,9 +653,9 @@ class executionDigest extends ExecutionTestSupport {
     def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(c)
-        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.PartnerCal)
+        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(f)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(3)
         _ <- s.traverse(addEndStepEvent)

@@ -40,7 +40,6 @@ import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
 
@@ -242,33 +241,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
      }
-
-  def unsetSED(tid: Target.Id): IO[Json] =
-    query(
-      pi,
-      s"""
-          mutation {
-            updateTargets(input: {
-              SET: {
-                sourceProfile: {
-                  point: {
-                    bandNormalized: {
-                      sed: null
-                    }
-                  }
-                }
-              }
-              WHERE: {
-                id: { EQ: "$tid"}
-              }
-            }) {
-              targets {
-                id
-              }
-            }
-          }
-      """
-    )
 
   def formatLD(ld: LocalDate): String = {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")

@@ -7,6 +7,7 @@ import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
 import cats.Monoid
 import cats.Parallel
+import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
 import cats.effect.{Unique as _, *}
 import cats.syntax.all.*
@@ -79,7 +80,7 @@ object OdbMapping {
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
-  def apply[F[_]: Async: Parallel: Trace: Logger](
+  def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
     database:      Resource[F, Session[F]],
     monitor0:      SkunkMonitor[F],
     user0:         User,
@@ -189,6 +190,7 @@ object OdbMapping {
           with ProgramEditMapping[F]
           with ProgramMapping[F]
           with ProgramNoteMapping[F]
+          with ProgramNoteSelectResultMapping[F]
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
@@ -244,6 +246,7 @@ object OdbMapping {
           with UpdateGroupsResultMapping[F]
           with UpdateAttachmentsResultMapping[F]
           with UpdateObservationsResultMapping[F]
+          with UpdateProgramNotesResultMapping[F]
           with UpdateProgramsResultMapping[F]
           with UpdateProgramUsersResultMapping[F]
           with UpdateProposalResultMapping[F]
@@ -392,6 +395,7 @@ object OdbMapping {
                 ProgramMapping,
                 ProgramEditMapping,
                 ProgramNoteMapping,
+                ProgramNoteSelectResultMapping,
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
@@ -467,6 +471,7 @@ object OdbMapping {
                 UpdateDatasetsResultMapping,
                 UpdateGroupsResultMapping,
                 UpdateObservationsResultMapping,
+                UpdateProgramNotesResultMapping,
                 UpdateProgramsResultMapping,
                 UpdateProgramUsersResultMapping,
                 UpdateProposalResultMapping,

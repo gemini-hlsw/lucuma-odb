@@ -16,6 +16,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
@@ -26,6 +27,15 @@ class guideEnvironment extends ExecutionTestSupport {
   val gaiaEmpty   = Timestamp.FromString.getOption("3000-01-30T04:00:00Z").get
   // for tests in which gaia should not get called
   val gaiaError   = Timestamp.FromString.getOption("4000-12-30T20:00:00Z").get
+
+  val setupTime = TimeSpan.fromMinutes(16).get
+  val fullTimeEstimate = TimeSpan.parse("PT36M1.8S").toOption.get
+  val durationTooShort = setupTime -| TimeSpan.fromMicroseconds(1).get
+  val durationTooLong = fullTimeEstimate +| TimeSpan.fromMicroseconds(1).get
+
+  // For tests in which the actual value of the duration is not validated because
+  // the execution digest cannot be calculated.
+  val durationNotValidated = TimeSpan.Zero
 
   val invalidTargetId = 1L
   val defaultTargetId = 3219118090462918016L
@@ -468,7 +478,7 @@ class guideEnvironment extends ExecutionTestSupport {
         "targetEnvironment": {
           "guideEnvironment": {
             "posAngle": {
-              "degrees": 160.000000
+              "degrees": 180.000000
             },
             "guideTargets": [
               {
@@ -540,7 +550,7 @@ class guideEnvironment extends ExecutionTestSupport {
         "targetEnvironment": {
           "guideEnvironment": {
             "posAngle": {
-              "degrees": 50.000000
+              "degrees": 100.000000
             },
             "guideTargets": [
               {
@@ -627,7 +637,7 @@ class guideEnvironment extends ExecutionTestSupport {
       for {
         p <- createProgramAs(pi)
         o <- createObservationAs(pi, p, List.empty)
-        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationNotValidated.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -637,13 +647,76 @@ class guideEnvironment extends ExecutionTestSupport {
     }
   }
 
+  test("no observation time") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideEnvironmentQuery(oid),
+        expected = List(s"Observation time not set for observation $oid.").asLeft)
+    }
+  }
+
+  test("no observation duration") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, none)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideEnvironmentQuery(oid),
+        expected = List(s"Observation duration not set for observation $oid.").asLeft)
+    }
+  }
+
+  test("observation duration too short") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationTooShort.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideEnvironmentQuery(oid),
+        expected = List(s"Observation duration of ${durationTooShort.format} is less than the setup time of ${setupTime.format} for observation $oid.").asLeft)
+    }
+  }
+
+  test("observation duration too long") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationTooLong.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideEnvironmentQuery(oid),
+        expected = List(s"Observation duration of ${durationTooLong.format} exceeds the remaining time of ${fullTimeEstimate.format} for observation $oid.").asLeft)
+    }
+  }
+
   test("no guide stars") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaEmpty.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaEmpty.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -659,7 +732,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)
-        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationNotValidated.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -675,7 +748,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
         _ <- setGuideTargetName(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
@@ -692,7 +765,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
@@ -705,7 +778,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = defaultGuideEnvironmentResults)
@@ -718,7 +791,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
         _ <- setGuideTargetName(pi, o, defaultTargetName.some)
       } yield o
     setup.flatMap { oid =>
@@ -732,7 +805,7 @@ class guideEnvironment extends ExecutionTestSupport {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, none)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
         _ <- setGuideTargetName(pi, o, otherTargetName.some)
       } yield o
     setup.flatMap { oid =>

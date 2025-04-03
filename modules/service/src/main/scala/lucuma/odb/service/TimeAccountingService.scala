@@ -115,7 +115,6 @@ object TimeAccountingService {
       c  = tas.charge
     } yield TimeCharge.Discount(
       TimestampInterval.between(s, e),
-      c.partnerTime,
       c.programTime,
       comment
     )
@@ -280,7 +279,6 @@ object TimeAccountingService {
         (
           timestamp_interval *:
           time_span          *:
-          time_span          *:
           text
         ).to[TimeCharge.Discount]
 
@@ -316,19 +314,15 @@ object TimeAccountingService {
       sql"""
         UPDATE t_visit
            SET c_raw_non_charged_time   = $time_span,
-               c_raw_partner_time       = $time_span,
                c_raw_program_time       = $time_span,
                c_final_non_charged_time = $time_span,
-               c_final_partner_time     = $time_span,
                c_final_program_time     = $time_span
          WHERE c_visit_id = $visit_id
       """.command
          .contramap { case (v, r, f) => (
            r.nonCharged,
-           r.partnerTime,
            r.programTime,
            f.nonCharged,
-           f.partnerTime,
            f.programTime,
            v
          )}
@@ -403,7 +397,6 @@ object TimeAccountingService {
             c_visit_id,
             c_start,
             c_end,
-            c_partner_discount,
             c_program_discount,
             c_comment,
             c_type,
@@ -485,11 +478,9 @@ object TimeAccountingService {
 
       sql"""
         UPDATE t_visit
-           SET c_final_partner_time = update_time_span(c_final_partner_time, $interval),
-               c_final_program_time = update_time_span(c_final_program_time, $interval)
+           SET c_final_program_time = update_time_span(c_final_program_time, $interval)
          WHERE c_visit_id = $visit_id
       """.command.contramap { case (vid, input) => (
-        toDuration(ChargeClass.Partner, input),
         toDuration(ChargeClass.Program, input),
         vid
       )}
@@ -499,7 +490,6 @@ object TimeAccountingService {
       sql"""
         SELECT
           COALESCE(SUM(c_final_non_charged_time), '0'::interval),
-          COALESCE(SUM(c_final_partner_time), '0'::interval),
           COALESCE(SUM(c_final_program_time), '0'::interval)
         FROM t_visit
         WHERE c_observation_id = $observation_id
@@ -510,7 +500,6 @@ object TimeAccountingService {
         SELECT
           o.c_science_band,
           COALESCE(SUM(v.c_final_non_charged_time), '0'::interval),
-          COALESCE(SUM(v.c_final_partner_time), '0'::interval),
           COALESCE(SUM(v.c_final_program_time), '0'::interval)
         FROM t_visit v
         INNER JOIN t_observation o ON v.c_observation_id = o.c_observation_id

@@ -9,7 +9,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -25,8 +24,7 @@ class ShortCut_2772 extends ExecutionTestSupport {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       30.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(10)
     )
 
   val user: User = serviceUser
