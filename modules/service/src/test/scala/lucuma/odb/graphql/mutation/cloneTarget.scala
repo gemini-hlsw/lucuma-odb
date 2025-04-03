@@ -14,6 +14,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.service.Services
 
 class cloneTarget extends OdbSuite {
   import createTarget.FullTargetGraph
@@ -177,13 +178,14 @@ class cloneTarget extends OdbSuite {
   test("clone a calibration target") {
     for {
       pid <- withServices(service) { s =>
-              s.session.transaction.use { xa =>
-                s.programService
-                  .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create.Default.some,
-                    CalibrationRole.Photometric,
-                    Description.unsafeFrom("PHOTO"))(using xa)
-              }
+              Services.asSuperUser:
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create.Default.some,
+                      CalibrationRole.Photometric,
+                      Description.unsafeFrom("PHOTO"))(using xa)
+                }
             }
       tid <- createTargetAs(service, pid)
       _   <- expect(
@@ -217,13 +219,14 @@ class cloneTarget extends OdbSuite {
   test("clone a calibration target into a regular program") {
     for {
       pid  <- withServices(service) { s => // calibration prograam
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.Telluric,
-                      Description.unsafeFrom("TELLURIC"))(using xa)
-                }
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.Telluric,
+                        Description.unsafeFrom("TELLURIC"))(using xa)
+                  }
               }
       tid  <- createTargetAs(service, pid) // calibration target
       pid2 <- createProgramAs(pi) // regular program

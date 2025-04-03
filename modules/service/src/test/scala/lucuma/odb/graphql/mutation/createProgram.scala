@@ -14,6 +14,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.service.Services
 
 class createProgram extends OdbSuite {
 
@@ -506,15 +507,16 @@ class createProgram extends OdbSuite {
     val name = "Photometric calibration targeets"
     for {
       pid <- withServices(service) { s =>
-              s.session.transaction.use { xa =>
-                s.programService
-                  .insertCalibrationProgram(
-                    ProgramPropertiesInput.Create.Default.copy(
-                      name = NonEmptyString.from(name).toOption
-                    ).some,
-                    CalibrationRole.Photometric,
-                    Description.unsafeFrom("PHOTO"))(using xa)
-              }
+              Services.asSuperUser:
+                s.session.transaction.use { xa =>
+                  s.programService
+                    .insertCalibrationProgram(
+                      ProgramPropertiesInput.Create.Default.copy(
+                        name = NonEmptyString.from(name).toOption
+                      ).some,
+                      CalibrationRole.Photometric,
+                      Description.unsafeFrom("PHOTO"))(using xa)
+                }
             }
       _ <- expect(
             user = staff,
