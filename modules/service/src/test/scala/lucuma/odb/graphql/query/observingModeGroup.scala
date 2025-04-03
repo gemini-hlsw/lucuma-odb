@@ -13,8 +13,8 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -40,7 +40,7 @@ class observingModeGroup extends OdbSuite:
     fpu:      String = "LONG_SLIT_0_25",
     xbin:     Option[GmosXBinning] = None,
     ybin:     Option[GmosYBinning] = None,
-    iq:       ImageQuality = ImageQuality.TwoPointZero,
+    iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
     asterism: List[Target.Id] = Nil
   ): IO[Observation.Id] =
     query(
@@ -99,7 +99,7 @@ class observingModeGroup extends OdbSuite:
             }
           """
       ).flatMap: tid =>
-        def create2(iq: ImageQuality, grating: GmosNorthGrating) =
+        def create2(iq: ImageQuality.Preset, grating: GmosNorthGrating) =
           createObservation(
             pi,
             pid,
@@ -109,9 +109,9 @@ class observingModeGroup extends OdbSuite:
             asterism =List(tid)
           ).replicateA(2)
 
-        (create2(ImageQuality.OnePointFive, GmosNorthGrating.B1200_G5301),
-         create2(ImageQuality.PointOne, GmosNorthGrating.R400_G5305),
-         create2(ImageQuality.PointOne, GmosNorthGrating.R831_G5302)
+        (create2(ImageQuality.Preset.OnePointFive, GmosNorthGrating.B1200_G5301),
+         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R400_G5305),
+         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R831_G5302)
         ).parTupled.flatMap: (g1, g2, g3) =>
           expect(
             user = pi,
@@ -205,7 +205,7 @@ class observingModeGroup extends OdbSuite:
               grating  = GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase,
               fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
               xbin     = bin,
-              iq       = ImageQuality.PointOne,
+              iq       = ImageQuality.Preset.PointOne,
               asterism = List(tid)
           )
 
@@ -283,7 +283,7 @@ class observingModeGroup extends OdbSuite:
               Site.GN,
               grating  = grating.tag.toScreamingSnakeCase,
               fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
-              iq       = ImageQuality.PointOne,
+              iq       = ImageQuality.Preset.PointOne,
               asterism = List(tid)
           )
 

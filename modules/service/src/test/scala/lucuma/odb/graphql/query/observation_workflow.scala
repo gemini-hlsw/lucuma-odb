@@ -13,12 +13,12 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CallForProposalsType
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
@@ -277,7 +277,7 @@ class observation_workflow
       s.prepareR(sql"update t_configuration_request set c_status = 'denied' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
         ps.execute(req).void
 
-  def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
+  def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction.Preset): IO[Unit] =
     updateObservation(user, oid, 
       update = s"""
         constraintSet: {
@@ -887,7 +887,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
+        _   <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointFive)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResultAs(pi, oid)
       } yield oid
@@ -904,7 +904,7 @@ class observation_workflow
           )
         ).asRight
       ) >>
-      updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
+      updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.PointFive) >>  // ask for better conditions
       computeItcResultAs(pi, oid) >> // recompute ITC
       expect(
         pi,
@@ -933,7 +933,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.OnePointFive)  // ask for poor conditions
+        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointFive)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResultAs(pi, oid)
         _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)
@@ -951,7 +951,7 @@ class observation_workflow
           )
         ).asRight
       ) >>
-      updateCloudExtinctionAs(pi, oid, CloudExtinction.PointFive) >>  // ask for better conditions
+      updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.PointFive) >>  // ask for better conditions
       computeItcResultAs(pi, oid) >> // recompute ITC
       expect(
         pi,
