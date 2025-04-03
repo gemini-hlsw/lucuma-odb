@@ -1064,23 +1064,23 @@ object GuideService {
   private object Decoders {
 
     val obsInfoDecoder: Decoder[ObservationInfo] =
-      (observation_id *:
-        program_id *:
-        cloud_extinction *:
-        image_quality *:
-        sky_background *:
-        water_vapor *:
-        air_mass_range_value.opt *:
-        air_mass_range_value.opt *:
+      (observation_id              *:
+        program_id                 *:
+        cloud_extinction_preset    *:
+        image_quality_preset       *:
+        sky_background             *:
+        water_vapor                *:
+        air_mass_range_value.opt   *:
+        air_mass_range_value.opt   *:
         hour_angle_range_value.opt *:
         hour_angle_range_value.opt *:
-        pac_mode *:
-        angle_µas *:
-        right_ascension.opt *:
-        declination.opt *:
-        core_timestamp.opt *:
-        time_span.opt *:
-        guide_target_name.opt *:
+        pac_mode                   *:
+        angle_µas                  *:
+        right_ascension.opt        *:
+        declination.opt            *:
+        core_timestamp.opt         *:
+        time_span.opt              *:
+        guide_target_name.opt      *:
         md5_hash.opt).emap {
         case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash) =>
           val paConstraint: PosAngleConstraint = mode match

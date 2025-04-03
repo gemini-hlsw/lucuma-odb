@@ -11,20 +11,20 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Coordinates
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.Configuration.ObservingMode
 import lucuma.core.model.Configuration.ObservingMode.GmosNorthLongSlit
 import lucuma.core.model.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.ImageQuality
 import lucuma.odb.json.coordinates.query.given
 
 object configurationrequest:
@@ -36,8 +36,8 @@ object configurationrequest:
 
     given Decoder[Conditions] = hc =>
       for 
-        c <- hc.downField("cloudExtinction").as[CloudExtinction]
-        i <- hc.downField("imageQuality").as[ImageQuality]
+        c <- hc.downField("cloudExtinction").as[CloudExtinction.Preset]
+        i <- hc.downField("imageQuality").as[ImageQuality.Preset]
         s <- hc.downField("skyBackground").as[SkyBackground]
         w <- hc.downField("waterVapor").as[WaterVapor]
       yield Conditions(c, i, s, w)

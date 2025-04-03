@@ -18,8 +18,8 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.binning.DefaultSampling
@@ -134,12 +134,12 @@ object GmosLongSlitService {
         which:   List[Observation.Id],
         f:       NonEmptyList[Observation.Id] => AppliedFragment,
         decoder: Decoder[A]
-      ): F[List[(Observation.Id, ImageQuality, A)]] =
+      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
         NonEmptyList
           .fromList(which)
           .fold(Applicative[F].pure(List.empty)) { oids =>
             val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id *: image_quality *: decoder)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList
             }
           }
