@@ -548,7 +548,10 @@ class executionDigest extends ExecutionTestSupport {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        // We now need to record at least a single step to count as ONGOING
+        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _ <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
       yield o
 
     setup.flatMap: oid =>
