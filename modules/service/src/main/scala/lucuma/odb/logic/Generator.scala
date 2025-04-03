@@ -54,8 +54,6 @@ import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.*
-import skunk.codec.temporal.timestamptz
-import skunk.implicits.*
 
 import java.security.MessageDigest
 import java.util.UUID
@@ -123,9 +121,6 @@ sealed trait Generator[F[_]] {
    *
    * @param futureLimit cap to place on the number of atoms that map appear in
    *                    the possibleFuture
-   * @param resetAcq pass `true` to force the acquisition sequence to start on
-   *                 the first step regardless of what datasets may have been
-   *                 recorded in the past
    * @param when perform the generation as if requested at this time (by default
    *             the sequence is requested generated at the current time)
    */
@@ -133,7 +128,6 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     futureLimit:   FutureLimit = FutureLimit.Default,
-    resetAcq:      Boolean = false,
     when:          Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
 
@@ -359,15 +353,6 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
-      private val tz: Codec[Timestamp] =
-        timestamptz.eimap(
-          odt => Timestamp.fromInstantTruncated(odt.toInstant).toRight(s"Invalid Timestamp: $odt"))(
-          ts  => java.time.OffsetDateTime.ofInstant(ts.toInstant, java.time.ZoneOffset.UTC)
-        )
-
-      val CurrentTimestamp: Query[Void, Timestamp] =
-        sql"select current_timestamp".query(tz)
-
       type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
       type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
@@ -375,46 +360,43 @@ object Generator {
         ctx:      Context,
         gen:      ExecutionConfigGenerator[S, D],
         steps:    Stream[F, StepRecord[D]],
-        resetAcq: Boolean,
         when:     Option[Timestamp]
       )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         if ctx.params.declaredComplete then
-          EitherT.pure((ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete))
+          EitherT.pure:
+            (ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
         else
-          val visits = services.visitService.selectAll(ctx.oid)
-          EitherT.liftF(services.transactionally {
-            for {
-              t <- when.fold(session.unique(CurrentTimestamp))(_.pure[F])
-              p <- gen.executionConfig(visits, steps, resetAcq, t)
-            } yield p
-          })
+          EitherT.liftF:
+            services.transactionally:
+              for
+                t <- when.fold(timeService.transactionTime)(_.pure[F])
+                p <- gen.executionConfig(steps, t)
+              yield p
 
       private def gmosNorthLongSlit(
-        ctx:      Context,
-        config:   lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
-        role:     Option[CalibrationRole],
-        resetAcq: Boolean,
-        when:     Option[Timestamp]
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
       ): EitherT[F, Error, (ProtoGmosNorth, ExecutionState)] =
-        val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
-          p <- protoExecutionConfig(ctx, g, srs, resetAcq, when)
+          p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
       private def gmosSouthLongSlit(
-        ctx:      Context,
-        config:   lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
-        role:     Option[CalibrationRole],
-        resetAcq: Boolean,
-        when:     Option[Timestamp]
+        ctx:    Context,
+        config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
       ): EitherT[F, Error, (ProtoGmosSouth, ExecutionState)] =
-        val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role)
+        val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
-          p <- protoExecutionConfig(ctx, g, srs, resetAcq, when)
+          p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
       private def calcDigestFromContext(
@@ -425,40 +407,38 @@ object Generator {
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete) =>
-            gmosNorthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+            gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete) =>
-            gmosSouthLongSlit(ctx, config, role, false, when).flatMap: (p, e) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
         )
 
       override def generate(
-        pid:      Program.Id,
-        oid:      Observation.Id,
-        lim:      FutureLimit = FutureLimit.Default,
-        resetAcq: Boolean = false,
-        when:     Option[Timestamp] = None
+        pid:  Program.Id,
+        oid:  Observation.Id,
+        lim:  FutureLimit = FutureLimit.Default,
+        when: Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfigFromContext(c, lim, resetAcq, when)
+          x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
       private def calcExecutionConfigFromContext(
         ctx:      Context,
         lim:      FutureLimit,
-        resetAcq: Boolean,
         when:     Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _) =>
-            gmosNorthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
+            gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
 
-          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _) =>
-            gmosSouthLongSlit(ctx, config, role, resetAcq, when).map: (p, _) =>
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 
       private def executionDigest[S, D](
