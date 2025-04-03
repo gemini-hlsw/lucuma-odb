@@ -46,12 +46,11 @@ trait GmosSouthParsers extends GmosCommonParsers {
         "OIIIC_G0339"               -> GmosSouthFilter.OIIIC,
         "HeII_G0340"                -> GmosSouthFilter.HeII,
         "HeIIC_G0341"               -> GmosSouthFilter.HeIIC,
-        "Lya395_G0342"              -> GmosSouthFilter.Lya395,
+        "Lya395_G0342"              -> GmosSouthFilter.HeII // Lya395 was removed
       ).withContext("GMOS South filter")
 
   val fpu: Parser[NonEmptyList[Option[GmosSouthFpu]]] =
     manyOfOption("None",
-      "bHROS"                -> GmosSouthFpu.Bhros,
       "N and S 0.50 arcsec"  -> GmosSouthFpu.Ns1,
       "N and S 0.75 arcsec"  -> GmosSouthFpu.Ns2,
       "N and S 1.00 arcsec"  -> GmosSouthFpu.Ns3,

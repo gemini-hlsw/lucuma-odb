@@ -430,4 +430,5 @@ class observations extends OdbSuite {
       oid2 <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
       res  <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }, site: { EQ: GS }""")
     yield assertEquals(res, Nil)
+
 }

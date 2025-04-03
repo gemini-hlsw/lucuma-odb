@@ -19,6 +19,8 @@ import scala.util.matching.Regex
 
 trait UtilityParsers {
 
+  import Availability.*
+
   private val regex: Regex = "^\\$(?<pattern>.+)".r
   private val splat: Regex = "(?<prefix>.*)\\*$".r
 
@@ -31,47 +33,61 @@ trait UtilityParsers {
    *
    * @see [[https://github.com/gemini-hlsw/ocs/blob/develop/bundle/edu.gemini.pot/src/main/java/edu/gemini/spModel/gemini/calunit/smartgcal/maps/BaseCalibrationMap.java#L29-L72]]
    */
-  def manyOf[A](kv: (String, A)*): Parser[NonEmptyList[A]] = {
+  def manyOf[A](kv: (String, A)*): Parser[NonEmptyList[A]] =
+    manyOfObsoletable(Set.empty, kv*).map: a =>
+      a.getOrElse(sys.error("Matched an obsolete key though none were given!"))
+
+  def manyOfObsoletable[A](isObsolete: Set[String], kv: (String, A)*): Parser[Availability[NonEmptyList[A]]] =
 
     val m: Map[String, A] = ListMap.from(kv)
 
     def formatNoMatch(prefix: String): String =
       s"$prefix, must match one of the strings: ${m.keys.map(s => s"'$s'").mkString("{", ", ", "}")}"
 
-    def matchingRegex(pat: String): Either[String, NonEmptyList[A]] =
+    def matchingRegex(pat: String): Either[String, Availability[NonEmptyList[A]]] =
       catching(classOf[PatternSyntaxException])
         .either(new Regex(pat))
         .leftMap(_ => s"Invalid regex pattern $pat")
-        .flatMap { r =>
-          m.toList.collect { case (key, value) if r.matches(key) => value } match {
-            case Nil     => formatNoMatch(s"Pattern '$pat' matched nothing").asLeft
-            case a :: as => NonEmptyList(a, as).asRight
-          }
-        }
+        .flatMap: r =>
+          m.toList.collect { case (key, value) if r.matches(key) => value } match
+            case Nil     => if isObsolete.exists(r.matches) then Obsolete.asRight else formatNoMatch(s"Pattern '$pat' matched nothing").asLeft
+            case a :: as => NonEmptyList(a, as).current.asRight
 
-    def matching(key: String): Either[String, NonEmptyList[A]] =
-      key match {
-        case regex(pat)    => matchingRegex(pat)
-        case splat(prefix) => matchingRegex(raw"^${Regex.quote(prefix)}.*$$")
-        case _             => m.get(key).toRight(formatNoMatch(s"Key '$key' not found")).map(NonEmptyList.one)
-      }
+    def matching(key: String): Either[String, Availability[NonEmptyList[A]]] =
+      key match
+        case regex(pat)    =>
+          matchingRegex(pat)
+        case splat(prefix) =>
+          matchingRegex(raw"^${Regex.quote(prefix)}.*$$")
+        case _             =>
+          m.get(key)
+           .fold(if isObsolete(key) then Obsolete.asRight else formatNoMatch(s"Key '$key' not found").asLeft): v =>
+             NonEmptyList.one(v).current.asRight
 
-    Parser.repUntil(char, comma).string.flatMap { s =>
+    Parser.repUntil(char, comma).string.flatMap: s =>
       matching(s.trim).fold(
-        msg => Parser.failWith[NonEmptyList[A]](msg),
-        as  => Parser.pure(as)
+        msg => Parser.failWith[Availability[NonEmptyList[A]]](msg),
+        a   => Parser.pure(a)
       )
-    }
-  }
 
   def manyOfOption[A](noneValue: String, kv: (String, A)*): Parser[NonEmptyList[Option[A]]] =
     manyOf(optionKv(noneValue, kv)*)
+
+  def manyOfObsoletableOption[A](
+    noneValue: String,
+    isObsolete: Set[String],
+    kv: (String, A)*
+  ): Parser[Availability[NonEmptyList[Option[A]]]] =
+    manyOfObsoletable(isObsolete, optionKv(noneValue, kv)*)
 
   def manyOfEnumerated[A](using e: Enumerated[A]): Parser[NonEmptyList[A]] =
     manyOf(enumeratedKv[A]*)
 
   def manyOfOptionEnumerated[A](noneValue: String)(using e: Enumerated[A]): Parser[NonEmptyList[Option[A]]] =
     manyOf(optionKv(noneValue, enumeratedKv[A])*)
+
+  def manyOfObsoletableOptionEnumerated[A](noneValue: String, isObsolete: Set[String])(using e: Enumerated[A]): Parser[Availability[NonEmptyList[Option[A]]]] =
+    manyOfObsoletableOption(noneValue, isObsolete, enumeratedKv[A]*)
 
   def oneOf[A](kv: (String, A)*): Parser[A] =
     Parser.fromStringMap(ListMap.from(kv))

@@ -36,7 +36,6 @@ import scala.collection.immutable.SortedSet
 sealed trait ExecutionDigestService[F[_]] {
 
   def selectOne(
-    programId:     Program.Id,
     observationId: Observation.Id,
     hash:          Md5Hash
   )(using Transaction[F]): F[Option[ExecutionDigest]]
@@ -64,12 +63,11 @@ object ExecutionDigestService {
     new ExecutionDigestService[F] {
 
       override def selectOne(
-        pid:  Program.Id,
         oid:  Observation.Id,
         hash: Md5Hash
       )(using Transaction[F]): F[Option[ExecutionDigest]] =
         session
-          .option(Statements.SelectOneExecutionDigest)(pid, oid)
+          .option(Statements.SelectOneExecutionDigest)(oid)
           .map(_.collect { case (h, d) if h === hash => d })
 
       override def selectMany(
@@ -119,14 +117,12 @@ object ExecutionDigestService {
           digest.setup.reacquisition,
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
-          digest.acquisition.timeEstimate(ChargeClass.Partner),
           digest.acquisition.timeEstimate(ChargeClass.Program),
           digest.acquisition.offsets.toList,
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
-          digest.science.timeEstimate(ChargeClass.Partner),
           digest.science.timeEstimate(ChargeClass.Program),
           digest.science.offsets.toList,
           digest.science.atomCount,
@@ -136,14 +132,12 @@ object ExecutionDigestService {
           digest.setup.reacquisition,
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
-          digest.acquisition.timeEstimate(ChargeClass.Partner),
           digest.acquisition.timeEstimate(ChargeClass.Program),
           digest.acquisition.offsets.toList,
           digest.acquisition.atomCount,
           digest.acquisition.executionState,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
-          digest.science.timeEstimate(ChargeClass.Partner),
           digest.science.timeEstimate(ChargeClass.Program),
           digest.science.offsets.toList,
           digest.science.atomCount,
@@ -198,29 +192,25 @@ object ExecutionDigestService {
         c_reacq_setup_time,
         c_acq_obs_class,
         c_acq_non_charged_time,
-        c_acq_partner_time,
         c_acq_program_time,
         c_acq_offsets,
         c_acq_atom_count,
         c_acq_execution_state,
         c_sci_obs_class,
         c_sci_non_charged_time,
-        c_sci_partner_time,
         c_sci_program_time,
         c_sci_offsets,
         c_sci_atom_count,
         c_sci_execution_state
       """
 
-    val SelectOneExecutionDigest: Query[(Program.Id, Observation.Id), (Md5Hash, ExecutionDigest)] =
+    val SelectOneExecutionDigest: Query[Observation.Id, (Md5Hash, ExecutionDigest)] =
       sql"""
         SELECT
           c_hash,
           #$DigestColumns
         FROM t_execution_digest
-        WHERE
-          c_program_id     = $program_id     AND
-          c_observation_id = $observation_id
+        WHERE c_observation_id = $observation_id
       """.query(md5_hash *: execution_digest)
 
     val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
@@ -254,12 +244,10 @@ object ExecutionDigestService {
       ObserveClass,
       TimeSpan,
       TimeSpan,
-      TimeSpan,
       List[Offset],
       NonNegInt,
       ExecutionState,
       ObserveClass,
-      TimeSpan,
       TimeSpan,
       TimeSpan,
       List[Offset],
@@ -271,12 +259,10 @@ object ExecutionDigestService {
       ObserveClass,
       TimeSpan,
       TimeSpan,
-      TimeSpan,
       List[Offset],
       NonNegInt,
       ExecutionState,
       ObserveClass,
-      TimeSpan,
       TimeSpan,
       TimeSpan,
       List[Offset],
@@ -292,14 +278,12 @@ object ExecutionDigestService {
           c_reacq_setup_time,
           c_acq_obs_class,
           c_acq_non_charged_time,
-          c_acq_partner_time,
           c_acq_program_time,
           c_acq_offsets,
           c_acq_atom_count,
           c_acq_execution_state,
           c_sci_obs_class,
           c_sci_non_charged_time,
-          c_sci_partner_time,
           c_sci_program_time,
           c_sci_offsets,
           c_sci_atom_count,
@@ -313,12 +297,10 @@ object ExecutionDigestService {
           $obs_class,
           $time_span,
           $time_span,
-          $time_span,
           $offset_array,
           $int4_nonneg,
           $execution_state,
           $obs_class,
-          $time_span,
           $time_span,
           $time_span,
           $offset_array,
@@ -330,14 +312,12 @@ object ExecutionDigestService {
               c_reacq_setup_time     = $time_span,
               c_acq_obs_class        = $obs_class,
               c_acq_non_charged_time = $time_span,
-              c_acq_partner_time     = $time_span,
               c_acq_program_time     = $time_span,
               c_acq_offsets          = $offset_array,
               c_acq_atom_count       = $int4_nonneg,
               c_acq_execution_state  = $execution_state,
               c_sci_obs_class        = $obs_class,
               c_sci_non_charged_time = $time_span,
-              c_sci_partner_time     = $time_span,
               c_sci_program_time     = $time_span,
               c_sci_offsets          = $offset_array,
               c_sci_atom_count       = $int4_nonneg,

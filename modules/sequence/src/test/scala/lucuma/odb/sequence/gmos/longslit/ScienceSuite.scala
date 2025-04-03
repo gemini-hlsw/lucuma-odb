@@ -9,19 +9,17 @@ import cats.data.NonEmptyList
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.math.Offset
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.WavelengthDither
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import munit.Location
 import munit.ScalaCheckSuite
-import org.scalacheck.Prop.*
 
 class ScienceSuite extends ScalaCheckSuite {
 
   private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
-    IntegrationTime(time, NonNegInt.unsafeFrom(exposures), SignalToNoise.Min)
+    IntegrationTime(time, NonNegInt.unsafeFrom(exposures))
 
   import Science.Adjustment
   import Science.Goal

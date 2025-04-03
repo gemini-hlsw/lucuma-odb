@@ -11,7 +11,6 @@ import coulomb.Quantity
 import eu.timepit.refined.types.numeric
 import grackle.Result
 import lucuma.core.enums.*
-import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.model.UnnormalizedSED
 import lucuma.odb.graphql.binding.*
 

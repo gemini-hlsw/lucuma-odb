@@ -101,7 +101,7 @@ class configurationRequests_applicableObservations
       oid1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid)) // oid1 and oid2 are identical
       oid2  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       oid3  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid)) // oid3 is different
-      _     <- updateGratingAs(pi, oid3, GmosNorthGrating.R150_G5306)   // due to this change
+      _     <- updateGratingAs(pi, oid3, GmosNorthGrating.R150_G5308)   // due to this change
       oid4  <- createObservationAs(pi, pid)  // oid4 has no configuration
 
       rid1  <- createConfigurationRequestAs(pi, oid1)

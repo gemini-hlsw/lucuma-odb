@@ -66,8 +66,6 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Codecs.group_id
-import lucuma.odb.util.Codecs.int2_nonneg
 import natchez.Trace
 import skunk.*
 import skunk.exception.PostgresErrorException
@@ -261,20 +259,9 @@ object ObservationService {
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] = {
-        val existenceOff = ObservationPropertiesInput.Edit(
-          Nullable.Absent,
-          Nullable.Absent,
-          None,
-          None,
-          None,
-          Nullable.Absent,
-          Nullable.Absent,
-          None,
-          Nullable.Absent,
-          Some(Existence.Deleted),
-          Nullable.Null,
-          None,
-          Nullable.Absent,
+        val existenceOff = ObservationPropertiesInput.Edit.Empty.copy(
+          existence = Existence.Deleted.some,
+          group     = Nullable.Null
         )
 
         // delete targets, asterisms and observations
@@ -516,7 +503,6 @@ object ObservationService {
               asterismService
                 .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
                 .map(_.as(CloneIds(origOid, newOid)))
-
     }
 
   private object Statements {
@@ -554,7 +540,7 @@ object ObservationService {
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
-          SET.observerNotes
+          SET.observerNotes,
         )
       }
 
@@ -572,7 +558,7 @@ object ObservationService {
       scienceRequirements: Option[ScienceRequirementsInput],
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
-      observerNotes:       Option[NonEmptyString]
+      observerNotes:       Option[NonEmptyString],
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -624,7 +610,7 @@ object ObservationService {
            spectroscopy.flatMap(_.capability.toOption)                              ,
            modeType                                                                 ,
            instrument                                                               ,
-           observerNotes
+           observerNotes                                                            ,
         )
       }
 
@@ -669,7 +655,7 @@ object ObservationService {
       Option[SpectroscopyCapabilities] ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
-      Option[NonEmptyString]
+      Option[NonEmptyString]           ,
     )] =
       sql"""
         INSERT INTO t_observation (

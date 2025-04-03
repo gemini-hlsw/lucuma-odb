@@ -34,7 +34,6 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -69,8 +68,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(3),
-      SignalToNoise.unsafeFromBigDecimalExact(50.0)
+      NonNegInt.unsafeFrom(3)
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
@@ -264,13 +262,13 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           _ <- defineF2(2, 1, expTimeSec = 1, count = 1, tableRow = tableRowArcF2)
 
           // multi steps
-          _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 4)
-          _ <- defineGmosN(6, tableRowFlatGmosN, stepOrder =  9, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 5)
-          _ <- defineGmosN(7, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5303, expTimeSec = 1)
+          _ <- defineGmosN(5, tableRowFlatGmosN, stepOrder = 10, disperser = GmosNorthGrating.R600_G5304, expTimeSec = 4)
+          _ <- defineGmosN(6, tableRowFlatGmosN, stepOrder =  9, disperser = GmosNorthGrating.R600_G5304, expTimeSec = 5)
+          _ <- defineGmosN(7, tableRowArcGmosN, disperser = GmosNorthGrating.R600_G5304, expTimeSec = 1)
 
           // step count
-          _ <- defineGmosN(8, tableRowFlatGmosN, disperser = GmosNorthGrating.B600_G5307, count = 2, expTimeSec = 6)
-          _ <- defineGmosN(9, tableRowArcGmosN, disperser = GmosNorthGrating.B600_G5307, expTimeSec = 1)
+          _ <- defineGmosN(8, tableRowFlatGmosN, disperser = GmosNorthGrating.B480_G5309, count = 2, expTimeSec = 6)
+          _ <- defineGmosN(9, tableRowArcGmosN, disperser = GmosNorthGrating.B480_G5309, expTimeSec = 1)
 
         } yield ()
       }
@@ -567,7 +565,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithModeAs(user, p, List(t),
           """
             gmosNorthLongSlit: {
-              grating: B600_G5303,
+              grating: R600_G5304,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
@@ -679,7 +677,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithModeAs(user, p, List(t),
           """
             gmosNorthLongSlit: {
-              grating: B600_G5307,
+              grating: B480_G5309,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
@@ -790,7 +788,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         o <- createObservationWithModeAs(user, p, List(t),
           """
             gmosNorthLongSlit: {
-              grating: R600_G5304,
+              grating: B1200_G5301,
               filter:  R_PRIME,
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 }
@@ -822,7 +820,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
              }
            """,
         expected = List(
-          "Could not generate a sequence for the observation o-104: missing Smart GCAL mapping: GmosNorth { grating: (R600_G5304, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
+          "Could not generate a sequence for the observation o-104: missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
         ).asLeft
       )
   }

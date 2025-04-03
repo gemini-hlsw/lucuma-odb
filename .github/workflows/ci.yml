@@ -30,6 +30,7 @@ jobs:
         os: [ubuntu-22.04]
         scala: [3]
         java: [temurin@17]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -57,40 +58,43 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
-      - name: Check that workflows are up to date
-        run: sbt -v -J-Xmx6g githubWorkflowCheck
-
-      - name: Check headers and formatting
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
-
-      - name: Check scalafix lints
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' 'scalafixAll --check'
-
-      - name: Test
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
-
-      - name: Check binary compatibility
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' mimaReportBinaryIssues
-
-      - name: Generate API documentation
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' doc
-
       - name: Validate Migrations
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'  && matrix.shard == '1'
         uses: gemini-hlsw/migration-validator-action@main
         with:
           path: modules/service/src/main/resources/db/migration/
 
       - name: Validate GraphQL schema changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.shard == '1'
         uses: kamilkisiela/graphql-inspector@master
         with:
           schema: 'main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql'
           approve-label: expected-breaking-change
+
+      - name: Check that workflows are up to date
+        run: sbt -v -J-Xmx6g githubWorkflowCheck
+
+      - name: Check headers and formatting
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
+
+      - name: Check scalafix lints
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' 'scalafixAll --check'
+
+      - name: Test
+        env:
+          TEST_SHARD_COUNT: 8
+          TEST_SHARD: ${{ matrix.shard }}
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
+
+      - name: Check binary compatibility
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' mimaReportBinaryIssues
+
+      - name: Generate API documentation
+        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04' && matrix.shard == '0'
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' doc
 
       - name: Aggregate coverage reports
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' coverageReport coverageAggregate

@@ -46,7 +46,6 @@ object TimeCharge {
    */
   case class Discount(
     interval: TimestampInterval,
-    partner:  TimeSpan,
     program:  TimeSpan,
     comment:  String
   )
@@ -54,7 +53,7 @@ object TimeCharge {
   object Discount {
 
     given Eq[Discount] =
-      Eq.by { a => (a.interval, a.partner, a.program, a.comment) }
+      Eq.by { a => (a.interval, a.program, a.comment) }
 
   }
 

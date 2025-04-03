@@ -428,7 +428,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
-        "observeClass" : "PARTNER_CAL",
+        "observeClass" : "NIGHT_CAL",
         "breakpoint": "DISABLED"
       }
     """
@@ -443,7 +443,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "arcs" : []
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
-        "observeClass" : "PARTNER_CAL",
+        "observeClass" : "NIGHT_CAL",
         "breakpoint": "DISABLED"
       }
     """

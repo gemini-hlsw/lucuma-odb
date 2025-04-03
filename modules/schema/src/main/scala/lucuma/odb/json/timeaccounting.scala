@@ -158,16 +158,14 @@ trait TimeAccountingCodec {
     Decoder.instance { c =>
       for {
         p <- c.downField("program").as[TimeSpan]
-        r <- c.downField("partner").as[TimeSpan]
         n <- c.downField("nonCharged").as[TimeSpan]
-      } yield CategorizedTime(ChargeClass.Program -> p, ChargeClass.Partner -> r, ChargeClass.NonCharged -> n)
+      } yield CategorizedTime(ChargeClass.Program -> p, ChargeClass.NonCharged -> n)
     }
 
   given (using Encoder[TimeSpan]): Encoder[CategorizedTime] =
     Encoder.instance { (a: CategorizedTime) =>
       Json.obj(
         "program"    -> a(ChargeClass.Program).asJson,
-        "partner"    -> a(ChargeClass.Partner).asJson,
         "nonCharged" -> a(ChargeClass.NonCharged).asJson,
         "total"      -> a.sum.asJson
       )

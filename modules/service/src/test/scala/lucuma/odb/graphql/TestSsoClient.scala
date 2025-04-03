@@ -14,8 +14,6 @@ import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.codec.user.*
 import lucuma.sso.client.util.JwtDecoder
 import org.http4s.*
-import org.http4s.Credentials
-import org.http4s.Request
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import pdi.jwt.Jwt
@@ -28,19 +26,19 @@ import java.time.Instant
 import scala.concurrent.duration.*
 
 trait TestSsoClient:
-  import TestSsoClient.* 
+  import TestSsoClient.*
 
   export TestSsoClient.{ authorizationHeader, authorizationObject }
 
   def validUsers: List[User]
 
   // User by attachments tests
-  val invalidAuthHeader = 
+  val invalidAuthHeader =
     Authorization(Credentials.Token(AuthScheme.Bearer, "***"))
 
   def ssoClient: SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User]:
-      def find(req: Request[IO]): IO[Option[User]] = 
+      def find(req: Request[IO]): IO[Option[User]] =
         OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
       def get(authorization: Authorization): IO[Option[User]] =
         authorization match
@@ -52,7 +50,7 @@ trait TestSsoClient:
                 case Left(t) => IO.raiseError(t)
                 case Right(u) => validUsers.find(_ === u).pure[IO]
           case _ => none.pure[IO]
-  
+
 private object TestSsoClient:
 
   private val keyGen     = KeyPairGenerator.getInstance("RSA", "SunRsaSign")

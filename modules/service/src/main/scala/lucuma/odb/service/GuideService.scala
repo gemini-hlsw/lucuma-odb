@@ -21,9 +21,6 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
-import lucuma.ags.AgsPosition
-import lucuma.ags.GuideStarCandidate
-import lucuma.ags.GuideStarName
 import lucuma.catalog.votable.*
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
@@ -107,15 +104,15 @@ trait GuideService[F[_]] {
   def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F]
   ): F[Result[List[AvailabilityPeriod]]]
-  
+
   // def setGuideTargetName(input: SetGuideTargetNameInput)(
   //   using NoTransaction[F]): F[Result[Observation.Id]]
-            
+
   def setGuideTargetName(
     checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]
   )(using NoTransaction[F]): F[Result[Observation.Id]]
 
-  def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using 
+  def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F]
   ): F[Result[Option[NonEmptyString]]]
 }
@@ -199,20 +196,23 @@ object GuideService {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
 
-    def validGuideStarName(generatorHash:Md5Hash, remainingTime: TimeSpan): Option[GuideStarName] =
+    def obsDuration: Result[TimeSpan] =
+      optObsDuration.toResult(generalError(s"Observation duration not set for observation $id.").asProblem)
+
+    def validGuideStarName(generatorHash:Md5Hash): Option[GuideStarName] =
       (guideStarName, guideStarHash).flatMapN { (name, hash) =>
-        val newHash = newGuideStarHash(generatorHash, remainingTime)
+        val newHash = newGuideStarHash(generatorHash)
         if (hash === newHash) guideStarName
         else none
        }
-    
+
     private val AllAngles =
       NonEmptyList.fromListUnsafe(
         (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
       )
 
     val availabilityAngles: NonEmptyList[Angle] =
-      posAngleConstraint match 
+      posAngleConstraint match
         case PosAngleConstraint.Fixed(a)               => NonEmptyList.of(a)
         case PosAngleConstraint.AllowFlip(a)           => NonEmptyList.of(a, a.flip)
         case PosAngleConstraint.ParallacticOverride(a) => NonEmptyList.of(a)
@@ -238,7 +238,7 @@ object GuideService {
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
 
-    def newGuideStarHash(generatorHash:Md5Hash, duration: TimeSpan): Md5Hash = {
+    def newGuideStarHash(generatorHash:Md5Hash): Md5Hash = {
       val md5 = MessageDigest.getInstance("MD5")
 
       md5.update(generatorHash.toByteArray)
@@ -249,14 +249,14 @@ object GuideService {
       given Encoder[PosAngleConstraint] = deriveEncoder
       given HashBytes[PosAngleConstraint] = HashBytes.forJsonEncoder
       md5.update(posAngleConstraint.hashBytes)
-    
+
       given Encoder[Coordinates] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
 
-      // changing time or duration doesn't necessarily invalidate the guide star, but 
+      // changing time or duration doesn't necessarily invalidate the guide star, but
       // we're not tracking what the "original" values are, so we can't say for sure...
       md5.update(optObsTime.hashBytes)
-      md5.update(duration.hashBytes)
+      md5.update(optObsDuration.hashBytes)
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
@@ -268,13 +268,22 @@ object GuideService {
     hash:   Md5Hash
   ) {
     val timeEstimate                         = digest.fullTimeEstimate.sum
+    val setupTime                            = digest.setup.full
     val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
-      case mode: gmos.longslit.Config.GmosSouth => 
+      case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
 
+    def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
+    def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
+      if (obsDuration > timeEstimate)
+        generalError(s"Observation duration of ${obsDuration.format} exceeds the remaining time of ${timeEstimate.format} for observation $obsId.").asFailure
+      else
+        (obsDuration.subtract(setupTime))
+          .filter(_.nonZero)
+          .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
   def instantiate[F[_]: Concurrent: Trace](
@@ -359,7 +368,7 @@ object GuideService {
         oid: Observation.Id,
         guideStarName: Option[GuideStarName],
         guideStarHash: Option[Md5Hash]
-      ): F[Result[Observation.Id]] = 
+      ): F[Result[Observation.Id]] =
         val af = Statements.updateGuideTargetName(user, pid, oid, guideStarName, guideStarHash)
         session
           .prepareR(af.fragment.query(observation_id))
@@ -372,14 +381,14 @@ object GuideService {
         getAvailabilityHash(pid, oid).flatMap(oldHash =>
           if (oldHash.exists(_ === newHash))
             getAvailabilityPeriods(pid, oid)
-              .map(l => 
+              .map(l =>
                 // If for some reason the cache is invalid, we'll just ignore it
                 ContiguousTimestampMap.fromList(l.map(ap => (ap.period, ap.posAngles)))
                   .getOrElse(ContiguousTimestampMap.empty[List[Angle]])
               )
           else ContiguousTimestampMap.empty[List[Angle]].pure[F]
         )
-      
+
       def cacheAvailability(
         pid:          Program.Id,
         oid:          Observation.Id,
@@ -475,11 +484,11 @@ object GuideService {
         } yield nel).value
 
       def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
-        ResultT.fromResult(guideStarIdFromName(name)).flatMap { id => 
+        ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
           given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
           val request = Request[F](Method.GET, CatalogSearch.gaiaSearchUriById(id),
                                   headers = Headers(("x-requested-with", "XMLHttpRequest"))
-          ) 
+          )
           ResultT(
             httpClient
               .stream(request)
@@ -528,7 +537,7 @@ object GuideService {
       extension (usable: AgsAnalysis.Usable)
         def toGuideEnvironment: GuideEnvironment =
           val target = GuideStarCandidate.siderealTarget.reverseGet(usable.target)
-          GuideEnvironment(usable.vignetting.head._1, List(GuideTarget(usable.guideProbe, target)))
+          GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
         pid: Program.Id,
@@ -570,8 +579,7 @@ object GuideService {
                        candidates
           )
           .sortUsablePositions
-          .collect { case usable: AgsAnalysis.Usable => usable }
-      
+
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
         wavelength:    Wavelength,
@@ -591,7 +599,6 @@ object GuideService {
                        candidates.toList
           )
           .sortUsablePositions
-          .collect { case usable: AgsAnalysis.Usable => usable }
           .headOption
 
       def buildAvailabilityAndCache(
@@ -602,7 +609,7 @@ object GuideService {
         genInfo:         GeneratorInfo,
         currentAvail:    ContiguousTimestampMap[List[Angle]],
         newHash:         Md5Hash
-      ): F[Result[ContiguousTimestampMap[List[Angle]]]] = 
+      ): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         (for {
           asterism     <- ResultT(getAsterism(pid, obsInfo.id))
           tracking      = ObjectTracking.fromAsterism(asterism)
@@ -612,7 +619,7 @@ object GuideService {
                           )
           positions     = getPositions(obsInfo.availabilityAngles, genInfo.offsets)
           neededLists  <- ResultT.fromResult(
-                            neededPeriods.traverse(p => 
+                            neededPeriods.traverse(p =>
                               buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, asterism, tracking, candidates, positions)
                             )
                           )
@@ -640,7 +647,7 @@ object GuideService {
           eap match
                       case Left(error)                      => error.asLeft
                       case Right(ap) if ap.period.end < period.end => go(ap.period.end, accum.unsafeAdd(ap.period, ap.posAngles))
-                      case Right(ap)                        => 
+                      case Right(ap)                        =>
                         val newPeriod = TimestampInterval.between(ap.period.start, period.end)
                         accum.unsafeAdd(newPeriod, ap.posAngles).asRight
         }
@@ -722,7 +729,7 @@ object GuideService {
           .collect { case u: AgsAnalysis.Usable => u }
           .scan(SortedMap.empty[Angle, Timestamp]){ (map, usable) =>
             val invalidDate = usable.target.tracking.invalidDate(start)
-            val angle       = usable.vignetting.head._1
+            val angle       = usable.posAngle
             // Always keep the oldest invalidation date for each angle
             map.updatedWith(angle)(_.fold(invalidDate)(_.max(invalidDate)).some)
           }
@@ -735,7 +742,7 @@ object GuideService {
           .getOrElse(SortedMap.empty)
       }
 
-      def guideStarIdFromName(name: GuideStarName): Result[Long] = 
+      def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
       override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
@@ -754,17 +761,19 @@ object GuideService {
         obsInfo: ObservationInfo,
         genInfo: GeneratorInfo,
         obsTime: Timestamp,
-        duration: TimeSpan
-      ): F[Result[GuideEnvironment]] = 
-        // If we got here, we either have the name but need to get all the details (they queried for more 
-        // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and 
+        obsDuration: TimeSpan,
+        scienceTime: Timestamp,
+        scienceDuration: TimeSpan
+      ): F[Result[GuideEnvironment]] =
+        // If we got here, we either have the name but need to get all the details (they queried for more
+        // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
         // select the best.
         (for {
           asterism      <- ResultT(getAsterism(pid, oid))
           baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
           visitEnd      <- ResultT.fromResult(
                              obsTime
-                               .plusMicrosOption(duration.toMicroseconds)
+                               .plusMicrosOption(obsDuration.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
           candidates    <- ResultT(
@@ -791,7 +800,7 @@ object GuideService {
                            )
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
-                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, genInfo.timeEstimate.toDuration)
+                              .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
@@ -807,31 +816,32 @@ object GuideService {
                              )
                            )
         } yield env).value
-      
+
       override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(
         using NoTransaction[F]
-      ): F[Result[GuideEnvironment]] = 
+      ): F[Result[GuideEnvironment]] =
         Trace[F].span("getGuideEnvironment"):
           (for {
-            obsInfo       <- ResultT(getObservationInfo(oid))
-            obsTime       <- ResultT.fromResult(obsInfo.obsTime)
-            asterism      <- ResultT(getAsterism(pid, oid))
-            genInfo       <- ResultT(getGeneratorInfo(pid, oid))
-            duration       = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
-            oGSName        = obsInfo.validGuideStarName(genInfo.hash, duration)
-            result        <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, duration))
+            obsInfo         <- ResultT(getObservationInfo(oid))
+            obsTime         <- ResultT.fromResult(obsInfo.obsTime)
+            obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
+            asterism        <- ResultT(getAsterism(pid, oid))
+            genInfo         <- ResultT(getGeneratorInfo(pid, oid))
+            scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
+            scienceStart     = genInfo.getScienceStartTime(obsTime)
+            oGSName          = obsInfo.validGuideStarName(genInfo.hash)
+            result          <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
         using NoTransaction[F]
-      ): F[Result[Option[NonEmptyString]]] = 
+      ): F[Result[Option[NonEmptyString]]] =
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
           genInfo    <- ResultT.liftF(getGeneratorInfo(pid, oid)).map(_.toOption)
           oGSName    <- ResultT.pure(
-                          genInfo.flatMap{ gi => 
-                            val duration = obsInfo.optObsDuration.getOrElse(gi.timeEstimate)
-                            obsInfo.validGuideStarName(gi.hash, duration)
+                          genInfo.flatMap{ gi =>
+                            obsInfo.validGuideStarName(gi.hash)
                           }
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
@@ -892,7 +902,7 @@ object GuideService {
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
             missingPeriods = currentAvail.findMissingIntervals(period)
             // only happens if we have disjoint periods too far apart. If so, we'll just replace the existing
-            (neededPeriods, startAvail) = if (missingPeriods.exists(_.boundedTimeSpan > maxAvailabilityPeriod)) 
+            (neededPeriods, startAvail) = if (missingPeriods.exists(_.boundedTimeSpan > maxAvailabilityPeriod))
                               (NonEmptyList.of(period).some, ContiguousTimestampMap.empty[List[Angle]])
                             else (NonEmptyList.fromList(missingPeriods), currentAvail)
             // if we don't need anything, then we already have what we need
@@ -909,14 +919,13 @@ object GuideService {
                         GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
                       )
             genInfo  <- ResultT(getGeneratorInfo(obsInfo.programId, obsInfo.id))
-            duration  = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
-            hash      = obsInfo.newGuideStarHash(genInfo.hash, duration)
+            hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
           } yield result).value
         }
 
       override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(
-        using NoTransaction[F]): F[Result[Observation.Id]] = 
+        using NoTransaction[F]): F[Result[Observation.Id]] =
           Trace[F].span("setGuideTargetName"):
             checked.foldWithId(
               OdbError.InvalidArgument().asFailureF
@@ -958,7 +967,7 @@ object GuideService {
         where c_observation_id = $observation_id
       """.apply(oid)
 
-    def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment = 
+    def getGuideAvailabilityHash(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
         select c_hash
         from t_guide_availability
@@ -971,7 +980,7 @@ object GuideService {
       pid: Program.Id,
       oid: Observation.Id,
       hash: Md5Hash
-    ): AppliedFragment = 
+    ): AppliedFragment =
       sql"""
         insert into t_guide_availability (
           c_program_id,
@@ -982,13 +991,13 @@ object GuideService {
           $program_id,
           $observation_id,
           $md5_hash
-      """.apply(pid, oid, hash) |+| 
+      """.apply(pid, oid, hash) |+|
       whereUserWriteAccess(user, pid) |+|
       sql"""
         on conflict on constraint t_guide_availability_pkey do update
           set c_hash = $md5_hash
       """.apply(hash)
-    
+
     def getAvailabilityPeriods(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
         select
@@ -999,12 +1008,12 @@ object GuideService {
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
       """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
-    
+
     def insertManyAvailabilityPeriods(
       user: User,
       pid: Program.Id,
       oid: Observation.Id,
-      periods: List[AvailabilityPeriod]): AppliedFragment = 
+      periods: List[AvailabilityPeriod]): AppliedFragment =
       sql"""
         insert into t_guide_availability_period (
           c_program_id,

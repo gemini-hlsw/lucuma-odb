@@ -35,7 +35,6 @@ import lucuma.core.math.units.Pixels
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
-import lucuma.core.syntax.all.*
 import lucuma.core.util.Enumerated
 import monocle.Lens
 
@@ -400,13 +399,10 @@ object Config {
     defaultWavelengthDithers(grating match
       case GmosNorthGrating.B1200_G5301 |
            GmosNorthGrating.R831_G5302  |
-           GmosNorthGrating.B600_G5303  |
-           GmosNorthGrating.B600_G5307  |
            GmosNorthGrating.R600_G5304  |
            GmosNorthGrating.B480_G5309  => 5
       case GmosNorthGrating.R400_G5305  => 8
-      case GmosNorthGrating.R150_G5306  |
-           GmosNorthGrating.R150_G5308  => 20
+      case GmosNorthGrating.R150_G5308  => 20
     )
 
   // ShortCut 3374

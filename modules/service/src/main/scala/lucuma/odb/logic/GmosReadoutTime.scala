@@ -138,9 +138,9 @@ object GmosReadoutTime {
     def validate(m: GmosReadoutTime): F[Unit] =
       (
         for {
-          d <- GmosNorthDetector.all.map(_.asLeft[GmosSouthDetector]) ++ GmosSouthDetector.all.map(_.asRight[GmosNorthDetector])
-          x <- GmosXBinning.all
-          y <- GmosYBinning.all
+          d <- GmosNorthDetector.all.map(_.asLeft[GmosSouthDetector]) ++ GmosSouthDetector.values.map(_.asRight[GmosNorthDetector])
+          x <- GmosXBinning.values
+          y <- GmosYBinning.values
           c <- d.fold(_.ampCounts.toNonEmptyList.toList, _.ampCounts.toNonEmptyList.toList)
           g <- GmosAmpGain.all
           o <- GmosAmpReadMode.all

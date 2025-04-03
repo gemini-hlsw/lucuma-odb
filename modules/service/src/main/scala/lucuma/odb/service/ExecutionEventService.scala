@@ -28,6 +28,11 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.AddAtomEventInput
+import lucuma.odb.graphql.input.AddDatasetEventInput
+import lucuma.odb.graphql.input.AddSequenceEventInput
+import lucuma.odb.graphql.input.AddSlewEventInput
+import lucuma.odb.graphql.input.AddStepEventInput
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -49,28 +54,23 @@ trait ExecutionEventService[F[_]] {
   )(using Transaction[F]): F[Option[TimestampInterval]]
 
   def insertAtomEvent(
-    atomId:    Atom.Id,
-    atomStage: AtomStage
+    input: AddAtomEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertDatasetEvent(
-    datasetId:    Dataset.Id,
-    datasetStage: DatasetStage
+    input: AddDatasetEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertSequenceEvent(
-    visitId: Visit.Id,
-    command: SequenceCommand
+    input: AddSequenceEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertSlewEvent(
-    visitId:   Visit.Id,
-    slewStage: SlewStage
+    input: AddSlewEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
   def insertStepEvent(
-    stepId:    Step.Id,
-    stepStage: StepStage
+    input: AddStepEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
 
 }
@@ -95,146 +95,120 @@ object ExecutionEventService {
       )(using Transaction[F]): F[Option[TimestampInterval]] =
         session.unique(Statements.SelectVisitRange)(visitId)
 
-      def insertAtomEvent(
-        atomId:    Atom.Id,
-        atomStage: AtomStage
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+      override def insertAtomEvent(
+        input: AddAtomEventInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
         def invalidAtom: OdbError.InvalidAtom =
-          OdbError.InvalidAtom(atomId, Some(s"Atom '$atomId' not found"))
+          OdbError.InvalidAtom(input.atomId, Some(s"Atom '${input.atomId}' not found"))
 
         val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id)]] =
           session
-            .option(Statements.InsertAtomEvent)(atomId, atomStage)
+            .option(Statements.InsertAtomEvent)(input.atomId, input.atomStage)
             .map(_.toResult(invalidAtom.asProblem))
-            .recoverWith {
+            .recoverWith:
               case SqlState.ForeignKeyViolation(_) => invalidAtom.asFailureF
-            }
 
-        (for {
+        (for
           e <- ResultT(insert)
           (eid, time, oid, vid) = e
-          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(atomId, atomStage))
-          _ <- ResultT.liftF(services.sequenceService.abandonOngoingAtomsExcept(oid, atomId))
+          _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(input.atomId, input.atomStage))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingAtomsExcept(oid, input.atomId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
-        } yield AtomEvent(eid, time, oid, vid, atomId, atomStage)).value
-      }
+        yield AtomEvent(eid, time, oid, vid, input.atomId, input.atomStage)).value
 
       override def insertDatasetEvent(
-        datasetId:    Dataset.Id,
-        datasetStage: DatasetStage
-      )(using xa: Transaction[F], sa: Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+        input: AddDatasetEventInput
+      )(using xa: Transaction[F], sa: Services.ServiceAccess): F[Result[ExecutionEvent]] =
 
         def invalidDataset: OdbError.InvalidDataset =
-          OdbError.InvalidDataset(datasetId, Some(s"Dataset '${datasetId.show}' not found"))
+          OdbError.InvalidDataset(input.datasetId, Some(s"Dataset '${input.datasetId.show}' not found"))
 
         val insertEvent: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id, Step.Id)]] =
           session
-            .option(Statements.InsertDatasetEvent)(datasetId, datasetStage)
+            .option(Statements.InsertDatasetEvent)(input.datasetId, input.datasetStage)
             .map(_.toResult(invalidDataset.asProblem))
-            .recoverWith {
+            .recoverWith:
               case SqlState.ForeignKeyViolation(_) => invalidDataset.asFailureF
-            }
 
         // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
         // unchanged) if there is an end event but no start or if the end time comes before the
         // start.
-        def setDatasetTime(t: Timestamp): F[Unit] = {
+        def setDatasetTime(t: Timestamp): F[Unit] =
           def setWith(f: (Dataset.Id, Timestamp) => F[Unit]): F[Unit] =
-            for {
+            for
               s <- xa.savepoint
-              _ <- f(datasetId, t).recoverWith {
+              _ <- f(input.datasetId, t).recoverWith:
                 case SqlState.CheckViolation(_) => xa.rollback(s).void
-              }
-            } yield ()
+            yield ()
 
           // StartExpose signals the start of the dataset, EndWrite the end.
-          datasetStage match {
+          input.datasetStage match
             case DatasetStage.StartExpose => setWith(services.datasetService.setStartTime)
             case DatasetStage.EndWrite    => setWith(services.datasetService.setEndTime)
             case _                        => ().pure
-          }
-        }
 
-        (for {
+        (for
           e <- ResultT(insertEvent)
           (eid, time, oid, vid, aid, sid) = e
           _ <- ResultT.liftF(setDatasetTime(time))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
-        } yield DatasetEvent(eid, time, oid, vid, aid, sid, datasetId, datasetStage)).value
-      }
+        yield DatasetEvent(eid, time, oid, vid, aid, sid, input.datasetId, input.datasetStage)).value
+
 
       override def insertSequenceEvent(
-        visitId: Visit.Id,
-        command: SequenceCommand
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+        input: AddSequenceEventInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
 
         def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
+          OdbError.InvalidVisit(input.visitId, Some(s"Visit '${input.visitId}' not found"))
 
         val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
           session
-            .option(Statements.InsertSequenceEvent)(visitId, command)
+            .option(Statements.InsertSequenceEvent)(input.visitId, input.command)
             .map(_.toResult(invalidVisit.asProblem))
-            .recoverWith {
+            .recoverWith:
               case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
-            }
 
-        (for {
+        (for
           e <- ResultT(insert)
           (eid, time, oid) = e
-          _ <- ResultT.liftF(services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(command.isTerminal))
-          _ <- ResultT.liftF(timeAccountingService.update(visitId))
-        } yield SequenceEvent(eid, time, oid, visitId, command)).value
-      }
+          _ <- ResultT.liftF(services.sequenceService.abandonAtomsAndStepsForObservation(oid).whenA(input.command.isTerminal))
+          _ <- ResultT.liftF(timeAccountingService.update(input.visitId))
+        yield SequenceEvent(eid, time, oid, input.visitId, input.command)).value
+
 
       override def insertSlewEvent(
-        visitId:   Visit.Id,
-        slewStage: SlewStage
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
-
-        def invalidVisit: OdbError.InvalidVisit =
-          OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found"))
-
-        val insert: F[Result[(Id, Timestamp, Observation.Id)]] =
-          session
-            .option(Statements.InsertSlewEvent)(visitId, slewStage)
-            .map(_.toResult(invalidVisit.asProblem))
-            .recoverWith {
-              case SqlState.ForeignKeyViolation(_) => invalidVisit.asFailureF
-            }
-
-        (for {
-          e <- ResultT(insert)
-          (eid, time, oid) = e
-          _ <- ResultT.liftF(timeAccountingService.update(visitId))
-        } yield SlewEvent(eid, time, oid, visitId, slewStage)).value
-      }
+        input: AddSlewEventInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
+        (for
+          v <- ResultT(visitService.lookupOrInsert(input.observationId))
+          e <- ResultT.liftF(session.unique(Statements.InsertSlewEvent)(v, input.slewStage))
+          (eid, time) = e
+          _ <- ResultT.liftF(timeAccountingService.update(v))
+        yield SlewEvent(eid, time, input.observationId, v, input.slewStage)).value
 
       override def insertStepEvent(
-        stepId:       Step.Id,
-        stepStage:    StepStage
-      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] = {
+        input: AddStepEventInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]] =
 
         def invalidStep: OdbError.InvalidStep =
-          OdbError.InvalidStep(stepId, Some(s"Step '$stepId' not found"))
+          OdbError.InvalidStep(input.stepId, Some(s"Step '${input.stepId}' not found"))
 
         val insert: F[Result[(Id, Timestamp, Observation.Id, Visit.Id, Atom.Id)]] =
           session
-            .option(Statements.InsertStepEvent)(stepId, stepStage)
+            .option(Statements.InsertStepEvent)(input.stepId, input.stepStage)
             .map(_.toResult(invalidStep.asProblem))
-            .recoverWith {
+            .recoverWith:
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
-            }
 
-        (for {
+        (for
           e <- ResultT(insert)
           (eid, time, oid, vid, aid) = e
           _ <- ResultT.liftF(services.sequenceService.setAtomExecutionState(aid, AtomStage.StartAtom))
-          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(stepId, stepStage, time))
-          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, stepId))
+          _ <- ResultT.liftF(services.sequenceService.setStepExecutionState(input.stepId, input.stepStage, time))
+          _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
-        } yield StepEvent(eid, time, oid, vid, aid, stepId, stepStage)).value
-      }
+        yield StepEvent(eid, time, oid, vid, aid, input.stepId, input.stepStage)).value
 
     }
 
@@ -378,7 +352,7 @@ object ExecutionEventService {
       """.query(execution_event_id *: core_timestamp *: observation_id)
          .contramap((v, s) => (v, s, v))
 
-    val InsertSlewEvent: Query[(Visit.Id, SlewStage), (Id, Timestamp, Observation.Id)] =
+    val InsertSlewEvent: Query[(Visit.Id, SlewStage), (Id, Timestamp)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -401,9 +375,8 @@ object ExecutionEventService {
           v.c_visit_id = $visit_id
         RETURNING
           c_execution_event_id,
-          c_received,
-          c_observation_id
-      """.query(execution_event_id *: core_timestamp *: observation_id)
+          c_received
+      """.query(execution_event_id *: core_timestamp)
          .contramap((v, s) => (v, s, v))
 
     val InsertStepEvent: Query[(Step.Id, StepStage), (Id,  Timestamp, Observation.Id, Visit.Id, Atom.Id)] =

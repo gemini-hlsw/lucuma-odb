@@ -20,17 +20,20 @@ import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
+import lucuma.itc.SignalToNoiseAt
+import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
+import lucuma.itc.TotalSN
+import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.GraphResult
-import lucuma.itc.client.ImagingIntegrationTimeInput
-import lucuma.itc.client.IntegrationTimeResult
+import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyGraphsInput
 import lucuma.itc.client.SpectroscopyGraphsResult
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult
-import lucuma.itc.client.SpectroscopyIntegrationTimeInput
 
 object TestItcClient {
 
@@ -40,7 +43,6 @@ object TestItcClient {
   def withSuccessResult[F[_]: Applicative](
     exposureTime:  TimeSpan,
     exposureCount: Int,
-    signalToNoise: BigDecimal,
     bandOrLine:    Either[Band, Wavelength],
     graphResult:   (NonEmptyList[ItcCcd], NonEmptyList[GraphResult])
   ): ItcClient[F] =
@@ -48,7 +50,6 @@ object TestItcClient {
       IntegrationTime(
         exposureTime,
         NonNegInt.unsafeFrom(exposureCount),
-        SignalToNoise.unsafeFromBigDecimalExact(signalToNoise)
       ),
       bandOrLine,
       graphResult
@@ -62,23 +63,33 @@ object TestItcClient {
     new ItcClient[F] {
 
       override def spectroscopy(
-        input:    SpectroscopyIntegrationTimeInput,
+        input:    SpectroscopyInput,
         useCache: Boolean
-      ): F[IntegrationTimeResult] =
+      ): F[ClientCalculationResult] =
         val resultʹ =
           input.exposureTimeMode match
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
             case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-              IntegrationTime(t, NonNegInt.unsafeFrom(c.value), result.signalToNoise)
+              IntegrationTime(t, NonNegInt.unsafeFrom(c.value))
 
-        IntegrationTimeResult(
+        val snAt = input.exposureTimeMode match
+          case ExposureTimeMode.SignalToNoiseMode(sn, at) =>
+            SignalToNoiseAt(
+              at,
+              SingleSN(sn),
+              TotalSN(sn)
+            ).some
+          case _                                        =>
+            none[SignalToNoiseAt]
+
+        ClientCalculationResult(
           Version,
           AsterismIntegrationTimeOutcomes(
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine).asRight
+                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine, snAt).asRight
                 )
               )
             ).get
@@ -86,16 +97,16 @@ object TestItcClient {
         ).pure[F]
 
       override def imaging(
-        input:    ImagingIntegrationTimeInput,
+        input:    ImagingInput,
         useCache: Boolean
-      ): F[IntegrationTimeResult] =
-        IntegrationTimeResult(
+      ): F[ClientCalculationResult] =
+        ClientCalculationResult(
           Version,
           AsterismIntegrationTimeOutcomes(
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine).asRight
+                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine, None).asRight
                 )
               )
             ).get

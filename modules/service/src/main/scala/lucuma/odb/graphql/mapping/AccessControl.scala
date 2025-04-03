@@ -17,6 +17,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
@@ -45,6 +46,7 @@ import lucuma.odb.graphql.input.UpdateAttachmentsInput
 import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
+import lucuma.odb.graphql.input.UpdateProgramNotesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
@@ -584,5 +586,41 @@ trait AccessControl[F[_]] extends Predicates[F] {
         .flatTraverse: which =>
           Services.asSuperUser:
             Result(AccessControl.unchecked(input.SET, which)).pure[F]
+
+  private def selectForProgramNoteUpdateImpl(
+    includeDeleted: Option[Boolean],
+    WHERE:          Option[Predicate]
+  )(using Services[F], NoTransaction[F]): F[Result[List[ProgramNote.Id]]] =
+    val whereNote: Predicate =
+      and(List(
+        Predicates.programNote.isWritableBy(user),
+        Predicates.programNote.existence.includeDeleted(includeDeleted.getOrElse(false)),
+        WHERE.getOrElse(True)
+      ))
+
+    MappedQuery(
+      Filter(whereNote, Select("id", None, Query.Empty)),
+      Context(QueryType, List("programNotes"), List("programNotes"), List(ProgramNoteType))
+    )
+      .flatMap(_.fragment)
+      .flatTraverse: af =>
+        session.prepareR(af.fragment.query(program_note_id)).use: pq =>
+          pq.stream(af.argument, 1024)
+            .compile
+            .toList
+            .map(Result.success)
+
+
+  def selectForUpdate(
+    input: UpdateProgramNotesInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithIds[ProgramNotePropertiesInput.Edit, ProgramNote.Id]]] =
+    if input.SET.isPrivate.contains(true) && user.role.access < Access.Staff then
+      Result(AccessControl.Checked.Empty).pure
+    else
+      selectForProgramNoteUpdateImpl(input.includeDeleted, input.WHERE)
+        .map(_.map { nids =>
+           Services.asSuperUser:
+             AccessControl.unchecked(input.SET, nids, program_note_id)
+        })
 
 }

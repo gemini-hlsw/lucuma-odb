@@ -10,11 +10,12 @@ import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.json.wavelength.transport.given
 
 class itc extends OdbSuite with ObservingModeSetupOperations {
 
@@ -58,7 +59,13 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   seconds
                 }
                 exposureCount
-                signalToNoise
+                signalToNoiseAt {
+                  wavelength {
+                    picometers
+                  }
+                  single
+                  total
+                }
               }
               all {
                 targetId
@@ -71,7 +78,13 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   seconds
                 }
                 exposureCount
-                signalToNoise
+                signalToNoiseAt {
+                  wavelength {
+                    picometers
+                  }
+                  single
+                  total
+                }
               }
               all {
                 targetId
@@ -82,8 +95,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
-    
-  def successfulItcResult(oid: Observation.Id, tid: Target.Id): Json = 
+
+  def successfulItcResult(oid: Observation.Id, tid: Target.Id): Json =
     json"""
       {
         "observation": {
@@ -96,7 +109,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   "seconds": 10.000000
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
-                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+                "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(500).get).asJson}
               },
               "all": [
                 {
@@ -111,7 +124,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   "seconds": 10.000000
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
-                "signalToNoise": ${FakeItcResult.signalToNoise.toBigDecimal}
+                "signalToNoiseAt": null
               },
               "all": [
                 {

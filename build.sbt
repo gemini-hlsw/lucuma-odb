@@ -16,11 +16,10 @@ val http4sJdkHttpClientVersion = "0.9.2"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.17"
 val log4catsVersion            = "2.7.0"
-val lucumaCatalogVersion       = "0.49.2"
-val lucumaItcVersion           = "0.27.0"
-val lucumaCoreVersion          = "0.116.4"
+val lucumaItcVersion           = "0.32.1"
+val lucumaCoreVersion          = "0.120.0"
 val lucumaGraphQLRoutesVersion = "0.8.17"
-val lucumaSsoVersion           = "0.8.3"
+val lucumaSsoVersion           = "0.8.7"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -32,32 +31,46 @@ val pprintVersion              = "0.9.0"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.18"
-ThisBuild / scalaVersion       := "3.6.3"
-ThisBuild / crossScalaVersions := Seq("3.6.3")
+ThisBuild / tlBaseVersion      := "0.19"
+ThisBuild / scalaVersion       := "3.6.4"
+ThisBuild / crossScalaVersions := Seq("3.6.4")
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
-ThisBuild / githubWorkflowBuild +=
+ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-    cond = Some("github.event_name == 'pull_request'")
+    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
   )
 
-ThisBuild / githubWorkflowBuild +=
+ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
     name = Some("Validate GraphQL schema changes"),
-    params = Map("schema"           -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-                 "approve-label"    -> "expected-breaking-change"
-    ),
-    cond = Some("github.event_name == 'pull_request'")
+    params =
+      Map("schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+          "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
+
+val nTestJobShards = 8
+
+ThisBuild / githubWorkflowBuildMatrixAdditions += (
+  "shard" -> ((0 to (nTestJobShards - 1)).map(_.toString).toList)
+)
+ThisBuild / githubWorkflowBuild ~= (_.map(step =>
+  if (step.name.contains("Test"))
+    step.withEnv(
+      Map("TEST_SHARD_COUNT" -> nTestJobShards.toString(), "TEST_SHARD" -> "${{ matrix.shard }}")
+    )
+  else step
+))
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
@@ -124,8 +137,8 @@ lazy val service = project
       "com.monovore"             %% "decline"                            % declineVersion,
       "io.laserdisc"             %% "fs2-aws-s3"                         % fs2AwsVersion,
       "org.typelevel"            %% "grackle-skunk"                      % grackleVersion,
-      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCatalogVersion,
-      "edu.gemini"               %% "lucuma-ags"                         % lucumaCatalogVersion,
+      "edu.gemini"               %% "lucuma-catalog"                     % lucumaCoreVersion,
+      "edu.gemini"               %% "lucuma-ags"                         % lucumaCoreVersion,
       "edu.gemini"               %% "lucuma-graphql-routes"              % lucumaGraphQLRoutesVersion,
       "edu.gemini"               %% "lucuma-sso-backend-client"          % lucumaSsoVersion,
       "is.cir"                   %% "ciris"                              % cirisVersion,
@@ -151,7 +164,7 @@ lazy val service = project
       "org.scalameta"            %% "munit"                              % munitVersion               % Test,
       "org.scalameta"            %% "munit-scalacheck"                   % munitVersion               % Test,
       "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
-      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCatalogVersion       % Test,
+      "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
       "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
       "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
