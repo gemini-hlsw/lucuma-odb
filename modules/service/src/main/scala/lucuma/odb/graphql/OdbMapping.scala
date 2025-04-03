@@ -210,6 +210,7 @@ object OdbMapping {
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
@@ -417,6 +418,7 @@ object OdbMapping {
                 RecordGmosSouthStepResultMapping,
                 RecordGmosSouthVisitResultMapping,
                 RedeemUserInvitationResultMapping,
+                ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 ScienceProgramReferenceMapping,
                 ScienceRequirementsMapping,

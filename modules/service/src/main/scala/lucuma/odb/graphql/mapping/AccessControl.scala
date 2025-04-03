@@ -37,6 +37,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
@@ -494,7 +495,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
           AccessControl.unchecked(input.SET, oid, observation_id)
 
   }
-  
+
+  def selectForUpdate(
+    input: ResetAcquisitionInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
+     requireStaffAccess:
+       observationService
+         .resolveOid(input.observationId, input.observationRef)
+         .nestMap: oid =>
+           Services.asSuperUser:
+             AccessControl.unchecked((), oid, observation_id)
+
   def selectForUpdate(
     input: CreateProgramNoteInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[ProgramNotePropertiesInput.Create, Program.Id]]] =
