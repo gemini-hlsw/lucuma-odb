@@ -6,10 +6,11 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.model.Attachment
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
-import lucuma.odb.graphql.input.AttachmentPropertiesInput.Edit
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -19,22 +20,28 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait AttachmentMetadataService [F[_]] {
+
   def updateAttachments(
-    SET: AttachmentPropertiesInput.Edit,
-    which: AppliedFragment
-  )(using Transaction[F]): F[List[Attachment.Id]]
+    input: AccessControl.Checked[AttachmentPropertiesInput.Edit]
+  )(using Transaction[F]): F[Result[List[Attachment.Id]]]
+
 }
 
 object AttachmentMetadataService {
 
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): AttachmentMetadataService[F] =
     new AttachmentMetadataService[F] {
-      def updateAttachments(SET: Edit, which: AppliedFragment)(using Transaction[F]): F[List[Attachment.Id]] =
-        Statements.updateAttachments(SET, which).fold(Nil.pure[F]) { af =>
-          session.prepareR(af.fragment.query(attachment_id)).use { pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList
-          }
-        }
+
+      override def updateAttachments(
+        input: AccessControl.Checked[AttachmentPropertiesInput.Edit]
+      )(using Transaction[F]): F[Result[List[Attachment.Id]]] =
+        input.fold(Result(Nil).pure[F]): (SET, which) =>
+          Statements.updateAttachments(SET, which).fold(Nil.pure[F]) { af =>
+            session.prepareR(af.fragment.query(attachment_id)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+            }
+          }.map(Result.success)
+
     }
 
   object Statements {

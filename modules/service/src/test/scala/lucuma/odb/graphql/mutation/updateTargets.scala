@@ -11,6 +11,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.User
 import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.service.Services
 
 class updateTargets extends OdbSuite {
 
@@ -129,12 +130,13 @@ class updateTargets extends OdbSuite {
   test("update calibration targets is allowed directly with the id by staff") {
     for {
       pid  <- withServices(service) { s =>
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.Photometric,
-                      Description.unsafeFrom("PHOTO"))(using xa)
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                    s.programService
+                      .insertCalibrationProgram(
+                        ProgramPropertiesInput.Create.Default.some,
+                        CalibrationRole.Photometric,
+                        Description.unsafeFrom("PHOTO"))(using xa)
                 }
               }
       tid  <- createTargetAs(staff, pid)

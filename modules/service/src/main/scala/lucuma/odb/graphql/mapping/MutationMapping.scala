@@ -270,7 +270,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       child
     )
 
-  def programUsersResultSubquery(ids: List[ProgramUser.Id], limit: Option[NonNegInt], child: Query) =
+  def programUsersResultSubquery(ids: List[ProgramUser.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     val pred   = Predicates.programUser.id.in(ids)
     val order  = List(
       OrderSelection[Program.Id](ProgramUserType / "program" / "id"),
@@ -354,15 +354,12 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           ), child)
 
   private lazy val CreateCallForProposals: MutationField =
-    MutationField("createCallForProposals", CreateCallForProposalsInput.Binding) { (input, child) =>
-      services.useTransactionally {
-        requireStaffAccess {
-          callForProposalsService.createCallForProposals(input).nestMap { gid =>
-            Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
-          }
-        }
-      }
-    }
+    MutationField("createCallForProposals", CreateCallForProposalsInput.Binding): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            callForProposalsService.createCallForProposals(checked).nestMap: gid =>
+              Unique(Filter(Predicates.callForProposals.id.eql(gid), child))
 
   private lazy val CreateConfigurationRequest: MutationField =
     MutationField("createConfigurationRequest", CreateConfigurationRequestInput.Binding) { (input, child) =>
@@ -395,8 +392,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CreateProgram =
     MutationField("createProgram", CreateProgramInput.Binding) { (input, child) =>
       services.useTransactionally {
-        programService.insertProgram(input.SET).nestMap: id =>
-          Unique(Filter(Predicates.program.id.eql(id), child))
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            programService.insertProgram(checked).nestMap: id =>
+              Unique(Filter(Predicates.program.id.eql(id), child))
       }
     }
 
@@ -603,11 +602,11 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetAllocations =
     MutationField("setAllocations", SetAllocationsInput.Binding): (input, child) =>
       services.useTransactionally:
-        requireStaffAccess:
-          allocationService.setAllocations(input).map(_ *>
-            allocationResultSubquery(input.programId, child)
-          )
-
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            allocationService.setAllocations(checked).map(_ *>
+              allocationResultSubquery(input.programId, child)
+            )
 
   private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
@@ -631,9 +630,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
       services.useTransactionally:
-        requireStaffAccess:
-          programService.setProgramReference(input).nestMap: (pid, _) =>
-            Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            programService.setProgramReference(checked).nestMap: (pid, _) =>
+              Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
@@ -670,28 +670,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
-    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))) { (input, child) =>
-      services.useTransactionally {
-        requireStaffAccess {
-          val p = and(List(
-            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-            input.WHERE.getOrElse(True)
-          ))
-
-          val idSelect: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(p, Select("id", None, Empty)),
-              Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
-            ).flatMap(_.fragment)
-
-          idSelect.flatTraverse { which =>
+    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
             callForProposalsService
-              .updateCallsForProposals(input.SET, which)
+              .updateCallsForProposals(checked)
               .map(_.flatMap(callForProposalsResultSubquery(_, input.LIMIT, child)))
-          }
-        }
-      }
-    }
 
   private lazy val UpdateConfigurationRequests: MutationField =
     MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
@@ -738,24 +723,14 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateAttachments =
-    MutationField("updateAttachments", UpdateAttachmentsInput.binding(Path.from(AttachmentType))) { (input, child) =>
-      services.useTransactionally {
-        val filterPredicate = and(List(
-          Predicates.attachment.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
-
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(
-            Filter(filterPredicate, Select("id", Empty)),
-            Context(QueryType, List("attachments"), List("attachments"), List(AttachmentType))
-          ).flatMap(_.fragment)
-
-        idSelect.flatTraverse { which =>
-          attachmentMetadataService.updateAttachments(input.SET, which).map(attachmentResultSubquery(_, input.LIMIT, child))
-        }
-      }
-    }
+    MutationField("updateAttachments", UpdateAttachmentsInput.binding(Path.from(AttachmentType))): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            attachmentMetadataService
+              .updateAttachments(checked)
+              .map: r =>
+                r.flatMap(attachmentResultSubquery(_, input.LIMIT, child))
 
   private lazy val UpdateProgramNotes: MutationField =
     MutationField("updateProgramNotes", UpdateProgramNotesInput.binding(Path.from(ProgramNoteType))): (input, child) =>
@@ -845,28 +820,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               )
 
   private lazy val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))) { (input, child) =>
-      services.useTransactionally {
-        // Our predicate for selecting programs to update
-        val filterPredicate = and(List(
-          Predicates.program.isWritableBy(user),
-          Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-          input.WHERE.getOrElse(True)
-        ))
-
-        // An applied fragment that selects all program ids that satisfy `filterPredicate`
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType))).flatMap(_.fragment)
-
-        // Update the specified programs and then return a query for the affected programs.
-        idSelect.flatTraverse { which =>
-          programService.updatePrograms(input.SET, which)
-           .map(
-              _.flatMap(programResultSubquery(_, input.LIMIT, child))
-            )
-        }
-      }
-    }
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>      
+      services.useTransactionally:
+        (for
+          checked <- ResultT(selectForUpdate(input))
+          pids    <- ResultT(programService.updatePrograms(checked))
+          query   <- ResultT.fromResult(programResultSubquery(pids, input.LIMIT, child))
+        yield query).value
 
   private lazy val UpdateProposal =
     MutationField("updateProposal", UpdateProposalInput.Binding) { (input, child) =>
