@@ -17,8 +17,8 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val Justification = col("c_justification", text_nonempty.opt)
 
     object Conditions:
-      val CloudExtinction = col("c_cloud_extinction", cloud_extinction)
-      val ImageQuality = col("c_image_quality", image_quality)
+      val CloudExtinction = col("c_cloud_extinction", cloud_extinction_preset)
+      val ImageQuality = col("c_image_quality", image_quality_preset)
       val SkyBackground = col("c_sky_background", sky_background)
       val WaterVapor = col("c_water_vapor", water_vapor)
 

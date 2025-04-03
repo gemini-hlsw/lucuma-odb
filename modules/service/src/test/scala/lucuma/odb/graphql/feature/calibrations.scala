@@ -16,7 +16,6 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.ObservationWorkflowState
@@ -27,6 +26,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -161,7 +161,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Eq, Decoder
-  case class CalibCE(cloudExtinction: CloudExtinction) derives Decoder
+  case class CalibCE(cloudExtinction: CloudExtinction.Preset) derives Decoder
   case class ScienceRequirements(spectroscopy: ExposureTimeMode) derives Decoder
   case class ExposureTimeMode(exposureTimeMode: SignalToNoise) derives Decoder
   case class SignalToNoise(signalToNoise: At) derives Decoder
@@ -412,7 +412,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       val oids = gr1.collect { case Right(oid) => oid }
       val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.ThreePointZero)), _) => true
+        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.ThreePointZero)), _) => true
         case _                       => false
       }
       // calibs belong to the calib group
@@ -442,7 +442,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       val oids = gr1.collect { case Right(oid) => oid }
       val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.PointThree)), _) => true
+        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.PointThree)), _) => true
         case _                       => false
       }
       // calibs belong to the calib group

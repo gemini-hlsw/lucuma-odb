@@ -7,18 +7,18 @@ package input
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
-import lucuma.core.enums.CloudExtinction
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
+import lucuma.core.model.ImageQuality
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
 
 final case class ConstraintSetInput(
-  cloudExtinction: Option[CloudExtinction],
-  imageQuality:    Option[ImageQuality],
+  cloudExtinction: Option[CloudExtinction.Preset],
+  imageQuality:    Option[ImageQuality.Preset],
   skyBackground:   Option[SkyBackground],
   waterVapor:      Option[WaterVapor],
   elevationRange:  Option[ElevationRangeInput]
@@ -42,8 +42,8 @@ object ConstraintSetInput {
 
   val NominalConstraints: ConstraintSet =
     ConstraintSet(
-      cloudExtinction = CloudExtinction.PointThree,
-      imageQuality    = ImageQuality.PointEight,
+      cloudExtinction = CloudExtinction.Preset.PointThree,
+      imageQuality    = ImageQuality.Preset.PointEight,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
       elevationRange  = ElevationRange.AirMass.Default
@@ -51,15 +51,15 @@ object ConstraintSetInput {
 
   val CalibrationConstraints: ConstraintSet =
     ConstraintSet(
-      cloudExtinction = CloudExtinction.ThreePointZero,
-      imageQuality    = ImageQuality.TwoPointZero,
+      cloudExtinction = CloudExtinction.Preset.ThreePointZero,
+      imageQuality    = ImageQuality.Preset.TwoPointZero,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
       elevationRange  = ElevationRange.AirMass.Default
     )
 
   val SpecPhotoConstraints: ConstraintSet = CalibrationConstraints
-  val TwilightConstraints: ConstraintSet = CalibrationConstraints.copy(cloudExtinction = CloudExtinction.PointThree)
+  val TwilightConstraints: ConstraintSet = CalibrationConstraints.copy(cloudExtinction = CloudExtinction.Preset.PointThree)
 
   val Default: ConstraintSetInput =
     ConstraintSetInput(
@@ -88,11 +88,11 @@ object ConstraintSetInput {
       ElevationRangeInput.Default.some
     )
 
-  val CloudExtinctionBinding: Matcher[CloudExtinction] =
-    enumeratedBinding[CloudExtinction]
+  val CloudExtinctionPresetBinding: Matcher[CloudExtinction.Preset] =
+    enumeratedBinding[CloudExtinction.Preset]
 
-  val ImageQualityBinding: Matcher[ImageQuality] =
-    enumeratedBinding[ImageQuality]
+  val ImageQualityPresetBinding: Matcher[ImageQuality.Preset] =
+    enumeratedBinding[ImageQuality.Preset]
 
   val SkyBackgroundBinding: Matcher[SkyBackground] =
     enumeratedBinding[SkyBackground]
@@ -103,8 +103,8 @@ object ConstraintSetInput {
   val Binding: Matcher[ConstraintSetInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ImageQualityBinding.Option("imageQuality", rImage),
-        CloudExtinctionBinding.Option("cloudExtinction", rCloud),
+        ImageQualityPresetBinding.Option("imageQuality", rImage),
+        CloudExtinctionPresetBinding.Option("cloudExtinction", rCloud),
         SkyBackgroundBinding.Option("skyBackground", rSky),
         WaterVaporBinding.Option("waterVapor", rWater),
         ElevationRangeInput.Binding.Option("elevationRange", rElevation)
