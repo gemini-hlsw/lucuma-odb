@@ -8,8 +8,8 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -64,7 +64,7 @@ class observation_configurationRequests
         }
       """
 
-  private def updateCloudExtinction(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction): IO[Unit] =
+  private def updateCloudExtinction(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction.Preset): IO[Unit] =
     updateObservationAs(user, oid):
       s"""
         constraintSet: {
@@ -159,18 +159,18 @@ class observation_configurationRequests
   test("request should not apply for narrower conditions"):
     for
       oid  <- setup
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive)
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive)
       mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive) // can't ask for better conditions
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // can't ask for better conditions
       _    <- expectRequests(pi, oid, Nil)
     yield ()
 
   test("request should apply for wider conditions"):
     for
       oid  <- setup
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.PointFive)
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
       mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.OnePointFive) // ok to ask for worse conditions
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive) // ok to ask for worse conditions
       _    <- expectRequests(pi, oid, List(mid))
     yield ()
 

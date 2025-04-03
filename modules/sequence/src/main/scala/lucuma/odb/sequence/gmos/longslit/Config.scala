@@ -23,7 +23,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
@@ -32,6 +31,7 @@ import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
@@ -184,7 +184,7 @@ object Config {
 
     def apply(
       sourceProfile:             SourceProfile,
-      imageQuality:              ImageQuality,
+      imageQuality:              ImageQuality.Preset,
       sampling:                  PosDouble,
       grating:                   GmosNorthGrating,
       filter:                    Option[GmosNorthFilter],
@@ -198,7 +198,7 @@ object Config {
       explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
       explicitSpatialOffsets:    Option[List[Q]]                = None
     ): GmosNorth = {
-      val (x, y) = northBinning(fpu, sourceProfile, imageQuality, grating, sampling = sampling)
+      val (x, y) = northBinning(fpu, sourceProfile, imageQuality.toImageQuality, grating, sampling = sampling)
 
       GmosNorth(
         grating,
@@ -285,7 +285,7 @@ object Config {
 
     def apply(
       sourceProfile:             SourceProfile,
-      imageQuality:              ImageQuality,
+      imageQuality:              ImageQuality.Preset,
       sampling:                  PosDouble,
       grating:                   GmosSouthGrating,
       filter:                    Option[GmosSouthFilter],
@@ -299,7 +299,7 @@ object Config {
       explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
       explicitSpatialOffsets:    Option[List[Q]]                = None
     ): GmosSouth = {
-      val (x, y) = southBinning(fpu, sourceProfile, imageQuality, grating, sampling = sampling)
+      val (x, y) = southBinning(fpu, sourceProfile, imageQuality.toImageQuality, grating, sampling = sampling)
 
       GmosSouth(
         grating,

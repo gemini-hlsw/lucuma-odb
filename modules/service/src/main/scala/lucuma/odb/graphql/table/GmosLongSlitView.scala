@@ -30,7 +30,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
 
     val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)
 
-    val ImageQuality: ColumnRef             = col("c_image_quality", image_quality)
+    val ImageQuality: ColumnRef             = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
   }
 

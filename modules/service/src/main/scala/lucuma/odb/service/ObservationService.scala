@@ -16,9 +16,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -32,10 +30,12 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
@@ -633,8 +633,8 @@ object ObservationService {
       Angle                            ,
       Option[RightAscension]           ,
       Option[Declination]              ,
-      CloudExtinction                  ,
-      ImageQuality                     ,
+      CloudExtinction.Preset            ,
+      ImageQuality.Preset               ,
       SkyBackground                    ,
       WaterVapor                       ,
       Option[PosBigDecimal]            ,
@@ -704,8 +704,8 @@ object ObservationService {
           $angle_µas,
           ${right_ascension.opt},
           ${declination.opt},
-          $cloud_extinction,
-          $image_quality,
+          $cloud_extinction_preset,
+          $image_quality_preset,
           $sky_background,
           $water_vapor,
           ${air_mass_range_value.opt},
@@ -788,8 +788,8 @@ object ObservationService {
     }
 
     def constraintSetUpdates(in: ConstraintSetInput): Result[List[AppliedFragment]] = {
-      val upCloud = sql"c_cloud_extinction = $cloud_extinction"
-      val upImage = sql"c_image_quality = $image_quality"
+      val upCloud = sql"c_cloud_extinction = $cloud_extinction_preset"
+      val upImage = sql"c_image_quality = $image_quality_preset"
       val upSky   = sql"c_sky_background = $sky_background"
       val upWater = sql"c_water_vapor = $water_vapor"
 

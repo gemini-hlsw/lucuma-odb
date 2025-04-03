@@ -21,13 +21,13 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
@@ -102,7 +102,7 @@ object GmosLongSlitInput {
        */
       def toObservingMode(
         sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality,
+        imageQuality:  ImageQuality.Preset,
         sampling:      PosDouble
       ): Config.GmosNorth =
         Config.GmosNorth(
@@ -177,7 +177,7 @@ object GmosLongSlitInput {
        */
       def toObservingMode(
         sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality,
+        imageQuality:  ImageQuality.Preset,
         sampling:      PosDouble
       ): Config.GmosSouth =
         Config.GmosSouth(
