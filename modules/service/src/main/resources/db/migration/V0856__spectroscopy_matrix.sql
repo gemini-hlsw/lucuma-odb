@@ -81,7 +81,7 @@ BEGIN
   FROM information_schema.columns
   WHERE table_name = 't_spectroscopy_config_option';
 
-  -- Make the INSERT INTO statement 
+  -- Make the INSERT INTO statement
   insert_sql := 'INSERT INTO t_spectroscopy_config_option (' ||
                   common_columns_sql ||
                 ') SELECT '          ||
