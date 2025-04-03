@@ -2931,6 +2931,15 @@ type Mutation {
   ): RecordGmosSouthVisitResult!
 
   """
+  Resets the acquisition sequence to start from the initial step regardless of
+  which acquisition steps may have been executed.  Requires staff (or better)
+  access.
+  """
+  resetAcquisition(
+    input: ResetAcquisitionInput!
+  ): ResetAcquisitionResult!
+
+  """
   Set the allocations for a program.
   """
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
@@ -4166,6 +4175,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for resetting the acquisition sequence so that it executes
+from the initial step, regardless of which steps may have previously been
+executed.  Select one of `observationId` or `observationReference`.
+"""
+input ResetAcquisitionInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of resetting the acquisition sequence.
+"""
+type ResetAcquisitionResult {
+  """
+  The observation whose acquisition was reset.
+  """
+  observation: Observation!
 }
 
 """

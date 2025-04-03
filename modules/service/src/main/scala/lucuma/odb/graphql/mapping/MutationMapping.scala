@@ -104,6 +104,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordGmosSouthStep,
       RecordGmosSouthVisit,
       RedeemUserInvitation,
+      ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
       SetGuideTargetName,
@@ -343,6 +344,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                   Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
                   Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId)
                 ), child)
+
+  private lazy val ResetAcquisition: MutationField =
+    MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            if checked.isEmpty then
+              OdbError.NotAuthorized(user.id).asFailureF
+            else
+              observationService.resetAcquisition(checked).nestMap: oid =>
+                Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
