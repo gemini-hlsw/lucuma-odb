@@ -1,4 +1,5 @@
 # Build a base image for test containers, with the database already initialized and migrated
+# This file is in modules/service/src because it needs a shared path with `modules/service/src/main/resources/db/migration` so it cannot be put in `modules/service/src/test/resources`
 FROM postgres:15
 
 ARG POSTGRES_USER
