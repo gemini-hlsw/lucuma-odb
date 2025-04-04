@@ -737,7 +737,10 @@ object Science:
     ): F[Either[String, SequenceGenerator[D]]] =
 
       def extractTime: Either[String, IntegrationTime] =
-        time.leftMap(m => s"GMOS Long Slit requires a valid target: ${m.format}")
+        time
+          .leftMap: m =>
+             s"GMOS Long Slit requires a valid target: ${m.format}"
+          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit science requires a positive exposure time.")
 
       // Adjust the config and integration time according to the calibration role.
       val configAndTime = calRole match
