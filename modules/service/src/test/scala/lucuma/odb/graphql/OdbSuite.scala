@@ -146,6 +146,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   override def afterContainersStart(c: GenericContainer): Unit =
     container = c
 
+    /**
+     * Build a single PostgreSQL container for test suites. Runs all migrations and database initialization in the image build.
+     * 
+     * The image is built for the first suite, and the Docker cache will be used for subsequent suites. Skipping the long db initialization.
+     */
   override val containerDef: GenericContainer.Def[GenericContainer] =
     val env = Map(
       "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
@@ -170,7 +175,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
       }: Unit
     }
-
     new GenericContainer.Def(dbContainer) {}
 
   implicit val log: Logger[IO] =
