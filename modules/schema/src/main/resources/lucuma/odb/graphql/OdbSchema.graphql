@@ -1193,7 +1193,7 @@ input ExposureTimeModeInput {
 Time And Count exposure time mode parameters
 """
 input TimeAndCountExposureTimeModeInput {
-  "Exposure time."
+  "Exposure time, which must be greater than zero."
   time: TimeSpanInput!
 
   "Exposure count."

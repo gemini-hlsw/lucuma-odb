@@ -294,3 +294,66 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupport:
           }
         """.asRight
       )
+
+  test("cannot generate time and count sequence with 0 second exposure time"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      _ <- expect(
+        user  = pi,
+        query = s"""
+        mutation {
+         createObservation(input: {
+             programId: ${p.asJson},
+             SET: {
+               constraintSet: {
+                 cloudExtinction: POINT_ONE,
+                 imageQuality: ONE_POINT_ZERO,
+                 skyBackground: DARKEST
+               },
+               targetEnvironment: {
+                 asterism: ${List(t).asJson}
+               },
+               scienceRequirements: {
+                 mode: SPECTROSCOPY,
+                 spectroscopy: {
+                   wavelength: {
+                     nanometers: 500
+                   },
+                   resolution: 100,
+                   exposureTimeMode: {
+                     timeAndCount: {
+                       time: { minutes: 0 },
+                       count: 3,
+                       at: { nanometers: 500 }
+                     }
+                   },
+                   wavelengthCoverage: {
+                     nanometers: 20
+                   },
+                   focalPlane: SINGLE_SLIT,
+                   focalPlaneAngle: {
+                     microarcseconds: 0
+                   }
+                 }
+               },
+               observingMode: {
+                 gmosNorthLongSlit: {
+                   grating: R831_G5302,
+                   fpu: LONG_SLIT_1_00,
+                   centralWavelength: {
+                     nanometers: 500
+                   }
+                 }
+               }
+             }
+           }) {
+             observation { id }
+           }
+         }
+        """,
+        expected = List(
+          "Argument 'input.SET.scienceRequirements.spectroscopy.exposureTimeMode.timeAndCount' is invalid: Exposure `time` parameter must be positive."
+        ).asLeft
+      )
+    yield ()
