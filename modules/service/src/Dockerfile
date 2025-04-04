@@ -16,6 +16,9 @@ ENV PGDATA=/var/lib/postgresql/odb-data
 # Copy migration scripts into the image
 COPY ./main/resources/db/migration/ /docker-entrypoint-initdb.d/
 
+# Remove the Postgres daemon from the entrypoint script to only run the init scripts
 RUN sed -i 's/exec "$@"/echo "skipping..."/' /usr/local/bin/docker-entrypoint.sh && \
+  # Run the init scripts
   /usr/local/bin/docker-entrypoint.sh postgres && \
+  # Put everything back again
   sed -i 's/echo "skipping..."/exec "$@"/' /usr/local/bin/docker-entrypoint.sh
