@@ -111,6 +111,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                     ... on TimeChargeDaylightDiscount {
                       site
                     }
+                    ... on TimeChargeOverlapDiscount {
+                      observation {
+                        id
+                      }
+                    }
                     ... on TimeChargeQaDiscount {
                       datasets {
                         id
@@ -195,13 +200,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
         },
         "comment": ${d.discount.comment}
       }
-    """.withObject { obj =>
-      d match {
+    """.withObject: obj =>
+      d match
         case TimeCharge.DiscountEntry.Daylight(_, s) => obj.add("site",     s.asJson).toJson
         case TimeCharge.DiscountEntry.NoData(_)      => obj.toJson
+        case TimeCharge.DiscountEntry.Overlap(_, o)  => obj.add("observation", Json.obj("id" -> o.asJson)).toJson
         case TimeCharge.DiscountEntry.Qa(_, ds)      => obj.add("datasets", ds.toList.map(id => Json.obj("id" -> id.asJson)).asJson).toJson
-      }
-    }
 
   def invoiceExected(
     invoice:     TimeCharge.Invoice,
@@ -453,6 +457,27 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       s.execute(cmd)((e.received, p, e.observationId, e.visitId, e.atomId, e.stepId, e.datasetId, e.stage))
     }.void
 
+  // For sanity sake, each test will start clean so that visits
+  // are not overlapping.
+  def cleanup: IO[Unit] =
+    withSession: s =>
+      s.execute(sql"DELETE FROM t_execution_event".command).void
+
+  /*
+  def report: IO[String] =
+    withSession: s =>
+      s.execute(
+        sql"""
+          SELECT
+            c_visit_id,
+            c_start,
+            c_end
+          FROM t_visit
+          ORDER BY c_visit_id
+        """.query(visit_id *: core_timestamp.opt *: core_timestamp.opt)
+      ).map(_.toString)
+   */
+
   def insertEvents(
     pid:    Program.Id,
     events: List[ExecutionEvent]
@@ -508,6 +533,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -533,6 +559,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice      = TimeCharge.Invoice(expExecution, List(noDataEntry), CategorizedTime.Zero)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 0, 0, 250)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -584,6 +611,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 2, 1, 1, 300)
       es = events(v)
       _ <- insertEvents(v.pid, es)
@@ -609,6 +637,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, index)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -691,6 +720,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".comment)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 900)
       _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
@@ -704,6 +734,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".comment)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1000)
       _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
@@ -752,6 +783,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -774,6 +806,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
 
     for {
+      _  <- cleanup
       v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1300)
       pid = v0.pid
       oid = v0.oid
@@ -790,6 +823,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
 
   }
+
+
 /*
   test("observation timeCharge, overflow") {
     val t0 =  0.fromNightStart
@@ -857,6 +892,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("program timeCharge, no observations") {
     for {
+      _ <- cleanup
       p <- createProgramAs(pi)
       _ <- expect(pi, programQuery(p), programExpectedCharge(Nil))
     } yield ()
@@ -871,6 +907,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 10.sec)))
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1500)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -892,6 +929,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 20.sec)))
 
     for {
+      _   <- cleanup
       // Obs0
       v0  <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1600)
       pid  = v0.pid
@@ -925,6 +963,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(ScienceBand.Band2.some, CategorizedTime(ChargeClass.Program -> 20.sec)))
 
     for {
+      _    <- cleanup
       pid  <- createProgramAs(pi)
       _    <- setAllocationsAs(service, pid, List(AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, 10.hourTimeSpan)))
 
@@ -971,6 +1010,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     )
 
     for {
+      _    <- cleanup
       pid  <- createProgramAs(pi)
       _    <- setAllocationsAs(service, pid, allocations)
 
@@ -994,4 +1034,5 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
   }
+
 }

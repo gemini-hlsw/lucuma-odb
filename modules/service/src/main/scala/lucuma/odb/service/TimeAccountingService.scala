@@ -6,11 +6,7 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.StateT
 import cats.effect.Concurrent
-import cats.syntax.eq.*
-import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
-import cats.syntax.functor.*
-import cats.syntax.option.*
+import cats.syntax.all.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -175,6 +171,23 @@ object TimeAccountingService {
             }
           }
 
+        private val overlapDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+          StateT: tas =>
+//            (for
+//              v <- visitService.select(visitId)
+//              r <- executionEventService.visitRange(visitId)
+//              o <- session.option(SelectChargeableOverlap)(visitId)
+//            yield o).map:
+            session
+              .option(SelectChargeableOverlap)(visitId)
+              .map:
+                case Some((overlapTime, oid)) =>
+                  val discount = toDiscount(tas.from(overlapTime), TimeAccounting.comment.Overlap).map: d =>
+                     TimeCharge.DiscountEntry.Overlap(d, oid)
+                  (tas.until(overlapTime), discount.toList)
+                case None                     =>
+                  (tas, Nil)
+
         private val qaDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
             datasetService.selectDatasetsWithQaFailures(visitId).map { failures =>
@@ -194,10 +207,11 @@ object TimeAccountingService {
               ini <- StateT.get[F, TimeAccountingState]
               nod <- noDataDiscount
               day <- daylightDiscounts
+              ovr <- overlapDiscounts
               qa  <- qaDiscounts
               // ... other discounts here ...
               fin <- StateT.get[F, TimeAccountingState]
-            } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ qa, fin.charge.corrected(corrections))
+            } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections))
 
           for {
             s <- initialState
@@ -228,6 +242,8 @@ object TimeAccountingService {
 
         // Stores any information specific to particular discount entry types.
         private def storeDiscountDetail(id: Long): TimeCharge.DiscountEntry => F[Unit] = {
+          case TimeCharge.DiscountEntry.Overlap(_, oid) =>
+            session.execute(StoreOverlapDiscountObservation)(id, oid).void
           case TimeCharge.DiscountEntry.Qa(_, datasets) =>
             datasets.toList.traverse_(session.execute(StoreQaDiscountDataset)(id, _))
           case _                                        =>
@@ -359,8 +375,7 @@ object TimeAccountingService {
           COALESCE(MIN(s.c_observe_class), 'science'::e_obs_class)
         FROM
           t_step_record s
-        INNER JOIN t_atom_record a ON
-          a.c_atom_id = s.c_atom_id
+        INNER JOIN t_atom_record a USING (c_atom_id)
         WHERE
           a.c_observation_id = $observation_id
       """.query(obs_class)
@@ -375,12 +390,38 @@ object TimeAccountingService {
           e.c_step_id
         FROM
           t_execution_event e
-        LEFT JOIN t_step_record s ON s.c_step_id = e.c_step_id
+        LEFT JOIN t_step_record s USING (c_step_id)
         WHERE
           e.c_visit_id = $visit_id
         ORDER BY
           e.c_received
       """.query(codec.event)
+
+    val SelectChargeableOverlap: Query[Visit.Id, (Timestamp, Observation.Id)] =
+      sql"""
+        WITH v AS (
+          SELECT
+            c_visit_id,
+            c_site,
+            c_start,
+            c_end
+          FROM t_visit
+          WHERE c_visit_id = $visit_id
+        )
+        SELECT
+          v2.c_start,
+          v2.c_observation_id
+        FROM
+          t_visit v2, v
+        WHERE
+          v2.c_visit_id != v.c_visit_id AND
+          v2.c_site = v.c_site          AND
+          v2.c_chargeable = true        AND
+          v2.c_start > v.c_start        AND
+          v2.c_start < v.c_end
+        ORDER BY v2.c_start
+        LIMIT 1;
+      """.query(core_timestamp *: observation_id)
 
     val DeleteDiscountEntries: Command[Visit.Id] =
       sql"""
@@ -408,6 +449,19 @@ object TimeAccountingService {
         ) RETURNING
           c_id
       """.query(int8)
+
+     val StoreOverlapDiscountObservation: Command[(Long, Observation.Id)] =
+       sql"""
+         INSERT INTO
+           t_time_charge_discount_overlap (
+             c_discount_id,
+             c_observation_id
+           )
+         VALUES (
+           $int8,
+           $observation_id
+         )
+       """.command
 
      val StoreQaDiscountDataset: Command[(Long, Dataset.Id)] =
        sql"""

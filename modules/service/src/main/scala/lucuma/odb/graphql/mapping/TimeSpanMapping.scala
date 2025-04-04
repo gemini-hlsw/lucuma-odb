@@ -48,6 +48,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
       timeSpanMappingAtPath(TimeChargeDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeNoDataDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
+      timeSpanMappingAtPath(TimeChargeOverlapDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeQaDiscountType / "program", TimeChargeDiscountTable.Program)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeInvoiceType / "executionTime" / "nonCharged", VisitTable.Raw.NonChargedTime)(VisitTable.Id),
       timeSpanMappingAtPath(TimeChargeInvoiceType / "executionTime" / "program", VisitTable.Raw.ProgramTime)(VisitTable.Id),
