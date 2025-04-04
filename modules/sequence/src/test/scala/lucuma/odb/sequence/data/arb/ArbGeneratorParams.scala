@@ -40,7 +40,7 @@ trait ArbGeneratorParams:
       im <- arbitrary[ImagingParameters]
       sm <- arbitrary[SpectroscopyParameters]
       s  <- Gen.choose(1, 4)
-      t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput)]).map(NonEmptyList.fromListUnsafe)
+      t  <- Gen.listOfN(s, arbitrary[(Target.Id, TargetInput, Option[Timestamp])]).map(NonEmptyList.fromListUnsafe)
     yield ItcInput(im.copy(mode = mo), sm.copy(mode = mo), t)
 
   val genGmosNorthLongSlit: Gen[GeneratorParams] =

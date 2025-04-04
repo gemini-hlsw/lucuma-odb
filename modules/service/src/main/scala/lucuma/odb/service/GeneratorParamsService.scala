@@ -18,6 +18,7 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
@@ -33,6 +34,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
+import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.GmosFpu
@@ -129,6 +131,8 @@ object GeneratorParamsService {
 
       import lucuma.odb.sequence.gmos
 
+      val customSedIdOptional = SourceProfile.unnormalizedSED.some.andThen(UnnormalizedSED.userDefinedAttachment).andThen(UnnormalizedSED.UserDefinedAttachment.attachmentId)
+
       override def selectOne(
         pid: Program.Id,
         oid: Observation.Id
@@ -158,7 +162,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- observingModeServices.selectObservingMode(oms)
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -195,6 +199,21 @@ object GeneratorParamsService {
         session
           .prepareR(af.fragment.query(Statements.params))
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+          .flatMap(addCustomSedTimestamps)
+
+      // If the user uploads a new custom sed in place of an existing one, that needs to 
+      // invalidate the cache. So, we include the timestamp of the attachment (if any) in
+      // the hash.
+      private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
+        NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
+          .fold(params.pure)(attIds =>
+            attachmentMetadataService.getUpdatedAt(attIds).map(map =>
+              params.map(p =>  
+                val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
+                aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
+              )
+            )
+          )
 
       private def observingMode(
         params: NonEmptyList[TargetParams],
@@ -266,7 +285,7 @@ object GeneratorParamsService {
         .leftMap(MissingParamSet.fromParams)
         .toEither
 
-      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput)] = {
+      private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, (Target.Id, TargetInput, Option[Timestamp])] = {
         // If emission line, SED not required, otherwhise must be defined
         def hasITCRequiredSEDParam(sp: SourceProfile): Boolean =
           SourceProfile.unnormalizedSED.getOption(sp).flatten.isDefined ||
@@ -284,36 +303,40 @@ object GeneratorParamsService {
               .map(_.nonEmpty)
         val validBrightness = brightnesses.orElse(wavelengthLines).getOrElse(false)
         val sed = sourceProf.filter(hasITCRequiredSEDParam)
+        val validCustomSed = sourceProf.flatMap(customSedIdOptional.getOption).isEmpty || targetParams.customSedTimestamp.isDefined
 
         targetParams.targetId.toValidNel(MissingParam.forObservation("target")).andThen: tid =>
           (sourceProf.toValidNel(MissingParam.forTarget(tid, "source profile")),
            sed.toValidNel(MissingParam.forTarget(tid, "SED")),
            Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
-           targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity"))
-          ).mapN: (sp,_, _, rv) =>
-            tid -> TargetInput(sp, rv)
+           targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity")),
+           Validated.condNel(validCustomSed, (), MissingParam.forTarget(tid, "custom SED attachment"))
+          ).mapN: (sp,_, _, rv, _) =>
+            (tid, TargetInput(sp, rv), targetParams.customSedTimestamp)
       }
 
     }
 
   case class ParamsRow(
-    observationId:    Observation.Id,
-    calibrationRole:  Option[CalibrationRole],
-    constraints:      ConstraintSet,
-    exposureTimeMode: Option[ExposureTimeMode],
-    observingMode:    Option[ObservingModeType],
-    scienceBand:      Option[ScienceBand],
-    targetId:         Option[Target.Id],
-    radialVelocity:   Option[RadialVelocity],
-    sourceProfile:    Option[SourceProfile],
-    declaredComplete: Boolean,
-    acqResetTime:     Option[Timestamp]
+    observationId:      Observation.Id,
+    calibrationRole:    Option[CalibrationRole],
+    constraints:        ConstraintSet,
+    exposureTimeMode:   Option[ExposureTimeMode],
+    observingMode:      Option[ObservingModeType],
+    scienceBand:        Option[ScienceBand],
+    targetId:           Option[Target.Id],
+    radialVelocity:     Option[RadialVelocity],
+    sourceProfile:      Option[SourceProfile],
+    declaredComplete:   Boolean,
+    acqResetTime:       Option[Timestamp],
+    customSedTimestamp: Option[Timestamp] = none
   )
 
   case class TargetParams(
-    targetId:        Option[Target.Id],
-    radialVelocity:  Option[RadialVelocity],
-    sourceProfile:   Option[SourceProfile]
+    targetId:           Option[Target.Id],
+    radialVelocity:     Option[RadialVelocity],
+    sourceProfile:      Option[SourceProfile],
+    customSedTimestamp: Option[Timestamp]
   )
 
   case class ObsParams(
@@ -339,7 +362,7 @@ object GeneratorParamsService {
           oParams.head.observingMode,
           oParams.head.scienceBand,
           oParams.map: r =>
-            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile),
+            TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
           oParams.head.declaredComplete,
           oParams.head.acqResetTime
         )
@@ -392,7 +415,8 @@ object GeneratorParamsService {
        source_profile.opt      *:
        bool                    *:
        core_timestamp.opt
-      ).to[ParamsRow]
+      ).map( (oid, role, cs, etm, om, sb, tid, rv, sp, dc, art) =>
+        ParamsRow(oid, role, cs, etm, om, sb, tid, rv, sp, dc, art))
 
     private def ParamColumns(tab: String): String =
       s"""
