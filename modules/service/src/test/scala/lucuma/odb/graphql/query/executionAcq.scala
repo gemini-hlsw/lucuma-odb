@@ -519,4 +519,26 @@ class executionAcq extends ExecutionTestSupport {
       ids.zip(ids.tail).foreach: (before, after) =>
         assertEquals(before.tail, after.toList, s"before: $before, after: $after")
 
+  test("reset can only be done by staff or better"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            resetAcquisition(input: {
+              observationId: "$o"
+            }) {
+              observation { id }
+            }
+          }
+        """,
+        expected = List(
+          s"User ${pi.id} is not authorized to perform this operation."
+        ).asLeft
+      )
+    yield ()
+
 }
