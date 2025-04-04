@@ -23,14 +23,18 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CloneObservationInput
+import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
+import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -50,6 +54,7 @@ import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramNotesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
+import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -469,6 +474,19 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   } 
 
+  def selectForUpdate(
+    input: CreateTargetInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[TargetPropertiesInput.Create, Program.Id]]] = {
+   ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
+      .map:
+        case None => AccessControl.Checked.Empty
+        case Some(pid) =>
+          Services.asSuperUser:
+            AccessControl.unchecked(input.SET, pid, program_id)
+      .value
+
+  } 
+
   def selectForClone(
     input: CloneObservationInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] = {
@@ -633,5 +651,53 @@ trait AccessControl[F[_]] extends Predicates[F] {
            Services.asSuperUser:
              AccessControl.unchecked(input.SET, nids, program_note_id)
         })
+  def selectForUpdate(
+    input: CloneTargetInput
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[CloneTargetInput, Program.Id]]] =
+
+    val editableProgram: ResultT[F, (Target.Id, Program.Id)] =
+      ResultT:
+        MappedQuery(
+          Filter(
+            And(
+              Predicates.target.id.eql(input.targetId),
+              Predicates.target.program.isWritableBy(user)
+            ),
+            Group(List(
+              Select("id", None),
+              Select("program", Select("id", None))
+            ))
+          ),
+          Context(QueryType, List("targets"), List("targets"), List(TargetType))
+        ).flatMap(_.fragment)
+          .flatTraverse: af =>
+            // N.B. the ordering of return columns here is not obvious
+            session.prepareR(af.fragment.query(program_id *: target_id)).use: pq =>
+              pq.option(af.argument).map:
+                case None => OdbError.InvalidTarget(input.targetId).asFailure
+                case Some(pair) => Result(pair.reverse)
+
+    def editableObservations(pid: Program.Id): ResultT[F, List[Observation.Id]] =
+      input.REPLACE_IN.map(_.toList).fold(ResultT.pure(Nil)): oids =>
+        ResultT:
+          selectForObservationUpdateImpl(
+            includeDeleted = None,
+            WHERE = Some(
+              And(
+                Predicates.observation.id.in(oids),
+                Predicates.observation.program.id.eql(pid)
+              )
+            ),
+            includeCalibrations = false,
+            allowedStates = ObservationWorkflowState.preExecutionSet
+          ) 
+
+    editableProgram
+      .flatMap: (tid, pid) =>
+        editableObservations(pid)
+          .map: oids =>
+            Services.asSuperUser:
+              AccessControl.unchecked(CloneTargetInput(tid, input.SET, NonEmptyList.fromList(oids)), pid, program_id)
+      .value
 
 }

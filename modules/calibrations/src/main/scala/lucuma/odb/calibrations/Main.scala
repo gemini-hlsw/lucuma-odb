@@ -15,6 +15,7 @@ import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.concurrent.Topic
 import fs2.io.net.Network
+import grackle.Result
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.odb.Config
@@ -142,20 +143,23 @@ object CMain extends MainParams {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
       _  <- Resource.eval(obsTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally{
-                for {
-                  t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                  _ <- calibrationsService
-                        .recalculateCalibrations(
-                          elem.programId,
-                          LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
-                        )
-                } yield ()
+                requireServiceAccess:
+                  for {
+                    t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
+                    _ <- calibrationsService
+                          .recalculateCalibrations(
+                            elem.programId,
+                            LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
+                          )
+                  } yield Result.unit
               }
             }.compile.drain.start.void)
       _  <- Resource.eval(Logger[F].info("Start listening for calibration time changes"))
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally {
-                calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                requireServiceAccess:
+                  calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                    .map(Result.success)
               }
             }.compile.drain.start.void)
     } yield ()

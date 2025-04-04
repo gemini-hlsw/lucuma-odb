@@ -45,6 +45,7 @@ import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
@@ -64,7 +65,7 @@ trait CalibrationsService[F[_]] {
   def setCalibrationRole(
     oid:  Observation.Id,
     role: Option[CalibrationRole]
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], ServiceAccess): F[Unit]
 
   /**
     * Recalculates the calibrations for a program
@@ -76,7 +77,7 @@ trait CalibrationsService[F[_]] {
   def recalculateCalibrations(
     pid: Program.Id,
     referenceInstant: Instant
-  )(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])]
+  )(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])]
 
   /**
     * Returns the calibration targets for a given role adjusted to a reference instant
@@ -86,7 +87,7 @@ trait CalibrationsService[F[_]] {
   def recalculateCalibrationTarget(
     pid: Program.Id,
     oid: Observation.Id,
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], ServiceAccess): F[Unit]
 }
 
 object CalibrationsService extends CalibrationObservations {
@@ -134,7 +135,7 @@ object CalibrationsService extends CalibrationObservations {
       override def setCalibrationRole(
         oid:  Observation.Id,
         role: Option[CalibrationRole]
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], ServiceAccess): F[Unit] =
         session.execute(Statements.SetCalibrationRole)(oid, role).void
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
@@ -248,7 +249,7 @@ object CalibrationsService extends CalibrationObservations {
         configs: List[CalibrationConfigSubset],
         gnCalc:  CalibrationIdealTargets,
         gsCalc:  CalibrationIdealTargets
-      )(using Transaction[F]): F[List[(CalibrationRole, Observation.Id)]] = {
+      )(using Transaction[F], ServiceAccess): F[List[(CalibrationRole, Observation.Id)]] = {
         def newCalibs(site: Site, ct: CalibrationRole, idealTarget: CalibrationIdealTargets): Option[F[List[(CalibrationRole, Observation.Id)]]] =
           idealTarget.bestTarget(ct).map(tgtid =>
             // We don't want to create a target if there are no pending configurations
@@ -279,7 +280,7 @@ object CalibrationsService extends CalibrationObservations {
         configs: List[CalibrationConfigSubset],
         gnTgt:   CalibrationIdealTargets,
         gsTgt:   CalibrationIdealTargets
-      )(using Transaction[F]): F[List[Observation.Id]] = {
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         if (configs.isEmpty) {
           List.empty.pure[F]
         } else
@@ -362,7 +363,7 @@ object CalibrationsService extends CalibrationObservations {
           session.execute(Statements.selectCalibrationTargets(roles))(roles)
             .map(targetCoordinates(referenceInstant))
 
-      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F]): F[(List[Observation.Id], List[Observation.Id])] =
+      def recalculateCalibrations(pid: Program.Id, referenceInstant: Instant)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // Read calibration targets
           tgts         <- calibrationTargets(CalibrationTypes, referenceInstant)
@@ -400,7 +401,7 @@ object CalibrationsService extends CalibrationObservations {
       def recalculateCalibrationTarget(
         pid: Program.Id,
         oid: Observation.Id,
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F], ServiceAccess): F[Unit] = {
         for {
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target

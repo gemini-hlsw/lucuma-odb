@@ -13,6 +13,7 @@ import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.Command
 import skunk.Session
+import skunk.SqlState
 import skunk.codec.all.*
 import skunk.implicits.*
 
@@ -27,13 +28,20 @@ object UserService {
       import Statements._
 
       def canonicalizeUser(u: User)(using Services.SuperUserAccess): F[Unit] =
-        Trace[F].span("canonicalizeUser") {
-          u match {
-            case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
-            case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
-            case su @ StandardUser(_, _, _, _) => canonicalizeStandardUser(su)
-          }
-        }
+        // RCN: This operation sometimes fails with an unknown portal
+        // exception. It's not yet clear why, so for now we retry.
+        def go(retries: Int): F[Unit] =
+          Trace[F].span("canonicalizeUser") {
+            u match {
+              case gu @ GuestUser(_)             => canonicalizeGuestUser(gu)
+              case su @ ServiceUser(_, _)        => canonicalizeServiceUser(su)
+              case su @ StandardUser(_, _, _, _) => canonicalizeStandardUser(su)
+            }
+          } .recoverWith:
+            case SqlState.InvalidCursorName(ex) =>
+              if retries > 0 then go(retries - 1)
+              else ex.raiseError
+        go(2)
 
       def canonicalizeGuestUser(gu: GuestUser): F[Unit] =
         Trace[F].span("canonicalizeGuestUser") {

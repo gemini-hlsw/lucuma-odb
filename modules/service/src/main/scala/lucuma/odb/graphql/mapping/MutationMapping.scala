@@ -358,12 +358,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
-      services.useTransactionally:
-        targetService.cloneTarget(input).nestMap: (oldTargetId, newTargetId) =>
-          Filter(And(
-            Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
-            Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
-          ), child)
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              targetService.cloneTarget(checked).nestMap: (oldTargetId, newTargetId) =>
+                Filter(And(
+                  Predicates.cloneTargetResult.originalTarget.id.eql(oldTargetId),
+                  Predicates.cloneTargetResult.newTarget.id.eql(newTargetId)
+                ), child)
 
   private lazy val CreateCallForProposals: MutationField =
     MutationField("createCallForProposals", CreateCallForProposalsInput.Binding): (input, child) =>
@@ -432,8 +436,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val CreateTarget =
     MutationField("createTarget", CreateTargetInput.Binding): (input, child) =>
       services.useTransactionally:
-        targetService.createTarget(input).nestMap: tid =>
-          Unique(Filter(Predicates.target.id.eql(tid), child))
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            targetService.createTarget(checked).nestMap: tid =>
+              Unique(Filter(Predicates.target.id.eql(tid), child))
 
   private lazy val CreateUserInvitation =
     MutationField("createUserInvitation", CreateUserInvitationInput.Binding): (input, child) =>
