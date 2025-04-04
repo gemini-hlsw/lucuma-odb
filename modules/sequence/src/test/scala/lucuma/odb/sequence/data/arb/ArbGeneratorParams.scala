@@ -10,8 +10,10 @@ import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Target
+import lucuma.core.util.Timestamp
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
+import lucuma.core.util.arb.ArbTimestamp
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyParameters
@@ -31,6 +33,7 @@ trait ArbGeneratorParams:
   import ArbIntegrationTimeInput.given
   import ArbInstrumentMode.given
   import ArbTargetInput.given
+  import ArbTimestamp.given
 
   private def genItcInput(mo: InstrumentMode): Gen[ItcInput] =
     for
@@ -48,7 +51,8 @@ trait ArbGeneratorParams:
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
       dc  <- arbitrary[Boolean]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc)
+      ts  <- arbitrary[Option[Timestamp]]
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, ts)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -58,7 +62,8 @@ trait ArbGeneratorParams:
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
       dc  <- arbitrary[Boolean]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc)
+      ts  <- arbitrary[Option[Timestamp]]
+    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, ts)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

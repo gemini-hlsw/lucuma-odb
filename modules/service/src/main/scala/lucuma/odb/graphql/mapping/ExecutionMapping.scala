@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.Eq
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
@@ -131,20 +130,14 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   private lazy val configHandler: EffectHandler[F] =
 
-    case class Params(futureLimit: Generator.FutureLimit, resetAcq: Boolean)
-    given Eq[Params] = Eq.by(a => (a.futureLimit, a.resetAcq))
+    val readEnv: Env => Result[Generator.FutureLimit] = env =>
+      env.getR[Generator.FutureLimit](FutureLimitParam)
 
-    val readEnv: Env => Result[Params] = env =>
-      for
-        f <- env.getR[Generator.FutureLimit](FutureLimitParam)
-        r <- env.get[Boolean](ResetAcqParam).getOrElse(false).success
-      yield Params(f, r)
-
-    val calculate: (Program.Id, Observation.Id, Params) => F[Result[Json]] =
-      (pid, oid, params) =>
+    val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
+      (pid, oid, futureLimit) =>
         services.use: s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .generate(pid, oid, params.futureLimit, params.resetAcq)
+           .generate(pid, oid, futureLimit)
            .map(_.bimap(_.toResult, _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
