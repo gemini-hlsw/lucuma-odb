@@ -531,30 +531,6 @@ trait DatabaseOperations { this: OdbSuite =>
       )
     )
 
-
-  // def setDeclaredComplete(user: User, oid: Observation.Id, declaredComplete: Boolean = true): IO[Unit] =
-  //   query(
-  //     user,
-  //     s"""
-  //       mutation {
-  //         updateObservations(
-  //           input: {
-  //             SET: {
-  //               declaredComplete: $declaredComplete
-  //             }
-  //             WHERE: {
-  //               id: { EQ: "$oid" }
-  //             }
-  //           }
-  //         ) {
-  //           observations {
-  //             id
-  //           }
-  //         }
-  //       }
-  //     """
-  //   ).void
-
   def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
     query(
       user,
@@ -649,6 +625,20 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
+
+  def resetAcquisitionAs(user: User, oid: Observation.Id): IO[Unit] =
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          resetAcquisition(input: {
+            observationId: "$oid"
+          }) {
+            observation { id }
+          }
+        }
+      """
+    ).void
 
   def createObservationInGroupAs(user: User, pid: Program.Id, groupId: Option[Group.Id] = None, groupIndex: Option[NonNegShort] = None): IO[Observation.Id] =
     query(

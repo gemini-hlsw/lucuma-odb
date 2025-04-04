@@ -58,7 +58,6 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
-import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
 
@@ -710,9 +709,6 @@ object Science:
         )
 
     end recordStep
-
-    override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
-      this
 
   end ScienceGenerator
 

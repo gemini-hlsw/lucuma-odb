@@ -1862,10 +1862,9 @@ type GmosNorthExecutionConfig {
   static: GmosNorthStatic!
 
   """
-  GMOS North acquisition execution sequence.  Pass `true` to (re)start
-  acquisition from the initial step.
+  GMOS North acquisition execution sequence
   """
-  acquisition(reset: Boolean = false): GmosNorthExecutionSequence
+  acquisition: GmosNorthExecutionSequence
 
   """
   GMOS North science execution
@@ -2258,10 +2257,9 @@ type GmosSouthExecutionConfig {
   static: GmosSouthStatic!
 
   """
-  GMOS South acquisition execution sequence.  Pass `true` to (re)start
-  acquisition from the initial step.
+  GMOS South acquisition execution sequence.
   """
-  acquisition(reset: Boolean = false): GmosSouthExecutionSequence
+  acquisition: GmosSouthExecutionSequence
 
   """
   GMOS South science execution
@@ -2931,6 +2929,15 @@ type Mutation {
     """
     input: RecordGmosSouthVisitInput!
   ): RecordGmosSouthVisitResult!
+
+  """
+  Resets the acquisition sequence to start from the initial step regardless of
+  which acquisition steps may have been executed.  Requires staff (or better)
+  access.
+  """
+  resetAcquisition(
+    input: ResetAcquisitionInput!
+  ): ResetAcquisitionResult!
 
   """
   Set the allocations for a program.
@@ -4168,6 +4175,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for resetting the acquisition sequence so that it executes
+from the initial step, regardless of which steps may have previously been
+executed.  Select one of `observationId` or `observationReference`.
+"""
+input ResetAcquisitionInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of resetting the acquisition sequence.
+"""
+type ResetAcquisitionResult {
+  """
+  The observation whose acquisition was reset.
+  """
+  observation: Observation!
 }
 
 """
