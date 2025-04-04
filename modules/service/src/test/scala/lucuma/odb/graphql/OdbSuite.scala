@@ -20,6 +20,7 @@ import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
+import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -75,9 +76,9 @@ import org.http4s.server.Server
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{Uri as Http4sUri, *}
 import org.slf4j
-import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
-import org.testcontainers.utility.DockerImageName
+import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.images.builder.ImageFromDockerfile
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.Session
@@ -85,7 +86,9 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import java.net.SocketException
+import java.nio.file.Paths
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 object OdbSuite:
   def reportFailure: Throwable => Unit =
@@ -138,22 +141,41 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val jlogger: slf4j.Logger =
     slf4j.LoggerFactory.getLogger("lucuma-odb-test-container")
 
-  var container: PostgreSQLContainer = null
+  var container: Containers = null
 
-  override val containerDef = new PostgreSQLContainer.Def(DockerImageName.parse("postgres:15")) {
-    override def createContainer(): PostgreSQLContainer = {
-      val c = super.createContainer()
-      c.container.withClasspathResourceMapping("/db/migration", "/docker-entrypoint-initdb.d/", BindMode.READ_ONLY)
-      if (debug) {
-        c.container.withLogConsumer{f =>
-          jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
-        }
-        ()
-      }
-      container = c
-      c
+  override def afterContainersStart(c: GenericContainer): Unit =
+    container = c
+
+    /**
+     * Build a single PostgreSQL container for test suites. Runs all migrations and database initialization in the image build.
+     * 
+     * The image is built for the first suite, and the Docker cache will be used for subsequent suites. Skipping the long db initialization.
+     */
+  override val containerDef: GenericContainer.Def[GenericContainer] =
+    val env = Map(
+      "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
+      "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
+      "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
+    )
+
+    val image = new ImageFromDockerfile("lucuma-odb-test-db")
+      .withDockerfile(Paths.get("modules/service/src/Dockerfile"))
+      .withBuildArgs(env.asJava)
+
+    val dbContainer = GenericContainer(
+      image,
+      env = env,
+      exposedPorts = Seq(POSTGRESQL_PORT),
+      waitStrategy = Wait
+        .forLogMessage(".*database system is ready to accept connections.*", 1)
+        .withStartupTimeout(java.time.Duration.ofSeconds(15))
+    )
+    if (debug) {
+      dbContainer.container.withLogConsumer { f =>
+        jlogger.debug(s"${AnsiColors.CYAN}${f.getUtf8String().trim()}${AnsiColors.Reset}")
+      }: Unit
     }
-  }
+    new GenericContainer.Def(dbContainer) {}
 
   implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test")
@@ -271,9 +293,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       maxCalibrationConnections = 10,
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),
-      user     = container.username,
-      password = container.password,
-      database = container.databaseName,
+      user     = PostgreSQLContainer.defaultUsername,
+      password = PostgreSQLContainer.defaultPassword,
+      database = PostgreSQLContainer.defaultDatabaseName,
     )
 
   // overriden in OdbSuiteWithS3 for tests that need it.
