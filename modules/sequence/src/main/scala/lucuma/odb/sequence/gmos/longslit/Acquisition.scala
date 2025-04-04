@@ -286,10 +286,11 @@ object Acquisition:
 
       case _                              =>
         time
-          .bimap(
-            m => s"GMOS Long Slit acquisition requires a valid target: ${m.format}",
-            t => AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
-          )
+          .leftMap: m =>
+             s"GMOS Long Slit acquisition requires a valid target: ${m.format}"
+          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit acquisition requires a positive exposure time.")
+          .map: t =>
+             AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
 
   def gmosNorth(
     estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
