@@ -17,11 +17,13 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.graphql.table.DatasetTable
+import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
 trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
+                                         with ObservationView[F]
                                          with TimeChargeDiscountTable[F]
                                          with VisitTable[F] {
 
@@ -56,6 +58,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
         c.fieldAs[DiscountDiscriminator]("type").flatMap {
           case DiscountDiscriminator.Daylight => Result(TimeChargeDaylightDiscountType)
           case DiscountDiscriminator.NoData   => Result(TimeChargeNoDataDiscountType)
+          case DiscountDiscriminator.Overlap  => Result(TimeChargeOverlapDiscountType)
           case DiscountDiscriminator.Qa       => Result(TimeChargeQaDiscountType)
           case d                              => Result.internalError(s"No TimeChargeDiscount implementation for ${d.dbTag}")
         }
@@ -67,6 +70,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
         tpe match {
           case TimeChargeDaylightDiscountType => mkPredicate(DiscountDiscriminator.Daylight)
           case TimeChargeNoDataDiscountType   => mkPredicate(DiscountDiscriminator.NoData)
+          case TimeChargeOverlapDiscountType  => mkPredicate(DiscountDiscriminator.Overlap)
           case TimeChargeQaDiscountType       => mkPredicate(DiscountDiscriminator.Qa)
           case _                              => Result.internalError(s"Invalid discriminator: $tpe")
         }
@@ -79,6 +83,11 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
 
   lazy val TimeChargeNoDataDiscountMapping: ObjectMapping =
     ObjectMapping(TimeChargeNoDataDiscountType)()
+
+  lazy val TimeChargeOverlapDiscountMapping: ObjectMapping =
+    ObjectMapping(TimeChargeOverlapDiscountType)(
+      SqlObject("observation", Join(TimeChargeDiscountTable.Id, TimeChargeDiscountOverlapTable.DiscountId), Join(TimeChargeDiscountOverlapTable.ObservationId, ObservationView.Id))
+    )
 
   lazy val TimeChargeQaDiscountMapping: ObjectMapping =
     ObjectMapping(TimeChargeQaDiscountType)(

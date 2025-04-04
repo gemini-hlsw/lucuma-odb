@@ -29,6 +29,7 @@ object TimeAccounting {
 
   object comment {
     val NoData: String   = "Time spent during a visit in which no dataset sets were collected."
+    val Overlap: String  = "Time spent observing after an overlapping chargeable observation started."
     val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
     val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
     val Qa: String       = "Time spent observing atoms with one or more datasets that don't pass QA."

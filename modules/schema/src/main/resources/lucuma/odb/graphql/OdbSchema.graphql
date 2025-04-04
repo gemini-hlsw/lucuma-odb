@@ -12132,6 +12132,25 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   comment: String!
 }
 
+"""
+A time charge discount that is applied when part of the observation is executed
+after an overlapping chargeable observation is started.  For example, when
+writing out datasets while slewing to a new target.
+"""
+type TimeChargeOverlapDiscount implements TimeChargeDiscount {
+  "The interval during which this discount applies."
+  interval: TimestampInterval!
+
+  "Time amount to discount from the program."
+  program: TimeSpan!
+
+  "Additional detail."
+  comment: String!
+
+  "The overlapping observation."
+  observation: Observation!
+}
+
 type TimeChargeQaDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
