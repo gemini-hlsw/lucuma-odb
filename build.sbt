@@ -10,7 +10,6 @@ val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.11.0"
 val grackleVersion             = "0.23.0"
-val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.9.2"
 val jwtVersion                 = "5.0.0"
@@ -145,8 +144,8 @@ lazy val service = project
       "is.cir"                   %% "ciris-refined"                      % cirisVersion,
       "org.flywaydb"              % "flyway-core"                        % flywayVersion,
       "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion,
-      "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
       "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
+      "org.http4s"               %% "http4s-ember-server"                % http4sEmberVersion,
       "org.postgresql"            % "postgresql"                         % postgresVersion,
       "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,

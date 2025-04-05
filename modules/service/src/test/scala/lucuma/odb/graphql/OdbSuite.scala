@@ -20,6 +20,7 @@ import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
+import com.comcast.ip4s.port
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
@@ -67,8 +68,8 @@ import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
 import natchez.Trace.Implicits.noop
-import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.Authorization
 import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -359,10 +360,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def server: Resource[IO, Server] =
     for {
       a <- httpApp
-      s <- BlazeServerBuilder[IO]
+      s <- EmberServerBuilder
+             .default[IO]
+             .withPort(port"0")
              .withHttpWebSocketApp(a)
-             .bindAny()
-             .resource
+             .withShutdownTimeout(Duration.Zero)
+             .build
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =
