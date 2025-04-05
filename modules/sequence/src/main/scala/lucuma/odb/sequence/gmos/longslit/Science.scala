@@ -58,7 +58,6 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
-import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
 
@@ -711,9 +710,6 @@ object Science:
 
     end recordStep
 
-    override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
-      this
-
   end ScienceGenerator
 
   private object ScienceGenerator:
@@ -741,7 +737,10 @@ object Science:
     ): F[Either[String, SequenceGenerator[D]]] =
 
       def extractTime: Either[String, IntegrationTime] =
-        time.leftMap(m => s"GMOS Long Slit requires a valid target: ${m.format}")
+        time
+          .leftMap: m =>
+             s"GMOS Long Slit requires a valid target: ${m.format}"
+          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit science requires a positive exposure time.")
 
       // Adjust the config and integration time according to the calibration role.
       val configAndTime = calRole match

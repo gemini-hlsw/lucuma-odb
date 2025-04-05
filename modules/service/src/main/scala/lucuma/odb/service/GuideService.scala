@@ -196,9 +196,12 @@ object GuideService {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
 
-    def validGuideStarName(generatorHash:Md5Hash, remainingTime: TimeSpan): Option[GuideStarName] =
+    def obsDuration: Result[TimeSpan] =
+      optObsDuration.toResult(generalError(s"Observation duration not set for observation $id.").asProblem)
+
+    def validGuideStarName(generatorHash:Md5Hash): Option[GuideStarName] =
       (guideStarName, guideStarHash).flatMapN { (name, hash) =>
-        val newHash = newGuideStarHash(generatorHash, remainingTime)
+        val newHash = newGuideStarHash(generatorHash)
         if (hash === newHash) guideStarName
         else none
        }
@@ -235,7 +238,7 @@ object GuideService {
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
 
-    def newGuideStarHash(generatorHash:Md5Hash, duration: TimeSpan): Md5Hash = {
+    def newGuideStarHash(generatorHash:Md5Hash): Md5Hash = {
       val md5 = MessageDigest.getInstance("MD5")
 
       md5.update(generatorHash.toByteArray)
@@ -253,7 +256,7 @@ object GuideService {
       // changing time or duration doesn't necessarily invalidate the guide star, but
       // we're not tracking what the "original" values are, so we can't say for sure...
       md5.update(optObsTime.hashBytes)
-      md5.update(duration.hashBytes)
+      md5.update(optObsDuration.hashBytes)
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
@@ -265,6 +268,7 @@ object GuideService {
     hash:   Md5Hash
   ) {
     val timeEstimate                         = digest.fullTimeEstimate.sum
+    val setupTime                            = digest.setup.full
     val offsets                              = NonEmptyList.fromFoldable(digest.science.offsets.union(digest.acquisition.offsets))
     val (site, agsParams, centralWavelength): (Site, AgsParams, Wavelength) = params.observingMode match
       case mode: gmos.longslit.Config.GmosNorth =>
@@ -272,6 +276,14 @@ object GuideService {
       case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
 
+    def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
+    def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
+      if (obsDuration > timeEstimate)
+        generalError(s"Observation duration of ${obsDuration.format} exceeds the remaining time of ${timeEstimate.format} for observation $obsId.").asFailure
+      else
+        (obsDuration.subtract(setupTime))
+          .filter(_.nonZero)
+          .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
   def instantiate[F[_]: Concurrent: Trace](
@@ -749,7 +761,9 @@ object GuideService {
         obsInfo: ObservationInfo,
         genInfo: GeneratorInfo,
         obsTime: Timestamp,
-        duration: TimeSpan
+        obsDuration: TimeSpan,
+        scienceTime: Timestamp,
+        scienceDuration: TimeSpan
       ): F[Result[GuideEnvironment]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
@@ -759,7 +773,7 @@ object GuideService {
           baseTracking   = obsInfo.explicitBase.fold(ObjectTracking.fromAsterism(asterism))(ObjectTracking.constant)
           visitEnd      <- ResultT.fromResult(
                              obsTime
-                               .plusMicrosOption(duration.toMicroseconds)
+                               .plusMicrosOption(obsDuration.toMicroseconds)
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
           candidates    <- ResultT(
@@ -786,7 +800,7 @@ object GuideService {
                            )
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
-                              .anglesToTestAt(genInfo.site, baseTracking, obsTime.toInstant, duration.toDuration)
+                              .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           positions      = getPositions(angles, genInfo.offsets)
@@ -808,13 +822,15 @@ object GuideService {
       ): F[Result[GuideEnvironment]] =
         Trace[F].span("getGuideEnvironment"):
           (for {
-            obsInfo       <- ResultT(getObservationInfo(oid))
-            obsTime       <- ResultT.fromResult(obsInfo.obsTime)
-            asterism      <- ResultT(getAsterism(pid, oid))
-            genInfo       <- ResultT(getGeneratorInfo(pid, oid))
-            duration       = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
-            oGSName        = obsInfo.validGuideStarName(genInfo.hash, duration)
-            result        <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, duration))
+            obsInfo         <- ResultT(getObservationInfo(oid))
+            obsTime         <- ResultT.fromResult(obsInfo.obsTime)
+            obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
+            asterism        <- ResultT(getAsterism(pid, oid))
+            genInfo         <- ResultT(getGeneratorInfo(pid, oid))
+            scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
+            scienceStart     = genInfo.getScienceStartTime(obsTime)
+            oGSName          = obsInfo.validGuideStarName(genInfo.hash)
+            result          <- ResultT(lookupGuideStar(pid, oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
@@ -825,8 +841,7 @@ object GuideService {
           genInfo    <- ResultT.liftF(getGeneratorInfo(pid, oid)).map(_.toOption)
           oGSName    <- ResultT.pure(
                           genInfo.flatMap{ gi =>
-                            val duration = obsInfo.optObsDuration.getOrElse(gi.timeEstimate)
-                            obsInfo.validGuideStarName(gi.hash, duration)
+                            obsInfo.validGuideStarName(gi.hash)
                           }
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
@@ -904,8 +919,7 @@ object GuideService {
                         GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
                       )
             genInfo  <- ResultT(getGeneratorInfo(obsInfo.programId, obsInfo.id))
-            duration  = obsInfo.optObsDuration.getOrElse(genInfo.timeEstimate)
-            hash      = obsInfo.newGuideStarHash(genInfo.hash, duration)
+            hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
           } yield result).value
         }
@@ -1050,23 +1064,23 @@ object GuideService {
   private object Decoders {
 
     val obsInfoDecoder: Decoder[ObservationInfo] =
-      (observation_id *:
-        program_id *:
-        cloud_extinction *:
-        image_quality *:
-        sky_background *:
-        water_vapor *:
-        air_mass_range_value.opt *:
-        air_mass_range_value.opt *:
+      (observation_id              *:
+        program_id                 *:
+        cloud_extinction_preset    *:
+        image_quality_preset       *:
+        sky_background             *:
+        water_vapor                *:
+        air_mass_range_value.opt   *:
+        air_mass_range_value.opt   *:
         hour_angle_range_value.opt *:
         hour_angle_range_value.opt *:
-        pac_mode *:
-        angle_µas *:
-        right_ascension.opt *:
-        declination.opt *:
-        core_timestamp.opt *:
-        time_span.opt *:
-        guide_target_name.opt *:
+        pac_mode                   *:
+        angle_µas                  *:
+        right_ascension.opt        *:
+        declination.opt            *:
+        core_timestamp.opt         *:
+        time_span.opt              *:
+        guide_target_name.opt      *:
         md5_hash.opt).emap {
         case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash) =>
           val paConstraint: PosAngleConstraint = mode match

@@ -132,6 +132,7 @@ class executionAcq extends ExecutionTestSupport {
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
+        _  <- resetAcquisitionAs(serviceUser, o)
       yield o
 
     setup.flatMap: oid =>
@@ -141,7 +142,7 @@ class executionAcq extends ExecutionTestSupport {
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition(reset: true)", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
                }
              }
            """,
@@ -313,7 +314,8 @@ class executionAcq extends ExecutionTestSupport {
         s4 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
-        // Now when we ask for acquisition, we should expect to take it from the top.
+        // Reset acquisition to take it from the top.
+        _  <- resetAcquisitionAs(serviceUser, o)
       } yield o
 
     setup.flatMap { oid =>
@@ -355,7 +357,8 @@ class executionAcq extends ExecutionTestSupport {
         // Record a new visit, but don't execute anything
         _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
 
-        // Now when we ask for acquisition, we should expect to take it from the top.
+        // Reset acquisition
+        _  <- resetAcquisitionAs(serviceUser, o)
       } yield o
 
     setup.flatMap { oid =>
@@ -515,5 +518,27 @@ class executionAcq extends ExecutionTestSupport {
     execAcq.map: ids =>
       ids.zip(ids.tail).foreach: (before, after) =>
         assertEquals(before.tail, after.toList, s"before: $before, after: $after")
+
+  test("reset can only be done by staff or better"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            resetAcquisition(input: {
+              observationId: "$o"
+            }) {
+              observation { id }
+            }
+          }
+        """,
+        expected = List(
+          s"User ${pi.id} is not authorized to perform this operation."
+        ).asLeft
+      )
+    yield ()
 
 }

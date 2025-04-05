@@ -20,9 +20,11 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Group
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -77,7 +79,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
-      LeafMapping[CloudExtinction](CloudExtinctionType),
+      LeafMapping[CloudExtinction.Preset](CloudExtinctionPresetType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
       LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
@@ -132,7 +134,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
-      LeafMapping[ImageQuality](ImageQualityType),
+      LeafMapping[ImageQuality.Preset](ImageQualityPresetType),
       LeafMapping[Instrument](InstrumentType),
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),

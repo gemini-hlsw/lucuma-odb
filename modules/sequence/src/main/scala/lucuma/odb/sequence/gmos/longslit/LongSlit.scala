@@ -15,6 +15,7 @@ import lucuma.core.enums.GmosSouthStageMode
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.MissingParamSet
 
@@ -55,11 +56,12 @@ object LongSlit:
     config:         Config.GmosNorth,
     acquisitionItc: Either[MissingParamSet, IntegrationTime],
     scienceItc:     Either[MissingParamSet, IntegrationTime],
-    calRole:        Option[CalibrationRole]
+    calRole:        Option[CalibrationRole],
+    lastAcqReset:   Option[Timestamp]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
       GmosNorthStatic,
-      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole),
+      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
       Science.gmosNorth(estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
@@ -70,11 +72,12 @@ object LongSlit:
     config:         Config.GmosSouth,
     acquisitionItc: Either[MissingParamSet, IntegrationTime],
     scienceItc:     Either[MissingParamSet, IntegrationTime],
-    calRole:        Option[CalibrationRole]
+    calRole:        Option[CalibrationRole],
+    lastAcqReset:   Option[Timestamp]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(
       GmosSouthStatic,
-      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole),
+      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
       Science.gmosSouth(estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
     )
 

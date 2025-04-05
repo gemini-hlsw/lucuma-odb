@@ -11,9 +11,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SkyBackground
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -25,7 +25,7 @@ class constraintSetGroup extends OdbSuite {
   val staff      = TestUsers.Standard.staff(nextId, nextId)
   val validUsers = List(pi, staff)
 
-  def createObservation(user: User, pid: Program.Id, iq: ImageQuality, sb: SkyBackground): IO[Observation.Id] =
+  def createObservation(user: User, pid: Program.Id, iq: ImageQuality.Preset, sb: SkyBackground): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -53,11 +53,11 @@ class constraintSetGroup extends OdbSuite {
   test("constraints should be correctly grouped") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
-        def create2(iq: ImageQuality, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
+        def create2(iq: ImageQuality.Preset, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
         (
-          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Dark)
+          create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
           expect(
             user = user,
@@ -126,14 +126,14 @@ class constraintSetGroup extends OdbSuite {
   test("should be able to use a proposal reference") {
     List(pi).traverse { user =>
       createProgramAs(user).flatMap { pid =>
-        def create2(iq: ImageQuality, sb: SkyBackground) = 
+        def create2(iq: ImageQuality.Preset, sb: SkyBackground) = 
           createObservation(user, pid, iq, sb)
             .flatTap(setObservationWorkflowState(user, _, ObservationWorkflowState.Inactive)) // avoid submission error
             .replicateA(2)
         (
-          create2(ImageQuality.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.PointOne, SkyBackground.Dark)
+          create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
           createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
