@@ -9,7 +9,6 @@ import fs2.Stream
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.StepRecord
-import lucuma.odb.sequence.data.VisitRecord
 
 /**
  * A sequence generator.  Record past steps and vists in order until all have
@@ -35,10 +34,6 @@ trait SequenceGenerator[D]:
    */
   def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D]
 
-  /**
-   * Records a visit and returns an updated generator.
-   */
-  def recordVisit(visit: VisitRecord): SequenceGenerator[D]
 
 object SequenceGenerator:
 
@@ -50,7 +45,4 @@ object SequenceGenerator:
         Stream.empty
 
       override def recordStep(step:  StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        this
-
-      override def recordVisit(visit:  VisitRecord): SequenceGenerator[D] =
         this

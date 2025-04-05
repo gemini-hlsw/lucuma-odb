@@ -1,15 +1,25 @@
-
-
 # These "empty" enums (they must have at least one element) will be replaced at runtime with
 # definitions based on database tables.
 
-enum ConditionsMeasurementSource { DUMMY }
-enum SeeingTrend { DUMMY }
-enum ConditionsExpectationType { DUMMY }
-enum FilterType { DUMMY }
-enum ProposalStatus { DUMMY }
+enum ConditionsMeasurementSource {
+  DUMMY
+}
+enum SeeingTrend {
+  DUMMY
+}
+enum ConditionsExpectationType {
+  DUMMY
+}
+enum FilterType {
+  DUMMY
+}
+enum ProposalStatus {
+  DUMMY
+}
 
-"""Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"""
+"""
+Email address, matching ^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$
+"""
 scalar EmailAddress
 
 "AtomEvent creation parameters."
@@ -20,35 +30,29 @@ input AddAtomEventInput {
 
 "The result of adding a atom event."
 type AddAtomEventResult {
-
   "The new atom event that was added."
   event: AtomEvent!
-
 }
 
 "DatasetEvent creation parameters."
 input AddDatasetEventInput {
-
   "Dataset id"
   datasetId: DatasetId!
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
-
 }
 
 "The result of adding a dataset event."
 type AddDatasetEventResult {
-
   "The new dataset event that was added."
   event: DatasetEvent!
-
 }
 
 input AddProgramUserInput {
   programId: ProgramId!
-  role:      ProgramUserRole!
-  SET:       ProgramUserPropertiesInput
+  role: ProgramUserRole!
+  SET: ProgramUserPropertiesInput
 }
 
 type AddProgramUserResult {
@@ -63,24 +67,20 @@ input AddSequenceEventInput {
 
 "The result of adding a sequence event."
 type AddSequenceEventResult {
-
   "The new sequence event that was added."
   event: SequenceEvent!
-
 }
 
 "SlewEvent creation parameters."
 input AddSlewEventInput {
-  visitId:   VisitId!
+  observationId: ObservationId!
   slewStage: SlewStage!
 }
 
 "The result of adding a slew event."
 type AddSlewEventResult {
-
   "The new slew event that was added."
   event: SlewEvent!
-
 }
 
 "StepEvent creation parameters."
@@ -91,10 +91,8 @@ input AddStepEventInput {
 
 "The result of adding a step event."
 type AddStepEventResult {
-
   "The new step event that was added."
   event: StepEvent!
-
 }
 
 """
@@ -102,8 +100,8 @@ Input to the 'addTimeChargeCorrection' mutation. Identifies the visit
 that will be corrected and describes the correction itself.
 """
 input AddTimeChargeCorrectionInput {
-  visitId:     VisitId!
-  correction:  TimeChargeCorrectionInput!
+  visitId: VisitId!
+  correction: TimeChargeCorrectionInput!
 }
 
 """
@@ -126,18 +124,18 @@ input AirMassRangeInput {
 An individual time allocation.
 """
 type Allocation {
-  category:    TimeAccountingCategory!
+  category: TimeAccountingCategory!
   scienceBand: ScienceBand!
-  duration:    TimeSpan!
+  duration: TimeSpan!
 }
 
 """
 An individual time allocation input.
 """
 input AllocationInput {
-  category:    TimeAccountingCategory!
+  category: TimeAccountingCategory!
   scienceBand: ScienceBand!
-  duration:    TimeSpanInput!
+  duration: TimeSpanInput!
 }
 
 """
@@ -162,7 +160,6 @@ input AngleInput {
 Atom-level events.  The execution of a single atom will generate multiple events.
 """
 type AtomEvent implements ExecutionEvent {
-
   "Event id"
   id: ExecutionEventId!
 
@@ -183,11 +180,9 @@ type AtomEvent implements ExecutionEvent {
 
   "Atom execution stage."
   atomStage: AtomStage!
-
 }
 
 enum AtomExecutionState {
-
   "No events have been received since the atom was recorded."
   NOT_STARTED
 
@@ -199,7 +194,6 @@ enum AtomExecutionState {
 
   "An ongoing atom was abandoned."
   ABANDONED
-
 }
 
 """
@@ -209,17 +203,13 @@ scalar AtomId
 
 "Execution stage or phase of an individual atom"
 enum AtomStage {
-
   END_ATOM
 
   START_ATOM
-
 }
-
 
 "An atom as recorded by Observe."
 type AtomRecord {
-
   "Atom ID."
   id: AtomId!
 
@@ -246,7 +236,6 @@ type AtomRecord {
 
   "Recorded steps associated with this atom."
   steps(
-
     """
     Starts the result set at (or after if not existent) the given step creation
     time.
@@ -255,23 +244,19 @@ type AtomRecord {
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
-
   ): StepRecordSelectResult!
 
   "Atom ID from the generated atom, if any, that produced this atom record."
   generatedId: AtomId
-
 }
 
 "AtomRecord query results, limited to a maximum of 1000 entries."
 type AtomRecordSelectResult {
-
   "Matching atom records up to the return size limit of 1000."
   matches: [AtomRecord!]!
 
   "`true` when there were additional matches that were not returned."
   hasMore: Boolean!
-
 }
 
 """
@@ -280,13 +265,11 @@ observations in distinct bands.  Time accounting at the program level must
 distinguish time spent in observations of each of these bands.
 """
 type BandedTime {
-
   "ScienceBand associated with the time, if any."
   band: ScienceBand
 
   "Time distributed across the program and non-charged categories."
   time: CategorizedTime!
-
 }
 
 """
@@ -392,7 +375,6 @@ enum Breakpoint {
 A single Call for Proposals definition.
 """
 type CallForProposals {
-
   """
   The unique Call for Proposals id associated with this Call.
   """
@@ -471,7 +453,6 @@ scalar CallForProposalsId
 The properties of a Call for Proposal in an input for creation and editing.
 """
 input CallForProposalsPropertiesInput {
-
   "Type of the call. Required on create."
   type: CallForProposalsType
 
@@ -538,15 +519,12 @@ input CallForProposalsPropertiesInput {
 Coordinate limits input per site.
 """
 input SiteCoordinateLimitsInput {
-
   north: CoordinateLimitsInput
 
   south: CoordinateLimitsInput
-
 }
 
 input CoordinateLimitsInput {
-
   """
   Optional RA limit start RA.
   """
@@ -566,14 +544,13 @@ input CoordinateLimitsInput {
   Optional declination limit end declination.
   """
   decEnd: DeclinationInput
-
 }
 
 """
 Groups a partner with its submission deadline.
 """
 type CallForProposalsPartner {
-  partner:  Partner!
+  partner: Partner!
 
   """
   Sets the submission deadline for this partner, overriding the
@@ -590,7 +567,7 @@ type CallForProposalsPartner {
 }
 
 input CallForProposalsPartnerInput {
-  partner:  Partner!
+  partner: Partner!
 
   """
   If this partner has an explicit submission deadline that overrides the
@@ -637,7 +614,6 @@ input CatalogInfoInput {
 
 "A time amount broken into charge class categories."
 type CategorizedTime {
-
   "Time charged to the program / PI."
   program: TimeSpan!
 
@@ -646,7 +622,6 @@ type CategorizedTime {
 
   "Total of program and uncharged times."
   total: TimeSpan!
-
 }
 
 """
@@ -655,24 +630,26 @@ should vary between the two extremes, depending upon which observations and
 groups are ultimately completed.
 """
 type CategorizedTimeRange {
+  """
+  Minimum remaining time estimate.
+  """
+  minimum: CategorizedTime!
 
-   """Minimum remaining time estimate."""
-   minimum: CategorizedTime!
-
-   """Maximum remaining time estimate."""
-   maximum: CategorizedTime!
+  """
+  Maximum remaining time estimate.
+  """
+  maximum: CategorizedTime!
 }
 
 """
 Input used to change the role of a program user.
 """
 input ChangeProgramUserRoleInput {
-
   "Program user to update."
   programUserId: ProgramUserId!
 
   "New role they should assume."
-  newRole:       ProgramUserRole!
+  newRole: ProgramUserRole!
 }
 
 """
@@ -690,9 +667,9 @@ both are specified, they must refer to the same observation.  If neither is
 specified, nothing will be cloned.
 """
 input CloneObservationInput {
-  observationId:        ObservationId
+  observationId: ObservationId
   observationReference: ObservationReferenceLabel
-  SET:                  ObservationPropertiesInput
+  SET: ObservationPropertiesInput
 }
 
 """
@@ -741,12 +718,12 @@ input ConstraintSetInput {
   """
   The imageQuality field is required when creating a new instance of ConstraintSet, but optional when editing
   """
-  imageQuality: ImageQuality
+  imageQuality: ImageQualityPreset
 
   """
   The cloudExtinction field is required when creating a new instance of ConstraintSet, but optional when editing
   """
-  cloudExtinction: CloudExtinction
+  cloudExtinction: CloudExtinctionPreset
 
   """
   The skyBackground field is required when creating a new instance of ConstraintSet, but optional when editing
@@ -792,21 +769,21 @@ input ConditionsEntryInput {
 scalar Extinction
 
 type ConditionsMeasurement {
-  source:     ConditionsMeasurementSource!
-  seeing:     Angle
+  source: ConditionsMeasurementSource!
+  seeing: Angle
   extinction: Extinction
   wavelength: Wavelength
-  azimuth:    Angle
-  elevation:  Angle
+  azimuth: Angle
+  elevation: Angle
 }
 
 input ConditionsMeasurementInput {
-  source:     ConditionsMeasurementSource!
-  seeing:     AngleInput
+  source: ConditionsMeasurementSource!
+  seeing: AngleInput
   extinction: Extinction
   wavelength: WavelengthInput
-  azimuth:    AngleInput
-  elevation:  AngleInput
+  azimuth: AngleInput
+  elevation: AngleInput
 }
 
 type ConditionsIntuition {
@@ -837,7 +814,6 @@ type AddConditionsEntryResult {
 RA/Dec limits.
 """
 type CoordinateLimits {
-
   """
   The start limit defines the beginning (inclusive) of an RA range in which
   observations will be accepted.
@@ -861,7 +837,6 @@ type CoordinateLimits {
   observations will be accepted.
   """
   decEnd: Declination!
-
 }
 
 """
@@ -934,8 +909,8 @@ type CreateProgramResult {
 Input for creating a proposal.
 """
 input CreateProposalInput {
-  programId:         ProgramId!
-  SET:               ProposalPropertiesInput!
+  programId: ProgramId!
+  SET: ProposalPropertiesInput!
 }
 
 """
@@ -983,7 +958,7 @@ type Dark implements StepConfig {
 Editable dataset properties
 """
 input DatasetPropertiesInput {
-  qaState: DatasetQaState,
+  qaState: DatasetQaState
   comment: NonEmptyString
 }
 
@@ -997,13 +972,11 @@ Date interval marked by a start 'Date' (inclusive) and an end 'Date' (exclusive)
 Dates are interpreted as local dates.
 """
 type DateInterval {
-
   "Start date, local to the observation site, of the interval (inclusive)."
   start: Date!
 
   "End date, local to the observation site, of the interval (exclusive)."
   end: Date!
-
 }
 
 """
@@ -1041,7 +1014,7 @@ type DeleteProposalResult {
 Add or delete targets in an asterism
 """
 input EditAsterismsPatchInput {
-  ADD:    [TargetId!]
+  ADD: [TargetId!]
   DELETE: [TargetId!]
 }
 
@@ -1220,7 +1193,7 @@ input ExposureTimeModeInput {
 Time And Count exposure time mode parameters
 """
 input TimeAndCountExposureTimeModeInput {
-  "Exposure time."
+  "Exposure time, which must be greater than zero."
   time: TimeSpanInput!
 
   "Exposure count."
@@ -1500,7 +1473,6 @@ type GmosCcdMode {
 GMOS CCD readout input parameters
 """
 input GmosCcdModeInput {
-
   """
   X Binning, defaults to 'ONE'.
   """
@@ -1525,7 +1497,6 @@ input GmosCcdModeInput {
   Amp Read Mode, defaults to 'SLOW'
   """
   ampReadMode: GmosAmpReadMode
-
 }
 
 """
@@ -1734,7 +1705,6 @@ type GmosNodAndShuffle {
 Creation input parameters for GMOS nod and shuffle
 """
 input GmosNodAndShuffleInput {
-
   """
   Offset position A
   """
@@ -1785,7 +1755,6 @@ type GmosNorthAtom {
   Individual steps that comprise the atom
   """
   steps: [GmosNorthStep!]!
-
 }
 
 """
@@ -1893,10 +1862,9 @@ type GmosNorthExecutionConfig {
   static: GmosNorthStatic!
 
   """
-  GMOS North acquisition execution sequence.  Pass `true` to (re)start
-  acquisition from the initial step.
+  GMOS North acquisition execution sequence
   """
-  acquisition(reset: Boolean = false): GmosNorthExecutionSequence
+  acquisition: GmosNorthExecutionSequence
 
   """
   GMOS North science execution
@@ -1908,7 +1876,6 @@ type GmosNorthExecutionConfig {
 Next atom to execute and potential future atoms.
 """
 type GmosNorthExecutionSequence {
-
   """
   Next atom to execute.
   """
@@ -1924,7 +1891,6 @@ type GmosNorthExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
 }
 
 """
@@ -2001,7 +1967,6 @@ input GmosNorthGratingConfigInput {
 Edit or create GMOS North Long Slit advanced configuration
 """
 input GmosNorthLongSlitInput {
-
   """
   The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -2121,7 +2086,6 @@ input GmosNorthStaticInput {
   GMOS Nod And Shuffle configuration
   """
   nodAndShuffle: GmosNodAndShuffleInput
-
 }
 
 """
@@ -2160,7 +2124,6 @@ type GmosNorthStep {
   Observe class for this step
   """
   observeClass: ObserveClass!
-
 }
 
 """
@@ -2294,10 +2257,9 @@ type GmosSouthExecutionConfig {
   static: GmosSouthStatic!
 
   """
-  GMOS South acquisition execution sequence.  Pass `true` to (re)start
-  acquisition from the initial step.
+  GMOS South acquisition execution sequence.
   """
-  acquisition(reset: Boolean = false): GmosSouthExecutionSequence
+  acquisition: GmosSouthExecutionSequence
 
   """
   GMOS South science execution
@@ -2309,7 +2271,6 @@ type GmosSouthExecutionConfig {
 Next atom to execute and potential future atoms.
 """
 type GmosSouthExecutionSequence {
-
   """
   Next atom to execute.
   """
@@ -2325,7 +2286,6 @@ type GmosSouthExecutionSequence {
   'possibleFuture'.
   """
   hasMore: Boolean!
-
 }
 
 """
@@ -2402,7 +2362,6 @@ input GmosSouthGratingConfigInput {
 Edit or create GMOS South Long Slit advanced configuration
 """
 input GmosSouthLongSlitInput {
-
   """
   The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -2457,7 +2416,6 @@ input GmosSouthLongSlitInput {
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
-
 }
 
 """
@@ -2484,7 +2442,6 @@ enum GmosSouthStageMode {
 Unchanging (over the course of the sequence) configuration values
 """
 type GmosSouthStatic {
-
   """
   Stage mode
   """
@@ -2510,7 +2467,6 @@ type GmosSouthStatic {
 GMOS South static configuration input parameters
 """
 input GmosSouthStaticInput {
-
   """
   GMOS South Stage Mode (defaults to FOLLOW_XYZ)
   """
@@ -2530,7 +2486,6 @@ input GmosSouthStaticInput {
   GMOS Nod And Shuffle configuration
   """
   nodAndShuffle: GmosNodAndShuffleInput
-
 }
 
 """
@@ -2569,7 +2524,6 @@ type GmosSouthStep {
   Observe class for this step
   """
   observeClass: ObserveClass!
-
 }
 
 input CloneGroupInput {
@@ -2626,13 +2580,11 @@ Links a 'User' with a 'Program', filling in the 'user' field of the
 corresponding 'ProgramUser'.
 """
 input LinkUserInput {
-
   "The program user that will reference the user."
   programUserId: ProgramUserId!
 
   "The user to be linked."
   userId: UserId!
-
 }
 
 scalar ProgramUserId
@@ -2646,34 +2598,29 @@ it to 'PENDING' status. If there is an outstanding invitation, it must be
 declined or revoked before a new one may be issued.
 """
 input CreateUserInvitationInput {
-
   "The associated program user."
   programUserId: ProgramUserId!
 
   "The recipient to whom the invitation should be sent."
   recipientEmail: EmailAddress!
-
 }
 
 enum UserInvitationStatus {
-
   "This invitation has not been used."
-  PENDING,
+  PENDING
 
   "This invitation was redeemed."
-  REDEEMED,
+  REDEEMED
 
   "This invitation was declined."
-  DECLINED,
+  DECLINED
 
   "This invitation was revoked, and can no longer be redeemed."
   REVOKED
-
 }
 
 "Invitation"
 type UserInvitation {
-
   "Id"
   id: UserInvitationId!
 
@@ -2694,29 +2641,23 @@ type UserInvitation {
 }
 
 type CreateUserInvitationResult {
-
   "The created invitation."
   invitation: UserInvitation!
 
   "Give this key to the person you wish to invite. They can later redeem the invitation."
   key: UserInvitationKey!
-
 }
 
 input RedeemUserInvitationInput {
-
   key: UserInvitationKey!
 
   "Pass false here to decline the invitation."
   accept: Boolean = true
-
 }
 
 type RedeemUserInvitationResult {
-
   "The redeemed invitation."
   invitation: UserInvitation!
-
 }
 
 input RevokeUserInvitationInput {
@@ -2724,10 +2665,8 @@ input RevokeUserInvitationInput {
 }
 
 type RevokeUserInvitationResult {
-
   "The revoked invitation."
   invitation: UserInvitation!
-
 }
 
 type LinkUserResult {
@@ -2750,14 +2689,11 @@ enum MosPreImaging {
 }
 
 type Mutation {
-
   """
   Logs  observing conditions to the Chronicle. This operation is permitted only for staff and
   service users.
   """
-  addConditionsEntry(
-    input: ConditionsEntryInput
-  ): AddConditionsEntryResult!
+  addConditionsEntry(input: ConditionsEntryInput): AddConditionsEntryResult!
 
   """
   Adds a new atom event.
@@ -2778,7 +2714,6 @@ type Mutation {
   transitions through the observe, readout and write stages.
   """
   addDatasetEvent(
-
     """
     Describes the dataset event to add.  All events are associated with a
     particular visit (see 'record{InstrumentName}Visit').  Dataset events
@@ -2786,7 +2721,6 @@ type Mutation {
     step may produce multiple datasets. (See also 'record{InstrumentName}Step'.)
     """
     input: AddDatasetEventInput!
-
   ): AddDatasetEventResult!
 
   """
@@ -2795,9 +2729,7 @@ type Mutation {
   sent and when accepted the 'User' field will become available and the 'User'
   will gain appropriate access to the program.
   """
-  addProgramUser(
-    input: AddProgramUserInput!
-  ): AddProgramUserResult!
+  addProgramUser(input: AddProgramUserInput!): AddProgramUserResult!
 
   """
   Adds a sequence event associated with the given visit. Multiple events
@@ -2805,7 +2737,6 @@ type Mutation {
   paused, continued, etc.
   """
   addSequenceEvent(
-
     """
     Describes the sequence event to add.  All events are associated with a
     particular visit (see 'record{InstrumentName}Visit').  Sequence events
@@ -2813,20 +2744,17 @@ type Mutation {
     the sequence command that acted upon the sequence.
     """
     input: AddSequenceEventInput!
-
   ): AddSequenceEventResult!
 
   """
   Adds a new slew event associated with the given visit.
   """
   addSlewEvent(
-
     """
     Describes the slew event to add.  All events are associated with a
     particular visit (see 'record{InstrumentName}Visit').
     """
     input: AddSlewEventInput!
-
   ): AddSlewEventResult!
 
   """
@@ -2835,14 +2763,12 @@ type Mutation {
   transitions through configure and observe stages.
   """
   addStepEvent(
-
     """
     Describes the step event to add.  All events are associated with a
     particular step (see 'record{InstrumentName}Step'). Each step event
     identifies the stage through which the step execution is passing.
     """
     input: AddStepEventInput!
-
   ): AddStepEventResult!
 
   """
@@ -2873,9 +2799,7 @@ type Mutation {
   """
   Copy this group and its contents, recursively, as a sibling of itself.
   """
-  cloneGroup(
-    input: CloneGroupInput!
-  ): CloneGroupResult!
+  cloneGroup(input: CloneGroupInput!): CloneGroupResult!
 
   """
   Makes a copy of an existing target, setting it to unobserved and to PRESENT.  If `REPLACE_IN` observationIds are specified in the input, the clone will replace the existing target in those observations
@@ -2895,10 +2819,7 @@ type Mutation {
   ): CreateCallForProposalsResult!
 
   "Creates a new observation according to provided parameters."
-  createGroup(
-    "Group description."
-    input: CreateGroupInput!
-  ): CreateGroupResult!
+  createGroup("Group description." input: CreateGroupInput!): CreateGroupResult!
 
   """
   Creates a new observation according to provided parameters
@@ -2923,9 +2844,7 @@ type Mutation {
   """
   Creates a new program note according to provided parameters
   """
-  createProgramNote(
-    input: CreateProgramNoteInput!
-  ): CreateProgramNoteResult!
+  createProgramNote(input: CreateProgramNoteInput!): CreateProgramNoteResult!
 
   """
   Creates a new proposal according to the provided properties
@@ -2950,16 +2869,12 @@ type Mutation {
   """
   Deletes a 'ProgramUser'.
   """
-  deleteProgramUser(
-    input: DeleteProgramUserInput!
-  ): DeleteProgramUserResult!
+  deleteProgramUser(input: DeleteProgramUserInput!): DeleteProgramUserResult!
 
   """
   Deletes the given program's proposal, if any.
   """
-  deleteProposal(
-    input: DeleteProposalInput!
-  ): DeleteProposalResult!
+  deleteProposal(input: DeleteProposalInput!): DeleteProposalResult!
 
   """
   Ties a specific user to an existing ProgramUser, which must not already be
@@ -3016,6 +2931,15 @@ type Mutation {
   ): RecordGmosSouthVisitResult!
 
   """
+  Resets the acquisition sequence to start from the initial step regardless of
+  which acquisition steps may have been executed.  Requires staff (or better)
+  access.
+  """
+  resetAcquisition(
+    input: ResetAcquisitionInput!
+  ): ResetAcquisitionResult!
+
+  """
   Set the allocations for a program.
   """
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
@@ -3026,7 +2950,9 @@ type Mutation {
   setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult!
 
   "Set the program reference."
-  setProgramReference(input: SetProgramReferenceInput!): SetProgramReferenceResult!
+  setProgramReference(
+    input: SetProgramReferenceInput!
+  ): SetProgramReferenceResult!
 
   "Set the proposal status."
   setProposalStatus(input: SetProposalStatusInput!): SetProposalStatusResult!
@@ -3084,7 +3010,6 @@ type Mutation {
     input: UpdateObservationsInput!
   ): UpdateObservationsResult!
 
-
   """
   Update existing configuration requests.
   """
@@ -3123,10 +3048,8 @@ type Mutation {
 
   "Updates existing program users."
   updateProgramUsers(
-
     "Parameters for updating an existing program user."
     input: UpdateProgramUsersInput!
-
   ): UpdateProgramUsersResult!
 
   """
@@ -3156,7 +3079,6 @@ type Mutation {
     input: CreateUserInvitationInput!
   ): CreateUserInvitationResult!
 
-
   """
   Redeem a user invitation.
   """
@@ -3185,7 +3107,6 @@ type Mutation {
   setObservationWorkflowState(
     input: SetObservationWorkflowStateInput!
   ): ObservationWorkflow
-
 }
 
 input SetObservationWorkflowStateInput {
@@ -3231,14 +3152,12 @@ type ObservationEdit { #implements Event {
   Edited object, can be null if the value was deleted
   """
   value: Observation
-
 }
 
 """
 Event sent when a configuration request is created or updated
 """
 type ConfigurationRequestEdit {
-
   """
   Type of edit
   """
@@ -3253,9 +3172,7 @@ type ConfigurationRequestEdit {
   Edited configuration request, can be null if the value was deleted
   """
   configurationRequest: ConfigurationRequest
-
 }
-
 
 """
 Configuration request properties.
@@ -3334,7 +3251,6 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
-
 }
 
 """
@@ -3368,7 +3284,6 @@ type Offset {
 Offset component (p or q) input parameters. Choose one angle units definition.
 """
 input OffsetComponentInput {
-
   """
   Angle in µas
   """
@@ -3389,7 +3304,6 @@ input OffsetComponentInput {
 Offset input.  Define offset in p and q.
 """
 input OffsetInput {
-
   """
   Offset in p
   """
@@ -3399,7 +3313,6 @@ input OffsetInput {
   Offset in q
   """
   q: OffsetComponentInput!
-
 }
 
 """
@@ -3414,13 +3327,20 @@ input ParallaxInput {
 Gemini Partners
 """
 enum Partner {
-   "Argentina"            AR
-   "Brazil"               BR
-   "Canada"               CA
-   "Chile"                CL
-   "Korea"                KR
-   "University of Hawaii" UH
-   "United States"        US
+  "Argentina"
+  AR
+  "Brazil"
+  BR
+  "Canada"
+  CA
+  "Chile"
+  CL
+  "Korea"
+  KR
+  "University of Hawaii"
+  UH
+  "United States"
+  US
 }
 
 """
@@ -3437,10 +3357,8 @@ enum PartnerLinkType {
 
 "Represents the association of a user with a `Partner`, if any."
 interface PartnerLink {
-
   "Partner link discriminator."
   linkType: PartnerLinkType!
-
 }
 
 """
@@ -3478,7 +3396,6 @@ Describes the user / partner association.  Only one of `partner` or `linkType`
 should be specified, but as long as they are consistent both may be supplied.
 """
 input PartnerLinkInput {
-
   """
   Describes the state of the association between a user and a partner. The
   link type is assumed to be `HAS_PARTNER` if the `partner` is specified.
@@ -3491,7 +3408,6 @@ input PartnerLinkInput {
   here.  Only set `partner` or `linkType`, but not both.
   """
   partner: Partner
-
 }
 
 """
@@ -3499,7 +3415,6 @@ Partner splits detail how requested time for a Queue or Classical proposal
 should be distributed amongst Gemini partners.
 """
 type PartnerSplit {
-
   partner: Partner!
 
   "Percentage of requested time that should be associated with the partner."
@@ -3511,7 +3426,6 @@ Time request percentage that should be associated with a particular partner for
 Queue and Classical proposals.
 """
 input PartnerSplitInput {
-
   partner: Partner!
 
   "Percentage of requested time that should be associated with the partner."
@@ -3521,10 +3435,8 @@ input PartnerSplitInput {
 """
 Create or edit position angle constraint.  If not specified, then the
 position angle required to reach the best guide star option will be used.
-
 """
 input PosAngleConstraintInput {
-
   """
   The constraint mode field determines whether the angle field is respected
   or ignored.
@@ -3556,14 +3468,16 @@ type ProgramEdit { #implements Event {
   Edited object
   """
   value: Program!
-  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
+  id: Long!
+    @deprecated(
+      reason: "id is no longer computed; a constant value is returned"
+    )
 }
 
 """
 Program properties
 """
 input ProgramPropertiesInput {
-
   """
   The program name / title, which is both optional and nullable.
   """
@@ -3610,7 +3524,6 @@ input ProgramPropertiesInput {
 ProgramNote creation and edit properties.
 """
 input ProgramNotePropertiesInput {
-
   "The note title.  Required on creation."
   title: NonEmptyString
 
@@ -3625,15 +3538,12 @@ input ProgramNotePropertiesInput {
 
   "Whether the program is considered deleted (defaults to PRESENT)."
   existence: Existence
-
 }
-
 
 """
 Editable properties that define a program / user connection.
 """
 input ProgramUserPropertiesInput {
-
   "The user's partner."
   partnerLink: PartnerLinkInput
 
@@ -3664,40 +3574,48 @@ input ProgramUserPropertiesInput {
 The role a user a plays when assigned to a program.
 """
 enum ProgramUserRole {
-  "Primary Investigator"               PI
-  "Co-Investigator"                    COI
-  "Co-Investigator (read-only access)" COI_RO
-  "External"                           EXTERNAL
-  "Staff/Partner Primary Support"      SUPPORT_PRIMARY
-  "Staff/Partner Secondary Support"    SUPPORT_SECONDARY
+  "Primary Investigator"
+  PI
+  "Co-Investigator"
+  COI
+  "Co-Investigator (read-only access)"
+  COI_RO
+  "External"
+  EXTERNAL
+  "Staff/Partner Primary Support"
+  SUPPORT_PRIMARY
+  "Staff/Partner Secondary Support"
+  SUPPORT_SECONDARY
 }
 
 """
 The type of support role.
 """
 enum ProgramUserSupportRoleType {
-  "Staff support"   STAFF
-  "Partner support" PARTNER
+  "Staff support"
+  STAFF
+  "Partner support"
+  PARTNER
 }
 
 """
 An assignment of a user to a program.
 """
 type ProgramUser {
-  id:                ProgramUserId!
+  id: ProgramUserId!
 
-  role:              ProgramUserRole!
-  program:           Program
-  user:              User
+  role: ProgramUserRole!
+  program: Program
+  user: User
 
   "How the partner is associated with a partner."
-  partnerLink:       PartnerLink!
+  partnerLink: PartnerLink!
 
   """
   Profile information reported when the corresponding ORCiD profile is not set
   or is not public.
   """
-  fallbackProfile:   UserProfile!
+  fallbackProfile: UserProfile!
 
   "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
@@ -3736,17 +3654,14 @@ Proposal properties that depend on the particular call for proposals associated
 with this proposal.
 """
 interface ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
-
 }
 
 """
 Proposal properties for Regular Semester (Classical) CallForProposals.
 """
 type Classical implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3763,14 +3678,12 @@ type Classical implements ProposalType {
   # TODO: JWST Synergy
   # TODO: US Long Term
   # TODO: Visitors?
-
 }
 
 """
 Proposal properties for Demo Science CallForProposals.
 """
 type DemoScience implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3785,14 +3698,12 @@ type DemoScience implements ProposalType {
   successful.
   """
   minPercentTime: IntPercent!
-
 }
 
 """
 Proposal properties for Director's Time CallForProposals.
 """
 type DirectorsTime implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3807,14 +3718,12 @@ type DirectorsTime implements ProposalType {
   successful.
   """
   minPercentTime: IntPercent!
-
 }
 
 """
 Proposal properties for Fast Turnaround CallForProposals.
 """
 type FastTurnaround implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3843,7 +3752,6 @@ type FastTurnaround implements ProposalType {
 Proposal properties for Large Program CallForProposals.
 """
 type LargeProgram implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3872,7 +3780,6 @@ type LargeProgram implements ProposalType {
 
   # TODO: AEON / Multi-facility
   # TODO: JWST Synergy
-
 }
 
 """
@@ -3887,7 +3794,6 @@ type PoorWeather implements ProposalType {
 Proposal properties for Regular Semester (Queue) CallForProposals.
 """
 type Queue implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3912,14 +3818,12 @@ type Queue implements ProposalType {
   # TODO: AEON / Multi-facility
   # TODO: JWST Synergy
   # TODO: US Long Term
-
 }
 
 """
 Proposal properties for System Verification CallForProposals.
 """
 type SystemVerification implements ProposalType {
-
   "The science type of this Call for Proposals."
   scienceSubtype: ScienceSubtype!
 
@@ -3934,7 +3838,6 @@ type SystemVerification implements ProposalType {
   successful.
   """
   minPercentTime: IntPercent!
-
 }
 
 """
@@ -3942,7 +3845,6 @@ Properties associated with particular proposal types.  Exactly one of
 these should be set upon creation or editing.
 """
 input ProposalTypeInput {
-
   classical: ClassicalInput
 
   demoScience: DemoScienceInput
@@ -3958,11 +3860,9 @@ input ProposalTypeInput {
   queue: QueueInput
 
   systemVerification: SystemVerificationInput
-
 }
 
 input ClassicalInput {
-
   """
   The minimum percentage of time required to consider this proposal a success.
   If not set, 100% is assumed.
@@ -3980,11 +3880,9 @@ input ClassicalInput {
   # TODO: JWST Synergy
   # TODO: US Long Term
   # TODO: Visitors?
-
 }
 
 input DemoScienceInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -3996,11 +3894,9 @@ input DemoScienceInput {
   If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
-
 }
 
 input DirectorsTimeInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -4012,11 +3908,9 @@ input DirectorsTimeInput {
   If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
-
 }
 
 input FastTurnaroundInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -4036,11 +3930,9 @@ input FastTurnaroundInput {
   piAffiliation: Partner
 
   # TODO: Reviewer?
-
 }
 
 input LargeProgramInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -4067,7 +3959,6 @@ input LargeProgramInput {
 
   # TODO: AEON / Multi-facility
   # TODO: JWST Synergy
-
 }
 
 """
@@ -4085,17 +3976,14 @@ poor weather proposal but GraphQL requires at least one field.  Therefore this
 input includes a single optional 'ignore' field which need not be set.
 """
 input PoorWeatherInput {
-
   """
   This field is not intended to be used (and may be left unset), but is required
   by the GraphQL specification.
   """
   ignore: Ignore
-
 }
 
 input QueueInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -4119,11 +4007,9 @@ input QueueInput {
   # TODO: AEON / Multi-facility
   # TODO: JWST Synergy
   # TODO: US Long Term
-
 }
 
 input SystemVerificationInput {
-
   """
   The toOActivation field is optional. If not specified when creating a
   proposal, it defaults to `NONE'.
@@ -4135,14 +4021,12 @@ input SystemVerificationInput {
   If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
-
 }
 
 """
 Program proposal
 """
 input ProposalPropertiesInput {
-
   """
   The category field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -4165,9 +4049,7 @@ input ProposalPropertiesInput {
   type itself, all properties required for that type must be included.
   """
   type: ProposalTypeInput
-
 }
-
 
 """
 Radial velocity, choose one of the available units
@@ -4213,20 +4095,18 @@ input RecordDatasetInput {
 
 "The result of recording a new dataset."
 type RecordDatasetResult {
-
   "The new dataset that was added."
   dataset: Dataset!
-
 }
 
 "Input parameters for creating a new GmosNorth StepRecord"
 input RecordGmosNorthStepInput {
-  atomId:          AtomId!
-  gmosNorth:       GmosNorthDynamicInput!
-  stepConfig:      StepConfigInput!
+  atomId: AtomId!
+  gmosNorth: GmosNorthDynamicInput!
+  stepConfig: StepConfigInput!
   telescopeConfig: TelescopeConfigInput
-  observeClass:    ObserveClass!
-  generatedId:     StepId
+  observeClass: ObserveClass!
+  generatedId: StepId
 }
 
 """
@@ -4244,7 +4124,7 @@ Input parameters for creating a new GmosNorthVisit
 """
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
-  gmosNorth:     GmosNorthStaticInput!
+  gmosNorth: GmosNorthStaticInput!
 }
 
 """
@@ -4261,12 +4141,12 @@ type RecordGmosNorthVisitResult {
 Input parameters for creating a new GmosSouth StepRecord
 """
 input RecordGmosSouthStepInput {
-  atomId:          AtomId!
-  gmosSouth:       GmosSouthDynamicInput!
-  stepConfig:      StepConfigInput!
+  atomId: AtomId!
+  gmosSouth: GmosSouthDynamicInput!
+  stepConfig: StepConfigInput!
   telescopeConfig: TelescopeConfigInput
-  observeClass:    ObserveClass!
-  generatedId:     StepId
+  observeClass: ObserveClass!
+  generatedId: StepId
 }
 
 """
@@ -4284,7 +4164,7 @@ Input parameters for creating a new GmosSouthVisit
 """
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
-  gmosSouth:     GmosSouthStaticInput!
+  gmosSouth: GmosSouthStaticInput!
 }
 
 """
@@ -4295,6 +4175,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for resetting the acquisition sequence so that it executes
+from the initial step, regardless of which steps may have previously been
+executed.  Select one of `observationId` or `observationReference`.
+"""
+input ResetAcquisitionInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of resetting the acquisition sequence.
+"""
+type ResetAcquisitionResult {
+  """
+  The observation whose acquisition was reset.
+  """
+  observation: Observation!
 }
 
 """
@@ -4312,7 +4212,6 @@ input RightAscensionInput {
 Science step
 """
 type Science implements StepConfig {
-
   """
   Step type is always SCIENCE.
   """
@@ -4333,21 +4232,18 @@ enum SmartGcalType {
 SmartGcal step configuration.
 """
 type SmartGcal implements StepConfig {
-
   smartGcalType: SmartGcalType!
 
   """
   Step type is always SMART_GCAL.
   """
   stepType: StepType!
-
 }
 
 """
 Edit or create an observation's observing mode
 """
 input ObservingModeInput {
-
   """
   The gmosNorthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -4379,7 +4275,7 @@ Describes the program allocations.  Each partner and band combination should
 appear at most once in the 'allocations' array.
 """
 input SetAllocationsInput {
-  programId:   ProgramId!
+  programId: ProgramId!
   allocations: [AllocationInput!]!
 }
 
@@ -4388,7 +4284,6 @@ type SetAllocationsResult {
 }
 
 type SetupTime {
-
   """
   Full setup time estimate, including slew, configuration and target acquisition
   """
@@ -4431,10 +4326,10 @@ these is specified, all must match.  Use `SET` to specify the new program
 reference properties.
 """
 input SetProgramReferenceInput {
-  programId:         ProgramId
+  programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference:  ProgramReferenceLabel
-  SET:               ProgramReferencePropertiesInput!
+  programReference: ProgramReferenceLabel
+  SET: ProgramReferencePropertiesInput!
 }
 
 """
@@ -4442,14 +4337,14 @@ Properties for the chosen program reference type.  Supply the value for exactly
 one of the inputs.
 """
 input ProgramReferencePropertiesInput {
-  calibration:   ProgramReferencePropertiesCalibrationInput
+  calibration: ProgramReferencePropertiesCalibrationInput
   commissioning: ProgramReferencePropertiesCommissioningInput
-  engineering:   ProgramReferencePropertiesEngineeringInput
-  example:       ProgramReferencePropertiesExampleInput
-  library:       ProgramReferencePropertiesLibraryInput
-  monitoring:    ProgramReferencePropertiesMonitoringInput
-  science:       ProgramReferencePropertiesScienceInput
-  system:        ProgramReferencePropertiesSystemInput
+  engineering: ProgramReferencePropertiesEngineeringInput
+  example: ProgramReferencePropertiesExampleInput
+  library: ProgramReferencePropertiesLibraryInput
+  monitoring: ProgramReferencePropertiesMonitoringInput
+  science: ProgramReferencePropertiesScienceInput
+  system: ProgramReferencePropertiesSystemInput
 }
 
 type SetProgramReferenceResult {
@@ -4461,7 +4356,7 @@ type SetProgramReferenceResult {
 Inputs required when updating or switching to a calibration program.
 """
 input ProgramReferencePropertiesCalibrationInput {
-  semester:   Semester!
+  semester: Semester!
   instrument: Instrument!
 }
 
@@ -4469,7 +4364,7 @@ input ProgramReferencePropertiesCalibrationInput {
 Inputs required when updating or switching to a commissioning program.
 """
 input ProgramReferencePropertiesCommissioningInput {
-  semester:   Semester!
+  semester: Semester!
   instrument: Instrument!
 }
 
@@ -4477,7 +4372,7 @@ input ProgramReferencePropertiesCommissioningInput {
 Inputs required when updating or switching to an engineering program.
 """
 input ProgramReferencePropertiesEngineeringInput {
-  semester:   Semester!
+  semester: Semester!
   instrument: Instrument!
 }
 
@@ -4492,7 +4387,7 @@ input ProgramReferencePropertiesExampleInput {
 Inputs required when updating or switching to a library program.
 """
 input ProgramReferencePropertiesLibraryInput {
-  instrument:  Instrument!
+  instrument: Instrument!
   description: NonEmptyString!
 }
 
@@ -4500,7 +4395,7 @@ input ProgramReferencePropertiesLibraryInput {
 Inputs required when updating or switching to a monitoring program.
 """
 input ProgramReferencePropertiesMonitoringInput {
-  semester:   Semester!
+  semester: Semester!
   instrument: Instrument!
 }
 
@@ -4508,7 +4403,7 @@ input ProgramReferencePropertiesMonitoringInput {
 Inputs required when updating or switching to a science program.
 """
 input ProgramReferencePropertiesScienceInput {
-  semester:       Semester!
+  semester: Semester!
   scienceSubtype: ScienceSubtype!
 }
 
@@ -4525,14 +4420,14 @@ of `programId`, `proposalReference` or `programReference`.  If more than one of
 these is specified, all must match.
 """
 input SetProposalStatusInput {
-  programId:         ProgramId
+  programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference:  ProgramReferenceLabel
-  status:            ProposalStatus!
+  programReference: ProgramReferenceLabel
+  status: ProposalStatus!
 }
 
 """
-  The result of setting the proposal status.
+The result of setting the proposal status.
 """
 type SetProposalStatusResult {
   """
@@ -4676,7 +4571,6 @@ interface StepConfig {
 Step configuration.  Choose exactly one step type.
 """
 input StepConfigInput {
-
   """
   Bias step creation option
   """
@@ -4701,7 +4595,6 @@ input StepConfigInput {
   Smart gcal creation option
   """
   smartGcal: StepConfigSmartGcalInput
-
 }
 
 """
@@ -4720,7 +4613,6 @@ input StepConfigGcalInput {
 SmartGcal step creation input
 """
 input StepConfigSmartGcalInput {
-
   """
   Smart Gcal type
   """
@@ -4731,7 +4623,6 @@ input StepConfigSmartGcalInput {
 Execution state of a recorded step.
 """
 enum StepExecutionState {
-
   "No events have been received since the step was recorded."
   NOT_STARTED
 
@@ -4749,7 +4640,6 @@ enum StepExecutionState {
 
   "An ongoing step was abandoned."
   ABANDONED
-
 }
 
 """
@@ -4783,7 +4673,6 @@ enum StepType {
 }
 
 type Subscription {
-
   """
   Subscribes to an event that is generated whenever a dataset is created or
   updated.  The input allows the caller to filter on program, observation or
@@ -4791,74 +4680,54 @@ type Subscription {
   observation or dataset).  It also permits limiting events to only those for
   which a dataset file has been written.
   """
-  datasetEdit(
-    input: DatasetEditInput
-  ): DatasetEdit!
+  datasetEdit(input: DatasetEditInput): DatasetEdit!
 
   """
-
   Subscribes to an event that is generated whenever a(n) observation is
   created or updated.  If a(n) observation id is provided, the event is only
   generated for edits to that particular observation.  If a program id is
   provided then the event must correspond to a(n) observation referenced by
   that program.
+  """
+  observationEdit(input: ObservationEditInput): ObservationEdit!
 
   """
-  observationEdit(
-    input: ObservationEditInput
-  ): ObservationEdit!
-
-  """
-
   Subscribes to an event that is generated whenever a program is created
   or edited. A particular program id may be provided to limit events to
   that program.
+  """
+  programEdit(input: ProgramEditInput): ProgramEdit!
 
   """
-  programEdit(
-    input: ProgramEditInput
-  ): ProgramEdit!
-
-  """
-
   Subscribes to an event that is generated whenever a(n) target is
   created or updated.  If a(n) target id is provided, the event is only
   generated for edits to that particular target.  If a program id is
   provided then the event must correspond to a(n) target referenced by
   that program.
+  """
+  targetEdit(input: TargetEditInput): TargetEdit!
 
   """
-  targetEdit(
-    input: TargetEditInput
-  ): TargetEdit!
-
-  """
-
   Subscribes to an event that is generated whenever a group is
   created or updated.  If a group id is provided, the event is only
   generated for edits to that particular group.  If a program id is
   provided then the event must correspond to a group referenced by
   that program.
-
   """
-  groupEdit(
-    input: GroupEditInput
-  ): GroupEdit!
+  groupEdit(input: GroupEditInput): GroupEdit!
 
   configurationRequestEdit(
     input: ConfigurationRequestEditInput
   ): ConfigurationRequestEdit!
 
-  executionEventAdded(
-    input: ExecutionEventAddedInput
-  ): ExecutionEventAdded!
+  executionEventAdded(input: ExecutionEventAddedInput): ExecutionEventAdded!
 }
 
 input ExecutionEventAddedInput {
-  programId:     ProgramId
+  programId: ProgramId
   observationId: ObservationId
-  visitId:       VisitId
-  eventType:     WhereEqExecutionEventType
+  visitId: VisitId
+  eventType: WhereEqExecutionEventType
 }
 
 type ExecutionEventAdded {
@@ -4866,38 +4735,34 @@ type ExecutionEventAdded {
 }
 
 input TargetEditInput {
-    """
-    Target ID
-    """
-    targetId: TargetId
+  """
+  Target ID
+  """
+  targetId: TargetId
 
-    """
-    Program ID
-    """
-    programId: ProgramId
-
+  """
+  Program ID
+  """
+  programId: ProgramId
 }
 
 input GroupEditInput {
-    """
-    Group ID, or Null to watch top-level group(s), or omit to watch all groups.
-    """
-    groupId: GroupId
+  """
+  Group ID, or Null to watch top-level group(s), or omit to watch all groups.
+  """
+  groupId: GroupId
 
-    """
-    Program ID
-    """
-    programId: ProgramId
-
+  """
+  Program ID
+  """
+  programId: ProgramId
 }
 
 input ConfigurationRequestEditInput {
-
-    """
-    Program ID
-    """
-    programId: ProgramId
-
+  """
+  Program ID
+  """
+  programId: ProgramId
 }
 
 """
@@ -4905,22 +4770,21 @@ Specifies filtering options for dataset edit events from the `datasetEdit`
 subscription.
 """
 input DatasetEditInput {
-
   "If set, only events for the associated dataset are sent."
-  datasetId:     DatasetId
+  datasetId: DatasetId
 
   "If set, only events for datasets produced by the associated observation are sent."
   observationId: ObservationId
 
   "If set, only events for datasets produced by the associated program are sent."
-  programId:     ProgramId
+  programId: ProgramId
 
   """
   If set, only events for datasets that are written to disk are sent.  (Note,
   datasets are considered to be written when an `END_WRITE` event is received by
   the database.)
   """
-  isWritten:     Boolean
+  isWritten: Boolean
 }
 
 type DatasetEdit {
@@ -4977,7 +4841,10 @@ type GroupEdit {
   Edited group, or null if it's the top-level group.
   """
   value: Group
-  id: Long! @deprecated(reason: "id is no longer computed; a constant value is returned")
+  id: Long!
+    @deprecated(
+      reason: "id is no longer computed; a constant value is returned"
+    )
 }
 
 """
@@ -5034,22 +4901,38 @@ Time Accounting Categories.  Each successful proposal is given one or more
 time allocations and each allocation has a time accounting category.
 """
 enum TimeAccountingCategory {
-  "Argentina"                AR
-  "Brazil"                   BR
-  "Canada"                   CA
-  "CFHT Exchange"            CFHT
-  "Chile"                    CL
-  "Director's Time"          DD
-  "Demo Science"             DS
-  "Guaranteed Time"          GT
-  "Subaru"                   JP
-  "Keck Exchange"            KECK
-  "Republic of Korea"        KR
-  "Large Program"            LP
-  "Limited-term Participant" LTP
-  "System Verification"      SV
-  "University of Hawaii"     UH
-  "United States"            US
+  "Argentina"
+  AR
+  "Brazil"
+  BR
+  "Canada"
+  CA
+  "CFHT Exchange"
+  CFHT
+  "Chile"
+  CL
+  "Director's Time"
+  DD
+  "Demo Science"
+  DS
+  "Guaranteed Time"
+  GT
+  "Subaru"
+  JP
+  "Keck Exchange"
+  KECK
+  "Republic of Korea"
+  KR
+  "Large Program"
+  LP
+  "Limited-term Participant"
+  LTP
+  "System Verification"
+  SV
+  "University of Hawaii"
+  UH
+  "United States"
+  US
 }
 
 """
@@ -5208,7 +5091,6 @@ changes, `WHERE` to select the calls to update, and `LIMIT` to control the
 size of the return value.
 """
 input UpdateCallsForProposalsInput {
-
   "Describes the call for proposals properties to modify."
   SET: CallForProposalsPropertiesInput!
 
@@ -5315,7 +5197,6 @@ type UpdateGroupsResult {
 Observation selection and update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
 """
 input UpdateObservationsInput {
-
   """
   Describes the observation values to modify.
   """
@@ -5341,7 +5222,6 @@ input UpdateObservationsInput {
 ConfigurationRequest selection and update description.  Use `SET` to specify the changes, `WHERE` to select the requests to update, and `LIMIT` to control the size of the return value.
 """
 input UpdateConfigurationRequestsInput {
-
   """
   Describes the observation values to modify.
   """
@@ -5356,14 +5236,12 @@ input UpdateConfigurationRequestsInput {
   Caps the number of results returned to the given value (if additional observations match the WHERE clause they will be updated but not returned).
   """
   LIMIT: NonNegInt
-
 }
 
 """
 Observation selection and times update description.  Use `SET` to specify the changes, `WHERE` to select the observations to update, and `LIMIT` to control the size of the return value.
 """
 input UpdateObservationsTimesInput {
-
   """
   Describes the observation time values to modify.
   """
@@ -5415,15 +5293,12 @@ type UpdateConfigurationRequestsResult {
   hasMore: Boolean!
 }
 
-
-
 """
 Parameters for the 'updateProgramUsers' mutation.  Use 'SET' to specify the
 changes, 'WHERE' to select the program users to update, and 'LIMIT' to control
 the size of the return value.
 """
 input UpdateProgramUsersInput {
-
   "Defines the program user properties to modify."
   SET: ProgramUserPropertiesInput!
 
@@ -5435,7 +5310,6 @@ input UpdateProgramUsersInput {
   users match the 'WHERE' clause they will be updated not returned).
   """
   LIMIT: NonNegInt
-
 }
 
 """
@@ -5444,7 +5318,6 @@ The result of calling 'updateProgramUsers', up to 'LIMIT' or the maximum of
 included in the result.
 """
 type UpdateProgramUsersResult {
-
   """
   The first program users that were updated (up to the LIMIT specified in the
   mutation).
@@ -5461,7 +5334,6 @@ Program note selection and update description.  Use `SET" to specify the changes
 return value.
 """
 input UpdateProgramNotesInput {
-
   "Describes the program note values to modify."
   SET: ProgramNotePropertiesInput!
 
@@ -5547,10 +5419,10 @@ these is specified, all must match.  Use `SET` to specify the new program
 reference properties.
 """
 input UpdateProposalInput {
-  programId:         ProgramId
+  programId: ProgramId
   proposalReference: ProposalReferenceLabel
-  programReference:  ProgramReferenceLabel
-  SET:               ProposalPropertiesInput!
+  programReference: ProgramReferenceLabel
+  SET: ProposalPropertiesInput!
 }
 
 """
@@ -5715,7 +5587,6 @@ type Angle {
 }
 
 type AsterismGroup {
-
   program: Program!
 
   """
@@ -5803,14 +5674,14 @@ enum AttachmentType {
 Attachment
 """
 type Attachment {
-  id:             AttachmentId!
+  id: AttachmentId!
   attachmentType: AttachmentType!
-  fileName:       NonEmptyString!
-  description:    NonEmptyString
-  checked:        Boolean!
-  fileSize:       Long!
-  updatedAt:      Timestamp!
-  program:        Program!
+  fileName: NonEmptyString!
+  description: NonEmptyString
+  checked: Boolean!
+  fileSize: Long!
+  updatedAt: Timestamp!
+  program: Program!
 }
 
 input AttachmentPropertiesInput {
@@ -6107,7 +5978,6 @@ enum CatalogName {
 Who is charged for time, if anyone.
 """
 enum ChargeClass {
-
   """
   Time that is not charged.
   """
@@ -6117,45 +5987,44 @@ enum ChargeClass {
   Time charged to the science program.
   """
   PROGRAM
-
 }
 
 """
 Cloud extinction
 """
-enum CloudExtinction {
+enum CloudExtinctionPreset {
   """
-  CloudExtinction PointOne
+  CloudExtinctionPreset PointOne
   """
   POINT_ONE
 
   """
-  CloudExtinction PointThree
+  CloudExtinctionPreset PointThree
   """
   POINT_THREE
 
   """
-  CloudExtinction PointFive
+  CloudExtinctionPreset PointFive
   """
   POINT_FIVE
 
   """
-  CloudExtinction OnePointZero
+  CloudExtinctionPreset OnePointZero
   """
   ONE_POINT_ZERO
 
   """
-  CloudExtinction OnePointFive
+  CloudExtinctionPreset OnePointFive
   """
   ONE_POINT_FIVE
 
   """
-  CloudExtinction TwoPointZero
+  CloudExtinctionPreset TwoPointZero
   """
   TWO_POINT_ZERO
 
   """
-  CloudExtinction ThreePointZero
+  CloudExtinctionPreset ThreePointZero
   """
   THREE_POINT_ZERO
 }
@@ -6164,7 +6033,6 @@ enum CloudExtinction {
 ObservingMode
 """
 enum ObservingModeType {
-
   """
   ObservingModeType GmosNorthLongSlit
   """
@@ -6174,19 +6042,18 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
-
 }
 
 type ConstraintSet {
   """
   Image quality
   """
-  imageQuality: ImageQuality!
+  imageQuality: ImageQualityPreset!
 
   """
   Cloud extinction
   """
-  cloudExtinction: CloudExtinction!
+  cloudExtinction: CloudExtinctionPreset!
 
   """
   Sky background
@@ -6205,7 +6072,6 @@ type ConstraintSet {
 }
 
 type ConstraintSetGroup {
-
   """
   Observations associated with the common value
   """
@@ -6343,7 +6209,6 @@ type Coordinates {
 scalar DatasetId
 
 type Dataset {
-
   "Dataset id."
   id: DatasetId!
 
@@ -6388,7 +6253,6 @@ type Dataset {
   written when an `END_WRITE` event is received from Observe.
   """
   isWritten: Boolean!
-
 }
 
 """
@@ -6396,7 +6260,6 @@ Dataset-level events.  A single dataset will be associated with multiple events
 as it makes its way through observe, readout and write stages.
 """
 type DatasetEvent implements ExecutionEvent {
-
   "Event id."
   id: ExecutionEventId!
 
@@ -6423,7 +6286,6 @@ type DatasetEvent implements ExecutionEvent {
 
   "The associated dataset."
   dataset: Dataset!
-
 }
 
 "Dataset filename in standard format."
@@ -6454,7 +6316,6 @@ Dataset reference type, broken into its constituient parts and including
 a formatted label.
 """
 type DatasetReference {
-
   "Formatted dataset reference label."
   label: DatasetReferenceLabel!
 
@@ -6493,7 +6354,6 @@ type DatasetSelectResult {
 
 "Execution stage or phase of an individual dataset."
 enum DatasetStage {
-
   END_EXPOSE
 
   END_READOUT
@@ -6635,7 +6495,6 @@ Reference observation epoch in format '[JB]YYYY.YYY'
 scalar EpochString
 
 type Execution {
-
   """
   Calculations dependent on the sequence, such as planned time and offsets.
   If a sequence cannot be generated for this observation, `null` is returned
@@ -6649,7 +6508,6 @@ type Execution {
   with warning messages.
   """
   config(
-
     """
     The maximum size (number of atoms) of the `possibleFuture` in the sequences.
     If the projected future is longer, the size will be capped at this value.
@@ -6659,7 +6517,6 @@ type Execution {
     projected atom count is available in the execution digest.
     """
     futureLimit: NonNegInt = 25
-
   ): ExecutionConfig
 
   """
@@ -6711,7 +6568,6 @@ type Execution {
 Execution configuration.  All but one of the instruments will be `null`.
 """
 type ExecutionConfig {
-
   """
   Instrument type.  This will indicate which of the instrument-specific fields
   is defined.
@@ -6729,7 +6585,6 @@ type ExecutionConfig {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthExecutionConfig
-
 }
 
 """
@@ -6789,24 +6644,20 @@ enum Existence {
 
 "Summarizes the execution setup time and sequences."
 type ExecutionDigest {
-
   "Setup time calculations."
-  setup:       SetupTime!
+  setup: SetupTime!
 
   "Acquisition sequence summary."
   acquisition: SequenceDigest
 
   "Science sequence summary."
-  science:     SequenceDigest
-
+  science: SequenceDigest
 }
-
 
 """
 Exposure time mode, either signal to noise or fixed
 """
 type ExposureTimeMode {
-
   "Signal to noise exposure time mode data, if applicable."
   signalToNoise: SignalToNoiseExposureTimeMode
 
@@ -6818,7 +6669,6 @@ type ExposureTimeMode {
 Flamingos2 Disperser
 """
 enum Flamingos2Disperser {
-
   """
   Flamingos2Disperser R=1200 (J + H) grism
   """
@@ -6833,7 +6683,6 @@ enum Flamingos2Disperser {
   Flamingos2Disperser R=3000 (J or H or K) grism
   """
   R3000
-
 }
 
 """
@@ -6884,7 +6733,6 @@ enum Flamingos2Filter {
   Flamingos2Filter K-blue (2.06 um)
   """
   K_BLUE
-
 }
 
 """
@@ -6936,9 +6784,9 @@ enum Flamingos2Fpu {
 Metadata for `enum FilterType`
 """
 type FilterTypeMeta {
-  tag:        FilterType!
-  shortName:  String!
-  longName:       String!
+  tag: FilterType!
+  shortName: String!
+  longName: String!
 }
 
 """
@@ -7340,7 +7188,6 @@ enum GmosNorthFilter {
   GmosNorthFilter ZPrime_CaT
   """
   Z_PRIME_CA_T
-
 }
 
 """
@@ -7382,7 +7229,6 @@ enum GmosNorthGrating {
 GMOS North Long Slit mode
 """
 type GmosNorthLongSlit {
-
   """
   GMOS North Grating
   """
@@ -7422,7 +7268,6 @@ type GmosNorthLongSlit {
   """
   explicitXBin: GmosXBinning
 
-
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
@@ -7439,7 +7284,6 @@ type GmosNorthLongSlit {
   default.
   """
   explicitYBin: GmosYBinning
-
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -7458,7 +7302,6 @@ type GmosNorthLongSlit {
   """
   explicitAmpReadMode: GmosAmpReadMode
 
-
   """
   GMOS amp read gain, either explicitly specified in explicitAmpGain or else
   taken from the defaultAmpGain.
@@ -7475,7 +7318,6 @@ type GmosNorthLongSlit {
   """
   explicitAmpGain: GmosAmpGain
 
-
   """
   GMOS ROI, either explicitly specified in explicitRoi or else taken from the
   defaultRoi.
@@ -7491,7 +7333,6 @@ type GmosNorthLongSlit {
   Optional explicitly specified GMOS ROI. If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
 
   """
   Wavelength dithers required to fill in the chip gaps. This value is either
@@ -7510,7 +7351,6 @@ type GmosNorthLongSlit {
   default.
   """
   explicitWavelengthDithers: [WavelengthDither!]
-
 
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
@@ -7827,7 +7667,6 @@ enum GmosSouthFilter {
   GmosSouthFilter HeIIC
   """
   HE_IIC
-
 }
 
 """
@@ -7874,7 +7713,6 @@ enum GmosSouthGrating {
 GMOS South Long Slit mode
 """
 type GmosSouthLongSlit {
-
   """
   GMOS South Grating
   """
@@ -7914,7 +7752,6 @@ type GmosSouthLongSlit {
   """
   explicitXBin: GmosXBinning
 
-
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
@@ -7931,7 +7768,6 @@ type GmosSouthLongSlit {
   default.
   """
   explicitYBin: GmosYBinning
-
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -7950,7 +7786,6 @@ type GmosSouthLongSlit {
   """
   explicitAmpReadMode: GmosAmpReadMode
 
-
   """
   GMOS amp read gain, either explicitly specified in explicitAmpGain or else
   taken from the defaultAmpGain.
@@ -7967,7 +7802,6 @@ type GmosSouthLongSlit {
   """
   explicitAmpGain: GmosAmpGain
 
-
   """
   GMOS ROI, either explicitly specified in explicitRoi or else taken from the
   defaultRoi.
@@ -7983,7 +7817,6 @@ type GmosSouthLongSlit {
   Optional explicitly specified GMOS ROI. If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
 
   """
   Wavelength dithers required to fill in the chip gaps. This value is either
@@ -8002,7 +7835,6 @@ type GmosSouthLongSlit {
   default.
   """
   explicitWavelengthDithers: [WavelengthDither!]
-
 
   """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
@@ -8088,7 +7920,6 @@ enum GmosYBinning {
 
 "Gemini Observatory Archive properties for a particular program."
 type GoaProperties {
-
   """
   How many months to withhold public access to the data.  This property is
   applicable to science programs, defaults to the proprietary period associated
@@ -8107,7 +7938,6 @@ type GoaProperties {
   property is applicable to science programs and defaults to false.
   """
   privateHeader: Boolean!
-
 }
 
 """
@@ -8115,7 +7945,6 @@ Gemini Observatory Archive properties creation and editing input for a
 particular program.
 """
 input GoaPropertiesInput {
-
   """
   How many months to withhold public access to the data.  This property is
   applicable to science programs, defaults to the proprietary period associated
@@ -8134,12 +7963,10 @@ input GoaPropertiesInput {
   property is applicable to science programs and defaults to false.
   """
   privateHeader: Boolean
-
 }
 
 "A group of observations and other groups."
 type Group {
-
   id: GroupId!
 
   "Id of this group's parent, or null if this group is at the top level."
@@ -8210,7 +8037,6 @@ input GroupElementInput {
 }
 
 input GroupPropertiesInput {
-
   "Group name (optional)."
   name: NonEmptyString
 
@@ -8237,7 +8063,6 @@ input GroupPropertiesInput {
 
   "Existence. Defaults to 'present' on creation. Change this value to delete a group (must be empty)."
   existence: Existence
-
 }
 
 """
@@ -8270,7 +8095,7 @@ type GuideAvailabilityPeriod {
   start: Timestamp!
 
   "Then end time of the availability period."
-  end:   Timestamp!
+  end: Timestamp!
 
   "The position angles available during this period."
   posAngles: [Angle!]!
@@ -8362,49 +8187,49 @@ type HourAngleRange {
 """
 Image quality
 """
-enum ImageQuality {
+enum ImageQualityPreset {
   """
-  ImageQuality PointOne
+  ImageQualityPreset PointOne
   """
   POINT_ONE
 
   """
-  ImageQuality PointTwo
+  ImageQualityPreset PointTwo
   """
   POINT_TWO
 
   """
-  ImageQuality PointThree
+  ImageQualityPreset PointThree
   """
   POINT_THREE
 
   """
-  ImageQuality PointFour
+  ImageQualityPreset PointFour
   """
   POINT_FOUR
 
   """
-  ImageQuality PointSix
+  ImageQualityPreset PointSix
   """
   POINT_SIX
 
   """
-  ImageQuality PointEight
+  ImageQualityPreset PointEight
   """
   POINT_EIGHT
 
   """
-  ImageQuality OnePointZero
+  ImageQualityPreset OnePointZero
   """
   ONE_POINT_ZERO
 
   """
-  ImageQuality OnePointFive
+  ImageQualityPreset OnePointFive
   """
   ONE_POINT_FIVE
 
   """
-  ImageQuality TwoPointZero
+  ImageQualityPreset TwoPointZero
   """
   TWO_POINT_ZERO
 }
@@ -8488,31 +8313,30 @@ enum Instrument {
 Describes an instrument configuration option for spectroscopy.
 """
 type SpectroscopyConfigOption {
-  name:               NonEmptyString!
-  instrument:         Instrument!
+  name: NonEmptyString!
+  instrument: Instrument!
 
-  focalPlane:         FocalPlane!
+  focalPlane: FocalPlane!
 
-  fpuLabel:           NonEmptyString! # e.g., '0.25"'
-  slitWidth:          Angle!
-  slitLength:         Angle!
+  fpuLabel: NonEmptyString! # e.g., '0.25"'
+  slitWidth: Angle!
+  slitLength: Angle!
 
-  disperserLabel:     NonEmptyString! # e.g., 'B1200'
-  filterLabel:        NonEmptyString  # e.g., 'JH'
-
-  wavelengthMin:      Wavelength!
-  wavelengthMax:      Wavelength!
-  wavelengthOptimal:  Wavelength!
+  disperserLabel: NonEmptyString! # e.g., 'B1200'
+  filterLabel: NonEmptyString # e.g., 'JH'
+  wavelengthMin: Wavelength!
+  wavelengthMax: Wavelength!
+  wavelengthOptimal: Wavelength!
   wavelengthCoverage: Wavelength!
 
-  resolution:         PosInt!
+  resolution: PosInt!
 
-  adaptiveOptics:     Boolean!
+  adaptiveOptics: Boolean!
 
   "A special capability (if any) that the configuration may have."
-  capability:         SpectroscopyCapabilities
+  capability: SpectroscopyCapabilities
 
-  site:               Site!
+  site: Site!
 
   """
   For GMOS North options, the GMOS North configuration.  Null for other
@@ -8531,25 +8355,24 @@ type SpectroscopyConfigOption {
   instruments.
   """
   flamingos2: SpectroscopyConfigOptionFlamingos2
-
 }
 
 type SpectroscopyConfigOptionGmosNorth {
-  fpu:     GmosNorthBuiltinFpu!
+  fpu: GmosNorthBuiltinFpu!
   grating: GmosNorthGrating!
-  filter:  GmosNorthFilter
+  filter: GmosNorthFilter
 }
 
 type SpectroscopyConfigOptionGmosSouth {
-  fpu:     GmosSouthBuiltinFpu!
+  fpu: GmosSouthBuiltinFpu!
   grating: GmosSouthGrating!
-  filter:  GmosSouthFilter
+  filter: GmosSouthFilter
 }
 
 type SpectroscopyConfigOptionFlamingos2 {
-  fpu:       Flamingos2Fpu!
+  fpu: Flamingos2Fpu!
   disperser: Flamingos2Disperser!
-  filter:    Flamingos2Filter!
+  filter: Flamingos2Filter!
 }
 
 """
@@ -8568,20 +8391,38 @@ results for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
-  all:      [ItcResult!]
-  index:    NonNegInt!
+  all: [ItcResult!]
+  index: NonNegInt!
+}
+
+"""
+Calculated signal to noise at a specific wavelength
+"""
+type SignalToNoiseAt {
+  """
+  Single exposure signal to noise
+  """
+  single: SignalToNoise!
+
+  """
+  Total exposure signal to noise
+  """
+  total: SignalToNoise!
+
+  """
+  Wavelength sn was calculated at
+  """
+  wavelength: Wavelength!
 }
 
 """
 A single ITC call result.
 """
 type ItcResult {
-  targetId:      TargetId!
-  exposureTime:  TimeSpan!
+  targetId: TargetId!
+  exposureTime: TimeSpan!
   exposureCount: NonNegInt!
-  # TODO This needs to include two values and a wavelength
-  # It is nullable as imaging doesn't return a signal to noise value yet
-  signalToNoise: SignalToNoise
+  signalToNoiseAt: SignalToNoiseAt
 }
 
 type LineFluxIntegrated {
@@ -8797,9 +8638,9 @@ type TimingWindow {
   """
   startUtc: Timestamp!
 
- """
- Window end. If absent, the window will never end.
- """
+  """
+  Window end. If absent, the window will never end.
+  """
   end: TimingWindowEnd
 }
 
@@ -8942,13 +8783,10 @@ type Observation {
   """
   configurationRequests: [ConfigurationRequest!]!
 
-
   workflow: ObservationWorkflow!
-
 }
 
 enum ExecutionState {
-
   """
   The sequence or observation isn't sufficiently defined, or there is a problem
   that must first be resolved.
@@ -8971,7 +8809,6 @@ enum ExecutionState {
   DECLARED_COMPLETE
 }
 
-
 type Configuration {
   conditions: ConfigurationConditions!
   referenceCoordinates: Coordinates # may not be available
@@ -8979,8 +8816,8 @@ type Configuration {
 }
 
 type ConfigurationConditions {
-  imageQuality: ImageQuality!
-  cloudExtinction: CloudExtinction!
+  imageQuality: ImageQualityPreset!
+  cloudExtinction: CloudExtinctionPreset!
   skyBackground: SkyBackground!
   waterVapor: WaterVapor!
 }
@@ -9033,7 +8870,6 @@ type Itc {
   The ITC result for the acquisition part of the sequence
   """
   acquisition: ItcResultSet!
-
 }
 
 """
@@ -9076,15 +8912,14 @@ Observation reference type, broken into its constituient parts and including
 a formatted label.
 """
 type ObservationReference {
-
   "Formatted observation reference label."
-  label:   ObservationReferenceLabel!
+  label: ObservationReferenceLabel!
 
   "The program reference."
   program: ProgramReference!
 
   "The observation index relative to its program."
-  index:   PosInt!
+  index: PosInt!
 }
 
 """
@@ -9116,12 +8951,12 @@ enum ObservationValidationCode {
   """
   The observation is not configured correctly and cannot be executed
   """
-  CONFIGURATION_ERROR,
+  CONFIGURATION_ERROR
 
   """
   The observation does not meet the requirements of the Call for Proposals
   """
-  CFP_ERROR,
+  CFP_ERROR
 
   """
   The observation does not have valid ITC results.
@@ -9132,7 +8967,6 @@ enum ObservationValidationCode {
   CONFIG_REQUEST_NOT_REQUESTED
   CONFIG_REQUEST_DENIED
   CONFIG_REQUEST_PENDING
-
 }
 
 """
@@ -9140,7 +8974,6 @@ Each step in a sequence is tagged with an observe class which identifies its
 purpose and who is ultimately charged for the time for that observe.
 """
 enum ObserveClass {
-
   """
   Science dataset, charged to the program.
   """
@@ -9160,7 +8993,6 @@ enum ObserveClass {
   Daytime calibration, charged to the observatory.
   """
   DAY_CAL
-
 }
 
 type Parallax {
@@ -9224,7 +9056,6 @@ enum PlanetaryNebulaSpectrum {
 Constraints (if any) on the observation's position angle.
 """
 type PosAngleConstraint {
-
   """
   The position angle constraint mode in use.  The value will determine whether
   the angle is respected or ignored.
@@ -9242,7 +9073,6 @@ type PosAngleConstraint {
 Position angle constraint type
 """
 enum PosAngleConstraintMode {
-
   """
   PosAngleConstraintMode Unbounded
   """
@@ -9267,7 +9097,6 @@ enum PosAngleConstraintMode {
   PosAngleConstraintMode ParallacticOverride
   """
   PARALLACTIC_OVERRIDE
-
 }
 
 """
@@ -9359,7 +9188,6 @@ type Program {
   All configuration requests associated with the program.
   """
   configurationRequests(
-
     """
     Starts the result set at (or after if not existent) the given configuration request id.
     """
@@ -9369,7 +9197,6 @@ type Program {
     Limits the result to at most this number of matches (but never more than 1000).
     """
     LIMIT: NonNegInt
-
   ): ConfigurationRequestSelectResult!
 
   """
@@ -9424,7 +9251,6 @@ type Program {
   Observatory archive properties related to this program.
   """
   goa: GoaProperties!
-
 }
 
 """
@@ -9437,7 +9263,6 @@ Program notes are arbitrary titled text messages associated with a particular
 program.  Notes may be private, in which case they are only visible to staff.
 """
 type ProgramNote {
-
   "This note's unique id."
   id: ProgramNoteId!
 
@@ -9455,7 +9280,6 @@ type ProgramNote {
 
   "DELETED or PRESENT"
   existence: Existence!
-
 }
 
 "ProgramNoteId is formated as `n-[1-9a-f][0-9a-f]*`"
@@ -9467,65 +9291,65 @@ for calibration, engineering, etc.
 """
 interface ProgramReference {
   label: ProgramReferenceLabel!
-  type:  ProgramType!
+  type: ProgramType!
 }
 
 type CalibrationProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  instrument:    Instrument!
-  semester:      Semester!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
   semesterIndex: PosInt!
 }
 
 type CommissioningProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  instrument:    Instrument!
-  semester:      Semester!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
   semesterIndex: PosInt!
 }
 
 type EngineeringProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  instrument:    Instrument!
-  semester:      Semester!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
   semesterIndex: PosInt!
 }
 
 type ExampleProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  instrument:    Instrument!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
 }
 
 type LibraryProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  description:   NonEmptyString!
-  instrument:    Instrument!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  description: NonEmptyString!
+  instrument: Instrument!
 }
 
 type MonitoringProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
-  instrument:    Instrument!
-  semester:      Semester!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  instrument: Instrument!
+  semester: Semester!
   semesterIndex: PosInt!
 }
 
 type ScienceProgramReference implements ProgramReference {
-  label:          ProgramReferenceLabel!
-  type:           ProgramType!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
   scienceSubtype: ScienceSubtype!
-  semester:       Semester!
-  semesterIndex:  PosInt!
+  semester: Semester!
+  semesterIndex: PosInt!
 }
 
 type SystemProgramReference implements ProgramReference {
-  label:         ProgramReferenceLabel!
-  type:          ProgramType!
+  label: ProgramReferenceLabel!
+  type: ProgramType!
 }
 
 """
@@ -9536,13 +9360,11 @@ where 2024B refers to the associated semester.
 scalar ProgramReferenceLabel
 
 type ProgramNoteSelectResult {
-
   "Matching notes up to the return size limit of 1000."
   matches: [ProgramNote!]!
 
   "`true` when there were additional matches that were not returned."
   hasMore: Boolean!
-
 }
 
 """
@@ -9621,7 +9443,6 @@ type ProperMotionRA {
 }
 
 type Proposal {
-
   """
   The proposal reference, assuming the proposal has been submitted and
   assigned a semester.
@@ -9647,8 +9468,8 @@ type Proposal {
 }
 
 type ProposalReference {
-  label:         ProposalReferenceLabel!
-  semester:      Semester!
+  label: ProposalReferenceLabel!
+  semester: Semester!
   semesterIndex: PosInt!
 }
 
@@ -9662,8 +9483,8 @@ scalar ProposalReferenceLabel
 Metadata for `enum ProposalStatus`
 """
 type ProposalStatusMeta {
-  tag:   ProposalStatus!
-  name:  String!
+  tag: ProposalStatus!
+  name: String!
 }
 
 """
@@ -9698,7 +9519,6 @@ type Query {
   match.
   """
   asterismGroup(
-
     "Program ID"
     programId: ProgramId
 
@@ -9727,15 +9547,12 @@ type Query {
   """
   Select a single Call for Proposals by id.
   """
-  callForProposals(
-    callForProposalsId: CallForProposalsId!
-  ): CallForProposals
+  callForProposals(callForProposalsId: CallForProposalsId!): CallForProposals
 
   """
   Select all Calls for Proposals.
   """
   callsForProposals(
-
     "Filters the selection of calls for proposals."
     WHERE: WhereCallForProposals
 
@@ -9756,7 +9573,6 @@ type Query {
   match.
   """
   constraintSetGroup(
-
     "Program ID"
     programId: ProgramId
 
@@ -9782,20 +9598,17 @@ type Query {
     includeDeleted: Boolean! = false
   ): ConstraintSetGroupSelectResult!
 
-
   """
   Returns the dataset with the given id or reference, if any.  Identify the
   dataset by specifying only one of datasetId or datasetReference. If more than
   one is provided, all must match.  If neither are set, nothing will match.
   """
   dataset(
-
     "Specify to lookup the dataset by its ID."
     datasetId: DatasetId
 
     "Specify to lookup the dataset by its reference."
     datasetReference: DatasetReferenceLabel
-
   ): Dataset
 
   """
@@ -9855,9 +9668,7 @@ type Query {
   """
   Returns the group indicated by the given groupId, if found.
   """
-  group(
-    groupId: GroupId!
-  ): Group
+  group(groupId: GroupId!): Group
 
   """
   Returns the observation with the given id or reference, if any.  Identify the
@@ -9866,13 +9677,11 @@ type Query {
   will match.
   """
   observation(
-
     "Specify to lookup the observation by its ID."
     observationId: ObservationId
 
     "Specify to lookup the observation by its reference."
     observationReference: ObservationReferenceLabel
-
   ): Observation
 
   """
@@ -9900,14 +9709,13 @@ type Query {
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
 
-
   """
   Selects observations via a normal predicate *and* an additional filter for allowed
   workflow states. This query is intended for operations and is available only for
   service users.
   """
   observationsByWorkflowState(
-    WHERE: WhereObservation,
+    WHERE: WhereObservation
     states: [ObservationWorkflowState!]
   ): [Observation!]!
 
@@ -9915,7 +9723,6 @@ type Query {
   Selects the first `LIMIT` matching configuration requests based on the provided `WHERE` parameter, if any.
   """
   configurationRequests(
-
     """
     Filters the selection of observations.
     """
@@ -9930,10 +9737,7 @@ type Query {
     Limits the result to at most this number of matches (but never more than 1000).
     """
     LIMIT: NonNegInt
-
   ): ConfigurationRequestSelectResult!
-
-
 
   """
   Observations grouped by commonly held observing modes. Identify the program by
@@ -9942,7 +9746,6 @@ type Query {
   match.
   """
   observingModeGroup(
-
     "Program ID"
     programId: ProgramId
 
@@ -9983,7 +9786,6 @@ type Query {
 
     "Program Reference"
     programReference: ProgramReferenceLabel
-
   ): Program
 
   """
@@ -10012,9 +9814,7 @@ type Query {
   ): ProgramSelectResult!
 
   "Selects the program note with the given id, if any."
-  programNote(
-    programNoteId: ProgramNoteId!
-  ): ProgramNote
+  programNote(programNoteId: ProgramNoteId!): ProgramNote
 
   """
   Selects the first `LIMIT` matching program notes based on the provided `WHERE`
@@ -10039,7 +9839,6 @@ type Query {
   parameter, if any.
   """
   programUsers(
-
     "Filters the selection of program users."
     WHERE: WhereProgramUser
 
@@ -10056,7 +9855,6 @@ type Query {
     Set to true to include program users linked to deleted programs.
     """
     includeDeleted: Boolean! = false
-
   ): ProgramUserSelectResult!
 
   """
@@ -10124,7 +9922,6 @@ type Query {
   match.
   """
   targetGroup(
-
     "Program ID"
     programId: ProgramId
 
@@ -10174,7 +9971,6 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): TargetSelectResult!
-
 }
 
 type RadialVelocity {
@@ -10219,7 +10015,6 @@ type RightAscension {
   Right Ascension (RA) in µs
   """
   microseconds: Long!
-
 }
 
 """
@@ -10344,7 +10139,6 @@ enum ScienceSubtype {
   SYSTEM_VERIFICATION
 }
 
-
 type ScienceRequirements {
   """
   Science mode
@@ -10415,7 +10209,6 @@ scalar Semester
 Sequence-level command
 """
 enum SequenceCommand {
-
   """
   SequenceCommand ABORT
   """
@@ -10443,14 +10236,19 @@ enum SequenceCommand {
 }
 
 type SequenceDigest {
-
-  """ObserveClass of the whole sequence. """
+  """
+  ObserveClass of the whole sequence.
+  """
   observeClass: ObserveClass!
 
-  """Time estimate for the whole sequence."""
+  """
+  Time estimate for the whole sequence.
+  """
   timeEstimate: CategorizedTime!
 
-  """Unique offsets that occur in the sequence."""
+  """
+  Unique offsets that occur in the sequence.
+  """
   offsets: [Offset!]!
 
   """
@@ -10471,7 +10269,6 @@ type SequenceDigest {
 Sequence-level events.  As commands are issued to execute a sequence, corresponding events are generated.
 """
 type SequenceEvent implements ExecutionEvent {
-
   "Event id."
   id: ExecutionEventId!
 
@@ -10489,7 +10286,6 @@ type SequenceEvent implements ExecutionEvent {
 
   "Sequence event data."
   command: SequenceCommand!
-
 }
 
 """
@@ -10561,20 +10357,17 @@ type SignalToNoiseExposureTimeMode {
 Telescope Sites
 """
 enum Site {
-
   "Gemini North"
   GN
 
   "Gemini South"
   GS
-
 }
 
 """
 Coordinate limits per site.
 """
 type SiteCoordinateLimits {
-
   """
   Gemini North coordinate limits.
   """
@@ -10584,7 +10377,6 @@ type SiteCoordinateLimits {
   Gemini South coordinate limits.
   """
   south: CoordinateLimits!
-
 }
 
 """
@@ -10616,7 +10408,6 @@ enum SkyBackground {
 Slew events.
 """
 type SlewEvent implements ExecutionEvent {
-
   "Event id."
   id: ExecutionEventId!
 
@@ -10634,19 +10425,14 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
-
 }
-
 
 "Slew stage"
 enum SlewStage {
-
   START_SLEW
 
   END_SLEW
-
 }
-
 
 """
 Source profile, exactly one of the fields will be defined
@@ -10758,8 +10544,8 @@ type SpectroscopyScienceRequirements {
 """
 Stellar library spectrum
 """
-enum StellarLibrarySpectrum  {
-    """
+enum StellarLibrarySpectrum {
+  """
   StellarLibrarySpectrum O5_V
   """
   O5_V
@@ -11554,7 +11340,6 @@ enum StellarLibrarySpectrum  {
 Step-level events.  The execution of a single step will generate multiple events.
 """
 type StepEvent implements ExecutionEvent {
-
   "Event id"
   id: ExecutionEventId!
 
@@ -11578,7 +11363,6 @@ type StepEvent implements ExecutionEvent {
 
   "Step execution stage."
   stepStage: StepStage!
-
 }
 
 "StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
@@ -11586,7 +11370,6 @@ scalar StepId
 
 "Execution stage or phase of an individual step"
 enum StepStage {
-
   ABORT
 
   CONTINUE
@@ -11606,7 +11389,6 @@ enum StepStage {
   START_STEP
 
   STOP
-
 }
 
 """
@@ -11616,7 +11398,6 @@ Gcal filter is updated).  ConfigChangeEstimate identifies a single item that wil
 be updated.
 """
 type ConfigChangeEstimate {
-
   """
   Name of the item that changed.
   """
@@ -11631,14 +11412,12 @@ type ConfigChangeEstimate {
   Estimated time required to effectuate the change.
   """
   estimate: TimeSpan!
-
 }
 
 """
 Time taken to update the configuration before a step is executed.
 """
 type AllConfigChangeEstimates {
-
   """
   The selected ConfigChangeEstimate is a maximum of all the config change
   estimates.  In other words, one that takes the longest.
@@ -11663,14 +11442,12 @@ type AllConfigChangeEstimates {
   parallel.
   """
   estimate: TimeSpan!
-
 }
 
 """
 Time estimate for taking an individual dataset.
 """
 type DatasetEstimate {
-
   """
   The exposure time itself
   """
@@ -11690,7 +11467,6 @@ type DatasetEstimate {
   Total estimate for the dataset, summing exposure, readout and write
   """
   estimate: TimeSpan!
-
 }
 
 """
@@ -11698,7 +11474,6 @@ Time estimate for a single detector.  Some instruments will employ multiple
 detectors per step.
 """
 type DetectorEstimate {
-
   """
   Indicates which detector is estimated here
   """
@@ -11724,14 +11499,12 @@ type DetectorEstimate {
   dataset estimate multiplied by the count.
   """
   estimate: TimeSpan!
-
 }
 
 """
 The collection of detector estimates involved in an individual step.
 """
 type AllDetectorEstimates {
-
   """
   The selected DetectorEstimate is a maximum of all the detector estimates.
   In other words, one that takes the longest.
@@ -11757,7 +11530,6 @@ type AllDetectorEstimates {
   parallel.
   """
   estimate: TimeSpan!
-
 }
 
 """
@@ -11765,7 +11537,6 @@ Time estimate for an individual step, including configuration changes and
 dataset production.
 """
 type StepEstimate {
-
   """
   Configuration changes required before the step is executed.  This will
   obviously depend not only on the step configuration but also the previous
@@ -11776,12 +11547,12 @@ type StepEstimate {
   """
   Time for producing the datasets for this step.
   """
-  detector:     AllDetectorEstimates
+  detector: AllDetectorEstimates
 
   """
   Total time estimate for the step.
   """
-  total:        TimeSpan!
+  total: TimeSpan!
 }
 
 """
@@ -11789,7 +11560,6 @@ A step as recorded by Observe.  There will be one instrument configuration per
 instrument, all but one of which will be null.
 """
 type StepRecord {
-
   "Step ID."
   id: StepId!
 
@@ -11882,13 +11652,11 @@ type StepRecord {
 
 "StepRecord query results, limited to a maximum of 1000 entries."
 type StepRecordSelectResult {
-
   "Matching step records up to the return size limit of 1000."
   matches: [StepRecord!]!
 
   "`true` when there were additional matches that were not returned."
   hasMore: Boolean!
-
 }
 
 """
@@ -12006,7 +11774,6 @@ Calibration role
 Observations/Programs/Targets can have a calibration role
 """
 enum CalibrationRole {
-
   """
   CalibrationRole Twilight
   """
@@ -12138,7 +11905,7 @@ type TargetEnvironment {
     start: Timestamp!
 
     "The ending time of the time range of interest."
-    end:   Timestamp!
+    end: Timestamp!
   ): [GuideAvailabilityPeriod!]!
 
   """
@@ -12202,7 +11969,6 @@ type TargetEnvironmentGroupSelectResult {
 }
 
 type TargetGroup {
-
   """
   Observations associated with the common value
   """
@@ -12232,7 +11998,6 @@ type TargetGroup {
   Link back to program.
   """
   program: Program!
-
 }
 
 """
@@ -12276,47 +12041,45 @@ application of a correction is bounded by a zero time span and the
 maximum time span.
 """
 type TimeChargeCorrection {
-
   "When the correction was made."
-  created:     Timestamp!
+  created: Timestamp!
 
   "The charge class to be corrected."
   chargeClass: ChargeClass!
 
   "The operation (add or subtract) to perform."
-  op:          TimeChargeCorrectionOp!
+  op: TimeChargeCorrectionOp!
 
   "The amount of time to add or subtract (respecting the min and max time span)."
-  amount:      TimeSpan!
+  amount: TimeSpan!
 
   "The user responsible for the change."
-  user:        User
+  user: User
 
   "Optional justification for the correction."
-  comment:     NonEmptyString
+  comment: NonEmptyString
 }
 
 """
 Describes a manual correction to time accounting calculations.
 """
 input TimeChargeCorrectionInput {
-
   "The charge class to be corrected."
   chargeClass: ChargeClass!
 
   "The operation (add or subtract) to perform."
-  op:          TimeChargeCorrectionOp!
+  op: TimeChargeCorrectionOp!
 
   "The amount of time to add or subtract (respecting the min and max time span)."
-  amount:      TimeSpanInput!
+  amount: TimeSpanInput!
 
   "Optional justification for the correction."
-  comment:     String
+  comment: String
 }
 
 "Time accounting correction operations."
 enum TimeChargeCorrectionOp {
-  ADD,
+  ADD
   SUBTRACT
 }
 
@@ -12325,7 +12088,6 @@ Describes a time charge discount, broken out by charge class.  For each class,
 the associated time is subtracted and then added to uncharged.
 """
 interface TimeChargeDiscount {
-
   "The interval during which this discount applies."
   interval: TimestampInterval!
 
@@ -12334,7 +12096,6 @@ interface TimeChargeDiscount {
 
   "Additional detail."
   comment: String!
-
 }
 
 """
@@ -12343,7 +12104,6 @@ outside of nautical twilight boundaries.  The portion that occurs during day
 time is not charged.
 """
 type TimeChargeDaylightDiscount implements TimeChargeDiscount {
-
   "The interval during which this discount applies."
   interval: TimestampInterval!
 
@@ -12355,7 +12115,6 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
 
   "The site where the observation was executed."
   site: Site!
-
 }
 
 """
@@ -12374,7 +12133,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
 }
 
 type TimeChargeQaDiscount implements TimeChargeDiscount {
-
   "The interval during which this discount applies."
   interval: TimestampInterval!
 
@@ -12386,7 +12144,6 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
 
   "Datasets associated with the discount."
   datasets: [Dataset!]!
-
 }
 
 # TBD
@@ -12399,7 +12156,6 @@ time along with any automatically applied discounts (e.g., for bad weather)
 and manual adjustments made by staff.
 """
 type TimeChargeInvoice {
-
   "Raw execution time."
   executionTime: CategorizedTime!
 
@@ -12414,7 +12170,6 @@ type TimeChargeInvoice {
   initial 'executionTime'.
   """
   finalCharge: CategorizedTime!
-
 }
 
 """
@@ -12492,7 +12247,6 @@ Time interval marked by a start 'Timestamp' (inclusive) and an end 'Timestamp'
 (exclusive).
 """
 type TimestampInterval {
-
   "Start time of the interval (inclusive)."
   start: Timestamp!
 
@@ -12501,7 +12255,6 @@ type TimestampInterval {
 
   "Duration of the interval."
   duration: TimeSpan!
-
 }
 
 """
@@ -12525,10 +12278,8 @@ enum ToOActivation {
 }
 
 input UnlinkUserInput {
-
   "The program user to unlink the user from."
   programUserId: ProgramUserId!
-
 }
 
 type UnlinkUserResult {
@@ -12562,25 +12313,25 @@ enum UserType {
 }
 
 type User {
-  id:          UserId!
-  type:        UserType!
-  serviceName: String,
-  orcidId:     String,
-  profile:     UserProfile!
+  id: UserId!
+  type: UserType!
+  serviceName: String
+  orcidId: String
+  profile: UserProfile!
 }
 
 type UserProfile {
-  givenName:  String
+  givenName: String
   familyName: String
   creditName: String
-  email:      String
+  email: String
 }
 
 input UserProfileInput {
-  givenName:  String
+  givenName: String
   familyName: String
   creditName: String
-  email:      String
+  email: String
 }
 
 """
@@ -12589,7 +12340,6 @@ is a specific static configuration for each instrument, only one of which is
 defined.  The same static configuration holds for the entire visit.
 """
 type Visit {
-
   "Visit id."
   id: VisitId!
 
@@ -12605,6 +12355,9 @@ type Visit {
 
   "Created by Observe at time."
   created: Timestamp!
+
+  "Site of the visit."
+  site: Site!
 
   "Time interval during which this visit executed."
   interval: TimestampInterval
@@ -12652,14 +12405,12 @@ type Visit {
   `GMOS_SOUTH`.
   """
   gmosSouth: GmosSouthStatic
-
 }
 
 """
 Matching visit results, limited to a maximum of 1000 entries.
 """
 type VisitSelectResult {
-
   "Matching visits up to the return size limit of 1000."
   matches: [Visit!]!
 
@@ -12747,7 +12498,6 @@ type WavelengthDither {
 }
 
 input WhereAngle {
-
   AND: [WhereAngle!]
 
   OR: [WhereAngle!]
@@ -12773,16 +12523,13 @@ input WhereAngle {
   degrees: WhereOrderBigDecimal
 
   hours: WhereOrderBigDecimal
-
 }
 
 input WhereBoolean {
-
   """
   Matches if the boolean is the provided value.
   """
   EQ: Boolean
-
 }
 
 input WhereOptionBoolean {
@@ -12791,17 +12538,13 @@ input WhereOptionBoolean {
   """
   IS_NULL: Boolean
 
-
   """
   Matches if the boolean is the provided value.
   """
   EQ: Boolean
-
 }
 
-
 input WhereCallForProposals {
-
   """
   A list of nested call for proposals filters that all must match in order for
   the AND group as a whole to match.
@@ -12895,7 +12638,6 @@ input WhereAttachment {
 """
 Filters on equality of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'EQ: FINDER'
-
 """
 input WhereAttachmentType {
   """
@@ -12923,7 +12665,6 @@ input WhereAttachmentType {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderAttachmentId {
   """
@@ -12969,7 +12710,6 @@ input WhereOrderAttachmentId {
 
 "Dataset filter options.  All specified items must match."
 input WhereDataset {
-
   """
   A list of nested dataset filters that all must match in order for the AND group as a whole to match.
   """
@@ -13016,7 +12756,6 @@ input WhereDataset {
 }
 
 input WhereDatasetReference {
-
   "Matches if the dataset reference is not defined."
   IS_NULL: Boolean
 
@@ -13031,7 +12770,6 @@ input WhereDatasetReference {
 
   "Matches the exposure index."
   exposureIndex: WhereOrderPosInt
-
 }
 
 """
@@ -13039,7 +12777,6 @@ Filters on equality (or not) of the call for proposals type.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereEqCallForProposalsType {
-
   """
   Matches if the call for proposals type is exactly the supplied value.
   """
@@ -13059,7 +12796,6 @@ input WhereEqCallForProposalsType {
   Matches if the call for proposals type is none of the supplied values.
   """
   NIN: [CallForProposalsType!]
-
 }
 
 """
@@ -13094,7 +12830,6 @@ input WhereOptionEqEducationalStatus {
 }
 
 input WhereEqExecutionEventType {
-
   """
   Matches if the property is exactly the supplied value.
   """
@@ -13114,7 +12849,6 @@ input WhereEqExecutionEventType {
   Matches if the property value is none of the supplied values.
   """
   NIN: [ExecutionEventType!]
-
 }
 
 """
@@ -13238,7 +12972,6 @@ Filters on equality (or not) of the program user role type and the supplied
 criteria. All supplied criteria must match, but usually only one is selected.
 """
 input WhereEqProgramUserRole {
-
   """
   Matches if the role is exactly the supplied value.
   """
@@ -13258,7 +12991,6 @@ input WhereEqProgramUserRole {
   Matches if the role is none of the supplied values.
   """
   NIN: [ProgramUserRole!]
-
 }
 
 """
@@ -13345,7 +13077,6 @@ Filters on equality of an optional site property.  All supplied criteria must
 match, but usually only one is selected.
 """
 input WhereOptionEqSite {
-
   """
   When `true`, matches if the site is not defined. When `false` matches if the
   site role is defined.
@@ -13371,7 +13102,6 @@ input WhereOptionEqSite {
   Matches if the site is none of the supplied values.
   """
   NIN: [Site!]
-
 }
 
 """
@@ -13405,7 +13135,6 @@ input WhereEqStepId {
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
-
 """
 input WhereEqToOActivation {
   """
@@ -13434,7 +13163,6 @@ Filters on equality (or not) of the user type value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.
 """
 input WhereEqUserType {
-
   """
   Matches if the user type is exactly the supplied value.
   """
@@ -13454,14 +13182,12 @@ input WhereEqUserType {
   Matches if the user type is none of the supplied values.
   """
   NIN: [UserType!]
-
 }
 
 """
 Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
-
 """
 input WhereEqVisitId {
   """
@@ -13539,7 +13265,6 @@ input WhereExecutionEvent {
 
   "Matches on the dataset stage, for dataset events."
   datasetStage: WhereOrderDatasetStage
-
 }
 
 """
@@ -13595,14 +13320,12 @@ input WhereObservation {
   Matches on the site associated with the observation's instrument, if any.
   """
   site: WhereOptionEqSite
-
 }
 
 """
 Configuration request filter options.  All specified items must match.
 """
 input WhereConfigurationRequest {
-
   """
   A list of nested filters that all must match in order for the AND group as a whole to match.
   """
@@ -13632,11 +13355,9 @@ input WhereConfigurationRequest {
   Matches the configuration request status.
   """
   status: WhereOrderConfigurationRequestStatus
-
 }
 
 input WhereObservationReference {
-
   "Matches if the observation reference is not defined."
   IS_NULL: Boolean
 
@@ -13648,11 +13369,9 @@ input WhereObservationReference {
 
   "Matches the observation index."
   index: WhereOrderPosInt
-
 }
 
 input WhereGroup {
-
   """
   A list of nested group filters that all must match in order for the AND group as a whole to match.
   """
@@ -13673,7 +13392,6 @@ input WhereGroup {
   name: WhereOptionString
 
   description: WhereOptionString
-
 }
 
 input WhereOrderGroupId {
@@ -13719,7 +13437,6 @@ input WhereOrderGroupId {
 }
 
 input WhereEqFocalPlane {
-
   """
   Matches if the focal plane option is exactly the supplied value.
   """
@@ -13748,7 +13465,6 @@ All supplied criteria must match, but usually only one is selected.  E.g.
 Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
 """
 input WhereEqInstrument {
-
   """
   Matches if the instrument is exactly the supplied value.
   """
@@ -13809,7 +13525,6 @@ Filters on equality (or not) of the (optional) partner. All supplied criteria
 must match, but usually only one is selected.
 """
 input WhereOptionEqPartner {
-
   """
   When `true`, matches if the partner is not defined. When `false` matches if
   the partner is defined.
@@ -13835,7 +13550,6 @@ input WhereOptionEqPartner {
   Matches if the partner is none of the supplied values.
   """
   NIN: [Partner!]
-
 }
 
 """
@@ -13878,7 +13592,6 @@ All supplied criteria must match, but usually only one is selected.  E.g.
 Defining, `EQ`, `NEQ` etc. implies `IS_NULL` is `false`.
 """
 input WhereEqScienceSubtype {
-
   """
   Matches if the subtype is exactly the supplied value.
   """
@@ -13905,7 +13618,6 @@ Filters on equality (or not) of the SpectroscopyCapabilities property. All
 supplied criteria must match, but usually only one is selected.
 """
 input WhereOptionEqSpectroscopyCapabilities {
-
   """
   When `true`, matches if the spectroscopy capability value is not defined.
   """
@@ -13931,7 +13643,6 @@ input WhereOptionEqSpectroscopyCapabilities {
   Matches if the spectroscopy capability is not any one of the supplied values.
   """
   NIN: [SpectroscopyCapabilities!]
-
 }
 
 """
@@ -13939,7 +13650,6 @@ Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".  Defining, `EQ`,
 `NEQ` etc. implies `IS_NULL` is `false`.
-
 """
 input WhereOptionEqTacCategory {
   """
@@ -14002,7 +13712,6 @@ Filters on equality or order comparisons of BigDecimal properties.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOrderBigDecimal {
-
   """
   Matches if the BigDecimal is exactly the supplied value.
   """
@@ -14049,7 +13758,6 @@ Filters on equality or order comparisons of call for proposals ids.  All
 supplied criteria must match, but usually only one is selected.
 """
 input WhereOrderCallForProposalsId {
-
   """
   Matches if the id is exactly the supplied value.
   """
@@ -14089,7 +13797,6 @@ input WhereOrderCallForProposalsId {
   Matches if the id is ordered before or equal (<=) the supplied value.
   """
   LTE: CallForProposalsId
-
 }
 
 """
@@ -14143,7 +13850,6 @@ input WhereOrderDatasetId {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderDatasetStage {
   """
@@ -14238,7 +13944,6 @@ input WhereOrderDate {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderExecutionEventId {
   """
@@ -14380,7 +14085,6 @@ Filters on equality or order comparisons of long property.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOrderLong {
-
   """
   Matches if the Long is exactly the supplied value.
   """
@@ -14568,7 +14272,6 @@ Filters on equality or order comparisons of PosBigDecimal properties.  All
 supplied criteria must match, but usually only one is selected.
 """
 input WhereOrderPosBigDecimal {
-
   """
   Matches if the PosBigDecimal is exactly the supplied value.
   """
@@ -14708,7 +14411,6 @@ Filters on equality or order comparisons of the program note Id. All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOrderProgramNoteId {
-
   "Matches if the program note id is exactly the supplied value."
   EQ: ProgramNoteId
 
@@ -14739,7 +14441,6 @@ Filters on equality or order comparisons of the program user id.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOrderProgramUserId {
-
   """
   Matches if the program user id is exactly the supplied value.
   """
@@ -14784,7 +14485,6 @@ input WhereOrderProgramUserId {
 }
 
 input WhereOrderUserId {
-
   """
   Matches if the user id is exactly the supplied value.
   """
@@ -14824,11 +14524,9 @@ input WhereOrderUserId {
   Matches if the user id is ordered before or equal (<=) the supplied value.
   """
   LTE: UserId
-
 }
 
 input WhereProposalReference {
-
   "Matches if the proposal reference is not defined."
   IS_NULL: Boolean
 
@@ -14840,7 +14538,6 @@ input WhereProposalReference {
 
   "Matches the index in the proposal reference."
   semesterIndex: WhereOrderPosInt
-
 }
 
 """
@@ -14848,7 +14545,6 @@ Filters on equality or order comparisons of science bands.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOptionOrderScienceBand {
-
   """
   When `true`, matches if the science band is not defined. When `false` matches
   if the science band is defined.
@@ -14902,7 +14598,6 @@ criteria must match, but usually only one is selected.  E.g.,
 'GT = "2024A"' will match when the value is "2024B" or later.
 """
 input WhereOrderSemester {
-
   """
   Matches if the property is exactly the supplied value.
   """
@@ -14995,7 +14690,6 @@ input WhereOrderSequenceCommand {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderSequenceType {
   """
@@ -15044,7 +14738,6 @@ Filters on equality or order comparisons of the SlewStage.  All supplied
 criteria must match, but usually only one is selected.
 """
 input WhereOrderSlewStage {
-
   """
   Matches if the property is exactly the supplied value.
   """
@@ -15086,12 +14779,10 @@ input WhereOrderSlewStage {
   LTE: SlewStage
 }
 
-
 """
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderStepStage {
   """
@@ -15139,7 +14830,6 @@ input WhereOrderStepStage {
 Filters on equality or order comparisons of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'GT = 2'
 for an integer property will match when the value is 3 or more.
-
 """
 input WhereOrderTargetId {
   """
@@ -15187,7 +14877,6 @@ input WhereOrderTargetId {
 Partner link filter options.  All specified items much match.
 """
 input WherePartnerLink {
-
   """
   Matches on equality of the link type.
   """
@@ -15198,7 +14887,6 @@ input WherePartnerLink {
   will have a partner.  For other link types it will be `null`.
   """
   partner: WhereOptionEqPartner
-
 }
 
 """
@@ -15268,7 +14956,6 @@ input WhereProgram {
 }
 
 input WhereProgramReference {
-
   "Matches if the program reference is not defined."
   IS_NULL: Boolean
 
@@ -15295,7 +14982,6 @@ input WhereProgramReference {
 Program note filter options.  All specified items must match.
 """
 input WhereProgramNote {
-
   """
   A list of nested program note filters that all must match in order for the
   AND group as a whole to match.
@@ -15328,14 +15014,12 @@ input WhereProgramNote {
 
   "Matches the private status."
   isPrivate: WhereBoolean
-
 }
 
 """
 Program user options.  All specified items must match.
 """
 input WhereProgramUser {
-
   """
   A list of nested program user filters that all must match in order for the AND group as a whole to match.
   """
@@ -15406,7 +15090,6 @@ input WhereProgramUser {
 Proposal filter options.  All specified items must match.
 """
 input WhereProposal {
-
   """
   When `true`, matches if the proposal is not defined. When `false` matches if the proposal is defined.
   """
@@ -15437,25 +15120,25 @@ input WhereProposal {
   """
   reference: WhereProposalReference
 
-#  """
-#  Matches the proposal TAC category.
-#  """
-#  category: WhereOptionEqTacCategory
-#
-#  """
-#  Matches the Target of Opportunity setting.
-#  """
-#  toOActivation: WhereEqToOActivation
-#
-#  """
-#  Matches the proposal abstract.
-#  """
-#  abstract: WhereOptionString
-#
-#  """
-#  Matches proposal partners.
-#  """
-#  partners: WhereProposalPartners
+  #  """
+  #  Matches the proposal TAC category.
+  #  """
+  #  category: WhereOptionEqTacCategory
+  #
+  #  """
+  #  Matches the Target of Opportunity setting.
+  #  """
+  #  toOActivation: WhereEqToOActivation
+  #
+  #  """
+  #  Matches the proposal abstract.
+  #  """
+  #  abstract: WhereOptionString
+  #
+  #  """
+  #  Matches proposal partners.
+  #  """
+  #  partners: WhereProposalPartners
 }
 
 """
@@ -15514,7 +15197,6 @@ properties of interest and pass it to the 'spectroscopyConfigOptions' query
 to find the corresponding configuration options.
 """
 input WhereSpectroscopyConfigOption {
-
   AND: [WhereSpectroscopyConfigOption!]
 
   OR: [WhereSpectroscopyConfigOption!]
@@ -15535,7 +15217,7 @@ input WhereSpectroscopyConfigOption {
 
   slitLength: WhereAngle
 
-  slitWidth:  WhereAngle
+  slitWidth: WhereAngle
 
   """
   Matches configuration options that support the provided wavelength. In other
@@ -15544,10 +15226,9 @@ input WhereSpectroscopyConfigOption {
   """
   rangeIncludes: WavelengthInput
 
-  wavelengthOptimal:  WhereWavelength
+  wavelengthOptimal: WhereWavelength
 
   wavelengthCoverage: WhereWavelength
-
 }
 
 """
@@ -15623,7 +15304,6 @@ input WhereTarget {
 User filter options.  All specified items must match.
 """
 input WhereUser {
-
   """
   When `true`, matches if the user is not defined. When `false` matches if the
   user is defined.
@@ -15655,18 +15335,16 @@ input WhereUser {
 
   orcidId: WhereOptionString
   profile: WhereUserProfile
-
 }
 
 input WhereUserProfile {
-  givenName:  WhereOptionString
+  givenName: WhereOptionString
   creditName: WhereOptionString
   familyName: WhereOptionString
-  email:      WhereOptionString
+  email: WhereOptionString
 }
 
 input WhereWavelength {
-
   AND: [WhereWavelength!]
 
   OR: [WhereWavelength!]
@@ -15680,7 +15358,6 @@ input WhereWavelength {
   nanometers: WhereOrderPosBigDecimal
 
   micrometers: WhereOrderPosBigDecimal
-
 }
 
 type OffsetQ {
@@ -15710,7 +15387,6 @@ The `Long` scalar type represents non-fractional signed whole numeric values. Lo
 """
 scalar Long
 
-
 enum ObservationWorkflowState {
   INACTIVE
   UNDEFINED
@@ -15726,4 +15402,3 @@ type ObservationWorkflow {
   validTransitions: [ObservationWorkflowState!]!
   validationErrors: [ObservationValidation!]!
 }
-

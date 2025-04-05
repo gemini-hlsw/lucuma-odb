@@ -31,6 +31,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.graphql.input.AddStepEventInput
 
 
 class executionDigest extends ExecutionTestSupport {
@@ -490,8 +491,8 @@ class executionDigest extends ExecutionTestSupport {
         services.session.transaction.use { xa =>
           for {
             _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-            _ <- services.executionEventService.insertStepEvent(s, StepStage.EndStep)(using xa, ().asInstanceOf) // shhh
-            d <- services.executionDigestService.selectOne(p, o, Md5Hash.Zero)(using xa)
+            _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+            d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
           } yield d.isEmpty
         }
       }
@@ -547,7 +548,10 @@ class executionDigest extends ExecutionTestSupport {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        // We now need to record at least a single step to count as ONGOING
+        a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
+        _ <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
       yield o
 
     setup.flatMap: oid =>

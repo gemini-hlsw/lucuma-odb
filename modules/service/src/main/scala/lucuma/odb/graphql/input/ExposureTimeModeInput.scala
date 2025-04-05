@@ -3,10 +3,10 @@
 
 package lucuma.odb.graphql.input
 
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ExposureTimeMode.SignalToNoiseMode
@@ -30,17 +30,21 @@ object ExposureTimeModeInput:
       
   object TimeAndCount:
     val Binding: Matcher[TimeAndCountMode] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           TimeSpanInput.Binding("time", rTime),
           NonNegIntBinding("count", rCount),
           WavelengthInput.Binding("at", rAt)
         ) =>
-          (rTime, rCount, rAt).parMapN(TimeAndCountMode.apply)
-      }      
-      
+          for
+            t <- rTime
+            _ <- OdbError.InvalidArgument("Exposure `time` parameter must be positive.".some).asFailure.unlessA(t.toNonNegMicroseconds.value > 0)
+            c <- rCount
+            a <- rAt
+          yield TimeAndCountMode(t, c, a)
+
   val Binding: Matcher[ExposureTimeMode] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         SignalToNoise.Binding.Option("signalToNoise", rSignal),
         TimeAndCount.Binding.Option("timeAndCount", rTimeAndCount)
@@ -50,4 +54,3 @@ object ExposureTimeModeInput:
           case (Some(s), None   ) => Result(ExposureTimeMode.signalToNoise.reverseGet(s))
           case (None,    Some(f)) => Result(ExposureTimeMode.timeAndCount.reverseGet(f))
           case _                  => OdbError.InvalidArgument("Exactly one of 'signalToNoise' or 'timeAndCount' must be selected, not both.".some).asFailure
-    }

@@ -6,56 +6,59 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.Site
+import lucuma.core.enums.SlewStage
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservingNight
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.util.Timestamp
 
-class addSlewEvent extends OdbSuite {
+class addSlewEvent extends OdbSuite:
 
+  val pi: User      = TestUsers.Standard.pi(nextId, nextId)
   val service: User = TestUsers.service(nextId)
 
-  override lazy val validUsers: List[User] = List(service)
+  override lazy val validUsers: List[User] = List(pi, service)
 
-  private def recordVisit(
+  private def createObservation(
     mode: ObservingModeType,
     user: User
-  ):IO[(Observation.Id, Visit.Id)] =
-    for {
+  ):IO[Observation.Id] =
+    for
       pid <- createProgramAs(user)
       oid <- createObservationAs(user, pid, mode.some)
-      vid <- recordVisitAs(user, mode.instrument, oid)
-    } yield (oid, vid)
+    yield oid
 
   private def addSlewEventTest(
     mode:     ObservingModeType,
     user:     User,
-    query:    Visit.Id => String,
-    expected: (Observation.Id, Visit.Id) => Either[String, Json]
-  ): IO[Unit] = {
-    for {
-      ids <- recordVisit(mode, user)
-      (oid, vid) = ids
-      _   <- expect(user, query(vid), expected(oid, vid).leftMap(s => List(s)))
-    } yield ()
-}
+    query:    Observation.Id => String,
+    expected: Observation.Id => Either[String, Json]
+  ): IO[Unit] =
+    for
+      oid <- createObservation(mode, user)
+      _   <- expect(user, query(oid), expected(oid).leftMap(s => List(s)))
+    yield ()
 
-  test("addSlewEvent") {
-    def query(vid: Visit.Id): String =
+  test("addSlewEvent"):
+    def query(oid: Observation.Id): String =
       s"""
         mutation {
           addSlewEvent(input: {
-            visitId: "$vid",
+            observationId: "$oid",
             slewStage: START_SLEW
           }) {
             event {
               eventType
-              visit {
-                id
-              }
               observation {
                 id
               }
@@ -70,15 +73,12 @@ class addSlewEvent extends OdbSuite {
     addSlewEventTest(
       ObservingModeType.GmosNorthLongSlit,
       service,
-      vid => query(vid),
-      (oid, vid) => json"""
+      oid => query(oid),
+      oid => json"""
       {
         "addSlewEvent": {
           "event": {
             "eventType": "SLEW",
-            "visit": {
-              "id": $vid
-            },
             "observation": {
               "id": $oid
             },
@@ -89,20 +89,15 @@ class addSlewEvent extends OdbSuite {
       """.asRight
     )
 
-  }
-
-  test("addSlewEvent - unknown visit") {
+  test("addSlewEvent - unknown visit"):
     def query: String =
       s"""
         mutation {
           addSlewEvent(input: {
-            visitId: "v-42",
+            observationId: "o-42",
             slewStage: START_SLEW
           }) {
             event {
-              visit {
-                id
-              }
               observation {
                 id
               }
@@ -115,10 +110,105 @@ class addSlewEvent extends OdbSuite {
       ObservingModeType.GmosNorthLongSlit,
       service,
       _ => query,
-      (_, _) => s"Visit 'v-42' not found".asLeft
+      _ => s"Observation 'o-42' not found.".asLeft
     )
 
-  }
+  def visits(o: Observation.Id): IO[List[(Visit.Id, ObservingNight)]] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          observation(observationId: "$o") {
+            execution {
+              visits {
+                matches {
+                  id
+                  site
+                  created
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      json
+        .hcursor
+        .downFields("observation", "execution", "visits", "matches")
+        .values
+        .toList
+        .flatten
+        .traverse: vjson =>
+          val c = vjson.hcursor
+          for
+            v <- c.downField("id").as[Visit.Id]
+            s <- c.downField("site").as[Site]
+            t <- c.downField("created").as[Timestamp]
+          yield (v, ObservingNight.fromSiteAndInstant(s, t.toInstant))
+        .fold(e => throw new RuntimeException(e.message), identity)
+
+  def checkVisits(visits: List[(Visit.Id, ObservingNight)]): Boolean =
+    visits match
+      case v :: Nil                  => true            // one visit expected
+      case (_, n0) :: (_, n1) :: Nil => n0.next === n1  // could be two if straddling an observing night
+      case _                         => false           // otherwise something is wrong
 
 
-}
+  test("slew then record visit"):
+    assertIOBoolean:
+      for
+        o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
+        _  <- addSlewEventAs(service, o, SlewStage.StartSlew)
+        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
+        _  <- addSlewEventAs(service, o, SlewStage.EndSlew)
+        _  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+        vs <- visits(o)
+      yield checkVisits(vs)
+
+  test("record visit then slew"):
+    assertIOBoolean:
+      for
+        o  <- createObservation(ObservingModeType.GmosNorthLongSlit, pi)
+        v  <- recordVisitAs(service, Instrument.GmosNorth, o)
+        _  <- addSlewEventAs(service, o, SlewStage.StartSlew)
+        _  <- addSlewEventAs(service, o, SlewStage.EndSlew)
+        _  <- addSequenceEventAs(service, v, SequenceCommand.Start)
+        vs <- visits(o)
+      yield checkVisits(vs)
+
+  test("no static"):
+    createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: o =>
+      addSlewEventAs(service, o, SlewStage.StartSlew) *>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            observation(observationId: "$o") {
+              execution {
+                visits {
+                  matches {
+                    gmosNorth {
+                      stageMode
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "visits": {
+                  "matches": [
+                    {
+                      "gmosNorth": null
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )

@@ -621,8 +621,8 @@ object ConfigurationService {
         FROM t_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
-          c_cloud_extinction = $cloud_extinction AND
-          c_image_quality = $image_quality AND
+          c_cloud_extinction = $cloud_extinction_preset AND
+          c_image_quality = $image_quality_preset AND
           c_sky_background = $sky_background AND
           c_water_vapor = $water_vapor AND
           c_reference_ra = $right_ascension AND
@@ -636,8 +636,8 @@ object ConfigurationService {
           configuration_request_id *:
           configuration_request_status *:
           text_nonempty.opt        *:
-          cloud_extinction         *:
-          image_quality            *:
+          cloud_extinction_preset         *:
+          image_quality_preset            *:
           sky_background           *:
           water_vapor              *:
           right_ascension          *:
@@ -725,8 +725,8 @@ object ConfigurationService {
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
           ${text_nonempty.opt},
-          $cloud_extinction,
-          $image_quality,
+          $cloud_extinction_preset,
+          $image_quality_preset,
           $sky_background,
           $water_vapor,
           $right_ascension,
@@ -754,8 +754,8 @@ object ConfigurationService {
           configuration_request_id *:
           configuration_request_status *:
           text_nonempty.opt        *:
-          cloud_extinction         *:
-          image_quality            *:
+          cloud_extinction_preset         *:
+          image_quality_preset            *:
           sky_background           *:
           water_vapor              *:
           right_ascension          *:

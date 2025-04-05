@@ -23,19 +23,32 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.AttachmentPropertiesInput
+import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
 import lucuma.odb.graphql.input.CloneObservationInput
+import lucuma.odb.graphql.input.CreateCallForProposalsInput
 import lucuma.odb.graphql.input.CreateObservationInput
+import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
+import lucuma.odb.graphql.input.ProgramPropertiesInput
+import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.ResetAcquisitionInput
+import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
+import lucuma.odb.graphql.input.UpdateAttachmentsInput
+import lucuma.odb.graphql.input.UpdateCallsForProposalsInput
 import lucuma.odb.graphql.input.UpdateObservationsInput
 import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramNotesInput
+import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -48,6 +61,7 @@ import lucuma.odb.syntax.observationWorkflowState.*
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Encoder
+import skunk.Transaction
 import skunk.syntax.stringcontext.*
 
 object AccessControl:
@@ -481,7 +495,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
           AccessControl.unchecked(input.SET, oid, observation_id)
 
   }
-  
+
+  def selectForUpdate(
+    input: ResetAcquisitionInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
+     requireStaffAccess:
+       observationService
+         .resolveOid(input.observationId, input.observationRef)
+         .nestMap: oid =>
+           Services.asSuperUser:
+             AccessControl.unchecked((), oid, observation_id)
+
   def selectForUpdate(
     input: CreateProgramNoteInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[ProgramNotePropertiesInput.Create, Program.Id]]] =
@@ -496,6 +520,83 @@ trait AccessControl[F[_]] extends Predicates[F] {
               Services.asSuperUser:
                 ResultT.pure(AccessControl.unchecked(input.SET, pid, program_id))
     ).value
+
+  def selectForUpdate(
+    input: SetProgramReferenceInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]]] =
+    programService
+      .resolvePid(input.programId, input.proposalReference, input.programReference)
+      .flatMap: r =>
+        r.flatTraverse: pid =>
+          requireStaffAccess: // this is the only access control check
+            Services.asSuperUser:
+              Result(AccessControl.unchecked(input.SET, pid, program_id)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateProgramsInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.Checked[ProgramPropertiesInput.Edit]]] =
+    MappedQuery(Filter(and(List(
+      Predicates.program.isWritableBy(user),
+      Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+      input.WHERE.getOrElse(True)
+    )), Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType)))
+      .flatMap(_.fragment)
+      .map: frag =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, frag)
+      .pure[F]
+
+  def selectForUpdate(
+    input: CreateProgramInput
+  ): F[Result[AccessControl.Checked[Option[ProgramPropertiesInput.Create]]]] =
+    Services.asSuperUser:
+      Result(AccessControl.unchecked(input.SET, AppliedFragment.empty)).pure[F] // always ok, for now
+
+  def selectForUpdate(
+    input: SetAllocationsInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[List[AllocationInput], Program.Id]]] =
+    requireStaffAccess: // this is the only check
+      Services.asSuperUser:
+        Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateAttachmentsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =
+    MappedQuery(
+      Filter(and(List(
+        Predicates.attachment.program.isWritableBy(user),
+        input.WHERE.getOrElse(True)
+      )), Select("id", Empty)),
+      Context(QueryType, List("attachments"), List("attachments"), List(AttachmentType))
+    ) .flatMap(_.fragment)
+      .traverse: af =>
+        Services.asSuperUser:
+          AccessControl.unchecked(input.SET, af).pure[F]
+
+  def selectForUpdate(
+    input: CreateCallForProposalsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Create]]] =
+    requireStaffAccess: // this is the only check
+      Services.asSuperUser:
+        Result(AccessControl.unchecked(input.SET, AppliedFragment.empty)).pure[F]
+
+  def selectForUpdate(
+    input: UpdateCallsForProposalsInput
+  )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Edit]]] =
+    requireStaffAccess: // this is the only check
+      MappedQuery(
+        Filter(
+          and(List(
+            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+            input.WHERE.getOrElse(True)
+          )), 
+          Select("id", None, Empty)
+        ),
+        Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
+      ) .flatMap(_.fragment)
+        .flatTraverse: which =>
+          Services.asSuperUser:
+            Result(AccessControl.unchecked(input.SET, which)).pure[F]
 
   private def selectForProgramNoteUpdateImpl(
     includeDeleted: Option[Boolean],

@@ -15,10 +15,10 @@ val http4sJdkHttpClientVersion = "0.9.2"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.17"
 val log4catsVersion            = "2.7.0"
-val lucumaItcVersion           = "0.32.1"
-val lucumaCoreVersion          = "0.120.0"
+val lucumaItcVersion           = "0.33.0"
+val lucumaCoreVersion          = "0.121.0"
 val lucumaGraphQLRoutesVersion = "0.8.17"
-val lucumaSsoVersion           = "0.8.7"
+val lucumaSsoVersion           = "0.8.8"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -44,18 +44,32 @@ ThisBuild / githubWorkflowBuildPreamble +=
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
     name = Some("Validate Migrations"),
     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-    cond = Some("github.event_name == 'pull_request'")
+    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
   )
 
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("kamilkisiela", "graphql-inspector", "master"),
     name = Some("Validate GraphQL schema changes"),
-    params = Map("schema"           -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-                 "approve-label"    -> "expected-breaking-change"
-    ),
-    cond = Some("github.event_name == 'pull_request'")
+    params =
+      Map("schema"        -> "main:modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+          "approve-label" -> "expected-breaking-change"
+      ),
+    cond = Some("github.event_name == 'pull_request' && matrix.shard == '1'")
   )
+
+val nTestJobShards = 8
+
+ThisBuild / githubWorkflowBuildMatrixAdditions += (
+  "shard" -> ((0 to (nTestJobShards - 1)).map(_.toString).toList)
+)
+ThisBuild / githubWorkflowBuild ~= (_.map(step =>
+  if (step.name.contains("Test"))
+    step.withEnv(
+      Map("TEST_SHARD_COUNT" -> nTestJobShards.toString(), "TEST_SHARD" -> "${{ matrix.shard }}")
+    )
+  else step
+))
 
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)

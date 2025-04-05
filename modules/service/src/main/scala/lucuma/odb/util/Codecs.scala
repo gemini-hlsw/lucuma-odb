@@ -196,8 +196,8 @@ trait Codecs {
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
 
-  val cloud_extinction: Codec[CloudExtinction] =
-    enumerated[CloudExtinction](Type.varchar)
+  val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
+    enumerated[CloudExtinction.Preset](Type.varchar)
 
   val core_timestamp: Codec[Timestamp] =
     timestamp.eimap(
@@ -314,8 +314,8 @@ trait Codecs {
       (h.minHours.value, h.maxHours.value)
     }
 
-  val image_quality: Codec[ImageQuality] =
-    enumerated[ImageQuality](Type.varchar)
+  val image_quality_preset: Codec[ImageQuality.Preset] =
+    enumerated[ImageQuality.Preset](Type.varchar)
 
   val _instrument: Codec[Arr[Instrument]] =
     Codec.array(_.tag, s => Enumerated[Instrument].fromTag(s).toRight(s"Invalid Instrument tag: $s"), Type("_d_tag", List(Type("d_tag"))))
@@ -605,10 +605,10 @@ trait Codecs {
     }
 
   val constraint_set: Codec[ConstraintSet] =
-    (image_quality    *:
-     cloud_extinction *:
-     sky_background   *:
-     water_vapor      *:
+    (image_quality_preset    *:
+     cloud_extinction_preset *:
+     sky_background          *:
+     water_vapor             *:
      elevation_range
     ).to[ConstraintSet]
 

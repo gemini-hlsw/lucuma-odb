@@ -156,7 +156,7 @@ class executionStepRecords extends OdbSuite with ExecutionQuerySetupOperations {
       """
 
     def expected(on: ObservationNode): Either[List[String], Json] = {
-      val events = on.visits.head.atoms.head.steps.head.allEvents
+      val events = on.visit.atoms.head.steps.head.allEvents
       val start  = events.head.received
       val end    = events.last.received
       json"""

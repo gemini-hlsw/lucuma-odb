@@ -531,30 +531,6 @@ trait DatabaseOperations { this: OdbSuite =>
       )
     )
 
-
-  // def setDeclaredComplete(user: User, oid: Observation.Id, declaredComplete: Boolean = true): IO[Unit] =
-  //   query(
-  //     user,
-  //     s"""
-  //       mutation {
-  //         updateObservations(
-  //           input: {
-  //             SET: {
-  //               declaredComplete: $declaredComplete
-  //             }
-  //             WHERE: {
-  //               id: { EQ: "$oid" }
-  //             }
-  //           }
-  //         ) {
-  //           observations {
-  //             id
-  //           }
-  //         }
-  //       }
-  //     """
-  //   ).void
-
   def setScienceBandAs(user: User, oid: Observation.Id, band: Option[ScienceBand]): IO[Unit] =
     query(
       user,
@@ -649,6 +625,20 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
+
+  def resetAcquisitionAs(user: User, oid: Observation.Id): IO[Unit] =
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          resetAcquisition(input: {
+            observationId: "$oid"
+          }) {
+            observation { id }
+          }
+        }
+      """
+    ).void
 
   def createObservationInGroupAs(user: User, pid: Program.Id, groupId: Option[Group.Id] = None, groupIndex: Option[NonNegShort] = None): IO[Observation.Id] =
     query(
@@ -1198,19 +1188,19 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def addSlewEventAs(
     user: User,
-    vid:  Visit.Id,
+    oid:  Observation.Id,
     stg:  SlewStage
   ): IO[SlewEvent] = {
     val q = s"""
       mutation {
         addSlewEvent(input: {
-          visitId: "$vid",
+          observationId: "$oid",
           slewStage: ${stg.tag.toUpperCase}
         }) {
           event {
             id
             received
-            observation { id }
+            visit { id }
           }
         }
       }
@@ -1221,8 +1211,8 @@ trait DatabaseOperations { this: OdbSuite =>
       val e = for {
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
-        o <- c.downFields("observation", "id").as[Observation.Id]
-      } yield SlewEvent(i, r, o, vid, stg)
+        v <- c.downFields("visit", "id").as[Visit.Id]
+      } yield SlewEvent(i, r, oid, v, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1769,7 +1759,9 @@ trait DatabaseOperations { this: OdbSuite =>
     obsDuration: Option[TimeSpan]
   ): IO[Unit] = {
     val time = obsTime.fold("null")(ts => s"\"${ts.isoFormat}\"")
-    val duration = obsDuration.fold("null")(ts => s"{ microseconds: ${ts.toMicroseconds} }")
+    // microseconds can be bigger than max int. The schema is a Long but values outside of
+    // the Int range must be a string.
+    val duration = obsDuration.fold("null")(ts => s"{ microseconds: \"${ts.toMicroseconds}\" }")
     val q = s"""
       mutation {
         updateObservationsTimes(input: {

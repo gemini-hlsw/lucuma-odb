@@ -16,7 +16,6 @@ import io.circe.literal.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.ObservationWorkflowState
@@ -27,6 +26,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -39,6 +39,7 @@ import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.CalibrationsService
+import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
 import lucuma.odb.service.TwilightCalibrations
 
@@ -161,7 +162,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Eq, Decoder
-  case class CalibCE(cloudExtinction: CloudExtinction) derives Decoder
+  case class CalibCE(cloudExtinction: CloudExtinction.Preset) derives Decoder
   case class ScienceRequirements(spectroscopy: ExposureTimeMode) derives Decoder
   case class ExposureTimeMode(exposureTimeMode: SignalToNoise) derives Decoder
   case class SignalToNoise(signalToNoise: At) derives Decoder
@@ -412,7 +413,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       val oids = gr1.collect { case Right(oid) => oid }
       val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.ThreePointZero)), _) => true
+        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.ThreePointZero)), _) => true
         case _                       => false
       }
       // calibs belong to the calib group
@@ -442,7 +443,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       val oids = gr1.collect { case Right(oid) => oid }
       val cgid = gr1.collect { case Left(gid) => gid }.headOption
       val cCount = ob.count {
-        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.PointThree)), _) => true
+        case CalibObs(_, _, Some(_), _, Some(CalibCE(CloudExtinction.Preset.PointThree)), _) => true
         case _                       => false
       }
       // calibs belong to the calib group
@@ -539,13 +540,14 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   test("select calibration target") {
     for {
-      tpid <- withServices(service) { s =>
-                s.session.transaction.use { xa =>
-                  s.programService
-                    .insertCalibrationProgram(
-                      ProgramPropertiesInput.Create.Default.some,
-                      CalibrationRole.SpectroPhotometric,
-                      Description.unsafeFrom("SPECTROTEST"))(using xa)
+      tpid <- withServices(service) { s =>                
+                Services.asSuperUser:
+                  s.session.transaction.use { xa =>
+                      s.programService
+                        .insertCalibrationProgram(
+                          ProgramPropertiesInput.Create.Default.some,
+                          CalibrationRole.SpectroPhotometric,
+                          Description.unsafeFrom("SPECTROTEST"))(using xa)
                 }
               }
       // PI program

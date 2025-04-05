@@ -25,7 +25,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
-import lucuma.odb.graphql.input.CreateCallForProposalsInput
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -41,13 +41,12 @@ trait CallForProposalsService[F[_]] {
   )(using Transaction[F]): F[Option[CallForProposalsService.CfpProperties]]
 
   def createCallForProposals(
-    input: CreateCallForProposalsInput
-  )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]]
+    input: AccessControl.Checked[CallForProposalsPropertiesInput.Create]
+  )(using Transaction[F]): F[Result[CallForProposals.Id]]
 
   def updateCallsForProposals(
-    SET:   CallForProposalsPropertiesInput.Edit,
-    which: AppliedFragment
-  )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]]
+    input: AccessControl.Checked[CallForProposalsPropertiesInput.Edit]
+  )(using Transaction[F]): F[Result[List[CallForProposals.Id]]]
 
 }
 
@@ -78,46 +77,49 @@ object CallForProposalsService {
       )(using Transaction[F]): F[Option[CfpProperties]] =
         session.option(Statements.SelectProperties)(cid)
 
-      override def createCallForProposals(
-        input: CreateCallForProposalsInput
-      )(using Transaction[F], Services.StaffAccess): F[Result[CallForProposals.Id]] =
+      def createCallForProposals(
+        input: AccessControl.Checked[CallForProposalsPropertiesInput.Create]
+      )(using Transaction[F]): F[Result[CallForProposals.Id]] = {
+        input.fold(OdbError.InvalidArgument().asFailureF): (SET, _) =>
 
-        val insertCfp: F[Result[CallForProposals.Id]] =
-          session.unique(Statements.InsertCallForProposals)(input.SET)
-            .map(_.success)
-            .recoverWith:
-              case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
-                OdbError.InvalidArgument(s"The maximum semester is capped at the current year +1 (${input.SET.semester} specified).".some).asFailureF
+          val insertCfp: F[Result[CallForProposals.Id]] =
+            session.unique(Statements.InsertCallForProposals)(SET)
+              .map(_.success)
+              .recoverWith:
+                case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
+                  OdbError.InvalidArgument(s"The maximum semester is capped at the current year +1 (${SET.semester} specified).".some).asFailureF
 
-        case class UsingCid(cid: CallForProposals.Id):
-          val cids = List(cid)
-          val instruments = input.SET.instruments
+          case class UsingCid(cid: CallForProposals.Id):
+            val cids = List(cid)
+            val instruments = SET.instruments
 
-          val insertPartnersDefault: F[Unit] =
-            session
-             .prepareR(Statements.InsertDefaultPartners(cids))
-             .use(_.execute(cids))
-             .void
-
-          val insertPartners: F[Unit] =
-            input.SET.partners.fold(insertPartnersDefault): partners =>
+            val insertPartnersDefault: F[Unit] =
               session
-                .prepareR(Statements.InsertPartners(cids, partners))
-                .use(_.execute(cids, partners))
-                .whenA(partners.nonEmpty)
+              .prepareR(Statements.InsertDefaultPartners(cids))
+              .use(_.execute(cids))
+              .void
 
-          val insertInstruments: F[Unit] =
-            session
-              .prepareR(Statements.InsertInstruments(cids, instruments))
-              .use(_.execute(cids, instruments))
-              .whenA(instruments.nonEmpty)
+            val insertPartners: F[Unit] =
+              SET.partners.fold(insertPartnersDefault): partners =>
+                session
+                  .prepareR(Statements.InsertPartners(cids, partners))
+                  .use(_.execute(cids, partners))
+                  .whenA(partners.nonEmpty)
 
-        (for
-          cid <- ResultT(insertCfp)
-          usingCid = UsingCid(cid)
-          _   <- ResultT.liftF(usingCid.insertPartners)
-          _   <- ResultT.liftF(usingCid.insertInstruments)
-        yield cid).value
+            val insertInstruments: F[Unit] =
+              session
+                .prepareR(Statements.InsertInstruments(cids, instruments))
+                .use(_.execute(cids, instruments))
+                .whenA(instruments.nonEmpty)
+
+          (for
+            cid <- ResultT(insertCfp)
+            usingCid = UsingCid(cid)
+            _   <- ResultT.liftF(usingCid.insertPartners)
+            _   <- ResultT.liftF(usingCid.insertInstruments)
+          yield cid).value
+
+      }
 
       private def updateCfpTable(
         SET:   CallForProposalsPropertiesInput.Edit,
@@ -176,15 +178,15 @@ object CallForProposalsService {
           .map(_.success)
       }
 
-      override def updateCallsForProposals(
-        SET:   CallForProposalsPropertiesInput.Edit,
-        which: AppliedFragment
-      )(using Transaction[F], Services.StaffAccess): F[Result[List[CallForProposals.Id]]] =
-        (for {
-          cids <- ResultT(updateCfpTable(SET, which))
-          _    <- ResultT(updatePartners(cids, SET.partners))
-          _    <- ResultT(updateInstruments(cids, SET.instruments))
-        } yield cids).value
+      def updateCallsForProposals(
+        input: AccessControl.Checked[CallForProposalsPropertiesInput.Edit]
+      )(using Transaction[F]): F[Result[List[CallForProposals.Id]]] =
+        input.fold(OdbError.InvalidArgument().asFailureF): (SET, which) =>
+          (for {
+            cids <- ResultT(updateCfpTable(SET, which))
+            _    <- ResultT(updatePartners(cids, SET.partners))
+            _    <- ResultT(updateInstruments(cids, SET.instruments))
+          } yield cids).value
 
     }
 

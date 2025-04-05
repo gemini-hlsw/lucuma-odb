@@ -50,8 +50,8 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
 
       object ConstraintSet {
         val Key: ColumnRef = col("c_conditions_key", text)
-        val CloudExtinction: ColumnRef = col("c_cloud_extinction", cloud_extinction.embedded)
-        val ImageQuality: ColumnRef    = col("c_image_quality",    image_quality.embedded)
+        val CloudExtinction: ColumnRef = col("c_cloud_extinction", cloud_extinction_preset.embedded)
+        val ImageQuality: ColumnRef    = col("c_image_quality",    image_quality_preset.embedded)
         val SkyBackground: ColumnRef   = col("c_sky_background",   sky_background.embedded)
         val WaterVapor: ColumnRef      = col("c_water_vapor",      water_vapor.embedded)
         object ElevationRange {

@@ -13,7 +13,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
-import lucuma.core.enums.CloudExtinction
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -26,7 +25,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ImageQuality
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
@@ -34,7 +32,9 @@ import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
@@ -680,10 +680,10 @@ class createObservation extends OdbSuite {
           .downField("observation")
           .downField("constraintSet")
           .downField("cloudExtinction")
-          .as[CloudExtinction]
+          .as[CloudExtinction.Preset]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, CloudExtinction.OnePointFive)
+        assertIO(get, CloudExtinction.Preset.OnePointFive)
       }
     }
   }
@@ -709,10 +709,10 @@ class createObservation extends OdbSuite {
           .downField("observation")
           .downField("constraintSet")
           .downField("cloudExtinction")
-          .as[CloudExtinction]
+          .as[CloudExtinction.Preset]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, CloudExtinction.PointThree)
+        assertIO(get, CloudExtinction.Preset.PointThree)
       }
     }
   }
@@ -738,10 +738,10 @@ class createObservation extends OdbSuite {
           .downField("observation")
           .downField("constraintSet")
           .downField("imageQuality")
-          .as[ImageQuality]
+          .as[ImageQuality.Preset]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, ImageQuality.PointEight)
+        assertIO(get, ImageQuality.Preset.PointEight)
       }
     }
   }
@@ -941,7 +941,7 @@ class createObservation extends OdbSuite {
     site:     Site,
     grating:  String,
     fpu:      String = "LONG_SLIT_0_25",
-    iq:       ImageQuality = ImageQuality.TwoPointZero,
+    iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
     asterism: List[Target.Id] = Nil
   ): String =
     s"""
@@ -1059,7 +1059,7 @@ class createObservation extends OdbSuite {
           }
         """.stripMargin
       ).flatMap { tid =>
-        query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.PointOne, asterism = List(tid))).flatMap { js =>
+        query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, asterism = List(tid))).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
           assertIO(

@@ -27,7 +27,8 @@ import lucuma.odb.data.*
 import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
-import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -42,11 +43,6 @@ import Services.Syntax.*
 trait ProgramService[F[_]] {
 
   /**
-   * Find the program id matching the given reference, if any.
-   */
-  def selectPid(ref: Ior[ProposalReference, ProgramReference]): F[Option[Program.Id]]
-
-  /**
    * Convenience method. Find the program id consistent with the provided ids (if any).
    */
   def resolvePid(
@@ -55,21 +51,27 @@ trait ProgramService[F[_]] {
     prog: Option[ProgramReference]
   ): F[Result[Program.Id]]
 
-  def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]]
+  def setProgramReference(
+    input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]
+  )(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
-  def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]]
+  def insertProgram(
+    input: AccessControl.Checked[Option[ProgramPropertiesInput.Create]]
+  )(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Insert a new calibration program, PI is left empty.
+   * N.B. Calibration programs are created as part of the database schema; this method is only called from tests.
    */
-  def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id]
+  def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id]
 
-  /** Update the properies for programs with ids given by the supplied fragment, yielding a list of affected ids. */
-  def updatePrograms(SET: ProgramPropertiesInput.Edit, where: AppliedFragment)(using Transaction[F]): F[Result[List[Program.Id]]]
+  def updatePrograms(
+    input: AccessControl.Checked[ProgramPropertiesInput.Edit]
+  )(using Transaction[F]): F[Result[List[Program.Id]]]
 
 }
 
@@ -164,22 +166,19 @@ object ProgramService {
                 .failure
           }
 
-      override def setProgramReference(input: SetProgramReferenceInput)(using Transaction[F], Services.StaffAccess): F[Result[(Program.Id, Option[ProgramReference])]] = {
-        def validateProposal(pid: Program.Id): F[Result[Unit]] =
-          proposalService.hasProposal(pid).map { hasProposal =>
-            OdbError
-              .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${input.SET.programType.abbreviation} until its proposal is removed.".some)
-              .asFailure
-              .whenA(hasProposal && input.SET.programType != ProgramType.Science)
-          }
-
-        programService.resolvePid(input.programId,input.proposalReference, input.programReference).flatMap: r =>
-          r.flatTraverse: pid =>
-            (for {
-              _ <- ResultT(validateProposal(pid))
-              r <- ResultT(setProgramReferenceImpl(pid, input.SET).map(_.map((pid, _))))
-            } yield r).value
-      }
+      override def setProgramReference(input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id])(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]] = 
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (props, pid) =>
+          def validateProposal(pid: Program.Id): F[Result[Unit]] =
+            proposalService.hasProposal(pid).map { hasProposal =>
+              OdbError
+                .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${props.programType.abbreviation} until its proposal is removed.".some)
+                .asFailure
+                .whenA(hasProposal && props.programType != ProgramType.Science)
+            }
+          (for {
+            _ <- ResultT(validateProposal(pid))
+            r <- ResultT(setProgramReferenceImpl(pid, props).map(_.map((pid, _))))
+          } yield r).value
 
       def validateActivePeriodUpdate[A](active: Option[A]): Result[Unit] =
         OdbError
@@ -201,80 +200,89 @@ object ProgramService {
               case _                                            => period.isEmpty
           )
 
-      def insertProgram(SET: Option[ProgramPropertiesInput.Create])(using Transaction[F]): F[Result[Program.Id]] =
-        Trace[F].span("insertProgram") {
-          val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
+      def insertProgram(
+        input: AccessControl.Checked[Option[ProgramPropertiesInput.Create]]
+      )(using Transaction[F]): F[Result[Program.Id]] =
+        input.fold(OdbError.InvalidArgument().asFailureF): (SET, _) =>
+          Trace[F].span("insertProgram") {
+            val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
-          val create =
-            session
-              .prepareR(Statements.InsertProgram)
-              .use(_.unique(SETʹ))
-              .flatTap: pid =>
-                user match
-                  case ServiceUser(_, _) =>
-                    Concurrent[F].unit
-                  case nonServiceUser    =>
-                    // Link the PI to the program.
-                    programUserService.addAndLinkPi(pid).void
-              .map(_.success)
+            val create =
+              session
+                .prepareR(Statements.InsertProgram)
+                .use(_.unique(SETʹ))
+                .flatTap: pid =>
+                  user match
+                    case ServiceUser(_, _) =>
+                      Concurrent[F].unit
+                    case nonServiceUser    =>
+                      // Link the PI to the program.
+                      programUserService.addAndLinkPi(pid).void
+                .map(_.success)
 
-          val proprietaryMonths =
-            SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
+            val proprietaryMonths =
+              SETʹ.goa.proprietaryMonths.some.filter(_ =!= GoaPropertiesInput.DefaultProprietaryMonths)
 
-          def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
-            val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
-            updatePrograms(edit, sql"select $program_id"(p)).map(_.void)
+            def setActivePeriod(p: Program.Id, a: Ior[LocalDate, LocalDate]): F[Result[Unit]] =
+              val edit = ProgramPropertiesInput.Edit.Default.copy(active = a.some)
+              updatePrograms(
+                Services.asSuperUser:
+                  // Irritating, we need to reign in the bare AppliedFragments because there's no 
+                  // way to know what form they should take. Sometimes it's IN (frag), other
+                  // times (as below) it's FROM (frag) and you need a SELECT in there.
+                  AccessControl.unchecked(edit, sql"select $program_id".apply(p))
+              ).map(_.void)
 
-          (for {
-            _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
-            _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
-            p <- ResultT(create)
-            _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
-          } yield p).value
-        }
+            (for {
+              _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
+              _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
+              p <- ResultT(create)
+              _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
+            } yield p).value
+          }
 
 
-      def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F]): F[Program.Id] =
+      def insertCalibrationProgram(SET: Option[ProgramPropertiesInput.Create], calibrationRole: CalibrationRole, description: Description)(using Transaction[F], SuperUserAccess): F[Program.Id] =
         Trace[F].span("insertCalibrationProgram") {
           val SETʹ = SET.getOrElse(ProgramPropertiesInput.Create.Default)
 
           session.prepareR(Statements.InsertCalibrationProgram).use(_.unique(SETʹ.name, calibrationRole, description.value))
         }
 
-      def updatePrograms(
-        SET:   ProgramPropertiesInput.Edit,
-        where: AppliedFragment
-      )(using Transaction[F]): F[Result[List[Program.Id]]] =
+      override def updatePrograms(input: AccessControl.Checked[ProgramPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Program.Id]]] = {
+        input.fold(Result(Nil).pure[F]): (SET, where) =>
 
-        // Create the temp table with the programs we're updating. We will join with this
-        // several times later on in the transaction.
-        val setup: F[Unit] =
-          val af = Statements.createProgramUpdateTempTable(where)
-          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+          // Create the temp table with the programs we're updating. We will join with this
+          // several times later on in the transaction.
+          val setup: F[Unit] =
+            val af = Statements.createProgramUpdateTempTable(where)
+            session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        // Update programs
-        val updatePrograms: F[Result[List[Program.Id]]] =
-          Statements.updatePrograms(SET).fold(Nil.success.pure[F]): af =>
-            session.prepareR(af.fragment.query(program_id)).use: ps =>
-              ps.stream(af.argument, 1024)
-                .compile
-                .toList
-                .map(_.success)
-                .recover {
-                  case SqlState.CheckViolation(e) if e.constraintName.contains("active_dates_check") =>
-                    OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
-                }
+          // Update programs
+          val updatePrograms: F[Result[List[Program.Id]]] =
+            Statements.updatePrograms(SET).fold(Nil.success.pure[F]): af =>
+              session.prepareR(af.fragment.query(program_id)).use: ps =>
+                ps.stream(af.argument, 1024)
+                  .compile
+                  .toList
+                  .map(_.success)
+                  .recover {
+                    case SqlState.CheckViolation(e) if e.constraintName.contains("active_dates_check") =>
+                      OdbError.InvalidArgument("Requested update to the active period is invalid: activeStart must come before activeEnd".some).asFailure
+                  }
 
-        (for
-          _   <- ResultT.liftF(setup)
-          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-          _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-          ids <- ResultT(updatePrograms)
-        yield ids).value
+          (for
+            _   <- ResultT.liftF(setup)
+            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+            ids <- ResultT(updatePrograms)
+          yield ids).value
+
+      }
 
     }
 
-  object Statements {
+  private object Statements {
 
     def selectPid(ref: Ior[ProposalReference, ProgramReference]): AppliedFragment =
       void"""
