@@ -694,21 +694,22 @@ class guideEnvironment extends ExecutionTestSupport {
     }
   }
 
-  test("observation duration too long") {
-    val setup: IO[Observation.Id] =
-      for {
-        p <- createProgramAs(pi)
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createObservationAs(pi, p, List(t))
-        _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationTooLong.some)
-      } yield o
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        guideEnvironmentQuery(oid),
-        expected = List(s"Observation duration of ${durationTooLong.format} exceeds the remaining time of ${fullTimeEstimate.format} for observation $oid.").asLeft)
-    }
-  }
+  // Temporarily(?) disable check for too long of a duration for sc-5322
+  // test("observation duration too long") {
+  //   val setup: IO[Observation.Id] =
+  //     for {
+  //       p <- createProgramAs(pi)
+  //       t <- createTargetWithProfileAs(pi, p)
+  //       o <- createObservationAs(pi, p, List(t))
+  //       _ <- setObservationTimeAndDuration(pi, o, gaiaError.some, durationTooLong.some)
+  //     } yield o
+  //   setup.flatMap { oid =>
+  //     expect(
+  //       pi,
+  //       guideEnvironmentQuery(oid),
+  //       expected = List(s"Observation duration of ${durationTooLong.format} exceeds the remaining time of ${fullTimeEstimate.format} for observation $oid.").asLeft)
+  //   }
+  // }
 
   test("no guide stars") {
     val setup: IO[Observation.Id] =
