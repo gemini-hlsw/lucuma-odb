@@ -18,7 +18,7 @@ import lucuma.odb.graphql.table.VisitTable
 
 trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
                                         with TimeChargeCorrectionTable[F]
-                                        with TimeChargeDiscountTable[F] {
+                                        with TimeChargeDiscountTable[F]:
 
   lazy val TimeChargeInvoiceMapping: ObjectMapping =
     ObjectMapping(TimeChargeInvoiceType)(
@@ -30,8 +30,10 @@ trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
     )
 
   lazy val TimeChargeInvoiceElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (TimeChargeInvoiceType, "discounts", Nil) =>
+      Elab.transformChild: child =>
+        OrderBy(OrderSelections(List(OrderSelection[Timestamp](TimeChargeDiscountType / "start"))), child)
+
     case (TimeChargeInvoiceType, "corrections", Nil) =>
-      Elab.transformChild { child =>
+      Elab.transformChild: child =>
         OrderBy(OrderSelections(List(OrderSelection[Timestamp](TimeChargeCorrectionType / "created"))), child)
-      }
-}
