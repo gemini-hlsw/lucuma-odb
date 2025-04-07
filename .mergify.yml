@@ -23,6 +23,14 @@ pull_request_rules:
   - status-success=Test (ubuntu-22.04, 3, temurin@17, 7)
   actions:
     merge: {}
+- name: Label binding PRs
+  conditions:
+  - files~=^modules/binding/
+  actions:
+    label:
+      add:
+      - binding
+      remove: []
 - name: Label calibrations PRs
   conditions:
   - files~=^modules/calibrations/
