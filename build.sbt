@@ -91,6 +91,18 @@ lazy val schema =
       )
     )
 
+lazy val binding = project
+  .in(file("modules/binding"))
+  .dependsOn(schema.jvm)
+  .settings(
+    name := "lucuma-odb-binding",
+    libraryDependencies ++= Seq(
+      "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
+      "org.typelevel" %% "grackle-core"       % grackleVersion,
+      "org.scalameta" %% "munit"              % munitVersion           % Test,
+    )
+  )
+
 lazy val sequence = project
   .in(file("modules/sequence"))
   .dependsOn(schema.jvm)
@@ -125,7 +137,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(phase0, sequence, smartgcal)
+  .dependsOn(binding, phase0, sequence, smartgcal)
   .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name                        := "lucuma-odb-service",
