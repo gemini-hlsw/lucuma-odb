@@ -65,6 +65,8 @@ enum OdbError:
 
 object OdbError:
 
+  val Key = "odb_error"
+
   // N.B. package-private to allow for Arb instance
   private[data] enum Tag(val value: String):
     case InvalidArgument           extends Tag("invalid_argument")
