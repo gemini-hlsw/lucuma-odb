@@ -8,6 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Attachment
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -25,6 +26,7 @@ trait AttachmentMetadataService [F[_]] {
     input: AccessControl.Checked[AttachmentPropertiesInput.Edit]
   )(using Transaction[F]): F[Result[List[Attachment.Id]]]
 
+  def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F]): F[Map[Attachment.Id, Timestamp]]
 }
 
 object AttachmentMetadataService {
@@ -42,6 +44,10 @@ object AttachmentMetadataService {
             }
           }.map(Result.success)
 
+      // Called by other services, no access validation is performed.
+      def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F]): F[Map[Attachment.Id, Timestamp]] =
+        val uniqueIds = aids.distinct
+        session.execute(Statements.getUpdatedAt(uniqueIds))(uniqueIds.toList).map(_.toMap)
     }
 
   object Statements {
@@ -68,5 +74,14 @@ object AttachmentMetadataService {
         void"WHERE t_attachment.c_attachment_id IN (" |+| which |+| void") " |+|
         void"RETURNING t_attachment.c_attachment_id"
       }
+
+    def getUpdatedAt(aids: NonEmptyList[Attachment.Id]): Query[List[Attachment.Id], (Attachment.Id, Timestamp)] =
+      sql"""
+        SELECT
+          c_attachment_id,
+          c_updated_at
+        FROM t_attachment
+        WHERE c_attachment_id IN(${attachment_id.list(aids.size)})
+      """.query(attachment_id *: core_timestamp)
   }
 }
