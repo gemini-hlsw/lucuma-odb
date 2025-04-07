@@ -96,6 +96,7 @@ lazy val binding = project
   .dependsOn(schema.jvm)
   .settings(
     name := "lucuma-odb-binding",
+    tlVersionIntroduced := Map("3" -> "0.19.3"),
     libraryDependencies ++= Seq(
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
