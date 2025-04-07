@@ -111,7 +111,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                       start
                       end
                     }
-                    program { seconds }
+                    amount { seconds }
                     comment
                     ... on TimeChargeDaylightDiscount {
                       site
@@ -200,7 +200,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           "start": ${d.discount.interval.start.asJson},
           "end": ${d.discount.interval.end.asJson}
         },
-        "program": {
+        "amount": {
           "seconds": ${d.discount.program.toSeconds}
         },
         "comment": ${d.discount.comment}
@@ -467,21 +467,6 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
   def cleanup: IO[Unit] =
     withSession: s =>
       s.execute(sql"DELETE FROM t_execution_event".command).void
-
-  /*
-  def report: IO[String] =
-    withSession: s =>
-      s.execute(
-        sql"""
-          SELECT
-            c_visit_id,
-            c_start,
-            c_end
-          FROM t_visit
-          ORDER BY c_visit_id
-        """.query(visit_id *: core_timestamp.opt *: core_timestamp.opt)
-      ).map(_.toString)
-   */
 
   def insertEvents(
     pid:    Program.Id,

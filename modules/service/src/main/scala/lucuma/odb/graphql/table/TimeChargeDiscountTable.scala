@@ -22,7 +22,7 @@ trait TimeChargeDiscountTable[F[_]] extends BaseMapping[F]:
     val VisitId      = col("c_visit_id",         visit_id)
     val Start        = col("c_start",            core_timestamp)
     val End          = col("c_end",              core_timestamp)
-    val Program      = col("c_program_discount", time_span)
+    val Amount       = col("c_amount",           time_span)
     val Comment      = col("c_comment",          text)
 
     val DiscountType = col("c_type",             time_charge_discount_type)

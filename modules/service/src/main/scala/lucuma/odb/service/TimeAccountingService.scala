@@ -441,7 +441,7 @@ object TimeAccountingService {
             c_visit_id,
             c_start,
             c_end,
-            c_program_discount,
+            c_amount,
             c_comment,
             c_type,
             c_site
