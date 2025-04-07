@@ -1,7 +1,7 @@
 -- A new time charge discount, "overlap" time.  This is time that is not going
 -- to be charged because we switched to some other chargeable visit.  For
 -- example, time spent writing out the last datasets while slewing to another
--- observatin.
+-- observation.
 ALTER TYPE e_time_charge_discount_type
   ADD VALUE 'overlap' AFTER 'nodata';
 
@@ -18,7 +18,7 @@ ALTER TABLE t_visit
   ADD COLUMN c_start timestamp NULL,
   ADD COLUMN c_end   timestamp NULL;
 
--- Initialize the visit times.  in the visit table.
+-- Initialize the visit times for existing visits.
 UPDATE t_visit v
    SET c_start = sub.min_ts,
        c_end   = sub.max_ts
@@ -38,6 +38,8 @@ UPDATE t_visit v
 CREATE INDEX idx_t_visit_site_chargeable_start
   ON t_visit (c_site, c_chargeable, c_start);
 
+-- Resets the visit times for a particular visit when a new event recorded.
+-- (Also when updated or deleted but we don't really do that.)
 CREATE OR REPLACE FUNCTION update_visit_times()
 RETURNS TRIGGER AS $$
 DECLARE

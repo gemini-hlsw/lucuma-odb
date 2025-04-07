@@ -173,11 +173,6 @@ object TimeAccountingService {
 
         private val overlapDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT: tas =>
-//            (for
-//              v <- visitService.select(visitId)
-//              r <- executionEventService.visitRange(visitId)
-//              o <- session.option(SelectChargeableOverlap)(visitId)
-//            yield o).map:
             session
               .option(SelectChargeableOverlap)(visitId)
               .map:
@@ -417,10 +412,18 @@ object TimeAccountingService {
           v2.c_visit_id != v.c_visit_id AND
           v2.c_site = v.c_site          AND
           v2.c_chargeable = true        AND
-          v2.c_start > v.c_start        AND
-          v2.c_start < v.c_end
-        ORDER BY v2.c_start
-        LIMIT 1;
+          v2.c_start < v.c_end          AND
+          (
+            -- The usual case if v2 overlaps
+            v2.c_start > v.c_start                                    OR
+
+            -- The edge case where the start times are the same on two visits.
+            -- Here we just pick the one with the newer id to be charged.
+            (v2.c_start = v.c_start AND v2.c_visit_id > v.c_visit_id)
+
+            -- If v2.c_start < v.c_start then these don't overlap
+          )
+        ORDER BY v2.c_start LIMIT 1; -- pick the first one that overlaps
       """.query(core_timestamp *: observation_id)
 
     val DeleteDiscountEntries: Command[Visit.Id] =
