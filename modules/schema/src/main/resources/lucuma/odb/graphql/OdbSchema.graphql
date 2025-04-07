@@ -12092,7 +12092,10 @@ interface TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan!
+  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
+
+  "Time amount to discount from the program."
+  amount: TimeSpan!
 
   "Additional detail."
   comment: String!
@@ -12108,7 +12111,10 @@ type TimeChargeDaylightDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan!
+  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
+
+  "Time amount to discount from the program."
+  amount: TimeSpan!
 
   "Additional detail."
   comment: String!
@@ -12126,7 +12132,10 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan!
+  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
+
+  "Time amount to discount from the program."
+  amount: TimeSpan!
 
   "Additional detail."
   comment: String!
@@ -12142,7 +12151,10 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan!
+  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
+
+  "Time amount to discount from the program."
+  amount: TimeSpan!
 
   "Additional detail."
   comment: String!
@@ -12156,7 +12168,10 @@ type TimeChargeQaDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan!
+  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
+
+  "Time amount to discount from the program."
+  amount: TimeSpan!
 
   "Additional detail."
   comment: String!

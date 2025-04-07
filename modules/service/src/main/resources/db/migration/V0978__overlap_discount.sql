@@ -1,3 +1,9 @@
+-- Now that we removed "partner" time and there's no need to distinguish
+-- between "program" vs. "partner", we'll rename the 'c_program_discount'
+-- column to 'c_amount'.
+ALTER TABLE t_time_charge_discount
+  RENAME c_program_discount TO c_amount;
+
 -- A new time charge discount, "overlap" time.  This is time that is not going
 -- to be charged because we switched to some other chargeable visit.  For
 -- example, time spent writing out the last datasets while slewing to another

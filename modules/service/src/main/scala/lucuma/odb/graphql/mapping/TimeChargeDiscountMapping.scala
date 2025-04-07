@@ -48,6 +48,7 @@ trait TimeChargeDiscountMapping[F[_]] extends DatasetTable[F]
         ),
 
         SqlObject("program"),
+        SqlObject("amount"),
         SqlField("comment", TimeChargeDiscountTable.Comment)
       )
     )
