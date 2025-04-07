@@ -13,8 +13,7 @@ import io.circe.JsonObject
 import io.circe.syntax.*
 
 object OdbErrorExtensions:
-
-  private val Key = "odb_error"
+  import OdbError.Key
 
   /** Some server-only extensions. */
   extension (e: OdbError)

@@ -12,9 +12,10 @@ import grackle.Result
 import grackle.Value
 import grackle.Value.AbsentValue
 import grackle.Value.NullValue
+import io.circe.JsonObject
+import io.circe.syntax.*
 import lucuma.odb.data
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 
 trait Matcher[A] { outer =>
 
@@ -91,8 +92,11 @@ trait Matcher[A] { outer =>
 
 object Matcher:
 
+  // N.B. in order to avoid adding a dependency on Grackle in odb-schema we need to duplicate 
+  // the OdbError "Problem" encoding from OdbErrorExtensions. Luckily it's very simple.
   def validationProblem(msg: String): Problem =
-    OdbError.InvalidArgument(Some(msg)).asProblem
+    val e =  OdbError.InvalidArgument(Some(msg))
+    Problem(e.message, Nil, Nil, Some(JsonObject(OdbError.Key -> e.asJson)))
 
   def validationFailure(msg: String): Result[Nothing] =
     Result.failure(validationProblem(msg))
