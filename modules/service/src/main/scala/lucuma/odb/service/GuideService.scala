@@ -278,10 +278,11 @@ object GuideService {
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
     def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
-      if (obsDuration > timeEstimate)
-        generalError(s"Observation duration of ${obsDuration.format} exceeds the remaining time of ${timeEstimate.format} for observation $obsId.").asFailure
-      else
-        (obsDuration.subtract(setupTime))
+      // Temporarily(?) disable check for too long of a duration for sc-5322
+      // if (obsDuration > timeEstimate)
+      //   generalError(s"Observation duration of ${obsDuration.format} exceeds the remaining time of ${timeEstimate.format} for observation $obsId.").asFailure
+      // else
+      obsDuration.subtract(setupTime)
           .filter(_.nonZero)
           .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
