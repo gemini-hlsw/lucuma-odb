@@ -1,8 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence
-package f2.longslit
+package lucuma.odb.sequence.f2.longslit
 
 import cats.Eq
 import cats.derived.*
@@ -25,15 +24,14 @@ import lucuma.core.enums.F2WindowCover
  */
 case class Config(
   grating: F2Disperser,
-  filter: F2Filter,
+  filter: Option[F2Filter],
   fpu: F2Fpu,
   explicitReadMode: Option[F2ReadMode]             = None,
   explicitDecker: Option[F2Decker]                 = None,
   explicitReadoutMode: Option[F2ReadoutMode]       = None,
   explicitReads: Option[F2Reads]                   = None,
   explicitWindowCover: Option[F2WindowCover]       = None,
-  explicitUseElectronicOffsetting: Option[Boolean] = None,
-  explicitMOSPreImaging: Option[Boolean]           = None
+  explicitUseElectronicOffsetting: Option[Boolean] = None
 ) derives Eq {
 
   def readMode: F2ReadMode =
@@ -60,9 +58,6 @@ case class Config(
   def defaultUseElectronicOffsetting: Boolean =
     DefaultF2UseElectronicOffsetting
 
-  def mosPreImaging: Boolean =
-    explicitMOSPreImaging.getOrElse(defaultMOSPreImaging)
-
   def defaultMOSPreImaging: Boolean =
     DefaultF2MOSPreImaging
 
@@ -71,7 +66,7 @@ case class Config(
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.writeChars(grating.tag)
-    out.writeChars(filter.tag)
+    out.writeChars(filter.foldMap(_.tag))
     out.writeChars(fpu.tag)
     out.writeChars(readMode.tag)
     out.writeChars(decker.tag)
@@ -79,7 +74,6 @@ case class Config(
     out.writeChars(reads.foldMap(_.tag))
     out.writeChars(windowCover.foldMap(_.tag))
     out.writeBoolean(useElectronicOffseting)
-    out.writeBoolean(mosPreImaging)
 
     out.close()
     bao.toByteArray

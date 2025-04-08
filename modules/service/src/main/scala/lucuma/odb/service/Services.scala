@@ -124,6 +124,9 @@ trait Services[F[_]]:
   /** The `GmosLongSlitService`. */
   def gmosLongSlitService: GmosLongSlitService[F]
 
+  /** The `F2LongSlitService`. */
+  def f2LongSlitService: F2LongSlitService[F]
+
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
 
@@ -217,6 +220,7 @@ object Services:
     using tf: Trace[F], uf: UUIDGen[F], sr: SecureRandom[F], cf: Concurrent[F], par: Parallel[F]
   ): Services[F[_]] =
     new Services[F]:
+
       val user = u
       val session = s
       val enums = e
@@ -268,6 +272,7 @@ object Services:
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
+      lazy val f2LongSlitService = F2LongSlitService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
       lazy val groupService = GroupService.instantiate
@@ -322,6 +327,7 @@ object Services:
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     def gmosLongSlitService[F[_]](using Services[F]): GmosLongSlitService[F] = summon[Services[F]].gmosLongSlitService
+    def f2LongSlitService[F[_]](using Services[F]): F2LongSlitService[F] = summon[Services[F]].f2LongSlitService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService

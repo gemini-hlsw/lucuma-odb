@@ -18,28 +18,26 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.model.ImageQuality
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.odb.graphql.input.GmosLongSlitInput
-import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
-import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
+import lucuma.odb.graphql.input.F2LongSlitInput
 import lucuma.odb.sequence.f2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.F2Codecs.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
+import skunk.codec.boolean.bool
 
 trait F2LongSlitService[F[_]] {
 
   def select(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => Config]]
+  ): F[Map[Observation.Id, Config]]
 
   def insertNorth(
     input: GmosLongSlitInput.Create.North
@@ -127,25 +125,37 @@ object F2LongSlitService {
          common
         ).to[GmosLongSlitInput.Create.South]
 
+      val f2LS: Decoder[F2LongSlitInput.Create] =
+        (f2_disperser        *:
+         f2_filter.opt       *:
+         f2_fpu              *:
+         f2_read_mode.opt    *:
+         f2_decker.opt       *:
+         f2_readout_mode.opt *:
+         f2_reads.opt        *:
+         f2_window_cover.opt *:
+         bool.opt
+        ).to[F2LongSlitInput.Create]
+
       private def select[A](
         which:   List[Observation.Id],
         f:       NonEmptyList[Observation.Id] => AppliedFragment,
         decoder: Decoder[A]
-      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
+      ): F[List[(Observation.Id, A)]] =
         NonEmptyList
           .fromList(which)
           .fold(Applicative[F].pure(List.empty)) { oids =>
             val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id *: decoder)).use { pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList
             }
           }
 
       override def select(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => Config]] =
-        select(which, Statements.selectGmosNorthLongSlit, north)
-          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      ): F[Map[Observation.Id, Config]] =
+        select(which, Statements.selectF2LongSlit, f2LS)
+          .map(_.map { case (oid, f2) => (oid, f2.toObservingMode) }.toMap)
 
       private def exec(af: AppliedFragment): F[Unit] =
         session.prepareR(af.fragment.command).use { pq =>
@@ -212,27 +222,21 @@ object F2LongSlitService {
 
   object Statements {
 
-    private def selectF2LongSlit(
-      table: String,
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
+    def selectF2LongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT
           ls.c_observation_id,
-          ob.c_image_quality,
-          ls.c_grating,
+          ls.c_disperser,
           ls.c_filter,
           ls.c_fpu,
-          ls.c_central_wavelength,
-          ls.c_xbin,
-          ls.c_ybin,
-          ls.c_amp_read_mode,
-          ls.c_amp_gain,
-          ls.c_roi,
-          ls.c_wavelength_dithers,
-          ls.c_spatial_offsets
+          ls.c_read_mode,
+          ls.c_decker,
+          ls.c_readout_mode,
+          ls.c_reads,
+          ls.c_window_cover,
+          ls.c_use_electronic_offsetting,
         FROM
-          #t_f2_long_slit ls
+          #t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
       """(Void) |+|
       void"""
@@ -240,50 +244,6 @@ object F2LongSlitService {
           ls.c_observation_id IN ("""                                     |+|
             observationIds.map(sql"$observation_id").intercalate(void",") |+|
           void")"
-
-    def selectGmosNorthLongSlit(
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      selectGmosLongSlit("t_gmos_north_long_slit", observationIds)
-
-    private def selectGmosLongSlit(
-      table: String,
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      sql"""
-        SELECT
-          ls.c_observation_id,
-          ob.c_image_quality,
-          ls.c_grating,
-          ls.c_filter,
-          ls.c_fpu,
-          ls.c_central_wavelength,
-          ls.c_xbin,
-          ls.c_ybin,
-          ls.c_amp_read_mode,
-          ls.c_amp_gain,
-          ls.c_roi,
-          ls.c_wavelength_dithers,
-          ls.c_spatial_offsets
-        FROM
-          #$table ls
-        INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
-      """(Void) |+|
-      void"""
-        WHERE
-          ls.c_observation_id IN ("""                                     |+|
-            observationIds.map(sql"$observation_id").intercalate(void",") |+|
-          void")"
-
-    def selectGmosNorthLongSlit(
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      selectGmosLongSlit("t_gmos_north_long_slit", observationIds)
-
-    def selectGmosSouthLongSlit(
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      selectGmosLongSlit("t_gmos_south_long_slit", observationIds)
 
     val InsertGmosNorthLongSlit: Fragment[(
       Observation.Id          ,
