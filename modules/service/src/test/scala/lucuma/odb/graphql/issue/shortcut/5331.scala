@@ -45,13 +45,102 @@ class ShortCut_5331 extends ExecutionTestSupport:
       }
     """)
 
-  test("Support passing large exposure time values"):
+
+  test("Support passing large exposure time values in graphql"):
     val setup =
       for {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- updateExpTime(o)
+      } yield o
+    setup.flatMap { case oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 scienceRequirements {
+                   spectroscopy {
+                     exposureTimeMode {
+                       timeAndCount {
+                         time {
+                           microseconds
+                         }
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           """,
+            expected = Right(json"""
+              {
+                "observation" : {
+                  "scienceRequirements" : {
+                    "spectroscopy" : {
+                      "exposureTimeMode" : {
+                        "timeAndCount" : {
+                          "time" : {
+                            "microseconds" : $secs
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """)
+      )
+    }
+
+  def updateExpTimeWithVariables(t: Observation.Id) = query(pi,
+    s"""
+      mutation($$input: UpdateObservationsInput!) {
+        updateObservations(input: $$input) {
+          observations {
+            id
+          }
+        }
+      }
+    """,
+    variables =
+      json"""
+        {
+          "input": {
+            "SET": {
+              "scienceRequirements": {
+                "spectroscopy": {
+                  "exposureTimeMode": {
+                    "timeAndCount": {
+                      "time": {
+                        "microseconds": $secs
+                      },
+                      "count": 1,
+                      "at": {
+                        "nanometers": 500
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "WHERE": {
+              "id": { "EQ": $t }
+            }
+          }
+        }
+      """.asObject
+  )
+
+  test("Support passing large exposure time values in variables"):
+    val setup =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- updateExpTimeWithVariables(o)
       } yield o
     setup.flatMap { case oid =>
       expect(
