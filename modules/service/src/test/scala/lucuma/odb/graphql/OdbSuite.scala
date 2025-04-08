@@ -158,8 +158,20 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
     )
 
+    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
+    // start in the root directory of the project. In that case, the dockerfile is in the
+    // modules/service/src directory.
+    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
+    // We'll handle both cases here.
+    val dockerPrefix = Paths.get("modules", "service")
+    val dockerSuffix = Paths.get("src", "Dockerfile")
+    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
+      dockerSuffix
+    else
+      dockerPrefix.resolve(dockerSuffix)
+    
     val image = new ImageFromDockerfile("lucuma-odb-test-db")
-      .withDockerfile(Paths.get("modules/service/src/Dockerfile"))
+      .withDockerfile(dockerPath)
       .withBuildArgs(env.asJava)
 
     val dbContainer = GenericContainer(
