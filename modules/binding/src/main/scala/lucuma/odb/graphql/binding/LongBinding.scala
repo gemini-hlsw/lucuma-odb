@@ -10,6 +10,10 @@ import scala.util.control.NonFatal
 
 val LongBinding: Matcher[Long] = {
   case Value.IntValue(v)     => v.toLong.asRight
+  case v@Value.FloatValue(double) =>
+    lazy val long = double.toLong
+    if double.isWhole && long.toDouble == double then long.asRight
+    else s"Expected Long, got $v".asLeft
   case Value.StringValue(v)  =>
     try v.toLong.asRight
     catch { case NonFatal(e) => s"Invalid Long: $v: ${e.getMessage}".asLeft }
