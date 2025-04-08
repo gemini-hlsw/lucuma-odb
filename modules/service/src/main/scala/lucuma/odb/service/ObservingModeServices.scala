@@ -66,7 +66,12 @@ object ObservingModeServices {
               .selectSouth(oids)
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
-          case (Flamingos2LongSlit, _) => ???
+          case (Flamingos2LongSlit, oids) =>
+            f2LongSlitService
+              .select(oids)
+            ???
+              // .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+
         }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
 
@@ -75,7 +80,8 @@ object ObservingModeServices {
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth)
+          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
+          // input.f2LongSlit.map(f2LongSlitService.insert)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode creation parameters were provided.")
@@ -96,7 +102,8 @@ object ObservingModeServices {
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth)
+          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
+          // input.f2LongSlit.map(f2LongSlitService.update)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
@@ -108,7 +115,8 @@ object ObservingModeServices {
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
-          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth))
+          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth)),
+          // input.f2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert))
         ).flattenOption match {
           case List(f) => f
           case Nil     => Result.failure("No observing mode edit parameters were provided.")

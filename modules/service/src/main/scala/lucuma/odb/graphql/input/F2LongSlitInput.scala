@@ -1,0 +1,226 @@
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package input
+
+import cats.syntax.foldable.*
+import cats.syntax.parallel.*
+import grackle.Result
+import lucuma.core.enums.ObservingModeType
+import lucuma.odb.graphql.binding.*
+import lucuma.odb.sequence.f2.longslit.Config
+
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2WindowCover
+import lucuma.odb.data.Nullable
+
+object F2LongSlitInput {
+
+  case class Create(
+    grating: F2Disperser,
+    filter: Option[F2Filter],
+    fpu: F2Fpu,
+    explicitReadMode: Option[F2ReadMode]             = None,
+    explicitDecker: Option[F2Decker]                 = None,
+    explicitReadoutMode: Option[F2ReadoutMode]       = None,
+    explicitReads: Option[F2Reads]                   = None,
+    explicitWindowCover: Option[F2WindowCover]       = None,
+    explicitUseElectronicOffsetting: Option[Boolean] = None
+  ) {
+    def observingModeType: ObservingModeType =
+      ObservingModeType.Flamingos2LongSlit
+
+    /**
+      * Creates a F2 long slit observing mode based on input parameters.
+      */
+    def toObservingMode: Config =
+      Config(
+        grating,
+        filter,
+        fpu,
+        explicitReadMode,
+        explicitDecker,
+        explicitReadoutMode,
+        explicitReads,
+        explicitWindowCover,
+        explicitUseElectronicOffsetting
+      )
+
+  }
+
+  object Create {
+    private val F2Data: Matcher[(
+      F2Disperser,
+      Option[F2Filter],
+      F2Fpu,
+      Option[F2ReadMode],
+      Option[F2Decker],
+      Option[F2ReadoutMode],
+      Option[F2Reads],
+      Option[F2WindowCover],
+      Option[Boolean],
+    )] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          F2DisperserBinding("disperser", rDisperser),
+          F2FilterBinding.Option("filter", rFilter),
+          F2FpuBinding("fpu", rFpu),
+          F2ReadModeBinding.Option("readMode", rReadMode),
+          F2DeckerBinding.Option("decker", rDecker),
+          F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
+          F2ReadsBinding.Option("reads", rReads),
+          F2WindowCoverBinding.Option("windowCover", rWindowCover),
+          BooleanBinding.Option("useElectronicOffsetting", rUseElectronicOffsetting),
+        ) => (
+          rDisperser,
+          rFilter,
+          rFpu,
+          rReadMode,
+          rDecker,
+          rReadoutMode,
+          rReads,
+          rWindowCover,
+          rUseElectronicOffsetting
+        ).parTupled
+      }
+
+    val Binding: Matcher[Create] =
+      F2Data.rmap {
+        case (
+        disperser,
+        filter,
+        fpu,
+        explicitReadMode,
+        explicitDecker,
+        explicitReadoutMode,
+        explicitReads,
+        explicitWindowCover,
+        explicitUseElectronicOffsetting
+      ) =>
+        Result(Create(
+          disperser,
+          filter,
+          fpu,
+          explicitReadMode,
+          explicitDecker,
+          explicitReadoutMode,
+          explicitReads,
+          explicitWindowCover,
+          explicitUseElectronicOffsetting
+        ))
+        case _ =>
+          Matcher.validationFailure("disperser and fpu are required when creating the Flamingos 2 Long Slit observing mode.")      }
+
+  }
+
+  case class Edit(
+    grating: Option[F2Disperser],
+    filter: Nullable[F2Filter],
+    fpu: Option[F2Fpu],
+    explicitReadMode: Nullable[F2ReadMode],
+    explicitDecker: Nullable[F2Decker],
+    explicitReadoutMode: Nullable[F2ReadoutMode],
+    explicitReads: Nullable[F2Reads],
+    explicitWindowCover: Nullable[F2WindowCover],
+    explicitUseElectronicOffsetting: Nullable[Boolean]
+  ) {
+
+    val observingModeType: ObservingModeType =
+      ObservingModeType.Flamingos2LongSlit
+
+    private def required[A](oa: Option[A], itemName: String): Result[A] =
+      Result.fromOption(
+        oa,
+        Matcher.validationProblem(s"A $itemName is required in order to create a Flamingos 2 Long Slit observing mode.")
+      )
+
+    val toCreate: Result[Create] =
+      for {
+        g <- required(grating, "grating")
+        u <- required(fpu, "fpu")
+      } yield Create(
+        g,
+        filter.toOption,
+        u,
+        explicitReadMode.toOption,
+        explicitDecker.toOption,
+        explicitReadoutMode.toOption,
+        explicitReads.toOption,
+        explicitWindowCover.toOption,
+        explicitUseElectronicOffsetting.toOption
+      )
+  }
+
+  object Edit {
+
+    val Binding: Matcher[Edit] =
+      F2EditData.rmap {
+        case (
+          grating,
+          filter,
+          fpu,
+          explicitReadMode,
+          explicitDecker,
+          explicitReadoutMode,
+          explicitReads,
+          explicitWindowCover,
+          explicitUseElectronicOffsetting
+          ) =>
+          Result(Edit(
+            grating,
+            filter,
+            fpu,
+            explicitReadMode,
+            explicitDecker,
+            explicitReadoutMode,
+            explicitReads,
+            explicitWindowCover,
+            explicitUseElectronicOffsetting
+          ))
+      }
+
+    private val F2EditData: Matcher[(
+      Option[F2Disperser],
+      Nullable[F2Filter],
+      Option[F2Fpu],
+      Nullable[F2ReadMode],
+      Nullable[F2Decker],
+      Nullable[F2ReadoutMode],
+      Nullable[F2Reads],
+      Nullable[F2WindowCover],
+      Nullable[Boolean]
+    )] =
+      ObjectFieldsBinding.rmap {
+        case List(
+          F2DisperserBinding.Option("disperser", rDisperser),
+          F2FilterBinding.Nullable("filter", rFilter),
+          F2FpuBinding.Option("fpu", rFpu),
+          F2ReadModeBinding.Nullable("readMode", rReadMode),
+          F2DeckerBinding.Nullable("decker", rDecker),
+          F2ReadoutModeBinding.Nullable("readoutMode", rReadoutMode),
+          F2ReadsBinding.Nullable("reads", rReads),
+          F2WindowCoverBinding.Nullable("windowCover", rWindowCover),
+          BooleanBinding.Nullable("useElectronicOffsetting", rUseElectronicOffsetting)
+        ) => (
+          rDisperser,
+          rFilter,
+          rFpu,
+          rReadMode,
+          rDecker,
+          rReadoutMode,
+          rReads,
+          rWindowCover,
+          rUseElectronicOffsetting
+        ).parTupled
+      }
+  }
+
+}
+
