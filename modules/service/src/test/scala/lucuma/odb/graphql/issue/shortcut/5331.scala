@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 package issue.shortcut
 
 import cats.syntax.all.*
+import grackle.Problem
+import grackle.Result
+import grackle.Value
 import io.circe.literal.*
 import lucuma.core.model.Observation
-import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.graphql.binding.LongBinding
-import grackle.Value
-import grackle.Result
-import grackle.Problem
+import lucuma.odb.graphql.query.ExecutionTestSupport
 
 class ShortCut_5331 extends ExecutionTestSupport:
   // Works up to 2147 seconds
