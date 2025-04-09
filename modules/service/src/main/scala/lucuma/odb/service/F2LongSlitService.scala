@@ -35,6 +35,8 @@ import skunk.codec.boolean.bool
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2Decker
 
 trait F2LongSlitService[F[_]] {
 
@@ -131,9 +133,9 @@ object F2LongSlitService {
       val f2LS: Decoder[F2LongSlitInput.Create] =
         (f2_disperser        *:
          f2_filter.opt       *:
-         f2_fpu              //*:
-         // f2_read_mode.opt    *:
-         // f2_decker.opt       *:
+         f2_fpu              *:
+         f2_read_mode.opt    *:
+         f2_decker.opt       //*:
          // f2_readout_mode.opt *:
          // f2_reads.opt        *:
          // f2_window_cover.opt *:
@@ -253,6 +255,8 @@ object F2LongSlitService {
       F2Disperser             ,
       Option[F2Filter] ,
       F2Fpu            ,
+      Option[F2ReadMode] ,
+      Option[F2Decker] ,
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -260,17 +264,21 @@ object F2LongSlitService {
           c_program_id,
           c_disperser,
           c_filter,
-          c_fpu
+          c_fpu,
+          c_read_mode,
+          c_decker
         )
         SELECT
           $observation_id,
           c_program_id,
           $f2_disperser,
           ${f2_filter.opt},
-          $f2_fpu
+          $f2_fpu,
+          ${f2_read_mode.opt},
+          ${f2_decker.opt}
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u) => (o, d, f, u, o)}
+       """.contramap { (o, d, f, u, r, e) => (o, d, f, u, r, e, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
@@ -281,6 +289,8 @@ object F2LongSlitService {
           input.disperser                        ,
           input.filter                         ,
           input.fpu                            ,
+          input.explicitReadMode                            ,
+          input.explicitDecker                            ,
       )
 
     val InsertGmosSouthLongSlit: Fragment[(
