@@ -6047,6 +6047,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
+
+  """
+  ObservingModeType Flamingos2LongSlit
+  """
+  FLAMINGOS_2LONG_SLIT
 }
 
 type ConstraintSet {
@@ -6677,12 +6682,12 @@ enum Flamingos2Disperser {
   """
   Flamingos2Disperser R=1200 (J + H) grism
   """
-  R1200JH
+  R1200_JH
 
   """
   Flamingos2Disperser R=1200 (H + K) grism
   """
-  R1200HK
+  R1200_HK
 
   """
   Flamingos2Disperser R=3000 (J or H or K) grism
@@ -6785,6 +6790,63 @@ enum Flamingos2Fpu {
   LONG_SLIT_8
 }
 
+  """
+Flamingos2 South Long Slit mode
+"""
+type Flamingos2LongSlit {
+
+  """
+  The disperser field must be specified.  It cannot be unset with a null value.
+  """
+  disperser: Flamingos2Disperser!
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: Flamingos2Filter
+
+  """
+  The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  fpu: Flamingos2Fpu!
+
+  #
+  # """
+  # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitXBin: GmosXBinning
+  #
+  # """
+  # The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitYBin: GmosYBinning
+  #
+  # """
+  # The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitAmpReadMode: GmosAmpReadMode
+  #
+  # """
+  # The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitAmpGain: GmosAmpGain
+  #
+  # """
+  # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitRoi: GmosRoi
+  #
+  # """
+  # The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitWavelengthDithers: [WavelengthDitherInput!]
+  #
+  # """
+  # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  # """
+  # explicitSpatialOffsets: [OffsetComponentInput!]
+}
+
 """
 Edit or create Flamingos2 Long Slit advanced configuration
 """
@@ -6797,52 +6859,12 @@ input Flamingos2LongSlitInput {
   """
   The filter field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  filter: GmosNorthFilter
+  filter: Flamingos2Filter
 
   """
   The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  fpu: GmosNorthBuiltinFpu
-
-  """
-  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  """
-  centralWavelength: WavelengthInput
-
-  """
-  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitXBin: GmosXBinning
-
-  """
-  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitYBin: GmosYBinning
-
-  """
-  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitAmpReadMode: GmosAmpReadMode
-
-  """
-  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitAmpGain: GmosAmpGain
-
-  """
-  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitRoi: GmosRoi
-
-  """
-  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitWavelengthDithers: [WavelengthDitherInput!]
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetComponentInput!]
+  fpu: Flamingos2Fpu!
 }
 
 """
@@ -10105,6 +10127,12 @@ type ObservingMode {
   GMOS South Long Slit mode
   """
   gmosSouthLongSlit: GmosSouthLongSlit
+
+  """
+  Flamingos 2 Long Slit mode
+  """
+  flamingos2LongSlit: Flamingos2LongSlit
+
 }
 
 type ObservingModeGroup {

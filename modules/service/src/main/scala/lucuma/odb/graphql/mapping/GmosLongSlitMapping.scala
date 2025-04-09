@@ -29,22 +29,7 @@ import lucuma.odb.sequence.gmos.longslit.Config
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]
-  extends GmosLongSlitView[F] { this: SkunkMapping[F] =>
-
-  private def explicitOrElseDefault[A: ClassTag : io.circe.Encoder](
-    name:          String,
-    explicitField: String,
-    defaultField:  String
-  ): CursorField[A] =
-    CursorField[A](
-      name,
-      cursor => {
-        (cursor.fieldAs[Option[A]](explicitField),
-          cursor.fieldAs[A](defaultField)
-        ).parMapN(_.getOrElse(_))
-      },
-      List(explicitField, defaultField)
-    )
+  extends GmosLongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
 
   private class CommonFieldMappings(cc: CommonColumns) {
 

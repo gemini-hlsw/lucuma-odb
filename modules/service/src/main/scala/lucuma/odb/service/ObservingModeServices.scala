@@ -81,7 +81,7 @@ object ObservingModeServices {
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
-          // input.f2LongSlit.map(f2LongSlitService.insert)
+          input.f2LongSlit.map(f2LongSlitService.insert)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode creation parameters were provided.")

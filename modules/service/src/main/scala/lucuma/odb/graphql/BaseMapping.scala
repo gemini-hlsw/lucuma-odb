@@ -129,6 +129,7 @@ trait BaseMapping[F[_]]
   lazy val F2FpuType                               = schema.ref("Flamingos2Fpu")
   lazy val F2DisperserType                         = schema.ref("Flamingos2Disperser")
   lazy val F2FilterType                            = schema.ref("Flamingos2Filter")
+  lazy val F2LongSlitType                          = schema.ref("Flamingos2LongSlit")
   lazy val FilterTypeMetaType                      = schema.ref("FilterTypeMeta")
   lazy val FilterTypeType                          = schema.ref("FilterType")
   lazy val FocalPlaneType                          = schema.ref("FocalPlane")

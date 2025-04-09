@@ -44,6 +44,11 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.core.enums.F2Disperser
+import lucuma.core.util.Enumerated
+import lucuma.core.syntax.string.*
+import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.F2Filter
 
 class createObservation extends OdbSuite {
 
@@ -1115,7 +1120,7 @@ class createObservation extends OdbSuite {
   private def createObsWithF2ObservingMode(
     pid:      Program.Id,
     grating:  String,
-    fpu:      String = "LONG_SLIT_0_25",
+    fpu:      String = "LONG_SLIT_2",
     iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
     asterism: List[Target.Id] = Nil
   ): String =
@@ -1129,13 +1134,9 @@ class createObservation extends OdbSuite {
             }
             observingMode: {
               flamingos2LongSlit: {
-                grating: $grating
-                filter: G_PRIME
+                disperser: $grating
+                filter: Y
                 fpu: $fpu
-                centralWavelength: {
-                  nanometers: 234.56
-                },
-                explicitYBin: TWO
               }
             }
             targetEnvironment: {
@@ -1146,24 +1147,9 @@ class createObservation extends OdbSuite {
           observation {
             observingMode {
               flamingos2LongSlit {
-                grating
+                disperser
                 filter
                 fpu
-                centralWavelength {
-                  nanometers
-                }
-                xBin,
-                explicitXBin,
-                defaultXBin,
-                yBin,
-                explicitYBin
-                defaultYBin
-                initialGrating
-                initialFilter
-                initialFpu
-                initialCentralWavelength {
-                  nanometers
-                }
               }
             }
           }
@@ -1173,39 +1159,41 @@ class createObservation extends OdbSuite {
 
   test("[general] specify f2 long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithF2ObservingMode(pid, "B1200_G5301")).flatMap { js =>
-        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+      query(pi, createObsWithF2ObservingMode(pid, "R1200_HK")).flatMap { js =>
+        println(js)
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+        println(longSlit)
 
         assertIO(
-          (longSlit.downIO[GmosNorthGrating]("grating"),
-           longSlit.downIO[Option[GmosNorthFilter]]("filter"),
-           longSlit.downIO[GmosNorthFpu]("fpu"),
-           longSlit.downIO[Double]("centralWavelength", "nanometers"),
-           longSlit.downIO[GmosXBinning]("xBin"),
-           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
-           longSlit.downIO[GmosXBinning]("defaultXBin"),
-           longSlit.downIO[GmosYBinning]("yBin"),
-           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
-           longSlit.downIO[GmosYBinning]("defaultYBin"),
-           longSlit.downIO[GmosNorthGrating]("initialGrating"),
-           longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
-           longSlit.downIO[GmosNorthFpu]("initialFpu"),
-           longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+          (longSlit.downIO[F2Disperser]("disperser"),
+           longSlit.downIO[Option[F2Filter]]("filter"),
+           longSlit.downIO[F2Fpu]("fpu"),
+           // longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           // longSlit.downIO[GmosXBinning]("xBin"),
+           // longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           // longSlit.downIO[GmosXBinning]("defaultXBin"),
+           // longSlit.downIO[GmosYBinning]("yBin"),
+           // longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           // longSlit.downIO[GmosYBinning]("defaultYBin"),
+           // longSlit.downIO[GmosNorthGrating]("initialGrating"),
+           // longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+           // longSlit.downIO[GmosNorthFpu]("initialFpu"),
+           // longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
           ).tupled,
-          (GmosNorthGrating.B1200_G5301,
-           Some(GmosNorthFilter.GPrime),
-           GmosNorthFpu.LongSlit_0_25,
-           234.56,
-           GmosXBinning.One,
-           None,
-           GmosXBinning.One,
-           GmosYBinning.Two,
-           Some(GmosYBinning.Two),
-           GmosYBinning.One,
-           GmosNorthGrating.B1200_G5301,
-           Some(GmosNorthFilter.GPrime),
-           GmosNorthFpu.LongSlit_0_25,
-           234.56
+          (F2Disperser.R1200HK,
+           Some(F2Filter.Y),
+           F2Fpu.LongSlit2,
+           // 234.56,
+           // GmosXBinning.One,
+           // None,
+           // GmosXBinning.One,
+           // GmosYBinning.Two,
+           // Some(GmosYBinning.Two),
+           // GmosYBinning.One,
+           // GmosNorthGrating.B1200_G5301,
+           // Some(GmosNorthFilter.GPrime),
+           // GmosNorthFpu.LongSlit_0_25,
+           // 234.56
           )
         )
 
