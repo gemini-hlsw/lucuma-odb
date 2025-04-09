@@ -30,8 +30,6 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
-import lucuma.core.model.ElevationRange.AirMass
-import lucuma.core.model.ElevationRange.HourAngle
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
@@ -148,15 +146,15 @@ trait Codecs {
   val air_mass_range_value: Codec[PosBigDecimal] =
     numeric(3, 2).eimap(PosBigDecimal.from)(_.value)
 
-  val air_mass_range: Codec[AirMass] =
+  val air_mass_range: Codec[ElevationRange.ByAirMass] =
     (air_mass_range_value ~ air_mass_range_value).eimap { case (min, max) =>
       for {
-        n <- AirMass.DecimalValue.from(min.value)
-        x <- AirMass.DecimalValue.from(max.value)
-        a <- AirMass.fromOrderedDecimalValues.getOption((n, x)).toRight(s"air mass min and max out of order: ($min, $max)")
+        n <- AirMassBound.fromBigDecimal(min.value)
+        x <- AirMassBound.fromBigDecimal(max.value)
+        a <- ElevationRange.ByAirMass.FromOrderedBounds.getOption((n, x)).toRight(s"air mass min and max out of order: ($min, $max)")
       } yield a
     } { a =>
-      (PosBigDecimal.unsafeFrom(a.min.value), PosBigDecimal.unsafeFrom(a.max.value))
+      (PosBigDecimal.unsafeFrom(a.min.toBigDecimal), PosBigDecimal.unsafeFrom(a.max.toBigDecimal))
     }
 
   val angle_µas: Codec[Angle] =
@@ -238,10 +236,10 @@ trait Codecs {
     enumerated(Type("e_educational_status"))
 
   val email_address: Codec[EmailAddress] =
-    codecFromPrism(EmailAddress.from, Type("citext"))
+    codecFromPrism(EmailAddress.From, Type("citext"))
 
   val guide_target_name: Codec[GuideStarName] =
-    codecFromPrism(GuideStarName.from, Type("text"))
+    codecFromPrism(GuideStarName.From, Type("text"))
 
   val email_id: Codec[EmailId] =
     text.eimap(EmailId.fromString)(_.value.value)
@@ -303,15 +301,15 @@ trait Codecs {
   val hour_angle_range_value: Codec[BigDecimal] =
     numeric(3, 2)
 
-  val hour_angle_range: Codec[HourAngle] =
+  val hour_angle_range: Codec[ElevationRange.ByHourAngle] =
     (hour_angle_range_value ~ hour_angle_range_value).eimap { case (min, max) =>
       for {
-        n <- HourAngle.DecimalHour.from(min)
-        x <- HourAngle.DecimalHour.from(max)
-        h <- HourAngle.fromOrderedDecimalHours.getOption((n, x)).toRight(s"hour angle min and max out of order: ($min, $max)")
+        n <- HourAngleBound.from(min)
+        x <- HourAngleBound.from(max)
+        h <- ElevationRange.ByHourAngle.FromOrderedBounds.getOption((n, x)).toRight(s"hour angle min and max out of order: ($min, $max)")
       } yield h
     } { h =>
-      (h.minHours.value, h.maxHours.value)
+      (h.minHours.toBigDecimal, h.maxHours.toBigDecimal)
     }
 
   val image_quality_preset: Codec[ImageQuality.Preset] =

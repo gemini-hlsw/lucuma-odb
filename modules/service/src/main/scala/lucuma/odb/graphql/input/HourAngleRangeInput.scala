@@ -8,28 +8,26 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import eu.timepit.refined.api.Refined.value
 import grackle.Result
-import lucuma.core.model.ElevationRange.HourAngle
-import lucuma.core.model.ElevationRange.HourAngle.DecimalHour
+import lucuma.core.model.ElevationRange
+import lucuma.core.model.HourAngleBound
 import lucuma.odb.graphql.binding.*
 
 final case class HourAngleRangeInput(
-  minHours: Option[DecimalHour],
-  maxHours: Option[DecimalHour]
+  minHours: Option[HourAngleBound],
+  maxHours: Option[HourAngleBound]
 ) {
 
   def minBigDecimal: Option[BigDecimal] =
-    minHours.map(_.value)
+    minHours.map(_.toBigDecimal)
 
   def maxBigDecimal: Option[BigDecimal] =
-    maxHours.map(_.value)
+    maxHours.map(_.toBigDecimal)
 
-  def create: Result[HourAngle] =
+  def create: Result[ElevationRange.ByHourAngle] =
     Result.fromOption(
-      (minHours, maxHours)
-        .tupled
-        .flatMap(HourAngle.fromOrderedDecimalHours.getOption),
+      (minHours, maxHours).tupled
+        .flatMap(ElevationRange.ByHourAngle.FromOrderedBounds.getOption),
       HourAngleRangeInput.messages.BothMinAndMax
     )
 
@@ -44,21 +42,22 @@ object HourAngleRangeInput {
 
   val Default: HourAngleRangeInput =
     HourAngleRangeInput(
-      HourAngle.DefaultMin.some,
-      HourAngle.DefaultMax.some
+      ElevationRange.ByHourAngle.DefaultMin.some,
+      ElevationRange.ByHourAngle.DefaultMax.some
     )
 
-  val HourAngleDecimalHour: Matcher[DecimalHour] =
+  val HourAngleDecimalHour: Matcher[HourAngleBound] =
     BigDecimalBinding.emap { bd =>
-      DecimalHour.from(bd).leftMap(m => s"Invalid Hour Angle constraint: $bd: $m")
+      HourAngleBound.from(bd).leftMap(m => s"Invalid Hour Angle constraint: $bd: $m")
     }
 
   val Binding: Matcher[HourAngleRangeInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        HourAngleDecimalHour.Option("minHours", rMin),
-        HourAngleDecimalHour.Option("maxHours", rMax)
-      ) => (rMin, rMax).parMapN(HourAngleRangeInput(_, _))
+            HourAngleDecimalHour.Option("minHours", rMin),
+            HourAngleDecimalHour.Option("maxHours", rMax)
+          ) =>
+        (rMin, rMax).parMapN(HourAngleRangeInput(_, _))
     }
 
 }
