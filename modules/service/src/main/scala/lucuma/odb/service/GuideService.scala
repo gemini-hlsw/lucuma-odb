@@ -35,8 +35,8 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.ElevationRange.AirMass
-import lucuma.core.model.ElevationRange.HourAngle
+import lucuma.core.model.AirMassBound
+import lucuma.core.model.HourAngleBound
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.PosAngleConstraint
@@ -1096,17 +1096,17 @@ object GuideService {
             (for {
               min  <- amMin
               max  <- amMax
-              aMin <- AirMass.DecimalValue.from(min.value).toOption
-              aMax <- AirMass.DecimalValue.from(max.value).toOption
-              am   <- AirMass.fromOrderedDecimalValues.getOption((aMin, aMax))
+              aMin <- AirMassBound.fromBigDecimal(min.value).toOption
+              aMax <- AirMassBound.fromBigDecimal(max.value).toOption
+              am   <- ElevationRange.ByAirMass.FromOrderedBounds.getOption((aMin, aMax))
             } yield am)
               .orElse(
                 for {
                   min  <- haMin
                   max  <- haMax
-                  hMin <- HourAngle.DecimalHour.from(min).toOption
-                  hMax <- HourAngle.DecimalHour.from(max).toOption
-                  ha   <- HourAngle.fromOrderedDecimalHours.getOption((hMin, hMax))
+                  hMin <- HourAngleBound.from(min).toOption
+                  hMax <- HourAngleBound.from(max).toOption
+                  ha   <- ElevationRange.ByHourAngle.FromOrderedBounds.getOption((hMin, hMax))
                 } yield ha
               )
               .toRight(s"Invalid elevation range in observation $id.")

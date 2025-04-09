@@ -7,4 +7,4 @@ import lucuma.core.data.EmailAddress
 
 val EmailAddressBinding: Matcher[EmailAddress] =
   StringBinding.emap: s =>
-    EmailAddress.from.getOption(s).toRight(s"Invalid email address: $s")
+    EmailAddress.From.getOption(s).toRight(s"Invalid email address: $s")

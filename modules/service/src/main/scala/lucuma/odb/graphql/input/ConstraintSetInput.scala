@@ -46,7 +46,7 @@ object ConstraintSetInput {
       imageQuality    = ImageQuality.Preset.PointEight,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
-      elevationRange  = ElevationRange.AirMass.Default
+      elevationRange  = ElevationRange.ByAirMass.Default
     )
 
   val CalibrationConstraints: ConstraintSet =
@@ -55,7 +55,7 @@ object ConstraintSetInput {
       imageQuality    = ImageQuality.Preset.TwoPointZero,
       skyBackground   = SkyBackground.Bright,
       waterVapor      = WaterVapor.Wet,
-      elevationRange  = ElevationRange.AirMass.Default
+      elevationRange  = ElevationRange.ByAirMass.Default
     )
 
   val SpecPhotoConstraints: ConstraintSet = CalibrationConstraints
