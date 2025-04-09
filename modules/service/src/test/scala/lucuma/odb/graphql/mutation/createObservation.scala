@@ -333,35 +333,6 @@ class createObservation extends OdbSuite {
     }
   }
 
-  // test("[general] created observation should have specified status") {
-  //   createProgramAs(pi).flatMap { pid =>
-  //     query(pi,
-  //       s"""
-  //         mutation {
-  //           createObservation(input: {
-  //             programId: ${pid.asJson}
-  //             SET: {
-  //               status: FOR_REVIEW
-  //             }
-  //           }) {
-  //             observation {
-  //               status
-  //             }
-  //           }
-  //         }
-  //         """).flatMap { js =>
-  //       val get = js.hcursor
-  //         .downField("createObservation")
-  //         .downField("observation")
-  //         .downField("status")
-  //         .as[ObsStatus]
-  //         .leftMap(f => new RuntimeException(f.message))
-  //         .liftTo[IO]
-  //       assertIO(get, ObsStatus.ForReview)
-  //     }
-  //   }
-  // }
-
   test("[general] created observation may have no science band") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
@@ -936,7 +907,7 @@ class createObservation extends OdbSuite {
       case Site.GS => "South"
     }
 
-  private def createObsWithObservingMode(
+  private def createObsWithGmosObservingMode(
     pid:      Program.Id,
     site:     Site,
     grating:  String,
@@ -998,7 +969,7 @@ class createObservation extends OdbSuite {
 
   test("[general] specify gmos north long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
@@ -1059,7 +1030,7 @@ class createObservation extends OdbSuite {
           }
         """.stripMargin
       ).flatMap { tid =>
-        query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, asterism = List(tid))).flatMap { js =>
+        query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, asterism = List(tid))).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
           assertIO(
@@ -1101,7 +1072,7 @@ class createObservation extends OdbSuite {
 
   test("[general] specify gmos south long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithObservingMode(pid, Site.GS, "B1200_G5321")).flatMap { js =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GS, "B1200_G5321")).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosSouthLongSlit")
 
         assertIO(
@@ -1133,6 +1104,107 @@ class createObservation extends OdbSuite {
            GmosSouthGrating.B1200_G5321,
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
+           234.56
+          )
+        )
+
+      }
+    }
+  }
+
+  private def createObsWithF2ObservingMode(
+    pid:      Program.Id,
+    grating:  String,
+    fpu:      String = "LONG_SLIT_0_25",
+    iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
+    asterism: List[Target.Id] = Nil
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            constraintSet: {
+              imageQuality: ${iq.tag.toUpperCase}
+            }
+            observingMode: {
+              flamingos2LongSlit: {
+                grating: $grating
+                filter: G_PRIME
+                fpu: $fpu
+                centralWavelength: {
+                  nanometers: 234.56
+                },
+                explicitYBin: TWO
+              }
+            }
+            targetEnvironment: {
+              asterism: [ ${asterism.map(_.asJson).mkString(", ")} ]
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              flamingos2LongSlit {
+                grating
+                filter
+                fpu
+                centralWavelength {
+                  nanometers
+                }
+                xBin,
+                explicitXBin,
+                defaultXBin,
+                yBin,
+                explicitYBin
+                defaultYBin
+                initialGrating
+                initialFilter
+                initialFpu
+                initialCentralWavelength {
+                  nanometers
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[general] specify f2 long slit observing mode at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, createObsWithF2ObservingMode(pid, "B1200_G5301")).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
+
+        assertIO(
+          (longSlit.downIO[GmosNorthGrating]("grating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("filter"),
+           longSlit.downIO[GmosNorthFpu]("fpu"),
+           longSlit.downIO[Double]("centralWavelength", "nanometers"),
+           longSlit.downIO[GmosXBinning]("xBin"),
+           longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+           longSlit.downIO[GmosXBinning]("defaultXBin"),
+           longSlit.downIO[GmosYBinning]("yBin"),
+           longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+           longSlit.downIO[GmosYBinning]("defaultYBin"),
+           longSlit.downIO[GmosNorthGrating]("initialGrating"),
+           longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+           longSlit.downIO[GmosNorthFpu]("initialFpu"),
+           longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+          ).tupled,
+          (GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
+           234.56,
+           GmosXBinning.One,
+           None,
+           GmosXBinning.One,
+           GmosYBinning.Two,
+           Some(GmosYBinning.Two),
+           GmosYBinning.One,
+           GmosNorthGrating.B1200_G5301,
+           Some(GmosNorthFilter.GPrime),
+           GmosNorthFpu.LongSlit_0_25,
            234.56
           )
         )

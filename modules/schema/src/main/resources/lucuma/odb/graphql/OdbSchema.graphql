@@ -4253,6 +4253,11 @@ input ObservingModeInput {
   The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthLongSlit: GmosSouthLongSlitInput
+
+  """
+  The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  flamingos2LongSlit: Flamingos2LongSlitInput
 }
 
 """
@@ -6778,6 +6783,66 @@ enum Flamingos2Fpu {
   Flamingos2Fpu 8-Pixel Long Slit
   """
   LONG_SLIT_8
+}
+
+"""
+Edit or create Flamingos2 Long Slit advanced configuration
+"""
+input Flamingos2LongSlitInput {
+  """
+  The disperser field must be specified.  It cannot be unset with a null value.
+  """
+  disperser: Flamingos2Disperser!
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosNorthFilter
+
+  """
+  The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  fpu: GmosNorthBuiltinFpu
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosXBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosYBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetComponentInput!]
 }
 
 """
