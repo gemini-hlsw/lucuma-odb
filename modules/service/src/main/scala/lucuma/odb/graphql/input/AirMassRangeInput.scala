@@ -11,26 +11,25 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import grackle.Result
-import lucuma.core.model.ElevationRange.AirMass
-import lucuma.core.model.ElevationRange.AirMass.DecimalValue
+import lucuma.core.model.AirMassBound
+import lucuma.core.model.ElevationRange
 import lucuma.odb.graphql.binding.*
 
 final case class AirMassRangeInput(
-  min: Option[DecimalValue],
-  max: Option[DecimalValue]
+  min: Option[AirMassBound],
+  max: Option[AirMassBound]
 ) {
 
   def minPosBigDecimal: Option[PosBigDecimal] =
-    min.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
+    min.flatMap(dv => PosBigDecimal.from(dv.value.value.value.value).toOption)
 
   def maxPosBigDecimal: Option[PosBigDecimal] =
-    max.flatMap(dv => PosBigDecimal.from(dv.value).toOption)
+    max.flatMap(dv => PosBigDecimal.from(dv.value.value.value.value).toOption)
 
-  def create: Result[AirMass] =
+  def create: Result[ElevationRange.ByAirMass] =
     Result.fromOption(
-      (min, max)
-        .tupled
-        .flatMap(AirMass.fromOrderedDecimalValues.getOption),
+      (min, max).tupled
+        .flatMap(ElevationRange.ByAirMass.FromOrderedBounds.getOption),
       AirMassRangeInput.messages.BothMinAndMax
     )
 
@@ -45,21 +44,22 @@ object AirMassRangeInput {
 
   val Default: AirMassRangeInput =
     AirMassRangeInput(
-      AirMass.DefaultMin.some,
-      AirMass.DefaultMax.some
+      ElevationRange.ByAirMass.DefaultMin.some,
+      ElevationRange.ByAirMass.DefaultMax.some
     )
 
-  val AirMassDecimalValue: Matcher[DecimalValue] =
+  val AirMassBoundValue: Matcher[AirMassBound] =
     BigDecimalBinding.emap { bd =>
-      DecimalValue.from(bd).leftMap(m => s"Invalid air mass constraint: $bd: $m")
+      AirMassBound.fromBigDecimal(bd).leftMap(m => s"Invalid air mass constraint: $bd: $m")
     }
 
   val Binding: Matcher[AirMassRangeInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        AirMassDecimalValue.Option("min", rMin),
-        AirMassDecimalValue.Option("max", rMax)
-      ) => (rMin, rMax).parMapN(AirMassRangeInput(_, _))
+            AirMassBoundValue.Option("min", rMin),
+            AirMassBoundValue.Option("max", rMax)
+          ) =>
+        (rMin, rMax).parMapN(AirMassRangeInput(_, _))
     }
 
 }

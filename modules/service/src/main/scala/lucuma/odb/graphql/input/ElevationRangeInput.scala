@@ -8,7 +8,6 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.ElevationRange.AirMass
 import lucuma.odb.graphql.binding.*
 
 final case class ElevationRangeInput(
@@ -20,7 +19,7 @@ final case class ElevationRangeInput(
     (airMass, hourAngle) match {
       case (Some(am), None)   => am.create
       case (None, Some(hr))   => hr.create
-      case (None, None)       => Result(AirMass.Default)
+      case (None, None)       => Result(ElevationRange.ByAirMass.Default)
       case (Some(_), Some(_)) => Matcher.validationFailure(ElevationRangeInput.messages.OnlyOneDefinition)
     }
 
