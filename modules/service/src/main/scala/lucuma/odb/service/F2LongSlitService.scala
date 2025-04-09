@@ -37,6 +37,9 @@ import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2WindowCover
 
 trait F2LongSlitService[F[_]] {
 
@@ -135,11 +138,10 @@ object F2LongSlitService {
          f2_filter.opt       *:
          f2_fpu              *:
          f2_read_mode.opt    *:
-         f2_decker.opt       //*:
-         // f2_readout_mode.opt *:
-         // f2_reads.opt        *:
-         // f2_window_cover.opt *:
-         // bool.opt
+         f2_decker.opt       *:
+         f2_readout_mode.opt *:
+         f2_reads.opt        *:
+         f2_window_cover.opt
         ).to[F2LongSlitInput.Create]
 
       private def select[A](
@@ -257,6 +259,9 @@ object F2LongSlitService {
       F2Fpu            ,
       Option[F2ReadMode] ,
       Option[F2Decker] ,
+      Option[F2ReadoutMode] ,
+      Option[F2Reads] ,
+      Option[F2WindowCover] ,
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -266,7 +271,10 @@ object F2LongSlitService {
           c_filter,
           c_fpu,
           c_read_mode,
-          c_decker
+          c_decker,
+          c_readout_mode,
+          c_reads,
+          c_window_cover
         )
         SELECT
           $observation_id,
@@ -275,10 +283,13 @@ object F2LongSlitService {
           ${f2_filter.opt},
           $f2_fpu,
           ${f2_read_mode.opt},
-          ${f2_decker.opt}
+          ${f2_decker.opt},
+          ${f2_readout_mode.opt},
+          ${f2_reads.opt},
+          ${f2_window_cover.opt}
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u, r, e) => (o, d, f, u, r, e, o)}
+       """.contramap { (o, d, f, u, r, e, m, a, w) => (o, d, f, u, r, e, m, a, w, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
@@ -291,93 +302,10 @@ object F2LongSlitService {
           input.fpu                            ,
           input.explicitReadMode                            ,
           input.explicitDecker                            ,
+          input.explicitReadoutMode                            ,
+          input.explicitReads                            ,
+          input.explicitWindowCover                            ,
       )
-
-    val InsertGmosSouthLongSlit: Fragment[(
-      Observation.Id          ,
-      GmosSouthGrating        ,
-      Option[GmosSouthFilter] ,
-      GmosSouthFpu            ,
-      Wavelength              ,
-      Option[GmosXBinning]    ,
-      Option[GmosYBinning]    ,
-      Option[GmosAmpReadMode] ,
-      Option[GmosAmpGain]     ,
-      Option[GmosRoi]         ,
-      Option[String]          ,
-      Option[String]          ,
-      GmosSouthGrating        ,
-      Option[GmosSouthFilter] ,
-      GmosSouthFpu            ,
-      Wavelength
-    )] =
-      sql"""
-        INSERT INTO t_gmos_south_long_slit (
-          c_observation_id,
-          c_program_id,
-          c_grating,
-          c_filter,
-          c_fpu,
-          c_central_wavelength,
-          c_xbin,
-          c_ybin,
-          c_amp_read_mode,
-          c_amp_gain,
-          c_roi,
-          c_wavelength_dithers,
-          c_spatial_offsets,
-          c_initial_grating,
-          c_initial_filter,
-          c_initial_fpu,
-          c_initial_central_wavelength
-        )
-        SELECT
-          $observation_id,
-          c_program_id,
-          $gmos_south_grating,
-          ${gmos_south_filter.opt},
-          $gmos_south_fpu,
-          $wavelength_pm,
-          ${gmos_x_binning.opt},
-          ${gmos_y_binning.opt},
-          ${gmos_amp_read_mode.opt},
-          ${gmos_amp_gain.opt},
-          ${gmos_roi.opt},
-          ${text.opt},
-          ${text.opt},
-          $gmos_south_grating,
-          ${gmos_south_filter.opt},
-          $gmos_south_fpu,
-          $wavelength_pm
-        FROM t_observation
-        WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
-       )}
-
-    def insertGmosSouthLongSlit(
-      observationId: Observation.Id,
-      input:         GmosLongSlitInput.Create.South
-    ): AppliedFragment =
-      InsertGmosSouthLongSlit.apply(
-        observationId                          ,
-          input.grating                        ,
-          input.filter                         ,
-          input.fpu                            ,
-          input.common.centralWavelength       ,
-          input.common.explicitXBin            ,
-          input.common.explicitYBin            ,
-          input.common.explicitAmpReadMode     ,
-          input.common.explicitAmpGain         ,
-          input.common.explicitRoi             ,
-          input.common.formattedλDithers       ,
-          input.common.formattedSpatialOffsets ,
-          input.grating                        ,
-          input.filter                         ,
-          input.fpu                            ,
-          input.common.centralWavelength
-      )
-
 
     private def observationIdIn(
       oids: NonEmptyList[Observation.Id]

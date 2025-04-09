@@ -29,9 +29,9 @@ object F2LongSlitInput {
     fpu: F2Fpu,
     explicitReadMode: Option[F2ReadMode]             = None,
     explicitDecker: Option[F2Decker]                 = None,
-    // explicitReadoutMode: Option[F2ReadoutMode]       = None,
-    // explicitReads: Option[F2Reads]                   = None,
-    // explicitWindowCover: Option[F2WindowCover]       = None,
+    explicitReadoutMode: Option[F2ReadoutMode]       = None,
+    explicitReads: Option[F2Reads]                   = None,
+    explicitWindowCover: Option[F2WindowCover]       = None,
     // explicitUseElectronicOffsetting: Option[Boolean] = None
   ) {
     def observingModeType: ObservingModeType =
@@ -47,9 +47,9 @@ object F2LongSlitInput {
         fpu,
         explicitReadMode,
         explicitDecker,
-        // explicitReadoutMode,
-        // explicitReads,
-        // explicitWindowCover,
+        explicitReadoutMode,
+        explicitReads,
+        explicitWindowCover,
         // explicitUseElectronicOffsetting
       )
 
@@ -62,9 +62,9 @@ object F2LongSlitInput {
       F2Fpu,
       Option[F2ReadMode],
       Option[F2Decker],
-      // Option[F2ReadoutMode],
-      // Option[F2Reads],
-      // Option[F2WindowCover],
+      Option[F2ReadoutMode],
+      Option[F2Reads],
+      Option[F2WindowCover],
       // Option[Boolean],
     )] =
       ObjectFieldsBinding.rmap {
@@ -74,9 +74,9 @@ object F2LongSlitInput {
           F2FpuBinding("fpu", rFpu),
           F2ReadModeBinding.Option("readMode", rReadMode),
           F2DeckerBinding.Option("decker", rDecker),
-          // F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
-          // F2ReadsBinding.Option("reads", rReads),
-          // F2WindowCoverBinding.Option("windowCover", rWindowCover),
+          F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
+          F2ReadsBinding.Option("reads", rReads),
+          F2WindowCoverBinding.Option("windowCover", rWindowCover),
           // BooleanBinding.Option("useElectronicOffsetting", rUseElectronicOffsetting),
         ) => (
           rDisperser,
@@ -84,9 +84,9 @@ object F2LongSlitInput {
           rFpu,
           rReadMode,
           rDecker,
-          // rReadoutMode,
-          // rReads,
-          // rWindowCover,
+          rReadoutMode,
+          rReads,
+          rWindowCover,
           // rUseElectronicOffsetting
         ).parTupled
       }
@@ -99,9 +99,9 @@ object F2LongSlitInput {
           fpu,
           explicitReadMode,
           explicitDecker,
-          // explicitReadoutMode,
-          // explicitReads,
-          // explicitWindowCover,
+          explicitReadoutMode,
+          explicitReads,
+          explicitWindowCover,
           // explicitUseElectronicOffsetting
       ) =>
         Result(Create(
@@ -110,9 +110,9 @@ object F2LongSlitInput {
           fpu,
           explicitReadMode,
           explicitDecker,
-          // explicitReadoutMode,
-          // explicitReads,
-          // explicitWindowCover,
+          explicitReadoutMode,
+          explicitReads,
+          explicitWindowCover,
           // explicitUseElectronicOffsetting
         ))
         case _ =>

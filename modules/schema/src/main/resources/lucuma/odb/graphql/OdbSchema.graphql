@@ -6832,6 +6832,119 @@ enum Flamingos2Decker {
 }
 
 """
+Flamingos2 Readout Mode
+"""
+enum Flamingos2ReadoutMode {
+  """
+  Flamingos2ReadoutMode Science
+  """
+  SCIENCE
+
+  """
+  Flamingos2ReadoutMode Engineering
+  """
+  ENGINEERING
+
+}
+
+"""
+Flamingos2 Reads
+"""
+enum Flamingos2Reads {
+  """
+  Flamingos2Reads Reads 1
+  """
+  READS_1
+
+  """
+  Flamingos2Reads Reads 3
+  """
+  READS_3
+
+  """
+  Flamingos2Reads Reads 4
+  """
+  READS_4
+
+  """
+  Flamingos2Reads Reads 5
+  """
+  READS_5
+
+  """
+  Flamingos2Reads Reads 6
+  """
+  READS_6
+
+  """
+  Flamingos2Reads Reads 7
+  """
+  READS_7
+
+  """
+  Flamingos2Reads Reads 8
+  """
+  READS_8
+
+  """
+  Flamingos2Reads Reads 9
+  """
+  READS_9
+
+  """
+  Flamingos2Reads Reads 10
+  """
+  READS_10
+
+  """
+  Flamingos2Reads Reads 11
+  """
+  READS_11
+
+  """
+  Flamingos2Reads Reads 12
+  """
+  READS_12
+
+  """
+  Flamingos2Reads Reads 13
+  """
+  READS_13
+
+  """
+  Flamingos2Reads Reads 14
+  """
+  READS_14
+
+  """
+  Flamingos2Reads Reads 15
+  """
+  READS_15
+
+  """
+  Flamingos2Reads Reads 16
+  """
+  READS_16
+
+}
+
+"""
+Flamingos2 Window Cover
+"""
+enum Flamingos2WindowCover {
+  """
+  Flamingos2WindowCover Open
+  """
+  OPEN
+
+  """
+  Flamingos2WindowCover CLOSE
+  """
+  CLOSE
+
+}
+
+"""
 Flamingos2 South Long Slit mode
 """
 type Flamingos2LongSlit {
@@ -6860,6 +6973,22 @@ type Flamingos2LongSlit {
   The decker field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   decker: Flamingos2Decker
+
+  """
+  The readout mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  readoutMode: Flamingos2ReadoutMode
+
+  """
+  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  reads: Flamingos2Reads
+
+  """
+  The windowCover field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  windowCover: Flamingos2WindowCover
+
   #
   # """
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -6925,6 +7054,21 @@ input Flamingos2LongSlitInput {
   The decker field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   decker: Flamingos2Decker
+
+  """
+  The readoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  readoutMode: Flamingos2ReadoutMode
+
+  """
+  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  reads: Flamingos2Reads
+
+  """
+  The windowCover field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  windowCover: Flamingos2WindowCover
 }
 
 """

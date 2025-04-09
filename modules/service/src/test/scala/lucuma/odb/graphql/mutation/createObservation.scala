@@ -51,6 +51,9 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2WindowCover
 
 class createObservation extends OdbSuite {
 
@@ -1185,6 +1188,9 @@ class createObservation extends OdbSuite {
     fpu:      String = "LONG_SLIT_2",
     rm:       Option[F2ReadMode],
     de:       Option[F2Decker],
+    ro:       Option[F2ReadoutMode],
+    re:       Option[F2Reads],
+    wc:       Option[F2WindowCover],
   ): String =
     s"""
       mutation {
@@ -1198,6 +1204,9 @@ class createObservation extends OdbSuite {
                 fpu: $fpu
                 readMode: ${rm.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 decker: ${de.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                readoutMode: ${ro.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                reads: ${re.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                windowCover: ${wc.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
               }
             }
           }
@@ -1210,6 +1219,9 @@ class createObservation extends OdbSuite {
                 fpu
                 readMode
                 decker
+                readoutMode
+                reads
+                windowCover
               }
             }
           }
@@ -1224,7 +1236,10 @@ class createObservation extends OdbSuite {
           pid,
           "R1200_HK",
           rm = Some(F2ReadMode.Bright),
-          de = Some(F2Decker.LongSlit)
+          de = Some(F2Decker.LongSlit),
+          ro = Some(F2ReadoutMode.Engineering),
+          re = Some(F2Reads.Reads_1),
+          wc = Some(F2WindowCover.Close),
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1234,34 +1249,18 @@ class createObservation extends OdbSuite {
             longSlit.downIO[F2Fpu]("fpu"),
             longSlit.downIO[Option[F2ReadMode]]("readMode"),
             longSlit.downIO[Option[F2Decker]]("decker"),
-            // longSlit.downIO[Double]("centralWavelength", "nanometers"),
-            // longSlit.downIO[GmosXBinning]("xBin"),
-            // longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
-            // longSlit.downIO[GmosXBinning]("defaultXBin"),
-            // longSlit.downIO[GmosYBinning]("yBin"),
-            // longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
-            // longSlit.downIO[GmosYBinning]("defaultYBin"),
-            // longSlit.downIO[GmosNorthGrating]("initialGrating"),
-            // longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
-            // longSlit.downIO[GmosNorthFpu]("initialFpu"),
-            // longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+            longSlit.downIO[Option[F2Reads]]("reads"),
+            longSlit.downIO[Option[F2WindowCover]]("windowCover"),
             ).tupled,
             (F2Disperser.R1200HK,
             Some(F2Filter.Y),
             F2Fpu.LongSlit2,
             Some(F2ReadMode.Bright),
-            Some(F2Decker.LongSlit)
-            // 234.56,
-            // GmosXBinning.One,
-            // None,
-           // GmosXBinning.One,
-           // GmosYBinning.Two,
-           // Some(GmosYBinning.Two),
-           // GmosYBinning.One,
-           // GmosNorthGrating.B1200_G5301,
-           // Some(GmosNorthFilter.GPrime),
-           // GmosNorthFpu.LongSlit_0_25,
-           // 234.56
+            Some(F2Decker.LongSlit),
+            Some(F2ReadoutMode.Engineering),
+            Some(F2Reads.Reads_1),
+            Some(F2WindowCover.Close),
           )
         )
 
