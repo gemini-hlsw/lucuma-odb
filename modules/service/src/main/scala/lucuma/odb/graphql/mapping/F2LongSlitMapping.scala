@@ -4,22 +4,10 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.all.*
-import grackle.Result
 import grackle.skunk.SkunkMapping
-import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 import lucuma.odb.graphql.table.*
-import lucuma.odb.sequence.f2.longslit.Config
-
-import scala.reflect.ClassTag
-import grackle.TypeRef
 
 trait F2LongSlitMapping[F[_]]
   extends F2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>

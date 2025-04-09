@@ -5,26 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.all.*
-import coulomb.*
-import grackle.Result
 import grackle.skunk.SkunkMapping
-import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.Offset.Q
-import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.Nanometer
-import lucuma.core.model.sequence.gmos.longslit.*
-import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
-import lucuma.odb.json.wavelength.query.given
-import lucuma.odb.sequence.gmos.longslit.Config
 
 import scala.reflect.ClassTag
 

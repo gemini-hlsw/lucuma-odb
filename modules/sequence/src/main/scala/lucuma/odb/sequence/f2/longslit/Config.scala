@@ -6,17 +6,17 @@ package lucuma.odb.sequence.f2.longslit
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
+import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
 import lucuma.core.enums.F2WindowCover
+
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 
 /**
  * Configuration for the Flamingos2 Long Slit science mode.  Using these parameters, a
