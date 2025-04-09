@@ -49,6 +49,8 @@ import lucuma.core.util.Enumerated
 import lucuma.core.syntax.string.*
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2Decker
 
 class createObservation extends OdbSuite {
 
@@ -1160,32 +1162,98 @@ class createObservation extends OdbSuite {
   test("[general] specify f2 long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
       query(pi, createObsWithF2ObservingMode(pid, "R1200_HK")).flatMap { js =>
-        println(js)
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
-        println(longSlit)
 
         assertIO(
           (longSlit.downIO[F2Disperser]("disperser"),
            longSlit.downIO[Option[F2Filter]]("filter"),
-           longSlit.downIO[F2Fpu]("fpu"),
-           // longSlit.downIO[Double]("centralWavelength", "nanometers"),
-           // longSlit.downIO[GmosXBinning]("xBin"),
-           // longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
-           // longSlit.downIO[GmosXBinning]("defaultXBin"),
-           // longSlit.downIO[GmosYBinning]("yBin"),
-           // longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
-           // longSlit.downIO[GmosYBinning]("defaultYBin"),
-           // longSlit.downIO[GmosNorthGrating]("initialGrating"),
-           // longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
-           // longSlit.downIO[GmosNorthFpu]("initialFpu"),
-           // longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+           longSlit.downIO[F2Fpu]("fpu")
           ).tupled,
           (F2Disperser.R1200HK,
            Some(F2Filter.Y),
-           F2Fpu.LongSlit2,
-           // 234.56,
-           // GmosXBinning.One,
-           // None,
+           F2Fpu.LongSlit2
+          )
+        )
+
+      }
+    }
+  }
+
+  private def createObsWithF2ObservingModeAllParams(
+    pid:      Program.Id,
+    disperser:  String,
+    fpu:      String = "LONG_SLIT_2",
+    rm:       Option[F2ReadMode],
+    de:       Option[F2Decker],
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                disperser: $disperser
+                filter: Y
+                fpu: $fpu
+                readMode: ${rm.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                decker: ${de.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              flamingos2LongSlit {
+                disperser
+                filter
+                fpu
+                readMode
+                decker
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[general] specify f2 long slit observing mode at observation creation, all params") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithF2ObservingModeAllParams(
+          pid,
+          "R1200_HK",
+          rm = Some(F2ReadMode.Bright),
+          de = Some(F2Decker.LongSlit)
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+
+          assertIO(
+            (longSlit.downIO[F2Disperser]("disperser"),
+            longSlit.downIO[Option[F2Filter]]("filter"),
+            longSlit.downIO[F2Fpu]("fpu"),
+            longSlit.downIO[Option[F2ReadMode]]("readMode"),
+            longSlit.downIO[Option[F2Decker]]("decker"),
+            // longSlit.downIO[Double]("centralWavelength", "nanometers"),
+            // longSlit.downIO[GmosXBinning]("xBin"),
+            // longSlit.downIO[Option[GmosXBinning]]("explicitXBin"),
+            // longSlit.downIO[GmosXBinning]("defaultXBin"),
+            // longSlit.downIO[GmosYBinning]("yBin"),
+            // longSlit.downIO[Option[GmosYBinning]]("explicitYBin"),
+            // longSlit.downIO[GmosYBinning]("defaultYBin"),
+            // longSlit.downIO[GmosNorthGrating]("initialGrating"),
+            // longSlit.downIO[Option[GmosNorthFilter]]("initialFilter"),
+            // longSlit.downIO[GmosNorthFpu]("initialFpu"),
+            // longSlit.downIO[Double]("initialCentralWavelength", "nanometers")
+            ).tupled,
+            (F2Disperser.R1200HK,
+            Some(F2Filter.Y),
+            F2Fpu.LongSlit2,
+            Some(F2ReadMode.Bright),
+            Some(F2Decker.LongSlit)
+            // 234.56,
+            // GmosXBinning.One,
+            // None,
            // GmosXBinning.One,
            // GmosYBinning.Two,
            // Some(GmosYBinning.Two),

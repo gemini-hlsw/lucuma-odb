@@ -105,6 +105,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[F2Disperser](F2DisperserType),
       LeafMapping[F2Filter](F2FilterType),
       LeafMapping[F2Fpu](F2FpuType),
+      LeafMapping[F2ReadMode](F2ReadModeType),
+      LeafMapping[F2Decker](F2DeckerType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),

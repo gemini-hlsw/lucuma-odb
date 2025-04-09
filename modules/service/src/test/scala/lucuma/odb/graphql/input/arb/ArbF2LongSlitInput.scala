@@ -32,7 +32,7 @@ trait ArbF2LongSlitInput:
         s <- arbitrary[Option[F2Reads]]
         w <- arbitrary[Option[F2WindowCover]]
         e <- arbitrary[Option[Boolean]]
-      } yield F2LongSlitInput.Create(g, f, u) //, r, d, o, s, w, e)
+      } yield F2LongSlitInput.Create(g, f, u, r, d) //, o, s, w, e)
     }
 
   given Arbitrary[F2LongSlitInput.Edit] =

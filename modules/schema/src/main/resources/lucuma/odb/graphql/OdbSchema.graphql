@@ -6790,7 +6790,48 @@ enum Flamingos2Fpu {
   LONG_SLIT_8
 }
 
+"""
+Flamingos2 Read Mode
+"""
+enum Flamingos2ReadMode {
   """
+  Flamingos2ReadMode Bright
+  """
+  BRIGHT
+
+  """
+  Flamingos2ReadMode Medium
+  """
+  MEDIUM
+
+  """
+  Flamingos2ReadMode Faint
+  """
+  FAINT
+}
+
+"""
+Flamingos2 Decker
+"""
+enum Flamingos2Decker {
+  """
+  Flamingos2Decker Imaging
+  """
+  IMAGING
+
+  """
+  Flamingos2Decker LongSlit
+  """
+  LONG_SLIT
+
+  """
+  Flamingos2Decker MOS
+  """
+  MOS
+
+}
+
+"""
 Flamingos2 South Long Slit mode
 """
 type Flamingos2LongSlit {
@@ -6810,6 +6851,15 @@ type Flamingos2LongSlit {
   """
   fpu: Flamingos2Fpu!
 
+  """
+  The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  readMode: Flamingos2ReadMode
+
+  """
+  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  decker: Flamingos2Decker
   #
   # """
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -6862,9 +6912,19 @@ input Flamingos2LongSlitInput {
   filter: Flamingos2Filter
 
   """
-  The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The fpu field must be specified.  It cannot be unset with a null value.
   """
   fpu: Flamingos2Fpu!
+
+  """
+  The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  readMode: Flamingos2ReadMode
+
+  """
+  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  decker: Flamingos2Decker
 }
 
 """
