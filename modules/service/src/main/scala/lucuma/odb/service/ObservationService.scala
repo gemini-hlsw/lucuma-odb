@@ -603,10 +603,10 @@ object ObservationService {
            constraintSet.imageQuality    ,
            constraintSet.skyBackground   ,
            constraintSet.waterVapor      ,
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.value)) ,  // TODO: fix in core
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.value)) ,
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.value)                           ,
-           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.value)                           ,
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.toBigDecimal)) ,  // TODO: fix in core
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)) ,
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                           ,
+           ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
            scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ,
            spectroscopy.flatMap(_.wavelength.toOption)                              ,
            spectroscopy.flatMap(_.resolution.toOption)                              ,
