@@ -58,6 +58,9 @@ trait F2LongSlitMapping[F[_]]
       SqlField("fpu",     F2LongSlitView.Fpu),
       SqlField("readMode",     F2LongSlitView.ReadMode),
       SqlField("decker",     F2LongSlitView.Decker),
+      SqlField("readoutMode",     F2LongSlitView.ReadoutMode),
+      SqlField("reads",     F2LongSlitView.Reads),
+      SqlField("windowCover",     F2LongSlitView.WindowCover),
       // explicitOrElseDefault[F2ReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
       // SqlField("defaultReadMode", cc.ReadModeDefault),
       // SqlField("explicitReadMode", cc.ReadMode)
