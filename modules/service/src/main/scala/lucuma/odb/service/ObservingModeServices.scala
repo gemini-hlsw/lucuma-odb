@@ -56,7 +56,6 @@ object ObservingModeServices {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
-
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
@@ -67,6 +66,7 @@ object ObservingModeServices {
               .selectSouth(oids)
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
+          case (Flamingos2LongSlit, _) => ???
         }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
 
@@ -86,8 +86,9 @@ object ObservingModeServices {
         mode: ObservingModeType
       ): (List[Observation.Id], Transaction[F]) => F[Unit] =
         mode match {
-          case ObservingModeType.GmosNorthLongSlit => gmosLongSlitService.deleteNorth
-          case ObservingModeType.GmosSouthLongSlit => gmosLongSlitService.deleteSouth
+          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
+          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
+          case ObservingModeType.Flamingos2LongSlit => ???
         }
 
       override def updateFunction(
@@ -118,8 +119,9 @@ object ObservingModeServices {
         mode: ObservingModeType
       ): (Observation.Id, Observation.Id) => F[Unit] =
         mode match {
-          case ObservingModeType.GmosNorthLongSlit => gmosLongSlitService.cloneNorth
-          case ObservingModeType.GmosSouthLongSlit => gmosLongSlitService.cloneSouth
+          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
+          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
+          case ObservingModeType.Flamingos2LongSlit => ???
         }
 
     }
