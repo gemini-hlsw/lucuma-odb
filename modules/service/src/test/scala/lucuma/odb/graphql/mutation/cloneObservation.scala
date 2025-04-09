@@ -69,7 +69,9 @@ class cloneObservation extends OdbSuite {
     """
 
   test("clones should have the same properties, for all observing modes") {
-    ObservingModeType.values.toList.traverse { obsMode =>
+    // TODO Remove filter when F2 is supported
+    // ObservingModeType.values.toList.traverse { obsMode =>
+    ObservingModeType.values.filterNot(_ === ObservingModeType.Flamingos2LongSlit).toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
         (t, t).tupled.flatMap { (tid1, tid2) =>
