@@ -20,7 +20,6 @@ import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbF2LongSlitInput:
 
-
   given Arbitrary[F2LongSlitInput.Create] =
     Arbitrary {
       for {
