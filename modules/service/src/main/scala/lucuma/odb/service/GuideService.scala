@@ -33,9 +33,9 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
+import lucuma.core.model.AirMassBound
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
-import lucuma.core.model.AirMassBound
 import lucuma.core.model.HourAngleBound
 import lucuma.core.model.ObjectTracking
 import lucuma.core.model.Observation

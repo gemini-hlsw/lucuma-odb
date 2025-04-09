@@ -11,8 +11,8 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.api.Refined.value
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import grackle.Result
-import lucuma.core.model.ElevationRange
 import lucuma.core.model.AirMassBound
+import lucuma.core.model.ElevationRange
 import lucuma.odb.graphql.binding.*
 
 final case class AirMassRangeInput(
