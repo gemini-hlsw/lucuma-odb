@@ -574,6 +574,7 @@ trait DatabaseOperations { this: OdbSuite =>
           focalPlaneAngle: { microarcseconds: 0 }
         }
       }"""
+      case ObservingModeType.Flamingos2LongSlit => ???
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -595,6 +596,7 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.Flamingos2LongSlit => ???
 
   def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(
@@ -1640,7 +1642,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def createUserInvitationAs(
     user: User,
     mid:  ProgramUser.Id,
-    recipientEmail: EmailAddress = EmailAddress.from.getOption("bob@dobbs.com").get,
+    recipientEmail: EmailAddress = EmailAddress.From.getOption("bob@dobbs.com").get,
   ): IO[UserInvitation] =
     query(
       user = user,
