@@ -73,6 +73,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
     def fromNightStart: Timestamp =
       Timestamp.unsafeFromInstantTruncated(tbn.start).plusMillisOption(i * 1000L).get
+
+    def fromNightEnd: Timestamp =
+      Timestamp.unsafeFromInstantTruncated(tbn.end).plusMillisOption(i * 1000L).get
   }
 
   extension (s: String) {
@@ -80,11 +83,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       NonEmptyString.from(s).toOption
   }
 
+  val tMinus10 = -10.fromNightStart
   val t00 =  0.fromNightStart
   val t10 = 10.fromNightStart
   val t20 = 20.fromNightStart
   val t30 = 30.fromNightStart
   val t40 = 40.fromNightStart
+  val t50 = 50.fromNightStart
 
   val validUsers = List(pi, service, staff)
 
@@ -106,10 +111,15 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
                       start
                       end
                     }
-                    program { seconds }
+                    amount { seconds }
                     comment
                     ... on TimeChargeDaylightDiscount {
                       site
+                    }
+                    ... on TimeChargeOverlapDiscount {
+                      observation {
+                        id
+                      }
                     }
                     ... on TimeChargeQaDiscount {
                       datasets {
@@ -190,18 +200,17 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
           "start": ${d.discount.interval.start.asJson},
           "end": ${d.discount.interval.end.asJson}
         },
-        "program": {
+        "amount": {
           "seconds": ${d.discount.program.toSeconds}
         },
         "comment": ${d.discount.comment}
       }
-    """.withObject { obj =>
-      d match {
+    """.withObject: obj =>
+      d match
         case TimeCharge.DiscountEntry.Daylight(_, s) => obj.add("site",     s.asJson).toJson
         case TimeCharge.DiscountEntry.NoData(_)      => obj.toJson
+        case TimeCharge.DiscountEntry.Overlap(_, o)  => obj.add("observation", Json.obj("id" -> o.asJson)).toJson
         case TimeCharge.DiscountEntry.Qa(_, ds)      => obj.add("datasets", ds.toList.map(id => Json.obj("id" -> id.asJson)).asJson).toJson
-      }
-    }
 
   def invoiceExected(
     invoice:     TimeCharge.Invoice,
@@ -453,6 +462,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       s.execute(cmd)((e.received, p, e.observationId, e.visitId, e.atomId, e.stepId, e.datasetId, e.stage))
     }.void
 
+  // For sanity sake, each test will start clean so that visits
+  // are not overlapping.
+  def cleanup: IO[Unit] =
+    withSession: s =>
+      s.execute(sql"DELETE FROM t_execution_event".command).void
+
   def insertEvents(
     pid:    Program.Id,
     events: List[ExecutionEvent]
@@ -508,6 +523,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, List(daylightEntry), expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -533,6 +549,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice      = TimeCharge.Invoice(expExecution, List(noDataEntry), CategorizedTime.Zero)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 0, 0, 250)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -584,6 +601,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     def invoice(v: VisitNode) = TimeCharge.Invoice(expExecution, List(qaEntry(v)), expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 2, 1, 1, 300)
       es = events(v)
       _ <- insertEvents(v.pid, es)
@@ -609,6 +627,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val invoice        = TimeCharge.Invoice(expExecution, Nil, expFinalCharge)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, index)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -691,6 +710,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, "add".comment)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 900)
       _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
@@ -704,6 +724,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val correction     = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Subtract, 5.sec, "add".comment)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1000)
       _ <- addTimeChargeCorrection(staff, v.vid, correction)
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, List(correction)))
@@ -752,6 +773,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 10.sec)
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -774,6 +796,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = CategorizedTime(ChargeClass.Program -> 20.sec)
 
     for {
+      _  <- cleanup
       v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1300)
       pid = v0.pid
       oid = v0.oid
@@ -790,6 +813,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     } yield ()
 
   }
+
+
 /*
   test("observation timeCharge, overflow") {
     val t0 =  0.fromNightStart
@@ -857,6 +882,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
   test("program timeCharge, no observations") {
     for {
+      _ <- cleanup
       p <- createProgramAs(pi)
       _ <- expect(pi, programQuery(p), programExpectedCharge(Nil))
     } yield ()
@@ -871,6 +897,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 10.sec)))
 
     for {
+      _ <- cleanup
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1500)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
@@ -892,6 +919,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(None, CategorizedTime(ChargeClass.Program -> 20.sec)))
 
     for {
+      _   <- cleanup
       // Obs0
       v0  <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1600)
       pid  = v0.pid
@@ -925,6 +953,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     val expected = List(BandedTime(ScienceBand.Band2.some, CategorizedTime(ChargeClass.Program -> 20.sec)))
 
     for {
+      _    <- cleanup
       pid  <- createProgramAs(pi)
       _    <- setAllocationsAs(service, pid, List(AllocationInput(TimeAccountingCategory.BR, ScienceBand.Band2, 10.hourTimeSpan)))
 
@@ -971,6 +1000,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
     )
 
     for {
+      _    <- cleanup
       pid  <- createProgramAs(pi)
       _    <- setAllocationsAs(service, pid, allocations)
 
@@ -994,4 +1024,196 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
   }
+
+  test("timeChargeInvoice (overlap)"):
+
+    val events0 = List(
+      (SequenceCommand.Start, tMinus10),
+      (SequenceCommand.Stop,  t20)
+    )
+
+    val events1 = List(
+      (SequenceCommand.Start, t10),
+      (SequenceCommand.Stop,  t30)
+    )
+
+    val expExecution0   = CategorizedTime(ChargeClass.Program -> 30.sec) // -10 -> 20
+    val expExecution1   = CategorizedTime(ChargeClass.Program -> 20.sec) //  10 -> 30
+    val discountDay     = TimeCharge.Discount(
+      TimestampInterval.between(tMinus10, t00),
+      10.sec,
+      TimeAccounting.comment.PreDusk
+    )
+    val discountOverlap = TimeCharge.Discount(
+      TimestampInterval.between(t10, t20),
+      10.sec,
+      TimeAccounting.comment.Overlap
+    )
+    val daylightEntry   = TimeCharge.DiscountEntry.Daylight(discountDay, Site.GS)
+    def overlapEntry(oid: Observation.Id) =
+      TimeCharge.DiscountEntry.Overlap(discountOverlap, oid)
+
+    val expFinalCharge0 = CategorizedTime(ChargeClass.Program -> 10.sec) // 30 - 10 (daylight) - 10 (overlap)
+    val expFinalCharge1 = CategorizedTime(ChargeClass.Program -> 20.sec)
+
+    def invoice0(oid: Observation.Id) =
+      TimeCharge.Invoice(expExecution0, List(daylightEntry, overlapEntry(oid)), expFinalCharge0)
+    val invoice1 = TimeCharge.Invoice(expExecution1, Nil, expFinalCharge1)
+
+    for
+      _  <- cleanup
+      v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1900)
+      e0  = events0.map { (c, t) => SequenceEvent(EventId, t, v0.oid, v0.vid, c) }
+      _  <- insertEvents(v0.pid, e0)
+      v1 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1950)
+      e1  = events1.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, c) }
+      _  <- insertEvents(v1.pid, e1)
+
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
+      _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
+    yield ()
+
+  test("timeChargeInvoice (overlap the overlap)"):
+
+    val events0 = List(
+      (SequenceCommand.Start, tMinus10),
+      (SequenceCommand.Stop,  t20)
+    )
+
+    val events1 = List(
+      (SequenceCommand.Start, t10),
+      (SequenceCommand.Stop,  t40)
+    )
+
+    val events2 = List(
+      (SequenceCommand.Start, t20),
+      (SequenceCommand.Stop,  t50)
+    )
+
+    val expExecution0   = CategorizedTime(ChargeClass.Program -> 30.sec) // -10 -> 20
+    val expExecution1   = CategorizedTime(ChargeClass.Program -> 30.sec) //  10 -> 40
+    val expExecution2   = CategorizedTime(ChargeClass.Program -> 30.sec) //  20 -> 50
+
+    val discountDay      = TimeCharge.Discount(
+      TimestampInterval.between(tMinus10, t00),
+      10.sec,
+      TimeAccounting.comment.PreDusk
+    )
+    val discountOverlap0 = TimeCharge.Discount(
+      TimestampInterval.between(t10, t20),
+      10.sec,
+      TimeAccounting.comment.Overlap
+    )
+    val discountOverlap1 = TimeCharge.Discount(
+      TimestampInterval.between(t20, t40),
+      20.sec,
+      TimeAccounting.comment.Overlap
+    )
+
+    val daylightEntry   = TimeCharge.DiscountEntry.Daylight(discountDay, Site.GS)
+    def overlapEntry0(oid: Observation.Id) =
+      TimeCharge.DiscountEntry.Overlap(discountOverlap0, oid)
+    def overlapEntry1(oid: Observation.Id) =
+      TimeCharge.DiscountEntry.Overlap(discountOverlap1, oid)
+
+    val expFinalCharge0 = CategorizedTime(ChargeClass.Program -> 10.sec) // 30 - 10 (daylight) - 10 (overlap)
+    val expFinalCharge1 = CategorizedTime(ChargeClass.Program -> 10.sec) // 30 - 20 (overlap)
+    val expFinalCharge2 = CategorizedTime(ChargeClass.Program -> 30.sec) // 30 (no discounts)
+
+    def invoice0(oid: Observation.Id) =
+      TimeCharge.Invoice(expExecution0, List(daylightEntry, overlapEntry0(oid)), expFinalCharge0)
+    def invoice1(oid: Observation.Id) =
+      TimeCharge.Invoice(expExecution1, List(overlapEntry1(oid)), expFinalCharge1)
+    val invoice2 = TimeCharge.Invoice(expExecution2, Nil, expFinalCharge2)
+
+    for
+      _  <- cleanup
+      v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 2000)
+      e0  = events0.map { (c, t) => SequenceEvent(EventId, t, v0.oid, v0.vid, c) }
+      _  <- insertEvents(v0.pid, e0)
+      v1 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 2050)
+      e1  = events1.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, c) }
+      _  <- insertEvents(v1.pid, e1)
+      v2 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 2100)
+      e2  = events2.map { (c, t) => SequenceEvent(EventId, t, v2.oid, v2.vid, c) }
+      _  <- insertEvents(v2.pid, e2)
+
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v2.vid)(using xa) } }
+
+      _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
+      _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1(v2.oid), Nil))
+      _ <- expect(pi, invoiceQuery(v2.oid), invoiceExected(invoice2, Nil))
+    yield ()
+
+  test("timeChargeInvoice (simultaneous discounts)"):
+
+    val tem20 = -20.fromNightEnd
+    val tem10 = -10.fromNightEnd
+    val te00 =   0.fromNightEnd
+    val te10  =  10.fromNightEnd
+    val te20  =  20.fromNightEnd
+
+    val events0 = List(
+      (SequenceCommand.Start, tem20),
+      (SequenceCommand.Stop,   te10)
+    )
+
+    val events1 = List(
+      (SequenceCommand.Start, tem10),
+      (SequenceCommand.Stop,   te20)
+    )
+
+    val expExecution0   = CategorizedTime(ChargeClass.Program -> 30.sec) // -20 -> 10
+    val expExecution1   = CategorizedTime(ChargeClass.Program -> 30.sec) // -10 -> 20
+
+    val discountDay0    = TimeCharge.Discount(
+      TimestampInterval.between(te00, te10),
+      10.sec,
+      TimeAccounting.comment.PostDawn
+    )
+    val discountDay1    = TimeCharge.Discount(
+      TimestampInterval.between(te00, te20),
+      20.sec,
+      TimeAccounting.comment.PostDawn
+    )
+
+    val discountOverlap = TimeCharge.Discount(
+      TimestampInterval.between(tem10, te00),
+      10.sec,
+      TimeAccounting.comment.Overlap
+    )
+    val daylightEntry0  = TimeCharge.DiscountEntry.Daylight(discountDay0, Site.GS)
+    val daylightEntry1  = TimeCharge.DiscountEntry.Daylight(discountDay1, Site.GS)
+    def overlapEntry(oid: Observation.Id) =
+      TimeCharge.DiscountEntry.Overlap(discountOverlap, oid)
+
+    val expFinalCharge0 = CategorizedTime(ChargeClass.Program -> 10.sec) // 30 - 10 (daylight) - 10 (overlap)
+    val expFinalCharge1 = CategorizedTime(ChargeClass.Program -> 10.sec) // 30 - 20 (daylight)
+
+    def invoice0(oid: Observation.Id) =
+      TimeCharge.Invoice(expExecution0, List(overlapEntry(oid), daylightEntry0), expFinalCharge0)
+    val invoice1 = TimeCharge.Invoice(expExecution1, List(daylightEntry1), expFinalCharge1)
+
+    for
+      _  <- cleanup
+      v0 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 2150)
+      e0  = events0.map { (c, t) => SequenceEvent(EventId, t, v0.oid, v0.vid, c) }
+      _  <- insertEvents(v0.pid, e0)
+      v1 <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 2200)
+      e1  = events1.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, c) }
+      _  <- insertEvents(v1.pid, e1)
+
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+
+      _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
+      _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
+    yield ()
+
+
 }
