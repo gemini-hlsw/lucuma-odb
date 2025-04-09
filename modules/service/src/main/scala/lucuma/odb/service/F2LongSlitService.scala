@@ -7,6 +7,14 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2WindowCover
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -20,26 +28,17 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.F2LongSlitInput
+import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.f2.longslit.Config
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.F2Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
-import skunk.codec.boolean.bool
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2WindowCover
 
 trait F2LongSlitService[F[_]] {
 

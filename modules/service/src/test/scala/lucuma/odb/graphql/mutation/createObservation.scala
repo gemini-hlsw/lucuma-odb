@@ -13,6 +13,14 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2WindowCover
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -41,19 +49,10 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
-import lucuma.core.enums.F2Disperser
-import lucuma.core.util.Enumerated
-import lucuma.core.syntax.string.*
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 
 class createObservation extends OdbSuite {
 

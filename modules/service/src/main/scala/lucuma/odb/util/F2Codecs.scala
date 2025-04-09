@@ -3,16 +3,16 @@
 
 package lucuma.odb.util
 
+import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
-import skunk.*
-import skunk.data.Type
 import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2WindowCover
-import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
+import lucuma.core.enums.F2WindowCover
+import skunk.*
+import skunk.data.Type
 
 trait F2Codecs:
 

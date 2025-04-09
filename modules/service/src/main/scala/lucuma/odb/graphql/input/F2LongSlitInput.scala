@@ -7,19 +7,18 @@ package input
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import grackle.Result
-import lucuma.core.enums.ObservingModeType
-import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.f2.longslit.Config
-
+import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2Reads
 import lucuma.core.enums.F2WindowCover
+import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.Nullable
+import lucuma.odb.graphql.binding.*
+import lucuma.odb.sequence.f2.longslit.Config
 
 object F2LongSlitInput {
 
@@ -115,8 +114,7 @@ object F2LongSlitInput {
           explicitWindowCover,
           // explicitUseElectronicOffsetting
         ))
-        case _ =>
-          Matcher.validationFailure("disperser and fpu are required when creating the Flamingos 2 Long Slit observing mode.")      }
+      }
 
   }
 

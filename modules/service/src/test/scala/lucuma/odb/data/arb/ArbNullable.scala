@@ -3,9 +3,9 @@
 
 package lucuma.odb.data.arb
 
+import lucuma.odb.data.Nullable
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
-import lucuma.odb.data.Nullable
 
 /**
  * Provides arbitrary instances for Nullable values.

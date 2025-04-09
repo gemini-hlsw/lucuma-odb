@@ -4,8 +4,8 @@
 package lucuma.odb.sequence
 package f2.longslit
 
-import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2Decker
+import lucuma.core.enums.F2ReadMode
 
 val DefaultF2ReadMode: F2ReadMode = F2ReadMode.Faint
 

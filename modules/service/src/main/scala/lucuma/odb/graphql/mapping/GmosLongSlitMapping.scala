@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.all.*
 import coulomb.*
 import grackle.Result
 import grackle.skunk.SkunkMapping

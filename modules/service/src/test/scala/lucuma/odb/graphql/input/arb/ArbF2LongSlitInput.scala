@@ -4,17 +4,17 @@
 package lucuma.odb.graphql.input
 package arb
 
+import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.F2Reads
 import lucuma.core.enums.F2WindowCover
 import lucuma.core.util.arb.ArbEnumerated.given
-import lucuma.odb.data.arb.ArbNullable.given
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.arb.ArbNullable.given
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
