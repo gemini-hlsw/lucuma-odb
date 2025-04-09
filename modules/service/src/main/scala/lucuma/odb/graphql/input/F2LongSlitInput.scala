@@ -160,32 +160,6 @@ object F2LongSlitInput {
 
   object Edit {
 
-    val Binding: Matcher[Edit] =
-      F2EditData.rmap {
-        case (
-          grating,
-          filter,
-          fpu,
-          explicitReadMode,
-          explicitDecker,
-          explicitReadoutMode,
-          explicitReads,
-          explicitWindowCover,
-          explicitUseElectronicOffsetting
-          ) =>
-          Result(Edit(
-            grating,
-            filter,
-            fpu,
-            explicitReadMode,
-            explicitDecker,
-            explicitReadoutMode,
-            explicitReads,
-            explicitWindowCover,
-            explicitUseElectronicOffsetting
-          ))
-      }
-
     private val F2EditData: Matcher[(
       Option[F2Disperser],
       Nullable[F2Filter],
@@ -220,6 +194,33 @@ object F2LongSlitInput {
           rUseElectronicOffsetting
         ).parTupled
       }
+
+    val Binding: Matcher[Edit] =
+      F2EditData.rmap {
+        case (
+          grating,
+          filter,
+          fpu,
+          explicitReadMode,
+          explicitDecker,
+          explicitReadoutMode,
+          explicitReads,
+          explicitWindowCover,
+          explicitUseElectronicOffsetting
+          ) =>
+          Result(Edit(
+            grating,
+            filter,
+            fpu,
+            explicitReadMode,
+            explicitDecker,
+            explicitReadoutMode,
+            explicitReads,
+            explicitWindowCover,
+            explicitUseElectronicOffsetting
+          ))
+      }
+
   }
 
 }
