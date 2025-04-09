@@ -458,6 +458,7 @@ object OdbMapping {
                 TimeChargeCorrectionMapping,
                 TimeChargeDaylightDiscountMapping,
                 TimeChargeNoDataDiscountMapping,
+                TimeChargeOverlapDiscountMapping,
                 TimeChargeQaDiscountMapping,
                 TimeChargeDiscountMapping,
                 TimeChargeInvoiceMapping,
