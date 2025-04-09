@@ -24,15 +24,15 @@ import lucuma.odb.data.Nullable
 object F2LongSlitInput {
 
   case class Create(
-    grating: F2Disperser,
+    disperser: F2Disperser,
     filter: Option[F2Filter],
     fpu: F2Fpu,
-    explicitReadMode: Option[F2ReadMode]             = None,
-    explicitDecker: Option[F2Decker]                 = None,
-    explicitReadoutMode: Option[F2ReadoutMode]       = None,
-    explicitReads: Option[F2Reads]                   = None,
-    explicitWindowCover: Option[F2WindowCover]       = None,
-    explicitUseElectronicOffsetting: Option[Boolean] = None
+    // explicitReadMode: Option[F2ReadMode]             = None,
+    // explicitDecker: Option[F2Decker]                 = None,
+    // explicitReadoutMode: Option[F2ReadoutMode]       = None,
+    // explicitReads: Option[F2Reads]                   = None,
+    // explicitWindowCover: Option[F2WindowCover]       = None,
+    // explicitUseElectronicOffsetting: Option[Boolean] = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -42,15 +42,15 @@ object F2LongSlitInput {
       */
     def toObservingMode: Config =
       Config(
-        grating,
+        disperser,
         filter,
         fpu,
-        explicitReadMode,
-        explicitDecker,
-        explicitReadoutMode,
-        explicitReads,
-        explicitWindowCover,
-        explicitUseElectronicOffsetting
+        // explicitReadMode,
+        // explicitDecker,
+        // explicitReadoutMode,
+        // explicitReads,
+        // explicitWindowCover,
+        // explicitUseElectronicOffsetting
       )
 
   }
@@ -60,34 +60,34 @@ object F2LongSlitInput {
       F2Disperser,
       Option[F2Filter],
       F2Fpu,
-      Option[F2ReadMode],
-      Option[F2Decker],
-      Option[F2ReadoutMode],
-      Option[F2Reads],
-      Option[F2WindowCover],
-      Option[Boolean],
+      // Option[F2ReadMode],
+      // Option[F2Decker],
+      // Option[F2ReadoutMode],
+      // Option[F2Reads],
+      // Option[F2WindowCover],
+      // Option[Boolean],
     )] =
       ObjectFieldsBinding.rmap {
         case List(
           F2DisperserBinding("disperser", rDisperser),
           F2FilterBinding.Option("filter", rFilter),
           F2FpuBinding("fpu", rFpu),
-          F2ReadModeBinding.Option("readMode", rReadMode),
-          F2DeckerBinding.Option("decker", rDecker),
-          F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
-          F2ReadsBinding.Option("reads", rReads),
-          F2WindowCoverBinding.Option("windowCover", rWindowCover),
-          BooleanBinding.Option("useElectronicOffsetting", rUseElectronicOffsetting),
+          // F2ReadModeBinding.Option("readMode", rReadMode),
+          // F2DeckerBinding.Option("decker", rDecker),
+          // F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
+          // F2ReadsBinding.Option("reads", rReads),
+          // F2WindowCoverBinding.Option("windowCover", rWindowCover),
+          // BooleanBinding.Option("useElectronicOffsetting", rUseElectronicOffsetting),
         ) => (
           rDisperser,
           rFilter,
           rFpu,
-          rReadMode,
-          rDecker,
-          rReadoutMode,
-          rReads,
-          rWindowCover,
-          rUseElectronicOffsetting
+          // rReadMode,
+          // rDecker,
+          // rReadoutMode,
+          // rReads,
+          // rWindowCover,
+          // rUseElectronicOffsetting
         ).parTupled
       }
 
@@ -97,23 +97,23 @@ object F2LongSlitInput {
         disperser,
         filter,
         fpu,
-        explicitReadMode,
-        explicitDecker,
-        explicitReadoutMode,
-        explicitReads,
-        explicitWindowCover,
-        explicitUseElectronicOffsetting
+        // explicitReadMode,
+        // explicitDecker,
+        // explicitReadoutMode,
+        // explicitReads,
+        // explicitWindowCover,
+        // explicitUseElectronicOffsetting
       ) =>
         Result(Create(
           disperser,
           filter,
           fpu,
-          explicitReadMode,
-          explicitDecker,
-          explicitReadoutMode,
-          explicitReads,
-          explicitWindowCover,
-          explicitUseElectronicOffsetting
+          // explicitReadMode,
+          // explicitDecker,
+          // explicitReadoutMode,
+          // explicitReads,
+          // explicitWindowCover,
+          // explicitUseElectronicOffsetting
         ))
         case _ =>
           Matcher.validationFailure("disperser and fpu are required when creating the Flamingos 2 Long Slit observing mode.")      }
@@ -149,12 +149,12 @@ object F2LongSlitInput {
         g,
         filter.toOption,
         u,
-        explicitReadMode.toOption,
-        explicitDecker.toOption,
-        explicitReadoutMode.toOption,
-        explicitReads.toOption,
-        explicitWindowCover.toOption,
-        explicitUseElectronicOffsetting.toOption
+        // explicitReadMode.toOption,
+        // explicitDecker.toOption,
+        // explicitReadoutMode.toOption,
+        // explicitReads.toOption,
+        // explicitWindowCover.toOption,
+        // explicitUseElectronicOffsetting.toOption
       )
   }
 

@@ -32,6 +32,9 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 import skunk.codec.boolean.bool
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
 
 trait F2LongSlitService[F[_]] {
 
@@ -39,53 +42,53 @@ trait F2LongSlitService[F[_]] {
     which: List[Observation.Id]
   ): F[Map[Observation.Id, Config]]
 
-  def insertNorth(
-    input: GmosLongSlitInput.Create.North
+  def insert(
+    input: F2LongSlitInput.Create
   )(
     which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
 
-  def insertSouth(
-    input: GmosLongSlitInput.Create.South
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
-
-  def deleteNorth(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
-
-  def deleteSouth(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
-
-  def updateNorth(
-    SET:   GmosLongSlitInput.Edit.North
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
-
-  def updateSouth(
-    SET: GmosLongSlitInput.Edit.South
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
-
-  def cloneNorth(
-    originalId: Observation.Id,
-    newId: Observation.Id,
-  ): F[Unit]
-
-  def cloneSouth(
-    originalId: Observation.Id,
-    newId: Observation.Id,
-  ): F[Unit]
+  // def insertSouth(
+  //   input: GmosLongSlitInput.Create.South
+  // )(
+  //   which: List[Observation.Id],
+  //   xa:    Transaction[F]
+  // ): F[Unit]
+  //
+  // def deleteNorth(
+  //   which: List[Observation.Id],
+  //   xa:    Transaction[F]
+  // ): F[Unit]
+  //
+  // def deleteSouth(
+  //   which: List[Observation.Id],
+  //   xa:    Transaction[F]
+  // ): F[Unit]
+  //
+  // def updateNorth(
+  //   SET:   GmosLongSlitInput.Edit.North
+  // )(
+  //   which: List[Observation.Id],
+  //   xa:    Transaction[F]
+  // ): F[Unit]
+  //
+  // def updateSouth(
+  //   SET: GmosLongSlitInput.Edit.South
+  // )(
+  //   which: List[Observation.Id],
+  //   xa:    Transaction[F]
+  // ): F[Unit]
+  //
+  // def cloneNorth(
+  //   originalId: Observation.Id,
+  //   newId: Observation.Id,
+  // ): F[Unit]
+  //
+  // def cloneSouth(
+  //   originalId: Observation.Id,
+  //   newId: Observation.Id,
+  // ): F[Unit]
 
 }
 
@@ -128,13 +131,13 @@ object F2LongSlitService {
       val f2LS: Decoder[F2LongSlitInput.Create] =
         (f2_disperser        *:
          f2_filter.opt       *:
-         f2_fpu              *:
-         f2_read_mode.opt    *:
-         f2_decker.opt       *:
-         f2_readout_mode.opt *:
-         f2_reads.opt        *:
-         f2_window_cover.opt *:
-         bool.opt
+         f2_fpu              //*:
+         // f2_read_mode.opt    *:
+         // f2_decker.opt       *:
+         // f2_readout_mode.opt *:
+         // f2_reads.opt        *:
+         // f2_window_cover.opt *:
+         // bool.opt
         ).to[F2LongSlitInput.Create]
 
       private def select[A](
@@ -162,49 +165,49 @@ object F2LongSlitService {
           pq.execute(af.argument).void
         }
 
-      override def insertNorth(
-        input: GmosLongSlitInput.Create.North,
+      override def insert(
+        input: F2LongSlitInput.Create,
       )(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        which.traverse { oid => exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void
+        which.traverse { oid => exec(Statements.insertF2LongSlit(oid, input)) }.void
 
-      override def insertSouth(
-        input: GmosLongSlitInput.Create.South,
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
-        which.traverse { oid => exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
-
-      override def deleteNorth(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
-        Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(exec)
-
-      override def deleteSouth(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
-        Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(exec)
-
-      override def updateNorth(
-        SET:   GmosLongSlitInput.Edit.North
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
-        Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
-
-      override def updateSouth(
-        SET: GmosLongSlitInput.Edit.South
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
-        Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
+      // override def insertSouth(
+      //   input: GmosLongSlitInput.Create.South,
+      // )(
+      //   which: List[Observation.Id],
+      //   xa:    Transaction[F]
+      // ): F[Unit] =
+      //   which.traverse { oid => exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
+      //
+      // override def deleteNorth(
+      //   which: List[Observation.Id],
+      //   xa:    Transaction[F]
+      // ): F[Unit] =
+      //   Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(exec)
+      //
+      // override def deleteSouth(
+      //   which: List[Observation.Id],
+      //   xa:    Transaction[F]
+      // ): F[Unit] =
+      //   Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(exec)
+      //
+      // override def updateNorth(
+      //   SET:   GmosLongSlitInput.Edit.North
+      // )(
+      //   which: List[Observation.Id],
+      //   xa:    Transaction[F]
+      // ): F[Unit] =
+      //   Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
+      //
+      // override def updateSouth(
+      //   SET: GmosLongSlitInput.Edit.South
+      // )(
+      //   which: List[Observation.Id],
+      //   xa:    Transaction[F]
+      // ): F[Unit] =
+      //   Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
 
       def cloneNorth(
         originalId: Observation.Id,
@@ -245,89 +248,39 @@ object F2LongSlitService {
             observationIds.map(sql"$observation_id").intercalate(void",") |+|
           void")"
 
-    val InsertGmosNorthLongSlit: Fragment[(
+    val InsertF2LongSlit: Fragment[(
       Observation.Id          ,
-      GmosNorthGrating        ,
-      Option[GmosNorthFilter] ,
-      GmosNorthFpu            ,
-      Wavelength              ,
-      Option[GmosXBinning]    ,
-      Option[GmosYBinning]    ,
-      Option[GmosAmpReadMode] ,
-      Option[GmosAmpGain]     ,
-      Option[GmosRoi]         ,
-      Option[String]          ,
-      Option[String]          ,
-      GmosNorthGrating        ,
-      Option[GmosNorthFilter] ,
-      GmosNorthFpu            ,
-      Wavelength
+      F2Disperser             ,
+      Option[F2Filter] ,
+      F2Fpu            ,
     )] =
       sql"""
-        INSERT INTO t_gmos_north_long_slit (
+        INSERT INTO t_flamingos_2_long_slit (
           c_observation_id,
           c_program_id,
-          c_grating,
+          c_disperser,
           c_filter,
-          c_fpu,
-          c_central_wavelength,
-          c_xbin,
-          c_ybin,
-          c_amp_read_mode,
-          c_amp_gain,
-          c_roi,
-          c_wavelength_dithers,
-          c_spatial_offsets,
-          c_initial_grating,
-          c_initial_filter,
-          c_initial_fpu,
-          c_initial_central_wavelength
+          c_fpu
         )
         SELECT
           $observation_id,
           c_program_id,
-          $gmos_north_grating,
-          ${gmos_north_filter.opt},
-          $gmos_north_fpu,
-          $wavelength_pm,
-          ${gmos_x_binning.opt},
-          ${gmos_y_binning.opt},
-          ${gmos_amp_read_mode.opt},
-          ${gmos_amp_gain.opt},
-          ${gmos_roi.opt},
-          ${text.opt},
-          ${text.opt},
-          $gmos_north_grating,
-          ${gmos_north_filter.opt},
-          $gmos_north_fpu,
-          $wavelength_pm
+          $f2_disperser,
+          ${f2_filter.opt},
+          $f2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
-       )}
+       """.contramap { (o, d, f, u) => (o, d, f, u, o)}
 
-    def insertGmosNorthLongSlit(
+    def insertF2LongSlit(
       observationId: Observation.Id,
-      input:         GmosLongSlitInput.Create.North
+      input:         F2LongSlitInput.Create
     ): AppliedFragment =
-      InsertGmosNorthLongSlit.apply(
+      InsertF2LongSlit.apply(
         observationId                          ,
-          input.grating                        ,
+          input.disperser                        ,
           input.filter                         ,
           input.fpu                            ,
-          input.common.centralWavelength       ,
-          input.common.explicitXBin            ,
-          input.common.explicitYBin            ,
-          input.common.explicitAmpReadMode     ,
-          input.common.explicitAmpGain         ,
-          input.common.explicitRoi             ,
-          input.common.formattedλDithers       ,
-          input.common.formattedSpatialOffsets ,
-          input.grating                        ,
-          input.filter                         ,
-          input.fpu                            ,
-          input.common.centralWavelength
       )
 
     val InsertGmosSouthLongSlit: Fragment[(
