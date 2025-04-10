@@ -6984,11 +6984,6 @@ type Flamingos2LongSlit {
   """
   reads: Flamingos2Reads
 
-  """
-  The windowCover field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  windowCover: Flamingos2WindowCover
-
   #
   # """
   # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -7064,11 +7059,6 @@ input Flamingos2LongSlitInput {
   The reads field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   reads: Flamingos2Reads
-
-  """
-  The windowCover field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  windowCover: Flamingos2WindowCover
 }
 
 """

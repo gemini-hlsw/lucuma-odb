@@ -38,8 +38,6 @@ CREATE TABLE t_flamingos_2_long_slit (
   c_decker                     d_tag                 NULL DEFAULT NULL    REFERENCES t_f2_decker(c_tag),
   c_readout_mode               d_tag                 NULL DEFAULT NULL    REFERENCES t_f2_readout_mode(c_tag),
   c_reads                      d_tag                 NULL DEFAULT NULL    REFERENCES t_f2_reads(c_tag),
-  c_window_cover               d_tag                 NULL DEFAULT NULL    REFERENCES t_f2_window_cover(c_tag),
-  c_use_electronic_offsetting  BOOL                  NULL DEFAULT NULL,
   c_mode_key                   text                  NOT NULL GENERATED ALWAYS AS (
     format_flamingos_2_long_slit_mode_group(
      'gs',
