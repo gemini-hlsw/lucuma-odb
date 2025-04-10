@@ -25,6 +25,7 @@ val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt t
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
 val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.7"
+val newRelicVersion            = "8.19.0"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.5"
 val pprintVersion              = "0.9.0"
@@ -164,6 +165,8 @@ lazy val service = project
       "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
+      "com.newrelic.agent.java"   % "newrelic-agent"                     % newRelicVersion,
+      "com.newrelic.agent.java"   % "newrelic-api"                       % newRelicVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,
