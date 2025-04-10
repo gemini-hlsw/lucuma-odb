@@ -14,7 +14,6 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -43,9 +42,9 @@ object F2LongSlitInput {
         filter,
         fpu,
         explicitReadMode,
+        explicitReads,
         explicitDecker,
         explicitReadoutMode,
-        explicitReads,
       )
 
   }
@@ -65,7 +64,7 @@ object F2LongSlitInput {
           F2DisperserBinding("disperser", rDisperser),
           F2FilterBinding.Option("filter", rFilter),
           F2FpuBinding("fpu", rFpu),
-          F2ReadModeBinding.Option("readMode", rReadMode),
+          F2ReadModeBinding.Option("explicitReadMode", rReadMode),
           F2DeckerBinding.Option("decker", rDecker),
           F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
           F2ReadsBinding.Option("reads", rReads),
@@ -89,7 +88,7 @@ object F2LongSlitInput {
           explicitReadMode,
           explicitDecker,
           explicitReadoutMode,
-          explicitReads,
+          explicitReads
       ) =>
         Result(Create(
           disperser,
@@ -98,7 +97,7 @@ object F2LongSlitInput {
           explicitReadMode,
           explicitDecker,
           explicitReadoutMode,
-          explicitReads,
+          explicitReads
         ))
       }
 
@@ -108,12 +107,10 @@ object F2LongSlitInput {
     grating: Option[F2Disperser],
     filter: Nullable[F2Filter],
     fpu: Option[F2Fpu],
-    explicitReadMode: Nullable[F2ReadMode],
+    explicitReadMode: Option[F2ReadMode],
     explicitDecker: Nullable[F2Decker],
     explicitReadoutMode: Nullable[F2ReadoutMode],
     explicitReads: Nullable[F2Reads],
-    explicitWindowCover: Nullable[F2WindowCover],
-    explicitUseElectronicOffsetting: Nullable[Boolean]
   ) {
 
     val observingModeType: ObservingModeType =
@@ -129,10 +126,12 @@ object F2LongSlitInput {
       for {
         g <- required(grating, "grating")
         u <- required(fpu, "fpu")
+        r <- required(explicitReadMode, "readMode")
       } yield Create(
         g,
         filter.toOption,
         u,
+        Some(r),
         // explicitReadMode.toOption,
         // explicitDecker.toOption,
         // explicitReadoutMode.toOption,
@@ -148,24 +147,20 @@ object F2LongSlitInput {
       Option[F2Disperser],
       Nullable[F2Filter],
       Option[F2Fpu],
-      Nullable[F2ReadMode],
+      Option[F2ReadMode],
       Nullable[F2Decker],
       Nullable[F2ReadoutMode],
       Nullable[F2Reads],
-      Nullable[F2WindowCover],
-      Nullable[Boolean]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
           F2DisperserBinding.Option("disperser", rDisperser),
           F2FilterBinding.Nullable("filter", rFilter),
           F2FpuBinding.Option("fpu", rFpu),
-          F2ReadModeBinding.Nullable("readMode", rReadMode),
+          F2ReadModeBinding.Option("explicitReadMode", rReadMode),
           F2DeckerBinding.Nullable("decker", rDecker),
           F2ReadoutModeBinding.Nullable("readoutMode", rReadoutMode),
           F2ReadsBinding.Nullable("reads", rReads),
-          F2WindowCoverBinding.Nullable("windowCover", rWindowCover),
-          BooleanBinding.Nullable("useElectronicOffsetting", rUseElectronicOffsetting)
         ) => (
           rDisperser,
           rFilter,
@@ -174,8 +169,6 @@ object F2LongSlitInput {
           rDecker,
           rReadoutMode,
           rReads,
-          rWindowCover,
-          rUseElectronicOffsetting
         ).parTupled
       }
 
@@ -189,8 +182,6 @@ object F2LongSlitInput {
           explicitDecker,
           explicitReadoutMode,
           explicitReads,
-          explicitWindowCover,
-          explicitUseElectronicOffsetting
           ) =>
           Result(Edit(
             grating,
@@ -200,8 +191,6 @@ object F2LongSlitInput {
             explicitDecker,
             explicitReadoutMode,
             explicitReads,
-            explicitWindowCover,
-            explicitUseElectronicOffsetting
           ))
       }
 

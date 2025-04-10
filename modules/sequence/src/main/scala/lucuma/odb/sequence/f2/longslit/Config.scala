@@ -13,7 +13,6 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -22,23 +21,17 @@ import java.io.DataOutputStream
  * Configuration for the Flamingos2 Long Slit science mode.  Using these parameters, a
  * F2 long slit sequence may be generated.
  */
-case class Config(
+case class Config private[longslit](
   grating: F2Disperser,
   filter: Option[F2Filter],
   fpu: F2Fpu,
-  explicitReadMode: Option[F2ReadMode]             = None,
-  explicitDecker: Option[F2Decker]                 = None,
-  explicitReadoutMode: Option[F2ReadoutMode]       = None,
-  explicitReads: Option[F2Reads]                   = None,
-  explicitWindowCover: Option[F2WindowCover]       = None,
-  explicitUseElectronicOffsetting: Option[Boolean] = None
+  defaultReadMode: F2ReadMode,
+  explicitReadMode: Option[F2ReadMode],
+  defaultReads: F2Reads,
+  explicitReads: Option[F2Reads],
+  explicitDecker: Option[F2Decker],
+  explicitReadoutMode: Option[F2ReadoutMode]
 ) derives Eq {
-
-  def readMode: F2ReadMode =
-    explicitReadMode.getOrElse(defaultReadMode)
-
-  def defaultReadMode: F2ReadMode =
-    DefaultF2ReadMode
 
   def decker: F2Decker =
     explicitDecker.getOrElse(defaultDecker)
@@ -48,18 +41,11 @@ case class Config(
 
   def readoutMode: Option[F2ReadoutMode] = explicitReadoutMode
 
-  def reads: Option[F2Reads] = explicitReads
+  def reads: F2Reads =
+    explicitReads.getOrElse(defaultReads)
 
-  def windowCover: Option[F2WindowCover] = explicitWindowCover
-
-  def useElectronicOffseting: Boolean =
-    explicitUseElectronicOffsetting.getOrElse(defaultUseElectronicOffsetting)
-
-  def defaultUseElectronicOffsetting: Boolean =
-    DefaultF2UseElectronicOffsetting
-
-  def defaultMOSPreImaging: Boolean =
-    DefaultF2MOSPreImaging
+  def readMode: F2ReadMode =
+    explicitReadMode.getOrElse(defaultReadMode)
 
   def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
@@ -69,11 +55,9 @@ case class Config(
     out.writeChars(filter.foldMap(_.tag))
     out.writeChars(fpu.tag)
     out.writeChars(readMode.tag)
+    out.writeChars(reads.tag)
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.foldMap(_.tag))
-    out.writeChars(reads.foldMap(_.tag))
-    out.writeChars(windowCover.foldMap(_.tag))
-    out.writeBoolean(useElectronicOffseting)
 
     out.close()
     bao.toByteArray
@@ -81,3 +65,26 @@ case class Config(
 
 }
 
+object Config:
+
+  def apply(
+    grating: F2Disperser,
+    filter: Option[F2Filter],
+    fpu: F2Fpu,
+    explicitReadMode: Option[F2ReadMode] = None,
+    explicitReads: Option[F2Reads] = None,
+    explicitDecker: Option[F2Decker] = None,
+    explicitReadoutMode: Option[F2ReadoutMode] = None,
+  ): Config =
+    val rm = explicitReadMode.getOrElse(DefaultF2ReadMode)
+    new Config(
+      grating,
+      filter,
+      fpu,
+      DefaultF2ReadMode,
+      explicitReadMode,
+      rm.readCount,
+      explicitReads,
+      explicitDecker,
+      explicitReadoutMode
+    )
