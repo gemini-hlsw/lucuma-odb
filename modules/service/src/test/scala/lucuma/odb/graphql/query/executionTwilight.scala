@@ -79,7 +79,7 @@ class executionTwilight extends ExecutionTestSupport {
   val setup: IO[(Program.Id, Observation.Id, Calibrations)] =
     for
       (p, o) <- setupScienceObs
-      _ <- withServices(staff) { services =>
+      _ <- withServices(serviceUser) { services =>
         services.session.transaction.use: xa =>
           services
             .calibrationsService
