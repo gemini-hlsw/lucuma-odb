@@ -880,7 +880,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     )
 
   def recalculateCalibrations(pid: Program.Id): IO[(List[Observation.Id], List[Observation.Id])] =
-    withServices(pi) { services =>
+    withServices(service) { services =>
       services.session.transaction.use { xa =>
         services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
       }
