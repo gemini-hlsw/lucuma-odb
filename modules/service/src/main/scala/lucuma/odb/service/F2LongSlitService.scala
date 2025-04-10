@@ -14,7 +14,6 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -139,8 +138,7 @@ object F2LongSlitService {
          f2_read_mode.opt    *:
          f2_decker.opt       *:
          f2_readout_mode.opt *:
-         f2_reads.opt        *:
-         f2_window_cover.opt
+         f2_reads.opt        //*:
         ).to[F2LongSlitInput.Create]
 
       private def select[A](
@@ -239,8 +237,6 @@ object F2LongSlitService {
           ls.c_decker,
           ls.c_readout_mode,
           ls.c_reads,
-          ls.c_window_cover,
-          ls.c_use_electronic_offsetting,
         FROM
           #t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
@@ -260,7 +256,6 @@ object F2LongSlitService {
       Option[F2Decker] ,
       Option[F2ReadoutMode] ,
       Option[F2Reads] ,
-      Option[F2WindowCover] ,
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -272,8 +267,7 @@ object F2LongSlitService {
           c_read_mode,
           c_decker,
           c_readout_mode,
-          c_reads,
-          c_window_cover
+          c_reads
         )
         SELECT
           $observation_id,
@@ -284,11 +278,10 @@ object F2LongSlitService {
           ${f2_read_mode.opt},
           ${f2_decker.opt},
           ${f2_readout_mode.opt},
-          ${f2_reads.opt},
-          ${f2_window_cover.opt}
+          ${f2_reads.opt}
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u, r, e, m, a, w) => (o, d, f, u, r, e, m, a, w, o)}
+       """.contramap { (o, d, f, u, r, e, m, a) => (o, d, f, u, r, e, m, a, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
@@ -303,7 +296,6 @@ object F2LongSlitService {
           input.explicitDecker                            ,
           input.explicitReadoutMode                            ,
           input.explicitReads                            ,
-          input.explicitWindowCover                            ,
       )
 
     private def observationIdIn(

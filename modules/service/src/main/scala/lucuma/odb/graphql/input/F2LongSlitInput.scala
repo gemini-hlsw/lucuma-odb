@@ -30,8 +30,6 @@ object F2LongSlitInput {
     explicitDecker: Option[F2Decker]                 = None,
     explicitReadoutMode: Option[F2ReadoutMode]       = None,
     explicitReads: Option[F2Reads]                   = None,
-    explicitWindowCover: Option[F2WindowCover]       = None,
-    // explicitUseElectronicOffsetting: Option[Boolean] = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -48,8 +46,6 @@ object F2LongSlitInput {
         explicitDecker,
         explicitReadoutMode,
         explicitReads,
-        explicitWindowCover,
-        // explicitUseElectronicOffsetting
       )
 
   }
@@ -63,8 +59,6 @@ object F2LongSlitInput {
       Option[F2Decker],
       Option[F2ReadoutMode],
       Option[F2Reads],
-      Option[F2WindowCover],
-      // Option[Boolean],
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -75,8 +69,6 @@ object F2LongSlitInput {
           F2DeckerBinding.Option("decker", rDecker),
           F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
           F2ReadsBinding.Option("reads", rReads),
-          F2WindowCoverBinding.Option("windowCover", rWindowCover),
-          // BooleanBinding.Option("useElectronicOffsetting", rUseElectronicOffsetting),
         ) => (
           rDisperser,
           rFilter,
@@ -85,8 +77,6 @@ object F2LongSlitInput {
           rDecker,
           rReadoutMode,
           rReads,
-          rWindowCover,
-          // rUseElectronicOffsetting
         ).parTupled
       }
 
@@ -100,8 +90,6 @@ object F2LongSlitInput {
           explicitDecker,
           explicitReadoutMode,
           explicitReads,
-          explicitWindowCover,
-          // explicitUseElectronicOffsetting
       ) =>
         Result(Create(
           disperser,
@@ -111,8 +99,6 @@ object F2LongSlitInput {
           explicitDecker,
           explicitReadoutMode,
           explicitReads,
-          explicitWindowCover,
-          // explicitUseElectronicOffsetting
         ))
       }
 

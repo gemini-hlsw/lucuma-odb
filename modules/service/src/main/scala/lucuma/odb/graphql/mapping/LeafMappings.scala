@@ -109,7 +109,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[F2Decker](F2DeckerType),
       LeafMapping[F2ReadoutMode](F2ReadoutModeType),
       LeafMapping[F2Reads](F2ReadsType),
-      LeafMapping[F2WindowCover](F2WindowCoverType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),

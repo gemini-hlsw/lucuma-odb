@@ -20,7 +20,6 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -1189,7 +1188,6 @@ class createObservation extends OdbSuite {
     de:       Option[F2Decker],
     ro:       Option[F2ReadoutMode],
     re:       Option[F2Reads],
-    wc:       Option[F2WindowCover],
   ): String =
     s"""
       mutation {
@@ -1205,7 +1203,6 @@ class createObservation extends OdbSuite {
                 decker: ${de.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 readoutMode: ${ro.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 reads: ${re.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
-                windowCover: ${wc.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
               }
             }
           }
@@ -1220,7 +1217,6 @@ class createObservation extends OdbSuite {
                 decker
                 readoutMode
                 reads
-                windowCover
               }
             }
           }
@@ -1238,7 +1234,6 @@ class createObservation extends OdbSuite {
           de = Some(F2Decker.LongSlit),
           ro = Some(F2ReadoutMode.Engineering),
           re = Some(F2Reads.Reads_1),
-          wc = Some(F2WindowCover.Close),
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1250,7 +1245,6 @@ class createObservation extends OdbSuite {
             longSlit.downIO[Option[F2Decker]]("decker"),
             longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
             longSlit.downIO[Option[F2Reads]]("reads"),
-            longSlit.downIO[Option[F2WindowCover]]("windowCover"),
             ).tupled,
             (F2Disperser.R1200HK,
             Some(F2Filter.Y),
@@ -1259,7 +1253,6 @@ class createObservation extends OdbSuite {
             Some(F2Decker.LongSlit),
             Some(F2ReadoutMode.Engineering),
             Some(F2Reads.Reads_1),
-            Some(F2WindowCover.Close),
           )
         )
 
