@@ -11,6 +11,3 @@ val DefaultF2ReadMode: F2ReadMode = F2ReadMode.Faint
 
 val DefaultF2Decker: F2Decker = F2Decker.LongSlit
 
-val DefaultF2UseElectronicOffsetting: Boolean = false
-
-val DefaultF2MOSPreImaging: Boolean = false

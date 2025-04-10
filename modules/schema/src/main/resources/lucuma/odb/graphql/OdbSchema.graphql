@@ -6965,9 +6965,21 @@ type Flamingos2LongSlit {
   fpu: Flamingos2Fpu!
 
   """
-  The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  The read mode is either explicitly specified in explicitReadMode or else taken
+  from defaultReadMode
   """
-  readMode: Flamingos2ReadMode
+  readMode: Flamingos2ReadMode!
+
+  """
+  Default read mode, calculated based on the exposure time
+  """
+  defaultReadMode: Flamingos2ReadMode!
+
+  """
+  Optional explicitly specified F2 ReadMode. If set it overrides the
+  default.
+  """
+  explicitReadMode: Flamingos2ReadMode
 
   """
   The decker field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -6980,45 +6992,23 @@ type Flamingos2LongSlit {
   readoutMode: Flamingos2ReadoutMode
 
   """
-  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
+  F2 reads, either explicitly specified in explicitReads or else taken
+  from the defaultXReads
   """
-  reads: Flamingos2Reads
+  reads: Flamingos2Reads!
 
-  #
-  # """
-  # The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitXBin: GmosXBinning
-  #
-  # """
-  # The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitYBin: GmosYBinning
-  #
-  # """
-  # The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitAmpReadMode: GmosAmpReadMode
-  #
-  # """
-  # The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitAmpGain: GmosAmpGain
-  #
-  # """
-  # The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitRoi: GmosRoi
-  #
-  # """
-  # The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitWavelengthDithers: [WavelengthDitherInput!]
-  #
-  # """
-  # The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  # """
-  # explicitSpatialOffsets: [OffsetComponentInput!]
+  """
+  Default reads, calculated from the selected read mode which in
+  turn is based on the exposure time
+  """
+  defaultReads: Flamingos2Reads!
+
+  """
+  Optional explicitly specified F2 Reads. If set it overrides the
+  default.
+  """
+  explicitReads: Flamingos2Reads
+
 }
 
 """
@@ -7043,7 +7033,7 @@ input Flamingos2LongSlitInput {
   """
   The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  readMode: Flamingos2ReadMode
+  explicitReadMode: Flamingos2ReadMode
 
   """
   The decker field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -7058,6 +7048,7 @@ input Flamingos2LongSlitInput {
   """
   The reads field may be unset by assigning a null value, or ignored by skipping it altogether
   """
+  # Change to explicitReads
   reads: Flamingos2Reads
 }
 

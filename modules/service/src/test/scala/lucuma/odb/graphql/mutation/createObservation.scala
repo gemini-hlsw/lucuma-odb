@@ -12,33 +12,8 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
-import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.GmosSouthFpu
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.Partner
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.Site
-import lucuma.core.enums.SpectroscopyCapabilities
-import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ImageQuality
@@ -1153,6 +1128,12 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
+                readMode
+                defaultReadMode
+                explicitReadMode
+                defaultReads
+                explicitReads
+                reads
               }
             }
           }
@@ -1168,11 +1149,23 @@ class createObservation extends OdbSuite {
         assertIO(
           (longSlit.downIO[F2Disperser]("disperser"),
            longSlit.downIO[Option[F2Filter]]("filter"),
-           longSlit.downIO[F2Fpu]("fpu")
+           longSlit.downIO[F2Fpu]("fpu"),
+           longSlit.downIO[F2ReadMode]("readMode"),
+           longSlit.downIO[F2ReadMode]("defaultReadMode"),
+           longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
+           longSlit.downIO[F2Reads]("defaultReads"),
+           longSlit.downIO[Option[F2Reads]]("explicitReads"),
+           longSlit.downIO[F2Reads]("reads"),
           ).tupled,
           (F2Disperser.R1200HK,
            Some(F2Filter.Y),
-           F2Fpu.LongSlit2
+           F2Fpu.LongSlit2,
+           F2ReadMode.Faint,
+           F2ReadMode.Faint, // default read mode is faint
+           None,
+           F2Reads.Reads_8, // faint reamd mode default reads to 8
+           None,
+           F2Reads.Reads_8
           )
         )
 
@@ -1184,10 +1177,10 @@ class createObservation extends OdbSuite {
     pid:      Program.Id,
     disperser:  String,
     fpu:      String = "LONG_SLIT_2",
-    rm:       Option[F2ReadMode],
+    explicitReadMode:       Option[F2ReadMode],
     de:       Option[F2Decker],
     ro:       Option[F2ReadoutMode],
-    re:       Option[F2Reads],
+    explicitReads:       Option[F2Reads],
   ): String =
     s"""
       mutation {
@@ -1199,10 +1192,10 @@ class createObservation extends OdbSuite {
                 disperser: $disperser
                 filter: Y
                 fpu: $fpu
-                readMode: ${rm.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitReadMode: ${explicitReadMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 decker: ${de.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 readoutMode: ${ro.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
-                reads: ${re.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                reads: ${explicitReads.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
               }
             }
           }
@@ -1214,8 +1207,12 @@ class createObservation extends OdbSuite {
                 filter
                 fpu
                 readMode
+                defaultReadMode
+                explicitReadMode
                 decker
                 readoutMode
+                defaultReads
+                explicitReads
                 reads
               }
             }
@@ -1224,16 +1221,16 @@ class createObservation extends OdbSuite {
       }
     """
 
-  test("[general] specify f2 long slit observing mode at observation creation, all params") {
+  test("[general] specify f2 long slit observing mode at observation creation with explicit read mode") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         createObsWithF2ObservingModeAllParams(
           pid,
           "R1200_HK",
-          rm = Some(F2ReadMode.Bright),
+          explicitReadMode = Some(F2ReadMode.Bright),
           de = Some(F2Decker.LongSlit),
           ro = Some(F2ReadoutMode.Engineering),
-          re = Some(F2Reads.Reads_1),
+          explicitReads = None,
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1241,18 +1238,26 @@ class createObservation extends OdbSuite {
             (longSlit.downIO[F2Disperser]("disperser"),
             longSlit.downIO[Option[F2Filter]]("filter"),
             longSlit.downIO[F2Fpu]("fpu"),
-            longSlit.downIO[Option[F2ReadMode]]("readMode"),
+            longSlit.downIO[F2ReadMode]("readMode"),
+            longSlit.downIO[F2ReadMode]("defaultReadMode"),
+            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
             longSlit.downIO[Option[F2Decker]]("decker"),
             longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
-            longSlit.downIO[Option[F2Reads]]("reads"),
+            longSlit.downIO[F2Reads]("defaultReads"),
+            longSlit.downIO[Option[F2Reads]]("explicitReads"),
+            longSlit.downIO[F2Reads]("reads"),
             ).tupled,
             (F2Disperser.R1200HK,
             Some(F2Filter.Y),
             F2Fpu.LongSlit2,
-            Some(F2ReadMode.Bright),
+            F2ReadMode.Bright, // Explicitly set read mode
+            F2ReadMode.Faint,
+            Some(F2ReadMode.Bright), // Explicitly set read mode
             Some(F2Decker.LongSlit),
             Some(F2ReadoutMode.Engineering),
-            Some(F2Reads.Reads_1),
+            F2Reads.Reads_1, // Default reads is 1 as por bright read mode
+            None, // Explicit reads is Empty
+            F2Reads.Reads_1, // Default reads is 1 as por bright read mode
           )
         )
 
@@ -1433,7 +1438,7 @@ class createObservation extends OdbSuite {
 
   test("[general] can't create an observation with two observing modes") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit") {
+      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit") {
         query(pi,
           s"""
           mutation {
@@ -1714,7 +1719,7 @@ class createObservation extends OdbSuite {
     } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
   }
 
-  test("[program] insert obs at beginning") {
+  test("[program] insert obs at beginning in a group") {
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)
@@ -1725,7 +1730,7 @@ class createObservation extends OdbSuite {
     } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
   }
 
-  test("[program] insert obs in the middle") {
+  test("[program] insert obs in the middle in a group") {
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)

@@ -236,7 +236,7 @@ object F2LongSlitService {
           ls.c_read_mode,
           ls.c_decker,
           ls.c_readout_mode,
-          ls.c_reads,
+          ls.c_reads
         FROM
           #t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
@@ -253,9 +253,9 @@ object F2LongSlitService {
       Option[F2Filter] ,
       F2Fpu            ,
       Option[F2ReadMode] ,
+      Option[F2Reads] ,
       Option[F2Decker] ,
       Option[F2ReadoutMode] ,
-      Option[F2Reads] ,
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -265,9 +265,9 @@ object F2LongSlitService {
           c_filter,
           c_fpu,
           c_read_mode,
+          C_reads,
           c_decker,
-          c_readout_mode,
-          c_reads
+          c_readout_mode
         )
         SELECT
           $observation_id,
@@ -276,9 +276,9 @@ object F2LongSlitService {
           ${f2_filter.opt},
           $f2_fpu,
           ${f2_read_mode.opt},
+          ${f2_reads.opt},
           ${f2_decker.opt},
-          ${f2_readout_mode.opt},
-          ${f2_reads.opt}
+          ${f2_readout_mode.opt}
         FROM t_observation
         WHERE c_observation_id = $observation_id
        """.contramap { (o, d, f, u, r, e, m, a) => (o, d, f, u, r, e, m, a, o)}
@@ -292,10 +292,10 @@ object F2LongSlitService {
           input.disperser                        ,
           input.filter                         ,
           input.fpu                            ,
-          input.explicitReadMode                            ,
+          input.explicitReadMode,
+          input.explicitReads                            ,
           input.explicitDecker                            ,
           input.explicitReadoutMode                            ,
-          input.explicitReads                            ,
       )
 
     private def observationIdIn(
