@@ -107,7 +107,7 @@ object F2LongSlitInput {
     grating: Option[F2Disperser],
     filter: Nullable[F2Filter],
     fpu: Option[F2Fpu],
-    explicitReadMode: Option[F2ReadMode],
+    explicitReadMode: Nullable[F2ReadMode],
     explicitDecker: Nullable[F2Decker],
     explicitReadoutMode: Nullable[F2ReadoutMode],
     explicitReads: Nullable[F2Reads],
@@ -126,18 +126,11 @@ object F2LongSlitInput {
       for {
         g <- required(grating, "grating")
         u <- required(fpu, "fpu")
-        r <- required(explicitReadMode, "readMode")
       } yield Create(
         g,
         filter.toOption,
         u,
-        Some(r),
-        // explicitReadMode.toOption,
-        // explicitDecker.toOption,
-        // explicitReadoutMode.toOption,
-        // explicitReads.toOption,
-        // explicitWindowCover.toOption,
-        // explicitUseElectronicOffsetting.toOption
+        explicitReadMode.toOption,
       )
   }
 
@@ -147,7 +140,7 @@ object F2LongSlitInput {
       Option[F2Disperser],
       Nullable[F2Filter],
       Option[F2Fpu],
-      Option[F2ReadMode],
+      Nullable[F2ReadMode],
       Nullable[F2Decker],
       Nullable[F2ReadoutMode],
       Nullable[F2Reads],
@@ -157,7 +150,7 @@ object F2LongSlitInput {
           F2DisperserBinding.Option("disperser", rDisperser),
           F2FilterBinding.Nullable("filter", rFilter),
           F2FpuBinding.Option("fpu", rFpu),
-          F2ReadModeBinding.Option("explicitReadMode", rReadMode),
+          F2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
           F2DeckerBinding.Nullable("decker", rDecker),
           F2ReadoutModeBinding.Nullable("readoutMode", rReadoutMode),
           F2ReadsBinding.Nullable("reads", rReads),

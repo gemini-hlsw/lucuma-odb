@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2Reads
 import lucuma.odb.graphql.table.*
@@ -34,11 +33,4 @@ trait F2LongSlitMapping[F[_]]
       SqlField("readoutMode",     F2LongSlitView.ReadoutMode),
     )
 
-}
-
-object F2LongSlitMapping {
-  // Default values from F2 Config class
-  val DefaultReadMode: F2ReadMode = F2ReadMode.Bright
-  val DefaultDecker: F2Decker = F2Decker.Imaging
-  val DefaultUseElectronicOffsetting: Boolean = false
 }

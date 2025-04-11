@@ -25,11 +25,11 @@ trait ArbF2LongSlitInput:
         g <- arbitrary[F2Disperser]
         f <- arbitrary[Option[F2Filter]]
         u <- arbitrary[F2Fpu]
-        r <- arbitrary[F2ReadMode]
+        r <- arbitrary[Option[F2ReadMode]]
         d <- arbitrary[Option[F2Decker]]
         o <- arbitrary[Option[F2ReadoutMode]]
         s <- arbitrary[Option[F2Reads]]
-      } yield F2LongSlitInput.Create(g, f, u, Some(r), d, o, s)
+      } yield F2LongSlitInput.Create(g, f, u, r, d, o, s)
     }
 
   given Arbitrary[F2LongSlitInput.Edit] =
@@ -38,7 +38,7 @@ trait ArbF2LongSlitInput:
         g <- arbitrary[Option[F2Disperser]]
         f <- arbitrary[Nullable[F2Filter]]
         u <- arbitrary[Option[F2Fpu]]
-        r <- arbitrary[Option[F2ReadMode]]
+        r <- arbitrary[Nullable[F2ReadMode]]
         d <- arbitrary[Nullable[F2Decker]]
         o <- arbitrary[Nullable[F2ReadoutMode]]
         s <- arbitrary[Nullable[F2Reads]]
