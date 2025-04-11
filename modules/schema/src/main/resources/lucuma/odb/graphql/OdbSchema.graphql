@@ -6982,16 +6982,6 @@ type Flamingos2LongSlit {
   explicitReadMode: Flamingos2ReadMode
 
   """
-  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  decker: Flamingos2Decker
-
-  """
-  The readout mode field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  readoutMode: Flamingos2ReadoutMode
-
-  """
   F2 reads, either explicitly specified in explicitReads or else taken
   from the defaultXReads
   """
@@ -7008,6 +6998,16 @@ type Flamingos2LongSlit {
   default.
   """
   explicitReads: Flamingos2Reads
+
+  """
+  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  decker: Flamingos2Decker
+
+  """
+  The readout mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  readoutMode: Flamingos2ReadoutMode
 
 }
 
