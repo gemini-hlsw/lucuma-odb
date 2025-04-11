@@ -214,7 +214,7 @@ UNION ALL
     m.c_mode_key,
     o.c_program_id;
 
--- Replace the observation view to add f2 long slite mode columns.
+-- Replace the observation view to add f2 long slit mode columns.
 DROP VIEW v_observation;
 
 CREATE OR REPLACE VIEW v_observation AS

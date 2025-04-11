@@ -33,11 +33,7 @@ case class Config private[longslit](
   explicitReadoutMode: Option[F2ReadoutMode]
 ) derives Eq {
 
-  def decker: F2Decker =
-    explicitDecker.getOrElse(defaultDecker)
-
-  def defaultDecker: F2Decker =
-    DefaultF2Decker
+  def decker: Option[F2Decker] = explicitDecker
 
   def readoutMode: Option[F2ReadoutMode] = explicitReadoutMode
 
@@ -56,7 +52,7 @@ case class Config private[longslit](
     out.writeChars(fpu.tag)
     out.writeChars(readMode.tag)
     out.writeChars(reads.tag)
-    out.writeChars(decker.tag)
+    out.writeChars(decker.foldMap(_.tag))
     out.writeChars(readoutMode.foldMap(_.tag))
 
     out.close()
@@ -81,7 +77,7 @@ object Config:
       grating,
       filter,
       fpu,
-      DefaultF2ReadMode,
+      rm,
       explicitReadMode,
       rm.readCount,
       explicitReads,

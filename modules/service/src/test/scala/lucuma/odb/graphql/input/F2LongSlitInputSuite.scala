@@ -26,12 +26,10 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
       assertEquals(om.grating, c.disperser)
       assertEquals(om.filter, c.filter)
       assertEquals(om.fpu, c.fpu)
-      // assertEquals(om.explicitReadMode, c.explicitReadMode)
-      // assertEquals(om.explicitDecker, c.explicitDecker)
-      // assertEquals(om.explicitReadoutMode, c.explicitReadoutMode)
-      // assertEquals(om.explicitReads, c.explicitReads)
-      // assertEquals(om.explicitWindowCover, c.explicitWindowCover)
-      // assertEquals(om.explicitUseElectronicOffsetting, c.explicitUseElectronicOffsetting)
+      assertEquals(om.explicitReadMode, c.explicitReadMode)
+      assertEquals(om.explicitDecker, c.explicitDecker)
+      assertEquals(om.explicitReadoutMode, c.explicitReadoutMode)
+      assertEquals(om.explicitReads, c.explicitReads)
 
   test("F2LongSlitInput.Edit should have correct observingModeType"):
     forAll: (e: F2LongSlitInput.Edit) =>
