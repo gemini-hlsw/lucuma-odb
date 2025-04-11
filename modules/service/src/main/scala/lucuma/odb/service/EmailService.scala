@@ -26,6 +26,7 @@ import skunk.Transaction
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 trait EmailService[F[_]] {
   def send(
@@ -35,7 +36,7 @@ trait EmailService[F[_]] {
     subject: NonEmptyString,
     textMessage: NonEmptyString,
     htmlMessage: Option[NonEmptyString]
-  )(using Transaction[F]): F[Result[EmailId]]
+  )(using Transaction[F], SuperUserAccess): F[Result[EmailId]]
 }
 
 object EmailService {
@@ -57,7 +58,7 @@ object EmailService {
         subject: NonEmptyString,
         textMessage: NonEmptyString,
         htmlMessage: Option[NonEmptyString]
-      )(using Transaction[F]): F[Result[EmailId]] = {
+      )(using Transaction[F], SuperUserAccess): F[Result[EmailId]] = {
 
         def insertEmail(emailId: EmailId): F[Result[Unit]] = {
           val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)
