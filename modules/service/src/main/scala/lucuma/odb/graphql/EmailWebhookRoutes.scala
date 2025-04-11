@@ -21,6 +21,7 @@ import scodec.bits.ByteVector
 
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import lucuma.odb.service.Services
 
 object EmailWebhookRoutes {
 
@@ -95,7 +96,8 @@ object EmailWebhookRoutes {
     import dsl.*
 
     def updateStatus(data: EventData): F[Unit] =
-      webhookService.updateStatus(data.messageId, data.emailStatus, data.timestamp)
+      Services.asSuperUser:
+        webhookService.updateStatus(data.messageId, data.emailStatus, data.timestamp)
 
     def validateSignature(event: WebhookEvent): F[Unit] =
       if (event.signature.isValid(emailConfig.webhookSigningKey)) Async[F].unit
