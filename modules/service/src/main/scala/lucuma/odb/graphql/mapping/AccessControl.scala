@@ -463,17 +463,18 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
     // Compute our ObservationPropertiesInput.Create and set/verify the science band
     def props(pid: Program.Id): F[Result[ObservationPropertiesInput.Create]] =
-      val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
-      props.scienceBand match
-        case None =>
-          allocationService
-            .selectScienceBands(pid)
-            .map(_.toList)
-            .map:
-              case List(b) => Result(props.copy(scienceBand = Some(b)))
-              case _       => Result(props)
-        case Some(band) =>
-          allocationService.validateBand(band, List(pid)).map(_.as(props))
+      Services.asSuperUser:
+        val props = input.SET.getOrElse(ObservationPropertiesInput.Create.Default)
+        props.scienceBand match
+          case None =>
+            allocationService
+              .selectScienceBands(pid)
+              .map(_.toList)
+              .map:
+                case List(b) => Result(props.copy(scienceBand = Some(b)))
+                case _       => Result(props)
+          case Some(band) =>
+            allocationService.validateBand(band, List(pid)).map(_.as(props))
 
     // Put it together
     ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))

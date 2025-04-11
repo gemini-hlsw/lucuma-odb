@@ -393,7 +393,10 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-              SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
+              SET.scienceBand.toOption.fold(ResultT.unit): band => 
+                ResultT:
+                  Services.asSuperUser:
+                    allocationService.validateBand(band, pids)
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
