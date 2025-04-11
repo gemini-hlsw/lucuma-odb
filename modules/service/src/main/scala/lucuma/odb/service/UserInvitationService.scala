@@ -79,8 +79,9 @@ object UserInvitationService:
         )
 
         // A different message could be sent for html clients
-        emailService(emailConfig, httpClient)
-          .send(pid, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
+        Services.asSuperUser:
+          emailService(emailConfig, httpClient)
+            .send(pid, emailConfig.invitationFrom, input.recipientEmail, subject, textMessage, none)
       }
 
       def updateEmailId(invitationId: UserInvitation.Id, emailId: EmailId): F[Result[Unit]] =
