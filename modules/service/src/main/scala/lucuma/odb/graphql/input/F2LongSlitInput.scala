@@ -65,9 +65,9 @@ object F2LongSlitInput {
           F2FilterBinding.Option("filter", rFilter),
           F2FpuBinding("fpu", rFpu),
           F2ReadModeBinding.Option("explicitReadMode", rReadMode),
-          F2DeckerBinding.Option("decker", rDecker),
-          F2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
-          F2ReadsBinding.Option("reads", rReads),
+          F2ReadsBinding.Option("explicitReads", rReads),
+          F2DeckerBinding.Option("explicitDecker", rDecker),
+          F2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode)
         ) => (
           rDisperser,
           rFilter,

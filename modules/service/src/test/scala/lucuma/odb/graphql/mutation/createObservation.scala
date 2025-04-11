@@ -1199,9 +1199,9 @@ class createObservation extends OdbSuite {
                 filter: Y
                 fpu: ${fpu.tag.toScreamingSnakeCase}
                 explicitReadMode: ${explicitReadMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
-                decker: ${explicitDecker.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
-                readoutMode: ${explicitReadoutMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
-                reads: ${explicitReads.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitDecker: ${explicitDecker.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitReadoutMode: ${explicitReadoutMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitReads: ${explicitReads.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
               }
             }
           }

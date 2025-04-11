@@ -7036,20 +7036,20 @@ input Flamingos2LongSlitInput {
   explicitReadMode: Flamingos2ReadMode
 
   """
+  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReads: Flamingos2Reads
+
+  """
   The decker field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  decker: Flamingos2Decker
+  explicitDecker: Flamingos2Decker
 
   """
   The readoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  readoutMode: Flamingos2ReadoutMode
+  explicitReadoutMode: Flamingos2ReadoutMode
 
-  """
-  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  # Change to explicitReads
-  reads: Flamingos2Reads
 }
 
 """
