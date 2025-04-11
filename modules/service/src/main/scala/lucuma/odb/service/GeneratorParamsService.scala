@@ -214,8 +214,8 @@ object GeneratorParamsService {
       private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
         NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
           .fold(params.pure)(attIds =>
-            attachmentMetadataService.getUpdatedAt(attIds).map(map =>
-              params.map(p =>
+            Services.asSuperUser(attachmentMetadataService.getUpdatedAt(attIds)).map(map =>
+              params.map(p =>  
                 val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
                 aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
               )
