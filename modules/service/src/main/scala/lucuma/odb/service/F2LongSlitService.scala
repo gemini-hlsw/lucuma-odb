@@ -51,48 +51,6 @@ trait F2LongSlitService[F[_]] {
     which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
-
-  // def insertSouth(
-  //   input: GmosLongSlitInput.Create.South
-  // )(
-  //   which: List[Observation.Id],
-  //   xa:    Transaction[F]
-  // ): F[Unit]
-  //
-  // def deleteNorth(
-  //   which: List[Observation.Id],
-  //   xa:    Transaction[F]
-  // ): F[Unit]
-  //
-  // def deleteSouth(
-  //   which: List[Observation.Id],
-  //   xa:    Transaction[F]
-  // ): F[Unit]
-  //
-  // def updateNorth(
-  //   SET:   GmosLongSlitInput.Edit.North
-  // )(
-  //   which: List[Observation.Id],
-  //   xa:    Transaction[F]
-  // ): F[Unit]
-  //
-  // def updateSouth(
-  //   SET: GmosLongSlitInput.Edit.South
-  // )(
-  //   which: List[Observation.Id],
-  //   xa:    Transaction[F]
-  // ): F[Unit]
-  //
-  // def cloneNorth(
-  //   originalId: Observation.Id,
-  //   newId: Observation.Id,
-  // ): F[Unit]
-  //
-  // def cloneSouth(
-  //   originalId: Observation.Id,
-  //   newId: Observation.Id,
-  // ): F[Unit]
-
 }
 
 object F2LongSlitService {
@@ -100,36 +58,6 @@ object F2LongSlitService {
   def instantiate[F[_]: Concurrent](using Services[F]): F2LongSlitService[F] =
 
     new F2LongSlitService[F] {
-
-      val common: Decoder[GmosLongSlitInput.Create.Common] =
-        (wavelength_pm          ~
-         gmos_x_binning.opt     ~
-         gmos_y_binning.opt     ~
-         gmos_amp_read_mode.opt ~
-         gmos_amp_gain.opt      ~
-         gmos_roi.opt           ~
-         text.opt               ~
-         text.opt
-        ).emap { case (((((((w, x), y), arm), ag), roi), owd), osd) =>
-          for {
-            wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
-            spatialDithers    <- osd.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as a spatial offsets list."))
-          } yield GmosLongSlitInput.Create.Common(w, x, y, arm, ag, roi, wavelengthDithers, spatialDithers)
-        }
-
-      val north: Decoder[GmosLongSlitInput.Create.North] =
-        (gmos_north_grating     *:
-         gmos_north_filter.opt  *:
-         gmos_north_fpu         *:
-         common
-        ).to[GmosLongSlitInput.Create.North]
-
-      val south: Decoder[GmosLongSlitInput.Create.South] =
-        (gmos_south_grating     *:
-         gmos_south_filter.opt  *:
-         gmos_south_fpu         *:
-         common
-        ).to[GmosLongSlitInput.Create.South]
 
       val f2LS: Decoder[F2LongSlitInput.Create] =
         (f2_disperser        *:
@@ -161,66 +89,13 @@ object F2LongSlitService {
         select(which, Statements.selectF2LongSlit, f2LS)
           .map(_.map { case (oid, f2) => (oid, f2.toObservingMode) }.toMap)
 
-      private def exec(af: AppliedFragment): F[Unit] =
-        session.prepareR(af.fragment.command).use { pq =>
-          pq.execute(af.argument).void
-        }
-
       override def insert(
         input: F2LongSlitInput.Create,
       )(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        which.traverse { oid => exec(Statements.insertF2LongSlit(oid, input)) }.void
-
-      // override def insertSouth(
-      //   input: GmosLongSlitInput.Create.South,
-      // )(
-      //   which: List[Observation.Id],
-      //   xa:    Transaction[F]
-      // ): F[Unit] =
-      //   which.traverse { oid => exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
-      //
-      // override def deleteNorth(
-      //   which: List[Observation.Id],
-      //   xa:    Transaction[F]
-      // ): F[Unit] =
-      //   Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(exec)
-      //
-      // override def deleteSouth(
-      //   which: List[Observation.Id],
-      //   xa:    Transaction[F]
-      // ): F[Unit] =
-      //   Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(exec)
-      //
-      // override def updateNorth(
-      //   SET:   GmosLongSlitInput.Edit.North
-      // )(
-      //   which: List[Observation.Id],
-      //   xa:    Transaction[F]
-      // ): F[Unit] =
-      //   Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
-      //
-      // override def updateSouth(
-      //   SET: GmosLongSlitInput.Edit.South
-      // )(
-      //   which: List[Observation.Id],
-      //   xa:    Transaction[F]
-      // ): F[Unit] =
-      //   Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
-
-      def cloneNorth(
-        originalId: Observation.Id,
-        newId: Observation.Id,
-      ): F[Unit] =
-        exec(Statements.cloneGmosNorthLongSlit(originalId, newId))
-
-      def cloneSouth(
-        originalId: Observation.Id,
-        newId: Observation.Id,
-      ): F[Unit] =
-        exec(Statements.cloneGmosSouthLongSlit(originalId, newId))
+        which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
 
     }
 

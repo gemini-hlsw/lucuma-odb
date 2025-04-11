@@ -156,18 +156,13 @@ object GmosLongSlitService {
         select(which, Statements.selectGmosSouthLongSlit, south)
           .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
 
-      private def exec(af: AppliedFragment): F[Unit] =
-        session.prepareR(af.fragment.command).use { pq =>
-          pq.execute(af.argument).void
-        }
-
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
       )(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        which.traverse { oid => exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void
+        which.traverse { oid => session.exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void
 
       override def insertSouth(
         input: GmosLongSlitInput.Create.South,
@@ -175,19 +170,19 @@ object GmosLongSlitService {
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        which.traverse { oid => exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
+        which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
 
       override def deleteNorth(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(exec)
+        Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       override def deleteSouth(
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(exec)
+        Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       override def updateNorth(
         SET:   GmosLongSlitInput.Edit.North
@@ -195,7 +190,7 @@ object GmosLongSlitService {
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
+        Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
 
       override def updateSouth(
         SET: GmosLongSlitInput.Edit.South
@@ -203,19 +198,19 @@ object GmosLongSlitService {
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(exec)
+        Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
 
       def cloneNorth(
         originalId: Observation.Id,
         newId: Observation.Id,
       ): F[Unit] =
-        exec(Statements.cloneGmosNorthLongSlit(originalId, newId))
+        session.exec(Statements.cloneGmosNorthLongSlit(originalId, newId))
 
       def cloneSouth(
         originalId: Observation.Id,
         newId: Observation.Id,
       ): F[Unit] =
-        exec(Statements.cloneGmosSouthLongSlit(originalId, newId))
+        session.exec(Statements.cloneGmosSouthLongSlit(originalId, newId))
 
     }
 
