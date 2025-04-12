@@ -39,6 +39,14 @@ pull_request_rules:
       add:
       - calibrations
       remove: []
+- name: Label obscalc PRs
+  conditions:
+  - files~=^modules/obscalc/
+  actions:
+    label:
+      add:
+      - obscalc
+      remove: []
 - name: Label phase0 PRs
   conditions:
   - files~=^modules/phase0/
