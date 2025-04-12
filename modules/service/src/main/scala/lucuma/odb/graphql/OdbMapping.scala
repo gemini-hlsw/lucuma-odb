@@ -26,6 +26,7 @@ import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
+import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
@@ -47,6 +48,7 @@ object OdbMapping {
   case class Topics[F[_]](
     program:              Topic[F, ProgramTopic.Element],
     observation:          Topic[F, ObservationTopic.Element],
+    obscalc:              Topic[F, ObscalcTopic.Element],
     target:               Topic[F, TargetTopic.Element],
     group:                Topic[F, GroupTopic.Element],
     configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
@@ -61,12 +63,13 @@ object OdbMapping {
         ses <- pool
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
+        oc  <- Resource.eval(ObscalcTopic(ses, 1024, sup))
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
         exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
         dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar, grp, cr, exe, dst)
+      } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.

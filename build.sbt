@@ -189,6 +189,16 @@ lazy val service = project
     reStartArgs += "serve"
   )
 
+lazy val obscalc = project
+  .in(file("modules/obscalc"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "obscalc-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082"
+  )
+
 lazy val calibrations = project
   .in(file("modules/calibrations"))
   .dependsOn(service)
