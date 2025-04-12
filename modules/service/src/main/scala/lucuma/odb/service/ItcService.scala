@@ -39,6 +39,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
@@ -118,8 +119,14 @@ sealed trait ItcService[F[_]] {
 
 object ItcService {
 
+  enum ErrorTag(val tag: String) derives Enumerated:
+    case ObservationDefinitionError extends ErrorTag("observationDefinitionError")
+    case RemoteServiceErrors        extends ErrorTag("removeServiceErrors")
+    case TargetMismatch             extends ErrorTag("targetMismatch")
+
   sealed trait Error:
     def format: String
+    def tag: ErrorTag
 
   object Error:
     case class ObservationDefinitionError(error: GeneratorParamsService.Error) extends Error:
@@ -129,6 +136,19 @@ object ItcService {
             s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
           case _                                           =>
             error.format
+      def tag: ErrorTag = ErrorTag.ObservationDefinitionError
+
+    object ObservationDefinitionError:
+      given io.circe.Decoder[ObservationDefinitionError] =
+        io.circe.Decoder.instance: c =>
+          c.downField("error").as[GeneratorParamsService.Error].map(ObservationDefinitionError.apply)
+
+      given io.circe.Encoder[ObservationDefinitionError] =
+        io.circe.Encoder.instance: a =>
+          Json.obj(
+            "tag"   -> a.tag.tag.asJson,
+            "error" -> a.error.asJson
+          )
 
     case class RemoteServiceErrors(
       problems: NonEmptyList[(Option[Target.Id], String)]
@@ -139,10 +159,64 @@ object ItcService {
           case (Some(tid), msg) => s"Target '$tid': $msg"
         }
         s"ITC returned errors: ${ps.intercalate(", ")}"
+      def tag: ErrorTag = ErrorTag.RemoteServiceErrors
+
+    object RemoteServiceErrors:
+      given io.circe.Decoder[RemoteServiceErrors] =
+        io.circe.Decoder.instance: c =>
+          c.downField("problems")
+           .values
+           .toList
+           .flatMap(_.toList)
+           .traverse: json =>
+             val c = json.hcursor
+             for
+               t <- c.downField("targetId").as[Option[Target.Id]]
+               m <- c.downField("message").as[String]
+             yield (t, m)
+           .flatMap:
+             case Nil     => DecodingFailure("Empty problem list", c.history).asLeft
+             case p :: ps => RemoteServiceErrors(NonEmptyList(p, ps)).asRight
+
+      given io.circe.Encoder[RemoteServiceErrors] =
+        io.circe.Encoder.instance: a =>
+          Json.obj(
+            "tag"      -> a.tag.tag.asJson,
+            "problems" ->
+              a.problems
+               .toList
+               .map: p =>
+                 p._1.fold(Json.obj("message" -> p._2.asJson)): targetId =>
+                   Json.obj("targetId" -> targetId.asJson, "message" -> p._2.asJson)
+               .asJson
+          )
 
     case object TargetMismatch extends Error:
       def format: String =
         s"ITC provided conflicting results"
+      def tag: ErrorTag = ErrorTag.TargetMismatch
+
+      given io.circe.Decoder[TargetMismatch.type] =
+        io.circe.Decoder.instance(Function.const(TargetMismatch.asRight))
+
+      given io.circe.Encoder[TargetMismatch.type] =
+        io.circe.Encoder.instance: a =>
+          Json.obj("tag" -> a.tag.tag.asJson)
+
+    given io.circe.Decoder[Error] =
+      io.circe.Decoder.instance: c =>
+        c.downField("tag").as[String].flatMap: s =>
+          Enumerated[ErrorTag].fromTag(s).fold(DecodingFailure(s"Unknown error tag: $s", c.history).asLeft):
+            case ErrorTag.ObservationDefinitionError => c.as[ObservationDefinitionError]
+            case ErrorTag.RemoteServiceErrors        => c.as[RemoteServiceErrors]
+            case ErrorTag.TargetMismatch             => c.as[TargetMismatch.type]
+
+    given io.circe.Encoder[Error] =
+      io.circe.Encoder.instance:
+        case a: ObservationDefinitionError => a.asJson
+        case a: RemoteServiceErrors        => a.asJson
+        case TargetMismatch                => TargetMismatch.asJson
+
   end Error
 
   case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoiseAt]) {
@@ -216,6 +290,23 @@ object ItcService {
         } yield result
       }
   }
+
+  opaque type Result = Either[Error, AsterismResults]
+
+  object Result:
+    def apply(e: Either[Error, AsterismResults]): Result =
+      e
+
+    given Decoder[Result] =
+      Decoder.decodeEither[Error, AsterismResults]("error", "asterismResults")
+
+    given Encoder[Result] =
+      Encoder.encodeEither[Error, AsterismResults]("error", "asterismResults")
+
+  extension (r: Result)
+    def toEither: Either[Error, AsterismResults] =
+      r
+
 
   def pollVersionsForever[F[_]: Async: Logger](
     client:     Resource[F, ItcClient[F]],
