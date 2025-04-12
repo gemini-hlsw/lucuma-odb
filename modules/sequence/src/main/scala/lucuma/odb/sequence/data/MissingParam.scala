@@ -5,6 +5,10 @@ package lucuma.odb.sequence.data
 
 import cats.Eq
 import cats.syntax.eq.*
+import io.circe.Decoder
+import io.circe.Encoder
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.model.Target
 
 /**
@@ -34,3 +38,15 @@ object MissingParam:
 
   def forTarget(targetId: Target.Id, param: String): MissingParam =
     MissingTargetParam(targetId, param)
+
+  given Decoder[MissingParam] =
+    Decoder.instance: c =>
+      for
+        n <- c.downField("name").as[String]
+        t <- c.downField("targetId").as[Option[Target.Id]]
+      yield t.fold(MissingObservationParam(n))(MissingTargetParam(_, n))
+
+  given Encoder[MissingParam] =
+    Encoder.instance:
+      case MissingObservationParam(n) => Json.obj("name" -> n.asJson)
+      case MissingTargetParam(t, n)   => Json.obj("targetId" -> t.asJson, "name" -> n.asJson)

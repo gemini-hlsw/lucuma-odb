@@ -53,6 +53,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.Obscalc
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
@@ -334,6 +335,9 @@ trait Codecs {
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
+
+  val obscalc_state: Codec[Obscalc.State] =
+    enumerated(Type("e_obscalc_state"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]

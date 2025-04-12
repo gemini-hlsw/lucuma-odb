@@ -5,8 +5,14 @@ package lucuma.odb.sequence.data
 
 import cats.Eq
 import cats.data.NonEmptyList
+import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
+import io.circe.Decoder
+import io.circe.DecodingFailure
+import io.circe.Encoder
+import io.circe.syntax.*
 import lucuma.core.model.Target
 import lucuma.odb.sequence.util.HashBytes
 
@@ -57,3 +63,13 @@ object MissingParamSet:
   given HashBytes[MissingParamSet] with
     def hashBytes(a: MissingParamSet): Array[Byte] =
       Array.emptyByteArray
+
+  given Decoder[MissingParamSet] =
+    Decoder.instance: c =>
+      c.values.toList.flatMap(_.toList).traverse(_.as[MissingParam]).flatMap:
+        case Nil     => DecodingFailure("Empty MissingParamSet", c.history).asLeft
+        case p :: ps => MissingParamSet.fromParams(NonEmptyList(p, ps)).asRight
+
+  given Encoder[MissingParamSet] =
+    Encoder.instance: a =>
+      a.toList.map(_.asJson).asJson
