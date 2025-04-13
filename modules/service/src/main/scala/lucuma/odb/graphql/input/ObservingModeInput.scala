@@ -72,8 +72,8 @@ object ObservingModeInput {
           (rGmosNorthLongSlit, rGmosSouthLongSlit, rFlamingos2LongSlit).parTupled.flatMap {
             case (gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit) =>
               oneOrFail(
-                gmosNorthLongSlit -> "gmosNorthLongSlit",
-                gmosSouthLongSlit -> "gmosSouthLongSlit",
+                gmosNorthLongSlit  -> "gmosNorthLongSlit",
+                gmosSouthLongSlit  -> "gmosSouthLongSlit",
                 flamingos2LongSlit -> "flamingos2LongSlit"
               ).as(Edit(gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit))
           }

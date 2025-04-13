@@ -25,10 +25,10 @@ object F2LongSlitInput {
     disperser: F2Disperser,
     filter: Option[F2Filter],
     fpu: F2Fpu,
-    explicitReadMode: Option[F2ReadMode]             = None,
-    explicitDecker: Option[F2Decker]                 = None,
-    explicitReadoutMode: Option[F2ReadoutMode]       = None,
-    explicitReads: Option[F2Reads]                   = None,
+    explicitReadMode: Option[F2ReadMode]       = None,
+    explicitReads: Option[F2Reads]             = None,
+    explicitDecker: Option[F2Decker]           = None,
+    explicitReadoutMode: Option[F2ReadoutMode] = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -44,7 +44,7 @@ object F2LongSlitInput {
         explicitReadMode,
         explicitReads,
         explicitDecker,
-        explicitReadoutMode,
+        explicitReadoutMode
       )
 
   }
@@ -75,7 +75,7 @@ object F2LongSlitInput {
           rReadMode,
           rDecker,
           rReadoutMode,
-          rReads,
+          rReads
         ).parTupled
       }
 
@@ -95,9 +95,9 @@ object F2LongSlitInput {
           filter,
           fpu,
           explicitReadMode,
+          explicitReads,
           explicitDecker,
-          explicitReadoutMode,
-          explicitReads
+          explicitReadoutMode
         ))
       }
 
@@ -108,9 +108,9 @@ object F2LongSlitInput {
     filter: Nullable[F2Filter],
     fpu: Option[F2Fpu],
     explicitReadMode: Nullable[F2ReadMode],
-    explicitDecker: Nullable[F2Decker],
-    explicitReadoutMode: Nullable[F2ReadoutMode],
     explicitReads: Nullable[F2Reads],
+    explicitDecker: Nullable[F2Decker],
+    explicitReadoutMode: Nullable[F2ReadoutMode]
   ) {
 
     val observingModeType: ObservingModeType =
@@ -130,7 +130,7 @@ object F2LongSlitInput {
         g,
         filter.toOption,
         u,
-        explicitReadMode.toOption,
+        explicitReadMode.toOption
       )
   }
 
@@ -141,9 +141,9 @@ object F2LongSlitInput {
       Nullable[F2Filter],
       Option[F2Fpu],
       Nullable[F2ReadMode],
-      Nullable[F2Decker],
-      Nullable[F2ReadoutMode],
       Nullable[F2Reads],
+      Nullable[F2Decker],
+      Nullable[F2ReadoutMode]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -151,17 +151,17 @@ object F2LongSlitInput {
           F2FilterBinding.Nullable("filter", rFilter),
           F2FpuBinding.Option("fpu", rFpu),
           F2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
-          F2DeckerBinding.Nullable("decker", rDecker),
-          F2ReadoutModeBinding.Nullable("readoutMode", rReadoutMode),
-          F2ReadsBinding.Nullable("reads", rReads),
+          F2ReadsBinding.Nullable("expliciReads", rReads),
+          F2DeckerBinding.Nullable("explicitDecker", rDecker),
+          F2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode)
         ) => (
           rDisperser,
           rFilter,
           rFpu,
           rReadMode,
-          rDecker,
-          rReadoutMode,
           rReads,
+          rDecker,
+          rReadoutMode
         ).parTupled
       }
 
@@ -172,18 +172,18 @@ object F2LongSlitInput {
           filter,
           fpu,
           explicitReadMode,
-          explicitDecker,
-          explicitReadoutMode,
           explicitReads,
+          explicitDecker,
+          explicitReadoutMode
           ) =>
           Result(Edit(
             grating,
             filter,
             fpu,
             explicitReadMode,
-            explicitDecker,
-            explicitReadoutMode,
             explicitReads,
+            explicitDecker,
+            explicitReadoutMode
           ))
       }
 
