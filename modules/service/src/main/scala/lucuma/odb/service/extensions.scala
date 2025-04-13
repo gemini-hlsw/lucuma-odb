@@ -4,11 +4,11 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.functor.*
 import lucuma.core.enums.Band
 import lucuma.core.model.SourceProfile
 import skunk.*
 import skunk.data.Completion
-import cats.syntax.functor.*
 
 extension [F[_]: MonadCancelThrow](s: Session[F])
   def executeCommand(af: AppliedFragment): F[Completion] =

@@ -13,6 +13,7 @@ import skunk.AppliedFragment
 import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
+
 import Services.Syntax.*
 
 trait TimingWindowService[F[_]] {
