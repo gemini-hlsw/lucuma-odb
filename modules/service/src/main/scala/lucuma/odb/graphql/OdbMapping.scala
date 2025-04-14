@@ -157,6 +157,7 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
+          with F2LongSlitMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
@@ -368,6 +369,7 @@ object OdbMapping {
                 ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
+                F2LongSlitMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
                 GmosSouthLongSlitMapping,
