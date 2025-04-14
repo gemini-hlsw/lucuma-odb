@@ -4,13 +4,17 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.functor.*
 import lucuma.core.enums.Band
 import lucuma.core.model.SourceProfile
 import skunk.*
 import skunk.data.Completion
 
-extension [F[_]: MonadCancelThrow](s: Session[F]) def executeCommand(af: AppliedFragment): F[Completion] =
-  s.prepareR(af.fragment.command).use(_.execute(af.argument))
+extension [F[_]: MonadCancelThrow](s: Session[F])
+  def executeCommand(af: AppliedFragment): F[Completion] =
+    s.prepareR(af.fragment.command).use(_.execute(af.argument))
+
+  def exec(af: AppliedFragment): F[Unit] = executeCommand(af).void
 
 private val gaiaBands: Set[Band] =
   Set(Band.Gaia, Band.GaiaBP, Band.GaiaRP)

@@ -12,26 +12,8 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
-import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.GmosSouthFpu
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.Partner
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.ScienceMode
-import lucuma.core.enums.Site
-import lucuma.core.enums.SpectroscopyCapabilities
-import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ImageQuality
@@ -41,6 +23,7 @@ import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
@@ -332,35 +315,6 @@ class createObservation extends OdbSuite {
       }
     }
   }
-
-  // test("[general] created observation should have specified status") {
-  //   createProgramAs(pi).flatMap { pid =>
-  //     query(pi,
-  //       s"""
-  //         mutation {
-  //           createObservation(input: {
-  //             programId: ${pid.asJson}
-  //             SET: {
-  //               status: FOR_REVIEW
-  //             }
-  //           }) {
-  //             observation {
-  //               status
-  //             }
-  //           }
-  //         }
-  //         """).flatMap { js =>
-  //       val get = js.hcursor
-  //         .downField("createObservation")
-  //         .downField("observation")
-  //         .downField("status")
-  //         .as[ObsStatus]
-  //         .leftMap(f => new RuntimeException(f.message))
-  //         .liftTo[IO]
-  //       assertIO(get, ObsStatus.ForReview)
-  //     }
-  //   }
-  // }
 
   test("[general] created observation may have no science band") {
     createProgramAs(pi).flatMap { pid =>
@@ -936,7 +890,7 @@ class createObservation extends OdbSuite {
       case Site.GS => "South"
     }
 
-  private def createObsWithObservingMode(
+  private def createObsWithGmosObservingMode(
     pid:      Program.Id,
     site:     Site,
     grating:  String,
@@ -998,7 +952,7 @@ class createObservation extends OdbSuite {
 
   test("[general] specify gmos north long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301")).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
         assertIO(
@@ -1059,7 +1013,7 @@ class createObservation extends OdbSuite {
           }
         """.stripMargin
       ).flatMap { tid =>
-        query(pi, createObsWithObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, asterism = List(tid))).flatMap { js =>
+        query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, asterism = List(tid))).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
           assertIO(
@@ -1101,7 +1055,7 @@ class createObservation extends OdbSuite {
 
   test("[general] specify gmos south long slit observing mode at observation creation") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi, createObsWithObservingMode(pid, Site.GS, "B1200_G5321")).flatMap { js =>
+      query(pi, createObsWithGmosObservingMode(pid, Site.GS, "B1200_G5321")).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosSouthLongSlit")
 
         assertIO(
@@ -1134,6 +1088,275 @@ class createObservation extends OdbSuite {
            Some(GmosSouthFilter.GPrime),
            GmosSouthFpu.LongSlit_0_25,
            234.56
+          )
+        )
+
+      }
+    }
+  }
+
+  private def createObsWithF2ObservingMode(
+    pid:      Program.Id,
+    grating:  String,
+    fpu:      String = "LONG_SLIT_2",
+    iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
+    asterism: List[Target.Id] = Nil
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            constraintSet: {
+              imageQuality: ${iq.tag.toUpperCase}
+            }
+            observingMode: {
+              flamingos2LongSlit: {
+                disperser: $grating
+                filter: Y
+                fpu: $fpu
+              }
+            }
+            targetEnvironment: {
+              asterism: [ ${asterism.map(_.asJson).mkString(", ")} ]
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              flamingos2LongSlit {
+                disperser
+                filter
+                fpu
+                readMode
+                defaultReadMode
+                explicitReadMode
+                defaultReads
+                explicitReads
+                reads
+                decker
+                readoutMode
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[general] specify f2 long slit observing mode at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, createObsWithF2ObservingMode(pid, "R1200_HK")).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+
+        assertIO(
+          (longSlit.downIO[F2Disperser]("disperser"),
+           longSlit.downIO[Option[F2Filter]]("filter"),
+           longSlit.downIO[F2Fpu]("fpu"),
+           longSlit.downIO[F2ReadMode]("readMode"),
+           longSlit.downIO[F2ReadMode]("defaultReadMode"),
+           longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
+           longSlit.downIO[F2Reads]("defaultReads"),
+           longSlit.downIO[Option[F2Reads]]("explicitReads"),
+           longSlit.downIO[F2Reads]("reads"),
+           longSlit.downIO[Option[F2Decker]]("decker"),
+           longSlit.downIO[Option[F2Decker]]("readoutMode")
+          ).tupled,
+          (F2Disperser.R1200HK,
+           Some(F2Filter.Y),
+           F2Fpu.LongSlit2,
+           F2ReadMode.Faint,
+           F2ReadMode.Faint, // default read mode is faint
+           None,
+           F2Reads.Reads_8,  // faint reamd mode default reads to 8
+           None,
+           F2Reads.Reads_8,
+           None,
+           None
+          )
+        )
+
+      }
+    }
+  }
+
+  private def createObsWithF2ObservingModeAllParams(
+    pid:                 Program.Id,
+    disperser:           F2Disperser,
+    fpu:                 F2Fpu,
+    explicitReadMode:    Option[F2ReadMode],
+    explicitDecker:      Option[F2Decker],
+    explicitReadoutMode: Option[F2ReadoutMode],
+    explicitReads:       Option[F2Reads]
+  ): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                disperser: ${disperser.tag.toScreamingSnakeCase}
+                filter: Y
+                fpu: ${fpu.tag.toScreamingSnakeCase}
+                explicitReadMode: ${explicitReadMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitDecker: ${explicitDecker.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitReadoutMode: ${explicitReadoutMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                explicitReads: ${explicitReads.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              flamingos2LongSlit {
+                disperser
+                filter
+                fpu
+                readMode
+                defaultReadMode
+                explicitReadMode
+                decker
+                readoutMode
+                defaultReads
+                explicitReads
+                reads
+                decker
+                readoutMode
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[general] specify f2 long slit observing mode at observation creation with explicit read mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithF2ObservingModeAllParams(
+          pid,
+          F2Disperser.R1200HK,
+          F2Fpu.LongSlit2,
+          explicitReadMode = Some(F2ReadMode.Bright),
+          explicitReads = None,
+          explicitDecker = Some(F2Decker.LongSlit),
+          explicitReadoutMode = Some(F2ReadoutMode.Engineering)
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+
+          assertIO((
+            longSlit.downIO[F2Disperser]("disperser"),
+            longSlit.downIO[Option[F2Filter]]("filter"),
+            longSlit.downIO[F2Fpu]("fpu"),
+            longSlit.downIO[F2ReadMode]("readMode"),
+            longSlit.downIO[F2ReadMode]("defaultReadMode"),
+            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[F2Reads]("defaultReads"),
+            longSlit.downIO[Option[F2Reads]]("explicitReads"),
+            longSlit.downIO[F2Reads]("reads"),
+            longSlit.downIO[Option[F2Decker]]("decker"),
+            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+          ).tupled, (
+            F2Disperser.R1200HK,
+            Some(F2Filter.Y),
+            F2Fpu.LongSlit2,
+            F2ReadMode.Bright,              // Explicitly set read mode
+            F2ReadMode.Faint,
+            Some(F2ReadMode.Bright),        // Explicitly set read mode
+            F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
+            None,                           // Explicit reads is Empty
+            F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
+            Some(F2Decker.LongSlit),        // Explicitly set
+            Some(F2ReadoutMode.Engineering) // Explicitly set
+          )
+        )
+
+      }
+    }
+  }
+
+  test("[general] specify f2 long slit observing mode at observation creation with explicit reads") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithF2ObservingModeAllParams(
+          pid,
+          F2Disperser.R1200HK,
+          F2Fpu.LongSlit2,
+          explicitReadMode = None,
+          explicitReads = Some(F2Reads.Reads_4),
+          explicitDecker = None,
+          explicitReadoutMode = None
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+
+          assertIO((
+            longSlit.downIO[F2Disperser]("disperser"),
+            longSlit.downIO[Option[F2Filter]]("filter"),
+            longSlit.downIO[F2Fpu]("fpu"),
+            longSlit.downIO[F2ReadMode]("readMode"),
+            longSlit.downIO[F2ReadMode]("defaultReadMode"),
+            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[F2Reads]("defaultReads"),
+            longSlit.downIO[Option[F2Reads]]("explicitReads"),
+            longSlit.downIO[F2Reads]("reads"),
+            longSlit.downIO[Option[F2Decker]]("decker"),
+            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+          ).tupled, (
+            F2Disperser.R1200HK,
+            Some(F2Filter.Y),
+            F2Fpu.LongSlit2,
+            F2ReadMode.Faint,
+            F2ReadMode.Faint,
+            None,
+            F2Reads.Reads_8,                // Default reads is 8 for faint read mode
+            Some(F2Reads.Reads_4),          // Explicit reads set to 4
+            F2Reads.Reads_4,                // Default reads is 1 as por bright read mode
+            None,
+            None
+          )
+        )
+
+      }
+    }
+  }
+
+  test("[general] specify f2 long slit observing mode at observation creation with explicit read mode and reads") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithF2ObservingModeAllParams(
+          pid,
+          F2Disperser.R1200HK,
+          F2Fpu.LongSlit2,
+          explicitReadMode = Some(F2ReadMode.Medium),
+          explicitReads = Some(F2Reads.Reads_16),
+          explicitDecker = None,
+          explicitReadoutMode = None
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+
+          assertIO((
+            longSlit.downIO[F2Disperser]("disperser"),
+            longSlit.downIO[Option[F2Filter]]("filter"),
+            longSlit.downIO[F2Fpu]("fpu"),
+            longSlit.downIO[F2ReadMode]("readMode"),
+            longSlit.downIO[F2ReadMode]("defaultReadMode"),
+            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[F2Reads]("defaultReads"),
+            longSlit.downIO[Option[F2Reads]]("explicitReads"),
+            longSlit.downIO[F2Reads]("reads"),
+            longSlit.downIO[Option[F2Decker]]("decker"),
+            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+          ).tupled, (
+            F2Disperser.R1200HK,
+            Some(F2Filter.Y),
+            F2Fpu.LongSlit2,
+            F2ReadMode.Medium,       // Read mode use the explicit value
+            F2ReadMode.Faint,
+            Some(F2ReadMode.Medium), // Explicitly set read mode
+            F2Reads.Reads_4,         // Default reads is 4 for faint read mode
+            Some(F2Reads.Reads_16),  // Explicit reads is 16
+            F2Reads.Reads_16,        // reads is 16
+            None,
+            None
           )
         )
 
@@ -1314,7 +1537,7 @@ class createObservation extends OdbSuite {
 
   test("[general] can't create an observation with two observing modes") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit") {
+      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit") {
         query(pi,
           s"""
           mutation {
@@ -1595,7 +1818,7 @@ class createObservation extends OdbSuite {
     } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
   }
 
-  test("[program] insert obs at beginning") {
+  test("[program] insert obs at beginning in a group") {
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)
@@ -1606,7 +1829,7 @@ class createObservation extends OdbSuite {
     } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
   }
 
-  test("[program] insert obs in the middle") {
+  test("[program] insert obs in the middle in a group") {
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)

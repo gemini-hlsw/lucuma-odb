@@ -30,24 +30,20 @@ trait TimingWindowService[F[_]] {
 object TimingWindowService:
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): TimingWindowService[F] =
     new TimingWindowService[F] {
-      private def exec(af: AppliedFragment): F[Unit] =
-        session.prepareR(af.fragment.command).use { pq =>
-          pq.execute(af.argument).void
-        }
 
       override def createFunction(
         timingWindows: List[TimingWindowInput]
       ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         Result( (obsIds, _) =>
-          exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
-            Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(exec)
+          session.exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
+            Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(session.exec)
         )
 
       def cloneTimingWindows(
         originalId: Observation.Id,
         newId: Observation.Id,
       )(using Transaction[F]): F[Unit] =
-        exec(Statements.clone(originalId, newId))
+        session.exec(Statements.clone(originalId, newId))
     }
 
 object Statements {
