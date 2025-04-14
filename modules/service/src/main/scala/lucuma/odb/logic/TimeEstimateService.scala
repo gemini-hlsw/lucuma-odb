@@ -125,7 +125,7 @@ object TimeEstimateService:
                   .callRemote(pid, oid, data.generatorParams)
                   .map:
                     case Left(ItcService.Error.ObservationDefinitionError(GeneratorParamsService.Error.MissingData(p))) =>
-                      p.asLeft[AsterismResults].some
+                      p.format.asLeft[AsterismResults].some
                     case Left(_)   => none
                     case Right(ar) => ar.asRight.some
               )

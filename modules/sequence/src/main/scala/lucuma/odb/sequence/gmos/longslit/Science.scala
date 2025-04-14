@@ -55,7 +55,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
@@ -732,14 +731,14 @@ object Science:
       expander:  SmartGcalExpander[F, D],
       blockDef:  BlockDefinition.Computer[D, G, L, U],
       config:    Config[G, L, U],
-      time:      Either[MissingParamSet, IntegrationTime],
+      time:      Either[String, IntegrationTime],
       calRole:   Option[CalibrationRole]
     ): F[Either[String, SequenceGenerator[D]]] =
 
       def extractTime: Either[String, IntegrationTime] =
         time
           .leftMap: m =>
-             s"GMOS Long Slit requires a valid target: ${m.format}"
+             s"GMOS Long Slit requires a valid target: $m"
           .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit science requires a positive exposure time.")
 
       // Adjust the config and integration time according to the calibration role.
@@ -794,7 +793,7 @@ object Science:
     namespace: UUID,
     expander:  SmartGcalExpander[F, GmosNorth],
     config:    Config.GmosNorth,
-    time:      Either[MissingParamSet, IntegrationTime],
+    time:      Either[String, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosNorth]]] =
     ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
@@ -805,7 +804,7 @@ object Science:
     namespace: UUID,
     expander:  SmartGcalExpander[F, GmosSouth],
     config:    Config.GmosSouth,
-    time:      Either[MissingParamSet, IntegrationTime],
+    time:      Either[String, IntegrationTime],
     calRole:   Option[CalibrationRole]
   ): F[Either[String, SequenceGenerator[GmosSouth]]] =
     ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)

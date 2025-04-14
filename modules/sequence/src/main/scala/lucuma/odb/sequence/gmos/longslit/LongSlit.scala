@@ -17,7 +17,6 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.MissingParamSet
 
 import java.util.UUID
 
@@ -54,8 +53,8 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
-    acquisitionItc: Either[MissingParamSet, IntegrationTime],
-    scienceItc:     Either[MissingParamSet, IntegrationTime],
+    acquisitionItc: Either[String, IntegrationTime],
+    scienceItc:     Either[String, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
@@ -70,8 +69,8 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
-    acquisitionItc: Either[MissingParamSet, IntegrationTime],
-    scienceItc:     Either[MissingParamSet, IntegrationTime],
+    acquisitionItc: Either[String, IntegrationTime],
+    scienceItc:     Either[String, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
