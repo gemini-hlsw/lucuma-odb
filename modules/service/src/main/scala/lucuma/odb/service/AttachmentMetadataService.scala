@@ -12,13 +12,13 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait AttachmentMetadataService [F[_]] {
 

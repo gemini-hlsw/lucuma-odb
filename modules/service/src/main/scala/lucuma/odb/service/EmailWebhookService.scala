@@ -8,11 +8,11 @@ import cats.syntax.all.*
 import lucuma.core.enums.EmailStatus
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EmailId
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Session
 import skunk.implicits.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait EmailWebhookService[F[Unit]] {
   
