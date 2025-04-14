@@ -157,8 +157,4 @@ CREATE OR REPLACE VIEW v_observation AS
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
-  LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id
-  LEFT JOIN t_gmos_north_long_slit  mode_gnls ON o.c_observation_id = mode_gnls.c_observation_id
-  LEFT JOIN t_gmos_south_long_slit  mode_gsls ON o.c_observation_id = mode_gsls.c_observation_id
-  LEFT JOIN t_flamingos_2_long_slit mode_f2ls ON o.c_observation_id = mode_f2ls.c_observation_id;
-
+  LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
