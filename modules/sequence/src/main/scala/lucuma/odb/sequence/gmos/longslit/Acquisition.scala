@@ -45,7 +45,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
-import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
@@ -272,7 +271,7 @@ object Acquisition:
 
   private def instantiate[D, G, L, U](
     stepComp:    StepComputer[D, G, L, U],
-    time:        Either[MissingParamSet, IntegrationTime],
+    time:        Either[String, IntegrationTime],
     calRole:     Option[CalibrationRole],
     atomBuilder: AtomBuilder[D],
     acqFilters:  NonEmptyList[L],
@@ -287,7 +286,7 @@ object Acquisition:
       case _                              =>
         time
           .leftMap: m =>
-             s"GMOS Long Slit acquisition requires a valid target: ${m.format}"
+             s"GMOS Long Slit acquisition requires a valid target: $m"
           .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit acquisition requires a positive exposure time.")
           .map: t =>
              AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
@@ -297,7 +296,7 @@ object Acquisition:
     static:    StaticConfig.GmosNorth,
     namespace: UUID,
     config:    Config.GmosNorth,
-    time:      Either[MissingParamSet, IntegrationTime],
+    time:      Either[String, IntegrationTime],
     calRole:   Option[CalibrationRole],
     lastReset: Option[Timestamp]
   ): Either[String, SequenceGenerator[GmosNorth]] =
@@ -317,7 +316,7 @@ object Acquisition:
     static:    StaticConfig.GmosSouth,
     namespace: UUID,
     config:    Config.GmosSouth,
-    time:      Either[MissingParamSet, IntegrationTime],
+    time:      Either[String, IntegrationTime],
     calRole:   Option[CalibrationRole],
     lastReset: Option[Timestamp]
   ): Either[String, SequenceGenerator[GmosSouth]] =
