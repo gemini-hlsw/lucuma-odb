@@ -15,12 +15,12 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait AllocationService[F[_]] {
 

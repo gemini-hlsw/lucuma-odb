@@ -13,6 +13,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.service.EmailWebhookService
+import lucuma.odb.service.Services
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.dsl.Http4sDsl
@@ -21,7 +22,6 @@ import scodec.bits.ByteVector
 
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import lucuma.odb.service.Services
 
 object EmailWebhookRoutes {
 

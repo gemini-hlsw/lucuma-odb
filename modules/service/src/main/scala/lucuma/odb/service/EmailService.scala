@@ -16,6 +16,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*
@@ -26,7 +27,6 @@ import skunk.Transaction
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 trait EmailService[F[_]] {
   def send(
