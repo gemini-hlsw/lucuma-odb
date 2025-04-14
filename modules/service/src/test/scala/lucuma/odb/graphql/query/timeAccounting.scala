@@ -496,7 +496,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 100)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
     } yield ()
 
@@ -527,7 +527,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
     } yield ()
 
@@ -553,7 +553,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 0, 0, 250)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
     } yield ()
 
@@ -606,7 +606,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       es = events(v)
       _ <- insertEvents(v.pid, es)
       _ <- updateDatasets(staff, DatasetQaState.Fail, v.atoms.last.steps.head.dids)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
     } yield ()
 
@@ -631,7 +631,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, index)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- corrections.traverse_ { c => addTimeChargeCorrection(staff, v.vid, c) }
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, corrections))
     } yield ()
@@ -777,7 +777,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1200)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, observationQuery(v.oid), observationExpectedCharge(expected))
     } yield ()
 
@@ -802,12 +802,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       oid = v0.oid
       es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
       _ <- insertEvents(pid, es0)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
       v1 <- recordVisitForObs(pid, oid, service, mode, t20, 1, 1, 1, 1301)
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(pid, es1)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, observationQuery(oid), observationExpectedCharge(expected))
     } yield ()
@@ -841,12 +841,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       oid = v0.oid
       es0 = events0.map { (c, t) => SequenceEvent(EventId, t, oid, v0.vid, c) }
       _ <- insertEvents(es0)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
       v1 <- recordVisitForObs(pid, oid, service, mode, t2, 1, 1, 1, 1401)
       es1 = events1.map { (c, t) => SequenceEvent(EventId, t, oid, v1.vid, c) }
       _ <- insertEvents(es1)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
       _ <- addTimeChargeCorrection(staff, v1.vid, correction)
 
       _ <- expect(pi, observationQuery(oid), observationExpectedCharge(expected))
@@ -901,7 +901,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v <- recordVisit(pi, service, mode, visitTime, 1, 1, 1, 1500)
       es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, c) }
       _ <- insertEvents(v.pid, es)
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
       _ <- expect(pi, programQuery(v.pid), programExpectedCharge(expected))
     } yield ()
   }
@@ -926,14 +926,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       oid0 = v0.oid
       es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
       _   <- insertEvents(pid, es0)
-      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _   <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
       // Obs1
       oid1 <- createObservationAs(pi, pid, mode.some)
       v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1601)
       es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
       _    <- insertEvents(pid, es1)
-      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _    <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
@@ -964,7 +964,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
       es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
       _   <- insertEvents(pid, es0)
-      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _   <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
       // Obs1
       oid1 <- createObservationAs(pi, pid, mode.some)
@@ -972,7 +972,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1701)
       es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
       _    <- insertEvents(pid, es1)
-      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _    <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
@@ -1011,7 +1011,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
 
       es0  = events0.map { (c, t) => SequenceEvent(EventId, t, oid0, v0.vid, c) }
       _   <- insertEvents(pid, es0)
-      _   <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _   <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
 
       // Obs1
       oid1 <- createObservationAs(pi, pid, mode.some)
@@ -1019,7 +1019,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       v1   <- recordVisitForObs(pid, oid1, service, mode, t20, 1, 1, 1, 1801)
       es1   = events1.map { (c, t) => SequenceEvent(EventId, t, oid1, v1.vid, c) }
       _    <- insertEvents(pid, es1)
-      _    <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _    <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, programQuery(pid), programExpectedCharge(expected))
     } yield ()
@@ -1069,8 +1069,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       e1  = events1.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, c) }
       _  <- insertEvents(v1.pid, e1)
 
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
       _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
@@ -1141,9 +1141,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       e2  = events2.map { (c, t) => SequenceEvent(EventId, t, v2.oid, v2.vid, c) }
       _  <- insertEvents(v2.pid, e2)
 
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v2.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v2.vid)(using xa) } }
 
       _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
       _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1(v2.oid), Nil))
@@ -1208,8 +1208,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations { this: OdbSuite =
       e1  = events1.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, c) }
       _  <- insertEvents(v1.pid, e1)
 
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
-      _ <- withServices(pi) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v0.vid)(using xa) } }
+      _ <- withServices(service) { s => s.session.transaction use { xa => s.timeAccountingService.update(v1.vid)(using xa) } }
 
       _ <- expect(pi, invoiceQuery(v0.oid), invoiceExected(invoice0(v1.oid), Nil))
       _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
