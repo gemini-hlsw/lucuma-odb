@@ -109,7 +109,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[MissingParamSet, ItcService.AsterismResults],
+    asterismResult: Either[String, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
@@ -226,17 +226,17 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[MissingParamSet, ItcService.AsterismResults],
+        itcRes: Either[String, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[MissingParamSet, IntegrationTime] =
+        val acquisitionIntegrationTime: Either[String, IntegrationTime] =
           itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: Either[MissingParamSet, IntegrationTime] =
+        val scienceIntegrationTime: Either[String, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
@@ -300,7 +300,7 @@ object Generator {
             // we cannot create the Context.
             // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(m.asLeft),
+              m => EitherT.pure(m.format.asLeft),
               _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
             )
           } yield Context(pid, oid, as, params)
@@ -342,7 +342,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[MissingParamSet, ItcService.AsterismResults],
+        asterismResults: Either[String, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
