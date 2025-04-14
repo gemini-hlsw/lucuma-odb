@@ -27,6 +27,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.numeric.int8
@@ -37,7 +38,6 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
-import lucuma.odb.service.Services.SuperUserAccess
 
 
 trait TimeAccountingService[F[_]] {
