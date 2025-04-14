@@ -37,6 +37,7 @@ import skunk.implicits.*
 import java.time.Duration
 
 import Services.Syntax.*
+import lucuma.odb.service.Services.SuperUserAccess
 
 
 trait TimeAccountingService[F[_]] {
@@ -46,7 +47,7 @@ trait TimeAccountingService[F[_]] {
    */
   def update(
     visitId: Visit.Id
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
    * Adds a manual time charge correction.
@@ -61,14 +62,14 @@ trait TimeAccountingService[F[_]] {
    */
   def selectObservation(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Option[CategorizedTime]]
+  )(using Transaction[F], SuperUserAccess): F[Option[CategorizedTime]]
 
   /**
    * Sums the final time accounting result for all observations of a program.
    */
   def selectProgram(
     programId: Program.Id
-  )(using Transaction[F]): F[List[BandedTime]]
+  )(using Transaction[F], SuperUserAccess): F[List[BandedTime]]
 }
 
 object TimeAccountingService {
@@ -128,7 +129,7 @@ object TimeAccountingService {
 
       override def update(
         visitId: Visit.Id
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         Update(visitId).run
 
       case class Update(visitId: Visit.Id)(using Transaction[F]) {
@@ -257,13 +258,13 @@ object TimeAccountingService {
 
       def selectObservation(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[CategorizedTime]] =
+      )(using Transaction[F], SuperUserAccess): F[Option[CategorizedTime]] =
         session
           .option(SelectObservation)(observationId)
 
       def selectProgram(
         programId: Program.Id
-      )(using Transaction[F]): F[List[BandedTime]] =
+      )(using Transaction[F], SuperUserAccess): F[List[BandedTime]] =
         session
           .execute(SelectProgram)(programId)
 
