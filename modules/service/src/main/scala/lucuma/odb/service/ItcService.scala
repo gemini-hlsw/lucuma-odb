@@ -39,7 +39,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
@@ -50,6 +49,7 @@ import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParamSet
@@ -70,7 +70,6 @@ import scala.concurrent.duration.*
 sealed trait ItcService[F[_]] {
 
   import ItcService.AsterismResults
-  import ItcService.Error
 
   /**
    * Obtains the ITC results for a single target, first checking the cache and
@@ -79,7 +78,7 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
@@ -89,7 +88,7 @@ sealed trait ItcService[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     params:        GeneratorParams
-  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
@@ -119,103 +118,28 @@ sealed trait ItcService[F[_]] {
 
 object ItcService {
 
-  enum ErrorTag(val tag: String) derives Enumerated:
-    case ObservationDefinitionError extends ErrorTag("observationDefinitionError")
-    case RemoteServiceErrors        extends ErrorTag("removeServiceErrors")
-    case TargetMismatch             extends ErrorTag("targetMismatch")
-
-  sealed trait Error:
-    def format: String
-    def tag: ErrorTag
-
   object Error:
-    case class ObservationDefinitionError(error: GeneratorParamsService.Error) extends Error:
-      def format: String =
-        error match
-          case GeneratorParamsService.Error.MissingData(p) =>
-            s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
-          case _                                           =>
-            error.format
-      def tag: ErrorTag = ErrorTag.ObservationDefinitionError
+    def observationDefinition(
+      oid:   Observation.Id,
+      error: GeneratorParamsService.Error
+    ): OdbError =
+      val msg = error match
+        case GeneratorParamsService.Error.MissingData(p) =>
+          s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
+        case _                                           =>
+          error.format
+      OdbError.InvalidObservation(oid, msg.some)
 
-    object ObservationDefinitionError:
-      given io.circe.Decoder[ObservationDefinitionError] =
-        io.circe.Decoder.instance: c =>
-          c.downField("error").as[GeneratorParamsService.Error].map(ObservationDefinitionError.apply)
-
-      given io.circe.Encoder[ObservationDefinitionError] =
-        io.circe.Encoder.instance: a =>
-          Json.obj(
-            "tag"   -> a.tag.tag.asJson,
-            "error" -> a.error.asJson
-          )
-
-    case class RemoteServiceErrors(
+    def remoteService(
       problems: NonEmptyList[(Option[Target.Id], String)]
-    ) extends Error:
-      def format: String =
-        val ps = problems.map {
-          case (None, msg)      => s"Asterism: $msg"
-          case (Some(tid), msg) => s"Target '$tid': $msg"
-        }
-        s"ITC returned errors: ${ps.intercalate(", ")}"
-      def tag: ErrorTag = ErrorTag.RemoteServiceErrors
+    ): OdbError =
+      val ps = problems.map:
+        case (None, msg)      => s"Asterism: $msg"
+        case (Some(tid), msg) => s"Target '$tid': $msg"
+      OdbError.ItcError(s"ITC returned errors: ${ps.intercalate(", ")}".some)
 
-    object RemoteServiceErrors:
-      given io.circe.Decoder[RemoteServiceErrors] =
-        io.circe.Decoder.instance: c =>
-          c.downField("problems")
-           .values
-           .toList
-           .flatMap(_.toList)
-           .traverse: json =>
-             val c = json.hcursor
-             for
-               t <- c.downField("targetId").as[Option[Target.Id]]
-               m <- c.downField("message").as[String]
-             yield (t, m)
-           .flatMap:
-             case Nil     => DecodingFailure("Empty problem list", c.history).asLeft
-             case p :: ps => RemoteServiceErrors(NonEmptyList(p, ps)).asRight
-
-      given io.circe.Encoder[RemoteServiceErrors] =
-        io.circe.Encoder.instance: a =>
-          Json.obj(
-            "tag"      -> a.tag.tag.asJson,
-            "problems" ->
-              a.problems
-               .toList
-               .map: p =>
-                 p._1.fold(Json.obj("message" -> p._2.asJson)): targetId =>
-                   Json.obj("targetId" -> targetId.asJson, "message" -> p._2.asJson)
-               .asJson
-          )
-
-    case object TargetMismatch extends Error:
-      def format: String =
-        s"ITC provided conflicting results"
-      def tag: ErrorTag = ErrorTag.TargetMismatch
-
-      given io.circe.Decoder[TargetMismatch.type] =
-        io.circe.Decoder.instance(Function.const(TargetMismatch.asRight))
-
-      given io.circe.Encoder[TargetMismatch.type] =
-        io.circe.Encoder.instance: a =>
-          Json.obj("tag" -> a.tag.tag.asJson)
-
-    given io.circe.Decoder[Error] =
-      io.circe.Decoder.instance: c =>
-        c.downField("tag").as[String].flatMap: s =>
-          Enumerated[ErrorTag].fromTag(s).fold(DecodingFailure(s"Unknown error tag: $s", c.history).asLeft):
-            case ErrorTag.ObservationDefinitionError => c.as[ObservationDefinitionError]
-            case ErrorTag.RemoteServiceErrors        => c.as[RemoteServiceErrors]
-            case ErrorTag.TargetMismatch             => c.as[TargetMismatch.type]
-
-    given io.circe.Encoder[Error] =
-      io.circe.Encoder.instance:
-        case a: ObservationDefinitionError => a.asJson
-        case a: RemoteServiceErrors        => a.asJson
-        case TargetMismatch                => TargetMismatch.asJson
+    def targetMismatch: OdbError =
+      OdbError.ItcError("ITC provided conflicting results".some)
 
   end Error
 
@@ -291,22 +215,15 @@ object ItcService {
       }
   }
 
-  opaque type Result = Either[Error, AsterismResults]
+  opaque type Result = Either[OdbError, AsterismResults]
 
   object Result:
-    def apply(e: Either[Error, AsterismResults]): Result =
+    def apply(e: Either[OdbError, AsterismResults]): Result =
       e
 
-    given Decoder[Result] =
-      Decoder.decodeEither[Error, AsterismResults]("error", "asterismResults")
-
-    given Encoder[Result] =
-      Encoder.encodeEither[Error, AsterismResults]("error", "asterismResults")
-
   extension (r: Result)
-    def toEither: Either[Error, AsterismResults] =
+    def toEither: Either[OdbError, AsterismResults] =
       r
-
 
   def pollVersionsForever[F[_]: Async: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -337,12 +254,10 @@ object ItcService {
   def instantiate[F[_]: Concurrent: Parallel](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
-      import Error.*
-
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
@@ -353,9 +268,9 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => ObservationDefinitionError(GeneratorParamsService.Error.MissingData(m))))
+          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.observationDefinition(oid, GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
@@ -364,10 +279,10 @@ object ItcService {
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResults])]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
-            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.observationDefinition(oid, _))))
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
@@ -416,12 +331,12 @@ object ItcService {
                   yield pair
                 .toMap
 
-      private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error =
-        RemoteServiceErrors(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
+      private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): OdbError =
+        Error.remoteService(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(targets: ItcInput): F[Either[Error, AsterismIntegrationTimes]] =
+      private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
         client
           .imaging(targets.imagingInput, useCache = false)
           .map:
@@ -440,7 +355,7 @@ object ItcService {
 
       private def callRemoteItc(
         targets: ItcInput
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
           case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
             val specResult = specOutcomes.partitionErrors.leftMap(convertRemoteErrors(targets))
@@ -458,11 +373,11 @@ object ItcService {
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
                     TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
                   },
-                ).toRight[Error](Error.TargetMismatch)
+                ).toRight(Error.targetMismatch)
             yield result
         }
         .handleError: t =>
-          RemoteServiceErrors(NonEmptyList.one(None, t.getMessage)).asLeft
+          Error.remoteService(NonEmptyList.one(None, t.getMessage)).asLeft
 
       private def insertOrUpdate(
         pid:     Program.Id,
