@@ -4,12 +4,14 @@
 package lucuma.odb.service
 
 import cats.Order.catsKernelOrderingForOrder
+import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -27,6 +29,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.logic.Generator
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -54,16 +57,13 @@ sealed trait ObscalcService[F[_]]:
 
   def resetCalculating(using Transaction[F]): F[Unit]
 
-  def loadPendingCalc(
-    max: Int
-  )(using Transaction[F]): F[List[Obscalc.PendingCalc]]
+  def load(max: Int)(using Transaction[F]): F[List[Obscalc.PendingCalc]]
 
-/*
-  def calculateResult(
+  def calculate(
     pending: Obscalc.PendingCalc
-  ): F[Obscalc.Result]
-*/
-  def storeResult(
+  )(using NoTransaction[F]): F[Obscalc.Result]
+
+  def update(
     pending: Obscalc.PendingCalc,
     result:  Obscalc.Result
   )(using Transaction[F]): F[Unit]
@@ -104,26 +104,44 @@ object ObscalcService:
       override def resetCalculating(using Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
 
-      override def loadPendingCalc(
+      override def load(
         max: Int
       )(using Transaction[F]): F[List[Obscalc.PendingCalc]] =
         session.execute(Statements.LoadPendingCalc)(max)
 
-/*
-      override def calculateResult(
+      override def calculate(
         pending: Obscalc.PendingCalc
       )(using NoTransaction[F]): F[Obscalc.Result] =
+
+        val params: EitherT[F, OdbError, GeneratorParams] =
+          EitherT:
+            services.transactionally:
+              generatorParamsService
+                .selectOne(pending.programId, pending.observationId)
+                .map(_.leftMap(e => OdbError.SequenceUnavailable(s"Could not generate the ${pending.observationId} sequence: ${e.format}".some)))
+
+        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): EitherT[F, OdbError, ExecutionDigest] =
+          for
+            p <- params
+            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult.leftMap(_.message), p))
+          yield d
+
         for
           r <- itc.lookup(pending.programId, pending.observationId)
-          d <- gen.digest()
-        yield r
-*/
+          d <- digest(r).value
+        yield d.fold(
+          Obscalc.Result.Error.apply,
+          dig => r.fold(
+            _ => Obscalc.Result.WithoutTarget(dig),
+            i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig)
+          )
+        )
 
-      override def storeResult(
+      override def update(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
       )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.StoreResults)(pending, result).void
+        session.execute(Statements.StoreResult)(pending, result).void
 
   object Statements:
     private val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -289,7 +307,7 @@ object ObscalcService:
         RETURNING tasks.c_program_id, c.c_observation_id, c_last_invalidation
       """.query(pending_obscalc)
 
-    val StoreResults: Command[(
+    val StoreResult: Command[(
       Obscalc.PendingCalc,
       Obscalc.Result
     )] =

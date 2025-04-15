@@ -150,7 +150,7 @@ object CalcMain extends MainParams:
              t.subscribe(100)
               .parEvalMapUnordered(ParallelTaskLimit): elem =>
                 s.useTransactionally:
-                  obscalc.loadPendingCalc(ParallelTaskLimit).void
+                  obscalc.load(ParallelTaskLimit).void
               .compile
               .drain
               .start
