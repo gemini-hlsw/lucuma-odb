@@ -123,7 +123,7 @@ object ObscalcService:
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): EitherT[F, OdbError, ExecutionDigest] =
           for
             p <- params
-            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult.leftMap(_.message), p))
+            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
           yield d
 
         for

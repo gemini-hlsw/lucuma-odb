@@ -17,6 +17,7 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
+import lucuma.odb.data.OdbError
 
 import java.util.UUID
 
@@ -40,9 +41,9 @@ object LongSlit:
 
   private def instantiate[F[_]: Monad, S, D](
     static:      S,
-    acquisition: Either[String, SequenceGenerator[D]],
-    science:     F[Either[String, SequenceGenerator[D]]]
-  ): F[Either[String, ExecutionConfigGenerator[S, D]]] =
+    acquisition: Either[OdbError, SequenceGenerator[D]],
+    science:     F[Either[OdbError, SequenceGenerator[D]]]
+  ): F[Either[OdbError, ExecutionConfigGenerator[S, D]]] =
     (for
       a <- EitherT.fromEither(acquisition)
       s <- EitherT(science)
@@ -53,11 +54,11 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
-    acquisitionItc: Either[String, IntegrationTime],
-    scienceItc:     Either[String, IntegrationTime],
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
       GmosNorthStatic,
       Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
@@ -69,11 +70,11 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
-    acquisitionItc: Either[String, IntegrationTime],
-    scienceItc:     Either[String, IntegrationTime],
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(
       GmosSouthStatic,
       Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),

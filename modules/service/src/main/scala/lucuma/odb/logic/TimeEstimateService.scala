@@ -125,10 +125,9 @@ object TimeEstimateService:
                 itcService(itcClient)
                   .callRemote(pid, oid, data.generatorParams)
                   .map:
-                    case Left(e@OdbError.InvalidObservation(_, _)) =>
-                      e.message.asLeft[AsterismResults].some
-                    case Left(_)   => none
-                    case Right(ar) => ar.asRight.some
+                    case Left(e@OdbError.InvalidObservation(_, _)) => e.asLeft[AsterismResults].some
+                    case Left(_)                                   => none
+                    case Right(ar)                                 => ar.asRight.some
               )
 
               // Calculate time estimate using provided ITC result and params.
