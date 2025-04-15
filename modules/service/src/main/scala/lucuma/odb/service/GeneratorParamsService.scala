@@ -86,7 +86,6 @@ trait GeneratorParamsService[F[_]] {
 
   def selectAll(
     programId: Program.Id,
-    // minStatus: ObsStatus = ObsStatus.New,
     selection: ObservationSelection = ObservationSelection.All
   )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
@@ -191,7 +190,6 @@ object GeneratorParamsService {
 
       private def selectAllParams(
         pid:       Program.Id,
-        // minStatus: ObsStatus,
         selection: ObservationSelection
       ): F[List[ParamsRow]] =
         executeSelect(Statements.selectAllParams(user, pid, /*minStatus,*/ selection))
@@ -261,8 +259,8 @@ object GeneratorParamsService {
               gs.roi.some
             )
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
-          case f2: f2.longslit.Config =>
-            ???
+          case _: f2.longslit.Config =>
+            throw new IllegalStateException("F2 step generation not supported.")
 
       private def itcObsParams(
         obsParams:  ObsParams,

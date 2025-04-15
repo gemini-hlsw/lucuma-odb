@@ -46,7 +46,7 @@ trait F2LongSlitService[F[_]] {
 
 object F2LongSlitService {
 
-  def instantiate[F[_]: {Concurrent as C, Services}]: F2LongSlitService[F] =
+  def instantiate[F[_]: {Concurrent as F, Services}]: F2LongSlitService[F] =
 
     new F2LongSlitService[F] {
 
@@ -92,7 +92,7 @@ object F2LongSlitService {
         which: List[Observation.Id],
         xa:    Transaction[F]
       ): F[Unit] =
-        Statements.deleteF2(which).fold(C.unit)(session.exec)
+        Statements.deleteF2(which).fold(F.unit)(session.exec)
 
     }
 
