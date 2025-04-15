@@ -45,6 +45,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.TargetIntegrationTime
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
@@ -271,23 +272,21 @@ object Acquisition:
 
   private def instantiate[D, G, L, U](
     stepComp:    StepComputer[D, G, L, U],
-    time:        Either[String, IntegrationTime],
+    time:        Either[OdbError, IntegrationTime],
     calRole:     Option[CalibrationRole],
     atomBuilder: AtomBuilder[D],
     acqFilters:  NonEmptyList[L],
     fpu:         U,
     λ:           Wavelength,
     lastReset:   Option[Timestamp]
-  ): Either[String, SequenceGenerator[D]] =
+  ): Either[OdbError, SequenceGenerator[D]] =
     calRole match
       case Some(CalibrationRole.Twilight) =>
         SequenceGenerator.empty.asRight
 
       case _                              =>
         time
-          .leftMap: m =>
-             s"GMOS Long Slit acquisition requires a valid target: $m"
-          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit acquisition requires a positive exposure time.")
+          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(s"GMOS Long Slit acquisition requires a positive exposure time.".some))
           .map: t =>
              AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
 
@@ -296,10 +295,10 @@ object Acquisition:
     static:    StaticConfig.GmosNorth,
     namespace: UUID,
     config:    Config.GmosNorth,
-    time:      Either[String, IntegrationTime],
+    time:      Either[OdbError, IntegrationTime],
     calRole:   Option[CalibrationRole],
     lastReset: Option[Timestamp]
-  ): Either[String, SequenceGenerator[GmosNorth]] =
+  ): Either[OdbError, SequenceGenerator[GmosNorth]] =
     instantiate(
       StepComputer.North,
       time,
@@ -316,10 +315,10 @@ object Acquisition:
     static:    StaticConfig.GmosSouth,
     namespace: UUID,
     config:    Config.GmosSouth,
-    time:      Either[String, IntegrationTime],
+    time:      Either[OdbError, IntegrationTime],
     calRole:   Option[CalibrationRole],
     lastReset: Option[Timestamp]
-  ): Either[String, SequenceGenerator[GmosSouth]] =
+  ): Either[OdbError, SequenceGenerator[GmosSouth]] =
     instantiate(
       StepComputer.South,
       time,
