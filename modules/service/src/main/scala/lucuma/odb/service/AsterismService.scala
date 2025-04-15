@@ -171,7 +171,7 @@ object AsterismService {
                 }
               })
           }.value
-        
+
       override def cloneAsterism(
         originalId: Observation.Id,
         newId: Observation.Id,
@@ -202,7 +202,7 @@ object AsterismService {
               .compile
               .toList
               .map(_.groupMap(_._1)(_._2))
-              
+
     }
 
   object Statements {
@@ -253,13 +253,6 @@ object AsterismService {
       programId: Program.Id
     ): AppliedFragment =
       sql"c_program_id = $program_id"(programId)
-
-    private def observationIdIn(
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      void"c_observation_id IN (" |+|
-        observationIds.map(sql"$observation_id").intercalate(void", ") |+|
-      void")"
 
     private def targetIdIn(
       targetIds: NonEmptyList[Target.Id]

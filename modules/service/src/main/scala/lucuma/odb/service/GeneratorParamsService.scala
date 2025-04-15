@@ -51,6 +51,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.f2
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -201,14 +202,14 @@ object GeneratorParamsService {
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           .flatMap(addCustomSedTimestamps)
 
-      // If the user uploads a new custom sed in place of an existing one, that needs to 
+      // If the user uploads a new custom sed in place of an existing one, that needs to
       // invalidate the cache. So, we include the timestamp of the attachment (if any) in
       // the hash.
       private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
         NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
           .fold(params.pure)(attIds =>
             attachmentMetadataService.getUpdatedAt(attIds).map(map =>
-              params.map(p =>  
+              params.map(p =>
                 val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
                 aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
               )
@@ -260,6 +261,8 @@ object GeneratorParamsService {
               gs.roi.some
             )
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+          case f2: f2.longslit.Config =>
+            ???
 
       private def itcObsParams(
         obsParams:  ObsParams,
