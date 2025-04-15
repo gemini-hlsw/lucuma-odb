@@ -67,7 +67,9 @@ object ObservingModeServices {
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
           case (Flamingos2LongSlit, oids) =>
-            ???
+            f2LongSlitService
+              .select(oids)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
         }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
@@ -91,7 +93,7 @@ object ObservingModeServices {
         mode match {
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
-          case ObservingModeType.Flamingos2LongSlit => ???
+          case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.delete
         }
 
       override def updateFunction(

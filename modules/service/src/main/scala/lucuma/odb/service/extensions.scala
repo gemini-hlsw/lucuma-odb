@@ -3,12 +3,17 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.MonadCancelThrow
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.Band
+import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
+import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.data.Completion
+import skunk.implicits.*
 
 extension [F[_]: MonadCancelThrow](s: Session[F])
   def executeCommand(af: AppliedFragment): F[Completion] =
@@ -31,3 +36,10 @@ extension (self: SourceProfile)
           .modifyOption(_.removedAll(gaiaBands))(self)
       )
       .getOrElse(self)
+
+def observationIdIn(
+  oids: NonEmptyList[Observation.Id]
+): AppliedFragment =
+  void"c_observation_id IN (" |+|
+    oids.map(sql"$observation_id").intercalate(void", ") |+|
+  void")"

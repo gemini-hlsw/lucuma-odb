@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Group
@@ -45,12 +46,13 @@ class updateObservations extends OdbSuite
 
   private def multiUpdateTest(
     user:    User,
-    updates: List[(String, String, Either[String, Json])]
+    updates: List[(String, String, Either[String, Json])],
+    observingMode: Option[ObservingModeType] = None
   ): IO[Unit] =
 
     for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid)
+      oid <- createObservationAs(user, pid, observingMode)
       _   <- updates.traverse_ { case (update, query, expected) =>
         updateObservation(user, oid, update, query, expected)
       }
@@ -1502,6 +1504,76 @@ class updateObservations extends OdbSuite
     val expected1 = "A centralWavelength is required in order to create a GMOS South Long Slit observing mode.".asLeft
 
     multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
+  }
+
+  test("observing mode: delete f2") {
+
+    val update0 = """
+      subtitle: "ABC"
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "mode": "FLAMINGOS_2_LONG_SLIT",
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_HK"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          mode
+          gmosNorthLongSlit {
+            grating
+          }
+          flamingos2LongSlit {
+            disperser
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: null
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": null,
+              "observingMode": null
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      ),
+      observingMode = Some(
+        ObservingModeType.Flamingos2LongSlit
+      )
+    )
   }
 
   test("observing mode: delete existing") {

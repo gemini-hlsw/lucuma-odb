@@ -6,6 +6,9 @@ package lucuma.odb.service
 import cats.Eq
 import cats.derived.*
 import cats.syntax.option.*
+import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.F2Filter
+import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -21,6 +24,7 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.f2.longslit.Config as F2Config
 import lucuma.odb.sequence.gmos.longslit.Config
 
 sealed trait CalibrationConfigSubset derives Eq
@@ -86,6 +90,12 @@ object CalibrationConfigSubset:
         none
       )
 
+  case class F2Configs(
+    disperser: F2Disperser,
+    filter:    Option[F2Filter],
+    fpu:       F2Fpu,
+  ) extends CalibrationConfigSubset derives Eq
+
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
@@ -110,4 +120,10 @@ object CalibrationConfigSubset:
             gs.yBin,
             gs.ampReadMode,
             gs.ampGain
+          )
+        case f2: F2Config =>
+          F2Configs(
+            f2.disperser,
+            f2.filter,
+            f2.fpu
           )

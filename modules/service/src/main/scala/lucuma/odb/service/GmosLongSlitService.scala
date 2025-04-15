@@ -425,14 +425,6 @@ object GmosLongSlitService {
           input.common.centralWavelength
       )
 
-
-    private def observationIdIn(
-      oids: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      void"c_observation_id IN (" |+|
-        oids.map(sql"$observation_id").intercalate(void", ") |+|
-      void")"
-
     def deleteGmosNorthLongSlit(
       which: List[Observation.Id]
     ): Option[AppliedFragment] =
