@@ -32,15 +32,16 @@ class updateObservations extends OdbSuite
   override lazy val validUsers: List[User] = List(pi, pi2, staff)
 
   private def oneUpdateTest(
-    user:     User,
-    update:   String,
-    query:    String,
-    expected: Either[String, Json]
+    user:          User,
+    update:        String,
+    query:         String,
+    expected:      Either[String, Json],
+    observingMode: Option[ObservingModeType] = None
   ): IO[Unit] =
 
     for
       pid <- createProgramAs(user)
-      oid <- createObservationAs(user, pid)
+      oid <- createObservationAs(user, pid, observingMode)
       _   <- updateObservation(user, oid, update, query, expected)
     yield ()
 
@@ -1359,6 +1360,105 @@ class updateObservations extends OdbSuite
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+  test("observing mode: existing f2 update read_mode updates reads") {
+
+    val update0 = """
+      subtitle: "sub"
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "mode": "FLAMINGOS_2_LONG_SLIT",
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_HK",
+                  "readMode": "FAINT",
+                  "defaultReadMode": "FAINT",
+                  "explicitReadMode": null,
+                  "reads": "READS_8",
+                  "defaultReads": "READS_8",
+                  "explicitReads": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          mode
+          gmosNorthLongSlit {
+            grating
+          }
+          flamingos2LongSlit {
+            disperser
+            readMode
+            defaultReadMode
+            explicitReadMode
+            reads
+            defaultReads
+            explicitReads
+          }
+        }
+      }
+    """
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          explicitReadMode: BRIGHT
+        }
+      }
+    """
+
+    // read mode update implicitly updates reads
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "mode": "FLAMINGOS_2_LONG_SLIT",
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_HK",
+                  "readMode": "BRIGHT",
+                  "defaultReadMode": "FAINT",
+                  "explicitReadMode": "BRIGHT",
+                  "reads": "READS_1",
+                  "defaultReads": "READS_1",
+                  "explicitReads": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      ),
+      observingMode = Some(
+        ObservingModeType.Flamingos2LongSlit
+      )
+    )
+  }
+
   test("observing mode: update existing, all fields") {
 
     val update0 = """
@@ -1694,7 +1794,7 @@ class updateObservations extends OdbSuite
   test("observing mode: delete f2") {
 
     val update0 = """
-      subtitle: "ABC"
+      subtitle: "sub"
     """
 
     val expected0 =
