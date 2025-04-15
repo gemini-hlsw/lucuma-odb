@@ -574,7 +574,23 @@ trait DatabaseOperations { this: OdbSuite =>
           focalPlaneAngle: { microarcseconds: 0 }
         }
       }"""
-      case ObservingModeType.Flamingos2LongSlit => ???
+      case ObservingModeType.Flamingos2LongSlit =>
+        """{
+        mode: SPECTROSCOPY
+        spectroscopy: {
+          wavelength: { nanometers: 1200 }
+          resolution: 100
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -596,7 +612,14 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
-      case ObservingModeType.Flamingos2LongSlit => ???
+      case ObservingModeType.Flamingos2LongSlit =>
+        """{
+          flamingos2LongSlit: {
+            disperser: R1200_HK
+            filter: Y
+            fpu: LONG_SLIT_2
+          }
+        }"""
 
   def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(
@@ -1857,7 +1880,7 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: json =>
       json.hcursor.downFields("setObservationWorkflowState", "state").require[ObservationWorkflowState]
 
-  private def itcQuery(oids: Observation.Id*) = 
+  private def itcQuery(oids: Observation.Id*) =
     s"""
       query {
         observations(

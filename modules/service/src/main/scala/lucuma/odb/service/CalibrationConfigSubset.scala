@@ -21,6 +21,7 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.f2.longslit.Config as F2Config
 import lucuma.odb.sequence.gmos.longslit.Config
 
 sealed trait CalibrationConfigSubset derives Eq
@@ -111,3 +112,5 @@ object CalibrationConfigSubset:
             gs.ampReadMode,
             gs.ampGain
           )
+        case f2: F2Config =>
+          ???

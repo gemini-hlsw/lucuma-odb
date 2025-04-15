@@ -13,6 +13,7 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
+import lucuma.odb.sequence.ObservingMode
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -22,7 +23,7 @@ import java.io.DataOutputStream
  * F2 long slit sequence may be generated.
  */
 case class Config private[longslit](
-  grating: F2Disperser,
+  disperser: F2Disperser,
   filter: Option[F2Filter],
   fpu: F2Fpu,
   defaultReadMode: F2ReadMode,
@@ -47,7 +48,7 @@ case class Config private[longslit](
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
-    out.writeChars(grating.tag)
+    out.writeChars(disperser.tag)
     out.writeChars(filter.foldMap(_.tag))
     out.writeChars(fpu.tag)
     out.writeChars(readMode.tag)
@@ -64,7 +65,7 @@ case class Config private[longslit](
 object Config:
 
   def apply(
-    grating: F2Disperser,
+    disperser: F2Disperser,
     filter: Option[F2Filter],
     fpu: F2Fpu,
     explicitReadMode: Option[F2ReadMode] = None,
@@ -74,7 +75,7 @@ object Config:
   ): Config =
     val rm = explicitReadMode.getOrElse(DefaultF2ReadMode)
     new Config(
-      grating,
+      disperser,
       filter,
       fpu,
       rm,
@@ -84,3 +85,17 @@ object Config:
       explicitDecker,
       explicitReadoutMode
     )
+
+  def reconcile(a: Config, modes: List[ObservingMode]): Option[Config] =
+    modes.headOption match {
+      case None                                                  =>
+        a.some
+
+      case Some(b: Config) =>
+        Option.when(a === b)(
+          reconcile(a, modes.tail)
+        ).flatten
+
+      case _                                                     =>
+        none
+    }

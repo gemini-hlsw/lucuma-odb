@@ -44,6 +44,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.f2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gmos.longslit.LongSlit
 import lucuma.odb.sequence.syntax.hash.*
@@ -330,7 +331,7 @@ object Generator {
             case None => calcDigestThenCache(context, when)
           .map: digest =>
             (digest, context.params, context.hash)
- 
+
       def digestWithParamsAndHash(
         pid:  Program.Id,
         oid:  Observation.Id,
@@ -414,6 +415,9 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
             gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
+
+          case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
+            ???
         )
 
       override def generate(
@@ -440,6 +444,9 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
             gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
+
+          case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
+            ???
 
       private def executionDigest[S, D](
         proto:     ProtoExecutionConfig[S, Atom[D]],
@@ -531,13 +538,13 @@ object Generator {
               input
                 .toList
                 .map:
-                  case (oid, (pid, itc, gps)) => 
+                  case (oid, (pid, itc, gps)) =>
                     Context(pid, oid, Right(itc), gps)
-          .flatMap: cached =>     
+          .flatMap: cached =>
             input
               .view
               .filterKeys(a => !cached.contains(a))     // remove cached subset
-              .toList 
+              .toList
               .traverse:
                 case (oid, (pid, itc, gps)) =>
                   calculateDigest(pid, oid, Right(itc), gps, None).map(oid -> _)  // compute one by one
@@ -545,7 +552,7 @@ object Generator {
                 list
                   .collect:
                     case (oid, Right(d)) => (oid, d)    // filter out failures
-                  .toMap ++ cached                      // combine with cached results                  
+                  .toMap ++ cached                      // combine with cached results
               .map: all =>
                 all
                   .view

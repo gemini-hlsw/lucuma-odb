@@ -79,7 +79,7 @@ object ObsAttachmentAssignmentService {
         session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument)
             .as(Result.unit)
-            .recoverWith { 
+            .recoverWith {
               case SqlState.ForeignKeyViolation(_) =>
                 Result.failure(ForeignKeyViolationMessage(programId, aids)).pure[F]
               case SqlState.CheckViolation(e) if e.constraintName.exists(_.contains("only_obs_attachments_check")) =>
@@ -153,13 +153,6 @@ object ObsAttachmentAssignmentService {
     ): AppliedFragment =
       sql"c_program_id = $program_id" (programId)
 
-    private def observationIdIn(
-      observationIds: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      void"c_observation_id IN (" |+|
-        observationIds.map(sql"$observation_id").intercalate(void", ") |+|
-        void")"
-
     private def attachmentIdIn(
       attachmentIds: NonEmptyList[Attachment.Id]
     ): AppliedFragment =
@@ -197,7 +190,7 @@ object ObsAttachmentAssignmentService {
           c_attachment_id,
           c_attachment_type
         )
-        SELECT 
+        SELECT
           t_obs_attachment_assignment.c_program_id,
           $observation_id,
           t_obs_attachment_assignment.c_attachment_id,
