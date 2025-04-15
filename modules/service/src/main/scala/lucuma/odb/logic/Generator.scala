@@ -12,6 +12,7 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.api.RefinedTypeOps
@@ -39,6 +40,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -59,7 +61,6 @@ import skunk.*
 import java.security.MessageDigest
 import java.util.UUID
 
-import Generator.Error
 import Generator.FutureLimit
 
 sealed trait Generator[F[_]] {
@@ -78,7 +79,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     when:          Option[Timestamp] = None
-  )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
+  )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
    * The same is `digest()`, but it also returns the GeneratorParms and the hash used
@@ -94,7 +95,7 @@ sealed trait Generator[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     when:          Option[Timestamp] = None
-  )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]]
+  )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
    * Calculates the ExecutionDigest given the AsterismResults from the ITC
@@ -112,7 +113,7 @@ sealed trait Generator[F[_]] {
     asterismResult: Either[String, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
-  )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]]
+  )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -130,7 +131,7 @@ sealed trait Generator[F[_]] {
     observationId: Observation.Id,
     futureLimit:   FutureLimit = FutureLimit.Default,
     when:          Option[Timestamp] = None
-  )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]]
+  )(using NoTransaction[F]): F[Either[OdbError, InstrumentExecutionConfig]]
 
   /**
    * Determines the execution state of the given observation by looking at the
@@ -184,33 +185,12 @@ object Generator {
       }
   }
 
-  sealed trait Error {
-    def format: String
-  }
+  object Error:
+    def invalidData(oid: Observation.Id, message: String): OdbError =
+      OdbError.SequenceUnavailable(s"Could not generate a sequence for the observation $oid: $message".some)
 
-  object Error {
-
-    case class ItcError(error: ItcService.Error) extends Error {
-      def format: String =
-        error.format
-    }
-
-    case class InvalidData(
-      observationId: Observation.Id,
-      message:       String
-    ) extends Error {
-      def format: String =
-        s"Could not generate a sequence for the observation $observationId: $message"
-    }
-
-    case object SequenceTooLong extends Error {
-      def format: String =
-        s"The generated sequence is too long (more than $SequenceAtomLimit atoms)."
-    }
-
-    val sequenceTooLong: Error = SequenceTooLong
-
-  }
+    val sequenceTooLong: OdbError =
+      OdbError.SequenceUnavailable(s"The generated sequence is too long (more than $SequenceAtomLimit atoms).".some)
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -218,8 +198,6 @@ object Generator {
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): Generator[F] =
     new Generator[F] {
-
-      import Error.*
 
       private val exp = SmartGcalImplementation.fromService(smartGcalService)
 
@@ -257,12 +235,12 @@ object Generator {
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
-        def checkCache(using NoTransaction[F]): EitherT[F, Error, Option[ExecutionDigest]] =
+        def checkCache(using NoTransaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
           EitherT.right(services.transactionally {
             executionDigestService.selectOne(oid, hash)
           })
 
-        def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, Error, Unit] =
+        def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, OdbError, Unit] =
           EitherT.right(services.transactionally {
             executionDigestService.insertOrUpdate(pid, oid, hash, digest)
           })
@@ -273,23 +251,18 @@ object Generator {
         def lookup(
           pid: Program.Id,
           oid: Observation.Id
-        )(using NoTransaction[F]): EitherT[F, Error, Context] = {
+        )(using NoTransaction[F]): EitherT[F, OdbError, Context] = {
           val itc = itcService(itcClient)
 
-          val opc: F[Either[Error, (GeneratorParams, Option[ItcService.AsterismResults])]] =
-            services.transactionally {
-              (for {
-                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => InvalidData(oid, e.format))))
+          val opc: F[Either[OdbError, (GeneratorParams, Option[ItcService.AsterismResults])]] =
+            services.transactionally:
+              (for
+                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => Error.invalidData(oid, e.format))))
                 c <- EitherT.liftF(itc.selectOne(pid, oid, p))
-              } yield (p, c)).value
-            }
+              yield (p, c)).value
 
-          def callItc(p: GeneratorParams): EitherT[F, Error, ItcService.AsterismResults] =
-            EitherT(itc.callRemote(pid, oid, p)).leftMap {
-              case e@ItcService.Error.ObservationDefinitionError(_) => InvalidData(oid, e.format)
-              case e@ItcService.Error.RemoteServiceErrors(_)        => ItcError(e)
-              case e@ItcService.Error.TargetMismatch                => ItcError(e)
-            }
+          def callItc(p: GeneratorParams): EitherT[F, OdbError, ItcService.AsterismResults] =
+            EitherT(itc.callRemote(pid, oid, p))
 
           for {
             pc <- EitherT(opc)
@@ -317,13 +290,13 @@ object Generator {
         pid:  Program.Id,
         oid:  Observation.Id,
         when: Option[Timestamp] = None
-      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
+      )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
       private def digestWithParamsAndHash(
         context: Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F]): EitherT[F, Error, (ExecutionDigest, GeneratorParams, Md5Hash)] =
+      )(using NoTransaction[F]): EitherT[F, OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)] =
         context
           .checkCache
           .flatMap:
@@ -336,7 +309,7 @@ object Generator {
         pid:  Program.Id,
         oid:  Observation.Id,
         when: Option[Timestamp] = None
-      )(using NoTransaction[F]): F[Either[Error, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
         Context.lookup(pid, oid).flatMap(digestWithParamsAndHash(_, when)).value
 
       override def calculateDigest(
@@ -345,13 +318,13 @@ object Generator {
         asterismResults: Either[String, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
-      )(using NoTransaction[F]): F[Either[Error, ExecutionDigest]] =
+      )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
         calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
       private def calcDigestThenCache(
         ctx:  Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
+      )(using NoTransaction[F]): EitherT[F, OdbError, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
       type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
@@ -362,7 +335,7 @@ object Generator {
         gen:      ExecutionConfigGenerator[S, D],
         steps:    Stream[F, StepRecord[D]],
         when:     Option[Timestamp]
-      )(using Eq[D]): EitherT[F, Error, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
+      )(using Eq[D]): EitherT[F, OdbError, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         if ctx.params.declaredComplete then
           EitherT.pure:
             (ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
@@ -379,11 +352,11 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, (ProtoGmosNorth, ExecutionState)] =
+      ): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
+          g <- EitherT(gen).leftMap(m => Error.invalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
@@ -392,18 +365,18 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, (ProtoGmosSouth, ExecutionState)] =
+      ): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.InvalidData(ctx.oid, m))
+          g <- EitherT(gen).leftMap(m => Error.invalidData(ctx.oid, m))
           p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
       private def calcDigestFromContext(
         ctx:  Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
+      )(using NoTransaction[F]): EitherT[F, OdbError, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
@@ -427,7 +400,7 @@ object Generator {
         oid:  Observation.Id,
         lim:  FutureLimit = FutureLimit.Default,
         when: Option[Timestamp] = None
-      )(using NoTransaction[F]): F[Either[Error, InstrumentExecutionConfig]] =
+      )(using NoTransaction[F]): F[Either[OdbError, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
           x <- calcExecutionConfigFromContext(c, lim, when)
@@ -437,7 +410,7 @@ object Generator {
         ctx:      Context,
         lim:      FutureLimit,
         when:     Option[Timestamp]
-      )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
+      )(using NoTransaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
         ctx.params match
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
@@ -456,7 +429,7 @@ object Generator {
         proto:     ProtoExecutionConfig[S, Atom[D]],
         execState: ExecutionState,
         setupTime: SetupTime
-      ): Either[Error, ExecutionDigest] =
+      ): Either[OdbError, ExecutionDigest] =
 
         if execState === ExecutionState.DeclaredComplete then
           ExecutionDigest(
@@ -466,13 +439,13 @@ object Generator {
           ).asRight
         else
           // Compute the sequence digest from the stream by folding over the steps.
-          def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[Error, SequenceDigest] =
-            s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[Error]) { case (eDigest, atom) =>
+          def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[OdbError, SequenceDigest] =
+            s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
               eDigest.flatMap: digest =>
                 digest
                   .incrementAtomCount
                   .filter(_.atomCount.value <= SequenceAtomLimit)
-                  .toRight(SequenceTooLong)
+                  .toRight(Error.sequenceTooLong)
                   .map: incDigest =>
                     atom.steps.foldLeft(incDigest) { case (d, s) =>
                       d.add(s.observeClass)
