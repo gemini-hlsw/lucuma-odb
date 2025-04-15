@@ -20,9 +20,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
-import io.circe.DecodingFailure
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
@@ -39,7 +36,6 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
@@ -97,62 +93,20 @@ trait GeneratorParamsService[F[_]] {
 
 object GeneratorParamsService {
 
-  enum ErrorTag(val tag: String) derives Enumerated:
-    case MissingObservation extends ErrorTag("missingObservation")
-    case MissingData        extends ErrorTag("missingData")
-    case ConflictingData    extends ErrorTag("conflictingData")
-
   sealed trait Error extends Product with Serializable:
     def format: String
-    def tag: ErrorTag
 
   object Error:
     case class MissingObservation(programId: Program.Id, observationId: Observation.Id) extends Error:
-      def format: String = s"Observation '$observationId' in program '$programId' not found."
-      def tag: ErrorTag  = ErrorTag.MissingObservation
-
-    object MissingObservation:
-      given io.circe.Decoder[MissingObservation] =
-        io.circe.Decoder.instance: c =>
-          for
-            p <- c.downField("programId").as[Program.Id]
-            o <- c.downField("observationId").as[Observation.Id]
-          yield MissingObservation(p, o)
-
-      given io.circe.Encoder[MissingObservation] =
-        io.circe.Encoder.instance: a =>
-          Json.obj(
-            "tag"           -> a.tag.tag.asJson,
-            "programId"     -> a.programId.asJson,
-            "observationId" -> a.observationId.asJson
-          )
+      def format: String =
+        s"Observation '$observationId' in program '$programId' not found."
 
     case class MissingData(params: MissingParamSet) extends Error:
       def format: String = params.format
-      def tag: ErrorTag  = ErrorTag.MissingData
-
-    object MissingData:
-      given io.circe.Decoder[MissingData] =
-        io.circe.Decoder.instance: c =>
-          c.downField("params").as[MissingParamSet].map(MissingData.apply)
-
-      given io.circe.Encoder[MissingData] =
-        io.circe.Encoder.instance: a =>
-          Json.obj(
-            "tag"    -> a.tag.tag.asJson,
-            "params" -> a.params.asJson
-          )
 
     case object ConflictingData extends Error:
-      def format: String = "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
-      def tag: ErrorTag  = ErrorTag.ConflictingData
-
-      given io.circe.Decoder[ConflictingData.type] =
-        io.circe.Decoder.instance(Function.const(ConflictingData.asRight))
-
-      given io.circe.Encoder[ConflictingData.type] =
-        io.circe.Encoder.instance: a =>
-          Json.obj("tag" -> a.tag.tag.asJson)
+      def format: String =
+         "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
 
     given Eq[Error] with
       def eqv(x: Error, y: Error): Boolean =
@@ -161,20 +115,6 @@ object GeneratorParamsService {
           case (MissingData(p0), MissingData(p1))                       => p0 === p1
           case (ConflictingData, ConflictingData)                       => true
           case _                                                        => false
-
-    given io.circe.Decoder[Error] =
-      io.circe.Decoder.instance: c =>
-        c.downField("tag").as[String].flatMap: s =>
-          Enumerated[ErrorTag].fromTag(s).fold(DecodingFailure(s"Unknown error tag: $s", c.history).asLeft):
-            case ErrorTag.MissingObservation => c.as[MissingObservation]
-            case ErrorTag.MissingData        => c.as[MissingData]
-            case ErrorTag.ConflictingData    => c.as[ConflictingData.type]
-
-    given io.circe.Encoder[Error] =
-      io.circe.Encoder.instance:
-        case a: MissingObservation => a.asJson
-        case a: MissingData        => a.asJson
-        case ConflictingData       => ConflictingData.asJson
 
   extension (mode: InstrumentMode)
     def asImaging(λ: Wavelength): InstrumentMode =
