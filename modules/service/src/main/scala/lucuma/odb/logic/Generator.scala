@@ -112,7 +112,7 @@ sealed trait Generator[F[_]] {
   def calculateDigest(
     programId:      Program.Id,
     observationId:  Observation.Id,
-    asterismResult: Either[String, ItcService.AsterismResults],
+    asterismResult: Either[OdbError, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
@@ -206,17 +206,17 @@ object Generator {
       private case class Context(
         pid:    Program.Id,
         oid:    Observation.Id,
-        itcRes: Either[String, ItcService.AsterismResults],
+        itcRes: Either[OdbError, ItcService.AsterismResults],
         params: GeneratorParams
       ) {
 
         def namespace: UUID =
           SequenceIds.namespace(commitHash, oid, params)
 
-        val acquisitionIntegrationTime: Either[String, IntegrationTime] =
+        val acquisitionIntegrationTime: Either[OdbError, IntegrationTime] =
           itcRes.map(_.acquisitionResult.focus.value)
 
-        val scienceIntegrationTime: Either[String, IntegrationTime] =
+        val scienceIntegrationTime: Either[OdbError, IntegrationTime] =
           itcRes.map(_.scienceResult.focus.value)
 
         val hash: Md5Hash = {
@@ -275,7 +275,7 @@ object Generator {
             // we cannot create the Context.
             // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(m.format.asLeft),
+              m => EitherT.pure(OdbError.SequenceUnavailable(s"Cannot generate sequence for $oid. Missing parameters: ${m.format}".some).asLeft),
               _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
             )
           } yield Context(pid, oid, as, params)
@@ -317,7 +317,7 @@ object Generator {
       override def calculateDigest(
         pid:             Program.Id,
         oid:             Observation.Id,
-        asterismResults: Either[String, ItcService.AsterismResults],
+        asterismResults: Either[OdbError, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
       )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
@@ -367,7 +367,7 @@ object Generator {
         val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.invalidData(ctx.oid, m))
+          g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
@@ -380,7 +380,7 @@ object Generator {
         val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
-          g <- EitherT(gen).leftMap(m => Error.invalidData(ctx.oid, m))
+          g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
         } yield p
 
