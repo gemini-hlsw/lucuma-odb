@@ -1040,6 +1040,11 @@ class updateObservations extends OdbSuite
               nanometers
             }
           }
+          flamingos2LongSlit {
+            disperser
+            filter
+            fpu
+          }
         }
       }
     """
@@ -1059,6 +1064,38 @@ class updateObservations extends OdbSuite
                   "centralWavelength": {
                     "nanometers": 234.560
                   }
+                },
+                "flamingos2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: Y
+          fpu: LONG_SLIT_2
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2"
                 }
               }
             }
@@ -1067,7 +1104,12 @@ class updateObservations extends OdbSuite
       }
     """.asRight
 
-    oneUpdateTest(pi, update, query, expected)
+    multiUpdateTest(pi,
+      List(
+        (update, query, expected),
+        (update1, query, expected1)
+      )
+    )
   }
 
   test("observing mode: (fail to) create in an existing observation") {
@@ -1102,6 +1144,149 @@ class updateObservations extends OdbSuite
   }
 
   test("observing mode: update existing") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 234.56
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthLongSlit {
+            grating
+          }
+          flamingos2LongSlit {
+            disperser
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                },
+                "flamingos2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "grating": "R831_G5302"
+                },
+                "flamingos2LongSlit": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update2 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: Y
+          fpu: LONG_SLIT_2
+        }
+      }
+    """
+
+    val expected2 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update3 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_HK
+          filter: Y
+          fpu: LONG_SLIT_2
+        }
+      }
+    """
+
+    val expected3 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_HK"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1),
+        (update2, query, expected2),
+        (update3, query, expected3)
+      )
+    )
+  }
+
+  test("observing mode: update existing f2") {
 
     val update0 = """
       observingMode: {
@@ -1599,6 +1784,9 @@ class updateObservations extends OdbSuite
           gmosNorthLongSlit {
             grating
           }
+          flamingos2LongSlit {
+            disperser
+          }
         }
       }
     """
@@ -1614,7 +1802,8 @@ class updateObservations extends OdbSuite
                 "mode": "GMOS_NORTH_LONG_SLIT",
                 "gmosNorthLongSlit": {
                   "grating": "B1200_G5301"
-                }
+                },
+                "flamingos2LongSlit": null
               }
             }
           ]
@@ -1640,7 +1829,43 @@ class updateObservations extends OdbSuite
       }
     """.asRight
 
-    multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
+    val update2 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: Y
+          fpu: LONG_SLIT_2
+        }
+      }
+    """
+
+    val expected2 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "mode": "FLAMINGOS_2_LONG_SLIT",
+                "gmosNorthLongSlit": null,
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1),
+        (update2, query, expected2)
+        )
+      )
   }
 
   def moveObservationsAs(user: User, oids: List[Observation.Id], gid: Option[Group.Id], index: Option[NonNegShort]): IO[Unit] =
