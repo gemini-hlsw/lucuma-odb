@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
@@ -15,6 +14,7 @@ import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.F2LongSlitInput
 import lucuma.odb.sequence.f2.longslit.Config
 import lucuma.odb.util.Codecs.*
@@ -28,7 +28,7 @@ trait F2LongSlitService[F[_]] {
 
   def select(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, Config]]
+  ): F[Map[Observation.Id, SourceProfile => Config]]
 
   def insert(
     input: F2LongSlitInput.Create
@@ -36,11 +36,17 @@ trait F2LongSlitService[F[_]] {
     which: List[Observation.Id],
     xa:    Transaction[F]
   ): F[Unit]
+
+  def delete(
+    which: List[Observation.Id],
+    xa:    Transaction[F]
+  ): F[Unit]
+
 }
 
 object F2LongSlitService {
 
-  def instantiate[F[_]: Concurrent](using Services[F]): F2LongSlitService[F] =
+  def instantiate[F[_]: {Concurrent as F, Services}]: F2LongSlitService[F] =
 
     new F2LongSlitService[F] {
 
@@ -61,7 +67,7 @@ object F2LongSlitService {
       ): F[List[(Observation.Id, A)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Applicative[F].pure(List.empty)) { oids =>
+          .fold(List.empty.pure[F]) { oids =>
             val af = f(oids)
             session.prepareR(af.fragment.query(observation_id *: decoder)).use { pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList
@@ -70,9 +76,9 @@ object F2LongSlitService {
 
       override def select(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, Config]] =
+      ): F[Map[Observation.Id, SourceProfile => Config]] =
         select(which, Statements.selectF2LongSlit, f2LS)
-          .map(_.map { case (oid, f2) => (oid, f2.toObservingMode) }.toMap)
+          .map(_.map { case (oid, f2) => (oid, (_: SourceProfile) => f2.toObservingMode) }.toMap)
 
       override def insert(
         input: F2LongSlitInput.Create,
@@ -81,6 +87,12 @@ object F2LongSlitService {
         xa:    Transaction[F]
       ): F[Unit] =
         which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
+
+      def delete(
+        which: List[Observation.Id],
+        xa:    Transaction[F]
+      ): F[Unit] =
+        Statements.deleteF2(which).fold(F.unit)(session.exec)
 
     }
 
@@ -98,7 +110,7 @@ object F2LongSlitService {
           ls.c_decker,
           ls.c_readout_mode
         FROM
-          #t_flamingos_2_long_slit ls
+          t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
       """(Void) |+|
       void"""
@@ -158,5 +170,13 @@ object F2LongSlitService {
         input.explicitReadoutMode
       )
 
+
+    def deleteF2(
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      NonEmptyList.fromList(which).map { oids =>
+        void"DELETE FROM ONLY t_flamingos_2_long_slit " |+|
+          void"WHERE " |+| observationIdIn(oids)
+      }
   }
 }

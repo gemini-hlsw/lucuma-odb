@@ -23,7 +23,7 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
   test("F2LongSlitInput.Create toObservingMode should preserve values"):
     forAll: (c: F2LongSlitInput.Create) =>
       val om = c.toObservingMode
-      assertEquals(om.grating, c.disperser)
+      assertEquals(om.disperser, c.disperser)
       assertEquals(om.filter, c.filter)
       assertEquals(om.fpu, c.fpu)
       assertEquals(om.explicitReadMode, c.explicitReadMode)
