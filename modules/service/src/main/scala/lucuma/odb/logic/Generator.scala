@@ -417,7 +417,9 @@ object Generator {
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
 
           case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
-            ???
+            EitherT.leftT[F, ExecutionDigest](
+              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
+            )
         )
 
       override def generate(
@@ -446,7 +448,9 @@ object Generator {
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 
           case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
-            ???
+            EitherT.leftT[F, InstrumentExecutionConfig](
+              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
+            )
 
       private def executionDigest[S, D](
         proto:     ProtoExecutionConfig[S, Atom[D]],
