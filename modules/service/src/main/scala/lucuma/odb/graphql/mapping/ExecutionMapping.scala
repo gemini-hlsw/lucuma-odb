@@ -7,7 +7,6 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import grackle.Env
 import grackle.Query
@@ -27,7 +26,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
@@ -117,17 +115,6 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   }
 
-  extension (e: Generator.Error) {
-    def toResult: Result[Json] =
-      val odbError =
-        e match
-          case Generator.Error.ItcError(e) => OdbError.ItcError(e.format.some)
-          case _                           => OdbError.SequenceUnavailable(e.format.some)
-
-      odbError.asWarning(Json.Null)
-  }
-
-
   private lazy val configHandler: EffectHandler[F] =
 
     val readEnv: Env => Result[Generator.FutureLimit] = env =>
@@ -138,7 +125,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         services.use: s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
            .generate(pid, oid, futureLimit)
-           .map(_.bimap(_.toResult, _.asJson.success).merge)
+           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
     // merges them with the top-level query environment.  This is done in order
@@ -168,7 +155,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         services.use { s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
            .digest(pid, oid)
-           .map(_.bimap(_.toResult, _.asJson.success).merge)
+           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
         }
       }
 

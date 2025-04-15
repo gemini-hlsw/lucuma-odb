@@ -22,19 +22,13 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.Timestamp
+import lucuma.itc.IntegrationTime
+import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Obscalc
+import lucuma.odb.data.OdbError
 import lucuma.odb.logic.Generator
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.util.Codecs.categorized_time
-import lucuma.odb.util.Codecs.core_timestamp
-import lucuma.odb.util.Codecs.execution_state
-import lucuma.odb.util.Codecs.int4_nonneg
-import lucuma.odb.util.Codecs.nel
-import lucuma.odb.util.Codecs.obs_class
-import lucuma.odb.util.Codecs.obscalc_state
-import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.program_id
-import lucuma.odb.util.Codecs.time_span
+import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
 import skunk.codec.numeric._int8
@@ -135,6 +129,26 @@ object ObscalcService:
     private val pending_obscalc: Codec[Obscalc.PendingCalc] =
       (program_id *: observation_id *: core_timestamp).to[Obscalc.PendingCalc]
 
+    private val odb_error: Codec[OdbError] =
+      jsonb.eimap(
+        _.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}")
+      )(_.asJson)
+
+    private val integration_time: Codec[IntegrationTime] =
+      (time_span *: int4_nonneg).to[IntegrationTime]
+
+    private val signal_to_noise_at: Codec[SignalToNoiseAt] =
+      (wavelength_pm *: signal_to_noise *: signal_to_noise)
+        .imap((w, s, t) => SignalToNoiseAt(w, lucuma.itc.SingleSN(s), lucuma.itc.TotalSN(t)))(
+          sna => (sna.wavelength, sna.single.value, sna.total.value)
+        )
+
+    private val target_result: Codec[ItcService.TargetResult] =
+      (target_id *: integration_time *: signal_to_noise_at.opt).to[ItcService.TargetResult]
+
+    private val itc_result: Codec[Obscalc.ItcResult] =
+      (target_result *: target_result).to[Obscalc.ItcResult]
+
     private val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
 
@@ -173,13 +187,13 @@ object ObscalcService:
     private val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
-    private val itc_result: Codec[ItcService.Result] =
-      jsonb.eimap(
-        _.as[ItcService.Result].leftMap(f => s"Could not decode ItcService.Result: ${f.message}")
-      )(_.asJson)
-
     private val obscalc_result: Codec[Obscalc.Result] =
-      (itc_result *: execution_digest.opt).to[Obscalc.Result]
+      (odb_error.opt *: itc_result.opt *: execution_digest.opt).eimap {
+        case (Some(e), None, None)    => Obscalc.Result.Error(e).asRight
+        case (None, None, Some(d))    => Obscalc.Result.WithoutTarget(d).asRight
+        case (None, Some(i), Some(d)) => Obscalc.Result.WithTarget(i, d).asRight
+        case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
+      }(r => (r.odbError, r.itcResult, r.digest))
 
     private val obscalc: Codec[Obscalc] =
       (observation_id *: obscalc_state *: core_timestamp *: core_timestamp *: obscalc_result).to[Obscalc]
@@ -190,15 +204,33 @@ object ObscalcService:
         "c_obscalc_state",
         "c_last_invalidation",
         "c_last_update",
-        "c_itc_result",
+
+        "c_odb_error",
+
+        "c_img_target_id",
+        "c_img_exposure_time",
+        "c_img_exposure_count",
+        "c_img_wavelength",
+        "c_img_single_sn",
+        "c_img_total_sn",
+
+        "c_spec_target_id",
+        "c_spec_exposure_time",
+        "c_spec_exposure_count",
+        "c_spec_wavelength",
+        "c_spec_single_sn",
+        "c_spec_total_sn",
+
         "c_full_setup_time",
         "c_reacq_setup_time",
+
         "c_acq_obs_class",
         "c_acq_non_charged_time",
         "c_acq_program_time",
         "c_acq_offsets",
         "c_acq_atom_count",
         "c_acq_execution_state",
+
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time",
@@ -269,15 +301,33 @@ object ObscalcService:
                                      ELSE 'pending'
                                    END,
           c_last_update          = now(),
-          c_itc_result           = $jsonb,
+
+          c_odb_error            = $jsonb,
+
+          c_img_target_id        = ${target_id.opt},
+          c_img_exposure_time    = ${time_span.opt},
+          c_img_exposure_count   = ${int4_nonneg.opt},
+          c_img_wavelength       = ${wavelength_pm.opt},
+          c_img_single_sn        = ${signal_to_noise.opt},
+          c_img_total_sn         = ${signal_to_noise.opt},
+
+          c_spec_target_id       = ${target_id.opt},
+          c_spec_exposure_time   = ${time_span.opt},
+          c_spec_exposure_count  = ${int4_nonneg.opt},
+          c_spec_wavelength      = ${wavelength_pm.opt},
+          c_spec_single_sn       = ${signal_to_noise.opt},
+          c_spec_total_sn        = ${signal_to_noise.opt},
+
           c_full_setup_time      = ${time_span.opt},
           c_reacq_setup_time     = ${time_span.opt},
+
           c_acq_obs_class        = ${obs_class.opt},
           c_acq_non_charged_time = ${time_span.opt},
           c_acq_program_time     = ${time_span.opt},
           c_acq_offsets          = ${offset_array.opt},
           c_acq_atom_count       = ${int4_nonneg.opt},
           c_acq_execution_state  = ${execution_state.opt},
+
           c_sci_obs_class        = ${obs_class.opt},
           c_sci_non_charged_time = ${time_span.opt},
           c_sci_program_time     = ${time_span.opt},
@@ -289,20 +339,39 @@ object ObscalcService:
          .contramap: (p, r) =>
            (
              p.lastInvalidation,
-             r.itc.asJson,
+
+             r.odbError.asJson,
+
+             r.itcResult.map(_.imaging.targetId),
+             r.itcResult.map(_.imaging.value.exposureTime),
+             r.itcResult.map(_.imaging.value.exposureCount),
+             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength),
+             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value),
+             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value),
+
+             r.itcResult.map(_.spectroscopy.targetId),
+             r.itcResult.map(_.spectroscopy.value.exposureTime),
+             r.itcResult.map(_.spectroscopy.value.exposureCount),
+             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.wavelength),
+             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.single.value),
+             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.total.value),
+
              r.digest.map(_.setup.full),
              r.digest.map(_.setup.reacquisition),
+
              r.digest.map(_.acquisition.observeClass),
              r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged)),
              r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program)),
              r.digest.map(_.acquisition.offsets.toList),
              r.digest.map(_.acquisition.atomCount),
              r.digest.map(_.acquisition.executionState),
+
              r.digest.map(_.science.observeClass),
              r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged)),
              r.digest.map(_.science.timeEstimate(ChargeClass.Program)),
              r.digest.map(_.science.offsets.toList),
              r.digest.map(_.science.atomCount),
              r.digest.map(_.science.executionState),
+
              p.observationId
            )

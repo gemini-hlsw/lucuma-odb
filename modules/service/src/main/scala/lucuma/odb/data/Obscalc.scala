@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import cats.syntax.option.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
@@ -15,7 +16,7 @@ case class Obscalc(
   state:            Obscalc.State,
   lastInvalidation: Timestamp,
   lastUpdate:       Timestamp,
-  result:          Obscalc.Result
+  result:           Obscalc.Result
 )
 
 object Obscalc:
@@ -31,7 +32,32 @@ object Obscalc:
     case Calculating extends State("calculating")
     case Ready       extends State("ready")
 
-  case class Result(
-    itc:    ItcService.Result,
-    digest: Option[ExecutionDigest]
+  case class ItcResult(
+    imaging:      ItcService.TargetResult,
+    spectroscopy: ItcService.TargetResult
   )
+
+  sealed trait Result extends Product with Serializable:
+    def fold[A](
+      error:         Result.Error         => A,
+      withoutTarget: Result.WithoutTarget => A,
+      withTarget:    Result.WithTarget    => A
+    ): A =
+      this match
+        case a@Result.Error(_)         => error(a)
+        case a@Result.WithoutTarget(_) => withoutTarget(a)
+        case a@Result.WithTarget(_, _) => withTarget(a)
+
+    def odbError: Option[OdbError] =
+      fold(_.e.some, _ => none, _ => none)
+
+    def itcResult: Option[ItcResult] =
+      fold(_ => none, _ => none, _.i.some)
+
+    def digest: Option[ExecutionDigest] =
+      fold(_ => none, _.d.some, _.d.some)
+
+  object Result:
+    case class Error(e: OdbError)                           extends Result
+    case class WithoutTarget(d: ExecutionDigest)            extends Result
+    case class WithTarget(i: ItcResult, d: ExecutionDigest) extends Result

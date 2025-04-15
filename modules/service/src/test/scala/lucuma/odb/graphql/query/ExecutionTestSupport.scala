@@ -57,6 +57,7 @@ import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -559,7 +560,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     oid:      Observation.Id,
     limit:    Option[Int]       = None,  // [0, 100]
     when:     Option[Timestamp] = None
-  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+  ): IO[Either[OdbError, InstrumentExecutionConfig]] =
     withSession: session =>
       for
         future <- limit.traverse(lim => IO.fromOption(Generator.FutureLimit.from(lim).toOption)(new IllegalArgumentException("Specify a future limit from 0 to 100")))
@@ -584,7 +585,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     when:     Option[Timestamp] = None
   ): IO[InstrumentExecutionConfig] =
     generate(pid, oid, limit, when).flatMap: res =>
-      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
 
   /**
    * Generates the sequence as if requested after the specified amount of time
@@ -597,7 +598,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     pid:  Program.Id,
     oid:  Observation.Id,
     time: TimeSpan
-  ): IO[Either[Generator.Error, InstrumentExecutionConfig]] =
+  ): IO[Either[OdbError, InstrumentExecutionConfig]] =
     for {
       now  <- timestampNow
       when <- IO.fromOption(now.plusMicrosOption(time.toMicroseconds))(new IllegalArgumentException(s"$time is too big"))
@@ -617,6 +618,6 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     time: TimeSpan
   ): IO[InstrumentExecutionConfig] =
     generateAfter(pid, oid, time).flatMap: res =>
-      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.format}")))
+      IO.fromEither(res.leftMap(e => new RuntimeException(s"Failed to generate the sequence: ${e.message}")))
 
 }
