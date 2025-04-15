@@ -175,8 +175,8 @@ object GuideService {
 
   private def generalError(error: String): OdbError =
     OdbError.GuideEnvironmentError(error.some)
-  private def generatorError(error: Generator.Error): OdbError =
-    OdbError.GuideEnvironmentError(error.format.some)
+  private def generatorError(error: OdbError): OdbError =
+    OdbError.GuideEnvironmentError(error.message.some)
   private def gaiaError(error:String): OdbError =
     OdbError.GuideEnvironmentError(s"Error calling Gaia: $error".some)
   private def guideStarNameError(name: String): OdbError =

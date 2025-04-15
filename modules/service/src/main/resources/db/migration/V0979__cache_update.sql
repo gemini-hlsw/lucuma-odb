@@ -10,7 +10,23 @@ CREATE TABLE t_obscalc(
   c_last_invalidation    timestamp           NOT NULL DEFAULT NOW(),
   c_last_update          timestamp           NOT NULL DEFAULT NOW(),
 
-  c_itc_result           jsonb,
+  c_odb_error            jsonb,
+
+  -- Imaging ITC Result
+  c_img_target_id        d_target_id         REFERENCES t_target(c_target_id) ON DELETE CASCADE,
+  c_img_exposure_time    interval,
+  c_img_exposure_count   int4,
+  c_img_wavelength       d_wavelength_pm,
+  c_img_single_sn        numeric(10,3),
+  c_img_total_sn         numeric(10, 3),
+
+  -- Spectroscopy ITC Result
+  c_spec_target_id        d_target_id        REFERENCES t_target(c_target_id) ON DELETE CASCADE,
+  c_spec_exposure_time    interval,
+  c_spec_exposure_count   int4,
+  c_spec_wavelength       d_wavelength_pm,
+  c_spec_single_sn        numeric(10,3),
+  c_spec_total_sn         numeric(10, 3),
 
   -- Setup time
   c_full_setup_time      interval,
