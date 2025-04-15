@@ -102,7 +102,7 @@ object ObservingModeServices {
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
-          // input.f2LongSlit.map(f2LongSlitService.update)
+          input.flamingos2LongSlit.map(f2LongSlitService.update)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
@@ -115,7 +115,7 @@ object ObservingModeServices {
         List(
           input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
           input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth)),
-          // input.f2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert))
+          input.flamingos2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert)),
         ).flattenOption match {
           case List(f) => f
           case Nil     => Result.failure("No observing mode edit parameters were provided.")

@@ -42,6 +42,12 @@ trait F2LongSlitService[F[_]] {
     xa:    Transaction[F]
   ): F[Unit]
 
+  def update(
+    SET: F2LongSlitInput.Edit
+  )(
+    which: List[Observation.Id],
+    xa:    Transaction[F]
+  ): F[Unit]
 }
 
 object F2LongSlitService {
@@ -94,6 +100,13 @@ object F2LongSlitService {
       ): F[Unit] =
         Statements.deleteF2(which).fold(F.unit)(session.exec)
 
+      def update(
+        SET: F2LongSlitInput.Edit
+      )(
+        which: List[Observation.Id],
+        xa:    Transaction[F]
+      ): F[Unit] =
+        Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
     }
 
   object Statements {
@@ -170,13 +183,46 @@ object F2LongSlitService {
         input.explicitReadoutMode
       )
 
-
-    def deleteF2(
-      which: List[Observation.Id]
-    ): Option[AppliedFragment] =
+    def deleteF2(which: List[Observation.Id]): Option[AppliedFragment] =
       NonEmptyList.fromList(which).map { oids =>
         void"DELETE FROM ONLY t_flamingos_2_long_slit " |+|
           void"WHERE " |+| observationIdIn(oids)
       }
+
+    private def f2Updates(input: F2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
+
+      val upDisperser   = sql"c_disperser    = $f2_disperser"
+      val upFilter      = sql"c_filter       = ${f2_filter.opt}"
+      val upFpu         = sql"c_fpu          = $f2_fpu"
+      val upReadMode    = sql"c_read_mode    = ${f2_read_mode.opt}"
+      val upReads       = sql"c_reads        = ${f2_reads.opt}"
+      val upDecker      = sql"c_decker       = ${f2_decker.opt}"
+      val upReadoutMode = sql"c_readout_mode = ${f2_readout_mode.opt}"
+
+      val ups: List[AppliedFragment] =
+        List(
+          input.disperser.map(upDisperser),
+          input.filter.toOptionOption.map(upFilter),
+          input.fpu.map(upFpu),
+          input.explicitReadMode.toOptionOption.map(upReadMode),
+          input.explicitReads.toOptionOption.map(upReads),
+          input.explicitDecker.toOptionOption.map(upDecker),
+          input.explicitReadoutMode.toOptionOption.map(upReadoutMode)
+        ).flatten
+
+      NonEmptyList.fromList(ups)
+    }
+
+    def updateF2LongSlit(
+      SET:   F2LongSlitInput.Edit,
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      for {
+        us   <- f2Updates(SET)
+        oids <- NonEmptyList.fromList(which)
+      } yield
+        void"UPDATE t_flamingos_2_long_slit " |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+          void"WHERE " |+| observationIdIn(oids)
   }
 }
