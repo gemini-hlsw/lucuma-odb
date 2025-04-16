@@ -1,20 +1,20 @@
 val catsParseVersion           = "1.1.0"
 val catsTimeVersion            = "0.5.1"
-val circeVersion               = "0.14.10"
+val circeVersion               = "0.14.12"
 val circeRefinedVersion        = "0.15.1"
-val cirisVersion               = "3.7.0"
+val cirisVersion               = "3.8.0"
 val clueVersion                = "0.43.1"
 val declineVersion             = "2.5.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.2.0"
-val fs2Version                 = "3.11.0"
+val fs2Version                 = "3.12.0"
 val grackleVersion             = "0.23.0"
 val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
-val http4sJdkHttpClientVersion = "0.9.2"
+val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
-val logbackVersion             = "1.5.17"
+val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.0"
 val lucumaItcVersion           = "0.34.1"
 val lucumaCoreVersion          = "0.124.0"
@@ -157,7 +157,6 @@ lazy val service = project
       "is.cir"                   %% "ciris"                              % cirisVersion,
       "is.cir"                   %% "ciris-refined"                      % cirisVersion,
       "org.flywaydb"              % "flyway-core"                        % flywayVersion,
-      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion,
       "org.http4s"               %% "http4s-blaze-server"                % http4sBlazeVersion,
       "org.http4s"               %% "http4s-ember-client"                % http4sEmberVersion,
       "org.postgresql"            % "postgresql"                         % postgresVersion,
@@ -179,6 +178,7 @@ lazy val service = project
       "org.typelevel"            %% "discipline-munit"                   % munitDisciplineVersion     % Test,
       "edu.gemini"               %% "lucuma-catalog-testkit"             % lucumaCoreVersion          % Test,
       "edu.gemini"               %% "lucuma-core-testkit"                % lucumaCoreVersion          % Test,
+      "org.http4s"               %% "http4s-jdk-http-client"             % http4sJdkHttpClientVersion % Test,
       "org.typelevel"            %% "cats-time"                          % catsTimeVersion,
       "org.typelevel"            %% "log4cats-slf4j"                     % log4catsVersion,
       "org.typelevel"            %% "munit-cats-effect-3"                % munitCatsEffectVersion     % Test,
