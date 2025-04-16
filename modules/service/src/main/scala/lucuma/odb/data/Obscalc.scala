@@ -16,7 +16,7 @@ case class Obscalc(
   state:            Obscalc.State,
   lastInvalidation: Timestamp,
   lastUpdate:       Timestamp,
-  result:           Obscalc.Result
+  result:           Option[Obscalc.Result]
 )
 
 object Obscalc:
