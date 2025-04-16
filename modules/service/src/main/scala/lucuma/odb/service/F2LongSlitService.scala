@@ -30,24 +30,13 @@ trait F2LongSlitService[F[_]] {
     which: List[Observation.Id]
   ): F[Map[Observation.Id, SourceProfile => Config]]
 
-  def insert(
-    input: F2LongSlitInput.Create
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  def insert(input: F2LongSlitInput.Create)(
+    which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def delete(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def update(
-    SET: F2LongSlitInput.Edit
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  def update(SET: F2LongSlitInput.Edit)(
+    which: List[Observation.Id])(using Transaction[F]): F[Unit]
 }
 
 object F2LongSlitService {
@@ -88,24 +77,14 @@ object F2LongSlitService {
 
       override def insert(
         input: F2LongSlitInput.Create,
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
 
-      def delete(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      def delete(which: List[Observation.Id] )(using Transaction[F]): F[Unit] =
         Statements.deleteF2(which).fold(F.unit)(session.exec)
 
-      def update(
-        SET: F2LongSlitInput.Edit
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      def update(SET: F2LongSlitInput.Edit)(
+        which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
     }
 

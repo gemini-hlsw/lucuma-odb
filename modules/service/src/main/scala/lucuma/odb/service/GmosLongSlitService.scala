@@ -46,41 +46,23 @@ trait GmosLongSlitService[F[_]] {
 
   def insertNorth(
     input: GmosLongSlitInput.Create.North
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def insertSouth(
     input: GmosLongSlitInput.Create.South
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def deleteNorth(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def deleteSouth(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  def deleteSouth(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def updateNorth(
     SET:   GmosLongSlitInput.Edit.North
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def updateSouth(
     SET: GmosLongSlitInput.Edit.South
-  )(
-    which: List[Observation.Id],
-    xa:    Transaction[F]
-  ): F[Unit]
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def cloneNorth(
     originalId: Observation.Id,
@@ -158,46 +140,28 @@ object GmosLongSlitService {
 
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         which.traverse { oid => session.exec(Statements.insertGmosNorthLongSlit(oid, input)) }.void
 
       override def insertSouth(
         input: GmosLongSlitInput.Create.South,
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         which.traverse { oid => session.exec(Statements.insertGmosSouthLongSlit(oid, input)) }.void
 
-      override def deleteNorth(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      override def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteGmosNorthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
-      override def deleteSouth(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      override def deleteSouth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteGmosSouthLongSlit(which).fold(Applicative[F].unit)(session.exec)
 
       override def updateNorth(
         SET:   GmosLongSlitInput.Edit.North
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.updateGmosNorthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
 
       override def updateSouth(
         SET: GmosLongSlitInput.Edit.South
-      )(
-        which: List[Observation.Id],
-        xa:    Transaction[F]
-      ): F[Unit] =
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.updateGmosSouthLongSlit(SET, which).fold(Applicative[F].unit)(session.exec)
 
       def cloneNorth(
