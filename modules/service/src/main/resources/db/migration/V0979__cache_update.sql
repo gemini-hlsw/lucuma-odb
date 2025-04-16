@@ -38,7 +38,7 @@ CREATE TABLE t_obscalc(
   c_acq_program_time     interval,
   c_acq_offsets          int8[][],
   c_acq_atom_count       int4                CHECK (c_acq_atom_count >= 0),
-  c_acq_execution_state  e_execution_state   NOT NULL DEFAULT 'not_defined',
+  c_acq_execution_state  e_execution_state,
 
   -- Science Digest
   c_sci_obs_class        e_obs_class,
@@ -46,5 +46,5 @@ CREATE TABLE t_obscalc(
   c_sci_program_time     interval,
   c_sci_offsets          int8[][],
   c_sci_atom_count       int4                CHECK (c_sci_atom_count >= 0),
-  c_sci_execution_state  e_execution_state   NOT NULL DEFAULT 'not_defined'
+  c_sci_execution_state  e_execution_state
 );

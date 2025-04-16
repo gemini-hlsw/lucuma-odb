@@ -17,6 +17,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import io.circe.syntax.*
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.ExecutionState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -149,7 +150,8 @@ object ObscalcService:
 
     private val odb_error: Codec[OdbError] =
       jsonb.eimap(
-        _.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}")
+        json => if json.isNull then s"Could not decode OdbError: unexpected NULL value.".asLeft
+                else json.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}.")
       )(_.asJson)
 
     private val integration_time: Codec[IntegrationTime] =
@@ -205,13 +207,14 @@ object ObscalcService:
     private val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
-    private val obscalc_result: Codec[Obscalc.Result] =
+    private val obscalc_result: Codec[Option[Obscalc.Result]] =
       (odb_error.opt *: itc_result.opt *: execution_digest.opt).eimap {
-        case (Some(e), None, None)    => Obscalc.Result.Error(e).asRight
-        case (None, None, Some(d))    => Obscalc.Result.WithoutTarget(d).asRight
-        case (None, Some(i), Some(d)) => Obscalc.Result.WithTarget(i, d).asRight
+        case (None, None, None)       => none.asRight
+        case (Some(e), None, None)    => Obscalc.Result.Error(e).some.asRight
+        case (None, None, Some(d))    => Obscalc.Result.WithoutTarget(d).some.asRight
+        case (None, Some(i), Some(d)) => Obscalc.Result.WithTarget(i, d).some.asRight
         case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
-      }(r => (r.odbError, r.itcResult, r.digest))
+      }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest)))
 
     private val obscalc: Codec[Obscalc] =
       (observation_id *: obscalc_state *: core_timestamp *: core_timestamp *: obscalc_result).to[Obscalc]
@@ -304,7 +307,7 @@ object ObscalcService:
         SET c_obscalc_state = 'calculating'
         FROM tasks
         WHERE c.c_observation_id = tasks.c_observation_id
-        RETURNING tasks.c_program_id, c.c_observation_id, c_last_invalidation
+        RETURNING tasks.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
     val StoreResult: Command[(
@@ -315,12 +318,12 @@ object ObscalcService:
         UPDATE t_obscalc
         SET
           c_obscalc_state        = CASE
-                                     WHEN c_last_invalidation = $core_timestamp THEN 'ready'
-                                     ELSE 'pending'
+                                     WHEN c_last_invalidation = $core_timestamp THEN 'ready' :: e_obscalc_state
+                                     ELSE 'pending' :: e_obscalc_state
                                    END,
           c_last_update          = now(),
 
-          c_odb_error            = $jsonb,
+          c_odb_error            = ${odb_error.opt},
 
           c_img_target_id        = ${target_id.opt},
           c_img_exposure_time    = ${time_span.opt},
@@ -358,7 +361,7 @@ object ObscalcService:
            (
              p.lastInvalidation,
 
-             r.odbError.asJson,
+             r.odbError,
 
              r.itcResult.map(_.imaging.targetId),
              r.itcResult.map(_.imaging.value.exposureTime),
