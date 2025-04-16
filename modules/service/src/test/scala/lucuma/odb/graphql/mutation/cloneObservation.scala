@@ -21,7 +21,7 @@ class cloneObservation extends OdbSuite {
   lazy val validUsers = List(pi, pi2, staff)
 
   val ObservationGraph = s"""
-    { 
+    {
       title
       subtitle
       program { id }
@@ -47,16 +47,23 @@ class cloneObservation extends OdbSuite {
       }
       observingMode {
         gmosNorthLongSlit {
-          grating 
-          filter 
-          fpu 
+          grating
+          filter
+          fpu
           centralWavelength { nanometers }
         }
         gmosSouthLongSlit {
-          grating 
-          filter 
-          fpu 
+          grating
+          filter
+          fpu
           centralWavelength { nanometers }
+        }
+        flamingos2LongSlit {
+          disperser
+          filter
+          fpu
+          readMode
+          reads
         }
       }
       targetEnvironment {
@@ -69,9 +76,7 @@ class cloneObservation extends OdbSuite {
     """
 
   test("clones should have the same properties, for all observing modes") {
-    // TODO Remove filter when F2 is supported
-    // ObservingModeType.values.toList.traverse { obsMode =>
-    ObservingModeType.values.filterNot(_ === ObservingModeType.Flamingos2LongSlit).toList.traverse { obsMode =>
+    ObservingModeType.values.toList.traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
         (t, t).tupled.flatMap { (tid1, tid2) =>
@@ -93,10 +98,10 @@ class cloneObservation extends OdbSuite {
               val b = json.hcursor.downFields("cloneObservation", "newObservation").require[Json]
               assertEquals(a, b)
             }
-          }          
+          }
         }
       }
-    }      
+    }
   }
 
   test("clones should have different ids") {
@@ -120,7 +125,7 @@ class cloneObservation extends OdbSuite {
             assertNotEquals(
               json.hcursor.downFields("cloneObservation", "originalObservation", "id").require[Observation.Id],
               json.hcursor.downFields("cloneObservation", "newObservation", "id").require[Observation.Id]
-            )          
+            )
           }
         }
       }
@@ -141,7 +146,7 @@ class cloneObservation extends OdbSuite {
     setup.flatMap { (tid1, tid2, oid) =>
       expect(
         user = pi,
-        query = 
+        query =
           s"""
           query {
           observation(observationId: ${oid.asJson}) {
@@ -194,7 +199,7 @@ class cloneObservation extends OdbSuite {
     setup.flatMap { (tid, oid) =>
       expect(
         user = pi,
-        query = 
+        query =
           s"""
           query {
           observation(observationId: ${oid.asJson}) {
@@ -256,7 +261,7 @@ class cloneObservation extends OdbSuite {
             mutation {
               cloneObservation(input: {observationId: ${oid.asJson}}) {
                 originalObservation {
-                  id     
+                  id
                 }
                 newObservation {
                   id
