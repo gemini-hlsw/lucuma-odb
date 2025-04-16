@@ -104,7 +104,7 @@ object F2LongSlitInput {
   }
 
   case class Edit(
-    grating: Option[F2Disperser],
+    disperser: Option[F2Disperser],
     filter: Nullable[F2Filter],
     fpu: Option[F2Fpu],
     explicitReadMode: Nullable[F2ReadMode],
@@ -124,7 +124,7 @@ object F2LongSlitInput {
 
     val toCreate: Result[Create] =
       for {
-        g <- required(grating, "grating")
+        g <- required(disperser, "disperser")
         u <- required(fpu, "fpu")
       } yield Create(
         g,
@@ -151,7 +151,7 @@ object F2LongSlitInput {
           F2FilterBinding.Nullable("filter", rFilter),
           F2FpuBinding.Option("fpu", rFpu),
           F2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
-          F2ReadsBinding.Nullable("expliciReads", rReads),
+          F2ReadsBinding.Nullable("explicitReads", rReads),
           F2DeckerBinding.Nullable("explicitDecker", rDecker),
           F2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode)
         ) => (

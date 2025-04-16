@@ -237,7 +237,7 @@ object ObservationService {
 
                   val rOptF = SET.observingMode.traverse(observingModeServices.createFunction)
                   (rOid, rOptF).parMapN { (oid, optF) =>
-                    optF.fold(oid.pure[F]) { f => f(List(oid), transaction).as(oid) }
+                    optF.fold(oid.pure[F]) { f => f(List(oid)).as(oid) }
                   }.sequence
 
                 }
@@ -345,24 +345,24 @@ object ObservationService {
               (existingMode, oEdit) match {
                 case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
                   // update existing
-                  observingModeServices.updateFunction(edit).traverse(f => f(matchingOids, transaction))
+                  observingModeServices.updateFunction(edit).traverse(_(matchingOids))
 
                 case (Some(ex), Some(edit)) =>
                   for {
                     // delete existing
-                    _ <- observingModeServices.deleteFunction(ex)(matchingOids, transaction)
+                    _ <- observingModeServices.deleteFunction(ex)(matchingOids)
 
                     // create new
-                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, transaction))
+                    r <- observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
                   } yield r
 
                 case (None,    Some(edit)) =>
                   // create new
-                  observingModeServices.createViaUpdateFunction(edit).traverse(f => f(matchingOids, transaction))
+                  observingModeServices.createViaUpdateFunction(edit).traverse(_(matchingOids))
 
                 case (Some(ex), None) =>
                   // delete existing
-                  observingModeServices.deleteFunction(ex)(matchingOids, transaction).as(Result.unit)
+                  observingModeServices.deleteFunction(ex)(matchingOids).as(Result.unit)
 
                 case _  =>
                   // do nothing

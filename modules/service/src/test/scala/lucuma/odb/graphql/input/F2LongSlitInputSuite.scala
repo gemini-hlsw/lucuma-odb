@@ -37,7 +37,7 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
 
   test("F2LongSlitInput.Edit toCreate should handle optional values correctly"):
     forAll: (e: F2LongSlitInput.Edit, grating: F2Disperser, fpu: F2Fpu) =>
-      val edit = e.copy(grating = Some(grating), fpu = Some(fpu))
+      val edit = e.copy(disperser = Some(grating), fpu = Some(fpu))
       val createResult = edit.toCreate
 
       assert(createResult.toEither.isRight, "Should succeed when all required fields are present")
@@ -45,7 +45,7 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
   test("F2LongSlitInput.Edit toCreate should fail when required fields are missing"):
     forAll: (edit: F2LongSlitInput.Edit) =>
       // Case when grating is missing
-      val noGrating = edit.copy(grating = None)
+      val noGrating = edit.copy(disperser = None)
       assert(noGrating.toCreate.isFailure, "Should fail when grating is missing")
 
       // Case when fpu is missing
@@ -53,6 +53,6 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
       assert(noFpu.toCreate.isFailure, "Should fail when fpu is missing")
 
       // Case when both are missing
-      val noBoth = edit.copy(grating = None, fpu = None)
+      val noBoth = edit.copy(disperser = None, fpu = None)
       assert(noBoth.toCreate.isFailure, "Should fail when both grating and fpu are missing")
 
