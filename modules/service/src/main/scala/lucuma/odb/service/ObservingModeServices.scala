@@ -25,23 +25,23 @@ sealed trait ObservingModeServices[F[_]] {
 
   def createFunction(
     input: ObservingModeInput.Create
-  ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
+  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
 
   def deleteFunction(
     mode: ObservingModeType
-  ): (List[Observation.Id], Transaction[F]) => F[Unit]
+  )(using Transaction[F]): List[Observation.Id] => F[Unit]
 
   def updateFunction(
     input: ObservingModeInput.Edit
-  ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
+  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
 
   def createViaUpdateFunction(
     input: ObservingModeInput.Edit
-  ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
+  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
 
   def cloneFunction(
     mode: ObservingModeType
-  ): (Observation.Id, Observation.Id) => F[Unit]
+  )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit]
 
 }
 
@@ -76,7 +76,7 @@ object ObservingModeServices {
 
       override def createFunction(
         input: ObservingModeInput.Create
-      ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
+      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
@@ -89,7 +89,7 @@ object ObservingModeServices {
 
       override def deleteFunction(
         mode: ObservingModeType
-      ): (List[Observation.Id], Transaction[F]) => F[Unit] =
+      )(using Transaction[F]): List[Observation.Id] => F[Unit] =
         mode match {
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
@@ -98,11 +98,11 @@ object ObservingModeServices {
 
       override def updateFunction(
         input: ObservingModeInput.Edit
-      ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
+      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
-          // input.f2LongSlit.map(f2LongSlitService.update)
+          input.flamingos2LongSlit.map(f2LongSlitService.update)
         ).flattenOption match {
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
@@ -111,11 +111,11 @@ object ObservingModeServices {
 
       override def createViaUpdateFunction(
         input: ObservingModeInput.Edit
-      ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
+      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
           input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth)),
-          // input.f2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert))
+          input.flamingos2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert)),
         ).flattenOption match {
           case List(f) => f
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
@@ -124,7 +124,7 @@ object ObservingModeServices {
 
       override def cloneFunction(
         mode: ObservingModeType
-      ): (Observation.Id, Observation.Id) => F[Unit] =
+      )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit] =
         mode match {
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth

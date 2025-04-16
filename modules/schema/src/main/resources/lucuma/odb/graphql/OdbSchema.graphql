@@ -7018,7 +7018,7 @@ input Flamingos2LongSlitInput {
   """
   The disperser field must be specified.  It cannot be unset with a null value.
   """
-  disperser: Flamingos2Disperser!
+  disperser: Flamingos2Disperser
 
   """
   The filter field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -7028,7 +7028,7 @@ input Flamingos2LongSlitInput {
   """
   The fpu field must be specified.  It cannot be unset with a null value.
   """
-  fpu: Flamingos2Fpu!
+  fpu: Flamingos2Fpu
 
   """
   The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
