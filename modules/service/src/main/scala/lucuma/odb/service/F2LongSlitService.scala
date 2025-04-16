@@ -37,6 +37,8 @@ trait F2LongSlitService[F[_]] {
 
   def update(SET: F2LongSlitInput.Edit)(
     which: List[Observation.Id])(using Transaction[F]): F[Unit]
+
+  def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 }
 
 object F2LongSlitService {
@@ -86,6 +88,9 @@ object F2LongSlitService {
       def update(SET: F2LongSlitInput.Edit)(
         which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
+
+      def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
+        session.exec(Statements.cloneF2(originalId, newId))
     }
 
   object Statements {
@@ -203,5 +208,38 @@ object F2LongSlitService {
         void"UPDATE t_flamingos_2_long_slit " |+|
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
+
+    def cloneF2(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      sql"""
+      INSERT INTO t_flamingos_2_long_slit (
+        c_observation_id,
+        c_program_id,
+        c_observing_mode_type,
+        c_disperser,
+        c_filter,
+        c_fpu,
+        c_read_mode,
+        c_read_mode_default,
+        c_reads,
+        c_reads_default,
+        c_decker,
+        c_readout_mode
+      )
+      SELECT
+        $observation_id,
+        (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id) AS c_program_id,
+        c_observing_mode_type,
+        c_disperser,
+        c_filter,
+        c_fpu,
+        c_read_mode,
+        c_read_mode_default,
+        c_reads,
+        c_reads_default,
+        c_decker,
+        c_readout_mode
+      FROM t_flamingos_2_long_slit
+      WHERE c_observation_id = $observation_id
+      """.apply(newId, newId, originalId)
   }
 }

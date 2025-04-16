@@ -47,7 +47,7 @@ sealed trait ObservingModeServices[F[_]] {
 
 object ObservingModeServices {
 
-  def instantiate[F[_]: MonadCancelThrow](using Services[F]): ObservingModeServices[F] =
+  def instantiate[F[_]: {MonadCancelThrow, Services}]: ObservingModeServices[F] =
     new ObservingModeServices[F] {
 
       override def selectObservingMode(
@@ -128,7 +128,7 @@ object ObservingModeServices {
         mode match {
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
-          case ObservingModeType.Flamingos2LongSlit => ???
+          case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.clone
         }
 
     }
