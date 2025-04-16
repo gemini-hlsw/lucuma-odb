@@ -156,7 +156,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     /**
      * Build a single PostgreSQL container for test suites. Runs all migrations and database initialization in the image build.
-     * 
+     *
      * The image is built for the first suite, and the Docker cache will be used for subsequent suites. Skipping the long db initialization.
      */
   override val containerDef: GenericContainer.Def[GenericContainer] =
@@ -177,7 +177,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       dockerSuffix
     else
       dockerPrefix.resolve(dockerSuffix)
-    
+
     val image = new ImageFromDockerfile("lucuma-odb-test-db")
       .withDockerfile(dockerPath)
       .withBuildArgs(env.asJava)
@@ -388,19 +388,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def session: Resource[IO, Session[IO]] =
     FMain.singleSession(databaseConfig)
 
-  private def transactionalClient(user: User)(svr: Server): IO[FetchClient[IO, Nothing]] =
-    authorizationHeader(user).flatMap { auth =>
+  private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
+      val uri  = svr.baseUri / "odb"
       for {
-        xbe <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
-        uri  = svr.baseUri / "odb"
-        xc  <- Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(Async[IO], xbe, Logger[IO])
+        auth <- Resource.eval(authorizationHeader(user))
+        xbe  <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
+        xc   <-
+          Resource.eval(Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(Async[IO], xbe, Logger[IO]))
       } yield xc
-    }
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, WebSocketClient[IO, Nothing]] =
-    Resource.eval(authorizationObject(user)).flatMap: ps =>
       for {
-        sbe <- Resource.eval(JdkWSClient.simple[IO].map(Http4sWebSocketBackend[IO](_)))
+        ps  <- Resource.eval(authorizationObject(user))
+        sbe <- JdkWSClient.simple[IO].map(Http4sWebSocketBackend[IO](_))
         uri  = (svr.baseUri / "ws").copy(scheme = Some(Http4sUri.Scheme.unsafeFromString("ws")))
         sc  <- Resource.eval(Http4sWebSocketClient.of[IO, Nothing](uri)(using Async[IO], Logger[IO], sbe))
         _   <- Resource.make(sc.connect(ps.pure[IO]))(_ => sc.disconnect())
@@ -426,7 +426,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     def connection(user: User): Server => Resource[IO, FetchClient[IO, Nothing]] =
       this match {
-        case ClientOption.Http => s => Resource.eval(transactionalClient(user)(s))
+        case ClientOption.Http => s => transactionalClient(user)(s)
         case ClientOption.Ws   => streamingClient(user)
       }
 
@@ -672,5 +672,5 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
-            
+
 }
