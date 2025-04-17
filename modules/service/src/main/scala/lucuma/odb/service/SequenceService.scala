@@ -164,7 +164,6 @@ object SequenceService {
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
-<<<<<<< HEAD
       override def selectFlamingos2StepRecords(
         observationId: Observation.Id
       ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
@@ -174,17 +173,6 @@ object SequenceService {
         observationId: Observation.Id
       ): Stream[F, StepRecord[GmosNorth]] =
         gmosSequenceService.selectGmosNorthStepRecords(observationId)
-=======
-      // override def selectGmosNorthStepRecords(
-      //   observationId: Observation.Id
-      // ): Stream[F, StepRecord[GmosNorth]] =
-      //   gmosSequenceService.selectGmosNorthStepRecords(observationId)
->>>>>>> 5061ec047 (SequenceService)
-
-      // override def selectGmosSouthStepRecords(
-      //   observationId: Observation.Id
-      // ): Stream[F, StepRecord[GmosSouth]] =
-      //   gmosSequenceService.selectGmosSouthStepRecords(observationId)
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
