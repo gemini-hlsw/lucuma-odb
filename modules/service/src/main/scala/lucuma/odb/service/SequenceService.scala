@@ -15,7 +15,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.Instrument
@@ -62,9 +61,9 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   ): Stream[F, StepRecord[GmosNorth]]
 
-  def selectGmosSouthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[GmosSouth]]
+  // def selectGmosSouthStepRecords(
+  //   observationId: Observation.Id
+  // ): Stream[F, StepRecord[GmosSouth]]
 
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
@@ -84,7 +83,7 @@ trait SequenceService[F[_]] {
     stepId: Step.Id,
     stage:  StepStage,
     time:   Timestamp
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def abandonOngoingStepsExcept(
     observationId: Observation.Id,
@@ -165,6 +164,7 @@ object SequenceService {
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
+<<<<<<< HEAD
       override def selectFlamingos2StepRecords(
         observationId: Observation.Id
       ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
@@ -174,11 +174,17 @@ object SequenceService {
         observationId: Observation.Id
       ): Stream[F, StepRecord[GmosNorth]] =
         gmosSequenceService.selectGmosNorthStepRecords(observationId)
+=======
+      // override def selectGmosNorthStepRecords(
+      //   observationId: Observation.Id
+      // ): Stream[F, StepRecord[GmosNorth]] =
+      //   gmosSequenceService.selectGmosNorthStepRecords(observationId)
+>>>>>>> 5061ec047 (SequenceService)
 
-      override def selectGmosSouthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[GmosSouth]] =
-        gmosSequenceService.selectGmosSouthStepRecords(observationId)
+      // override def selectGmosSouthStepRecords(
+      //   observationId: Observation.Id
+      // ): Stream[F, StepRecord[GmosSouth]] =
+      //   gmosSequenceService.selectGmosSouthStepRecords(observationId)
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
@@ -268,7 +274,7 @@ object SequenceService {
         stepId: Step.Id,
         stage:  StepStage,
         time:   Timestamp
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
         val state = stage match {
           case StepStage.EndStep => StepExecutionState.Completed
           case StepStage.Abort   => StepExecutionState.Aborted
