@@ -67,6 +67,7 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import org.http4s.Header
@@ -90,19 +91,19 @@ trait GuideService[F[_]] {
   import GuideService.GuideEnvironment
 
   def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F]
+    NoTransaction[F], SuperUserAccess
   ): F[Result[ObjectTracking]]
 
   def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(using
-    NoTransaction[F]
+    NoTransaction[F], SuperUserAccess
   ): F[Result[List[GuideEnvironment]]]
 
   def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F]
+    NoTransaction[F], SuperUserAccess
   ): F[Result[GuideEnvironment]]
 
   def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
-    NoTransaction[F]
+    NoTransaction[F], SuperUserAccess
   ): F[Result[List[AvailabilityPeriod]]]
 
   // def setGuideTargetName(input: SetGuideTargetNameInput)(
@@ -113,7 +114,7 @@ trait GuideService[F[_]] {
   )(using NoTransaction[F]): F[Result[Observation.Id]]
 
   def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F]
+    NoTransaction[F], SuperUserAccess
   ): F[Result[Option[NonEmptyString]]]
 }
 
@@ -296,7 +297,7 @@ object GuideService {
     new GuideService[F] {
 
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F]
+        NoTransaction[F], SuperUserAccess
       ): F[Result[NonEmptyList[Target]]] =
         asterismService
           .getAsterism(pid, oid)
@@ -610,7 +611,7 @@ object GuideService {
         genInfo:         GeneratorInfo,
         currentAvail:    ContiguousTimestampMap[List[Angle]],
         newHash:         Md5Hash
-      ): F[Result[ContiguousTimestampMap[List[Angle]]]] =
+      )(using SuperUserAccess): F[Result[ContiguousTimestampMap[List[Angle]]]] =
         (for {
           asterism     <- ResultT(getAsterism(pid, obsInfo.id))
           tracking      = ObjectTracking.fromAsterism(asterism)
@@ -747,7 +748,7 @@ object GuideService {
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
       override def getObjectTracking(pid: Program.Id, oid: Observation.Id)(using
-        NoTransaction[F]
+        NoTransaction[F], SuperUserAccess
       ): F[Result[ObjectTracking]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
@@ -765,7 +766,7 @@ object GuideService {
         obsDuration: TimeSpan,
         scienceTime: Timestamp,
         scienceDuration: TimeSpan
-      ): F[Result[GuideEnvironment]] =
+      )(using SuperUserAccess): F[Result[GuideEnvironment]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
         // select the best.
@@ -819,7 +820,7 @@ object GuideService {
         } yield env).value
 
       override def getGuideEnvironment(pid: Program.Id, oid: Observation.Id)(
-        using NoTransaction[F]
+        using NoTransaction[F], SuperUserAccess
       ): F[Result[GuideEnvironment]] =
         Trace[F].span("getGuideEnvironment"):
           (for {
@@ -835,7 +836,7 @@ object GuideService {
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
-        using NoTransaction[F]
+        using NoTransaction[F], SuperUserAccess
       ): F[Result[Option[NonEmptyString]]] =
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
@@ -849,7 +850,7 @@ object GuideService {
 
       // TODO: This can go away when Navigate is ready.
       override def getGuideEnvironments(pid: Program.Id, oid: Observation.Id, obsTime: Timestamp)(
-        using NoTransaction[F]
+        using NoTransaction[F], SuperUserAccess
       ): F[Result[List[GuideEnvironment]]] =
         (for {
           obsInfo       <- ResultT(getObservationInfo(oid))
@@ -887,7 +888,7 @@ object GuideService {
         } yield usable.toGuideEnvironments.toList).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
-        using NoTransaction[F]
+        using NoTransaction[F], SuperUserAccess
       ): F[Result[List[AvailabilityPeriod]]] =
         Trace[F].span("getGuideAvailability"):
           (for {
