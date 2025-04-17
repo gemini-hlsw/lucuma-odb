@@ -39,6 +39,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.enums.Enums
+import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.MissingParamSet
@@ -80,8 +81,7 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
   def setWorkflowState(
-    oid: Observation.Id,
-    state: ObservationWorkflowState,
+    input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
     commitHash: CommitHash,
     itcClient: ItcClient[F],
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -551,18 +551,14 @@ object ObservationWorkflowService {
           .flatMap(getWorkflows(_, commitHash, itcClient, ptc))
 
       override def setWorkflowState(
-        oid: Observation.Id,
-        state: ObservationWorkflowState,
+        input: AccessControl.CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id],
         commitHash: CommitHash,
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
-        ResultT(Services.asSuperUser(getWorkflows(List(oid), commitHash, itcClient, ptc)))
-          .map(_(oid))
-          .flatMap: w =>
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): 
+          case ((w, state), oid) =>
             if w.state === state then ResultT.success(w)
-            else if !w.validTransitions.contains(state)
-            then ResultT.failure(OdbError.InvalidWorkflowTransition(w.state, state).asProblem)
             else ResultT: 
               // If we're transitioning to or from a UserState, just update that column
               if w.state.isUserState || state.isUserState then
