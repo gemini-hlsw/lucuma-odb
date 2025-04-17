@@ -44,13 +44,10 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
     yield (p, t, o)
 
   def instantiate(services: Services[IO]): IO[ObscalcService[IO]] =
-      given Services[IO] = services
       TimeEstimateCalculatorImplementation
         .fromSession(services.session, services.enums)
         .map: tec =>
-          val gen = services.generator(CommitHash.Zero, itcClient, tec)
-          ObscalcService.instantiate(services.itcService(itcClient), gen)
-
+          services.obscalcService(CommitHash.Zero, itcClient, tec)
 
   def withObscalcService[A](f: ObscalcService[IO] => IO[A]): IO[A] =
     withServices(serviceUser): services =>
