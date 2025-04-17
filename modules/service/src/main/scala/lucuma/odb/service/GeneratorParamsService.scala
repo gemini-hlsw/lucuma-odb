@@ -171,7 +171,7 @@ object GeneratorParamsService {
         for
           paramsRows <- params
           oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _) => (oid, om) }.distinct
-          m          <- observingModeServices.selectObservingMode(oms)
+          m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
             ObsParams.fromParamsRows(paramsRowsNel).map: (obsId, obsParams) =>
