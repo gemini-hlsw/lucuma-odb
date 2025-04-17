@@ -440,21 +440,22 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeCalibrations: Boolean
   )(using Services[F],
           NoTransaction[F]
-  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]]  =
-    observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
-      r.flatTraverse: oid =>
-        selectForObservationUpdateImpl(
-          None,
-          List(oid),
-          includeCalibrations,
-          if user.role.access <= Access.Pi 
-            then ObservationWorkflowState.preExecutionSet
-            else ObservationWorkflowState.allButComplete
-        ).map: r =>
-          r.flatMap:
-            case Nil => Result(AccessControl.Checked.Empty)
-            case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
-            case _ => Result.internalError("Unpossible: got more than one oid back")
+  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]] =
+    Services.asSuperUser:
+      observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
+        r.flatTraverse: oid =>
+          selectForObservationUpdateImpl(
+            None,
+            List(oid),
+            includeCalibrations,
+            if user.role.access <= Access.Pi 
+              then ObservationWorkflowState.preExecutionSet
+              else ObservationWorkflowState.allButComplete
+          ).map: r =>
+            r.flatMap:
+              case Nil => Result(AccessControl.Checked.Empty)
+              case List(x) => Services.asSuperUser(Result(AccessControl.unchecked(input, x, observation_id)))
+              case _ => Result.internalError("Unpossible: got more than one oid back")
 
   // Resolve to a Program.Id if the corresponding program is writable by the user.
   def resolvePidWritable(
@@ -523,19 +524,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]]] = {
 
     val ensureWritable: F[Result[Option[Observation.Id]]] =
-      observationService
-        .resolveOid(input.observationId, input.observationRef)
-        .flatMap: r =>
-          r.flatTraverse: oid =>
-            selectForObservationCloneImpl(
-              includeDeleted = None,
-              WHERE = Some(Predicates.observation.id.eql(oid)),
-              includeCalibrations = false
-            ).map: res =>
-              res.flatMap:
-                case List(oid) => Result(Some(oid))
-                case Nil       => Result(None)
-                case _         => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids")
+      Services.asSuperUser:
+        observationService
+          .resolveOid(input.observationId, input.observationRef)
+          .flatMap: r =>
+            r.flatTraverse: oid =>
+              selectForObservationCloneImpl(
+                includeDeleted = None,
+                WHERE = Some(Predicates.observation.id.eql(oid)),
+                includeCalibrations = false
+              ).map: res =>
+                res.flatMap:
+                  case List(oid) => Result(Some(oid))
+                  case Nil       => Result(None)
+                  case _         => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids")
 
     ensureWritable.nestMap:
       case None      => AccessControl.Checked.Empty
@@ -549,11 +551,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
     input: ResetAcquisitionInput,
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
      requireStaffAccess:
-       observationService
-         .resolveOid(input.observationId, input.observationRef)
-         .nestMap: oid =>
-           Services.asSuperUser:
-             AccessControl.unchecked((), oid, observation_id)
+      Services.asSuperUser:
+        observationService
+          .resolveOid(input.observationId, input.observationRef)
+          .nestMap: oid =>
+            AccessControl.unchecked((), oid, observation_id)
 
   def selectForUpdate(
     input: CreateProgramNoteInput

@@ -65,6 +65,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
@@ -83,15 +84,11 @@ sealed trait ObservationService[F[_]] {
   def resolveOid(
     oid: Option[Observation.Id],
     ref: Option[ObservationReference]
-  ): F[Result[Observation.Id]]
+  )(using SuperUserAccess): F[Result[Observation.Id]]
 
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
-
-  def selectObservingModes(
-    which: List[Observation.Id]
-  )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
     update: AccessControl.Checked[ObservationPropertiesInput.Edit]
@@ -107,7 +104,7 @@ sealed trait ObservationService[F[_]] {
 
   def deleteCalibrationObservations(
     oids: NonEmptyList[Observation.Id]
-  )(using Transaction[F]): F[Result[Unit]]
+  )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
   def resetAcquisition(
     input: AccessControl.CheckedWithId[Unit, Observation.Id]
@@ -210,7 +207,7 @@ object ObservationService {
       override def resolveOid(
         oid: Option[Observation.Id],
         ref: Option[ObservationReference]
-      ): F[Result[Observation.Id]] =
+      )(using SuperUserAccess): F[Result[Observation.Id]] =
         resolver.resolve(oid, ref)
 
       private def setTimingWindows(
@@ -265,7 +262,7 @@ object ObservationService {
       // It assumes the imple case where the observation has no extra timing windows or attachments
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] = {
+      )(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
         val existenceOff = ObservationPropertiesInput.Edit.Empty.copy(
           existence = Existence.Deleted.some,
           group     = Nullable.Null
@@ -311,7 +308,7 @@ object ObservationService {
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
 
-      override def selectObservingModes(
+      def selectObservingModes(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
         NonEmptyList

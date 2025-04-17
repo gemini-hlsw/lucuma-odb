@@ -441,9 +441,9 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
   }
 
   test("triggers for deleting a calibration observation") {
-    import Group1.pi
+    import Group1.{ pi, service }
     def deleteCalibrationObservation(oid: Observation.Id) =
-      withServices(pi) { services =>
+      withServices(service) { services =>
         services.session.transaction.use { xa =>
           services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))(using xa)
         }

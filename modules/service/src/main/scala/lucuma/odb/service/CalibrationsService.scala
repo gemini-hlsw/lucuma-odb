@@ -300,7 +300,7 @@ object CalibrationsService extends CalibrationObservations {
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
         calibrations:   List[(Observation.Id, CalibrationConfigSubset)]
-      )(using Transaction[F]): F[List[Observation.Id]] = {
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val oids = NonEmptyList.fromList(
           calibrations
             .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
