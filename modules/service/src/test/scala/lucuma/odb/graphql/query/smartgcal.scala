@@ -180,7 +180,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int,
           count:      Int              = 1
         ): IO[Unit] =
-          defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
+          Services.asSuperUser:
+            defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
 
         def defineGmosS(
           id:         Int,
@@ -192,7 +193,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           expTimeSec: Int,
           count:      Int              = 1
         ): IO[Unit] =
-          defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)
+          Services.asSuperUser:
+            defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)
 
         def defineGmos[G, L, U](
           id:         Int,
@@ -243,7 +245,8 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               _ <- Flamingos2.TableRow.stepCount       := PosInt.unsafeFrom(count)
             } yield ()
 
-          services.smartGcalService.insertFlamingos2(id, update.runS(tableRow).value)
+          Services.asSuperUser:
+            services.smartGcalService.insertFlamingos2(id, update.runS(tableRow).value)
         }
 
         for {
