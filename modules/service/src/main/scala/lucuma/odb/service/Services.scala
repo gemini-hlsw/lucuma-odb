@@ -220,6 +220,9 @@ object Services:
   opaque type ServiceAccess   <: AdminAccess = Unit
   opaque type SuperUserAccess <: ServiceAccess = Unit
 
+  // You're always at least a guest
+  given GuestAccess = ()
+
   def asSuperUser[A](f: SuperUserAccess ?=> A): A =
     f(using ())
 
