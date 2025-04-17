@@ -338,7 +338,7 @@ object ObservationService {
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
-      )(using Transaction[F]): F[Result[Unit]] =
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
@@ -409,7 +409,7 @@ object ObservationService {
                 g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
                 u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
                 _ <- validateBand(g.keys.toList)
-                _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
+                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u))).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
