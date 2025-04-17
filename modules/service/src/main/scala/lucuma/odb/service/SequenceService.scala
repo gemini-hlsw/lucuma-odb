@@ -51,14 +51,6 @@ import Services.Syntax.*
 
 trait SequenceService[F[_]] {
 
-  // def selectGmosNorthStepRecords(
-  //   observationId: Observation.Id
-  // ): Stream[F, StepRecord[GmosNorth]]
-
-  // def selectGmosSouthStepRecords(
-  //   observationId: Observation.Id
-  // ): Stream[F, StepRecord[GmosSouth]]
-
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
@@ -147,16 +139,6 @@ object SequenceService {
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
-
-      // override def selectGmosNorthStepRecords(
-      //   observationId: Observation.Id
-      // ): Stream[F, StepRecord[GmosNorth]] =
-      //   gmosSequenceService.selectGmosNorthStepRecords(observationId)
-
-      // override def selectGmosSouthStepRecords(
-      //   observationId: Observation.Id
-      // ): Stream[F, StepRecord[GmosSouth]] =
-      //   gmosSequenceService.selectGmosSouthStepRecords(observationId)
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
