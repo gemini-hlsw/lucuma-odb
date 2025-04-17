@@ -302,7 +302,9 @@ object ObservationService {
               SET
                 .asterism
                 .traverse: a =>
-                  ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
+                  ResultT:
+                    Services.asSuperUser:
+                      asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
             .value
             .flatTap: r =>
@@ -508,9 +510,10 @@ object ObservationService {
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
           cloneObservationImpl(origOid, oSET).flatMap: res =>
             res.flatTraverse: (pid, newOid) =>
-              asterismService
-                .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
-                .map(_.as(CloneIds(origOid, newOid)))
+              Services.asSuperUser:
+                asterismService
+                  .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
+                  .map(_.as(CloneIds(origOid, newOid)))
 
       override def resetAcquisition(
         input: AccessControl.CheckedWithId[Unit, Observation.Id]
