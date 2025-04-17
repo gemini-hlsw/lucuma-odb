@@ -32,6 +32,8 @@ import lucuma.core.model.sequence.f2.F2DynamicConfig as Flamingos2
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.TimeSpan
+import lucuma.odb.service.Services.GuestAccess
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.smartgcal.data.Flamingos2.TableKey as Flamingos2SearchKey
 import lucuma.odb.smartgcal.data.Flamingos2.TableRow as Flamingos2TableRow
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
@@ -63,7 +65,7 @@ trait SmartGcalService[F[_]] {
   def selectGmosNorth(
     gn:  GmosNorthSearchKey,
     sgt: SmartGcalType
-  ): F[List[(GmosNorth => GmosNorth, Gcal)]]
+  )(using GuestAccess): F[List[(GmosNorth => GmosNorth, Gcal)]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -79,7 +81,7 @@ trait SmartGcalService[F[_]] {
   def selectGmosSouth(
     gn:  GmosSouthSearchKey,
     sgt: SmartGcalType
-  ): F[List[(GmosSouth => GmosSouth, Gcal)]]
+  )(using GuestAccess): F[List[(GmosSouth => GmosSouth, Gcal)]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -95,24 +97,24 @@ trait SmartGcalService[F[_]] {
   def selectFlamingos2(
     f2:  Flamingos2SearchKey,
     sgt: SmartGcalType
-  ): F[List[(Flamingos2 => Flamingos2, Gcal)]]
+  )(using GuestAccess): F[List[(Flamingos2 => Flamingos2, Gcal)]]
 
   // N.B. Insertion is done by a flyway migration and not via this method.  The
   // insert here is intended for initializing a database for testing.
   def insertGmosNorth(
     id:  Int,
     row: GmosNorthTableRow
-  ): F[Unit]
+  )(using SuperUserAccess): F[Unit]
 
   def insertGmosSouth(
     id:  Int,
     row: GmosSouthTableRow
-  ): F[Unit]
+  )(using SuperUserAccess): F[Unit]
 
   def insertFlamingos2(
     id:  Int,
     row: Flamingos2TableRow
-  ): F[Unit]
+  )(using SuperUserAccess): F[Unit]
 }
 
 object SmartGcalService {
@@ -123,7 +125,7 @@ object SmartGcalService {
       override def selectGmosNorth(
         gn:  GmosNorthSearchKey,
         sgt: SmartGcalType
-      ): F[List[(GmosNorth => GmosNorth, Gcal)]] =
+      )(using GuestAccess): F[List[(GmosNorth => GmosNorth, Gcal)]] =
         selectGcal(Statements.selectGmosNorth(gn, sgt)) { exposureTime =>
           GmosNorth.exposure.replace(exposureTime)
         }
@@ -131,7 +133,7 @@ object SmartGcalService {
       override def selectGmosSouth(
         gs:  GmosSouthSearchKey,
         sgt: SmartGcalType
-      ): F[List[(GmosSouth => GmosSouth, Gcal)]] =
+      )(using GuestAccess): F[List[(GmosSouth => GmosSouth, Gcal)]] =
         selectGcal(Statements.selectGmosSouth(gs, sgt)) { exposureTime =>
           GmosSouth.exposure.replace(exposureTime)
         }
@@ -153,7 +155,7 @@ object SmartGcalService {
       def selectFlamingos2(
         f2:  Flamingos2SearchKey,
         sgt: SmartGcalType
-      ): F[List[(Flamingos2 => Flamingos2, Gcal)]] =
+      )(using GuestAccess): F[List[(Flamingos2 => Flamingos2, Gcal)]] =
         selectGcal(Statements.selectF2(f2, sgt)) { exposureTime =>
           Flamingos2.exposure.replace(exposureTime)
         }
@@ -161,7 +163,7 @@ object SmartGcalService {
       override def insertGmosNorth(
         id:  Int,
         row: GmosNorthTableRow
-      ): F[Unit] =
+      )(using SuperUserAccess): F[Unit] =
 
         val insertInstRow =
           session.executeCommand(
@@ -194,7 +196,7 @@ object SmartGcalService {
       override def insertGmosSouth(
         id:  Int,
         row: GmosSouthTableRow
-      ): F[Unit] =
+      )(using SuperUserAccess): F[Unit] =
 
         val insertInstRow =
           session.executeCommand(
@@ -227,7 +229,7 @@ object SmartGcalService {
       def insertFlamingos2(
         id:  Int,
         row: Flamingos2TableRow
-      ): F[Unit] =
+      )(using SuperUserAccess): F[Unit] =
         val insertGcalRow  =
           session.executeCommand(
             Statements.InsertGcal(

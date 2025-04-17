@@ -171,7 +171,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
       services.transactionally {
         tableRows.zipWithIndex.traverse_ { (r, i) =>
-          services.smartGcalService.insertGmosNorth(i, r)
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosNorth(i, r)
         }
       }
     }
