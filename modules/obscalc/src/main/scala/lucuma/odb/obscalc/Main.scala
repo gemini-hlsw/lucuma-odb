@@ -23,10 +23,8 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
-import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ItcService
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
@@ -135,13 +133,14 @@ object CalcMain extends MainParams:
       yield t
 
   def runObscalcDaemon[F[_]: Async: Parallel: Logger](
+    h: CommitHash,
     i: ItcClient[F],
-    g: Services[F] ?=> Generator[F],
+    e: TimeEstimateCalculatorImplementation.ForInstrumentMode,
     t: Topic[F, ObscalcTopic.Element],
     s: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     def obscalc(using Services[F]): ObscalcService[F] =
-      ObscalcService.instantiate(ItcService.instantiate(i), g)
+      obscalcService(h, i, e)
 
     for
       _ <- Resource.eval(Logger[F].info("Start listening for observation calc changes"))
@@ -191,7 +190,7 @@ object CalcMain extends MainParams:
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      _     <- runObscalcDaemon(itc, generator(c.commitHash, itc, ptc), t, pool.evalMap(services(user, enums)))
+      _     <- runObscalcDaemon(c.commitHash, itc, ptc, t, pool.evalMap(services(user, enums)))
     yield ExitCode.Success
 
   /** Our logical entry point. */

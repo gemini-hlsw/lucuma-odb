@@ -27,10 +27,13 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
+import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.logic.Generator
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -72,8 +75,9 @@ sealed trait ObscalcService[F[_]]:
 object ObscalcService:
 
   def instantiate[F[_]: Concurrent](
-    itc: ItcService[F],
-    gen: Generator[F]
+    commitHash: CommitHash,
+    itcClient:  ItcClient[F],
+    calculator: ForInstrumentMode
   )(using Services[F]): ObscalcService[F] =
 
     new ObscalcService[F]:
@@ -124,11 +128,11 @@ object ObscalcService:
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): EitherT[F, OdbError, ExecutionDigest] =
           for
             p <- params
-            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
+            d <- EitherT(generator(commitHash, itcClient, calculator).calculateDigest(pending.programId, pending.observationId, itcResult, p))
           yield d
 
         for
-          r <- itc.lookup(pending.programId, pending.observationId)
+          r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
           d <- digest(r).value
         yield d.fold(
           Obscalc.Result.Error.apply,
