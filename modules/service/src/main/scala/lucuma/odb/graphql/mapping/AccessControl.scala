@@ -16,6 +16,7 @@ import grackle.ResultT
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
@@ -44,6 +45,7 @@ import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
@@ -220,6 +222,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
               .compile
               .toList
               .map(Result.success)
+
+  /** Verify that `oid` is writable. */
+  private def verifyWritable(
+    oid: Observation.Id
+  )(using Services[F], NoTransaction[F]): F[Result[Unit]] =
+    selectForObservationCloneImpl(
+      includeDeleted = None,
+      WHERE = Some(Predicates.observation.id.eql(oid)),
+      includeCalibrations = false
+    ).map: res =>
+      res.flatMap:
+        case List(`oid`) => Result.unit
+        case Nil         => OdbError.NotAuthorized(user.id).asFailure
+        case _           => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids, or the wrong id")
 
   /**
    * Select and return the ids of programs that are editable by the current user and meet
@@ -720,5 +736,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
             Services.asSuperUser:
               AccessControl.unchecked(CloneTargetInput(tid, input.SET, NonEmptyList.fromList(oids)), pid, program_id)
       .value
+
+
+  def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
+    verifyWritable(input.observationId) >>
+    Services.asSuperUser:
+      observationWorkflowService.getWorkflows(List(input.observationId), commitHash, itcClient, timeEstimateCalculator)
+        .map: res =>
+          res.map(_(input.observationId)).flatMap: w =>
+            if w.state === input.state || w.validTransitions.contains(input.state)
+            then Result(AccessControl.unchecked((w, input.state), input.observationId, observation_id))
+            else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 
 }

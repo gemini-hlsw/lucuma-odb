@@ -669,7 +669,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
       services.useNonTransactionally:
-        observationWorkflowService.setWorkflowState(input.observationId, input.state, commitHash, itcClient, timeEstimateCalculator)
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            observationWorkflowService.setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
