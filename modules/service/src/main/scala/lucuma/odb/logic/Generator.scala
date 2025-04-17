@@ -391,7 +391,7 @@ object Generator {
 
           case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
             EitherT.leftT[F, ExecutionDigest](
-              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
+              OdbError.SequenceUnavailable(s"Cannot calculate digest for obs ${ctx.oid}: F2 longslit not implemented".some)
             )
         )
 
@@ -422,7 +422,7 @@ object Generator {
 
           case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
             EitherT.leftT[F, InstrumentExecutionConfig](
-              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
+              OdbError.SequenceUnavailable(s"Cannot generate sequences for obs ${ctx.oid}: F2 longslit not implemented".some)
             )
 
       private def executionDigest[S, D](
