@@ -85,11 +85,12 @@ trait ConfigurationMapping[F[_]]
             Result(None).pure[F]
           case Some(refTime) =>
             services.use { implicit s =>
-              s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-                .getObjectTracking(pid, oid)
-                .map:
-                  case Failure(problems) => Warning(problems, None) // turn failure into a warning
-                  case other => other.map(_.at(refTime.toInstant).map(_.value))
+              Services.asSuperUser:
+                s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+                  .getObjectTracking(pid, oid)
+                  .map:
+                    case Failure(problems) => Warning(problems, None) // turn failure into a warning
+                    case other => other.map(_.at(refTime.toInstant).map(_.value))
             }
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
