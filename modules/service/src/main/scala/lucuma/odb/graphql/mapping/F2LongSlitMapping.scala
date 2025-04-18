@@ -31,6 +31,11 @@ trait F2LongSlitMapping[F[_]]
 
       SqlField("decker",     F2LongSlitView.Decker),
       SqlField("readoutMode",     F2LongSlitView.ReadoutMode),
+
+      SqlField("initialDisperser", F2LongSlitView.InitialDisperser),
+      SqlField("initialFilter",  F2LongSlitView.InitialFilter),
+      SqlField("initialFpu",     F2LongSlitView.InitialFpu),
+
     )
 
 }

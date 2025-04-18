@@ -117,14 +117,17 @@ object F2LongSlitService {
           void")"
 
     val InsertF2LongSlit: Fragment[(
-      Observation.Id          ,
-      F2Disperser             ,
-      Option[F2Filter] ,
-      F2Fpu            ,
-      Option[F2ReadMode] ,
-      Option[F2Reads] ,
-      Option[F2Decker] ,
-      Option[F2ReadoutMode] ,
+      Observation.Id       ,
+      F2Disperser          ,
+      Option[F2Filter]     ,
+      F2Fpu                ,
+      Option[F2ReadMode]   ,
+      Option[F2Reads]      ,
+      Option[F2Decker]     ,
+      Option[F2ReadoutMode],
+      F2Disperser          ,
+      Option[F2Filter]     ,
+      F2Fpu
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -136,7 +139,10 @@ object F2LongSlitService {
           c_read_mode,
           C_reads,
           c_decker,
-          c_readout_mode
+          c_readout_mode,
+          c_initial_disperser,
+          c_initial_filter,
+          c_initial_fpu
         )
         SELECT
           $observation_id,
@@ -147,10 +153,13 @@ object F2LongSlitService {
           ${f2_read_mode.opt},
           ${f2_reads.opt},
           ${f2_decker.opt},
-          ${f2_readout_mode.opt}
+          ${f2_readout_mode.opt},
+          $f2_disperser,
+          ${f2_filter.opt},
+          $f2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u, r, e, m, a) => (o, d, f, u, r, e, m, a, o)}
+       """.contramap { (o, d, f, u, r, e, m, a, id, ii, iu) => (o, d, f, u, r, e, m, a, id, ii, iu, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
@@ -164,7 +173,10 @@ object F2LongSlitService {
         input.explicitReadMode   ,
         input.explicitReads      ,
         input.explicitDecker     ,
-        input.explicitReadoutMode
+        input.explicitReadoutMode,
+        input.disperser          ,
+        input.filter             ,
+        input.fpu                ,
       )
 
     def deleteF2(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -223,7 +235,10 @@ object F2LongSlitService {
         c_reads,
         c_reads_default,
         c_decker,
-        c_readout_mode
+        c_readout_mode,
+        c_initial_disperser,
+        c_initial_filter,
+        c_initial_fpu
       )
       SELECT
         $observation_id,
@@ -237,7 +252,10 @@ object F2LongSlitService {
         c_reads,
         c_reads_default,
         c_decker,
-        c_readout_mode
+        c_readout_mode,
+        c_initial_disperser,
+        c_initial_filter,
+        c_initial_fpu
       FROM t_flamingos_2_long_slit
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)

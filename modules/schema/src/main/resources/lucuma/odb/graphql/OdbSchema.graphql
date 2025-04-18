@@ -7009,6 +7009,24 @@ type Flamingos2LongSlit {
   """
   readoutMode: Flamingos2ReadoutMode
 
+  """
+  The disperser as it was initially selected.  See the `disperser` field for the
+  disperser that will be used in the observation.
+  """
+  initialDisperser: Flamingos2Disperser!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: Flamingos2Filter
+
+  """
+  The FPU as it was initially selected.  See the `fpu` field for the FPU that
+  will be used in the observation.
+  """
+  initialFpu: Flamingos2Fpu!
+
 }
 
 """
