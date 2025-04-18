@@ -1168,6 +1168,11 @@ class updateObservations extends OdbSuite
           }
           flamingos2LongSlit {
             disperser
+            filter
+            fpu
+            initialDisperser
+            initialFilter
+            initialFpu
           }
         }
       }
@@ -1239,7 +1244,12 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
-                  "disperser": "R1200_JH"
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "initialDisperser": "R1200_JH",
+                  "initialFilter": "Y",
+                  "initialFpu": "LONG_SLIT_2"
                 }
               }
             }
@@ -1268,7 +1278,12 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
-                  "disperser": "R1200_HK"
+                  "disperser": "R1200_HK",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "initialDisperser": "R1200_JH",
+                  "initialFilter": "Y",
+                  "initialFpu": "LONG_SLIT_2"
                 }
               }
             }
@@ -1287,7 +1302,7 @@ class updateObservations extends OdbSuite
     )
   }
 
-  test("observing mode: update existing f2") {
+  test("observing mode: update existing") {
 
     val update0 = """
       observingMode: {

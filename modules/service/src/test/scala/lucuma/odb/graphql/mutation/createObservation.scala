@@ -1136,6 +1136,9 @@ class createObservation extends OdbSuite {
                 reads
                 decker
                 readoutMode
+                initialDisperser
+                initialFilter
+                initialFpu
               }
             }
           }
@@ -1159,7 +1162,10 @@ class createObservation extends OdbSuite {
            longSlit.downIO[Option[F2Reads]]("explicitReads"),
            longSlit.downIO[F2Reads]("reads"),
            longSlit.downIO[Option[F2Decker]]("decker"),
-           longSlit.downIO[Option[F2Decker]]("readoutMode")
+           longSlit.downIO[Option[F2Decker]]("readoutMode"),
+           longSlit.downIO[F2Disperser]("initialDisperser"),
+           longSlit.downIO[Option[F2Filter]]("initialFilter"),
+           longSlit.downIO[F2Fpu]("initialFpu")
           ).tupled,
           (F2Disperser.R1200HK,
            Some(F2Filter.Y),
@@ -1171,7 +1177,10 @@ class createObservation extends OdbSuite {
            None,
            F2Reads.Reads_8,
            None,
-           None
+           None,
+           F2Disperser.R1200HK,
+           Some(F2Filter.Y),
+           F2Fpu.LongSlit2
           )
         )
 
