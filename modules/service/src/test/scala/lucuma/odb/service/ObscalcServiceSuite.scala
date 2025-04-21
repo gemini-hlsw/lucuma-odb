@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
@@ -36,12 +37,32 @@ import scala.collection.immutable.SortedSet
 
 class ObscalcServiceSuite extends ExecutionTestSupport:
 
+  val cleanup: IO[Unit] =
+    withSession: session =>
+      val truncate = sql"""
+        TRUNCATE t_obscalc
+      """.command
+      session.execute(truncate).void
+
   val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
     for
+      _ <- cleanup
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
     yield (p, t, o)
+
+  val selectStates: IO[Map[Observation.Id, Obscalc.State]] =
+    withSession: session =>
+      val states: Query[Void, (Observation.Id, Obscalc.State)] = sql"""
+        SELECT
+          c_observation_id,
+          c_obscalc_state
+        FROM
+          t_obscalc
+      """.query(observation_id *: obscalc_state)
+
+      session.execute(states).map(_.toMap)
 
   def instantiate(services: Services[IO]): IO[ObscalcService[IO]] =
       TimeEstimateCalculatorImplementation
@@ -64,18 +85,17 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   val load: IO[List[Obscalc.PendingCalc]] =
     withObscalcServiceTransactionally(_.load(10))
 
-  def calc(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
-    withObscalcService(_.calculate(pc))
+  def calculateAndUpdate(p: Obscalc.PendingCalc): IO[Obscalc.Result] =
+    withObscalcService(_.calculateAndUpdate(p))
 
-  def update(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Unit] =
-    withObscalcServiceTransactionally(_.update(p, r))
+  def calculateOnly(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
+    withObscalcService(_.calculateOnly(pc))
 
-  val cleanup: IO[Unit] =
-    withSession: session =>
-      val truncate = sql"""
-        TRUNCATE t_obscalc
-      """.command
-      session.execute(truncate).void
+  def updateOnly(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Unit] =
+    withObscalcServiceTransactionally(_.updateOnly(p, r))
+
+  val resetCalculating: IO[Unit] =
+    withObscalcServiceTransactionally(_.resetCalculating)
 
   def insert(pc: Obscalc.PendingCalc): IO[Unit] =
     withSession: session =>
@@ -91,6 +111,18 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       """.command.contramap((o, t) => (o, t, t))
 
       session.execute(ins)(pc.observationId, pc.lastInvalidation).void
+
+  def setRetry(o: Observation.Id): IO[Unit] =
+    withSession: session =>
+      val up: Command[Observation.Id] = sql"""
+        UPDATE t_obscalc
+        SET c_obscalc_state = 'retry' :: e_obscalc_state,
+            c_retry_at      = now(),
+            c_failure_count = 10
+        WHERE c_observation_id = $observation_id
+      """.command
+
+      session.execute(up)(o).void
 
   def obscalcState(o: Observation.Id): IO[Obscalc.State] =
     withSession: session =>
@@ -144,7 +176,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       p <- createProgram
       o <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
       _ <- assertIO(
-            calc(Obscalc.PendingCalc(p, o, randomTime)),
+            calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
             Obscalc.Result.Error(OdbError.SequenceUnavailable(s"Could not generate the $o sequence: observation is missing target".some))
           )
     yield ()
@@ -152,7 +184,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   test("calc with target"):
     setup.flatTap: (p, t, o) =>
       assertIO(
-        calc(Obscalc.PendingCalc(p, o, randomTime)),
+        calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
         fakeWithTargetResult(t)
       )
 
@@ -165,9 +197,9 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   test("update then select"):
     setup.flatTap: (p, _, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
-      calc(pc).flatTap: r =>
+      calculateOnly(pc).flatTap: r =>
         assertIO(
-          insert(pc) *> update(pc, r) *> select(o).map(_.flatMap(_.result)),
+          insert(pc) *> updateOnly(pc, r) *> select(o).map(_.flatMap(_.result)),
           r.some
         )
 
@@ -176,9 +208,9 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       p <- createProgram
       o <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
       pc = Obscalc.PendingCalc(p, o, randomTime)
-      r <- calc(pc)
+      r <- calculateOnly(pc)
       _ <- insert(pc)
-      _ <- update(pc, r)
+      _ <- updateOnly(pc, r)
       _ <- assertIO(select(o).map(_.flatMap(_.result)), r.some)
     yield ()
 
@@ -192,15 +224,52 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
     yield ()
 
   test("update then load"):
-    (cleanup *> setup).flatTap: (p, _, o) =>
+    setup.flatTap: (p, _, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
-      calc(pc).flatTap: r =>
-        assertIO(insert(pc) *> update(pc, r) *> load, Nil)
+      calculateOnly(pc).flatTap: r =>
+        assertIO(insert(pc) *> updateOnly(pc, r) *> load, Nil)
 
   test("invalidate, update then load"):
-    (cleanup *> setup).flatTap: (p, _, o) =>
+    setup.flatTap: (p, _, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
-      calc(pc).flatTap: r =>
+      calculateOnly(pc).flatTap: r =>
         // invalidated before the result was written out
         val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
-        assertIO(insert(pc2) *> update(pc, r) *> load, List(pc2))
+        assertIO(insert(pc2) *> updateOnly(pc, r) *> load, List(pc2))
+
+  test("reset calculating"):
+    val states = for
+      _  <- cleanup
+      p  <- createProgram
+      o0 <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      o1 <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      _  <- setRetry(o1)
+      r0 <- selectStates
+      _  <- load
+      r1 <- selectStates
+      _  <- resetCalculating
+      r2 <- selectStates
+    yield (List(r0(o0), r1(o0), r2(o0)),
+           List(r0(o1), r1(o1), r2(o1)))
+
+    assertIOBoolean:
+      states.map: (o0, o1) =>
+        o0 === List(Obscalc.State.Pending, Obscalc.State.Calculating, Obscalc.State.Pending) &&
+        o1 === List(Obscalc.State.Retry,   Obscalc.State.Calculating, Obscalc.State.Retry  )
+
+  test("mark failed"):
+    def setWavelengthToMagicValue(o: Observation.Id): IO[Unit] =
+      withSession: session =>
+        val cmd = sql"""
+          UPDATE t_gmos_north_long_slit
+             SET c_central_wavelength = 666000
+           WHERE c_observation_id = $observation_id
+        """.command
+        session.execute(cmd)(o).void
+
+    val res = setup.flatMap: (_, _, o) =>
+      setWavelengthToMagicValue(o) *>
+      load.flatMap: lst =>
+        calculateAndUpdate(lst.head) *> selectStates
+
+    assertIO(res.map(_.values.toList.head), Obscalc.State.Retry)

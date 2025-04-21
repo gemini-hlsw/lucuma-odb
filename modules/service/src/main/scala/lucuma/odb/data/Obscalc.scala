@@ -4,6 +4,7 @@
 package lucuma.odb.data
 
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
@@ -16,6 +17,8 @@ case class Obscalc(
   state:            Obscalc.State,
   lastInvalidation: Timestamp,
   lastUpdate:       Timestamp,
+  retryAt:          Option[Timestamp],
+  failureCount:     NonNegInt,
   result:           Option[Obscalc.Result]
 )
 
@@ -29,6 +32,7 @@ object Obscalc:
 
   enum State(val tag: String) derives Enumerated:
     case Pending     extends State("pending")
+    case Retry       extends State("retry")
     case Calculating extends State("calculating")
     case Ready       extends State("ready")
 
