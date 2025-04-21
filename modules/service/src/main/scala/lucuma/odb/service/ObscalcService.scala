@@ -8,10 +8,12 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -47,27 +49,67 @@ import scala.collection.immutable.SortedSet
 
 sealed trait ObscalcService[F[_]]:
 
+  /**
+   * Selects Obscalc data for a single observation, if the observation exists
+   * and there is an obscalc entry for it.
+   */
   def selectOne(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[Obscalc]]
 
+  /**
+   * Selects Obscalc data for the given observations, where the observation
+   * exists and there is an obscalc entry for it.
+   */
   def selectMany(
     observationIds: List[Observation.Id]
   )(using Transaction[F]): F[Map[Observation.Id, Obscalc]]
 
+  /**
+   * Selects Obscalc data for all observations in a program for which a result
+   * exists.
+   */
   def selectProgram(
     programId: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Obscalc]]
 
+  /**
+   * Marks all 'calculating' observations as 'pending' (or 'retry' if
+   * appropriate). This is intended to be used by the worker service on startup
+   * to cleanup state and restart.
+   */
   def resetCalculating(using Transaction[F]): F[Unit]
 
+  /**
+   * Loads up to `max` `pending` (or `retry`) calculations.  Loading changes
+   * the state of the entries to `calculating` before they are returned.
+   */
   def load(max: Int)(using Transaction[F]): F[List[Obscalc.PendingCalc]]
 
-  def calculate(
+  /**
+   * Calculates the result for the associated observation and updates the
+   * entry accordingly.
+   */
+  def calculateAndUpdate(
     pending: Obscalc.PendingCalc
   )(using NoTransaction[F]): F[Obscalc.Result]
 
-  def update(
+  /**
+   * Calculates and returns the result for the associated observation without
+   * updating the database.  This is intended primarily to facilitate testing.
+   * Instead, `calculateAndUpdate` is provided for the Obscalc worker service
+   * that is keeping everything up-to-date.
+   */
+  def calculateOnly(
+    pending: Obscalc.PendingCalc
+  )(using NoTransaction[F]): F[Obscalc.Result]
+
+  /**
+   * Updates the obscalc result in the database. This is intended primarily to
+   * facilitate testing.  Instead, `calculateAndUpdate` is provided for the
+   * Obscalc worker service that is keeping everything up-to-date.
+   */
+  def updateOnly(
     pending: Obscalc.PendingCalc,
     result:  Obscalc.Result
   )(using Transaction[F]): F[Unit]
@@ -114,7 +156,7 @@ object ObscalcService:
       )(using Transaction[F]): F[List[Obscalc.PendingCalc]] =
         session.execute(Statements.LoadPendingCalc)(max)
 
-      override def calculate(
+      override def calculateOnly(
         pending: Obscalc.PendingCalc
       )(using NoTransaction[F]): F[Obscalc.Result] =
 
@@ -142,11 +184,43 @@ object ObscalcService:
           )
         )
 
-      override def update(
+      private def storeResult(
+        pending:       Obscalc.PendingCalc,
+        result:        Obscalc.Result,
+        expectedState: Obscalc.State
+      )(using Transaction[F]): F[Unit] =
+        for
+          lu <- session.unique(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
+          ns  = if lu === pending.lastInvalidation then expectedState else Obscalc.State.Pending
+          af  = Statements.storeResult(pending, result, ns)
+          _  <- session.execute(af.fragment.command)(af.argument)
+        yield ()
+
+      override def updateOnly(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
       )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.StoreResult)(pending, result).void
+        storeResult(pending, result, Obscalc.State.Ready)
+
+      private def markFailed(
+        pending: Obscalc.PendingCalc,
+        result:  Obscalc.Result
+      )(using Transaction[F]): F[Unit] =
+        storeResult(pending, result, Obscalc.State.Retry)
+
+      override def calculateAndUpdate(
+        pending: Obscalc.PendingCalc
+      )(using NoTransaction[F]): F[Obscalc.Result] =
+        calculateOnly(pending)
+          .flatMap: result =>
+            services.transactionally:
+              result.odbError match
+                case Some(OdbError.ItcError(_)) => markFailed(pending, result).as(result)
+                case _                          => updateOnly(pending, result).as(result)
+          .onError: e =>
+            services.transactionally:
+              val error = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
+              markFailed(pending, error)
 
   object Statements:
     private val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -220,8 +294,15 @@ object ObscalcService:
         case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
       }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest)))
 
-    private val obscalc: Codec[Obscalc] =
-      (observation_id *: obscalc_state *: core_timestamp *: core_timestamp *: obscalc_result).to[Obscalc]
+    private val obscalc: Codec[Obscalc] = (
+      observation_id     *: // c_observation_id
+      obscalc_state      *: // c_obscalc_state
+      core_timestamp     *: // c_last_invalidation
+      core_timestamp     *: // c_last_update
+      core_timestamp.opt *: // c_retry_at
+      int4_nonneg        *: // c_failure_count
+      obscalc_result
+    ).to[Obscalc]
 
     private def obscalcColumns(prefix: Option[String] = None): String =
       List(
@@ -229,6 +310,8 @@ object ObscalcService:
         "c_obscalc_state",
         "c_last_invalidation",
         "c_last_update",
+        "c_retry_at",
+        "c_failure_count",
 
         "c_odb_error",
 
@@ -292,8 +375,12 @@ object ObscalcService:
 
     val ResetCalculating: Command[Void] =
       sql"""
-        UPDATE t_obscalc c
-        SET c_obscalc_state = 'pending'
+        UPDATE t_obscalc
+        SET
+          c_obscalc_state  = CASE
+            WHEN t_obscalc.c_retry_at IS NULL THEN 'pending' :: e_obscalc_state
+            ELSE 'retry' :: e_obscalc_state
+          END
         WHERE c_obscalc_state = 'calculating'
       """.command
 
@@ -303,7 +390,10 @@ object ObscalcService:
           SELECT o.c_program_id, o.c_observation_id
           FROM t_obscalc c
           INNER JOIN t_observation o USING (c_observation_id)
-          WHERE c.c_obscalc_state = 'pending'
+          WHERE (
+            c.c_obscalc_state = 'pending' OR
+            (c.c_obscalc_state = 'retry' AND c.c_retry_at <= now())
+          )
           ORDER BY c.c_last_invalidation LIMIT $int4
           FOR UPDATE SKIP LOCKED
         )
@@ -314,89 +404,71 @@ object ObscalcService:
         RETURNING tasks.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
-    val StoreResult: Command[(
-      Obscalc.PendingCalc,
-      Obscalc.Result
-    )] =
+    private def updatesForResult(r: Obscalc.Result): NonEmptyList[AppliedFragment] =
+      NonEmptyList.of(
+        sql"c_odb_error            = ${odb_error.opt}"(r.odbError),
+
+        // Imaging ITC Results
+        sql"c_img_target_id        = ${target_id.opt}"(r.itcResult.map(_.imaging.targetId)),
+        sql"c_img_exposure_time    = ${time_span.opt}"(r.itcResult.map(_.imaging.value.exposureTime)),
+        sql"c_img_exposure_count   = ${int4_nonneg.opt}"(r.itcResult.map(_.imaging.value.exposureCount)),
+        sql"c_img_wavelength       = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength)),
+        sql"c_img_single_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value)),
+        sql"c_img_total_sn         = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value)),
+
+        // Spectroscopy ITC Results
+        sql"c_spec_target_id       = ${target_id.opt}"(r.itcResult.map(_.spectroscopy.targetId)),
+        sql"c_spec_exposure_time   = ${time_span.opt}"(r.itcResult.map(_.spectroscopy.value.exposureTime)),
+        sql"c_spec_exposure_count  = ${int4_nonneg.opt}"(r.itcResult.map(_.spectroscopy.value.exposureCount)),
+        sql"c_spec_wavelength      = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.wavelength)),
+        sql"c_spec_single_sn       = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.single.value)),
+        sql"c_spec_total_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.total.value)),
+
+        // Setup Times
+        sql"c_full_setup_time      = ${time_span.opt}"(r.digest.map(_.setup.full)),
+        sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
+
+        // Acquisition Digest
+        sql"c_acq_obs_class        = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),
+        sql"c_acq_non_charged_time = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged))),
+        sql"c_acq_program_time     = ${time_span.opt}"(r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program))),
+        sql"c_acq_offsets          = ${offset_array.opt}"(r.digest.map(_.acquisition.offsets.toList)),
+        sql"c_acq_atom_count       = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.atomCount)),
+        sql"c_acq_execution_state  = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
+
+        // Science Digest
+        sql"c_sci_obs_class        = ${obs_class.opt}"(r.digest.map(_.science.observeClass)),
+        sql"c_sci_non_charged_time = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged))),
+        sql"c_sci_program_time     = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.Program))),
+        sql"c_sci_offsets          = ${offset_array.opt}"(r.digest.map(_.science.offsets.toList)),
+        sql"c_sci_atom_count       = ${int4_nonneg.opt}"(r.digest.map(_.science.atomCount)),
+        sql"c_sci_execution_state  = ${execution_state.opt}"(r.digest.map(_.science.executionState))
+      )
+
+    val SelectLastInvalidationForUpdate: Query[Observation.Id, Timestamp] =
       sql"""
-        UPDATE t_obscalc
-        SET
-          c_obscalc_state        = CASE
-                                     WHEN c_last_invalidation = $core_timestamp THEN 'ready' :: e_obscalc_state
-                                     ELSE 'pending' :: e_obscalc_state
-                                   END,
-          c_last_update          = now(),
-
-          c_odb_error            = ${odb_error.opt},
-
-          c_img_target_id        = ${target_id.opt},
-          c_img_exposure_time    = ${time_span.opt},
-          c_img_exposure_count   = ${int4_nonneg.opt},
-          c_img_wavelength       = ${wavelength_pm.opt},
-          c_img_single_sn        = ${signal_to_noise.opt},
-          c_img_total_sn         = ${signal_to_noise.opt},
-
-          c_spec_target_id       = ${target_id.opt},
-          c_spec_exposure_time   = ${time_span.opt},
-          c_spec_exposure_count  = ${int4_nonneg.opt},
-          c_spec_wavelength      = ${wavelength_pm.opt},
-          c_spec_single_sn       = ${signal_to_noise.opt},
-          c_spec_total_sn        = ${signal_to_noise.opt},
-
-          c_full_setup_time      = ${time_span.opt},
-          c_reacq_setup_time     = ${time_span.opt},
-
-          c_acq_obs_class        = ${obs_class.opt},
-          c_acq_non_charged_time = ${time_span.opt},
-          c_acq_program_time     = ${time_span.opt},
-          c_acq_offsets          = ${offset_array.opt},
-          c_acq_atom_count       = ${int4_nonneg.opt},
-          c_acq_execution_state  = ${execution_state.opt},
-
-          c_sci_obs_class        = ${obs_class.opt},
-          c_sci_non_charged_time = ${time_span.opt},
-          c_sci_program_time     = ${time_span.opt},
-          c_sci_offsets          = ${offset_array.opt},
-          c_sci_atom_count       = ${int4_nonneg.opt},
-          c_sci_execution_state  = ${execution_state.opt}
+        SELECT c_last_invalidation
+        FROM t_obscalc
         WHERE c_observation_id = $observation_id
-      """.command
-         .contramap: (p, r) =>
-           (
-             p.lastInvalidation,
+        FOR UPDATE
+      """.query(core_timestamp)
 
-             r.odbError,
+    def storeResult(
+      pending:  Obscalc.PendingCalc,
+      result:   Obscalc.Result,
+      newState: Obscalc.State
+    ): AppliedFragment =
 
-             r.itcResult.map(_.imaging.targetId),
-             r.itcResult.map(_.imaging.value.exposureTime),
-             r.itcResult.map(_.imaging.value.exposureCount),
-             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength),
-             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value),
-             r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value),
+      val isRetry = newState === Obscalc.State.Retry
+      val upState        =  sql"c_obscalc_state = $obscalc_state"(newState)
+      val upLastUpdate   = void"c_last_update   = now()"
+      val upFailureCount = void"c_failure_count = " |+|
+                           (if isRetry then void"c_failure_count + 1" else void"0")
+      val upRetryAt      = void"c_retry_at      = " |+|
+                           (if isRetry then void"now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))" else void"NULL")
 
-             r.itcResult.map(_.spectroscopy.targetId),
-             r.itcResult.map(_.spectroscopy.value.exposureTime),
-             r.itcResult.map(_.spectroscopy.value.exposureCount),
-             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.wavelength),
-             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.single.value),
-             r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.total.value),
+      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result)
 
-             r.digest.map(_.setup.full),
-             r.digest.map(_.setup.reacquisition),
-
-             r.digest.map(_.acquisition.observeClass),
-             r.digest.map(_.acquisition.timeEstimate(ChargeClass.NonCharged)),
-             r.digest.map(_.acquisition.timeEstimate(ChargeClass.Program)),
-             r.digest.map(_.acquisition.offsets.toList),
-             r.digest.map(_.acquisition.atomCount),
-             r.digest.map(_.acquisition.executionState),
-
-             r.digest.map(_.science.observeClass),
-             r.digest.map(_.science.timeEstimate(ChargeClass.NonCharged)),
-             r.digest.map(_.science.timeEstimate(ChargeClass.Program)),
-             r.digest.map(_.science.offsets.toList),
-             r.digest.map(_.science.atomCount),
-             r.digest.map(_.science.executionState),
-
-             p.observationId
-           )
+      void"UPDATE t_obscalc " |+|
+        void"SET " |+| updates.intercalate(void", ") |+| void" " |+|
+        sql"WHERE c_observation_id = $observation_id"(pending.observationId)
