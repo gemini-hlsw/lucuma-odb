@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.core.enums.F2Decker
 import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
 import lucuma.odb.graphql.table.*
 
@@ -18,23 +20,28 @@ trait F2LongSlitMapping[F[_]]
       SqlField("observationId", F2LongSlitView.ObservationId, key = true, hidden = true),
 
       SqlField("disperser", F2LongSlitView.Disperser),
-      SqlField("filter",  F2LongSlitView.Filter),
-      SqlField("fpu",     F2LongSlitView.Fpu),
+      SqlField("filter",    F2LongSlitView.Filter),
+      SqlField("fpu",       F2LongSlitView.Fpu),
 
       explicitOrElseDefault[F2ReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
-      SqlField("defaultReadMode", F2LongSlitView.ReadModeDefault),
+      SqlField("defaultReadMode",  F2LongSlitView.ReadModeDefault),
       SqlField("explicitReadMode", F2LongSlitView.ReadMode),
 
       explicitOrElseDefault[F2Reads]("reads", "explicitReads", "defaultReads"),
-      SqlField("defaultReads", F2LongSlitView.ReadsDefault),
+      SqlField("defaultReads",  F2LongSlitView.ReadsDefault),
       SqlField("explicitReads", F2LongSlitView.Reads),
 
-      SqlField("decker",     F2LongSlitView.Decker),
-      SqlField("readoutMode",     F2LongSlitView.ReadoutMode),
+      explicitOrElseDefault[F2Decker]("decker", "explicitDecker", "defaultDecker"),
+      SqlField("defaultDecker",  F2LongSlitView.DeckerDefault),
+      SqlField("explicitDecker", F2LongSlitView.Decker),
+
+      explicitOrElseDefault[F2ReadoutMode]("readoutMode", "explicitReadoutMode", "defaultReadoutMode"),
+      SqlField("defaultReadoutMode",  F2LongSlitView.ReadoutModeDefault),
+      SqlField("explicitReadoutMode", F2LongSlitView.ReadoutMode),
 
       SqlField("initialDisperser", F2LongSlitView.InitialDisperser),
-      SqlField("initialFilter",  F2LongSlitView.InitialFilter),
-      SqlField("initialFpu",     F2LongSlitView.InitialFpu),
+      SqlField("initialFilter",    F2LongSlitView.InitialFilter),
+      SqlField("initialFpu",       F2LongSlitView.InitialFpu),
 
     )
 
