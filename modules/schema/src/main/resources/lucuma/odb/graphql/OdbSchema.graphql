@@ -6955,9 +6955,9 @@ type Flamingos2LongSlit {
   disperser: Flamingos2Disperser!
 
   """
-  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  The filter field must be specified.  It cannot be unset with a null value.
   """
-  filter: Flamingos2Filter
+  filter: Flamingos2Filter!
 
   """
   The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -7000,14 +7000,38 @@ type Flamingos2LongSlit {
   explicitReads: Flamingos2Reads
 
   """
-  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
+  The decker field is either explicitly specified in explicitDecker or else taken
+  from defaultDecker
   """
-  decker: Flamingos2Decker
+  decker: Flamingos2Decker!
 
   """
-  The readout mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  Default decker, calculated based on the exposure time
   """
-  readoutMode: Flamingos2ReadoutMode
+  defaultDecker: Flamingos2Decker!
+
+  """
+  Optional explicitly specified F2 Decker. If set it overrides the
+  default.
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field is either explicitly specified in explicitReadoutMode or else taken
+  from defaultReadoutMode
+  """
+  readoutMode: Flamingos2ReadoutMode!
+
+  """
+  Default readout mode, science
+  """
+  defaultReadoutMode: Flamingos2ReadoutMode!
+
+  """
+  Optional explicitly specified F2 Readout mode. If set it overrides the
+  default.
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
 
   """
   The disperser as it was initially selected.  See the `disperser` field for the
@@ -7019,7 +7043,7 @@ type Flamingos2LongSlit {
   The filter as it was initially selected (if any).  See the `filter` field
   for the filter that will be used in the observation.
   """
-  initialFilter: Flamingos2Filter
+  initialFilter: Flamingos2Filter!
 
   """
   The FPU as it was initially selected.  See the `fpu` field for the FPU that
