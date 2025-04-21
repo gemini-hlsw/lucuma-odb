@@ -1398,7 +1398,13 @@ class updateObservations extends OdbSuite
                   "explicitReadMode": null,
                   "reads": "READS_8",
                   "defaultReads": "READS_8",
-                  "explicitReads": null
+                  "explicitReads": null,
+                  "decker": "LONG_SLIT",
+                  "defaultDecker": "LONG_SLIT",
+                  "explicitDecker": null,
+                  "readoutMode": "SCIENCE",
+                  "defaultReadoutMode": "SCIENCE",
+                  "explicitReadoutMode": null
                 }
               }
             }
@@ -1423,6 +1429,12 @@ class updateObservations extends OdbSuite
             reads
             defaultReads
             explicitReads
+            decker
+            defaultDecker
+            explicitDecker
+            readoutMode
+            defaultReadoutMode
+            explicitReadoutMode
           }
         }
       }
@@ -1432,6 +1444,8 @@ class updateObservations extends OdbSuite
       observingMode: {
         flamingos2LongSlit: {
           explicitReadMode: BRIGHT
+          explicitDecker: MOS
+          explicitReadoutMode: ENGINEERING
         }
       }
     """
@@ -1454,7 +1468,13 @@ class updateObservations extends OdbSuite
                   "explicitReadMode": "BRIGHT",
                   "reads": "READS_1",
                   "defaultReads": "READS_1",
-                  "explicitReads": null
+                  "explicitReads": null,
+                  "decker": "MOS",
+                  "defaultDecker": "LONG_SLIT",
+                  "explicitDecker": "MOS",
+                  "readoutMode": "ENGINEERING",
+                  "defaultReadoutMode": "SCIENCE",
+                  "explicitReadoutMode": "ENGINEERING"
                 }
               }
             }

@@ -235,7 +235,9 @@ object F2LongSlitService {
         c_reads,
         c_reads_default,
         c_decker,
+        c_decker_default,
         c_readout_mode,
+        c_readout_mode_default,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu
@@ -252,7 +254,9 @@ object F2LongSlitService {
         c_reads,
         c_reads_default,
         c_decker,
+        c_decker_default,
         c_readout_mode,
+        c_readout_mode_default,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu

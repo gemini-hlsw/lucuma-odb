@@ -1135,7 +1135,11 @@ class createObservation extends OdbSuite {
                 explicitReads
                 reads
                 decker
+                defaultDecker
+                explicitDecker
                 readoutMode
+                defaultReadoutMode
+                explicitReadoutMode
                 initialDisperser
                 initialFilter
                 initialFpu
@@ -1161,8 +1165,12 @@ class createObservation extends OdbSuite {
            longSlit.downIO[F2Reads]("defaultReads"),
            longSlit.downIO[Option[F2Reads]]("explicitReads"),
            longSlit.downIO[F2Reads]("reads"),
-           longSlit.downIO[Option[F2Decker]]("decker"),
-           longSlit.downIO[Option[F2Decker]]("readoutMode"),
+           longSlit.downIO[F2Decker]("decker"),
+           longSlit.downIO[F2Decker]("defaultDecker"),
+           longSlit.downIO[Option[F2Decker]]("explicitDecker"),
+           longSlit.downIO[F2ReadoutMode]("readoutMode"),
+           longSlit.downIO[F2ReadoutMode]("defaultReadoutMode"),
+           longSlit.downIO[Option[F2ReadoutMode]]("explicitReadoutMode"),
            longSlit.downIO[F2Disperser]("initialDisperser"),
            longSlit.downIO[Option[F2Filter]]("initialFilter"),
            longSlit.downIO[F2Fpu]("initialFpu")
@@ -1176,7 +1184,11 @@ class createObservation extends OdbSuite {
            F2Reads.Reads_8,  // faint reamd mode default reads to 8
            None,
            F2Reads.Reads_8,
+           F2Decker.LongSlit,
+           F2Decker.LongSlit,
            None,
+           F2ReadoutMode.Science,
+           F2ReadoutMode.Science,
            None,
            F2Disperser.R1200HK,
            Some(F2Filter.Y),
@@ -1224,13 +1236,15 @@ class createObservation extends OdbSuite {
                 readMode
                 defaultReadMode
                 explicitReadMode
-                decker
-                readoutMode
+                reads
                 defaultReads
                 explicitReads
-                reads
                 decker
+                defaultDecker
+                explicitDecker
                 readoutMode
+                defaultReadoutMode
+                explicitReadoutMode
               }
             }
           }
@@ -1247,7 +1261,7 @@ class createObservation extends OdbSuite {
           F2Fpu.LongSlit2,
           explicitReadMode = Some(F2ReadMode.Bright),
           explicitReads = None,
-          explicitDecker = Some(F2Decker.LongSlit),
+          explicitDecker = Some(F2Decker.MOS),
           explicitReadoutMode = Some(F2ReadoutMode.Engineering)
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
@@ -1262,8 +1276,12 @@ class createObservation extends OdbSuite {
             longSlit.downIO[F2Reads]("defaultReads"),
             longSlit.downIO[Option[F2Reads]]("explicitReads"),
             longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[Option[F2Decker]]("decker"),
-            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+            longSlit.downIO[F2Decker]("decker"),
+            longSlit.downIO[F2Decker]("defaultDecker"),
+            longSlit.downIO[Option[F2Decker]]("explicitDecker"),
+            longSlit.downIO[F2ReadoutMode]("readoutMode"),
+            longSlit.downIO[F2ReadoutMode]("defaultReadoutMode"),
+            longSlit.downIO[Option[F2ReadoutMode]]("explicitReadoutMode")
           ).tupled, (
             F2Disperser.R1200HK,
             Some(F2Filter.Y),
@@ -1274,7 +1292,11 @@ class createObservation extends OdbSuite {
             F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
             None,                           // Explicit reads is Empty
             F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
-            Some(F2Decker.LongSlit),        // Explicitly set
+            F2Decker.MOS,                   // Explicitly set
+            F2Decker.LongSlit,              // default to long slit
+            Some(F2Decker.MOS),             // Explicitly set
+            F2ReadoutMode.Engineering,      // Explicitly set
+            F2ReadoutMode.Science,          // Science bf default
             Some(F2ReadoutMode.Engineering) // Explicitly set
           )
         )
@@ -1307,8 +1329,8 @@ class createObservation extends OdbSuite {
             longSlit.downIO[F2Reads]("defaultReads"),
             longSlit.downIO[Option[F2Reads]]("explicitReads"),
             longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[Option[F2Decker]]("decker"),
-            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+            longSlit.downIO[F2Decker]("decker"),
+            longSlit.downIO[F2ReadoutMode]("readoutMode")
           ).tupled, (
             F2Disperser.R1200HK,
             Some(F2Filter.Y),
@@ -1319,8 +1341,8 @@ class createObservation extends OdbSuite {
             F2Reads.Reads_8,                // Default reads is 8 for faint read mode
             Some(F2Reads.Reads_4),          // Explicit reads set to 4
             F2Reads.Reads_4,                // Default reads is 1 as por bright read mode
-            None,
-            None
+            F2Decker.LongSlit,              // default to long slit
+            F2ReadoutMode.Science           // Science bf default
           )
         )
 
@@ -1352,8 +1374,8 @@ class createObservation extends OdbSuite {
             longSlit.downIO[F2Reads]("defaultReads"),
             longSlit.downIO[Option[F2Reads]]("explicitReads"),
             longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[Option[F2Decker]]("decker"),
-            longSlit.downIO[Option[F2ReadoutMode]]("readoutMode"),
+            longSlit.downIO[F2Decker]("decker"),
+            longSlit.downIO[F2ReadoutMode]("readoutMode")
           ).tupled, (
             F2Disperser.R1200HK,
             Some(F2Filter.Y),
@@ -1364,8 +1386,8 @@ class createObservation extends OdbSuite {
             F2Reads.Reads_4,         // Default reads is 4 for faint read mode
             Some(F2Reads.Reads_16),  // Explicit reads is 16
             F2Reads.Reads_16,        // reads is 16
-            None,
-            None
+            F2Decker.LongSlit,       // default to long slit
+            F2ReadoutMode.Science    // Science bf default
           )
         )
 
