@@ -94,8 +94,8 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   def updateOnly(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Unit] =
     withObscalcServiceTransactionally(_.updateOnly(p, r))
 
-  val resetCalculating: IO[Unit] =
-    withObscalcServiceTransactionally(_.resetCalculating)
+  val reset: IO[Unit] =
+    withObscalcServiceTransactionally(_.reset)
 
   def insert(pc: Obscalc.PendingCalc): IO[Unit] =
     withSession: session =>
@@ -237,7 +237,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
         val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
         assertIO(insert(pc2) *> updateOnly(pc, r) *> load, List(pc2))
 
-  test("reset calculating"):
+  test("reset"):
     val states = for
       _  <- cleanup
       p  <- createProgram
@@ -247,7 +247,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       r0 <- selectStates
       _  <- load
       r1 <- selectStates
-      _  <- resetCalculating
+      _  <- reset
       r2 <- selectStates
     yield (List(r0(o0), r1(o0), r2(o0)),
            List(r0(o1), r1(o1), r2(o1)))
