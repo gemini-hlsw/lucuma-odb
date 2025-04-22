@@ -80,6 +80,13 @@ CREATE PROCEDURE invalidate_obscalc(
 DECLARE
   current_state e_obscalc_state;
 BEGIN
+  -- Exit early if the observation no longer exists.
+  IF NOT EXISTS (
+    SELECT 1 FROM t_observation WHERE c_observation_id = observation_id
+  ) THEN
+    RETURN;
+  END IF;
+
   -- Try to insert. If this is the first time the observation has been modified
   -- then it will succeed but otherwise we'll do nothing.
   INSERT INTO t_obscalc (c_observation_id)
@@ -188,7 +195,7 @@ BEGIN
       CREATE TRIGGER %I_invalidate_trigger
       AFTER INSERT OR UPDATE OR DELETE ON %I
       FOR EACH ROW EXECUTE FUNCTION obsid_obscalc_invalidate()
-    $f$, t, t);
+    $f$, substring(t from 3), t);
   END LOOP;
 END;
 $$;
@@ -214,6 +221,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER target_invalidate_trigger
+  AFTER UPDATE ON t_target
+  FOR EACH ROW
+  EXECUTE FUNCTION target_invalidate();
+
 
 -- DROP TRIGGER dataset_qa_state_update_trigger ON t_dataset;
 -- DROP FUNCTION clear_execution_digest_on_qa_state_change;
