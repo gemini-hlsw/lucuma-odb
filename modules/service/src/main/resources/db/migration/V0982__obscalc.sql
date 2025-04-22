@@ -80,7 +80,8 @@ CREATE PROCEDURE invalidate_obscalc(
 DECLARE
   current_state e_obscalc_state;
 BEGIN
-  -- Exit early if the observation no longer exists.
+  -- Exit early if the observation no longer exists, which happens when
+  -- calibration observations are truly good and gone.
   IF NOT EXISTS (
     SELECT 1 FROM t_observation WHERE c_observation_id = observation_id
   ) THEN
