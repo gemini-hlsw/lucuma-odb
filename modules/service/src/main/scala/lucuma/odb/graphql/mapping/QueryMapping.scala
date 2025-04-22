@@ -61,7 +61,6 @@ import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.ConfigurationService.downFields
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import skunk.Transaction
@@ -138,7 +137,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   import Services.Syntax.*
 
   // We can't directly filter for computed values like workflow state, so our strategy here
-  // is to first fetch the oids of the observations that match the WhereObservation, then 
+  // is to first fetch the oids of the observations that match the WhereObservation, then
   // fetch the workflow states for just those oids, then find the ones with the states we're
   // interested in and build a new query that's the same as the original but with a swapped
   // out predicate that explicitly matches the set of oids we have computed.
@@ -168,7 +167,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         def stateMap(oids: List[model.Observation.Id])(using Services[F], NoTransaction[F]) : F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
           Services.asSuperUser:
             observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
-              r.map: m => 
+              r.map: m =>
                 m.view.mapValues(_.state).toMap
 
         // a new query with a predicate over the specified oids, with ordering by oid
@@ -200,7 +199,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
       case other =>
         Result.internalError(s"observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got $other").pure[F]
-    
+
     }
 
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (p, e) =>
@@ -564,7 +563,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         Elab.transformChild { child =>
           (rWHERE, rStates).parMapN { (WHERE, states) =>
             Environment(
-              Env("states" -> states.orEmpty), 
+              Env("states" -> states.orEmpty),
               Filter(
                 and(List(
                   Predicates.observation.existence.includeDeleted(false),
