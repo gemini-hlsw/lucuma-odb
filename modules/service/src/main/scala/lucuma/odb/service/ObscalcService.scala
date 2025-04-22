@@ -78,13 +78,19 @@ sealed trait ObscalcService[F[_]]:
    * appropriate). This is intended to be used by the worker service on startup
    * to cleanup state and restart.
    */
-  def resetCalculating(using Transaction[F]): F[Unit]
+  def reset(using Transaction[F]): F[Unit]
 
   /**
    * Loads up to `max` `pending` (or `retry`) calculations.  Loading changes
    * the state of the entries to `calculating` before they are returned.
    */
   def load(max: Int)(using Transaction[F]): F[List[Obscalc.PendingCalc]]
+
+  /**
+   * Loads the PendingCalc entry for the given observation, if it exists and is
+   * in fact pending (or 'retry').
+   */
+  def loadObs(observationId: Observation.Id)(using Transaction[F]): F[Option[Obscalc.PendingCalc]]
 
   /**
    * Calculates the result for the associated observation and updates the
@@ -148,13 +154,18 @@ object ObscalcService:
           .execute(Statements.SelectProgram)(programId)
           .map(_.fproductLeft(_.observationId).toMap)
 
-      override def resetCalculating(using Transaction[F]): F[Unit] =
+      override def reset(using Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
 
       override def load(
         max: Int
       )(using Transaction[F]): F[List[Obscalc.PendingCalc]] =
         session.execute(Statements.LoadPendingCalc)(max)
+
+      override def loadObs(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Obscalc.PendingCalc]] =
+        session.option(Statements.LoadPendingCalcFor)(observationId)
 
       override def calculateOnly(
         pending: Obscalc.PendingCalc
@@ -402,6 +413,25 @@ object ObscalcService:
         FROM tasks
         WHERE c.c_observation_id = tasks.c_observation_id
         RETURNING tasks.c_program_id, c.c_observation_id, c.c_last_invalidation
+      """.query(pending_obscalc)
+
+    val LoadPendingCalcFor: Query[Observation.Id, Obscalc.PendingCalc] =
+      sql"""
+        WITH task AS (
+          SELECT o.c_program_id, o.c_observation_id
+          FROM t_obscalc c
+          INNER JOIN t_observation o USING (c_observation_id)
+          WHERE (
+            c.c_obscalc_state = 'pending' OR
+            (c.c_obscalc_state = 'retry' AND c.c_retry_at <= now())
+          ) AND c.observation_id = $observation_id
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE t_obscalc c
+        SET c_obscalc_state = 'calculating'
+        FROM task
+        WHERE c.c_observation_id = task.c_observation_id
+        RETURNING task.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
     private def updatesForResult(r: Obscalc.Result): NonEmptyList[AppliedFragment] =

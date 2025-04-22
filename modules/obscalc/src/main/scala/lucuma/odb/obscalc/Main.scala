@@ -13,6 +13,7 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
+import fs2.Stream
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import lucuma.core.model.Access
@@ -21,6 +22,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -75,7 +77,9 @@ object ObscalcMain extends CommandIOApp(
 
 object CalcMain extends MainParams:
 
+  // TODO: env variables?
   val ParallelTaskLimit = 8
+  val PollInterval      = 10.seconds
 
   case class PendingCalc(
     observationId:    Observation.Id,
@@ -139,21 +143,39 @@ object CalcMain extends MainParams:
     t: Topic[F, ObscalcTopic.Element],
     s: Resource[F, Services[F]]
   ): Resource[F, Unit] =
-    def obscalc(using Services[F]): ObscalcService[F] =
-      obscalcService(h, i, e)
+
+    val obscalc: Services[F] ?=> ObscalcService[F] = obscalcService(h, i, e)
+
+    // Stream of pending calc produced by watching for updates to t_obscalc
+    val eventStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
+      t.subscribe(1000).evalMapFilter: e =>
+        summon[Services[F]].transactionally:
+          obscalc.loadObs(e.observationId)
+
+    // Stream of pending calc produced by periodic polling
+    val pollStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
+      Stream
+        .awakeEvery(PollInterval)
+        .evalMap: _ =>
+          summon[Services[F]].transactionally:
+            obscalc.load(ParallelTaskLimit)
+        .flatMap(Stream.emits)
 
     for
-      _ <- Resource.eval(Logger[F].info("Start listening for observation calc changes"))
-      _ <- Resource.eval(s.useTransactionally(obscalc.resetCalculating))
+      _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
+      _ <- Resource.eval(s.useTransactionally(obscalc.reset))
       _ <- Resource.eval(
-             t.subscribe(100)
-              .parEvalMapUnordered(ParallelTaskLimit): elem =>
-                s.useTransactionally:
-                  obscalc.load(ParallelTaskLimit).void
-              .compile
-              .drain
-              .start
-              .void
+             s.useNonTransactionally:
+               eventStream
+                 .merge(pollStream)
+                 .evalTap: pc =>
+                   Logger[F].debug(s"Loaded PendingCalc ${pc.observationId} last invalidated at ${pc.lastInvalidation}")
+                 .parEvalMapUnordered(ParallelTaskLimit): pc =>
+                   obscalc.calculateAndUpdate(pc).void
+                 .compile
+                 .drain
+                 .start
+                 .void
            )
     yield ()
 
