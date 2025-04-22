@@ -171,9 +171,9 @@ object CalcMain extends MainParams:
                  .evalTap: pc =>
                    Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
                  .parEvalMapUnordered(ParallelTaskLimit): pc =>
-                   obscalc.calculateAndUpdate(pc)
-                 .evalTap: meta =>
-                   Logger[F].debug(s"Stored result for ${meta.observationId}. Current status: $meta.")
+                   obscalc.calculateAndUpdate(pc).tupleLeft(pc)
+                 .evalTap: (pc, meta) =>
+                   Logger[F].debug(s"Stored result for ${pc.observationId}. Current status: $meta.")
                  .compile
                  .drain
                  .start

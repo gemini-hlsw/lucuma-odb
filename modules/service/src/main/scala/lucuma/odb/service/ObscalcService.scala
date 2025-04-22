@@ -98,7 +98,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def calculateAndUpdate(
     pending: Obscalc.PendingCalc
-  )(using NoTransaction[F]): F[Obscalc.Meta]
+  )(using NoTransaction[F]): F[Option[Obscalc.Meta]]
 
   /**
    * Calculates and returns the result for the associated observation without
@@ -118,7 +118,7 @@ sealed trait ObscalcService[F[_]]:
   def updateOnly(
     pending: Obscalc.PendingCalc,
     result:  Obscalc.Result
-  )(using Transaction[F]): F[Obscalc.Meta]
+  )(using Transaction[F]): F[Option[Obscalc.Meta]]
 
 object ObscalcService:
 
@@ -199,29 +199,29 @@ object ObscalcService:
         pending:       Obscalc.PendingCalc,
         result:        Obscalc.Result,
         expectedState: Obscalc.State
-      )(using Transaction[F]): F[Obscalc.Meta] =
+      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
         for
-          lu <- session.unique(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
-          ns  = if lu === pending.lastInvalidation then expectedState else Obscalc.State.Pending
-          af  = Statements.storeResult(pending, result, ns)
-          m  <- session.unique(af.fragment.query(Statements.obscalc_meta))(af.argument)
+          lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
+          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expectedState else Obscalc.State.Pending)
+          af  = ns.map(newState => Statements.storeResult(pending, result, newState))
+          m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 
       override def updateOnly(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
-      )(using Transaction[F]): F[Obscalc.Meta] =
+      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
         storeResult(pending, result, Obscalc.State.Ready)
 
       private def markFailed(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
-      )(using Transaction[F]): F[Obscalc.Meta] =
+      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
         storeResult(pending, result, Obscalc.State.Retry)
 
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
-      )(using NoTransaction[F]): F[Obscalc.Meta] =
+      )(using NoTransaction[F]): F[Option[Obscalc.Meta]] =
         calculateOnly(pending)
           .flatMap: result =>
             services.transactionally:
