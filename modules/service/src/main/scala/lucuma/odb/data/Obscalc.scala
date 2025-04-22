@@ -13,13 +13,8 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.service.ItcService
 
 case class Obscalc(
-  observationId:    Observation.Id,
-  state:            Obscalc.State,
-  lastInvalidation: Timestamp,
-  lastUpdate:       Timestamp,
-  retryAt:          Option[Timestamp],
-  failureCount:     NonNegInt,
-  result:           Option[Obscalc.Result]
+  meta:   Obscalc.Meta,
+  result: Option[Obscalc.Result]
 )
 
 object Obscalc:
@@ -28,6 +23,15 @@ object Obscalc:
     programId:        Program.Id,
     observationId:    Observation.Id,
     lastInvalidation: Timestamp
+  )
+
+  case class Meta(
+    observationId:    Observation.Id,
+    state:            Obscalc.State,
+    lastInvalidation: Timestamp,
+    lastUpdate:       Timestamp,
+    retryAt:          Option[Timestamp],
+    failureCount:     NonNegInt
   )
 
   enum State(val tag: String) derives Enumerated:

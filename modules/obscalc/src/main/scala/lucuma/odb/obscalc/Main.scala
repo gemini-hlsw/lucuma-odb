@@ -169,9 +169,11 @@ object CalcMain extends MainParams:
                eventStream
                  .merge(pollStream)
                  .evalTap: pc =>
-                   Logger[F].debug(s"Loaded PendingCalc ${pc.observationId} last invalidated at ${pc.lastInvalidation}")
+                   Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
                  .parEvalMapUnordered(ParallelTaskLimit): pc =>
-                   obscalc.calculateAndUpdate(pc).void
+                   obscalc.calculateAndUpdate(pc)
+                 .evalTap: meta =>
+                   Logger[F].debug(s"Stored result for ${meta.observationId}. Current status: $meta.")
                  .compile
                  .drain
                  .start

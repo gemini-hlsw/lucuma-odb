@@ -85,13 +85,13 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   val load: IO[List[Obscalc.PendingCalc]] =
     withObscalcServiceTransactionally(_.load(10))
 
-  def calculateAndUpdate(p: Obscalc.PendingCalc): IO[Obscalc.Result] =
+  def calculateAndUpdate(p: Obscalc.PendingCalc): IO[Obscalc.Meta] =
     withObscalcService(_.calculateAndUpdate(p))
 
   def calculateOnly(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
     withObscalcService(_.calculateOnly(pc))
 
-  def updateOnly(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Unit] =
+  def updateOnly(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Obscalc.Meta] =
     withObscalcServiceTransactionally(_.updateOnly(p, r))
 
   val reset: IO[Unit] =

@@ -98,7 +98,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def calculateAndUpdate(
     pending: Obscalc.PendingCalc
-  )(using NoTransaction[F]): F[Obscalc.Result]
+  )(using NoTransaction[F]): F[Obscalc.Meta]
 
   /**
    * Calculates and returns the result for the associated observation without
@@ -118,7 +118,7 @@ sealed trait ObscalcService[F[_]]:
   def updateOnly(
     pending: Obscalc.PendingCalc,
     result:  Obscalc.Result
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Obscalc.Meta]
 
 object ObscalcService:
 
@@ -145,14 +145,14 @@ object ObscalcService:
               .stream(Statements.selectMany(enc))(nel, 1024)
               .compile
               .toList
-              .map(_.fproductLeft(_.observationId).toMap)
+              .map(_.fproductLeft(_.meta.observationId).toMap)
 
       override def selectProgram(
         programId: Program.Id
       )(using Transaction[F]): F[Map[Observation.Id, Obscalc]] =
         session
           .execute(Statements.SelectProgram)(programId)
-          .map(_.fproductLeft(_.observationId).toMap)
+          .map(_.fproductLeft(_.meta.observationId).toMap)
 
       override def reset(using Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
@@ -199,69 +199,77 @@ object ObscalcService:
         pending:       Obscalc.PendingCalc,
         result:        Obscalc.Result,
         expectedState: Obscalc.State
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F]): F[Obscalc.Meta] =
         for
           lu <- session.unique(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
           ns  = if lu === pending.lastInvalidation then expectedState else Obscalc.State.Pending
           af  = Statements.storeResult(pending, result, ns)
-          _  <- session.execute(af.fragment.command)(af.argument)
-        yield ()
+          m  <- session.unique(af.fragment.query(Statements.obscalc_meta))(af.argument)
+        yield m
 
       override def updateOnly(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F]): F[Obscalc.Meta] =
         storeResult(pending, result, Obscalc.State.Ready)
 
       private def markFailed(
         pending: Obscalc.PendingCalc,
         result:  Obscalc.Result
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F]): F[Obscalc.Meta] =
         storeResult(pending, result, Obscalc.State.Retry)
 
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
-      )(using NoTransaction[F]): F[Obscalc.Result] =
+      )(using NoTransaction[F]): F[Obscalc.Meta] =
         calculateOnly(pending)
           .flatMap: result =>
             services.transactionally:
               result.odbError match
-                case Some(OdbError.ItcError(_)) => markFailed(pending, result).as(result)
-                case _                          => updateOnly(pending, result).as(result)
+                case Some(OdbError.ItcError(_)) => markFailed(pending, result)
+                case _                          => updateOnly(pending, result)
           .onError: e =>
             services.transactionally:
-              val error = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
-              markFailed(pending, error)
+              markFailed(pending, Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))).void
 
   object Statements:
-    private val pending_obscalc: Codec[Obscalc.PendingCalc] =
+    val pending_obscalc: Codec[Obscalc.PendingCalc] =
       (program_id *: observation_id *: core_timestamp).to[Obscalc.PendingCalc]
 
-    private val odb_error: Codec[OdbError] =
+    val obscalc_meta: Codec[Obscalc.Meta] = (
+      observation_id     *: // c_observation_id
+      obscalc_state      *: // c_obscalc_state
+      core_timestamp     *: // c_last_invalidation
+      core_timestamp     *: // c_last_update
+      core_timestamp.opt *: // c_retry_at
+      int4_nonneg           // c_failure_count
+    ).to[Obscalc.Meta]
+
+    val odb_error: Codec[OdbError] =
       jsonb.eimap(
         json => if json.isNull then s"Could not decode OdbError: unexpected NULL value.".asLeft
                 else json.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}.")
       )(_.asJson)
 
-    private val integration_time: Codec[IntegrationTime] =
+    val integration_time: Codec[IntegrationTime] =
       (time_span *: int4_nonneg).to[IntegrationTime]
 
-    private val signal_to_noise_at: Codec[SignalToNoiseAt] =
+    val signal_to_noise_at: Codec[SignalToNoiseAt] =
       (wavelength_pm *: signal_to_noise *: signal_to_noise)
         .imap((w, s, t) => SignalToNoiseAt(w, lucuma.itc.SingleSN(s), lucuma.itc.TotalSN(t)))(
           sna => (sna.wavelength, sna.single.value, sna.total.value)
         )
 
-    private val target_result: Codec[ItcService.TargetResult] =
+    val target_result: Codec[ItcService.TargetResult] =
       (target_id *: integration_time *: signal_to_noise_at.opt).to[ItcService.TargetResult]
 
-    private val itc_result: Codec[Obscalc.ItcResult] =
+    val itc_result: Codec[Obscalc.ItcResult] =
       (target_result *: target_result).to[Obscalc.ItcResult]
 
-    private val setup_time: Codec[SetupTime] =
+    val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
 
-    private val offset_array: Codec[List[Offset]] =
+    val offset_array: Codec[List[Offset]] =
       _int8.eimap { arr =>
         val len = arr.size / 2
         if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
@@ -282,7 +290,7 @@ object ObscalcService:
           .get
       }
 
-    private val sequence_digest: Codec[SequenceDigest] =
+    val sequence_digest: Codec[SequenceDigest] =
       (obs_class *: categorized_time *: offset_array *: int4_nonneg *: execution_state).imap { case (oClass, pTime, offsets, aCount, execState) =>
         SequenceDigest(oClass, pTime, SortedSet.from(offsets), aCount, execState)
       } { sd => (
@@ -293,10 +301,10 @@ object ObscalcService:
         sd.executionState
       )}
 
-    private val execution_digest: Codec[ExecutionDigest] =
+    val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
-    private val obscalc_result: Codec[Option[Obscalc.Result]] =
+    val obscalc_result_opt: Codec[Option[Obscalc.Result]] =
       (odb_error.opt *: itc_result.opt *: execution_digest.opt).eimap {
         case (None, None, None)       => none.asRight
         case (Some(e), None, None)    => Obscalc.Result.Error(e).some.asRight
@@ -305,15 +313,8 @@ object ObscalcService:
         case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
       }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest)))
 
-    private val obscalc: Codec[Obscalc] = (
-      observation_id     *: // c_observation_id
-      obscalc_state      *: // c_obscalc_state
-      core_timestamp     *: // c_last_invalidation
-      core_timestamp     *: // c_last_update
-      core_timestamp.opt *: // c_retry_at
-      int4_nonneg        *: // c_failure_count
-      obscalc_result
-    ).to[Obscalc]
+    val obscalc: Codec[Obscalc] =
+      (obscalc_meta *: obscalc_result_opt).to[Obscalc]
 
     private def obscalcColumns(prefix: Option[String] = None): String =
       List(
@@ -501,4 +502,5 @@ object ObscalcService:
 
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|
-        sql"WHERE c_observation_id = $observation_id"(pending.observationId)
+        sql"WHERE c_observation_id = $observation_id"(pending.observationId) |+| void" " |+|
+        void"RETURNING c_observation_id, c_obscalc_state, c_last_invalidation, c_last_update, c_retry_at, c_failure_count"

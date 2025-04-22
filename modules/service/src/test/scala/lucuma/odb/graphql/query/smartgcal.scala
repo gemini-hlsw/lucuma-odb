@@ -820,7 +820,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
              }
            """,
         expected = List(
-          "Could not generate a sequence for the observation o-104: missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
+          "missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
         ).asLeft
       )
   }
