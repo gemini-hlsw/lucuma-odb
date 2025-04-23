@@ -106,7 +106,7 @@ object GeneratorParamsService {
 
     case object ConflictingData extends Error:
       def format: String =
-         "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
+        "Conflicting data, all stars in the asterism must use the same observing mode and parameters."
 
     given Eq[Error] with
       def eqv(x: Error, y: Error): Boolean =
