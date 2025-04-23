@@ -228,7 +228,7 @@ CREATE TRIGGER target_invalidate_trigger
   FOR EACH ROW
   EXECUTE FUNCTION target_invalidate();
 
-
+-- N.B. These shold be removed in a future migration.
 -- DROP TRIGGER dataset_qa_state_update_trigger ON t_dataset;
 -- DROP FUNCTION clear_execution_digest_on_qa_state_change;
 -- DROP TRIGGER ch_observation_edit_execution_digest_trigger;
