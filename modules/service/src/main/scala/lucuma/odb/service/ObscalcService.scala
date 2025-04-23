@@ -110,16 +110,6 @@ sealed trait ObscalcService[F[_]]:
     pending: Obscalc.PendingCalc
   )(using NoTransaction[F]): F[Obscalc.Result]
 
-  /**
-   * Updates the obscalc result in the database. This is intended primarily to
-   * facilitate testing.  Instead, `calculateAndUpdate` is provided for the
-   * Obscalc worker service that is keeping everything up-to-date.
-   */
-  def updateOnly(
-    pending: Obscalc.PendingCalc,
-    result:  Obscalc.Result
-  )(using Transaction[F]): F[Option[Obscalc.Meta]]
-
 object ObscalcService:
 
   def instantiate[F[_]: Concurrent](
@@ -207,18 +197,6 @@ object ObscalcService:
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 
-      override def updateOnly(
-        pending: Obscalc.PendingCalc,
-        result:  Obscalc.Result
-      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
-        storeResult(pending, result, Obscalc.State.Ready)
-
-      private def markFailed(
-        pending: Obscalc.PendingCalc,
-        result:  Obscalc.Result
-      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
-        storeResult(pending, result, Obscalc.State.Retry)
-
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
       )(using NoTransaction[F]): F[Option[Obscalc.Meta]] =
@@ -226,11 +204,13 @@ object ObscalcService:
           .flatMap: result =>
             services.transactionally:
               result.odbError match
-                case Some(OdbError.ItcError(_)) => markFailed(pending, result)
-                case _                          => updateOnly(pending, result)
+                case Some(OdbError.ItcError(_)) => storeResult(pending, result, Obscalc.State.Retry)
+                case _                          => storeResult(pending, result, Obscalc.State.Ready)
+
           .onError: e =>
+            val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
             services.transactionally:
-              markFailed(pending, Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))).void
+              storeResult(pending, result, Obscalc.State.Retry).void
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
