@@ -1,3 +1,18 @@
+-- Obscalc Service
+
+-- The obscalc state typically moves from 'ready' to 'pending' when something is
+-- edited, then when the entry is picked up by an obscalc worker the state is
+-- moved to 'calculating'.  When the calculation is complete, the state moves
+-- to 'ready' again if there were no additional edits to the observation.
+-- Otherwise, back to 'pending' to be picked up by a worker.
+--
+-- If there are possibly recoverable errors (calling the ITC) when calculating,
+-- the state moves from 'calculating' to 'retry' to be attempted later.  An edit
+-- while in 'retry' transitions the state to 'pending' immediately.
+
+-- Other errors, like missing targets or observing mode, result in errors that
+-- are stored as the result of the calculation.
+
 CREATE TYPE e_obscalc_state AS ENUM(
   'pending',
   'retry',
@@ -19,11 +34,21 @@ CREATE TABLE t_obscalc(
     ON DELETE CASCADE,
   CONSTRAINT t_obscalc_pkey PRIMARY KEY (c_program_id, c_observation_id),
 
---  c_observation_id       d_observation_id    PRIMARY KEY REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
   c_obscalc_state        e_obscalc_state     NOT NULL DEFAULT 'pending',
+
+  -- When the entry was last marked dirty.  This is compared to the value when
+  -- the entry was picked up by a worker at the time the result is written. If
+  -- unchanged, the state moves to 'ready'.  Otherwise, it moves back to 'pending'.
   c_last_invalidation    timestamp           NOT NULL DEFAULT NOW(),
+
+  -- When the last result was written.
   c_last_update          timestamp           NOT NULL DEFAULT NOW(),
+
+  -- If in 'retry' state, the retry will not be attempted before this time.
   c_retry_at             timestamp           NULL DEFAULT NULL,
+
+  -- The number of attempts to perform the calculation that have failed since
+  -- it was last 'pending'.
   c_failure_count        int4                NOT NULL DEFAULT 0 CHECK (c_failure_count >= 0),
 
   -- retry fields only apply to 'retry' and 'calculating'
@@ -37,6 +62,7 @@ CREATE TABLE t_obscalc(
     (c_obscalc_state != 'retry') OR (c_retry_at IS NOT NULL)
   ),
 
+  -- Error result, if any.
   c_odb_error            jsonb,
 
   -- Imaging ITC Result
@@ -78,10 +104,10 @@ CREATE TABLE t_obscalc(
 
 -- Invalidates the obscalc results for the given observation, moving the
 -- calculation state to 'pending' so that it may be picked up.  If an
--- observation is invalidated while it is updating (calculating) then it is not
--- reset to pending because we don't want it to get picked up by a worker.  The
+-- observation is invalidated while it is updating ('calculating') then it is not
+-- reset to 'pending' because we don't want it to get picked up by a worker.  The
 -- last invalidation time is updated though so that at the end of the
--- calculation we know whether the result is then 'ready' (last invalidation
+-- calculation we know whether the result is then 'ready' (c_last_invalidation
 -- time unchanged) or else should go back to 'pending' (has newer invalidation).
 CREATE PROCEDURE invalidate_obscalc(
   observation_id d_observation_id
