@@ -146,11 +146,15 @@ object CalcMain extends MainParams:
 
     val obscalc: Services[F] ?=> ObscalcService[F] = obscalcService(h, i, e)
 
-    // Stream of pending calc produced by watching for updates to t_obscalc
+    // Stream of pending calc produced by watching for updates to t_obscalc.
+    // We filter out anything but transitions to Pending.
     val eventStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
       t.subscribe(1000).evalMapFilter: e =>
-        summon[Services[F]].transactionally:
-          obscalc.loadObs(e.observationId)
+        Option
+          .when(e.oldState.forall(_ =!= Obscalc.State.Pending) && e.newState.exists(_ === Obscalc.State.Pending))(e.observationId)
+          .flatTraverse: oid =>
+            summon[Services[F]].transactionally:
+              obscalc.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling
     val pollStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =

@@ -10,7 +10,16 @@ CREATE TYPE e_obscalc_state AS ENUM(
 -- t_execution_digest with some extra state, but more information (like time
 -- accounting) could be added here.
 CREATE TABLE t_obscalc(
-  c_observation_id       d_observation_id    PRIMARY KEY REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
+  -- Primary Key (+ fk to t_observation)
+  c_program_id           d_program_id        NOT NULL,
+  c_observation_id       d_observation_id    NOT NULL,
+
+  FOREIGN KEY (c_program_id, c_observation_id)
+    REFERENCES t_observation(c_program_id, c_observation_id)
+    ON DELETE CASCADE,
+  CONSTRAINT t_obscalc_pkey PRIMARY KEY (c_program_id, c_observation_id),
+
+--  c_observation_id       d_observation_id    PRIMARY KEY REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
   c_obscalc_state        e_obscalc_state     NOT NULL DEFAULT 'pending',
   c_last_invalidation    timestamp           NOT NULL DEFAULT NOW(),
   c_last_update          timestamp           NOT NULL DEFAULT NOW(),
@@ -78,20 +87,21 @@ CREATE PROCEDURE invalidate_obscalc(
   observation_id d_observation_id
 ) LANGUAGE plpgsql AS $$
 DECLARE
+  program_id    d_program_id;
   current_state e_obscalc_state;
 BEGIN
+  SELECT c_program_id INTO program_id FROM t_observation WHERE c_observation_id = observation_id;
+
   -- Exit early if the observation no longer exists, which happens when
   -- calibration observations are truly good and gone.
-  IF NOT EXISTS (
-    SELECT 1 FROM t_observation WHERE c_observation_id = observation_id
-  ) THEN
+  IF NOT FOUND THEN
     RETURN;
   END IF;
 
   -- Try to insert. If this is the first time the observation has been modified
   -- then it will succeed but otherwise we'll do nothing.
-  INSERT INTO t_obscalc (c_observation_id)
-  VALUES (observation_id)
+  INSERT INTO t_obscalc (c_program_id, c_observation_id)
+  VALUES (program_id, observation_id)
   ON CONFLICT ON CONSTRAINT t_obscalc_pkey DO NOTHING;
 
   -- Get the current state and lock the row.
@@ -227,6 +237,35 @@ CREATE TRIGGER target_invalidate_trigger
   AFTER UPDATE ON t_target
   FOR EACH ROW
   EXECUTE FUNCTION target_invalidate();
+
+-- Notify when the obscalc state is updated.
+CREATE OR REPLACE FUNCTION ch_obscalc_update()
+  RETURNS trigger AS $$
+DECLARE
+  obscalc record;
+BEGIN
+  IF ROW(NEW.*) IS DISTINCT FROM ROW(OLD.*) THEN
+    obscalc := COALESCE(NEW, OLD);
+    PERFORM pg_notify(
+      'ch_obscalc_update',
+      array_to_string(ARRAY[
+        obscalc.c_observation_id,
+        obscalc.c_program_id,
+        COALESCE(OLD.c_obscalc_state::text, 'null'),
+        COALESCE(NEW.c_obscalc_state::text, 'null'),
+        TG_OP
+      ], ',')
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ch_obscalc_update_trigger
+  AFTER INSERT OR UPDATE ON t_obscalc
+  DEFERRABLE
+  FOR EACH ROW
+  EXECUTE PROCEDURE ch_obscalc_update();
 
 -- N.B. These shold be removed in a future migration.
 -- DROP TRIGGER dataset_qa_state_update_trigger ON t_dataset;

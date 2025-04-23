@@ -30,6 +30,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.obscalc_state
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.program_id
 import skunk.*
 import skunk.implicits.*
 
@@ -99,18 +100,20 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
 
   def insert(pc: Obscalc.PendingCalc): IO[Unit] =
     withSession: session =>
-      val ins: Command[(Observation.Id, Timestamp)] = sql"""
+      val ins: Command[(Program.Id, Observation.Id, Timestamp)] = sql"""
         INSERT INTO t_obscalc (
+          c_program_id,
           c_observation_id,
           c_last_invalidation
         ) SELECT
+          $program_id,
           $observation_id,
           $core_timestamp
         ON CONFLICT ON CONSTRAINT t_obscalc_pkey DO UPDATE
           SET c_last_invalidation = $core_timestamp
-      """.command.contramap((o, t) => (o, t, t))
+      """.command.contramap((p, o, t) => (p, o, t, t))
 
-      session.execute(ins)(pc.observationId, pc.lastInvalidation).void
+      session.execute(ins)(pc.programId, pc.observationId, pc.lastInvalidation).void
 
   def setRetry(o: Observation.Id): IO[Unit] =
     withSession: session =>

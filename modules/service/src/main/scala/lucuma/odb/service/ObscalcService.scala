@@ -237,6 +237,7 @@ object ObscalcService:
       (program_id *: observation_id *: core_timestamp).to[Obscalc.PendingCalc]
 
     val obscalc_meta: Codec[Obscalc.Meta] = (
+      program_id         *: // c_program_id
       observation_id     *: // c_observation_id
       obscalc_state      *: // c_obscalc_state
       core_timestamp     *: // c_last_invalidation
@@ -318,6 +319,7 @@ object ObscalcService:
 
     private def obscalcColumns(prefix: Option[String] = None): String =
       List(
+        "c_program_id",
         "c_observation_id",
         "c_obscalc_state",
         "c_last_invalidation",
@@ -380,9 +382,8 @@ object ObscalcService:
       sql"""
         SELECT
           #${obscalcColumns("c".some)}
-        FROM t_obscalc c
-        INNER JOIN t_observation o USING (c_observation_id)
-        WHERE o.c_program_id = $program_id
+        FROM t_obscalc
+        WHERE c_program_id = $program_id
       """.query(obscalc)
 
     val ResetCalculating: Command[Void] =
@@ -399,40 +400,38 @@ object ObscalcService:
     val LoadPendingCalc: Query[Int, Obscalc.PendingCalc] =
       sql"""
         WITH tasks AS (
-          SELECT o.c_program_id, o.c_observation_id
-          FROM t_obscalc c
-          INNER JOIN t_observation o USING (c_observation_id)
+          SELECT c_program_id, c_observation_id
+          FROM t_obscalc
           WHERE (
-            c.c_obscalc_state = 'pending' OR
-            (c.c_obscalc_state = 'retry' AND c.c_retry_at <= now())
+            c_obscalc_state = 'pending' OR
+            (c_obscalc_state = 'retry' AND c_retry_at <= now())
           )
-          ORDER BY c.c_last_invalidation LIMIT $int4
+          ORDER BY c_last_invalidation LIMIT $int4
           FOR UPDATE SKIP LOCKED
         )
         UPDATE t_obscalc c
         SET c_obscalc_state = 'calculating'
         FROM tasks
         WHERE c.c_observation_id = tasks.c_observation_id
-        RETURNING tasks.c_program_id, c.c_observation_id, c.c_last_invalidation
+        RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
     val LoadPendingCalcFor: Query[Observation.Id, Obscalc.PendingCalc] =
       sql"""
         WITH task AS (
-          SELECT o.c_program_id, o.c_observation_id
-          FROM t_obscalc c
-          INNER JOIN t_observation o USING (c_observation_id)
+          SELECT c_program_id, c_observation_id
+          FROM t_obscalc
           WHERE (
-            c.c_obscalc_state = 'pending' OR
-            (c.c_obscalc_state = 'retry' AND c.c_retry_at <= now())
-          ) AND c.observation_id = $observation_id
+            c_obscalc_state = 'pending' OR
+            (c_obscalc_state = 'retry' AND c_retry_at <= now())
+          ) AND c_observation_id = $observation_id
           FOR UPDATE SKIP LOCKED
         )
         UPDATE t_obscalc c
         SET c_obscalc_state = 'calculating'
         FROM task
         WHERE c.c_observation_id = task.c_observation_id
-        RETURNING task.c_program_id, c.c_observation_id, c.c_last_invalidation
+        RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
     private def updatesForResult(r: Obscalc.Result): NonEmptyList[AppliedFragment] =
@@ -503,4 +502,4 @@ object ObscalcService:
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|
         sql"WHERE c_observation_id = $observation_id"(pending.observationId) |+| void" " |+|
-        void"RETURNING c_observation_id, c_obscalc_state, c_last_invalidation, c_last_update, c_retry_at, c_failure_count"
+        void"RETURNING c_program_id, c_observation_id, c_obscalc_state, c_last_invalidation, c_last_update, c_retry_at, c_failure_count"

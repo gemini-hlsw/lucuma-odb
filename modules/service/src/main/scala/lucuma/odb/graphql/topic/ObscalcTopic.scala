@@ -23,29 +23,33 @@ object ObscalcTopic:
   /**
    * @param observationId the id of the observation that was inserted or edited
    * @param programId the observation's program's id
+   * @param oldState the previous obs calculation state (if any)
+   * @param newState the current obs calculation state
    * @param editType determines creation vs update
    * @param users users associated with this program
    */
   case class Element(
     observationId: Observation.Id,
     programId:     Program.Id,
-    obsCalcState:  Obscalc.State,
+    oldState:      Option[Obscalc.State],
+    newState:      Option[Obscalc.State],
     editType:      EditType,
     users:         List[User.Id]
   ) extends TopicElement
 
   private val topic =
-    OdbTopic.define[(Observation.Id, Program.Id, Obscalc.State, EditType), Element](
+    OdbTopic.define[(Observation.Id, Program.Id, Option[Obscalc.State], Option[Obscalc.State], EditType), Element](
       "Obscalc",
       id"ch_obscalc_update",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, update._4, users)
+      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
     ) {
-      case Array(_oid, _pid, _state, _tg_op) =>
+      case Array(_oid, _pid, _oldState, _newState, _tg_op) =>
         (
           Gid[Observation.Id].fromString.getOption(_oid),
           Gid[Program.Id].fromString.getOption(_pid),
-          Enumerated[Obscalc.State].fromTag(_state),
+          Enumerated[Obscalc.State].fromTag(_oldState).some, // treat the string "null" as Some(None)
+          Enumerated[Obscalc.State].fromTag(_newState).some,
           EditType.fromTgOp(_tg_op)
         ).tupled
     }
