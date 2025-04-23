@@ -17,9 +17,7 @@ import fs2.Stream
 import fs2.concurrent.Topic
 import fs2.io.net.Network
 import lucuma.core.model.Access
-import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.Obscalc
@@ -80,11 +78,6 @@ object CalcMain extends MainParams:
   // TODO: env variables?
   val ParallelTaskLimit = 8
   val PollInterval      = 10.seconds
-
-  case class PendingCalc(
-    observationId:    Observation.Id,
-    lastInvalidation: Timestamp
-  )
 
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
@@ -147,16 +140,26 @@ object CalcMain extends MainParams:
     val obscalc: Services[F] ?=> ObscalcService[F] = obscalcService(h, i, e)
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
-    // We filter out anything but transitions to Pending.
+    // We filter out anything but transitions to Pending.  Entries in the Retry
+    // state are picked up via polling (see pollStream below).  By responding
+    // only to events produced by moving to `Pending` we naturally debounce
+    // multiple events that happen while 'Calculating'.  At the end of the
+    // calculation we'll move back to 'Pending' if there were additional updates
+    // or to 'Ready' otherwise.
     val eventStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
       t.subscribe(1000).evalMapFilter: e =>
         Option
-          .when(e.oldState.forall(_ =!= Obscalc.State.Pending) && e.newState.exists(_ === Obscalc.State.Pending))(e.observationId)
+          .when(
+            e.oldState.forall(_ =!= Obscalc.State.Pending) &&
+            e.newState.exists(_ === Obscalc.State.Pending)
+          )(e.observationId)
           .flatTraverse: oid =>
             summon[Services[F]].transactionally:
               obscalc.loadObs(oid)
 
-    // Stream of pending calc produced by periodic polling
+    // Stream of pending calc produced by periodic polling.  This will pick up
+    // up to ParallelTaskLimit entries including those that are in a 'Retry'
+    // state.
     val pollStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
       Stream
         .awakeEvery(PollInterval)
@@ -177,7 +180,7 @@ object CalcMain extends MainParams:
                  .parEvalMapUnordered(ParallelTaskLimit): pc =>
                    obscalc.calculateAndUpdate(pc).tupleLeft(pc)
                  .evalTap: (pc, meta) =>
-                   Logger[F].debug(s"Stored result for ${pc.observationId}. Current status: $meta.")
+                   Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
                  .compile
                  .drain
                  .start
