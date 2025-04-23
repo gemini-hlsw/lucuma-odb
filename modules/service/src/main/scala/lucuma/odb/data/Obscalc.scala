@@ -26,6 +26,7 @@ object Obscalc:
   )
 
   case class Meta(
+    programId:        Program.Id,
     observationId:    Observation.Id,
     state:            Obscalc.State,
     lastInvalidation: Timestamp,
