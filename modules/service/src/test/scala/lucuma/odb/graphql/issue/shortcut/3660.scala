@@ -54,7 +54,7 @@ class ShortCut_3660 extends ExecutionTestSupport {
              }
            """,
         expected = Set(
-          OdbError.SequenceUnavailable(s"Could not generate a sequence for the observation $oid: observation is missing observing mode".some),
+          OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: observation is missing observing mode".some),
           OdbError.InvalidObservation(oid, "ITC cannot be queried until the following parameters are defined: observing mode".some)
         )
       )

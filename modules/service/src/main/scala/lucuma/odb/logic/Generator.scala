@@ -188,11 +188,11 @@ object Generator {
   }
 
   object Error:
-    def invalidData(oid: Observation.Id, message: String): OdbError =
-      OdbError.SequenceUnavailable(s"Could not generate a sequence for the observation $oid: $message".some)
+    def sequenceUnavailable(oid: Observation.Id, message: String): OdbError =
+      OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $message".some)
 
-    val sequenceTooLong: OdbError =
-      OdbError.SequenceUnavailable(s"The generated sequence is too long (more than $SequenceAtomLimit atoms).".some)
+    def sequenceTooLong(oid: Observation.Id): OdbError =
+      sequenceUnavailable(oid, "The generated sequence is too long (more than $SequenceAtomLimit atoms).")
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
@@ -259,7 +259,7 @@ object Generator {
           val opc: F[Either[OdbError, (GeneratorParams, Option[ItcService.AsterismResults])]] =
             services.transactionally:
               (for
-                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => Error.invalidData(oid, e.format))))
+                p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => Error.sequenceUnavailable(oid, e.format))))
                 c <- EitherT.liftF(itc.selectOne(pid, oid, p))
               yield (p, c)).value
 
@@ -275,7 +275,7 @@ object Generator {
             // we cannot create the Context.
             // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
-              m => EitherT.pure(OdbError.SequenceUnavailable(s"Cannot generate sequence for $oid. Missing parameters: ${m.format}".some).asLeft),
+              m => EitherT.pure(Error.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),
               _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
             )
           } yield Context(pid, oid, as, params)
@@ -364,7 +364,7 @@ object Generator {
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       ): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
-        val gen = LongSlit.gmosNorth(calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+        val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen)
@@ -377,7 +377,7 @@ object Generator {
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       ): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
-        val gen = LongSlit.gmosSouth(calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+        val gen = LongSlit.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for {
           g <- EitherT(gen)
@@ -389,7 +389,7 @@ object Generator {
         when: Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, OdbError, ExecutionDigest] =
         EitherT
-          .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
+          .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
           case GeneratorParams(_, _, config: f2.longslit.Config, role, declaredComplete, _) =>
@@ -398,11 +398,11 @@ object Generator {
 
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
-              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosNorth.estimateSetup))
 
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
             gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
-              EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
         )
 
       override def generate(
@@ -435,6 +435,7 @@ object Generator {
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
 
       private def executionDigest[S, D](
+        oid:       Observation.Id,
         proto:     ProtoExecutionConfig[S, Atom[D]],
         execState: ExecutionState,
         setupTime: SetupTime
@@ -454,7 +455,7 @@ object Generator {
                 digest
                   .incrementAtomCount
                   .filter(_.atomCount.value <= SequenceAtomLimit)
-                  .toRight(Error.sequenceTooLong)
+                  .toRight(Error.sequenceTooLong(oid))
                   .map: incDigest =>
                     atom.steps.foldLeft(incDigest) { case (d, s) =>
                       d.add(s.observeClass)
