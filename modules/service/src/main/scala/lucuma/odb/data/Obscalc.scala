@@ -12,20 +12,15 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.odb.service.ItcService
 
-case class Obscalc(
-  meta:   Obscalc.Meta,
-  result: Option[Obscalc.Result]
-)
-
 object Obscalc:
 
-  case class PendingCalc(
+  final case class PendingCalc(
     programId:        Program.Id,
     observationId:    Observation.Id,
     lastInvalidation: Timestamp
   )
 
-  case class Meta(
+  final case class Meta(
     programId:        Program.Id,
     observationId:    Observation.Id,
     state:            Obscalc.State,
@@ -41,7 +36,7 @@ object Obscalc:
     case Calculating extends State("calculating")
     case Ready       extends State("ready")
 
-  case class ItcResult(
+  final case class ItcResult(
     imaging:      ItcService.TargetResult,
     spectroscopy: ItcService.TargetResult
   )
@@ -70,3 +65,9 @@ object Obscalc:
     case class Error(e: OdbError)                           extends Result
     case class WithoutTarget(d: ExecutionDigest)            extends Result
     case class WithTarget(i: ItcResult, d: ExecutionDigest) extends Result
+
+  final case class Entry(
+    meta:   Obscalc.Meta,
+    result: Option[Obscalc.Result]
+  )
+

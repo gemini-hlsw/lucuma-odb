@@ -55,7 +55,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def selectOne(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Option[Obscalc]]
+  )(using Transaction[F]): F[Option[Obscalc.Entry]]
 
   /**
    * Selects Obscalc data for the given observations, where the observation
@@ -63,7 +63,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def selectMany(
     observationIds: List[Observation.Id]
-  )(using Transaction[F]): F[Map[Observation.Id, Obscalc]]
+  )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]]
 
   /**
    * Selects Obscalc data for all observations in a program for which a result
@@ -71,7 +71,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def selectProgram(
     programId: Program.Id
-  )(using Transaction[F]): F[Map[Observation.Id, Obscalc]]
+  )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]]
 
   /**
    * Marks all 'calculating' observations as 'pending' (or 'retry' if
@@ -121,12 +121,12 @@ object ObscalcService:
     new ObscalcService[F]:
       override def selectOne(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[Obscalc]] =
+      )(using Transaction[F]): F[Option[Obscalc.Entry]] =
         session.option(Statements.SelectOne)(observationId)
 
       override def selectMany(
         observationIds: List[Observation.Id]
-      )(using Transaction[F]): F[Map[Observation.Id, Obscalc]] =
+      )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]] =
         NonEmptyList.fromList(observationIds) match
           case None      => Map.empty.pure
           case Some(nel) =>
@@ -139,7 +139,7 @@ object ObscalcService:
 
       override def selectProgram(
         programId: Program.Id
-      )(using Transaction[F]): F[Map[Observation.Id, Obscalc]] =
+      )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]] =
         session
           .execute(Statements.SelectProgram)(programId)
           .map(_.fproductLeft(_.meta.observationId).toMap)
@@ -294,8 +294,8 @@ object ObscalcService:
         case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
       }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest)))
 
-    val obscalc: Codec[Obscalc] =
-      (obscalc_meta *: obscalc_result_opt).to[Obscalc]
+    val obscalc_entry: Codec[Obscalc.Entry] =
+      (obscalc_meta *: obscalc_result_opt).to[Obscalc.Entry]
 
     private def obscalcColumns(prefix: Option[String] = None): String =
       List(
@@ -342,29 +342,29 @@ object ObscalcService:
       ).map(col => prefix.fold(col)(p => s"$p.$col"))
        .mkString("", ",\n", "\n")
 
-    val SelectOne: Query[Observation.Id, Obscalc] =
+    val SelectOne: Query[Observation.Id, Obscalc.Entry] =
       sql"""
         SELECT
           #${obscalcColumns()}
         FROM t_obscalc
         WHERE c_observation_id = $observation_id
-      """.query(obscalc)
+      """.query(obscalc_entry)
 
-    def selectMany[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, Obscalc] =
+    def selectMany[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, Obscalc.Entry] =
       sql"""
         SELECT
           #${obscalcColumns()}
         FROM t_obscalc
         WHERE c_observation_id in ($enc)
-      """.query(obscalc)
+      """.query(obscalc_entry)
 
-    val SelectProgram: Query[Program.Id, Obscalc] =
+    val SelectProgram: Query[Program.Id, Obscalc.Entry] =
       sql"""
         SELECT
           #${obscalcColumns("c".some)}
         FROM t_obscalc
         WHERE c_program_id = $program_id
-      """.query(obscalc)
+      """.query(obscalc_entry)
 
     val ResetCalculating: Command[Void] =
       sql"""
