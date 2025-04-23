@@ -92,9 +92,6 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   def calculateOnly(pc: Obscalc.PendingCalc): IO[Obscalc.Result] =
     withObscalcService(_.calculateOnly(pc))
 
-  def updateOnly(p: Obscalc.PendingCalc, r: Obscalc.Result): IO[Option[Obscalc.Meta]] =
-    withObscalcServiceTransactionally(_.updateOnly(p, r))
-
   val reset: IO[Unit] =
     withObscalcServiceTransactionally(_.reset)
 
@@ -202,7 +199,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       val pc = Obscalc.PendingCalc(p, o, randomTime)
       calculateOnly(pc).flatTap: r =>
         assertIO(
-          insert(pc) *> updateOnly(pc, r) *> select(o).map(_.flatMap(_.result)),
+          insert(pc) *> calculateAndUpdate(pc) *> select(o).map(_.flatMap(_.result)),
           r.some
         )
 
@@ -213,7 +210,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       pc = Obscalc.PendingCalc(p, o, randomTime)
       r <- calculateOnly(pc)
       _ <- insert(pc)
-      _ <- updateOnly(pc, r)
+      _ <- calculateAndUpdate(pc)
       _ <- assertIO(select(o).map(_.flatMap(_.result)), r.some)
     yield ()
 
@@ -229,16 +226,13 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
   test("update then load"):
     setup.flatTap: (p, _, o) =>
       val pc = Obscalc.PendingCalc(p, o, randomTime)
-      calculateOnly(pc).flatTap: r =>
-        assertIO(insert(pc) *> updateOnly(pc, r) *> load, Nil)
+      assertIO(insert(pc) *> calculateAndUpdate(pc) *> load, Nil)
 
   test("invalidate, update then load"):
     setup.flatTap: (p, _, o) =>
-      val pc = Obscalc.PendingCalc(p, o, randomTime)
-      calculateOnly(pc).flatTap: r =>
-        // invalidated before the result was written out
-        val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
-        assertIO(insert(pc2) *> updateOnly(pc, r) *> load, List(pc2))
+      val pc  = Obscalc.PendingCalc(p, o, randomTime)
+      val pc2 = pc.copy(lastInvalidation = randomTime.plusMicrosOption(1).get)
+      assertIO(insert(pc2) *> calculateAndUpdate(pc) *> load, List(pc2))
 
   test("reset"):
     val states = for
