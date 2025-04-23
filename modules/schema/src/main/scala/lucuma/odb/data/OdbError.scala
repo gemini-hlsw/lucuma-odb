@@ -45,7 +45,7 @@ enum OdbError:
   case InvalidProgram(programId: Program.Id, detail: Option[String] = None)       
   case InvalidObservation(observationId: Observation.Id, detail: Option[String] = None)   
   case InvalidObservationList(observationIds: NonEmptyList[Observation.Id], detail: Option[String] = None)
-  case SequenceUnavailable(detail: Option[String] = None)
+  case SequenceUnavailable(observationId: Observation.Id, detail: Option[String] = None)
   case InvalidTarget(targetId: Target.Id, detail: Option[String] = None)        
   case InvalidTargetList(programId: Program.Id, targetIds: NonEmptyList[Target.Id], detail: Option[String] = None)    
   case InvalidVisit(visitId: Visit.Id, detail: Option[String] = None)         
@@ -111,7 +111,7 @@ object OdbError:
       case InvalidProgram(_, _)               => Tag.InvalidProgram
       case InvalidObservation(_, _)           => Tag.InvalidObservation
       case InvalidObservationList(_, _)       => Tag.InvalidObservationList
-      case SequenceUnavailable(_)             => Tag.SequenceUnavailable
+      case SequenceUnavailable(_, _)          => Tag.SequenceUnavailable
       case InvalidTarget(_, _)                => Tag.InvalidTarget
       case InvalidTargetList(_, _, _)         => Tag.InvalidTargetList
       case InvalidVisit(_, _)                 => Tag.InvalidVisit
@@ -138,7 +138,7 @@ object OdbError:
       case InvalidProgram(p, _)          => s"Program $p does not exist, is not visible, or is ineligible for the requested operation."
       case InvalidObservation(o, _)      => s"Observation $o does not exist, is not visible, or is ineligible for the requested operation."
       case InvalidObservationList(os, _) => s"Observation(s) ${os.sorted.toList.mkString(", ")} must exist and be associated with the same program."
-      case SequenceUnavailable(_)        => "Could not generate the requested sequence."
+      case SequenceUnavailable(o, _)     => s"Could not generate the requested sequence for observation $o."
       case InvalidTarget(t, _)           => s"Target $t does not exist, is not visible, or is ineligible for the requested operation."
       case InvalidTargetList(p, ts, _)   => s"Target(s) ${ts.sorted.toList.mkString(", ")} must exist and be associated with Program $p."
       case InvalidVisit(v, _)            => s"Visit $v does not exist, is not visible, or is ineligible for the requested operation."
@@ -165,7 +165,7 @@ object OdbError:
       case InvalidProgram(p, _)               => JsonObject("programId" -> p.asJson)
       case InvalidObservation(o, _)           => JsonObject("observationId" -> o.asJson)
       case InvalidObservationList(os, _)      => JsonObject("observationIds" -> os.asJson)
-      case SequenceUnavailable(_)             => JsonObject()
+      case SequenceUnavailable(o, _)          => JsonObject("observationId" -> o.asJson)
       case InvalidTarget(t, _)                => JsonObject("targetId" -> t.asJson)
       case InvalidTargetList(p, ts, _)        => JsonObject("programId" -> p.asJson, "targetIds" -> ts.asJson)
       case InvalidVisit(v, _)                 => JsonObject("visitId" -> v.asJson)
@@ -192,7 +192,7 @@ object OdbError:
       case Tag.InvalidProgram            => c.downField("programId").as[Program.Id].map(InvalidProgram(_, detail))
       case Tag.InvalidObservation        => c.downField("observationId").as[Observation.Id].map(InvalidObservation(_, detail))
       case Tag.InvalidObservationList    => c.downField("observationIds").as[NonEmptyList[Observation.Id]].map(InvalidObservationList(_, detail))
-      case Tag.SequenceUnavailable       => SequenceUnavailable(detail).asRight
+      case Tag.SequenceUnavailable       => c.downField("observationId").as[Observation.Id].map(SequenceUnavailable(_, detail))
       case Tag.InvalidTarget             => c.downField("targetId").as[Target.Id].map(InvalidTarget(_, detail))
       case Tag.InvalidTargetList         => (c.downField("programId").as[Program.Id], c.downField("targetIds").as[NonEmptyList[Target.Id]]).mapN(InvalidTargetList(_, _, detail))
       case Tag.InvalidVisit              => c.downField("visitId").as[Visit.Id].map(InvalidVisit(_, detail))
