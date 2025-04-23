@@ -176,7 +176,7 @@ object ObscalcService:
             services.transactionally:
               generatorParamsService
                 .selectOne(pending.programId, pending.observationId)
-                .map(_.leftMap(e => OdbError.SequenceUnavailable(s"Could not generate the ${pending.observationId} sequence: ${e.format}".some)))
+                .map(_.leftMap(e => OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: ${e.format}".some)))
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): EitherT[F, OdbError, ExecutionDigest] =
           for

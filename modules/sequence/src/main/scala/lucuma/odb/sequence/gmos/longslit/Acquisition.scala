@@ -34,6 +34,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -271,6 +272,7 @@ object Acquisition:
   end AcquisitionState
 
   private def instantiate[D, G, L, U](
+    oid:         Observation.Id,
     stepComp:    StepComputer[D, G, L, U],
     time:        Either[OdbError, IntegrationTime],
     calRole:     Option[CalibrationRole],
@@ -286,20 +288,22 @@ object Acquisition:
 
       case _                              =>
         time
-          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(s"GMOS Long Slit acquisition requires a positive exposure time.".some))
+          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: GMOS Long Slit acquisition requires a positive exposure time.".some))
           .map: t =>
              AcquisitionState.Init(lastReset, IndexTracker.Zero, atomBuilder, stepComp.compute(acqFilters, fpu, t.exposureTime, λ))
 
   def gmosNorth(
-    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
-    static:    StaticConfig.GmosNorth,
-    namespace: UUID,
-    config:    Config.GmosNorth,
-    time:      Either[OdbError, IntegrationTime],
-    calRole:   Option[CalibrationRole],
-    lastReset: Option[Timestamp]
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:        StaticConfig.GmosNorth,
+    namespace:     UUID,
+    config:        Config.GmosNorth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole],
+    lastReset:     Option[Timestamp]
   ): Either[OdbError, SequenceGenerator[GmosNorth]] =
     instantiate(
+      observationId,
       StepComputer.North,
       time,
       calRole,
@@ -311,15 +315,17 @@ object Acquisition:
     )
 
   def gmosSouth(
-    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
-    static:    StaticConfig.GmosSouth,
-    namespace: UUID,
-    config:    Config.GmosSouth,
-    time:      Either[OdbError, IntegrationTime],
-    calRole:   Option[CalibrationRole],
-    lastReset: Option[Timestamp]
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:        StaticConfig.GmosSouth,
+    namespace:     UUID,
+    config:        Config.GmosSouth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole],
+    lastReset:     Option[Timestamp]
   ): Either[OdbError, SequenceGenerator[GmosSouth]] =
     instantiate(
+      observationId,
       StepComputer.South,
       time,
       calRole,

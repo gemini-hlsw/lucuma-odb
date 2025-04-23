@@ -104,7 +104,7 @@ class executionFailures extends ExecutionTestSupport {
              }
            """,
         expected = {
-          case OdbError.SequenceUnavailable(Some("Could not generate a sequence for the observation o-101: observation is missing observing mode")) => //ok
+          case OdbError.SequenceUnavailable(oid, Some("Could not generate a sequence for o-101: observation is missing observing mode")) => //ok
         }
       )
     }
@@ -266,7 +266,7 @@ class executionFailures extends ExecutionTestSupport {
                }
              }
            """,
-        expected = List(s"Could not generate a sequence for the observation $oid: GMOS Long Slit photometric not implemented").asLeft
+        expected = List(s"Could not generate a sequence for $oid: GMOS Long Slit photometric not implemented").asLeft
       )
     }
   }

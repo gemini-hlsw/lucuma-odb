@@ -261,7 +261,7 @@ class executionDigest extends ExecutionTestSupport {
              }
            """,
         expected = Ior.both(
-          List(s"Could not generate a sequence for the observation $oid: observation is missing target"),
+          List(s"Could not generate a sequence for $oid: observation is missing target"),
           json"""
             {
               "program": {
@@ -315,7 +315,7 @@ class executionDigest extends ExecutionTestSupport {
              }
            """,
         expected = Ior.both(
-          List(s"Could not generate a sequence for the observation $oid: observation is missing observing mode"),
+          List(s"Could not generate a sequence for $oid: observation is missing observing mode"),
           json"""
             {
               "program": {
@@ -370,7 +370,7 @@ class executionDigest extends ExecutionTestSupport {
              }
            """,
         expected = Ior.both(
-          List(s"Could not generate a sequence for the observation $oid1: observation is missing observing mode"),
+          List(s"Could not generate a sequence for $oid1: observation is missing observing mode"),
           json"""
             {
               "program": {
@@ -437,7 +437,7 @@ class executionDigest extends ExecutionTestSupport {
              }
            """,
         expected = Ior.both(
-          List(s"Could not generate a sequence for the observation $oid0: observation is missing observing mode"),
+          List(s"Could not generate a sequence for $oid0: observation is missing observing mode"),
           json"""
             {
               "program": {

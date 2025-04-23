@@ -40,6 +40,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
@@ -293,6 +294,7 @@ object Science:
        *                    calibrations do not have arcs)
        */
       def compute[F[_]: Monad](
+        oid:      Observation.Id,
         expander: SmartGcalExpander[F, D],
         config:   Config[G, L, U],
         time:     IntegrationTime,
@@ -321,7 +323,7 @@ object Science:
             as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
           } yield BlockDefinition(g, as.toList, fs, science)).value
         }
-        .map(_.traverse(_.leftMap(s => OdbError.SequenceUnavailable(s.some))))
+        .map(_.traverse(_.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))))
 
       end compute
     end Computer
@@ -726,6 +728,7 @@ object Science:
       } yield ()).runS(c).value
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
+      oid:       Observation.Id,
       estimator: TimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
@@ -737,7 +740,7 @@ object Science:
     ): F[Either[OdbError, SequenceGenerator[D]]] =
 
       def sequenceUnavailable(m: String): OdbError =
-        OdbError.SequenceUnavailable(m.some)
+        OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)
 
       def extractTime: Either[OdbError, IntegrationTime] =
         time.filterOrElse(
@@ -774,7 +777,7 @@ object Science:
       // Compute the generator
       val result = for
         (configʹ, timeʹ) <- EitherT.fromEither[F](configAndTimeʹ)
-        defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, calRole))
+        defs             <- EitherT(blockDef.compute(oid, expander, configʹ, timeʹ, calRole))
       yield ScienceGenerator(
         estimator,
         static,
@@ -792,25 +795,27 @@ object Science:
   end ScienceGenerator
 
   def gmosNorth[F[_]: Monad](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
-    static:    StaticConfig.GmosNorth,
-    namespace: UUID,
-    expander:  SmartGcalExpander[F, GmosNorth],
-    config:    Config.GmosNorth,
-    time:      Either[OdbError, IntegrationTime],
-    calRole:   Option[CalibrationRole]
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:        StaticConfig.GmosNorth,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GmosNorth],
+    config:        Config.GmosNorth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosNorth]]] =
-    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
 
   def gmosSouth[F[_]: Monad](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
-    static:    StaticConfig.GmosSouth,
-    namespace: UUID,
-    expander:  SmartGcalExpander[F, GmosSouth],
-    config:    Config.GmosSouth,
-    time:      Either[OdbError, IntegrationTime],
-    calRole:   Option[CalibrationRole]
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:        StaticConfig.GmosSouth,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GmosSouth],
+    config:        Config.GmosSouth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosSouth]]] =
-    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
 
 end Science

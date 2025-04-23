@@ -177,7 +177,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       o <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
       _ <- assertIO(
             calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
-            Obscalc.Result.Error(OdbError.SequenceUnavailable(s"Could not generate the $o sequence: observation is missing target".some))
+            Obscalc.Result.Error(OdbError.SequenceUnavailable(o, s"Could not generate a sequence for $o: observation is missing target".some))
           )
     yield ()
 
