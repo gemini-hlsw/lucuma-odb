@@ -52,7 +52,7 @@ class ShortCut_2887 extends ExecutionTestSupport {
                }
              }
            """,
-        expected = List(s"The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
+        expected = List(s"Could not generate a sequence for $oid: The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
       )
     }
   }

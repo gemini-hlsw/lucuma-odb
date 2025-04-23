@@ -192,7 +192,7 @@ object Generator {
       OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $message".some)
 
     def sequenceTooLong(oid: Observation.Id): OdbError =
-      sequenceUnavailable(oid, "The generated sequence is too long (more than $SequenceAtomLimit atoms).")
+      sequenceUnavailable(oid, s"The generated sequence is too long (more than $SequenceAtomLimit atoms).")
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
