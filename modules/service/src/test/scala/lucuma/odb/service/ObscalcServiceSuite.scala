@@ -80,7 +80,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       services.transactionally:
         instantiate(services).flatMap(f)
 
-  def select(o: Observation.Id): IO[Option[Obscalc]] =
+  def select(o: Observation.Id): IO[Option[Obscalc.Entry]] =
     withObscalcServiceTransactionally(_.selectOne(o))
 
   val load: IO[List[Obscalc.PendingCalc]] =
