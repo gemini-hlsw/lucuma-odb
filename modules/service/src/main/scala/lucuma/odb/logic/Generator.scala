@@ -43,7 +43,6 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.f2
@@ -271,7 +270,6 @@ object Generator {
             // definition is missing target information we just record that in the
             // Context.  On the other hand if there is an error calling the ITC then
             // we cannot create the Context.
-            // EitherT[F, Error, Either[MissingParamSet, ItcService.AsterismResults]]
             as <- params.itcInput.fold(
               m => EitherT.pure(Error.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),
               _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)

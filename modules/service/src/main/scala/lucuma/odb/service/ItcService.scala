@@ -52,7 +52,6 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
