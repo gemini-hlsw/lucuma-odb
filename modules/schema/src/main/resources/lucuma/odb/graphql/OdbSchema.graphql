@@ -6743,6 +6743,11 @@ enum Flamingos2Filter {
   Flamingos2Filter K-blue (2.06 um)
   """
   K_BLUE
+
+  """
+  Flamingos2Filter K-red (2.31 um)
+  """
+  K_RED
 }
 
 """
