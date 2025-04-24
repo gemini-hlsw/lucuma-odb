@@ -146,7 +146,7 @@ object CalcMain extends MainParams:
     // multiple events that happen while 'Calculating'.  At the end of the
     // calculation we'll move back to 'Pending' if there were additional updates
     // or to 'Ready' otherwise.
-    val eventStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
+    val eventStream: Stream[F, Obscalc.PendingCalc] =
       t.subscribe(1000).evalMapFilter: e =>
         Option
           .when(
@@ -154,17 +154,17 @@ object CalcMain extends MainParams:
             e.newState.exists(_ === Obscalc.State.Pending)
           )(e.observationId)
           .flatTraverse: oid =>
-            summon[Services[F]].transactionally:
+            s.useTransactionally:
               obscalc.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
     // up to ParallelTaskLimit entries including those that are in a 'Retry'
     // state.
-    val pollStream: Services[F] ?=> Stream[F, Obscalc.PendingCalc] =
+    val pollStream: Stream[F, Obscalc.PendingCalc] =
       Stream
         .awakeEvery(PollInterval)
         .evalMap: _ =>
-          summon[Services[F]].transactionally:
+          s.useTransactionally:
             obscalc.load(ParallelTaskLimit)
         .flatMap(Stream.emits)
 
@@ -172,19 +172,19 @@ object CalcMain extends MainParams:
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
       _ <- Resource.eval(s.useTransactionally(obscalc.reset))
       _ <- Resource.eval(
-             s.useNonTransactionally:
-               eventStream
-                 .merge(pollStream)
-                 .evalTap: pc =>
-                   Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
-                 .parEvalMapUnordered(ParallelTaskLimit): pc =>
+             eventStream
+               .merge(pollStream)
+               .evalTap: pc =>
+                 Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
+               .parEvalMapUnordered(ParallelTaskLimit): pc =>
+                 s.useNonTransactionally:
                    obscalc.calculateAndUpdate(pc).tupleLeft(pc)
-                 .evalTap: (pc, meta) =>
-                   Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
-                 .compile
-                 .drain
-                 .start
-                 .void
+               .evalTap: (pc, meta) =>
+                 Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
+               .compile
+               .drain
+               .start
+               .void
            )
     yield ()
 
