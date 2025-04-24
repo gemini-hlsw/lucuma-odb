@@ -88,9 +88,12 @@ sealed trait ObscalcService[F[_]]:
 
   /**
    * Loads the PendingCalc entry for the given observation, if it exists and is
-   * in fact pending (or 'retry').
+   * in fact `pending` (or `retry`).  The state is update to `calculating`
+   * before the entry is returned.
    */
-  def loadObs(observationId: Observation.Id)(using Transaction[F]): F[Option[Obscalc.PendingCalc]]
+  def loadObs(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Obscalc.PendingCalc]]
 
   /**
    * Calculates the result for the associated observation and updates the

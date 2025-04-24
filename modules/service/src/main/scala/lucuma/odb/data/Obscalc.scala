@@ -12,14 +12,68 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.odb.service.ItcService
 
+/**
+ * Data used in performing background observation calculations.
+ */
 object Obscalc:
 
+  /**
+   * A PendingCalc identifies an observation that needs to be updated.  The
+   * last invalidation time is compared with the current last invalidation
+   * time when the result is written in order to determine the resulting
+   * calculation state (ready or pending).
+   */
   final case class PendingCalc(
     programId:        Program.Id,
     observationId:    Observation.Id,
     lastInvalidation: Timestamp
   )
 
+  /**
+   * Calculation state.
+   */
+  enum State(val tag: String) derives Enumerated:
+
+    /**
+     * Pending means an update has marked an observation invalid but no workers
+     * have started calculating results.
+     */
+    case Pending     extends State("pending")
+
+    /**
+     * Like 'Pending' but 'Retry' signifies that at least one attempt to perform
+     * the calculation has previously failed.
+     */
+    case Retry       extends State("retry")
+
+    /**
+     * An entry in the 'Calculating' state is being processed by a worker.
+     */
+    case Calculating extends State("calculating")
+
+    /**
+     * Ready signifies that all update computations have completed and the
+     * result is not stale.
+     */
+    case Ready       extends State("ready")
+
+  /**
+   * Metadata associated with an observation calculation.
+   *
+   * @param programId        program associated with the observation
+   * @param observationId    identifies the observation to update
+   * @param state            calculation state
+   * @param lastInvalidation the last time the observation was modified in such
+   *                         a way that it might impact calculations
+   * @param lastUpdate       the time at which a result was last written
+   * @param retryAt          when in the Retry state, this is the time at which
+   *                         another attempt at the calculation may be made.
+   *                         Failure retries are backed off expontentially to
+   *                         avoid flooding the ITC.
+   * @param failureCount     the number of failed attempts to update the
+   *                         observation that have been made since it was last
+   *                         marked invalid
+   */
   final case class Meta(
     programId:        Program.Id,
     observationId:    Observation.Id,
@@ -30,17 +84,14 @@ object Obscalc:
     failureCount:     NonNegInt
   )
 
-  enum State(val tag: String) derives Enumerated:
-    case Pending     extends State("pending")
-    case Retry       extends State("retry")
-    case Calculating extends State("calculating")
-    case Ready       extends State("ready")
-
   final case class ItcResult(
     imaging:      ItcService.TargetResult,
     spectroscopy: ItcService.TargetResult
   )
 
+  /**
+   * Obscalc calculation results.
+   */
   sealed trait Result extends Product with Serializable:
     def fold[A](
       error:         Result.Error         => A,
@@ -66,6 +117,10 @@ object Obscalc:
     case class WithoutTarget(d: ExecutionDigest)            extends Result
     case class WithTarget(i: ItcResult, d: ExecutionDigest) extends Result
 
+  /**
+   * The Obscalc Entry pairs metadata with a (possibily missing, possibly
+   * stale) computation result.
+   */
   final case class Entry(
     meta:   Obscalc.Meta,
     result: Option[Obscalc.Result]
