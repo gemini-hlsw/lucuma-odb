@@ -6955,17 +6955,17 @@ Flamingos2 South Long Slit mode
 type Flamingos2LongSlit {
 
   """
-  The disperser field must be specified.  It cannot be unset with a null value.
+  Flamingos2 Disperser
   """
   disperser: Flamingos2Disperser!
 
   """
-  The filter field must be specified.  It cannot be unset with a null value.
+  Flamingos2 Filter
   """
   filter: Flamingos2Filter!
 
   """
-  The fpu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  Flamingos2 FPU
   """
   fpu: Flamingos2Fpu!
 
