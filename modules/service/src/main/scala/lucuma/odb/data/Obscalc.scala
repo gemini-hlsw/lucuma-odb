@@ -8,7 +8,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.util.Enumerated
 import lucuma.core.util.Timestamp
 import lucuma.odb.service.ItcService
 
@@ -30,34 +29,6 @@ object Obscalc:
   )
 
   /**
-   * Calculation state.
-   */
-  enum State(val tag: String) derives Enumerated:
-
-    /**
-     * Pending means an update has marked an observation invalid but no workers
-     * have started calculating results.
-     */
-    case Pending     extends State("pending")
-
-    /**
-     * Like 'Pending' but 'Retry' signifies that at least one attempt to perform
-     * the calculation has previously failed.
-     */
-    case Retry       extends State("retry")
-
-    /**
-     * An entry in the 'Calculating' state is being processed by a worker.
-     */
-    case Calculating extends State("calculating")
-
-    /**
-     * Ready signifies that all update computations have completed and the
-     * result is not stale.
-     */
-    case Ready       extends State("ready")
-
-  /**
    * Metadata associated with an observation calculation.
    *
    * @param programId        program associated with the observation
@@ -77,7 +48,7 @@ object Obscalc:
   final case class Meta(
     programId:        Program.Id,
     observationId:    Observation.Id,
-    state:            Obscalc.State,
+    state:            ObscalcState,
     lastInvalidation: Timestamp,
     lastUpdate:       Timestamp,
     retryAt:          Option[Timestamp],

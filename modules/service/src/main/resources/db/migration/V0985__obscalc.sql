@@ -288,7 +288,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER ch_obscalc_update_trigger
-  AFTER INSERT OR UPDATE ON t_obscalc
+  AFTER INSERT OR UPDATE OR DELETE ON t_obscalc
   DEFERRABLE
   FOR EACH ROW
   EXECUTE PROCEDURE ch_obscalc_update();

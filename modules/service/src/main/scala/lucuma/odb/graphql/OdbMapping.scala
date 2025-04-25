@@ -180,6 +180,7 @@ object OdbMapping {
           with MutationMapping[F]
           with NonsiderealMapping[F]
           with AttachmentMapping[F]
+          with ObscalcUpdateMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
@@ -388,6 +389,7 @@ object OdbMapping {
                 MonitoringProgramReferenceMapping,
                 MutationMapping,
                 NonsiderealMapping,
+                ObscalcUpdateMapping,
                 ObservationEditMapping,
                 ObservationMapping,
                 ObservationReferenceMapping,

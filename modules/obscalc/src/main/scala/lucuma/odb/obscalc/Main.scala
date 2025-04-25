@@ -21,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.Obscalc
+import lucuma.odb.data.ObscalcState
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -150,8 +151,8 @@ object CalcMain extends MainParams:
       t.subscribe(1000).evalMapFilter: e =>
         Option
           .when(
-            e.oldState.forall(_ =!= Obscalc.State.Pending) &&
-            e.newState.exists(_ === Obscalc.State.Pending)
+            e.oldState.forall(_ =!= ObscalcState.Pending) &&
+            e.newState.exists(_ === ObscalcState.Pending)
           )(e.observationId)
           .flatTraverse: oid =>
             s.useTransactionally:
