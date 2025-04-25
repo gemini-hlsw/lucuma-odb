@@ -76,18 +76,16 @@ object ObscalcMain extends CommandIOApp(
 
 object CalcMain extends MainParams:
 
-  // TODO: env variables?
-  val ParallelTaskLimit = 8
-  val PollInterval      = 10.seconds
-
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
     val banner =
         s"""|
             |$Header
             |
-            |CommitHash. : ${config.commitHash.format}
-            |PID         : ${ProcessHandle.current.pid}
+            |CommitHash.....: ${config.commitHash.format}
+            |Max Connections: ${config.database.maxObscalcConnections}
+            |Poll Period....: ${config.obscalcPoll}
+            |PID............: ${ProcessHandle.current.pid}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -131,14 +129,17 @@ object CalcMain extends MainParams:
       yield t
 
   def runObscalcDaemon[F[_]: Async: Parallel: Logger](
-    h: CommitHash,
-    i: ItcClient[F],
-    e: TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    t: Topic[F, ObscalcTopic.Element],
-    s: Resource[F, Services[F]]
+    connectionsLimit: Int,
+    commitHash:       CommitHash,
+    pollPeriod:       FiniteDuration,
+    itcClient:        ItcClient[F],
+    timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    topic:            Topic[F, ObscalcTopic.Element],
+    services:         Resource[F, Services[F]]
   ): Resource[F, Unit] =
 
-    val obscalc: Services[F] ?=> ObscalcService[F] = obscalcService(h, i, e)
+    val obscalc: Services[F] ?=> ObscalcService[F] =
+      obscalcService(commitHash, itcClient, timeEstimate)
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
     // We filter out anything but transitions to Pending.  Entries in the Retry
@@ -148,37 +149,37 @@ object CalcMain extends MainParams:
     // calculation we'll move back to 'Pending' if there were additional updates
     // or to 'Ready' otherwise.
     val eventStream: Stream[F, Obscalc.PendingCalc] =
-      t.subscribe(1000).evalMapFilter: e =>
+      topic.subscribe(1000).evalMapFilter: e =>
         Option
           .when(
             e.oldState.forall(_ =!= ObscalcState.Pending) &&
             e.newState.exists(_ === ObscalcState.Pending)
           )(e.observationId)
           .flatTraverse: oid =>
-            s.useTransactionally:
+            services.useTransactionally:
               obscalc.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
-    // up to ParallelTaskLimit entries including those that are in a 'Retry'
+    // up to connectionsLimit entries including those that are in a 'Retry'
     // state.
     val pollStream: Stream[F, Obscalc.PendingCalc] =
       Stream
-        .awakeEvery(PollInterval)
+        .awakeEvery(pollPeriod)
         .evalMap: _ =>
-          s.useTransactionally:
-            obscalc.load(ParallelTaskLimit)
+          services.useTransactionally:
+            obscalc.load(connectionsLimit)
         .flatMap(Stream.emits)
 
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
-      _ <- Resource.eval(s.useTransactionally(obscalc.reset))
+      _ <- Resource.eval(services.useTransactionally(obscalc.reset))
       _ <- Resource.eval(
              eventStream
                .merge(pollStream)
                .evalTap: pc =>
                  Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
-               .parEvalMapUnordered(ParallelTaskLimit): pc =>
-                 s.useNonTransactionally:
+               .parEvalMapUnordered(connectionsLimit): pc =>
+                 services.useNonTransactionally:
                    obscalc.calculateAndUpdate(pc).tupleLeft(pc)
                .evalTap: (pc, meta) =>
                  Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
@@ -222,7 +223,7 @@ object CalcMain extends MainParams:
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      _     <- runObscalcDaemon(c.commitHash, itc, ptc, t, pool.evalMap(services(user, enums)))
+      _     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums)))
     yield ExitCode.Success
 
   /** Our logical entry point. */
