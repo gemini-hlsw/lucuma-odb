@@ -49,7 +49,8 @@ case class Config(
   corsOverHttps: Boolean,          // Whether to require CORS over HTTPS
   domain:        List[String],     // Domains, for CORS headers
   commitHash:    CommitHash,       // From Heroku Dyno Metadata
-  goaUsers:      Set[User.Id]      // Gemini Observatory Archive user id(s)
+  goaUsers:      Set[User.Id],     // Gemini Observatory Archive user id(s)
+  obscalcPoll:   FiniteDuration    // Obscalc poll period
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -275,5 +276,6 @@ object Config:
     envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").as[List[String]],
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero),
-    envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty)
+    envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
+    envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds)
   ).parMapN(Config.apply)
