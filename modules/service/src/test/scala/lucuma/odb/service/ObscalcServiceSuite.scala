@@ -23,6 +23,7 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
+import lucuma.odb.data.ObscalcState
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -36,34 +37,7 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
 
-class ObscalcServiceSuite extends ExecutionTestSupport:
-
-  val cleanup: IO[Unit] =
-    withSession: session =>
-      val truncate = sql"""
-        TRUNCATE t_obscalc
-      """.command
-      session.execute(truncate).void
-
-  val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
-    for
-      _ <- cleanup
-      p <- createProgram
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-    yield (p, t, o)
-
-  val selectStates: IO[Map[Observation.Id, Obscalc.State]] =
-    withSession: session =>
-      val states: Query[Void, (Observation.Id, Obscalc.State)] = sql"""
-        SELECT
-          c_observation_id,
-          c_obscalc_state
-        FROM
-          t_obscalc
-      """.query(observation_id *: obscalc_state)
-
-      session.execute(states).map(_.toMap)
+trait ObscalcServiceSuiteSupport extends ExecutionTestSupport:
 
   def instantiate(services: Services[IO]): IO[ObscalcService[IO]] =
       TimeEstimateCalculatorImplementation
@@ -124,7 +98,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
 
       session.execute(up)(o).void
 
-  def obscalcState(o: Observation.Id): IO[Obscalc.State] =
+  def obscalcState(o: Observation.Id): IO[ObscalcState] =
     withSession: session =>
       val query = sql"""
         SELECT c_obscalc_state
@@ -132,6 +106,35 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
         WHERE c_observation_id = $observation_id
       """.query(obscalc_state)
       session.unique(query)(o)
+
+  val selectStates: IO[Map[Observation.Id, ObscalcState]] =
+    withSession: session =>
+      val states: Query[Void, (Observation.Id, ObscalcState)] = sql"""
+        SELECT
+          c_observation_id,
+          c_obscalc_state
+        FROM
+          t_obscalc
+      """.query(observation_id *: obscalc_state)
+
+      session.execute(states).map(_.toMap)
+
+  val cleanup: IO[Unit] =
+    withSession: session =>
+      val truncate = sql"""
+        TRUNCATE t_obscalc
+      """.command
+      session.execute(truncate).void
+
+class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
+
+  val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
+    for
+      _ <- cleanup
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+    yield (p, t, o)
 
   def fakeWithTargetResult(tid: Target.Id): Obscalc.Result =
     Obscalc.Result.WithTarget(
@@ -192,7 +195,7 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
     setup.flatTap: (p, _, o) =>
        val pc = Obscalc.PendingCalc(p, o, randomTime)
        assertIO(insert(pc) *> load, List(pc)) *>
-       assertIO(obscalcState(o), Obscalc.State.Calculating)
+       assertIO(obscalcState(o), ObscalcState.Calculating)
 
   test("update then select"):
     setup.flatTap: (p, _, o) =>
@@ -251,8 +254,8 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
 
     assertIOBoolean:
       states.map: (o0, o1) =>
-        o0 === List(Obscalc.State.Pending, Obscalc.State.Calculating, Obscalc.State.Pending) &&
-        o1 === List(Obscalc.State.Retry,   Obscalc.State.Calculating, Obscalc.State.Retry  )
+        o0 === List(ObscalcState.Pending, ObscalcState.Calculating, ObscalcState.Pending) &&
+        o1 === List(ObscalcState.Retry,   ObscalcState.Calculating, ObscalcState.Retry  )
 
   test("mark failed"):
     def setWavelengthToMagicValue(o: Observation.Id): IO[Unit] =
@@ -269,4 +272,4 @@ class ObscalcServiceSuite extends ExecutionTestSupport:
       load.flatMap: lst =>
         calculateAndUpdate(lst.head) *> selectStates
 
-    assertIO(res.map(_.values.toList.head), Obscalc.State.Retry)
+    assertIO(res.map(_.values.toList.head), ObscalcState.Retry)

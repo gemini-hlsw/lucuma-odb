@@ -207,6 +207,8 @@ trait BaseMapping[F[_]]
   lazy val NonNegIntType                           = schema.ref("NonNegInt")
   lazy val NonNegShortType                         = schema.ref("NonNegShort")
   lazy val NonsiderealType                         = schema.ref("Nonsidereal")
+  lazy val ObscalcStateType                        = schema.ref("ObscalcState")
+  lazy val ObscalcUpdateType                       = schema.ref("ObscalcUpdate")
   lazy val OffsetPType                             = schema.ref("OffsetP")
   lazy val OffsetQType                             = schema.ref("OffsetQ")
   lazy val OffsetType                              = schema.ref("Offset")
