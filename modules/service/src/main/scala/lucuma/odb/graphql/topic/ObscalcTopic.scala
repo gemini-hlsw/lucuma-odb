@@ -13,7 +13,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
-import lucuma.odb.data.Obscalc
+import lucuma.odb.data.ObscalcState
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.implicits.*
@@ -31,14 +31,14 @@ object ObscalcTopic:
   case class Element(
     observationId: Observation.Id,
     programId:     Program.Id,
-    oldState:      Option[Obscalc.State],
-    newState:      Option[Obscalc.State],
+    oldState:      Option[ObscalcState],
+    newState:      Option[ObscalcState],
     editType:      EditType,
     users:         List[User.Id]
   ) extends TopicElement
 
   private val topic =
-    OdbTopic.define[(Observation.Id, Program.Id, Option[Obscalc.State], Option[Obscalc.State], EditType), Element](
+    OdbTopic.define[(Observation.Id, Program.Id, Option[ObscalcState], Option[ObscalcState], EditType), Element](
       "Obscalc",
       id"ch_obscalc_update",
       _._2,
@@ -48,8 +48,8 @@ object ObscalcTopic:
         (
           Gid[Observation.Id].fromString.getOption(_oid),
           Gid[Program.Id].fromString.getOption(_pid),
-          Enumerated[Obscalc.State].fromTag(_oldState).some, // treat the string "null" as Some(None)
-          Enumerated[Obscalc.State].fromTag(_newState).some,
+          Enumerated[ObscalcState].fromTag(_oldState).some, // treat the string "null" as Some(None)
+          Enumerated[ObscalcState].fromTag(_newState).some,
           EditType.fromTgOp(_tg_op)
         ).tupled
     }

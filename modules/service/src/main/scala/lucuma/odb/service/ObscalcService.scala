@@ -31,6 +31,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
+import lucuma.odb.data.ObscalcState
 import lucuma.odb.data.OdbError
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -191,11 +192,11 @@ object ObscalcService:
       private def storeResult(
         pending:       Obscalc.PendingCalc,
         result:        Obscalc.Result,
-        expectedState: Obscalc.State
+        expectedState: ObscalcState
       )(using Transaction[F]): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
-          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expectedState else Obscalc.State.Pending)
+          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expectedState else ObscalcState.Pending)
           af  = ns.map(newState => Statements.storeResult(pending, result, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
@@ -207,13 +208,13 @@ object ObscalcService:
           .flatMap: result =>
             services.transactionally:
               result.odbError match
-                case Some(OdbError.ItcError(_)) => storeResult(pending, result, Obscalc.State.Retry)
-                case _                          => storeResult(pending, result, Obscalc.State.Ready)
+                case Some(OdbError.ItcError(_)) => storeResult(pending, result, ObscalcState.Retry)
+                case _                          => storeResult(pending, result, ObscalcState.Ready)
 
           .onError: e =>
             val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
             services.transactionally:
-              storeResult(pending, result, Obscalc.State.Retry).void
+              storeResult(pending, result, ObscalcState.Retry).void
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -469,10 +470,10 @@ object ObscalcService:
     def storeResult(
       pending:  Obscalc.PendingCalc,
       result:   Obscalc.Result,
-      newState: Obscalc.State
+      newState: ObscalcState
     ): AppliedFragment =
 
-      val isRetry = newState === Obscalc.State.Retry
+      val isRetry = newState === ObscalcState.Retry
       val upState        =  sql"c_obscalc_state = $obscalc_state"(newState)
       val upLastUpdate   = void"c_last_update   = now()"
       val upFailureCount = void"c_failure_count = " |+|
