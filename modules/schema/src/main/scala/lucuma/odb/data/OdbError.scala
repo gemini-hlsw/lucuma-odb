@@ -62,6 +62,7 @@ enum OdbError:
   case InconsistentGroupError(detail: Option[String] = None)
   case InvalidConfiguration(detail: Option[String] = None)
   case InvalidWorkflowTransition(currentState: ObservationWorkflowState, requestedState: ObservationWorkflowState, detail: Option[String] = None)
+  case RemoteServiceCallError(detail: Option[String] = None)
 
 object OdbError:
 
@@ -93,6 +94,7 @@ object OdbError:
     case InconsistentGroup         extends Tag("inconsistent_group")
     case InvalidConfiguration      extends Tag("invalid_configuration")
     case InvalidWorkflowTransition extends Tag("invalid_workflow_transition")
+    case RemoteServiceCallError    extends Tag("remote_service_call_error")
 
   private[data]  object Tag:
 
@@ -128,6 +130,7 @@ object OdbError:
       case InconsistentGroupError(_)          => Tag.InconsistentGroup
       case InvalidConfiguration(_)            => Tag.InvalidConfiguration
       case InvalidWorkflowTransition(_, _, _) => Tag.InvalidWorkflowTransition
+      case RemoteServiceCallError(_)          => Tag.RemoteServiceCallError
 
   def defaultMessage(e: OdbError): String =
     e match
@@ -155,6 +158,7 @@ object OdbError:
       case InconsistentGroupError(_)     => "Group hierarchy is inconsistent, or a deleted group contains a non-deleted element."
       case InvalidConfiguration(_)       => "Observation configuration is incomplete."
       case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be chanegd from $a to $b."
+      case RemoteServiceCallError(_)     => "Error attempting to call a remote service."
 
   private def data(e: OdbError): JsonObject =
     e match
@@ -182,6 +186,7 @@ object OdbError:
       case InconsistentGroupError(_)          => JsonObject()
       case InvalidConfiguration(_)            => JsonObject()
       case InvalidWorkflowTransition(a, b, _) => JsonObject("currentState" -> a.asJson, "requestedState" -> b.asJson)
+      case RemoteServiceCallError(_)          => JsonObject()
     
   private def decode(d: Tag, detail: Option[String], c: ACursor): Decoder.Result[OdbError] =
     d match
@@ -209,6 +214,7 @@ object OdbError:
       case Tag.InconsistentGroup         => InconsistentGroupError(detail).asRight
       case Tag.InvalidConfiguration      => InvalidConfiguration(detail).asRight
       case Tag.InvalidWorkflowTransition => (c.downField("currentState").as[ObservationWorkflowState], c.downField("requestedState").as[ObservationWorkflowState]).mapN(InvalidWorkflowTransition(_, _, detail))
+      case Tag.RemoteServiceCallError    => RemoteServiceCallError(detail).asRight
     
   private object Field:
     private val Prefix = "odb_error"

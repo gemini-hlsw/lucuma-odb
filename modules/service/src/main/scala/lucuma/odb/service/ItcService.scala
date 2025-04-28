@@ -118,7 +118,7 @@ sealed trait ItcService[F[_]] {
 object ItcService {
 
   object Error:
-    def observationDefinition(
+    def invalidObservation(
       oid:   Observation.Id,
       error: GeneratorParamsService.Error
     ): OdbError =
@@ -129,7 +129,7 @@ object ItcService {
           error.format
       OdbError.InvalidObservation(oid, msg.some)
 
-    def remoteService(
+    def itcError(
       problems: NonEmptyList[(Option[Target.Id], String)]
     ): OdbError =
       val ps = problems.map:
@@ -269,7 +269,7 @@ object ItcService {
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.observationDefinition(oid, GeneratorParamsService.Error.MissingData(m))))
+          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
@@ -281,7 +281,7 @@ object ItcService {
       )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
-            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.observationDefinition(oid, _))))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
@@ -330,8 +330,8 @@ object ItcService {
                   yield pair
                 .toMap
 
-      private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): OdbError =
-        Error.remoteService(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
+      private def convertErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): OdbError =
+        Error.itcError(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
@@ -350,14 +350,14 @@ object ItcService {
                     r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MinExposureTime))).asRight
                   case other => other
             .partitionErrors
-            .leftMap(convertRemoteErrors(targets))
+            .leftMap(convertErrors(targets))
 
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
           case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
-            val specResult = specOutcomes.partitionErrors.leftMap(convertRemoteErrors(targets))
+            val specResult = specOutcomes.partitionErrors.leftMap(convertErrors(targets))
 
             for
               img    <- imgResult
@@ -376,7 +376,7 @@ object ItcService {
             yield result
         }
         .handleError: t =>
-          Error.remoteService(NonEmptyList.one(None, t.getMessage)).asLeft
+          OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
       private def insertOrUpdate(
         pid:     Program.Id,

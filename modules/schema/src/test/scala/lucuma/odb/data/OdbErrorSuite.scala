@@ -92,6 +92,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.InconsistentGroup         => OdbError.InconsistentGroupError(detail).pure[Gen]
           case Tag.InvalidConfiguration      => OdbError.InvalidConfiguration(detail).pure[Gen]
           case Tag.InvalidWorkflowTransition => (arbitrary[ObservationWorkflowState], arbitrary[ObservationWorkflowState]).mapN(OdbError.InvalidWorkflowTransition(_, _, detail))
+          case Tag.RemoteServiceCallError    => OdbError.RemoteServiceCallError(detail).pure[Gen]
                       
   checkAll("OdbErrorCodec", CodecTests[OdbError].codec)
 

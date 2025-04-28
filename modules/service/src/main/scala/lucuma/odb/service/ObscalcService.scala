@@ -208,13 +208,12 @@ object ObscalcService:
           .flatMap: result =>
             services.transactionally:
               result.odbError match
-                case Some(OdbError.ItcError(_)) => storeResult(pending, result, ObscalcState.Retry)
-                case _                          => storeResult(pending, result, ObscalcState.Ready)
-
-          .onError: e =>
+                case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, ObscalcState.Retry)
+                case _                                        => storeResult(pending, result, ObscalcState.Ready)
+          .handleErrorWith: e =>
             val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
             services.transactionally:
-              storeResult(pending, result, ObscalcState.Retry).void
+              storeResult(pending, result, ObscalcState.Retry)
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
