@@ -463,10 +463,10 @@ trait Codecs {
     enumerated[SequenceType](Type("e_sequence_type"))
 
   val _site: Codec[Arr[Site]] =
-    Codec.array(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
+    Codec.array(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
 
   val site: Codec[Site] =
-    `enum`(_.tag.toLowerCase, s => Site.fromTag(s.toUpperCase), Type("e_site"))
+    `enum`(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase), Type("e_site"))
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)

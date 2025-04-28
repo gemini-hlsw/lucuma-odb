@@ -27,7 +27,7 @@ import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.geom.ShapeExpression
-import lucuma.core.geom.gmos.probeArm
+import lucuma.core.geom.gmos.candidatesArea
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -466,7 +466,7 @@ object GuideService {
       ): F[Result[List[GuideStarCandidate]]] =
         (for {
           query      <- ResultT.fromResult(
-                          getGaiaQuery(oid, start, end, tracking, probeArm.candidatesArea, wavelength, constraints)
+                          getGaiaQuery(oid, start, end, tracking, candidatesArea.candidatesArea, wavelength, constraints)
                         )
           candidates <- ResultT(callGaia(oid, query))
         } yield candidates).value

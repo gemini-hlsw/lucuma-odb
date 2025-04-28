@@ -16,6 +16,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.core.util.Enumerated
 import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
 import lucuma.odb.smartgcal.data.Gmos.TableKey
 
@@ -26,7 +27,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
     val definition = "$R400.*,$.*one|.*G.*,$.* 0.50 arcsec,4,1,675 - 1200,1,Low"
 
     // $.*one|.*G.*  Matches all the filters.  Seems like it could have been just "*".
-    val filters = NonEmptyList(none, GmosNorthFilter.all.map(_.some))
+    val filters = NonEmptyList(none, Enumerated[GmosNorthFilter].all.map(_.some))
 
     // Both these are 0.50 arcsec
     val fpus    = NonEmptyList.of(GmosNorthFpu.LongSlit_0_50.some, GmosNorthFpu.Ns1.some)
@@ -65,7 +66,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
 
     val definition = "Mirror,$.*one|.*G.*,$.* 0.50 arcsec,4,1,675 - 1200,*,Low"
 
-    val filters = NonEmptyList(none, GmosNorthFilter.all.map(_.some))
+    val filters = NonEmptyList(none, Enumerated[GmosNorthFilter].all.map(_.some))
 
     // Both these are 0.50 arcsec
     val fpus    = NonEmptyList.of(GmosNorthFpu.LongSlit_0_50.some, GmosNorthFpu.Ns1.some)
