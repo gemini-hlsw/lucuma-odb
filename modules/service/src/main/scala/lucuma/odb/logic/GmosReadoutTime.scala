@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Tag
 import monocle.Focus
@@ -142,9 +143,9 @@ object GmosReadoutTime {
           x <- GmosXBinning.values
           y <- GmosYBinning.values
           c <- d.fold(_.ampCounts.toNonEmptyList.toList, _.ampCounts.toNonEmptyList.toList)
-          g <- GmosAmpGain.all
-          o <- GmosAmpReadMode.all
-          r <- GmosRoi.all
+          g <- Enumerated[GmosAmpGain].all
+          o <- Enumerated[GmosAmpReadMode].all
+          r <- Enumerated[GmosRoi].all
           k  = Key(d, GmosCcdMode(x, y, c, g, o), r)
         } yield m.get(k).liftTo[F](new RuntimeException(s"Missing GMOS readout time definition for $k"))
       ).sequence.void
