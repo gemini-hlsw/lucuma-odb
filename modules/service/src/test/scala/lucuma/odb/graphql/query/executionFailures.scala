@@ -69,7 +69,7 @@ class executionFailures extends ExecutionTestSupport {
              }
            """,
           expected = {
-            case OdbError.ItcError(Some("ITC returned errors: Asterism: Artifical exception for test cases.")) => // ok
+            case OdbError.RemoteServiceCallError(Some("Error calling ITC service: Artifical exception for test cases.")) => // ok
           }
       )
     }
