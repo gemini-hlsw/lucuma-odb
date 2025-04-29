@@ -49,7 +49,7 @@ object F2LongSlitService {
 
       val f2LS: Decoder[F2LongSlitInput.Create] =
         (f2_disperser        *:
-         f2_filter.opt       *:
+         f2_filter           *:
          f2_fpu              *:
          f2_read_mode.opt    *:
          f2_reads.opt        *:
@@ -119,14 +119,14 @@ object F2LongSlitService {
     val InsertF2LongSlit: Fragment[(
       Observation.Id       ,
       F2Disperser          ,
-      Option[F2Filter]     ,
+      F2Filter             ,
       F2Fpu                ,
       Option[F2ReadMode]   ,
       Option[F2Reads]      ,
       Option[F2Decker]     ,
       Option[F2ReadoutMode],
       F2Disperser          ,
-      Option[F2Filter]     ,
+      F2Filter             ,
       F2Fpu
     )] =
       sql"""
@@ -148,14 +148,14 @@ object F2LongSlitService {
           $observation_id,
           c_program_id,
           $f2_disperser,
-          ${f2_filter.opt},
+          $f2_filter,
           $f2_fpu,
           ${f2_read_mode.opt},
           ${f2_reads.opt},
           ${f2_decker.opt},
           ${f2_readout_mode.opt},
           $f2_disperser,
-          ${f2_filter.opt},
+          $f2_filter,
           $f2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
@@ -188,7 +188,7 @@ object F2LongSlitService {
     private def f2Updates(input: F2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
       val upDisperser   = sql"c_disperser    = $f2_disperser"
-      val upFilter      = sql"c_filter       = ${f2_filter.opt}"
+      val upFilter      = sql"c_filter       = $f2_filter"
       val upFpu         = sql"c_fpu          = $f2_fpu"
       val upReadMode    = sql"c_read_mode    = ${f2_read_mode.opt}"
       val upReads       = sql"c_reads        = ${f2_reads.opt}"
@@ -198,7 +198,7 @@ object F2LongSlitService {
       val ups: List[AppliedFragment] =
         List(
           input.disperser.map(upDisperser),
-          input.filter.toOptionOption.map(upFilter),
+          input.filter.map(upFilter),
           input.fpu.map(upFpu),
           input.explicitReadMode.toOptionOption.map(upReadMode),
           input.explicitReads.toOptionOption.map(upReads),

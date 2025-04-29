@@ -23,7 +23,7 @@ trait ArbF2LongSlitInput:
     Arbitrary {
       for {
         g <- arbitrary[F2Disperser]
-        f <- arbitrary[Option[F2Filter]]
+        f <- arbitrary[F2Filter]
         u <- arbitrary[F2Fpu]
         r <- arbitrary[Option[F2ReadMode]]
         s <- arbitrary[Option[F2Reads]]
@@ -36,7 +36,7 @@ trait ArbF2LongSlitInput:
     Arbitrary {
       for {
         g <- arbitrary[Option[F2Disperser]]
-        f <- arbitrary[Nullable[F2Filter]]
+        f <- arbitrary[Option[F2Filter]]
         u <- arbitrary[Option[F2Fpu]]
         r <- arbitrary[Nullable[F2ReadMode]]
         s <- arbitrary[Nullable[F2Reads]]
