@@ -36,8 +36,8 @@ class F2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstances:
       assertEquals(e.observingModeType, ObservingModeType.Flamingos2LongSlit)
 
   test("F2LongSlitInput.Edit toCreate should handle optional values correctly"):
-    forAll: (e: F2LongSlitInput.Edit, grating: F2Disperser, fpu: F2Fpu) =>
-      val edit = e.copy(disperser = Some(grating), fpu = Some(fpu))
+    forAll: (e: F2LongSlitInput.Edit, grating: F2Disperser, fpu: F2Fpu, filter: F2Filter) =>
+      val edit = e.copy(disperser = Some(grating), fpu = Some(fpu), filter = Some(filter))
       val createResult = edit.toCreate
 
       assert(createResult.toEither.isRight, "Should succeed when all required fields are present")
