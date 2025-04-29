@@ -259,8 +259,9 @@ object GeneratorParamsService {
               gs.roi.some
             )
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
-          case _: f2.longslit.Config =>
-            throw new IllegalStateException("F2 step generation not supported.")
+          case f2 @ f2.longslit.Config(disperser, filter, fpu, _, _, _, _, _, _, _, _) =>
+            val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
+            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
       private def itcObsParams(
         obsParams:  ObsParams,

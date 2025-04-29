@@ -92,8 +92,8 @@ object CalibrationConfigSubset:
 
   case class F2Configs(
     disperser: F2Disperser,
-    filter:    Option[F2Filter],
-    fpu:       F2Fpu,
+    filter:    F2Filter,
+    fpu:       F2Fpu
   ) extends CalibrationConfigSubset derives Eq
 
   extension (mode: ObservingMode)
