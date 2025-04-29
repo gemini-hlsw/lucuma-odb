@@ -24,19 +24,23 @@ import java.io.DataOutputStream
  */
 case class Config private[longslit](
   disperser: F2Disperser,
-  filter: Option[F2Filter],
+  filter: F2Filter,
   fpu: F2Fpu,
   defaultReadMode: F2ReadMode,
   explicitReadMode: Option[F2ReadMode],
   defaultReads: F2Reads,
   explicitReads: Option[F2Reads],
+  defaultDecker: F2Decker,
   explicitDecker: Option[F2Decker],
+  defaultReadoutMode: F2ReadoutMode,
   explicitReadoutMode: Option[F2ReadoutMode]
 ) derives Eq {
 
-  def decker: Option[F2Decker] = explicitDecker
+  def decker: F2Decker =
+    explicitDecker.getOrElse(defaultDecker)
 
-  def readoutMode: Option[F2ReadoutMode] = explicitReadoutMode
+  def readoutMode: F2ReadoutMode =
+    explicitReadoutMode.getOrElse(defaultReadoutMode)
 
   def reads: F2Reads =
     explicitReads.getOrElse(defaultReads)
@@ -49,12 +53,12 @@ case class Config private[longslit](
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.writeChars(disperser.tag)
-    out.writeChars(filter.foldMap(_.tag))
+    out.writeChars(filter.tag)
     out.writeChars(fpu.tag)
     out.writeChars(readMode.tag)
     out.writeChars(reads.tag)
-    out.writeChars(decker.foldMap(_.tag))
-    out.writeChars(readoutMode.foldMap(_.tag))
+    out.writeChars(decker.tag)
+    out.writeChars(readoutMode.tag)
 
     out.close()
     bao.toByteArray
@@ -66,7 +70,7 @@ object Config:
 
   def apply(
     disperser: F2Disperser,
-    filter: Option[F2Filter],
+    filter: F2Filter,
     fpu: F2Fpu,
     explicitReadMode: Option[F2ReadMode] = None,
     explicitReads: Option[F2Reads] = None,
@@ -82,7 +86,9 @@ object Config:
       explicitReadMode,
       rm.readCount,
       explicitReads,
+      F2Decker.LongSlit,
       explicitDecker,
+      DefaultF2ReadoutMode,
       explicitReadoutMode
     )
 

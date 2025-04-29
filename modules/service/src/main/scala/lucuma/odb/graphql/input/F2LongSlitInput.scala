@@ -23,7 +23,7 @@ object F2LongSlitInput {
 
   case class Create(
     disperser: F2Disperser,
-    filter: Option[F2Filter],
+    filter: F2Filter,
     fpu: F2Fpu,
     explicitReadMode: Option[F2ReadMode]       = None,
     explicitReads: Option[F2Reads]             = None,
@@ -52,7 +52,7 @@ object F2LongSlitInput {
   object Create {
     private val F2Data: Matcher[(
       F2Disperser,
-      Option[F2Filter],
+      F2Filter,
       F2Fpu,
       Option[F2ReadMode],
       Option[F2Decker],
@@ -62,7 +62,7 @@ object F2LongSlitInput {
       ObjectFieldsBinding.rmap {
         case List(
           F2DisperserBinding("disperser", rDisperser),
-          F2FilterBinding.Option("filter", rFilter),
+          F2FilterBinding("filter", rFilter),
           F2FpuBinding("fpu", rFpu),
           F2ReadModeBinding.Option("explicitReadMode", rReadMode),
           F2ReadsBinding.Option("explicitReads", rReads),
@@ -105,7 +105,7 @@ object F2LongSlitInput {
 
   case class Edit(
     disperser: Option[F2Disperser],
-    filter: Nullable[F2Filter],
+    filter: Option[F2Filter],
     fpu: Option[F2Fpu],
     explicitReadMode: Nullable[F2ReadMode],
     explicitReads: Nullable[F2Reads],
@@ -125,10 +125,11 @@ object F2LongSlitInput {
     val toCreate: Result[Create] =
       for {
         g <- required(disperser, "disperser")
+        f <- required(filter, "filter")
         u <- required(fpu, "fpu")
       } yield Create(
         g,
-        filter.toOption,
+        f,
         u,
         explicitReadMode.toOption
       )
@@ -138,7 +139,7 @@ object F2LongSlitInput {
 
     private val F2EditData: Matcher[(
       Option[F2Disperser],
-      Nullable[F2Filter],
+      Option[F2Filter],
       Option[F2Fpu],
       Nullable[F2ReadMode],
       Nullable[F2Reads],
@@ -148,7 +149,7 @@ object F2LongSlitInput {
       ObjectFieldsBinding.rmap {
         case List(
           F2DisperserBinding.Option("disperser", rDisperser),
-          F2FilterBinding.Nullable("filter", rFilter),
+          F2FilterBinding.Option("filter", rFilter),
           F2FpuBinding.Option("fpu", rFpu),
           F2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
           F2ReadsBinding.Nullable("explicitReads", rReads),
