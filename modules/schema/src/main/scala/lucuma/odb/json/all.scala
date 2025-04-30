@@ -6,7 +6,7 @@ package lucuma.odb.json
 object all {
 
   trait UniversalCodecs
-    extends CalculationValueCodec
+    extends CalculatedValueCodec
        with CatalogInfoCodec
        with EpochCodec
        with GmosCodec

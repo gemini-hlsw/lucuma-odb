@@ -6,25 +6,25 @@ package lucuma.odb.graphql.input
 import cats.syntax.parallel.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.odb.data.ObscalcState
+import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.binding.*
 
 case class ObscalcUpdateInput(
   programId:     Option[Program.Id],
   observationId: Option[Observation.Id],
-  oldState:      Option[WhereOptionEq[ObscalcState]],
-  newState:      Option[WhereOptionEq[ObscalcState]]
+  oldState:      Option[WhereOptionEq[CalculationState]],
+  newState:      Option[WhereOptionEq[CalculationState]]
 )
 
 object ObscalcUpdateInput:
 
-  private val WhereOptionEqObscalcState = WhereOptionEq.inputBinding(ObscalcStateBinding)
+  private val WhereOptionEqCalculationState = WhereOptionEq.inputBinding(CalculationStateBinding)
 
   val Binding = ObjectFieldsBinding.rmap:
     case List(
       ProgramIdBinding.Option("programId", rProgramId),
       ObservationIdBinding.Option("observationId", rObservationId),
-      WhereOptionEqObscalcState.Option("oldState", rOldState),
-      WhereOptionEqObscalcState.Option("newState", rNewState)
+      WhereOptionEqCalculationState.Option("oldState", rOldState),
+      WhereOptionEqCalculationState.Option("newState", rNewState)
     ) =>
       (rProgramId, rObservationId, rOldState, rNewState).parMapN(apply)

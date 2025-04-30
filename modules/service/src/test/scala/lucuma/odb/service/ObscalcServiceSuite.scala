@@ -20,16 +20,16 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
-import lucuma.odb.data.ObscalcState
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.util.Codecs.core_timestamp
-import lucuma.odb.util.Codecs.obscalc_state
+import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.*
@@ -98,24 +98,24 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupport:
 
       session.execute(up)(o).void
 
-  def obscalcState(o: Observation.Id): IO[ObscalcState] =
+  def calculationState(o: Observation.Id): IO[CalculationState] =
     withSession: session =>
       val query = sql"""
         SELECT c_obscalc_state
         FROM t_obscalc
         WHERE c_observation_id = $observation_id
-      """.query(obscalc_state)
+      """.query(calculation_state)
       session.unique(query)(o)
 
-  val selectStates: IO[Map[Observation.Id, ObscalcState]] =
+  val selectStates: IO[Map[Observation.Id, CalculationState]] =
     withSession: session =>
-      val states: Query[Void, (Observation.Id, ObscalcState)] = sql"""
+      val states: Query[Void, (Observation.Id, CalculationState)] = sql"""
         SELECT
           c_observation_id,
           c_obscalc_state
         FROM
           t_obscalc
-      """.query(observation_id *: obscalc_state)
+      """.query(observation_id *: calculation_state)
 
       session.execute(states).map(_.toMap)
 
@@ -195,7 +195,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     setup.flatTap: (p, _, o) =>
        val pc = Obscalc.PendingCalc(p, o, randomTime)
        assertIO(insert(pc) *> load, List(pc)) *>
-       assertIO(obscalcState(o), ObscalcState.Calculating)
+       assertIO(calculationState(o), CalculationState.Calculating)
 
   test("update then select"):
     setup.flatTap: (p, _, o) =>
@@ -254,8 +254,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
 
     assertIOBoolean:
       states.map: (o0, o1) =>
-        o0 === List(ObscalcState.Pending, ObscalcState.Calculating, ObscalcState.Pending) &&
-        o1 === List(ObscalcState.Retry,   ObscalcState.Calculating, ObscalcState.Retry  )
+        o0 === List(CalculationState.Pending, CalculationState.Calculating, CalculationState.Pending) &&
+        o1 === List(CalculationState.Retry,   CalculationState.Calculating, CalculationState.Retry  )
 
   test("mark failed"):
     def setWavelengthToMagicValue(o: Observation.Id): IO[Unit] =
@@ -272,4 +272,4 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       load.flatMap: lst =>
         calculateAndUpdate(lst.head) *> selectStates
 
-    assertIO(res.map(_.values.toList.head), ObscalcState.Retry)
+    assertIO(res.map(_.values.toList.head), CalculationState.Retry)

@@ -18,10 +18,10 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import lucuma.core.model.Access
 import lucuma.core.model.User
+import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.Obscalc
-import lucuma.odb.data.ObscalcState
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -152,8 +152,8 @@ object CalcMain extends MainParams:
       topic.subscribe(1000).evalMapFilter: e =>
         Option
           .when(
-            e.oldState.forall(_ =!= ObscalcState.Pending) &&
-            e.newState.exists(_ === ObscalcState.Pending)
+            e.oldState.forall(_ =!= CalculationState.Pending) &&
+            e.newState.exists(_ === CalculationState.Pending)
           )(e.observationId)
           .flatTraverse: oid =>
             services.useTransactionally:
