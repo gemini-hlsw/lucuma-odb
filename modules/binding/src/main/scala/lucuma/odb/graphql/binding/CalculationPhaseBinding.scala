@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package binding
 
-import lucuma.odb.data.ObscalcState
+import lucuma.core.util.CalculationState
 
-val ObscalcStateBinding: Matcher[ObscalcState] =
+val CalculationStateBinding: Matcher[CalculationState] =
   enumeratedBinding

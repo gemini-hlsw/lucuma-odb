@@ -371,12 +371,6 @@ enum Breakpoint {
   DISABLED
 }
 
-type CalculatedExecutionDigest implements Calculated {
-  state:         ObscalcState!
-  observationId: ObservationId!
-  digest:        ExecutionDigest
-}
-
 """
 A single Call for Proposals definition.
 """
@@ -648,7 +642,7 @@ type CategorizedTimeRange {
 }
 
 type CalculatedCategorizedTimeRange {
-  state: ObscalcState!
+  state: CalculationState!
   range: CategorizedTimeRange
 }
 
@@ -4763,7 +4757,13 @@ type Subscription {
 """
 Observation background-update calculation states.
 """
-enum ObscalcState {
+enum CalculationState {
+
+  """
+  RETRY signifies that the observation update calculation failed and will be
+  automatically attempted again even if its properties are not modified.
+  """
+  RETRY
 
   """
   PENDING signifies that the observation will be updated by a background worker
@@ -4771,12 +4771,6 @@ enum ObscalcState {
   that point.
   """
   PENDING
-
-  """
-  RETRY signifies that the observation update calculation failed and will be
-  automatically attempted again even if its properties are not modified.
-  """
-  RETRY
 
   """
   CALCULATING signifies that an observation background calculation is currently
@@ -4799,37 +4793,37 @@ new states to limit events to only those transitions.
 input ObscalcUpdateInput {
   programId:     ProgramId
   observationId: ObservationId
-  oldState:      WhereOptionEqObscalcState
-  newState:      WhereOptionEqObscalcState
+  oldState:      WhereOptionEqCalculationState
+  newState:      WhereOptionEqCalculationState
 }
 
-input WhereOptionEqObscalcState {
+input WhereOptionEqCalculationState {
 
   """
-  When `true`, matches if the ObscalcState is not defined. When `false` matches
-  if the ObscalcState is defined.
+  When `true`, matches if the CalculationState is not defined. When `false` matches
+  if the CalculationState is defined.
   """
   IS_NULL: Boolean
 
   """
   Matches if the property is exactly the supplied value.
   """
-  EQ: ObscalcState
+  EQ: CalculationState
 
   """
   Matches if the property is not the supplied value.
   """
-  NEQ: ObscalcState
+  NEQ: CalculationState
 
   """
   Matches if the property value is any of the supplied options.
   """
-  IN: [ObscalcState!]
+  IN: [CalculationState!]
 
   """
   Matches if the property value is none of the supplied values.
   """
-  NIN: [ObscalcState!]
+  NIN: [CalculationState!]
 
 }
 
@@ -4846,12 +4840,12 @@ type ObscalcUpdate {
   """
   Old calculation state, if any.
   """
-  oldState: ObscalcState
+  oldState: CalculationState
 
   """
   New calculation state, if any.
   """
-  newState: ObscalcState
+  newState: CalculationState
 
   """
   Id of the observation that was updated.

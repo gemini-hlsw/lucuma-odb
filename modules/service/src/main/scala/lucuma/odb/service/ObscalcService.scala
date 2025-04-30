@@ -28,13 +28,14 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.util.CalculationState
+import lucuma.core.util.CalculatedValue
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
-import lucuma.odb.data.ObscalcState
 import lucuma.odb.data.OdbError
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -82,14 +83,14 @@ sealed trait ObscalcService[F[_]]:
    */
   def selectOneCategorizedTime(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Option[Obscalc.CalculatedValue[CategorizedTime]]]
+  )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTime]]]
 
   /**
    * Select calculated categorized time for all observations in a program.
    */
   def selectProgramCategorizedTime(
     programId: Program.Id
-  )(using Transaction[F]): F[Map[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]]]
+  )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[CategorizedTime]]]
 
   /**
    * Marks all 'calculating' observations as 'pending' (or 'retry' if
@@ -167,12 +168,12 @@ object ObscalcService:
 
       override def selectOneCategorizedTime(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[Obscalc.CalculatedValue[CategorizedTime]]] =
+      )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTime]]] =
         session.option(Statements.SelectOneCategorizedTime)(observationId)
 
       override def selectProgramCategorizedTime(
         programId: Program.Id
-      )(using Transaction[F]): F[Map[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]]] =
+      )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[CategorizedTime]]] =
         session
           .execute(Statements.SelectProgramCategorizedTime)(programId)
           .map(_.toMap)
@@ -219,13 +220,13 @@ object ObscalcService:
         )
 
       private def storeResult(
-        pending:       Obscalc.PendingCalc,
-        result:        Obscalc.Result,
-        expectedState: ObscalcState
+        pending:  Obscalc.PendingCalc,
+        result:   Obscalc.Result,
+        expected: CalculationState
       )(using Transaction[F]): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
-          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expectedState else ObscalcState.Pending)
+          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expected else CalculationState.Pending)
           af  = ns.map(newState => Statements.storeResult(pending, result, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
@@ -237,12 +238,12 @@ object ObscalcService:
           .flatMap: result =>
             services.transactionally:
               result.odbError match
-                case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, ObscalcState.Retry)
-                case _                                        => storeResult(pending, result, ObscalcState.Ready)
+                case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, CalculationState.Retry)
+                case _                                        => storeResult(pending, result, CalculationState.Ready)
           .handleErrorWith: e =>
             val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
             services.transactionally:
-              storeResult(pending, result, ObscalcState.Retry)
+              storeResult(pending, result, CalculationState.Retry)
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -251,7 +252,7 @@ object ObscalcService:
     val obscalc_meta: Codec[Obscalc.Meta] = (
       program_id         *: // c_program_id
       observation_id     *: // c_observation_id
-      obscalc_state      *: // c_obscalc_state
+      calculation_state      *: // c_obscalc_state
       core_timestamp     *: // c_last_invalidation
       core_timestamp     *: // c_last_update
       core_timestamp.opt *: // c_retry_at
@@ -408,13 +409,13 @@ object ObscalcService:
       ).mkString("", ",\n", "\n")
 
     private def timeEstimate(
-      state:      ObscalcState,
+      state:      CalculationState,
       setup:      TimeSpan,
       obsclass:   ObserveClass,
       nonCharged: TimeSpan,
       program:    TimeSpan
-    ): Obscalc.CalculatedValue[CategorizedTime] =
-      Obscalc.CalculatedValue(
+    ): CalculatedValue[CategorizedTime] =
+      CalculatedValue(
         state,
         CategorizedTime(
           ChargeClass.NonCharged -> nonCharged,
@@ -422,18 +423,18 @@ object ObscalcService:
         ).sumCharge(obsclass.chargeClass, setup)
       )
 
-    val SelectOneCategorizedTime: Query[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]] =
+    val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
         SELECT
           #${CategorizedTimeColumns}
         FROM t_obscalc
         WHERE c_observation_id = $observation_id
       """
-        .query(obscalc_state *: time_span *: obs_class *: time_span *: time_span)
+        .query(calculation_state *: time_span *: obs_class *: time_span *: time_span)
         .map: (state, setup, obsclass, nonCharged, program) =>
           timeEstimate(state, setup, obsclass, nonCharged, program)
 
-    val SelectProgramCategorizedTime: Query[Program.Id, (Observation.Id, Obscalc.CalculatedValue[CategorizedTime])] =
+    val SelectProgramCategorizedTime: Query[Program.Id, (Observation.Id, CalculatedValue[CategorizedTime])] =
       sql"""
         SELECT
           c_observation_id,
@@ -441,7 +442,7 @@ object ObscalcService:
         FROM t_obscalc
         WHERE c_program_id = $program_id
       """
-        .query(observation_id *: obscalc_state *: time_span *: obs_class *: time_span *: time_span)
+        .query(observation_id *: calculation_state *: time_span *: obs_class *: time_span *: time_span)
         .map: (oid, state, setup, obsclass, nonCharged, program) =>
           oid -> timeEstimate(state, setup, obsclass, nonCharged, program)
 
@@ -545,11 +546,11 @@ object ObscalcService:
     def storeResult(
       pending:  Obscalc.PendingCalc,
       result:   Obscalc.Result,
-      newState: ObscalcState
+      newState: CalculationState
     ): AppliedFragment =
 
-      val isRetry = newState === ObscalcState.Retry
-      val upState        =  sql"c_obscalc_state = $obscalc_state"(newState)
+      val isRetry = newState === CalculationState.Retry
+      val upState        =  sql"c_obscalc_state = $calculation_state"(newState)
       val upLastUpdate   = void"c_last_update   = now()"
       val upFailureCount = void"c_failure_count = " |+|
                            (if isRetry then void"c_failure_count + 1" else void"0")

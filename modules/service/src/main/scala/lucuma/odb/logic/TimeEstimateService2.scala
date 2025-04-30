@@ -19,9 +19,10 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
+import lucuma.core.util.CalculationState
+import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.GroupTree
-import lucuma.odb.data.Obscalc.CalculatedValue
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
