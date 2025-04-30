@@ -194,7 +194,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
         (for
-          p <- OptionT(groupService.selectPid(gid))
+          p <- OptionT(services.transactionally(groupService.selectPid(gid)))
           d <- OptionT.liftF(load(p))
           (tree, dataMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))
@@ -231,7 +231,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]] =
         (for
-          p <- OptionT(groupService.selectPid(gid))
+          p <- OptionT(services.transactionally(groupService.selectPid(gid)))
           d <- OptionT.liftF(load(p))
           (tree, dataMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))

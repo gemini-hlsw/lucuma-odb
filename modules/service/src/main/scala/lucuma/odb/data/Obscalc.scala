@@ -3,6 +3,8 @@
 
 package lucuma.odb.data
 
+import cats.Monoid
+import cats.syntax.monoid.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
@@ -97,3 +99,18 @@ object Obscalc:
     result: Option[Obscalc.Result]
   )
 
+  /**
+   * Calculated
+   */
+  case class CalculatedValue[A](state: ObscalcState, value: A)
+
+  object CalculatedValue:
+
+    def empty[A](using Monoid[A]): CalculatedValue[A] =
+      CalculatedValue(ObscalcState.Zero, Monoid[A].empty)
+
+    given [A](using Monoid[A]): Monoid[CalculatedValue[A]] =
+      Monoid.instance(
+        empty,
+        (a, b) => CalculatedValue(a.state |+| b.state, a.value |+| b.value)
+      )

@@ -20,12 +20,15 @@ import cats.syntax.traverse.*
 import io.circe.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
@@ -73,6 +76,20 @@ sealed trait ObscalcService[F[_]]:
   def selectProgram(
     programId: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]]
+
+  /**
+   * Select calculated categorized time for a single observation.
+   */
+  def selectOneCategorizedTime(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Obscalc.CalculatedValue[CategorizedTime]]]
+
+  /**
+   * Select calculated categorized time for all observations in a program.
+   */
+  def selectProgramCategorizedTime(
+    programId: Program.Id
+  )(using Transaction[F]): F[Map[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]]]
 
   /**
    * Marks all 'calculating' observations as 'pending' (or 'retry' if
@@ -147,6 +164,18 @@ object ObscalcService:
         session
           .execute(Statements.SelectProgram)(programId)
           .map(_.fproductLeft(_.meta.observationId).toMap)
+
+      override def selectOneCategorizedTime(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Obscalc.CalculatedValue[CategorizedTime]]] =
+        session.option(Statements.SelectOneCategorizedTime)(observationId)
+
+      override def selectProgramCategorizedTime(
+        programId: Program.Id
+      )(using Transaction[F]): F[Map[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]]] =
+        session
+          .execute(Statements.SelectProgramCategorizedTime)(programId)
+          .map(_.toMap)
 
       override def reset(using Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
@@ -368,6 +397,53 @@ object ObscalcService:
         FROM t_obscalc
         WHERE c_program_id = $program_id
       """.query(obscalc_entry)
+
+    private val CategorizedTimeColumns: String =
+      List(
+        "c_obscalc_state",
+        "c_full_setup_time",
+        "c_sci_obs_class",
+        "c_sci_non_charged_time",
+        "c_sci_program_time"
+      ).mkString("", ",\n", "\n")
+
+    private def timeEstimate(
+      state:      ObscalcState,
+      setup:      TimeSpan,
+      obsclass:   ObserveClass,
+      nonCharged: TimeSpan,
+      program:    TimeSpan
+    ): Obscalc.CalculatedValue[CategorizedTime] =
+      Obscalc.CalculatedValue(
+        state,
+        CategorizedTime(
+          ChargeClass.NonCharged -> nonCharged,
+          ChargeClass.Program    -> program
+        ).sumCharge(obsclass.chargeClass, setup)
+      )
+
+    val SelectOneCategorizedTime: Query[Observation.Id, Obscalc.CalculatedValue[CategorizedTime]] =
+      sql"""
+        SELECT
+          #${CategorizedTimeColumns}
+        FROM t_obscalc
+        WHERE c_observation_id = $observation_id
+      """
+        .query(obscalc_state *: time_span *: obs_class *: time_span *: time_span)
+        .map: (state, setup, obsclass, nonCharged, program) =>
+          timeEstimate(state, setup, obsclass, nonCharged, program)
+
+    val SelectProgramCategorizedTime: Query[Program.Id, (Observation.Id, Obscalc.CalculatedValue[CategorizedTime])] =
+      sql"""
+        SELECT
+          c_observation_id,
+          #${CategorizedTimeColumns}
+        FROM t_obscalc
+        WHERE c_program_id = $program_id
+      """
+        .query(observation_id *: obscalc_state *: time_span *: obs_class *: time_span *: time_span)
+        .map: (oid, state, setup, obsclass, nonCharged, program) =>
+          oid -> timeEstimate(state, setup, obsclass, nonCharged, program)
 
     val ResetCalculating: Command[Void] =
       sql"""

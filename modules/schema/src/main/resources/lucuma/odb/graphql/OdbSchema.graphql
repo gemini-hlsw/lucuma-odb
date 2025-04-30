@@ -371,6 +371,12 @@ enum Breakpoint {
   DISABLED
 }
 
+type CalculatedExecutionDigest implements Calculated {
+  state:         ObscalcState!
+  observationId: ObservationId!
+  digest:        ExecutionDigest
+}
+
 """
 A single Call for Proposals definition.
 """
@@ -639,6 +645,11 @@ type CategorizedTimeRange {
   Maximum remaining time estimate.
   """
   maximum: CategorizedTime!
+}
+
+type CalculatedCategorizedTimeRange {
+  state: ObscalcState!
+  range: CategorizedTimeRange
 }
 
 """
