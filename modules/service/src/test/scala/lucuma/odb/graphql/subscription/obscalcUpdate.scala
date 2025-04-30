@@ -10,8 +10,8 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.EditType
-import lucuma.odb.data.ObscalcState
 import lucuma.odb.service.ObscalcServiceSuiteSupport
 
 import scala.concurrent.duration.*
@@ -46,7 +46,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
           Json.obj(
             "obscalcUpdate" -> Json.obj(
               "oldState" -> Json.Null,
-              "newState" -> ObscalcState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
               "editType" -> EditType.Created.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "title" -> "V1647 Orionis".asJson  // Target title
@@ -81,8 +81,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
-              "oldState" -> ObscalcState.Pending.asJson,
-              "newState" -> ObscalcState.Calculating.asJson,
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Calculating.asJson,
               "editType" -> EditType.Updated.tag.toUpperCase.asJson,
               "value" -> Json.obj(
                 "id" -> oid.asJson
@@ -120,8 +120,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         Json.obj(
           "obscalcUpdate" -> Json.obj(
             "observationId" -> oid.asJson,
-            "oldState" -> ObscalcState.Pending.asJson,
-            "newState" -> ObscalcState.Pending.asJson,
+            "oldState" -> CalculationState.Pending.asJson,
+            "newState" -> CalculationState.Pending.asJson,
             "editType" -> EditType.Updated.tag.toUpperCase.asJson,
             "value" -> Json.Null
           )
@@ -131,7 +131,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         Json.obj(
           "obscalcUpdate" -> Json.obj(
             "observationId" -> oid.asJson,
-            "oldState" -> ObscalcState.Pending.asJson,
+            "oldState" -> CalculationState.Pending.asJson,
             "newState" -> Json.Null,
             "editType" -> EditType.DeletedCal.tag.toUpperCase.asJson,
             "value" -> Json.Null
@@ -159,8 +159,8 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         // Just one event -- when moving from calculating to ready
         Json.obj(
           "obscalcUpdate" -> Json.obj(
-            "oldState" -> ObscalcState.Calculating.asJson,
-            "newState" -> ObscalcState.Ready.asJson,
+            "oldState" -> CalculationState.Calculating.asJson,
+            "newState" -> CalculationState.Ready.asJson,
             "editType" -> EditType.Updated.tag.toUpperCase.asJson
           )
         )

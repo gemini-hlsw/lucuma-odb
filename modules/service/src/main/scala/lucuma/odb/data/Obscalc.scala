@@ -3,13 +3,13 @@
 
 package lucuma.odb.data
 
-import cats.Monoid
 import cats.syntax.monoid.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.service.ItcService
 
@@ -35,7 +35,7 @@ object Obscalc:
    *
    * @param programId        program associated with the observation
    * @param observationId    identifies the observation to update
-   * @param state            calculation state
+   * @param state            stage, or phase, of the calculation process
    * @param lastInvalidation the last time the observation was modified in such
    *                         a way that it might impact calculations
    * @param lastUpdate       the time at which a result was last written
@@ -50,7 +50,7 @@ object Obscalc:
   final case class Meta(
     programId:        Program.Id,
     observationId:    Observation.Id,
-    state:            ObscalcState,
+    state:            CalculationState,
     lastInvalidation: Timestamp,
     lastUpdate:       Timestamp,
     retryAt:          Option[Timestamp],
@@ -98,19 +98,3 @@ object Obscalc:
     meta:   Obscalc.Meta,
     result: Option[Obscalc.Result]
   )
-
-  /**
-   * Calculated
-   */
-  case class CalculatedValue[A](state: ObscalcState, value: A)
-
-  object CalculatedValue:
-
-    def empty[A](using Monoid[A]): CalculatedValue[A] =
-      CalculatedValue(ObscalcState.Zero, Monoid[A].empty)
-
-    given [A](using Monoid[A]): Monoid[CalculatedValue[A]] =
-      Monoid.instance(
-        empty,
-        (a, b) => CalculatedValue(a.state |+| b.state, a.value |+| b.value)
-      )

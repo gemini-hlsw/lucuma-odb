@@ -8,23 +8,23 @@ import io.circe.Decoder
 import io.circe.HCursor
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.util.CalculationPhase
-import lucuma.core.util.CalculationValue
+import lucuma.core.util.CalculationState
+import lucuma.core.util.CalculatedValue
 
-trait CalculationValueCodec:
+trait CalculatedValueCodec:
 
-  given [A: Codec]: Codec[CalculationValue[A]] with
-    def apply(c: CalculationValue[A]): Json =
+  given [A: Codec]: Codec[CalculatedValue[A]] with
+    def apply(c: CalculatedValue[A]): Json =
       Json.obj(
-        "phase" -> c.phase.asJson,
+        "state" -> c.state.asJson,
         "value" -> c.value.asJson
       )
 
-    def apply(c: HCursor): Decoder.Result[CalculationValue[A]] =
+    def apply(c: HCursor): Decoder.Result[CalculatedValue[A]] =
       for
-        p <- c.downField("phase").as[CalculationPhase]
+        p <- c.downField("state").as[CalculationState]
         v <- c.downField("value").as[A]
-      yield CalculationValue(p, v)
+      yield CalculatedValue(p, v)
 
-object calculationValue extends CalculationValueCodec
+object calculationValue extends CalculatedValueCodec
 
