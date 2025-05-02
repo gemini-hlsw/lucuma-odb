@@ -5,8 +5,10 @@ package lucuma.odb.logic
 
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
+import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Concurrent
+import cats.kernel.CommutativeMonoid
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -78,6 +80,9 @@ object TimeEstimateService2:
       services.obscalcService(commitHash, itcClient, calculator)
 
     new TimeEstimateService2[F]:
+
+      given Semigroup[CalculatedValue[CategorizedTime]] =
+        CommutativeMonoid[CalculatedValue[CategorizedTime]]
 
       // CategorizedTime Ordering that sorts longest to shortest.
       val longestToShortest: Ordering[CategorizedTime] =
