@@ -399,52 +399,50 @@ object ObscalcService:
         WHERE c_program_id = $program_id
       """.query(obscalc_entry)
 
-    private val CategorizedTimeColumns: String =
+    private def categorizedTimeColumns(prefix: String): String =
       List(
         "c_obscalc_state",
         "c_full_setup_time",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time"
-      ).mkString("", ",\n", "\n")
+      ).map(s => s"$prefix.$s").mkString("", ",\n", "\n")
 
-    private def timeEstimate(
-      state:      CalculationState,
-      setup:      TimeSpan,
-      obsclass:   ObserveClass,
-      nonCharged: TimeSpan,
-      program:    TimeSpan
-    ): CalculatedValue[CategorizedTime] =
-      CalculatedValue(
-        state,
-        CategorizedTime(
-          ChargeClass.NonCharged -> nonCharged,
-          ChargeClass.Program    -> program
-        ).sumCharge(obsclass.chargeClass, setup)
-      )
+    val full_categorized_time: Decoder[CategorizedTime] =
+       (time_span *: obs_class *: time_span *: time_span).map: (setup, obsclass, nonCharged, program) =>
+         CategorizedTime(
+           ChargeClass.NonCharged -> nonCharged,
+           ChargeClass.Program    -> program
+         ).sumCharge(obsclass.chargeClass, setup)
 
     val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
         SELECT
-          #${CategorizedTimeColumns}
-        FROM t_obscalc
-        WHERE c_observation_id = $observation_id
+          #${categorizedTimeColumns("c")}
+        FROM t_obscalc c
+        INNER JOIN t_observation o USING (c_observation_id)
+        WHERE c.c_observation_id = $observation_id
+          AND c.c_odb_error IS NULL
+          AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
       """
-        .query(calculation_state *: time_span *: obs_class *: time_span *: time_span)
-        .map: (state, setup, obsclass, nonCharged, program) =>
-          timeEstimate(state, setup, obsclass, nonCharged, program)
+        .query(calculation_state *: full_categorized_time.opt)
+        .map: (state, catTime) =>
+          CalculatedValue(state, catTime.getOrElse(CategorizedTime.Zero))
 
     val SelectProgramCategorizedTime: Query[Program.Id, (Observation.Id, CalculatedValue[CategorizedTime])] =
       sql"""
         SELECT
-          c_observation_id,
-          #${CategorizedTimeColumns}
-        FROM t_obscalc
-        WHERE c_program_id = $program_id
+          c.c_observation_id,
+          #${categorizedTimeColumns("c")}
+        FROM t_obscalc c
+        INNER JOIN t_observation o USING (c_observation_id)
+        WHERE c.c_program_id = $program_id
+          AND c.c_odb_error IS NULL
+          AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
       """
-        .query(observation_id *: calculation_state *: time_span *: obs_class *: time_span *: time_span)
-        .map: (oid, state, setup, obsclass, nonCharged, program) =>
-          oid -> timeEstimate(state, setup, obsclass, nonCharged, program)
+        .query(observation_id *: calculation_state *: full_categorized_time.opt)
+        .map: (oid, state, catTime) =>
+          oid -> CalculatedValue(state, catTime.getOrElse(CategorizedTime.Zero))
 
     val ResetCalculating: Command[Void] =
       sql"""
