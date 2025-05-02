@@ -291,19 +291,22 @@ class executionTwilight extends ExecutionTestSupport {
       query = s"""
         query {
           program(programId: "$p") {
-            timeEstimateRange {
-              maximum {
-                program { seconds }
-                nonCharged { seconds }
-                total { seconds }
+            timeEstimateRange2 {
+              value {
+                maximum {
+                  program { seconds }
+                  nonCharged { seconds }
+                  total { seconds }
+                }
               }
             }
           }
         }
       """
     ).map: json =>
-      json.hcursor.downFields("program", "timeEstimateRange", "maximum").require[CategorizedTime]
+      json.hcursor.downFields("program", "timeEstimateRange2", "value", "maximum").require[CategorizedTime]
 
+  // OBSCALC TODO: this will be work with the obscalc digest when the API is updated
   def obsTimeEstimate(oid: Observation.Id): IO[CategorizedTime] =
     query(
       user  = pi,
@@ -339,11 +342,15 @@ class executionTwilight extends ExecutionTestSupport {
 
   test("twilight - program timeEstimate"):
     assertIOBoolean(for
-      (p0, o0)   <- setupScienceObs
-      (p1, _, c) <- setup
-      t0         <- programTimeEstimate(p0)
-      t1         <- programTimeEstimate(p1)
-      cSpecPhot  <- obsTimeEstimate(c.specPhot)
+      (p0, o0)    <- setupScienceObs
+      (p1, o1, c) <- setup
+      _           <- runObscalcUpdate(p0, o0)
+      _           <- runObscalcUpdate(p1, o1)
+      _           <- runObscalcUpdate(p1, c.specPhot)
+
+      t0          <- programTimeEstimate(p0)
+      t1          <- programTimeEstimate(p1)
+      cSpecPhot   <- obsTimeEstimate(c.specPhot)
     yield (t0.programTime +| cSpecPhot.programTime) === t1.programTime)
 
 }

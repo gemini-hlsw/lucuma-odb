@@ -78,6 +78,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val serviceUser       = TestUsers.service(3)
   val staff: User       = TestUsers.Standard.staff(4, 33)
 
+  def runObscalcUpdate(p: Program.Id, o: Observation.Id): IO[Unit] =
+    runObscalcUpdateAs(serviceUser, p, o)
+
   override val validUsers: List[User] =
     List(pi, pi2, serviceUser, staff)
 

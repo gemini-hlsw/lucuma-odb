@@ -126,7 +126,8 @@ class programPlannedTime extends ExecutionTestSupport:
       for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -136,9 +137,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -147,12 +150,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : $ShortTime }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : $ShortTime }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : $ShortTime }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : $ShortTime }
+                    }
                   }
                 }
               }
@@ -166,7 +171,8 @@ class programPlannedTime extends ExecutionTestSupport:
       for
         p <- createProgram
         t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -176,9 +182,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -187,11 +195,13 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": null,
-                    "time": {
-                      "total": { "seconds" : $ShortTime }
+                    "value": {
+                      "band": null,
+                      "time": {
+                        "total": { "seconds" : $ShortTime }
+                      }
                     }
                   }
                 ]
@@ -207,7 +217,8 @@ class programPlannedTime extends ExecutionTestSupport:
         p <- createProgram
         _ <- setAllocationsAs(staff, p, List(AllocationB2))
         t <- createTargetWithProfileAs(user, p)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        o <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -217,9 +228,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -228,11 +241,13 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": "BAND2",
-                    "time": {
-                      "total": { "seconds" : $ShortTime }
+                    "value": {
+                      "band": "BAND2",
+                      "time": {
+                        "total": { "seconds" : $ShortTime }
+                      }
                     }
                   }
                 ]
@@ -249,6 +264,7 @@ class programPlannedTime extends ExecutionTestSupport:
         t <- createTargetWithProfileAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -258,9 +274,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -269,12 +287,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : 0.000000 }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : 0.000000 }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : 0.000000 }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : 0.000000 }
+                    }
                   }
                 }
               }
@@ -286,10 +306,12 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level range.: two complete observations"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -299,9 +321,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -310,12 +334,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : ${ShortTime * 2} }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : ${ShortTime * 2} }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    }
                   }
                 }
               }
@@ -327,11 +353,13 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level banded: two complete observations, same band"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        _ <- setAllocationsAs(user, p, List(AllocationB1))
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        p  <- createProgram
+        _  <- setAllocationsAs(user, p, List(AllocationB1))
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        o1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -341,9 +369,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -352,11 +382,13 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": "BAND1",
-                    "time": {
-                      "total": { "seconds" : ${ShortTime * 2} }
+                    "value": {
+                      "band": "BAND1",
+                      "time": {
+                        "total": { "seconds" : ${ShortTime * 2} }
+                      }
                     }
                   }
                 ]
@@ -369,11 +401,13 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level banded: two complete observations, different bands"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        _ <- setAllocationsAs(user, p, List(AllocationB1, AllocationB2))
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        p  <- createProgram
+        _  <- setAllocationsAs(user, p, List(AllocationB1, AllocationB2))
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        o1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -383,9 +417,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -394,17 +430,21 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": "BAND1",
-                    "time": {
-                      "total" : { "seconds" : $ShortTime }
+                    "value": {
+                      "band": "BAND1",
+                      "time": {
+                        "total" : { "seconds" : $ShortTime }
+                      }
                     }
                   },
                   {
-                    "band": "BAND2",
-                    "time": {
-                      "total" : { "seconds" : $ShortTime }
+                    "value": {
+                      "band": "BAND2",
+                      "time": {
+                        "total" : { "seconds" : $ShortTime }
+                      }
                     }
                   }
                 ]
@@ -417,11 +457,13 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level banded: two complete observations, one no band"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        _ <- setAllocationsAs(user, p, List(AllocationB1))
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, none)
+        p  <- createProgram
+        _  <- setAllocationsAs(user, p, List(AllocationB1))
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        o1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, none)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -431,9 +473,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -442,17 +486,21 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": null,
-                    "time": {
-                      "total" : { "seconds" : $ShortTime }
+                    "value": {
+                      "band": null,
+                      "time": {
+                        "total" : { "seconds" : $ShortTime }
+                      }
                     }
                   },
                   {
-                    "band": "BAND1",
-                    "time": {
-                      "total" : { "seconds" : $ShortTime }
+                    "value": {
+                      "band": "BAND1",
+                      "time": {
+                        "total" : { "seconds" : $ShortTime }
+                      }
                     }
                   }
                 ]
@@ -465,11 +513,13 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level range.: two complete observations, but one is inactive"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- setObservationWorkflowState(user, o, ObservationWorkflowState.Inactive)
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _  <- setObservationWorkflowState(user, o1, ObservationWorkflowState.Inactive)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -479,9 +529,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -490,12 +542,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : $ShortTime }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : $ShortTime }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : $ShortTime }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : $ShortTime }
+                    }
                   }
                 }
               }
@@ -507,10 +561,12 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level range.: one incomplete, one complete observation"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- createObservationWithNoModeAs(user, p, t)
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        o1 <- createObservationWithNoModeAs(user, p, t)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -520,9 +576,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -531,12 +589,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                 "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : $ShortTime }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : $ShortTime }
+                 "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : $ShortTime }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : $ShortTime }
+                    }
                   }
                 }
               }
@@ -553,6 +613,7 @@ class programPlannedTime extends ExecutionTestSupport:
         g <- createGroupAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(g, o)
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -562,9 +623,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -573,12 +636,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : $ShortTime }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : $ShortTime }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : $ShortTime }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : $ShortTime }
+                    }
                   }
                 }
               }
@@ -595,6 +660,7 @@ class programPlannedTime extends ExecutionTestSupport:
         g <- createGroupAs(user, p)
         o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         _ <- moveObsToGroup(g, o)
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -606,9 +672,11 @@ class programPlannedTime extends ExecutionTestSupport:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange {
-                       minimum { total { seconds } }
-                       maximum { total { seconds } }
+                     timeEstimateRange2 {
+                       value {
+                         minimum { total { seconds } }
+                         maximum { total { seconds } }
+                       }
                      }
                    }
                  }
@@ -622,12 +690,14 @@ class programPlannedTime extends ExecutionTestSupport:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange": {
-                        "minimum": {
-                          "total": { "seconds" : $ShortTime }
-                        },
-                        "maximum": {
-                          "total": { "seconds" : $ShortTime }
+                      "timeEstimateRange2": {
+                        "value": {
+                          "minimum": {
+                            "total": { "seconds" : $ShortTime }
+                          },
+                          "maximum": {
+                            "total": { "seconds" : $ShortTime }
+                          }
                         }
                       }
                     }
@@ -648,6 +718,7 @@ class programPlannedTime extends ExecutionTestSupport:
         g <- createGroupAs(user, p)
         o <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band3.some)
         _ <- moveObsToGroup(g, o)
+        _ <- runObscalcUpdate(p, o)
       yield p
 
     setup.flatMap: pid =>
@@ -657,9 +728,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -668,11 +741,13 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": "BAND3",
-                    "time": {
-                      "total" : { "seconds" : $ShortTime }
+                    "value": {
+                      "band": "BAND3",
+                      "time": {
+                        "total" : { "seconds" : $ShortTime }
+                      }
                     }
                   }
                 ]
@@ -685,12 +760,14 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level range.: a group with observation and a top-level obs"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        g <- createGroupAs(user, p)
-        o <- createGmosNorthLongSlitObservationAs(user, p, List(t))
-        _ <- moveObsToGroup(g, o)
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        g  <- createGroupAs(user, p)
+        o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+        _  <- moveObsToGroup(g, o1)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -700,9 +777,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -711,12 +790,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : ${ShortTime * 2} }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : ${ShortTime * 2} }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    }
                   }
                 }
               }
@@ -728,13 +809,15 @@ class programPlannedTime extends ExecutionTestSupport:
   test("program level banded: a group with observation and a top-level obs"):
     val setup: IO[Program.Id] =
       for
-        p <- createProgram
-        _ <- setAllocationsAs(user, p, List(AllocationB1))
-        t <- createTargetWithProfileAs(user, p)
-        _ <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
-        g <- createGroupAs(user, p)
-        o <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
-        _ <- moveObsToGroup(g, o)
+        p  <- createProgram
+        _  <- setAllocationsAs(user, p, List(AllocationB1))
+        t  <- createTargetWithProfileAs(user, p)
+        o0 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        g  <- createGroupAs(user, p)
+        o1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band1.some)
+        _  <- moveObsToGroup(g, o1)
+        _  <- runObscalcUpdate(p, o0)
+        _  <- runObscalcUpdate(p, o1)
       yield p
 
     setup.flatMap: pid =>
@@ -744,9 +827,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded {
-                   band
-                   time { total { seconds } }
+                 timeEstimateBanded2 {
+                   value {
+                     band
+                     time { total { seconds } }
+                   }
                  }
                }
              }
@@ -755,11 +840,13 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateBanded": [
+                "timeEstimateBanded2": [
                   {
-                    "band": "BAND1",
-                    "time": {
-                      "total": { "seconds" : ${ShortTime * 2} }
+                    "value": {
+                      "band": "BAND1",
+                      "time": {
+                        "total": { "seconds" : ${ShortTime * 2} }
+                      }
                     }
                   }
                 ]
@@ -778,6 +865,8 @@ class programPlannedTime extends ExecutionTestSupport:
         oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g, oShort, oLong)
+        _ <- runObscalcUpdate(p, oShort)
+        _ <- runObscalcUpdate(p, oLong)
       yield p
 
     setup.flatMap: pid =>
@@ -787,9 +876,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -798,12 +889,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : $ShortTime }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : $LongTime }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : $ShortTime }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : $LongTime }
+                    }
                   }
                 }
               }
@@ -821,6 +914,8 @@ class programPlannedTime extends ExecutionTestSupport:
         oShort <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g, oShort, oLong)
+        _ <- runObscalcUpdate(p, oShort)
+        _ <- runObscalcUpdate(p, oLong)
       yield p
 
     setup.flatMap: pid =>
@@ -832,9 +927,11 @@ class programPlannedTime extends ExecutionTestSupport:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange {
-                       minimum { total { seconds } }
-                       maximum { total { seconds } }
+                     timeEstimateRange2 {
+                       value {
+                         minimum { total { seconds } }
+                         maximum { total { seconds } }
+                       }
                      }
                    }
                  }
@@ -848,12 +945,14 @@ class programPlannedTime extends ExecutionTestSupport:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange": {
-                        "minimum": {
-                          "total": { "seconds" : $ShortTime }
-                        },
-                        "maximum": {
-                          "total": { "seconds" : $LongTime }
+                      "timeEstimateRange2": {
+                        "value": {
+                          "minimum": {
+                            "total": { "seconds" : $ShortTime }
+                          },
+                          "maximum": {
+                            "total": { "seconds" : $LongTime }
+                          }
                         }
                       }
                     }
@@ -874,6 +973,8 @@ class programPlannedTime extends ExecutionTestSupport:
         o1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         o2 <- createObservationWithNoModeAs(user, p, t)
         _  <- moveObsToGroup(g, o1, o2)
+        _  <- runObscalcUpdate(p, o1)
+        _  <- runObscalcUpdate(p, o2)
       yield p
 
     setup.flatMap: pid =>
@@ -883,9 +984,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -894,12 +997,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : 0.000000 }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : 0.000000 }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : 0.000000 }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : 0.000000 }
+                    }
                   }
                 }
               }
@@ -921,6 +1026,10 @@ class programPlannedTime extends ExecutionTestSupport:
         oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g1, oShort1, oLong1)
+        _ <- runObscalcUpdate(p, oShort0)
+        _ <- runObscalcUpdate(p, oLong0)
+        _ <- runObscalcUpdate(p, oShort1)
+        _ <- runObscalcUpdate(p, oLong1)
       yield p
 
     setup.flatMap: pid =>
@@ -930,9 +1039,11 @@ class programPlannedTime extends ExecutionTestSupport:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange {
-                   minimum { total { seconds } }
-                   maximum { total { seconds } }
+                 timeEstimateRange2 {
+                   value {
+                     minimum { total { seconds } }
+                     maximum { total { seconds } }
+                   }
                  }
                }
              }
@@ -941,12 +1052,14 @@ class programPlannedTime extends ExecutionTestSupport:
           json"""
             {
               "program": {
-                "timeEstimateRange": {
-                  "minimum": {
-                    "total": { "seconds" : ${ShortTime * 2} }
-                  },
-                  "maximum": {
-                    "total": { "seconds" : ${LongTime * 2} }
+                "timeEstimateRange2": {
+                  "value": {
+                    "minimum": {
+                      "total": { "seconds" : ${ShortTime * 2} }
+                    },
+                    "maximum": {
+                      "total": { "seconds" : ${LongTime * 2} }
+                    }
                   }
                 }
               }
@@ -968,6 +1081,10 @@ class programPlannedTime extends ExecutionTestSupport:
         oShort1 <- createGmosNorthLongSlitObservationAs(user, p, List(t))
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g1, oShort1, oLong1)
+        _ <- runObscalcUpdate(p, oShort0)
+        _ <- runObscalcUpdate(p, oLong0)
+        _ <- runObscalcUpdate(p, oShort1)
+        _ <- runObscalcUpdate(p, oLong1)
       yield p
 
     setup.flatMap: pid =>
@@ -979,9 +1096,11 @@ class programPlannedTime extends ExecutionTestSupport:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange {
-                       minimum { total { seconds } }
-                       maximum { total { seconds } }
+                     timeEstimateRange2 {
+                       value {
+                         minimum { total { seconds } }
+                         maximum { total { seconds } }
+                       }
                      }
                    }
                  }
@@ -995,15 +1114,17 @@ class programPlannedTime extends ExecutionTestSupport:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange": {
-                        "minimum": {
-                          "total" : {
-                              "seconds" : $ShortTime
-                          }
-                        },
-                        "maximum": {
-                          "total" : {
-                              "seconds" : $LongTime
+                      "timeEstimateRange2": {
+                        "value": {
+                          "minimum": {
+                            "total" : {
+                                "seconds" : $ShortTime
+                            }
+                          },
+                          "maximum": {
+                            "total" : {
+                                "seconds" : $LongTime
+                            }
                           }
                         }
                       }
@@ -1011,12 +1132,14 @@ class programPlannedTime extends ExecutionTestSupport:
                   },
                   {
                     "group": {
-                      "timeEstimateRange": {
-                        "minimum": {
-                          "total": { "seconds" : $ShortTime }
-                        },
-                        "maximum": {
-                          "total": { "seconds" : $LongTime }
+                      "timeEstimateRange2": {
+                        "value": {
+                          "minimum": {
+                            "total": { "seconds" : $ShortTime }
+                          },
+                          "maximum": {
+                            "total": { "seconds" : $LongTime }
+                          }
                         }
                       }
                     }
@@ -1042,6 +1165,10 @@ class programPlannedTime extends ExecutionTestSupport:
         oShort1 <- createBandedGmosNorthLongSlitObservationAs(user, p, t, ScienceBand.Band2.some)
         oLong1  <- createLongerGmosNorthLongSlitObservationAs(user, p, t)
         _ <- moveObsToGroup(g1, oShort1, oLong1)
+        _ <- runObscalcUpdate(p, oShort0)
+        _ <- runObscalcUpdate(p, oLong0)
+        _ <- runObscalcUpdate(p, oShort1)
+        _ <- runObscalcUpdate(p, oLong1)
       yield p
 
     setup.flatMap: pid =>
@@ -1053,9 +1180,11 @@ class programPlannedTime extends ExecutionTestSupport:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateBanded {
-                       band
-                       time { total { seconds } }
+                     timeEstimateBanded2 {
+                       value {
+                         band
+                         time { total { seconds } }
+                       }
                      }
                    }
                  }
@@ -1069,28 +1198,36 @@ class programPlannedTime extends ExecutionTestSupport:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateBanded": [
+                      "timeEstimateBanded2": [
                         {
-                          "band": null,
-                          "time": { "total": { "seconds" : $LongTime } }
+                          "value": {
+                            "band": null,
+                            "time": { "total": { "seconds" : $LongTime } }
+                          }
                         },
                         {
-                          "band": "BAND2",
-                          "time": { "total": { "seconds" : $ShortTime } }
+                          "value": {
+                            "band": "BAND2",
+                            "time": { "total": { "seconds" : $ShortTime } }
+                          }
                         }
                       ]
                     }
                   },
                   {
                     "group": {
-                      "timeEstimateBanded": [
+                      "timeEstimateBanded2": [
                         {
-                          "band": null,
-                          "time": { "total": { "seconds" : $LongTime } }
+                          "value": {
+                            "band": null,
+                            "time": { "total": { "seconds" : $LongTime } }
+                          }
                         },
                         {
-                          "band": "BAND2",
-                          "time": { "total": { "seconds" : $ShortTime } }
+                          "value": {
+                            "band": "BAND2",
+                            "time": { "total": { "seconds" : $ShortTime } }
+                          }
                         }
                       ]
                     }

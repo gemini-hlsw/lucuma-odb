@@ -272,6 +272,11 @@ type BandedTime {
   time: CategorizedTime!
 }
 
+type CalculatedBandedTime {
+  state: CalculationState!
+  value: BandedTime
+}
+
 """
 Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
 """
@@ -643,7 +648,7 @@ type CategorizedTimeRange {
 
 type CalculatedCategorizedTimeRange {
   state: CalculationState!
-  range: CategorizedTimeRange
+  value: CategorizedTimeRange
 }
 
 """
@@ -8446,6 +8451,9 @@ type Group {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  # OBSCALC TODO: replace original version above with this one
+  timeEstimateRange2: CalculatedCategorizedTimeRange
+
   """
   Prepared time by band ignoring `minimumRequired`, for observations that can be
   calculated.  In order for an observation to have an estimate, it must be
@@ -8453,6 +8461,9 @@ type Group {
   observations in every band present in the group are included.
   """
   timeEstimateBanded: [BandedTime!]!
+
+  # OBSCALC TODO: replace original version above with this one
+  timeEstimateBanded2: [CalculatedBandedTime!]!
 
   existence: Existence!
 
@@ -9659,6 +9670,9 @@ type Program {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  # OBSCALC TODO: replace original version with this one
+  timeEstimateRange2: CalculatedCategorizedTimeRange
+
   """
   Prepared time by band ignoring `minimumRequired` in groups, for observations
   that can be calculated.  In order for an observation to have an estimate, it
@@ -9666,6 +9680,9 @@ type Program {
   defined observations in every band present in the program are included.
   """
   timeEstimateBanded: [BandedTime!]!
+
+  # OBSCALC TODO: replace original version with this one
+  timeEstimateBanded2: [CalculatedBandedTime!]!
 
   """
   Program-wide time charge, summing all corrected observation time charges.
