@@ -28,8 +28,8 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.calculation_state
+import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.*
@@ -90,7 +90,7 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupport:
     withSession: session =>
       val up: Command[Observation.Id] = sql"""
         UPDATE t_obscalc
-        SET c_obscalc_state = 'retry' :: e_obscalc_state,
+        SET c_obscalc_state = 'retry' :: e_calculation_state,
             c_retry_at      = now(),
             c_failure_count = 10
         WHERE c_observation_id = $observation_id

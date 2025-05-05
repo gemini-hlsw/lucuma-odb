@@ -28,8 +28,8 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.util.CalculationState
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
@@ -252,7 +252,7 @@ object ObscalcService:
     val obscalc_meta: Codec[Obscalc.Meta] = (
       program_id         *: // c_program_id
       observation_id     *: // c_observation_id
-      calculation_state      *: // c_obscalc_state
+      calculation_state  *: // c_obscalc_state
       core_timestamp     *: // c_last_invalidation
       core_timestamp     *: // c_last_update
       core_timestamp.opt *: // c_retry_at
@@ -449,8 +449,8 @@ object ObscalcService:
         UPDATE t_obscalc
         SET
           c_obscalc_state  = CASE
-            WHEN t_obscalc.c_retry_at IS NULL THEN 'pending' :: e_obscalc_state
-            ELSE 'retry' :: e_obscalc_state
+            WHEN t_obscalc.c_retry_at IS NULL THEN 'pending' :: e_calculation_state
+            ELSE 'retry' :: e_calculation_state
           END
         WHERE c_obscalc_state = 'calculating'
       """.command

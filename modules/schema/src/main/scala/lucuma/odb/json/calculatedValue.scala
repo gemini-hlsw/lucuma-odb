@@ -8,8 +8,8 @@ import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.util.CalculationState
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.CalculationState
 
 trait CalculatedValueCodec:
 

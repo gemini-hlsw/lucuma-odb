@@ -337,7 +337,7 @@ trait Codecs {
     enumerated(Type("e_obs_class"))
 
   val calculation_state: Codec[CalculationState] =
-    enumerated(Type("e_obscalc_state"))
+    enumerated(Type("e_calculation_state"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
