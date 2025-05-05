@@ -63,7 +63,7 @@ object OdbMapping {
         ses <- pool
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
-        oc  <- Resource.eval(ObscalcTopic(ses, 1024, sup))
+        oc  <- Resource.eval(ObscalcTopic(ses, 65536, sup))
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))

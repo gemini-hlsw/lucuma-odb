@@ -4,6 +4,8 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.ApplicativeError
+import cats.MonadError
 import cats.Parallel
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
@@ -384,6 +386,10 @@ object Services:
     def requireServiceAccess[F[_], A](fa: Services.ServiceAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Service then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF
+
+    def requireServiceAccessOrThrow[F[_], A](fa: Services.ServiceAccess ?=> F[A])(using Services[F], MonadError[F, Throwable]): F[A] =
+      requireServiceAccess(fa.map(Result.success)).flatMap: r =>
+        ApplicativeError.liftFromOption(r.toOption, new RuntimeException(s"ServiceAccess required, ${user.id} not authorized."))
 
     // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
     // the service in which you want to use it. Like:

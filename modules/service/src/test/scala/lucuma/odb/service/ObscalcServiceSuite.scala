@@ -28,6 +28,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupport
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.observation_id
@@ -45,11 +46,11 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupport:
         .map: tec =>
           services.obscalcService(CommitHash.Zero, itcClient, tec)
 
-  def withObscalcService[A](f: ObscalcService[IO] => IO[A]): IO[A] =
+  def withObscalcService[A](f: ServiceAccess ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServices(serviceUser): services =>
       instantiate(services).flatMap(f)
 
-  def withObscalcServiceTransactionally[A](f: Transaction[IO] ?=> ObscalcService[IO] => IO[A]): IO[A] =
+  def withObscalcServiceTransactionally[A](f: (ServiceAccess, Transaction[IO]) ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServices(serviceUser): services =>
       services.transactionally:
         instantiate(services).flatMap(f)
