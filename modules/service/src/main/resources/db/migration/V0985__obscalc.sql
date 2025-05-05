@@ -299,3 +299,18 @@ CREATE CONSTRAINT TRIGGER ch_obscalc_update_trigger
 -- DROP TRIGGER ch_observation_edit_execution_digest_trigger;
 -- DROP TRIGGER delete_execution_digest_trigger;
 -- DROP FUNCTION delete_execution_digest;
+
+-- Initialize the t_obscalc table to set all existing observations to pending.
+INSERT INTO t_obscalc (
+  c_observation_id,
+  c_program_id,
+  c_obscalc_state,
+  c_last_invalidation
+)
+SELECT
+  o.c_observation_id,
+  o.c_program_id,
+  'pending'::e_obscalc_state,
+  now()
+FROM t_observation o
+ON CONFLICT DO NOTHING;
