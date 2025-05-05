@@ -41,6 +41,7 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -97,13 +98,13 @@ sealed trait ObscalcService[F[_]]:
    * appropriate). This is intended to be used by the worker service on startup
    * to cleanup state and restart.
    */
-  def reset(using Transaction[F]): F[Unit]
+  def reset(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
    * Loads up to `max` `pending` (or `retry`) calculations.  Loading changes
    * the state of the entries to `calculating` before they are returned.
    */
-  def load(max: Int)(using Transaction[F]): F[List[Obscalc.PendingCalc]]
+  def load(max: Int)(using ServiceAccess, Transaction[F]): F[List[Obscalc.PendingCalc]]
 
   /**
    * Loads the PendingCalc entry for the given observation, if it exists and is
@@ -112,7 +113,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def loadObs(
     observationId: Observation.Id
-  )(using Transaction[F]): F[Option[Obscalc.PendingCalc]]
+  )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.PendingCalc]]
 
   /**
    * Calculates the result for the associated observation and updates the
@@ -120,7 +121,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def calculateAndUpdate(
     pending: Obscalc.PendingCalc
-  )(using NoTransaction[F]): F[Option[Obscalc.Meta]]
+  )(using ServiceAccess, NoTransaction[F]): F[Option[Obscalc.Meta]]
 
   /**
    * Calculates and returns the result for the associated observation without
@@ -178,17 +179,17 @@ object ObscalcService:
           .execute(Statements.SelectProgramCategorizedTime)(programId)
           .map(_.toMap)
 
-      override def reset(using Transaction[F]): F[Unit] =
+      override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
 
       override def load(
         max: Int
-      )(using Transaction[F]): F[List[Obscalc.PendingCalc]] =
+      )(using ServiceAccess, Transaction[F]): F[List[Obscalc.PendingCalc]] =
         session.execute(Statements.LoadPendingCalc)(max)
 
       override def loadObs(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[Obscalc.PendingCalc]] =
+      )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.PendingCalc]] =
         session.option(Statements.LoadPendingCalcFor)(observationId)
 
       override def calculateOnly(
@@ -223,7 +224,7 @@ object ObscalcService:
         pending:  Obscalc.PendingCalc,
         result:   Obscalc.Result,
         expected: CalculationState
-      )(using Transaction[F]): F[Option[Obscalc.Meta]] =
+      )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
           ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expected else CalculationState.Pending)
@@ -233,7 +234,7 @@ object ObscalcService:
 
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
-      )(using NoTransaction[F]): F[Option[Obscalc.Meta]] =
+      )(using ServiceAccess, NoTransaction[F]): F[Option[Obscalc.Meta]] =
         calculateOnly(pending)
           .flatMap: result =>
             services.transactionally:
