@@ -272,7 +272,11 @@ type BandedTime {
   time: CategorizedTime!
 }
 
+"""
+A BandedTime that is automatically updated by a background process.
+"""
 type CalculatedBandedTime {
+  "The current state of the background calculation."
   state: CalculationState!
   value: BandedTime
 }
@@ -646,7 +650,11 @@ type CategorizedTimeRange {
   maximum: CategorizedTime!
 }
 
+"""
+A CategorizedTimeRange that is automatically updated by a background process.
+"""
 type CalculatedCategorizedTimeRange {
+  "The current state of the background calculation."
   state: CalculationState!
   value: CategorizedTimeRange
 }
