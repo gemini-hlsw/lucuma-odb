@@ -193,6 +193,9 @@ trait Services[F[_]]:
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
 
+  // OBSCALC TODO: version 1 of TimeEstimateService will be deleted and
+  // replaced with version 2.
+
   /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
   def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService[F]
   def timeEstimateService2(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService2[F]

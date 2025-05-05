@@ -21,8 +21,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
-import lucuma.core.util.CalculationState
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.GroupTree
 import lucuma.odb.sequence.util.CommitHash
@@ -32,7 +32,8 @@ import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
 /**
- * A service that can estimate the time for a program.
+ * A service that can estimate the time required to finish the unexecuted
+ * remainder of a program.
  */
 sealed trait TimeEstimateService2[F[_]]:
 

@@ -13,7 +13,7 @@
 -- Other errors, like missing targets or observing mode, result in errors that
 -- are stored as the result of the calculation.
 
-CREATE TYPE e_obscalc_state AS ENUM(
+CREATE TYPE e_calculation_state AS ENUM(
   'pending',
   'retry',
   'calculating',
@@ -34,7 +34,7 @@ CREATE TABLE t_obscalc(
     ON DELETE CASCADE,
   CONSTRAINT t_obscalc_pkey PRIMARY KEY (c_program_id, c_observation_id),
 
-  c_obscalc_state        e_obscalc_state     NOT NULL DEFAULT 'pending',
+  c_obscalc_state        e_calculation_state NOT NULL DEFAULT 'pending',
 
   -- When the entry was last marked dirty.  This is compared to the value when
   -- the entry was picked up by a worker at the time the result is written. If
@@ -114,7 +114,7 @@ CREATE PROCEDURE invalidate_obscalc(
 ) LANGUAGE plpgsql AS $$
 DECLARE
   program_id    d_program_id;
-  current_state e_obscalc_state;
+  current_state e_calculation_state;
 BEGIN
   SELECT c_program_id INTO program_id FROM t_observation WHERE c_observation_id = observation_id;
 
@@ -138,7 +138,7 @@ BEGIN
 
   -- Update calculation state to 'pending' if not currently executing.  Always
   -- set the invalidation timestamp.
-  IF current_state = 'calculating' :: e_obscalc_state THEN
+  IF current_state = 'calculating' :: e_calculation_state THEN
     UPDATE t_obscalc
     SET c_last_invalidation = now(),
         c_failure_count     = 0,
@@ -149,7 +149,7 @@ BEGIN
     SET c_last_invalidation = now(),
         c_failure_count     = 0,
         c_retry_at          = NULL,
-        c_obscalc_state     = 'pending' :: e_obscalc_state
+        c_obscalc_state     = 'pending' :: e_calculation_state
     WHERE c_observation_id = observation_id;
   END IF;
 END;
@@ -310,7 +310,7 @@ INSERT INTO t_obscalc (
 SELECT
   o.c_observation_id,
   o.c_program_id,
-  'pending'::e_obscalc_state,
+  'pending'::e_calculation_state,
   now()
 FROM t_observation o
 ON CONFLICT DO NOTHING;
