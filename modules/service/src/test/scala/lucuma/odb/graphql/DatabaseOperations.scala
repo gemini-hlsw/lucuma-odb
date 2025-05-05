@@ -78,6 +78,8 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
@@ -99,9 +101,10 @@ trait DatabaseOperations { this: OdbSuite =>
       TimeEstimateCalculatorImplementation
         .fromSession(services.session, services.enums)
         .flatMap: tec =>
-          services
-            .obscalcService(CommitHash.Zero, itcClient, tec)
-            .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
+          given Services[IO] = services
+          requireServiceAccessOrThrow:
+            obscalcService(CommitHash.Zero, itcClient, tec)
+              .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
       .void
 
   def createCallForProposalsAs(

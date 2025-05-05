@@ -41,6 +41,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
+import scala.util.NotGiven
 
 sealed trait MainParams:
   val ServiceName: String =
@@ -125,7 +126,7 @@ object CalcMain extends MainParams:
       for
         s <- Supervisor[F]
         p <- pool
-        t <- Resource.eval(ObscalcTopic(p, 1024, s))
+        t <- Resource.eval(ObscalcTopic(p, 65536, s))
       yield t
 
   def runObscalcDaemon[F[_]: Async: Parallel: Logger](
@@ -136,7 +137,7 @@ object CalcMain extends MainParams:
     timeEstimate:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
     topic:            Topic[F, ObscalcTopic.Element],
     services:         Resource[F, Services[F]]
-  ): Resource[F, Unit] =
+  ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
     val obscalc: Services[F] ?=> ObscalcService[F] =
       obscalcService(commitHash, itcClient, timeEstimate)
@@ -149,7 +150,7 @@ object CalcMain extends MainParams:
     // calculation we'll move back to 'Pending' if there were additional updates
     // or to 'Ready' otherwise.
     val eventStream: Stream[F, Obscalc.PendingCalc] =
-      topic.subscribe(1000).evalMapFilter: e =>
+      topic.subscribe(65536).evalMapFilter: e =>
         Option
           .when(
             e.oldState.forall(_ =!= CalculationState.Pending) &&
@@ -157,7 +158,8 @@ object CalcMain extends MainParams:
           )(e.observationId)
           .flatTraverse: oid =>
             services.useTransactionally:
-              obscalc.loadObs(oid)
+              requireServiceAccessOrThrow:
+                obscalc.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
     // up to connectionsLimit entries including those that are in a 'Retry'
@@ -167,28 +169,35 @@ object CalcMain extends MainParams:
         .awakeEvery(pollPeriod)
         .evalMap: _ =>
           services.useTransactionally:
-            obscalc.load(connectionsLimit)
+            requireServiceAccessOrThrow:
+              obscalc.load(1024)
         .flatMap(Stream.emits)
+
+    // Combine the eventStream and the pollStream (after startup), process each
+    // pending calc as it appears doing the calculation and storing the results.
+    val calcAndUpdateStream: Stream[F, Unit] =
+      eventStream
+        .merge(pollStream)
+        .evalTap: pc =>
+          Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
+        .parEvalMapUnordered(connectionsLimit): pc =>
+          services.useNonTransactionally:
+            requireServiceAccessOrThrow:
+              obscalc
+                .calculateAndUpdate(pc)
+                .tupleLeft(pc)
+        .evalTap: (pc, meta) =>
+          Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
+        .void
 
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
-      _ <- Resource.eval(services.useTransactionally(obscalc.reset))
-      _ <- Resource.eval(
-             eventStream
-               .merge(pollStream)
-               .evalTap: pc =>
-                 Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
-               .parEvalMapUnordered(connectionsLimit): pc =>
-                 services.useNonTransactionally:
-                   obscalc.calculateAndUpdate(pc).tupleLeft(pc)
-               .evalTap: (pc, meta) =>
-                 Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
-               .compile
-               .drain
-               .start
-               .void
-           )
-    yield ()
+      _ <- Resource.eval:
+             services.useTransactionally:
+               requireServiceAccessOrThrow:
+                 obscalc.reset
+      o <- calcAndUpdateStream.compile.drain.background
+    yield o
 
   def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger: SecureRandom](
     user: Option[User],
@@ -210,7 +219,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Parallel: Logger: Trace: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c     <- Resource.eval(Config.fromCiris.load[F])
       _     <- Resource.eval(banner[F](c))
@@ -223,9 +232,13 @@ object CalcMain extends MainParams:
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      _     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums)))
-    yield ExitCode.Success
+      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums)))
+    yield o
 
   /** Our logical entry point. */
   def runF[F[_]:   Async: Parallel: Logger: Trace: Network: Console: SecureRandom]: F[ExitCode] =
-    server.use(_ => Concurrent[F].never[ExitCode])
+    server.use: o =>
+      o.flatMap:
+        case Outcome.Succeeded(_) => Logger[F].info("Obscalc completed.")  >> ExitCode.Success.pure[F]
+        case Outcome.Errored(e)   => Logger[F].error(e)("Obscalc failed.") >> ExitCode.Error.pure[F]
+        case Outcome.Canceled()   => Logger[F].info("Obscalc cancelled.")  >> ExitCode.Success.pure[F]
