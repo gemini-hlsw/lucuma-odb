@@ -81,6 +81,8 @@ object TimeEstimateService2:
 
     new TimeEstimateService2[F]:
 
+      // OBSCALC TODO: In core, need to fiddle with `NotGiven` in `CalculatedValue`
+      // to avoid the need to do this.
       given Semigroup[CalculatedValue[CategorizedTime]] =
         CommutativeMonoid[CalculatedValue[CategorizedTime]]
 
