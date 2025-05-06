@@ -26,9 +26,7 @@ case class Config private[longslit](
   disperser: F2Disperser,
   filter: F2Filter,
   fpu: F2Fpu,
-  defaultReadMode: F2ReadMode,
   explicitReadMode: Option[F2ReadMode],
-  defaultReads: F2Reads,
   explicitReads: Option[F2Reads],
   defaultDecker: F2Decker,
   explicitDecker: Option[F2Decker],
@@ -42,12 +40,6 @@ case class Config private[longslit](
   def readoutMode: F2ReadoutMode =
     explicitReadoutMode.getOrElse(defaultReadoutMode)
 
-  def reads: F2Reads =
-    explicitReads.getOrElse(defaultReads)
-
-  def readMode: F2ReadMode =
-    explicitReadMode.getOrElse(defaultReadMode)
-
   def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -55,8 +47,8 @@ case class Config private[longslit](
     out.writeChars(disperser.tag)
     out.writeChars(filter.tag)
     out.writeChars(fpu.tag)
-    out.writeChars(readMode.tag)
-    out.writeChars(reads.tag)
+    out.writeChars(explicitReadMode.foldMap(_.tag))
+    out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.tag)
 
@@ -77,14 +69,11 @@ object Config:
     explicitDecker: Option[F2Decker] = None,
     explicitReadoutMode: Option[F2ReadoutMode] = None,
   ): Config =
-    val rm = explicitReadMode.getOrElse(DefaultF2ReadMode)
     new Config(
       disperser,
       filter,
       fpu,
-      rm,
       explicitReadMode,
-      rm.readCount,
       explicitReads,
       F2Decker.LongSlit,
       explicitDecker,
