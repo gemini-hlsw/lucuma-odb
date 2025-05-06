@@ -19,10 +19,8 @@ trait F2LongSlitView[F[_]] extends BaseMapping[F]:
     val ObservationId: ColumnRef      = col("c_observation_id", observation_id)
 
     val ReadMode: ColumnRef           = col("c_read_mode", f2_read_mode.opt)
-    val ReadModeDefault: ColumnRef    = col("c_read_mode_default", f2_read_mode)
 
     val Reads: ColumnRef              = col("c_reads", f2_reads.opt)
-    val ReadsDefault: ColumnRef       = col("c_reads_default", f2_reads)
 
     val Decker: ColumnRef             = col("c_decker", f2_decker.opt)
     val DeckerDefault: ColumnRef      = col("c_decker_default", f2_decker)

@@ -6,9 +6,7 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
 import lucuma.odb.graphql.table.*
 
 trait F2LongSlitMapping[F[_]]
@@ -23,12 +21,7 @@ trait F2LongSlitMapping[F[_]]
       SqlField("filter",    F2LongSlitView.Filter),
       SqlField("fpu",       F2LongSlitView.Fpu),
 
-      explicitOrElseDefault[F2ReadMode]("readMode", "explicitReadMode", "defaultReadMode"),
-      SqlField("defaultReadMode",  F2LongSlitView.ReadModeDefault),
       SqlField("explicitReadMode", F2LongSlitView.ReadMode),
-
-      explicitOrElseDefault[F2Reads]("reads", "explicitReads", "defaultReads"),
-      SqlField("defaultReads",  F2LongSlitView.ReadsDefault),
       SqlField("explicitReads", F2LongSlitView.Reads),
 
       explicitOrElseDefault[F2Decker]("decker", "explicitDecker", "defaultDecker"),
