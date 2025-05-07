@@ -79,25 +79,25 @@ object OdbTopic:
           top <- Topic[F, E]
           es   = elements(s, maxQueued).through(top.publish)
           _   <- sup.supervise(
-                   es
+                   (es
                      .compile
                      .drain
                      .onError:
                         case e => Logger[F].error(e)(s"$name Event Stream crashed!")
-                     >> Logger[F].info(s"$name Event Stream terminated.")
+                   ) >> Logger[F].info(s"$name Event Stream terminated.")
                  )
 
           // Add a no-op subscriber to guarantee that there is at least one
           // subscriber consuming events at all times.
           _   <- sup.supervise(
-                   top
+                   (top
                      .subscribe(1024)
                      .evalTap(e => Logger[F].debug(s"$name Event Consumer received $e"))
                      .compile
                      .drain
                      .onError:
                        case e => Logger[F].error(e)(s"$name Event Consumer crashed!")
-                     >> Logger[F].info(s"$name Event Consumer terminated.")
+                   ) >> Logger[F].info(s"$name Event Consumer terminated.")
                  )
                    
           _   <- Logger[F].info(s"Started topic for ${channel.value}")
