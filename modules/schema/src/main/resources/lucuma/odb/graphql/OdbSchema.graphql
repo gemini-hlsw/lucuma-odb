@@ -3635,6 +3635,16 @@ enum ProgramUserSupportRoleType {
 }
 
 """
+The type of support role in an FT program.
+"""
+enum FTSupportRole {
+  "Reviewer"
+  REVIEWER
+  "Mentor"
+  MENTOR
+}
+
+"""
 An assignment of a user to a program.
 """
 type ProgramUser {
@@ -3667,6 +3677,9 @@ type ProgramUser {
 
   "Has access to data."
   hasDataAccess: Boolean!
+
+  "Role of the user on an FT program (reviwer/mentor/none)."
+  ftSupportRole: FTSupportRole
 }
 
 """
@@ -3781,7 +3794,17 @@ type FastTurnaround implements ProposalType {
   """
   piAffiliation: Partner
 
-  # TODO: Reviewer?
+  """
+  Program User that will be selected as a reviewer for this program
+  """
+  reviewer: ProgramUser!
+
+  # """
+  # Program User that will be selected as a mentor for this program
+  # """
+  # mentor: ProgramUser
+
+  # support: [ProgramUser!]
 }
 
 """

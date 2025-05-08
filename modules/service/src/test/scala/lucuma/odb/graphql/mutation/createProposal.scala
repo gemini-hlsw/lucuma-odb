@@ -15,7 +15,7 @@ import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 
 class createProposal extends OdbSuite with DatabaseOperations  {
-  
+
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
   val staff    = TestUsers.Standard.staff(3, 103)
@@ -575,6 +575,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                     toOActivation
                     minPercentTime
                     piAffiliation
+                    reviewer {
+                      id
+                    }
                   }
                 }
               }
@@ -590,7 +593,9 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
-                  "piAffiliation": "US"
+                  "piAffiliation": "US",
+                  "support": null,
+                  "reviewer": null
                 }
               }
             }
