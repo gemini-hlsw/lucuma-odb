@@ -62,8 +62,6 @@ class cloneObservation extends OdbSuite {
           disperser
           filter
           fpu
-          readMode
-          reads
         }
       }
       targetEnvironment {

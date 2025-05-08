@@ -6970,33 +6970,10 @@ type Flamingos2LongSlit {
   fpu: Flamingos2Fpu!
 
   """
-  The read mode is either explicitly specified in explicitReadMode or else taken
-  from defaultReadMode
-  """
-  readMode: Flamingos2ReadMode!
-
-  """
-  Default read mode, calculated based on the exposure time
-  """
-  defaultReadMode: Flamingos2ReadMode!
-
-  """
   Optional explicitly specified F2 ReadMode. If set it overrides the
   default.
   """
   explicitReadMode: Flamingos2ReadMode
-
-  """
-  F2 reads, either explicitly specified in explicitReads or else taken
-  from the defaultXReads
-  """
-  reads: Flamingos2Reads!
-
-  """
-  Default reads, calculated from the selected read mode which in
-  turn is based on the exposure time
-  """
-  defaultReads: Flamingos2Reads!
 
   """
   Optional explicitly specified F2 Reads. If set it overrides the
