@@ -3745,7 +3745,15 @@ type FastTurnaround implements ProposalType {
   """
   piAffiliation: Partner
 
-  # TODO: Reviewer?
+  """
+  Program User that will be selected as a reviewer for this program
+  """
+  reviewer: ProgramUser!
+
+  """
+  Program User that will be selected as a mentor for this program
+  """
+  mentor: ProgramUser
 }
 
 """

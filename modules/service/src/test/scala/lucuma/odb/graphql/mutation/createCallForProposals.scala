@@ -35,799 +35,799 @@ class createCallForProposals extends OdbSuite {
     )
   }
 
-  test("failure - start too far in the future for LST calc") {
-    expect(
-      user = pi,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2100-02-28"
-                activeEnd:   "2025-07-31"
-              }
-            }
-          ) { callForProposals { id } }
-        }
-      """,
-      expected = List("Argument 'input.SET' is invalid: 'activeStart' date (2100-02-28) must be between 1900 and 2100 UTC (exclusive)").asLeft
-    )
-  }
-
-  test("failure - end too far in the future for LST calc") {
-    expect(
-      user = pi,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2025-02-28"
-                activeEnd:   "2100-07-31"
-              }
-            }
-          ) { callForProposals { id } }
-        }
-      """,
-      expected = List("Argument 'input.SET' is invalid: 'activeEnd' date (2100-07-31) must be between 1900 and 2100 UTC (exclusive)").asLeft
-    )
-  }
-
-  test("success - simple with defaults") {
-
-    // existence defaults to PRESENT
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2024B"
-                activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
-              }
-            }
-          ) {
-            callForProposals {
-              id
-              type
-              semester
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-              }
-              active {
-                start
-                end
-              }
-              submissionDeadlineDefault
-              partners {
-                partner
-                submissionDeadline
-              }
-              instruments
-              proprietaryMonths
-              existence
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "id":            "c-100",
-              "type":          "REGULAR_SEMESTER",
-              "semester":      "2024B",
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "16:30:00.000000" },
-                  "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
-                }
-              },
-              "active": {
-                "start": "2024-07-31",
-                "end": "2025-02-01"
-              },
-              "submissionDeadlineDefault": null,
-              "partners": [
-                {
-                  "partner" : "AR",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "BR",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "CA",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "CL",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "KR",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "UH",
-                  "submissionDeadline": null
-                },
-                {
-                  "partner" : "US",
-                  "submissionDeadline": null
-                }
-              ],
-              "instruments":       [],
-              "proprietaryMonths": 12,
-              "existence":         "PRESENT"
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("failure - end before start") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2025-07-31"
-                activeEnd:   "2025-02-28"
-              }
-            }
-          ) { callForProposals { id } }
-        }
-      """,
-      expected = List("Argument 'input.SET' is invalid: 'activeStart' must come before 'activeEnd'").asLeft
-    )
-  }
-
-  test("success - with partners") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2026-02-01"
-                activeEnd:   "2026-07-31"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
-                partners:    [
-                  {
-                    partner: CA
-                    submissionDeadlineOverride: "2025-07-31 10:00:00"
-                  },
-                  {
-                    partner: CL
-                  },
-                  {
-                    partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:01"
-                  }
-                ]
-              }
-            }
-          ) {
-             callForProposals {
-               id
-               submissionDeadlineDefault
-               partners {
-                 partner
-                 submissionDeadlineOverride
-                 submissionDeadline
-               }
-               allowsNonPartnerPi
-               nonPartnerDeadline
-             }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "id": "c-101",
-              "submissionDeadlineDefault": "2025-07-31 10:00:02",
-              "partners": [
-                {
-                  "partner": "CA",
-                  "submissionDeadlineOverride": "2025-07-31 10:00:00",
-                  "submissionDeadline": "2025-07-31 10:00:00"
-                },
-                {
-                  "partner": "CL",
-                  "submissionDeadlineOverride": null,
-                  "submissionDeadline": "2025-07-31 10:00:02"
-                },
-                {
-                  "partner": "US",
-                  "submissionDeadlineOverride": "2025-07-31 10:00:01",
-                  "submissionDeadline": "2025-07-31 10:00:01"
-                }
-              ],
-              "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31 10:00:01"
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("success - with empty partners") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2026-02-01"
-                activeEnd:   "2026-07-31"
-                partners:    []
-              }
-            }
-          ) {
-             callForProposals {
-               id
-               partners { partner }
-               allowsNonPartnerPi
-               nonPartnerDeadline
-             }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "id": "c-102",
-              "partners": [],
-              "allowsNonPartnerPi": false,
-              "nonPartnerDeadline": null
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("failure - with duplicate partners") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2026-02-01"
-                activeEnd:   "2026-07-31"
-                partners:    [
-                  {
-                    partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:00"
-                  },
-                  {
-                    partner: US
-                    submissionDeadlineOverride: "2025-07-31 10:00:01"
-                  }
-                ]
-              }
-            }
-          ) {
-             callForProposals {
-               id
-               partners {
-                 partner
-                 submissionDeadline
-               }
-             }
-          }
-        }
-      """,
-      expected = List("Argument 'input.SET' is invalid: duplicate 'partners' specified: US").asLeft
-    )
-  }
-
-  test("success - with instruments") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2026-02-01"
-                activeEnd:   "2026-07-31"
-                instruments: [GMOS_SOUTH, GMOS_NORTH]
-              }
-            }
-          ) {
-             callForProposals {
-               instruments
-             }
-          }
-        }
-      """,
-      // sorted by instrument name
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("failure - with duplicate instruments") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2025A"
-                activeStart: "2026-02-01"
-                activeEnd:   "2026-07-31"
-                instruments: [GMOS_SOUTH, GMOS_SOUTH]
-              }
-            }
-          ) {
-             callForProposals {
-               instruments
-             }
-          }
-        }
-      """,
-      expected = List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
-    )
-  }
-
-  test("success - with ra") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:         REGULAR_SEMESTER
-                semester:    "2024B"
-                activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
-                coordinateLimits: {
-                  north: {
-                    raStart: { hms: "17:00:00" }
-                    raEnd: { hms: "13:00:00" }
-                  }
-                }
-              }
-            }
-          ) {
-            callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "17:00:00.000000" },
-                  "raEnd": { "hms": "13:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
-                }
-              }
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("success - with dec") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:         REGULAR_SEMESTER
-                semester:    "2024B"
-                activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
-                coordinateLimits: {
-                  south: {
-                    decStart: { dms: "45:00:00" }
-                    decEnd: { dms: "-45:00:00" }
-                  }
-                }
-              }
-            }
-          ) {
-             callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "16:30:00.000000" },
-                  "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "+45:00:00.000000" },
-                  "decEnd": { "dms": "-45:00:00.000000" }
-                }
-              }
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("director's time - non-partner accepted") {
-
-    // existence defaults to PRESENT
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        DIRECTORS_TIME
-                semester:    "2024B"
-                activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
-              }
-            }
-          ) {
-            callForProposals {
-              id
-              type
-              allowsNonPartnerPi
-              nonPartnerDeadline
-              proprietaryMonths
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "id":   "c-106",
-              "type": "DIRECTORS_TIME",
-              "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31 10:00:02",
-              "proprietaryMonths": 6
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("demo science - non-partner prohibited") {
-
-    // existence defaults to PRESENT
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        DEMO_SCIENCE
-                semester:    "2024B"
-                activeStart: "2024-07-31"
-                activeEnd:   "2025-02-01"
-                submissionDeadlineDefault: "2025-07-31 10:00:02"
-              }
-            }
-          ) {
-            callForProposals {
-              id
-              type
-              allowsNonPartnerPi
-              nonPartnerDeadline
-              proprietaryMonths
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "id":   "c-107",
-              "type": "DEMO_SCIENCE",
-              "allowsNonPartnerPi": false,
-              "nonPartnerDeadline": null,
-              "proprietaryMonths": 3
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("negative LST bug") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type: FAST_TURNAROUND
-                semester: "2024B"
-                activeStart: "2024-10-01"
-                activeEnd: "2024-12-31"
-                submissionDeadlineDefault: "2024-08-31T22:00:00Z"
-                partners: [{ partner: US }]
-                instruments: [GMOS_NORTH, GMOS_SOUTH]
-              }
-            }
-          ) {
-            callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                }
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "20:00:00.000000" },
-                  "raEnd": { "hms": "12:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "20:00:00.000000" },
-                  "raEnd": { "hms": "10:00:00.000000" }
-                }
-              }
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("success - explicit proprietaryMonths") {
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:              REGULAR_SEMESTER
-                semester:          "2024B"
-                activeStart:       "2024-07-31"
-                activeEnd:         "2025-02-01"
-                proprietaryMonths: 36
-              }
-            }
-          ) {
-            callForProposals {
-              proprietaryMonths
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "proprietaryMonths": 36
-            }
-          }
-        }
-      """.asRight
-    )
-  }
-
-  test("failure - too far in the future"):
-    expect(
-      user  = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type: REGULAR_SEMESTER
-                semester: "2099A"
-                activeStart: "2026-02-01"
-                activeEnd: "2026-07-31"
-                partners: [{ partner: CL }, { partner: US }]
-                instruments: [GMOS_NORTH, GMOS_SOUTH]
-              }
-            }
-          ) {
-            callForProposals {
-              id
-            }
-          }
-        }
-      """,
-      expected = List("The maximum semester is capped at the current year +1 (Semester(2099A) specified).").asLeft
-    )
-
-  test("success - maximum active period"):
-
-    // existence defaults to PRESENT
-    expect(
-      user = staff,
-      query = """
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        REGULAR_SEMESTER
-                semester:    "2024B"
-                activeStart: "1901-01-01"
-                activeEnd:   "2099-12-31"
-              }
-            }
-          ) {
-            callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-              }
-              active {
-                start
-                end
-              }
-            }
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "createCallForProposals": {
-            "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "01:30:00.000000" },
-                  "raEnd": { "hms": "12:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "03:30:00.000000" },
-                  "raEnd": { "hms": "10:00:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
-                }
-              },
-              "active": {
-                "start": "1901-01-01",
-                "end": "2099-12-31"
-              }
-            }
-          }
-        }
-      """.asRight
-    )
-
+//   test("failure - start too far in the future for LST calc") {
+//     expect(
+//       user = pi,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2100-02-28"
+//                 activeEnd:   "2025-07-31"
+//               }
+//             }
+//           ) { callForProposals { id } }
+//         }
+//       """,
+//       expected = List("Argument 'input.SET' is invalid: 'activeStart' date (2100-02-28) must be between 1900 and 2100 UTC (exclusive)").asLeft
+//     )
+//   }
+//
+//   test("failure - end too far in the future for LST calc") {
+//     expect(
+//       user = pi,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2025-02-28"
+//                 activeEnd:   "2100-07-31"
+//               }
+//             }
+//           ) { callForProposals { id } }
+//         }
+//       """,
+//       expected = List("Argument 'input.SET' is invalid: 'activeEnd' date (2100-07-31) must be between 1900 and 2100 UTC (exclusive)").asLeft
+//     )
+//   }
+//
+//   test("success - simple with defaults") {
+//
+//     // existence defaults to PRESENT
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2024B"
+//                 activeStart: "2024-07-31"
+//                 activeEnd:   "2025-02-01"
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               id
+//               type
+//               semester
+//               coordinateLimits {
+//                 north {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//                 south {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//               }
+//               active {
+//                 start
+//                 end
+//               }
+//               submissionDeadlineDefault
+//               partners {
+//                 partner
+//                 submissionDeadline
+//               }
+//               instruments
+//               proprietaryMonths
+//               existence
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "id":            "c-100",
+//               "type":          "REGULAR_SEMESTER",
+//               "semester":      "2024B",
+//               "coordinateLimits": {
+//                 "north": {
+//                   "raStart": { "hms": "16:30:00.000000" },
+//                   "raEnd": { "hms": "14:00:00.000000" },
+//                   "decStart": { "dms": "-37:00:00.000000" },
+//                   "decEnd": { "dms": "+90:00:00.000000" }
+//                 },
+//                 "south": {
+//                   "raStart": { "hms": "15:30:00.000000" },
+//                   "raEnd": { "hms": "12:30:00.000000" },
+//                   "decStart": { "dms": "-90:00:00.000000" },
+//                   "decEnd": { "dms": "+28:00:00.000000" }
+//                 }
+//               },
+//               "active": {
+//                 "start": "2024-07-31",
+//                 "end": "2025-02-01"
+//               },
+//               "submissionDeadlineDefault": null,
+//               "partners": [
+//                 {
+//                   "partner" : "AR",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "BR",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "CA",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "CL",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "KR",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "UH",
+//                   "submissionDeadline": null
+//                 },
+//                 {
+//                   "partner" : "US",
+//                   "submissionDeadline": null
+//                 }
+//               ],
+//               "instruments":       [],
+//               "proprietaryMonths": 12,
+//               "existence":         "PRESENT"
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("failure - end before start") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2025-07-31"
+//                 activeEnd:   "2025-02-28"
+//               }
+//             }
+//           ) { callForProposals { id } }
+//         }
+//       """,
+//       expected = List("Argument 'input.SET' is invalid: 'activeStart' must come before 'activeEnd'").asLeft
+//     )
+//   }
+//
+//   test("success - with partners") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd:   "2026-07-31"
+//                 submissionDeadlineDefault: "2025-07-31 10:00:02"
+//                 partners:    [
+//                   {
+//                     partner: CA
+//                     submissionDeadlineOverride: "2025-07-31 10:00:00"
+//                   },
+//                   {
+//                     partner: CL
+//                   },
+//                   {
+//                     partner: US
+//                     submissionDeadlineOverride: "2025-07-31 10:00:01"
+//                   }
+//                 ]
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//                id
+//                submissionDeadlineDefault
+//                partners {
+//                  partner
+//                  submissionDeadlineOverride
+//                  submissionDeadline
+//                }
+//                allowsNonPartnerPi
+//                nonPartnerDeadline
+//              }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "id": "c-101",
+//               "submissionDeadlineDefault": "2025-07-31 10:00:02",
+//               "partners": [
+//                 {
+//                   "partner": "CA",
+//                   "submissionDeadlineOverride": "2025-07-31 10:00:00",
+//                   "submissionDeadline": "2025-07-31 10:00:00"
+//                 },
+//                 {
+//                   "partner": "CL",
+//                   "submissionDeadlineOverride": null,
+//                   "submissionDeadline": "2025-07-31 10:00:02"
+//                 },
+//                 {
+//                   "partner": "US",
+//                   "submissionDeadlineOverride": "2025-07-31 10:00:01",
+//                   "submissionDeadline": "2025-07-31 10:00:01"
+//                 }
+//               ],
+//               "allowsNonPartnerPi": true,
+//               "nonPartnerDeadline": "2025-07-31 10:00:01"
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("success - with empty partners") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd:   "2026-07-31"
+//                 partners:    []
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//                id
+//                partners { partner }
+//                allowsNonPartnerPi
+//                nonPartnerDeadline
+//              }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "id": "c-102",
+//               "partners": [],
+//               "allowsNonPartnerPi": false,
+//               "nonPartnerDeadline": null
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("failure - with duplicate partners") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd:   "2026-07-31"
+//                 partners:    [
+//                   {
+//                     partner: US
+//                     submissionDeadlineOverride: "2025-07-31 10:00:00"
+//                   },
+//                   {
+//                     partner: US
+//                     submissionDeadlineOverride: "2025-07-31 10:00:01"
+//                   }
+//                 ]
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//                id
+//                partners {
+//                  partner
+//                  submissionDeadline
+//                }
+//              }
+//           }
+//         }
+//       """,
+//       expected = List("Argument 'input.SET' is invalid: duplicate 'partners' specified: US").asLeft
+//     )
+//   }
+//
+//   test("success - with instruments") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd:   "2026-07-31"
+//                 instruments: [GMOS_SOUTH, GMOS_NORTH]
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//                instruments
+//              }
+//           }
+//         }
+//       """,
+//       // sorted by instrument name
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("failure - with duplicate instruments") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2025A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd:   "2026-07-31"
+//                 instruments: [GMOS_SOUTH, GMOS_SOUTH]
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//                instruments
+//              }
+//           }
+//         }
+//       """,
+//       expected = List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
+//     )
+//   }
+//
+//   test("success - with ra") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:         REGULAR_SEMESTER
+//                 semester:    "2024B"
+//                 activeStart: "2024-07-31"
+//                 activeEnd:   "2025-02-01"
+//                 coordinateLimits: {
+//                   north: {
+//                     raStart: { hms: "17:00:00" }
+//                     raEnd: { hms: "13:00:00" }
+//                   }
+//                 }
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               coordinateLimits {
+//                 north {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//                 south {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "coordinateLimits": {
+//                 "north": {
+//                   "raStart": { "hms": "17:00:00.000000" },
+//                   "raEnd": { "hms": "13:00:00.000000" },
+//                   "decStart": { "dms": "-37:00:00.000000" },
+//                   "decEnd": { "dms": "+90:00:00.000000" }
+//                 },
+//                 "south": {
+//                   "raStart": { "hms": "15:30:00.000000" },
+//                   "raEnd": { "hms": "12:30:00.000000" },
+//                   "decStart": { "dms": "-90:00:00.000000" },
+//                   "decEnd": { "dms": "+28:00:00.000000" }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("success - with dec") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:         REGULAR_SEMESTER
+//                 semester:    "2024B"
+//                 activeStart: "2024-07-31"
+//                 activeEnd:   "2025-02-01"
+//                 coordinateLimits: {
+//                   south: {
+//                     decStart: { dms: "45:00:00" }
+//                     decEnd: { dms: "-45:00:00" }
+//                   }
+//                 }
+//               }
+//             }
+//           ) {
+//              callForProposals {
+//               coordinateLimits {
+//                 north {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//                 south {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "coordinateLimits": {
+//                 "north": {
+//                   "raStart": { "hms": "16:30:00.000000" },
+//                   "raEnd": { "hms": "14:00:00.000000" },
+//                   "decStart": { "dms": "-37:00:00.000000" },
+//                   "decEnd": { "dms": "+90:00:00.000000" }
+//                 },
+//                 "south": {
+//                   "raStart": { "hms": "15:30:00.000000" },
+//                   "raEnd": { "hms": "12:30:00.000000" },
+//                   "decStart": { "dms": "+45:00:00.000000" },
+//                   "decEnd": { "dms": "-45:00:00.000000" }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("director's time - non-partner accepted") {
+//
+//     // existence defaults to PRESENT
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        DIRECTORS_TIME
+//                 semester:    "2024B"
+//                 activeStart: "2024-07-31"
+//                 activeEnd:   "2025-02-01"
+//                 submissionDeadlineDefault: "2025-07-31 10:00:02"
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               id
+//               type
+//               allowsNonPartnerPi
+//               nonPartnerDeadline
+//               proprietaryMonths
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "id":   "c-106",
+//               "type": "DIRECTORS_TIME",
+//               "allowsNonPartnerPi": true,
+//               "nonPartnerDeadline": "2025-07-31 10:00:02",
+//               "proprietaryMonths": 6
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("demo science - non-partner prohibited") {
+//
+//     // existence defaults to PRESENT
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        DEMO_SCIENCE
+//                 semester:    "2024B"
+//                 activeStart: "2024-07-31"
+//                 activeEnd:   "2025-02-01"
+//                 submissionDeadlineDefault: "2025-07-31 10:00:02"
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               id
+//               type
+//               allowsNonPartnerPi
+//               nonPartnerDeadline
+//               proprietaryMonths
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "id":   "c-107",
+//               "type": "DEMO_SCIENCE",
+//               "allowsNonPartnerPi": false,
+//               "nonPartnerDeadline": null,
+//               "proprietaryMonths": 3
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("negative LST bug") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type: FAST_TURNAROUND
+//                 semester: "2024B"
+//                 activeStart: "2024-10-01"
+//                 activeEnd: "2024-12-31"
+//                 submissionDeadlineDefault: "2024-08-31T22:00:00Z"
+//                 partners: [{ partner: US }]
+//                 instruments: [GMOS_NORTH, GMOS_SOUTH]
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               coordinateLimits {
+//                 north {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                 }
+//                 south {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "coordinateLimits": {
+//                 "north": {
+//                   "raStart": { "hms": "20:00:00.000000" },
+//                   "raEnd": { "hms": "12:00:00.000000" }
+//                 },
+//                 "south": {
+//                   "raStart": { "hms": "20:00:00.000000" },
+//                   "raEnd": { "hms": "10:00:00.000000" }
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("success - explicit proprietaryMonths") {
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:              REGULAR_SEMESTER
+//                 semester:          "2024B"
+//                 activeStart:       "2024-07-31"
+//                 activeEnd:         "2025-02-01"
+//                 proprietaryMonths: 36
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               proprietaryMonths
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "proprietaryMonths": 36
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//   }
+//
+//   test("failure - too far in the future"):
+//     expect(
+//       user  = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type: REGULAR_SEMESTER
+//                 semester: "2099A"
+//                 activeStart: "2026-02-01"
+//                 activeEnd: "2026-07-31"
+//                 partners: [{ partner: CL }, { partner: US }]
+//                 instruments: [GMOS_NORTH, GMOS_SOUTH]
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               id
+//             }
+//           }
+//         }
+//       """,
+//       expected = List("The maximum semester is capped at the current year +1 (Semester(2099A) specified).").asLeft
+//     )
+//
+//   test("success - maximum active period"):
+//
+//     // existence defaults to PRESENT
+//     expect(
+//       user = staff,
+//       query = """
+//         mutation {
+//           createCallForProposals(
+//             input: {
+//               SET: {
+//                 type:        REGULAR_SEMESTER
+//                 semester:    "2024B"
+//                 activeStart: "1901-01-01"
+//                 activeEnd:   "2099-12-31"
+//               }
+//             }
+//           ) {
+//             callForProposals {
+//               coordinateLimits {
+//                 north {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//                 south {
+//                   raStart { hms }
+//                   raEnd { hms }
+//                   decStart { dms }
+//                   decEnd { dms }
+//                 }
+//               }
+//               active {
+//                 start
+//                 end
+//               }
+//             }
+//           }
+//         }
+//       """,
+//       expected = json"""
+//         {
+//           "createCallForProposals": {
+//             "callForProposals": {
+//               "coordinateLimits": {
+//                 "north": {
+//                   "raStart": { "hms": "01:30:00.000000" },
+//                   "raEnd": { "hms": "12:00:00.000000" },
+//                   "decStart": { "dms": "-37:00:00.000000" },
+//                   "decEnd": { "dms": "+90:00:00.000000" }
+//                 },
+//                 "south": {
+//                   "raStart": { "hms": "03:30:00.000000" },
+//                   "raEnd": { "hms": "10:00:00.000000" },
+//                   "decStart": { "dms": "-90:00:00.000000" },
+//                   "decEnd": { "dms": "+28:00:00.000000" }
+//                 }
+//               },
+//               "active": {
+//                 "start": "1901-01-01",
+//                 "end": "2099-12-31"
+//               }
+//             }
+//           }
+//         }
+//       """.asRight
+//     )
+//
 }
