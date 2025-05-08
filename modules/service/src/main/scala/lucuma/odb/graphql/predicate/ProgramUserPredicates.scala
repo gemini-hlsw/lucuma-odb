@@ -19,6 +19,7 @@ class ProgramUserPredicates(path: Path) {
   lazy val program       = ProgramPredicates(path / "program")
   lazy val programId     = LeafPredicates[Program.Id](programIdPath)
   lazy val role          = LeafPredicates[ProgramUserRole](path / "role")
+  lazy val ftSupportRole = LeafPredicates[Option[FTSupportRole]](path / "ftSupportRole")
   lazy val userId        = LeafPredicates[User.Id](userIdPath)
   lazy val hasDataAccess = LeafPredicates[Boolean](path / "hasDataAccess")
 
@@ -28,4 +29,10 @@ class ProgramUserPredicates(path: Path) {
   def isNotPi: Predicate =
     role.neql(ProgramUserRole.Pi)
 
+  // def isMentor: Predicate =
+  //   Predicate.and(List(ftSupportRole.isNull(false), ftSupportRole.eql(Some(FTSupportRole.Mentor))))
+
+  def isReviewer: Predicate =
+    ftSupportRole.eql(Some(FTSupportRole.Reviewer))
+    // Predicate.and(List(ftSupportRole.isNull(false), ftSupportRole.eql(Some(FTSupportRole.Reviewer))))
 }

@@ -24,9 +24,17 @@ import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
+import lucuma.odb.graphql.table.FTSupportTable
+import lucuma.odb.graphql.table.ProgramUserTable
+import grackle.Query.Filter
+import lucuma.odb.graphql.predicate.Predicates
+import grackle.Query.Unique
 
 trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
+                                   with Predicates[F]
                                    with PartnerSplitTable[F]
+                                   with ProgramUserTable[F]
+                                   with FTSupportTable[F]
                                    with ProposalView[F] {
 
   lazy val ProposalTypeMapping: ObjectMapping =
@@ -94,7 +102,10 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
-      SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate)
+      SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate),
+      // SqlObject("support",       Join(ProposalView.FastTurnaround.Id, ProgramUserTable.ProgramUserId)),
+      // SqlObject("reviewer",       Join(ProgramUserTable.ProgramUserId, ProposalView.FastTurnaround.ReviewerId)) //FTSupportTable.ProgramId))
+      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)) //FTSupportTable.ProgramId))
     )
 
   lazy val LargeProgramMapping: ObjectMapping =
@@ -142,6 +153,12 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (ClassicalType, "partnerSplits", Nil) => SortSplits
     case (QueueType,     "partnerSplits", Nil) => SortSplits
+
+    case (FastTurnaroundType, "reviewer", Nil) =>
+      Elab.transformChild { child =>
+        println(child)
+        Unique(Filter(Predicates.programUser.isReviewer, child))
+      }
   }
 
 }

@@ -56,6 +56,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
+import lucuma.odb.graphql.predicate.FTSupportRole
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
@@ -113,6 +114,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Flamingos2ReadoutMode](Flamingos2ReadoutModeType),
       LeafMapping[Flamingos2Reads](Flamingos2ReadsType),
       LeafMapping[FocalPlane](FocalPlaneType),
+      LeafMapping[FTSupportRole](FTSupportRoleType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),
       LeafMapping[GcalContinuum](GcalContinuumType),
