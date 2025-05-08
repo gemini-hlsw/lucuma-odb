@@ -5,10 +5,13 @@ package lucuma.odb.logic
 
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
+import lucuma.core.model.sequence.f2.F2DynamicConfig
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.odb.sequence.data.ProtoStep
@@ -33,6 +36,18 @@ object DetectorEstimator {
 
   class Applied private[DetectorEstimator] (private val ctx: TimeEstimateContext) {
 
+    extension (f2: F2DynamicConfig) {
+      def datasetEstimate: DatasetEstimate =
+        DatasetEstimate(
+          f2.exposure,
+          f2.readMode match
+            case F2ReadMode.Bright => ctx.enums.TimeEstimate.Flamingos2BrightReadout.time
+            case F2ReadMode.Medium => ctx.enums.TimeEstimate.Flamingos2MediumReadout.time
+            case F2ReadMode.Faint  => ctx.enums.TimeEstimate.Flamingos2FaintReadout.time,
+          ctx.enums.TimeEstimate.Flamingos2Write.time
+        )
+    }
+
     extension (gn: DynamicConfig.GmosNorth) {
       def readoutKey(detector: GmosNorthDetector): GmosReadoutTime.Key =
         GmosReadoutTime.Key(detector.asLeft, gn.readout, gn.roi)
@@ -56,6 +71,16 @@ object DetectorEstimator {
           ctx.enums.TimeEstimate.GmosSouthWrite.time
         )
     }
+
+    lazy val flamingos2: DetectorEstimator[F2StaticConfig, F2DynamicConfig] =
+      (static: F2StaticConfig, step: ProtoStep[F2DynamicConfig]) => List(
+        DetectorEstimate(
+          "Flamingos2",
+          s"Flamingos 2 Detector Array",
+          step.value.datasetEstimate,
+          NonNegInt.unsafeFrom(1)
+        )
+      )
 
     lazy val gmosNorth: DetectorEstimator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
       (static: StaticConfig.GmosNorth, step: ProtoStep[DynamicConfig.GmosNorth]) => List(
