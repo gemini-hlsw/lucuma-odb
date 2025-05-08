@@ -10,6 +10,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.f2.F2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.TimeEstimateCalculator
@@ -46,6 +47,15 @@ object ConfigChangeEstimator:
 
       def estimate(past: TimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
         instrumentChecks(past, present).flattenOption ++ gcal(past, present) ++ offset(past, present)
+
+    lazy val flamingos2: ConfigChangeEstimator[F2DynamicConfig] =
+      new ForInstrument[F2DynamicConfig]:
+        override def instrumentChecks(past:  TimeEstimateCalculator.Last[F2DynamicConfig], present:  ProtoStep[F2DynamicConfig]): List[Option[ConfigChangeEstimate]] =
+          List(
+            check(enums.TimeEstimate.Flamingos2Filter, past, present)(_.filter),
+            check(enums.TimeEstimate.Flamingos2Fpu, past, present)(_.fpu),
+            check(enums.TimeEstimate.Flamingos2Disperser, past, present)(_.disperser)
+          )
 
     lazy val gmosNorth: ConfigChangeEstimator[DynamicConfig.GmosNorth] =
       new ForInstrument[DynamicConfig.GmosNorth]:
