@@ -12,6 +12,7 @@ trait FTSupportTable[F[_]] extends BaseMapping[F] {
 
   object FTSupportTable extends TableDef("t_ft_proposal_support") {
     val ProgramId  = col("c_program_id", program_id)
+    val ProgramUserId  = col("c_program_user_id", program_user_id)
   }
 
 }

@@ -25,9 +25,15 @@ import lucuma.core.model.IntPercent
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProposalView
 import lucuma.odb.graphql.table.FTSupportTable
+import lucuma.odb.graphql.table.ProgramUserTable
+import grackle.Query.Filter
+import lucuma.odb.graphql.predicate.Predicates
+import grackle.Query.Unique
 
 trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
+                                   with Predicates[F]
                                    with PartnerSplitTable[F]
+                                   with ProgramUserTable[F]
                                    with FTSupportTable[F]
                                    with ProposalView[F] {
 
@@ -97,8 +103,8 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate),
-      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.Id, FTSupportTable.ProgramId))
-      // SqlField("reviewer",        ProposalView.FastTurnaround.PiAffiliate)
+      SqlObject("support",       Join(ProposalView.FastTurnaround.Id, ProgramUserTable.ProgramUserId)),
+      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.Id, ProgramUserTable.ProgramUserId)) //FTSupportTable.ProgramId))
     )
 
   lazy val LargeProgramMapping: ObjectMapping =
@@ -146,6 +152,12 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (ClassicalType, "partnerSplits", Nil) => SortSplits
     case (QueueType,     "partnerSplits", Nil) => SortSplits
+
+    case (ProgramUserType, "reviewer", Nil) =>
+      Elab.transformChild { child =>
+        println(child)
+        Unique(Filter(Predicates.ftSupportUser.isReviewer, child))
+      }
   }
 
 }
