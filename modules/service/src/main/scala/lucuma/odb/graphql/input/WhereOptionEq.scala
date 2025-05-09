@@ -4,12 +4,27 @@
 package lucuma.odb.graphql.input
 
 import cats.Eq
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
+
+final case class WhereOptionEq[A: Eq](
+  isNull: Option[Boolean],
+  eq:     Option[A],
+  neq:    Option[A],
+  in:     Option[List[A]],
+  nin:    Option[List[A]]
+):
+  def matches(oa: Option[A]): Boolean =
+    isNull.forall(_ === oa.isEmpty)           &&
+    eq.forall(a => oa.exists(_ === a))        &&
+    neq.forall(a => oa.exists(_ =!= a))       &&
+    in.forall(lst => oa.exists(lst.contains)) &&
+    nin.forall(lst => oa.forall(a => !lst.contains(a)))
 
 object WhereOptionEq {
 
@@ -34,4 +49,14 @@ object WhereOptionEq {
         }
     }
 
+  def inputBinding[A: Eq](binding: Matcher[A]): Matcher[WhereOptionEq[A]] =
+    ObjectFieldsBinding.rmap:
+      case List(
+        BooleanBinding.Option("IS_NULL", rIsNull),
+        binding.Option("EQ", rEQ),
+        binding.Option("NEQ", rNEQ),
+        binding.List.Option("IN", rIN),
+        binding.List.Option("NIN", rNIN)
+      ) =>
+        (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN(WhereOptionEq.apply)
 }

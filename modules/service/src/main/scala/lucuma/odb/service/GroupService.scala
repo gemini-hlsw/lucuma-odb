@@ -33,8 +33,8 @@ import Services.Syntax.*
 trait GroupService[F[_]] {
   def createGroup(input: CreateGroupInput, system: Boolean = false)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
-  def selectGroups(programId: Program.Id): F[GroupTree]
-  def selectPid(groupId: Group.Id): F[Option[Program.Id]]
+  def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree]
+  def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
 }
 
@@ -167,7 +167,7 @@ object GroupService {
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 
-      def selectGroups(programId: Program.Id): F[GroupTree] = {
+      def selectGroups(programId: Program.Id)(using Transaction[F]): F[GroupTree] = {
 
         def mkTree(m: Map[Option[Group.Id], List[GroupTree.Child]]): GroupTree = {
 
@@ -190,7 +190,7 @@ object GroupService {
 
       }
 
-      def selectPid(groupId: Group.Id): F[Option[Program.Id]] =
+      def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]] =
         session.option(Statements.SelectPid)(groupId)
 
     }

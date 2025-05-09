@@ -111,6 +111,11 @@ sealed trait ObservationService[F[_]] {
   def resetAcquisition(
     input: AccessControl.CheckedWithId[Unit, Observation.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
+
+  def selectBands(
+    pid: Program.Id
+  )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
+
 }
 
 object ObservationService {
@@ -513,6 +518,14 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Observation.Id]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
           session.execute(Statements.ResetAcquisition)(oid).as(oid.success)
+
+      override def selectBands(
+        pid: Program.Id
+      )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]] =
+        session
+          .execute(Statements.SelectBands)(pid)
+          .map(_.toMap)
+
     }
 
 
@@ -1077,6 +1090,15 @@ object ObservationService {
            SET c_acq_reset_time = now()
          WHERE c_observation_id = $observation_id
       """.command
+
+    val SelectBands: Query[Program.Id, (Observation.Id, Option[ScienceBand])] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_science_band
+        FROM t_observation
+        WHERE c_program_id = $program_id AND c_existence = 'present'
+      """.query(observation_id *: science_band.opt)
   }
 
 }

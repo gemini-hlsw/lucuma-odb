@@ -75,7 +75,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.InvalidProgram            => arbitrary[Program.Id].map(OdbError.InvalidProgram(_, detail))
           case Tag.InvalidObservation        => arbitrary[Observation.Id].map(OdbError.InvalidObservation(_, detail))
           case Tag.InvalidObservationList    => arbitrary[NonEmptyList[Observation.Id]].map(OdbError.InvalidObservationList(_, detail))
-          case Tag.SequenceUnavailable       => OdbError.SequenceUnavailable(detail).pure[Gen]
+          case Tag.SequenceUnavailable       => arbitrary[Observation.Id].map(OdbError.SequenceUnavailable(_, detail))
           case Tag.InvalidTarget             => arbitrary[Target.Id].map(OdbError.InvalidTarget(_, detail))
           case Tag.InvalidTargetList         => (arbitrary[Program.Id], arbitrary[NonEmptyList[Target.Id]]).mapN(OdbError.InvalidTargetList(_, _, detail))
           case Tag.InvalidVisit              => arbitrary[Visit.Id].map(OdbError.InvalidVisit(_, detail))
@@ -92,6 +92,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
           case Tag.InconsistentGroup         => OdbError.InconsistentGroupError(detail).pure[Gen]
           case Tag.InvalidConfiguration      => OdbError.InvalidConfiguration(detail).pure[Gen]
           case Tag.InvalidWorkflowTransition => (arbitrary[ObservationWorkflowState], arbitrary[ObservationWorkflowState]).mapN(OdbError.InvalidWorkflowTransition(_, _, detail))
+          case Tag.RemoteServiceCallError    => OdbError.RemoteServiceCallError(detail).pure[Gen]
                       
   checkAll("OdbErrorCodec", CodecTests[OdbError].codec)
 

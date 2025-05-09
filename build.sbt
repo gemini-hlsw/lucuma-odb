@@ -31,7 +31,7 @@ val pprintVersion              = "0.9.0"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.19"
+ThisBuild / tlBaseVersion      := "0.20"
 ThisBuild / scalaVersion       := "3.6.4"
 ThisBuild / crossScalaVersions := Seq("3.6.4")
 
@@ -187,6 +187,16 @@ lazy val service = project
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve"
+  )
+
+lazy val obscalc = project
+  .in(file("modules/obscalc"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "obscalc-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082"
   )
 
 lazy val calibrations = project

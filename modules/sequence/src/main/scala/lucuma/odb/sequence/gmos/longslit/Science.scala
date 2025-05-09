@@ -19,7 +19,6 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -41,6 +40,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TelescopeConfig
@@ -55,7 +55,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
@@ -294,11 +294,12 @@ object Science:
        *                    calibrations do not have arcs)
        */
       def compute[F[_]: Monad](
+        oid:      Observation.Id,
         expander: SmartGcalExpander[F, D],
         config:   Config[G, L, U],
         time:     IntegrationTime,
         calRole:  Option[CalibrationRole]
-      ): F[Either[String, NonEmptyList[BlockDefinition[D]]]] =
+      ): F[Either[OdbError, NonEmptyList[BlockDefinition[D]]]] =
         Goal.compute(config.wavelengthDithers, config.spatialOffsets, time).traverse { g =>
           val isTwilight = calRole.contains(CalibrationRole.Twilight)
 
@@ -321,7 +322,8 @@ object Science:
             fs <- if includeFlats then EitherT(expander.expandStep(smartFlat)).map(_.toList) else EitherT.pure(List.empty)
             as <- if includeArcs then EitherT(expander.expandStep(smartArc)).map(_.toList) else EitherT.pure(List.empty)
           } yield BlockDefinition(g, as.toList, fs, science)).value
-        }.map(_.sequence)
+        }
+        .map(_.traverse(_.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))))
 
       end compute
     end Computer
@@ -726,21 +728,25 @@ object Science:
       } yield ()).runS(c).value
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
+      oid:       Observation.Id,
       estimator: TimeEstimateCalculator[S, D],
       static:    S,
       namespace: UUID,
       expander:  SmartGcalExpander[F, D],
       blockDef:  BlockDefinition.Computer[D, G, L, U],
       config:    Config[G, L, U],
-      time:      Either[MissingParamSet, IntegrationTime],
+      time:      Either[OdbError, IntegrationTime],
       calRole:   Option[CalibrationRole]
-    ): F[Either[String, SequenceGenerator[D]]] =
+    ): F[Either[OdbError, SequenceGenerator[D]]] =
 
-      def extractTime: Either[String, IntegrationTime] =
-        time
-          .leftMap: m =>
-             s"GMOS Long Slit requires a valid target: ${m.format}"
-          .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, s"GMOS Long Slit science requires a positive exposure time.")
+      def sequenceUnavailable(m: String): OdbError =
+        OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)
+
+      def extractTime: Either[OdbError, IntegrationTime] =
+        time.filterOrElse(
+          _.exposureTime.toNonNegMicroseconds.value > 0,
+          sequenceUnavailable(s"GMOS Long Slit science requires a positive exposure time.")
+        )
 
       // Adjust the config and integration time according to the calibration role.
       val configAndTime = calRole match
@@ -756,22 +762,22 @@ object Science:
         case Some(CalibrationRole.Twilight)           =>
           val configʹ = calibrationObservationConfig(config)
           val timeʹ   = IntegrationTime(TwilightExposureTime, NonNegInt.unsafeFrom(configʹ.wavelengthDithers.length))
-          (configʹ, timeʹ).asRight[String]
+          (configʹ, timeʹ).asRight[OdbError]
 
         case Some(c)                                  =>
-          s"GMOS Long Slit ${c.tag} not implemented".asLeft
+          sequenceUnavailable(s"GMOS Long Slit ${c.tag} not implemented").asLeft
 
       // If exposure time is longer than the science period, there will never be
       // time enough to do any science steps.
       val configAndTimeʹ = configAndTime.filterOrElse(
         _._2.exposureTime <= SciencePeriod,
-        s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported."
+        sequenceUnavailable(s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
       )
 
       // Compute the generator
       val result = for
         (configʹ, timeʹ) <- EitherT.fromEither[F](configAndTimeʹ)
-        defs             <- EitherT(blockDef.compute(expander, configʹ, timeʹ, calRole))
+        defs             <- EitherT(blockDef.compute(oid, expander, configʹ, timeʹ, calRole))
       yield ScienceGenerator(
         estimator,
         static,
@@ -789,25 +795,27 @@ object Science:
   end ScienceGenerator
 
   def gmosNorth[F[_]: Monad](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
-    static:    StaticConfig.GmosNorth,
-    namespace: UUID,
-    expander:  SmartGcalExpander[F, GmosNorth],
-    config:    Config.GmosNorth,
-    time:      Either[MissingParamSet, IntegrationTime],
-    calRole:   Option[CalibrationRole]
-  ): F[Either[String, SequenceGenerator[GmosNorth]]] =
-    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
+    static:        StaticConfig.GmosNorth,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GmosNorth],
+    config:        Config.GmosNorth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
+  ): F[Either[OdbError, SequenceGenerator[GmosNorth]]] =
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, BlockDefinition.North, config, time, calRole)
 
   def gmosSouth[F[_]: Monad](
-    estimator: TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
-    static:    StaticConfig.GmosSouth,
-    namespace: UUID,
-    expander:  SmartGcalExpander[F, GmosSouth],
-    config:    Config.GmosSouth,
-    time:      Either[MissingParamSet, IntegrationTime],
-    calRole:   Option[CalibrationRole]
-  ): F[Either[String, SequenceGenerator[GmosSouth]]] =
-    ScienceGenerator.instantiate(estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
+    observationId: Observation.Id,
+    estimator:     TimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
+    static:        StaticConfig.GmosSouth,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GmosSouth],
+    config:        Config.GmosSouth,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
+  ): F[Either[OdbError, SequenceGenerator[GmosSouth]]] =
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, BlockDefinition.South, config, time, calRole)
 
 end Science
