@@ -56,20 +56,26 @@ object ObservingModeServices {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
+          case (Flamingos2LongSlit, oids) =>
+            f2LongSlitService
+              .select(oids)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+
+          case (GmosNorthImaging, oids) =>
+            MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North Imaging not implemented."))
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
-          case (Flamingos2LongSlit, oids) =>
-            f2LongSlitService
-              .select(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+          case (GmosSouthImaging, oids) =>
+            MonadCancelThrow[F].raiseError(new RuntimeException("GMOS South Imaging not implemented."))
 
         }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
@@ -78,58 +84,57 @@ object ObservingModeServices {
         input: ObservingModeInput.Create
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
+          input.f2LongSlit.map(f2LongSlitService.insert),
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
-          input.f2LongSlit.map(f2LongSlitService.insert)
-        ).flattenOption match {
+          input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth)
+        ).flattenOption match
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode creation parameters were provided.")
           case _       => Result.failure("Only one observing mode's creation parameters may be provided.")
-        }
 
       override def deleteFunction(
         mode: ObservingModeType
       )(using Transaction[F]): List[Observation.Id] => F[Unit] =
-        mode match {
-          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
-          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
+        mode match
           case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.delete
-        }
+          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
+          case ObservingModeType.GmosNorthImaging   => _ => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North Imaging not implemented."))
+          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
+          case ObservingModeType.GmosSouthImaging   => _ => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS South Imaging not implemented."))
 
       override def updateFunction(
         input: ObservingModeInput.Edit
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
+          input.flamingos2LongSlit.map(f2LongSlitService.update),
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
-          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
-          input.flamingos2LongSlit.map(f2LongSlitService.update)
-        ).flattenOption match {
+          input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth)
+        ).flattenOption match
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
           case _       => Result.failure("Only one observing mode's edit parameters may be provided.")
-        }
 
       override def createViaUpdateFunction(
         input: ObservingModeInput.Edit
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
-          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth)),
           input.flamingos2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert)),
-        ).flattenOption match {
+          input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
+          input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth))
+        ).flattenOption match
           case List(f) => f
           case Nil     => Result.failure("No observing mode edit parameters were provided.")
           case _       => Result.failure("Only one observing mode's edit parameters may be provided.")
-        }
 
       override def cloneFunction(
         mode: ObservingModeType
       )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit] =
-        mode match {
-          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
-          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
+        mode match
           case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.clone
-        }
+          case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
+          case ObservingModeType.GmosNorthImaging   => (_, _) => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North Imaging not implemented."))
+          case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
+          case ObservingModeType.GmosSouthImaging   => (_, _) => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS South Imaging not implemented."))
 
     }
 
