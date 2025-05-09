@@ -31,6 +31,8 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.f2.F2DynamicConfig
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -354,8 +356,9 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, Error, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
-      type ProtoGmosNorth = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
-      type ProtoGmosSouth = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
+      type ProtoFlamingos2 = ProtoExecutionConfig[F2StaticConfig,  Atom[F2DynamicConfig]]
+      type ProtoGmosNorth  = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
+      type ProtoGmosSouth  = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
       private def protoExecutionConfig[S, D](
         ctx:      Context,
@@ -373,6 +376,14 @@ object Generator {
                 t <- when.fold(timeService.transactionTime)(_.pure[F])
                 p <- gen.executionConfig(steps, t)
               yield p
+
+      private def flamingos2LongSlit(
+        ctx:    Context,
+        config: lucuma.odb.sequence.f2.longslit.Config,
+        role:   Option[CalibrationRole],
+        when:   Option[Timestamp]
+      ): EitherT[F, Error, (ProtoFlamingos2, ExecutionState)] =
+        EitherT.leftT(Error.InvalidData(ctx.oid, s"F2 longslit not implemented ($ctx, $config, $role, $when)"))
 
       private def gmosNorthLongSlit(
         ctx:    Context,
@@ -408,6 +419,10 @@ object Generator {
           .fromEither(Error.sequenceTooLong.asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
+          case GeneratorParams(_, _, config: f2.longslit.Config, role, declaredComplete, _) =>
+            flamingos2LongSlit(ctx, config, role, when).flatMap: (p, e) =>
+              EitherT.fromEither[F](executionDigest(p, e, calculator.flamingos2.estimateSetup))
+
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosNorth.estimateSetup))
@@ -415,11 +430,6 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
             gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(p, e, calculator.gmosSouth.estimateSetup))
-
-          case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
-            EitherT.leftT[F, ExecutionDigest](
-              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
-            )
         )
 
       override def generate(
@@ -439,6 +449,10 @@ object Generator {
         when:     Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, Error, InstrumentExecutionConfig] =
         ctx.params match
+          case GeneratorParams(_, _, config: f2.longslit.Config, role, _, _) =>
+            flamingos2LongSlit(ctx, config, role, when).map: (p, _) =>
+              InstrumentExecutionConfig.Flamingos2(executionConfig(p, lim))
+
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
             gmosNorthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosNorth(executionConfig(p, lim))
@@ -446,11 +460,6 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
             gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
-
-          case GeneratorParams(_, _, config: f2.longslit.Config, _, _, _) =>
-            EitherT.leftT[F, InstrumentExecutionConfig](
-              Error.InvalidData(ctx.oid, "F2 longslit not implemented")
-            )
 
       private def executionDigest[S, D](
         proto:     ProtoExecutionConfig[S, Atom[D]],
