@@ -25,7 +25,12 @@ object Flamingos2:
     disperser: Option[F2Disperser],
     filter:    F2Filter,
     fpu:       Option[F2Fpu]
-  )
+  ):
+    def format: String =
+      val d = s"disperser: ${disperser.fold("None"){d => s"$d, ${d.wavelength.nm.value.value} nm"}}"
+      val f = s"filter: $filter"
+      val u = s"fpu: ${fpu.getOrElse("None")}"
+      s"Flamingos2 { $d, $f, $u }"
 
   object TableKey:
     def fromDynamicConfig(f2: F2DynamicConfig): TableKey =
