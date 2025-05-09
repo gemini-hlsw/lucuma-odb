@@ -6676,6 +6676,314 @@ type ExposureTimeMode {
 }
 
 """
+Flamingos 2 Execution Config
+"""
+type Flamingos2ExecutionConfig {
+  """
+  Flamingos 2 static configuration
+  """
+  static: Flamingos2Static!
+
+  """
+  Flamingos 2 acquisition execution sequence
+  """
+  acquisition: Flamingos2ExecutionSequence
+
+  """
+  Flamingos 2 science execution
+  """
+  science: Flamingos2ExecutionSequence
+}
+
+"""
+Next atom to execute and potential future atoms.
+"""
+type Flamingos2ExecutionSequence {
+  """
+  Next atom to execute.
+  """
+  nextAtom: Flamingos2Atom!
+
+  """
+  (Prefix of the) remaining atoms to execute, if any.
+  """
+  possibleFuture: [Flamingos2Atom!]!
+
+  """
+  Whether there are more anticipated atoms than those that appear in
+  'possibleFuture'.
+  """
+  hasMore: Boolean!
+}
+
+"""
+Unchanging (over the course of the sequence) configuration values
+"""
+type Flamingos2Static {
+
+  """
+  Is MOS Pre-Imaging Observation
+  """
+  mosPreImaging: MosPreImaging!
+
+  """
+  Whether to use electronic offsetting
+  """
+  useElectronicOffsetting: Boolean!
+
+}
+
+"""
+Flamingos 2 static configuration input parameters
+"""
+input Flamingos2StaticInput {
+
+  """
+  Whether this is a MOS pre-imaging observation (defaults to IS_NOT_MOS_PRE_IMAGING)
+  """
+  mosPreImaging: MosPreImaging
+
+  """
+  Whether to use electronic offsetting
+  """
+  useElectronicOffsetting: Boolean
+
+}
+
+"""
+Flamingos 2 atom, a collection of steps that should be executed in their entirety
+"""
+type Flamingos2Atom {
+  """
+  Atom id
+  """
+  id: AtomId!
+
+  """
+  Optional description of the atom.
+  """
+  description: String
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """
+  Individual steps that comprise the atom
+  """
+  steps: [Flamingos2Step!]!
+}
+
+"""
+Flmaingos 2 step with potential breakpoint
+"""
+type Flamingos2Step {
+  """
+  Instrument configuration for this step
+  """
+  instrumentConfig: Flamingos2Dynamic!
+
+  """
+  Step id
+  """
+  id: StepId!
+
+  """
+  Whether to pause before the execution of this step
+  """
+  breakpoint: Breakpoint!
+
+  """
+  The sequence step itself
+  """
+  stepConfig: StepConfig!
+
+  "The telescope configuration at this step."
+  telescopeConfig: TelescopeConfig!
+
+  """
+  Time estimate for this step's execution
+  """
+  estimate: StepEstimate!
+
+  """
+  Observe class for this step
+  """
+  observeClass: ObserveClass!
+}
+
+"""
+Flamingos 2 dynamic step configuration
+"""
+type Flamingos2Dynamic {
+
+  """
+  Flamingos 2 exposure time
+  """
+  exposure: TimeSpan!
+
+  """
+  Flamingos 2 disperser, if any.
+  """
+  disperser: Flamingos2Disperser
+
+  """
+  Flamingos 2 filter.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  Flamingos 2 read mode.
+  """
+  readMode: Flamingos2ReadMode!
+
+  """
+  Flamingos 2 Lyot Wheel.
+  """
+  lyot: Flamingos2LyotWheel!
+
+  """
+  Flamingos 2 mask, if any.
+  """
+  mask: Flamingos2Mask
+
+  """
+  Readout mode, if specified.
+  """
+  readoutMode: Flamingos2ReadoutMode
+
+  """
+  Reads, if specified.
+  """
+  reads: Flamingos2Reads
+}
+
+"""
+Flamingos 2 instrument configuration input
+"""
+input Flamingos2DynamicInput {
+
+  exposure: TimeSpanInput!
+
+  disperser: Flamingos2Disperser
+
+  filter: Flamingos2Filter!
+
+  readMode: Flamingos2ReadMode!
+
+  lyot: Flamingos2LyotWheel!
+
+  mask: Flamingos2MaskInput
+
+  readoutMode: Flamingos2ReadoutMode
+
+  reads: Flamingos2Reads
+}
+
+"""
+Flamingos 2 mask option, either builtin or custom mask
+"""
+type Flamingos2Mask {
+
+  """
+  The custom mask, if in use
+  """
+  customMask: Flamingos2CustomMask
+
+  """
+  Flamingos 2 builtin FPU, if in use
+  """
+  builtin: Flamingos2Fpu
+
+}
+
+"""
+Flamingos 2 mask input parameters (choose custom or builtin).
+"""
+input Flamingos2MaskInput {
+  """
+  Custom mask FPU option
+  """
+  customMask: Flamingos2CustomMaskInput
+
+  """
+  Builtin FPU option
+  """
+  builtin: Flamingos2Fpu
+
+}
+
+"""
+Flamingos 2 Custom Mask
+"""
+type Flamingos2CustomMask {
+  """
+  Custom Mask Filename
+  """
+  filename: String!
+
+  """
+  Custom Slit Width
+  """
+  slitWidth: Flamingos2CustomSlitWidth!
+}
+
+"""
+Flamingos 2 custom mask input parameters
+"""
+input Flamingos2CustomMaskInput {
+  """
+  Custom mask file name
+  """
+  filename: String!
+
+  """
+  Custom mask slit width
+  """
+  slitWidth: Flamingos2CustomSlitWidth!
+}
+
+"""
+Flamingos 2 Custom Slit Width
+"""
+enum Flamingos2CustomSlitWidth {
+
+  CUSTOM_WIDTH_1_PIX
+
+  CUSTOM_WIDTH_2_PIX
+
+  CUSTOM_WIDTH_3_PIX
+
+  CUSTOM_WIDTH_4_PIX
+
+  CUSTOM_WIDTH_6_PIX
+
+  CUSTOM_WIDTH_8_PIX
+
+  OTHER
+
+}
+
+"""
+Flamingos 2 Lyot Wheel
+"""
+enum Flamingos2LyotWheel {
+
+  F16
+
+  GEMS_UNDER
+
+  GEMS_OVER
+
+  HARTMANN_A
+
+  HARTMANN_B
+
+}
+
+"""
 Flamingos2 Disperser
 """
 enum Flamingos2Disperser {
@@ -6930,22 +7238,6 @@ enum Flamingos2Reads {
   Flamingos2Reads Reads 16
   """
   READS_16
-
-}
-
-"""
-Flamingos2 Window Cover
-"""
-enum Flamingos2WindowCover {
-  """
-  Flamingos2WindowCover Open
-  """
-  OPEN
-
-  """
-  Flamingos2WindowCover CLOSE
-  """
-  CLOSE
 
 }
 
