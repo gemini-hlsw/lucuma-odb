@@ -19,7 +19,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.f2.longslit.Config
 
-object F2LongSlitInput {
+object Flamingos2LongSlitInput {
 
   case class Create(
     disperser: F2Disperser,
