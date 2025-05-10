@@ -2898,6 +2898,16 @@ type Mutation {
     input: RecordDatasetInput!
   ): RecordDatasetResult!
 
+  """
+  Record a new Flamingos 2 visit
+  """
+  recordFlamingos2Visit(
+    """
+    Visit creation parameters
+    """
+    input: RecordFlamingos2VisitInput!
+  ): RecordFlamingos2VisitResult!
+
   "Record a new GMOS North step"
   recordGmosNorthStep(
     "GMOS North step configuration parameters"
@@ -6744,10 +6754,28 @@ input Flamingos2StaticInput {
   mosPreImaging: MosPreImaging
 
   """
-  Whether to use electronic offsetting
+  Whether to use electronic offsetting (defaults to false)
   """
   useElectronicOffsetting: Boolean
 
+}
+
+"""
+Input parameters for creating a new Flamingos 2 Visit
+"""
+input RecordFlamingos2VisitInput {
+  observationId: ObservationId!
+  flamingos2:    Flamingos2StaticInput!
+}
+
+"""
+Result for recordFlamingos2Visit mutation.
+"""
+type RecordFlamingos2VisitResult {
+  """
+  The newly added visit record itself.
+  """
+  visit: Visit!
 }
 
 """
@@ -13020,6 +13048,12 @@ type Visit {
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
 
+  """
+  Flamingos 2 static instrument configuration, for Flamingos 2 visits.  See the
+  `instrument` discriminator.  This will be null unless the instrument is
+  `FLAMINGOS2`.
+  """
+  flamingos2: Flamingos2Static
   """
   GmosNorth static instrument configuration, for GMOS North visits.  See the
   `instrument` discriminator.  This will be null unless the instrument is

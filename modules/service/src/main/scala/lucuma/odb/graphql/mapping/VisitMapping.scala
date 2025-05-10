@@ -22,6 +22,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
 import table.ExecutionEventTable
+import table.Flamingos2StaticTable
 import table.GmosStaticTables
 import table.ObservationView
 import table.VisitTable
@@ -29,6 +30,7 @@ import table.VisitTable
 trait VisitMapping[F[_]] extends VisitTable[F]
                             with EventRangeEffectHandler[F]
                             with ExecutionEventTable[F]
+                            with Flamingos2StaticTable[F]
                             with GmosStaticTables[F]
                             with ObservationView[F]
                             with Predicates[F]
@@ -49,8 +51,9 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("timeChargeInvoice"),
-      SqlObject("gmosNorth", Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
-      SqlObject("gmosSouth", Join(VisitTable.Id, GmosSouthStaticTable.VisitId))
+      SqlObject("flamingos2", Join(VisitTable.Id, Flamingos2StaticTable.VisitId)),
+      SqlObject("gmosNorth",  Join(VisitTable.Id, GmosNorthStaticTable.VisitId)),
+      SqlObject("gmosSouth",  Join(VisitTable.Id, GmosSouthStaticTable.VisitId))
     )
 
   lazy val VisitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

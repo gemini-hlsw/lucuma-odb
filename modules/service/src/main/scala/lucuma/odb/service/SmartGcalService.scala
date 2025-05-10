@@ -39,7 +39,7 @@ import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow.North as GmosNorthTableRow
 import lucuma.odb.smartgcal.data.Gmos.TableRow.South as GmosSouthTableRow
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.F2Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
 import skunk.codec.numeric.int4

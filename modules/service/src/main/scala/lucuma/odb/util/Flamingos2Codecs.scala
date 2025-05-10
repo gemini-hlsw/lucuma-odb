@@ -10,11 +10,12 @@ import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.F2ReadMode
 import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
-import lucuma.core.enums.F2WindowCover
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.data.Type
 
-trait F2Codecs:
+trait Flamingos2Codecs:
 
   import Codecs.enumerated
 
@@ -39,7 +40,13 @@ trait F2Codecs:
   val f2_reads: Codec[F2Reads] =
     enumerated(Type.varchar)
 
-  val f2_window_cover: Codec[F2WindowCover] =
-    enumerated(Type.varchar)
+  val flamingos_2_static: Codec[F2StaticConfig] =
+    (
+      Codecs.mos_pre_imaging *:
+      bool
+    ).imap { case (m, e) => F2StaticConfig(m, e) } { f2 => (
+      f2.mosPreImaging,
+      f2.useElectronicOffseting
+    )}
 
-object F2Codecs extends F2Codecs
+object Flamingos2Codecs extends Flamingos2Codecs

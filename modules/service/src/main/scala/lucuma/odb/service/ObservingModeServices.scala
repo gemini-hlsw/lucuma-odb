@@ -57,7 +57,7 @@ object ObservingModeServices {
 
         which.groupMap(_._2)(_._1).toList.traverse {
           case (Flamingos2LongSlit, oids) =>
-            f2LongSlitService
+            flamingos2LongSlitService
               .select(oids)
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
@@ -84,7 +84,7 @@ object ObservingModeServices {
         input: ObservingModeInput.Create
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.f2LongSlit.map(f2LongSlitService.insert),
+          input.f2LongSlit.map(flamingos2LongSlitService.insert),
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth)
         ).flattenOption match
@@ -96,7 +96,7 @@ object ObservingModeServices {
         mode: ObservingModeType
       )(using Transaction[F]): List[Observation.Id] => F[Unit] =
         mode match
-          case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.delete
+          case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
           case ObservingModeType.GmosNorthImaging   => _ => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North Imaging not implemented."))
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
@@ -106,7 +106,7 @@ object ObservingModeServices {
         input: ObservingModeInput.Edit
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.flamingos2LongSlit.map(f2LongSlitService.update),
+          input.flamingos2LongSlit.map(flamingos2LongSlitService.update),
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth)
         ).flattenOption match
@@ -118,7 +118,7 @@ object ObservingModeServices {
         input: ObservingModeInput.Edit
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.flamingos2LongSlit.map(m => m.toCreate.map(f2LongSlitService.insert)),
+          input.flamingos2LongSlit.map(m => m.toCreate.map(flamingos2LongSlitService.insert)),
           input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
           input.gmosSouthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertSouth))
         ).flattenOption match
@@ -130,7 +130,7 @@ object ObservingModeServices {
         mode: ObservingModeType
       )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit] =
         mode match
-          case ObservingModeType.Flamingos2LongSlit => f2LongSlitService.clone
+          case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
           case ObservingModeType.GmosNorthImaging   => (_, _) => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North Imaging not implemented."))
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth

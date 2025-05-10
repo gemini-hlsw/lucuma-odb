@@ -5,12 +5,12 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.F2Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.circe.codec.json.*
 
-trait F2LongSlitView[F[_]] extends BaseMapping[F]:
+trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
 
-  object F2LongSlitView extends TableDef("v_flamingos_2_long_slit"):
+  object Flamingos2LongSlitView extends TableDef("v_flamingos_2_long_slit"):
 
     val Disperser: ColumnRef          = col("c_disperser", f2_disperser)
     val Filter: ColumnRef             = col("c_filter", f2_filter)

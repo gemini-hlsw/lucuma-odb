@@ -99,6 +99,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       LinkUser,
       RecordAtom,
       RecordDataset,
+      RecordFlamingos2Visit,
       RecordGmosNorthStep,
       RecordGmosNorthVisit,
       RecordGmosSouthStep,
@@ -582,6 +583,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     child:     Query
   )(using Services[F], Transaction[F]): F[Result[Query]] =
     ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
+
+
+  private lazy val RecordFlamingos2Visit: MutationField =
+    MutationField("recordFlamingos2Visit", RecordFlamingos2VisitInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordVisit(
+            visitService.recordFlamingos2(input),
+            Predicates.visit.id,
+            child
+          )
 
   private lazy val RecordGmosNorthVisit: MutationField =
     MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding): (input, child) =>

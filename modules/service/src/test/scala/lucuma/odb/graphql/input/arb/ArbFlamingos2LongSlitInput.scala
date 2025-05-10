@@ -17,9 +17,9 @@ import lucuma.odb.data.arb.ArbNullable.given
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-trait ArbF2LongSlitInput:
+trait ArbFlamingos2LongSlitInput:
 
-  given Arbitrary[F2LongSlitInput.Create] =
+  given Arbitrary[Flamingos2LongSlitInput.Create] =
     Arbitrary {
       for {
         g <- arbitrary[F2Disperser]
@@ -29,10 +29,10 @@ trait ArbF2LongSlitInput:
         s <- arbitrary[Option[F2Reads]]
         d <- arbitrary[Option[F2Decker]]
         o <- arbitrary[Option[F2ReadoutMode]]
-      } yield F2LongSlitInput.Create(g, f, u, r, s, d, o)
+      } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o)
     }
 
-  given Arbitrary[F2LongSlitInput.Edit] =
+  given Arbitrary[Flamingos2LongSlitInput.Edit] =
     Arbitrary {
       for {
         g <- arbitrary[Option[F2Disperser]]
@@ -42,8 +42,8 @@ trait ArbF2LongSlitInput:
         s <- arbitrary[Nullable[F2Reads]]
         d <- arbitrary[Nullable[F2Decker]]
         o <- arbitrary[Nullable[F2ReadoutMode]]
-      } yield F2LongSlitInput.Edit(g, f, u, r, s, d, o)
+      } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o)
     }
 
 
-object ArbF2LongSlitInput extends ArbF2LongSlitInput
+object ArbFlamingos2LongSlitInput extends ArbFlamingos2LongSlitInput
