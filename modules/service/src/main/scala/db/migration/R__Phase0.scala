@@ -16,14 +16,26 @@ import java.io.InputStream
  */
 class R__Phase0 extends RepeatableMigration("Phase 0 Instrument Options") {
 
-  val fileName: String = "Phase0_Instrument_Matrix - Spectroscopy.tsv"
+  val spectroscopyFileName: String = "Phase0_Instrument_Matrix - Spectroscopy.tsv"
+
+  val imagingFileName: String = "Phase0_Instrument_Matrix - Imaging.tsv"
 
   override val importForcingVersion: Int = 5
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
-    filesFromClasspath("phase0", NonEmptyList.one(fileName))
+    filesFromClasspath("phase0", NonEmptyList.of(spectroscopyFileName, imagingFileName))
 
   override def ioMigrate(ctx: Context, bc: BaseConnection): IO[Unit] =
-    Phase0Loader.loadAll(bc, fileName, definitionFiles.head._2)
+    definitionFiles.map(_._2).toList match {
+      case spec :: imaging :: Nil =>
+        Phase0Loader.spectroscopyLoadAll(bc, spectroscopyFileName, spec) *>
+          Phase0Loader.spectroscopyLoadAll(bc, imagingFileName, imaging)
+      case _ =>
+        IO.raiseError(
+          new RuntimeException(
+            s"Expected 2 input files, found ${definitionFiles.size}"
+          )
+        )
+    }
 
 }

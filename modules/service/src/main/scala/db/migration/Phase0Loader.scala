@@ -11,9 +11,12 @@ import fs2.Pipe
 import fs2.Stream
 import fs2.io.readInputStream
 import lucuma.core.enums.Instrument
+import lucuma.odb.phase0.ConfigurationRow
 import lucuma.odb.phase0.F2SpectroscopyRow
 import lucuma.odb.phase0.FileReader
+import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import org.postgresql.core.BaseConnection
 
@@ -26,10 +29,10 @@ import java.io.InputStream
  * spectroscopy table (where instrument specific grating, filter and FPU values
  * are referenced as FKs).
  */
-class Phase0Loader[A](
+class Phase0Loader[A, B <: ConfigurationRow](
   val instrument: Instrument,
   val pipe:       Pipe[IO, Byte, (A, PosInt)],
-  val specRow:    A => SpectroscopyRow,
+  val specRow:    A => B,
   val instTable:  Phase0Table[A]
 ) {
 
@@ -50,7 +53,12 @@ class Phase0Loader[A](
       readInputStream(is, ByteChunkSize, closeAfterUse = true)
         .through(pipe)
         .map { (a, idx) => (
-          Phase0Table.Spectroscopy.stdinLine(specRow(a), idx),
+          specRow(a) match {
+            case s: SpectroscopyRow =>
+              Phase0Table.Spectroscopy.stdinLine(s, idx)
+            case i: ImagingRow =>
+              Phase0Table.Imaging.stdinLine(i, idx)
+          },
           instTable.stdinLine(a, idx)
         )}
 
@@ -75,12 +83,20 @@ class Phase0Loader[A](
 
 object Phase0Loader {
 
-  def loadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
+  def spectroscopyLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
     val rdr = FileReader[IO](fileName)
     List(
-      new Phase0Loader[GmosSpectroscopyRow.GmosNorth](Instrument.GmosNorth, rdr.gmosNorth, _.spec, Phase0Table.SpectroscopyGmosNorth),
-      new Phase0Loader[GmosSpectroscopyRow.GmosSouth](Instrument.GmosSouth, rdr.gmosSouth, _.spec, Phase0Table.SpectroscopyGmosSouth),
-      new Phase0Loader[F2SpectroscopyRow](Instrument.Flamingos2, rdr.f2, _.spec, Phase0Table.SpectroscopyF2)
+      new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth),
+      new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth),
+      new Phase0Loader[F2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.f2Spectroscopy, _.spec, Phase0Table.SpectroscopyF2)
+    ).traverse_(_.load(bc, is))
+
+  def imagingLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
+    val rdr = FileReader[IO](fileName)
+    IO.unit
+    List(
+      new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth),
+    //   new Phase0Loader[GmosSpectroscopyRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouth, _.spec, Phase0Table.SpectroscopyGmosSouth),
     ).traverse_(_.load(bc, is))
 
 }
