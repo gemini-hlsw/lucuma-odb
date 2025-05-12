@@ -9132,6 +9132,40 @@ type SpectroscopyConfigOptionFlamingos2 {
 }
 
 """
+Describes an instrument configuration option for imaging.
+"""
+type ImagingConfigOption {
+  instrument: Instrument!
+
+  filterLabel: NonEmptyString # e.g., 'JH'
+
+  adaptiveOptics: Boolean!
+
+  site: Site!
+
+  """
+  For GMOS North options, the GMOS North configuration.  Null for other
+  instruments.
+  """
+  gmosNorth: ImagingConfigOptionGmosNorth
+
+  """
+  For GMOS South options, the GMOS South configuration.  Null for other
+  instruments.
+  """
+  gmosSouth: ImagingConfigOptionGmosSouth
+
+}
+
+type ImagingConfigOptionGmosNorth {
+  filter: GmosNorthFilter!
+}
+
+type ImagingConfigOptionGmosSouth {
+  filter: GmosSouthFilter!
+}
+
+"""
 An 'Int` in the range 0 to 100
 """
 scalar IntPercent
@@ -10645,6 +10679,13 @@ type Query {
   spectroscopyConfigOptions(
     WHERE: WhereSpectroscopyConfigOption
   ): [SpectroscopyConfigOption!]!
+
+  """
+  Imaging configuration options matching the WHERE parameter.
+  """
+  imagingConfigOptions(
+    WHERE: WhereImagingConfigOption
+  ): [ImagingConfigOption!]!
 
   """
   Retrieves the target with the given id, if it exists
@@ -16037,6 +16078,23 @@ input WhereSpectroscopyConfigOption {
   wavelengthOptimal: WhereWavelength
 
   wavelengthCoverage: WhereWavelength
+}
+
+"""
+Imaging instrument configuration option matcher.  Configure with the
+properties of interest and pass it to the 'imagingConfigOptions' query
+to find the corresponding configuration options.
+"""
+input WhereImagingConfigOption {
+  AND: [WhereImagingConfigOption!]
+
+  OR: [WhereImagingConfigOption!]
+
+  NOT: WhereImagingConfigOption
+
+  adaptiveOptics: WhereBoolean
+
+  site: WhereEqSite
 }
 
 """
