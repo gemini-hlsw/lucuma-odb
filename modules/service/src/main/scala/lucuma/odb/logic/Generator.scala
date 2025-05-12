@@ -353,8 +353,8 @@ object Generator {
         config: lucuma.odb.sequence.f2.longslit.Config,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      ): EitherT[F, Error, (ProtoFlamingos2, ExecutionState)] =
-        EitherT.leftT(Error.InvalidData(ctx.oid, s"F2 longslit not implemented ($ctx, $config, $role, $when)"))
+      ): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
+        EitherT.leftT(Error.sequenceUnavailable(ctx.oid, s"F2 longslit not implemented ($ctx, $config, $role, $when)"))
 
       private def gmosNorthLongSlit(
         ctx:    Context,
@@ -392,7 +392,7 @@ object Generator {
         (ctx.params match
           case GeneratorParams(_, _, config: f2.longslit.Config, role, declaredComplete, _) =>
             flamingos2LongSlit(ctx, config, role, when).flatMap: (p, e) =>
-              EitherT.fromEither[F](executionDigest(p, e, calculator.flamingos2.estimateSetup))
+              EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.flamingos2.estimateSetup))
 
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
             gmosNorthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
