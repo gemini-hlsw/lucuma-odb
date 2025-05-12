@@ -22,6 +22,8 @@ Instrument	Config	Focal Plane	fpu	slit width	slit length	disperser	filter	wave m
 GMOS-N	B1200 0.25"	singleslit,multislit	0.25"	0.250	330	B1200	none	0.36	0.72	0.463	0.164	7488	no		n
  */
 
+sealed trait ConfigurationRow
+
 /**
  * Represents a single row in the spectroscopy instrument option "phase 0" table.
  */
@@ -42,10 +44,9 @@ case class SpectroscopyRow(
   ao:             Boolean,
   capability:     Option[Capability],
   site:           Site
-)
+) extends ConfigurationRow
 
-object SpectroscopyRow {
-
+trait RowParsers:
   val string: Parser[String] =
     (vchar | sp).rep.string
 
@@ -55,6 +56,28 @@ object SpectroscopyRow {
         inst.shortName.equalsIgnoreCase(s) || inst.longName === s || inst.tag === s
       }
     }
+
+  val arcsec: Parser0[Angle] =
+    posBigDecimal.map { bd =>
+      Angle.fromBigDecimalArcseconds(bd.value)
+    }
+
+  val ao: Parser[Boolean] =
+    string.map {
+      case "yes" => true
+      case _     => false
+    }
+
+  val site: Parser[Site] =
+    string.mapFilter {
+      case "n" => Site.GN.some
+      case "s" => Site.GS.some
+      case _   => none
+    }
+
+object RowParsers extends RowParsers
+
+object SpectroscopyRow extends RowParsers {
 
   val filter: Parser[Option[String]] =
     string.map { s => Option.when(s =!= "none")(s) }
@@ -68,33 +91,15 @@ object SpectroscopyRow {
       )
     }
 
-  val arcsec: Parser0[Angle] =
-    posBigDecimal.map { bd =>
-      Angle.fromBigDecimalArcseconds(bd.value)
-    }
-
   val µm: Parser0[Wavelength] =
     posBigDecimal.mapFilter { bd =>
       Wavelength.decimalMicrometers.getOption(bd.value)
-    }
-
-  val ao: Parser[Boolean] =
-    string.map {
-      case "yes" => true
-      case _     => false
     }
 
   val capability: Parser0[Option[Capability]] =
     vchar.rep0.string.mapFilter {
       case "" => none.some
       case s  => Capability.values.find(_.label === s).map(_.some)
-    }
-
-  val site: Parser[Site] =
-    string.mapFilter {
-      case "n" => Site.GN.some
-      case "s" => Site.GS.some
-      case _   => none
     }
 
   /**
@@ -122,6 +127,50 @@ object SpectroscopyRow {
   ).map { case (((((((((((((((inst, desc), fpuOpts), fpu), slitWidth), slitLength), disp), filter), min), max), opt), cov), res), ao), capability), site) =>
     fpuOpts.toList.map { fpuOpt =>
       SpectroscopyRow(inst, desc, fpuOpt, fpu, slitWidth, slitLength, disp, filter, min, max, opt, cov, res, ao, capability, site)
+    }
+  }
+
+}
+
+/*
+Instrument	FoV	 Filters	AO	capabilities	site
+GMOS-S	330	u,g,r,i,CaT,z,Z,Y,ri,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,DS920,g+GG455,g+OG515, r+RG610,i+CaT,z+CaT	no		s
+ */
+
+/**
+ * Represents a single row in the spectroscopy instrument option "phase 0" table.
+ */
+case class ImagingRow(
+  instrument:     Instrument,
+  fov:            Angle,
+  filter:         String,
+  ao:             Boolean,
+  capability:     Option[Capability],
+  site:           Site
+) extends ConfigurationRow
+
+object ImagingRow extends RowParsers {
+
+  val filterOptions: Parser[Set[String]] =
+    string.map { s =>
+      Set.from(
+        s.split(',')
+      )
+    }
+
+  /**
+   * A single line in the .tsv file is split into 1 or more rows according to the filters included.
+   */
+  val rows: Parser[List[ImagingRow]] = (
+    (instrument    <* htab) ~
+    (arcsec        <* htab) ~
+    (filterOptions <* htab) ~
+    (ao            <* htab) ~
+    (string.?      <* htab) ~
+    site
+  ).map { case (((((inst, fov), filterOpts), ao), _), site) =>
+    filterOpts.toList.map { filter =>
+      ImagingRow(inst, fov, filter, ao, None, site)
     }
   }
 

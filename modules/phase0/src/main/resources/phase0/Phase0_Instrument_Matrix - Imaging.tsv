@@ -1,0 +1,16 @@
+instrument	FoV	filters	AO	capabilities	site
+GMOS-S	330	u,g,r,i,CaT,z,Z,Y,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,g+GG455,g+OG515,r+RG610,i+CaT,z+CaT	no		s
+GMOS-N	330	g,r,i,CaT,z,Z,Y,r+i,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,DS920,g+GG455,g+OG515,r+RG610,i+CaT,z+CaT	no		n
+FLAMINGOS2	366	Y,J,H,Ks,K-blue,K-red	no		s
+GSAOI	85	Z,J,H,K,K(prime),K(short),K	yes		s
+GPI	2.8	Y,J,H,K1,K2	yes		s
+NIRI f/6	120	J,H,K,L,M	no		n
+NIRI f/14	50	J,H,K	yes		n
+NIRI f/14	50	L,M	no		n
+NIRI f/32	22	J,H,K	yes		n
+NIRI f/32	22	L,M	no		n
+Alopeke Speckle	3	u,g,r,i,z,EO466,EO562,EO716,EO832	no	speckle	n
+Zorro Speckle	3	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	speckle	s
+Alopeke Wide Field	35	u,g,r,i,z,EO466,EO562,EO716,EO832	no		n
+Zorro Wide Field	35	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no		s
+SCORPIO	180	g,r,i,z,J,H,Ks	no		s
