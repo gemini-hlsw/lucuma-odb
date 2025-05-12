@@ -215,7 +215,7 @@ object OdbMapping {
           with RecordFlamingos2VisitResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
-          with RecordGmosStepResultMapping[F]
+          with RecordStepResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -423,6 +423,7 @@ object OdbMapping {
                 RadialVelocityMapping,
                 RecordAtomResultMapping,
                 RecordDatasetResultMapping,
+                RecordFlamingos2StepResultMapping,
                 RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,

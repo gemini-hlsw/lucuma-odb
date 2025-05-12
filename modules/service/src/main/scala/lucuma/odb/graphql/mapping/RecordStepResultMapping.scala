@@ -8,7 +8,7 @@ import grackle.TypeRef
 
 import table.StepRecordView
 
-trait RecordGmosStepResultMapping[F[_]] extends StepRecordView[F] {
+trait RecordStepResultMapping[F[_]] extends StepRecordView[F]:
 
   private def recordStepResultMapping(
     typeRef: TypeRef
@@ -18,10 +18,11 @@ trait RecordGmosStepResultMapping[F[_]] extends StepRecordView[F] {
       SqlObject("stepRecord")
     )
 
+  lazy val RecordFlamingos2StepResultMapping: ObjectMapping =
+    recordStepResultMapping(RecordFlamingos2StepResultType)
+
   lazy val RecordGmosNorthStepResultMapping: ObjectMapping =
     recordStepResultMapping(RecordGmosNorthStepResultType)
 
   lazy val RecordGmosSouthStepResultMapping: ObjectMapping =
     recordStepResultMapping(RecordGmosSouthStepResultType)
-
-}

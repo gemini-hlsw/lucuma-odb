@@ -2917,6 +2917,14 @@ type Mutation {
   ): RecordDatasetResult!
 
   """
+  Record a new Flamingos 2 step.
+  """
+  recordFlamingos2Step(
+    "Flamingos 2 step configuration parameters"
+    input: RecordFlamingos2StepInput!
+  ): RecordFlamingos2StepResult!
+
+  """
   Record a new Flamingos 2 visit
   """
   recordFlamingos2Visit(
@@ -6895,6 +6903,28 @@ input Flamingos2StaticInput {
 }
 
 """
+Input parameters for creating a new Flamingos 2 StepRecord
+"""
+input RecordFlamingos2StepInput {
+  atomId: AtomId!
+  flamingos2: Flamingos2DynamicInput!
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+  generatedId: StepId
+}
+
+"""
+The result of recording a Flamingos 2 step.
+"""
+type RecordFlamingos2StepResult {
+  """
+  The newly added step record itself.
+  """
+  stepRecord: StepRecord!
+}
+
+"""
 Input parameters for creating a new Flamingos 2 Visit
 """
 input RecordFlamingos2VisitInput {
@@ -7035,7 +7065,7 @@ input Flamingos2DynamicInput {
 
   readMode: Flamingos2ReadMode!
 
-  lyot: Flamingos2LyotWheel!
+  lyotWheel: Flamingos2LyotWheel!
 
   mask: Flamingos2MaskInput
 
