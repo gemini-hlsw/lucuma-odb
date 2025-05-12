@@ -20,7 +20,7 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
       SqlField("slitWidth",    table.Fpu.CustomMask.SlitWidth)
     )
 
-  lazy val GmosCustomMaskMapping: List[TypeMapping] =
+  lazy val GmosCustomMaskMappings: List[TypeMapping] =
     List(
       customMaskMappingAtPath(StepRecordType / "gmosNorth" / "fpu" / "customMask", GmosNorthDynamicTable),
       customMaskMappingAtPath(StepRecordType / "gmosSouth" / "fpu" / "customMask", GmosSouthDynamicTable),

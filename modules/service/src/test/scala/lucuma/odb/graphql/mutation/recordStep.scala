@@ -49,6 +49,118 @@ class recordStep extends OdbSuite {
       _   <- expect(user, query(aid), expected(aid).leftMap(msg => List(msg)))
     } yield ()
 
+  test("recordStep - Flamingos 2"):
+    recordStepTest(
+      ObservingModeType.Flamingos2LongSlit,
+      service,
+      aid => s"""
+        mutation {
+          recordFlamingos2Step(input: {
+            atomId: ${aid.asJson},
+            ${dynamicConfig(Instrument.Flamingos2)},
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
+            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
+          }) {
+            stepRecord {
+              gmosNorth {
+                exposure {
+                  seconds
+                }
+                readout {
+                  xBin
+                  yBin
+                  ampCount
+                  ampGain
+                  ampReadMode
+                }
+                dtax
+                roi
+                gratingConfig {
+                  grating
+                  order
+                  wavelength {
+                    nanometers
+                  }
+                }
+                filter
+                fpu {
+                  customMask {
+                    filename
+                    slitWidth
+                  }
+                  builtin
+                }
+                centralWavelength {
+                  nanometers
+                }
+              }
+              gmosSouth {
+                exposure {
+                  seconds
+                }
+              }
+              observeClass
+              estimate {
+                seconds
+              }
+            }
+          }
+        }
+      """,
+      _ => json"""
+        {
+          "recordGmosNorthStep": {
+            "stepRecord": {
+              "gmosNorth": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "readout": {
+                  "xBin": "ONE",
+                  "yBin": "ONE",
+                  "ampCount": "TWELVE",
+                  "ampGain": "LOW",
+                  "ampReadMode": "SLOW"
+                },
+                "dtax": "TWO",
+                "roi": "FULL_FRAME",
+                "gratingConfig": {
+                  "grating": "B1200_G5301",
+                  "order": "ONE",
+                  "wavelength": {
+                    "nanometers": 600.000
+                  }
+                },
+                "filter": null,
+                "fpu": {
+                  "customMask": null,
+                  "builtin": "LONG_SLIT_0_50"
+                },
+                "centralWavelength": {
+                  "nanometers": 600.000
+                }
+              },
+              "gmosSouth": null,
+              "observeClass": "ACQUISITION",
+              "estimate": {
+                "seconds": 1299.562500
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+
+    // Step Time estimate:
+    // 1200.0     Exposure
+    //   82.5     Readout (HAMAMATSU, 1x1, 12 amp, Low gain, Slow read, FullFrame)
+    //   10.0     Writeout
+    //    7.0     Offset constant
+    //    0.06250 Offset distance (0.00625 sec / arcsec X 10 arcsec)
+    // ----------
+    // 1299.56250 seconds
+
   test("recordStep - GmosNorth") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,
