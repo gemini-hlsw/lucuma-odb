@@ -1,5 +1,5 @@
 instrument	FoV	filters	AO	capabilities	site
-GMOS-S	330	u,g,r,i,CaT,z,Z,Y,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,g+GG455,g+OG515,r+RG610,i+CaT,z+Cat	no		s
+GMOS-S	330	u,g,r,i,CaT,z,Z,Y,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,g+GG455,g+OG515,r+RG610,i+CaT,z+CaT	no		s
 GMOS-N	330	g,r,i,CaT,z,Z,Y,r+i,HeII,HeIIC,OIII,OIIIC,Ha,HaC,SII,OVIC,OVI,DS920,g+GG455,g+OG515,r+RG610,i+CaT,z+CaT	no		n
 FLAMINGOS2	366	Y,J,H,Ks,K-blue,K-red	no		s
 GSAOI	85	Z,J,H,K,K(prime),K(short),K	yes		s

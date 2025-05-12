@@ -1,7 +1,7 @@
 
 -- Missing GmosS filters
-insert into t_gmos_south_filter values ('OVI', 'OVI', 'OVI_G0347', 684000, '[681600, 696500]', 'NarrowBand');
-insert into t_gmos_south_filter values ('OVIC', 'OVIC', 'OVI_G0349', 679000, '[679000, 680500]', 'NarrowBand');
+insert into t_gmos_south_filter values ('OVI', 'OVI', 'OVI_G0347', 684000, '[681600, 686500]', 'NarrowBand');
+insert into t_gmos_south_filter values ('OVIC', 'OVIC', 'OVI_G0348', 679000, '[676100, 680900]', 'NarrowBand');
 
 -- Imaging Configuration Options
 CREATE TABLE t_imaging_config_option (
@@ -45,3 +45,6 @@ CREATE TABLE t_imaging_config_option_gmos_south (
 );
 
 COMMENT ON TABLE t_imaging_config_option_gmos_south IS 'Imaging Configuration Options for Gmos South';
+
+-- Update GS filter name
+update t_gmos_south_filter set c_short_name = 'z+CaT' where c_tag = 'ZPrime_CaT';
