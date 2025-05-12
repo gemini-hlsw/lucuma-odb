@@ -212,6 +212,7 @@ lazy val phase0 = project
       "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
       "org.scalameta" %% "munit"               % munitVersion           % Test,
       "org.scalameta" %% "munit-scalacheck"    % munitVersion           % Test,
+      "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
   )
