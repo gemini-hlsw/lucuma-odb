@@ -62,6 +62,7 @@ class Phase0Loader[A](
     // 3. Bulk copy in to the spectroscopy table.
     // 4. Bulk copy in to the instrument table.
     for {
+      _  <- IO.println(s"Loading Phase 0 table for $instrument")
       _  <- bc.ioUpdate(instTable.truncate)
       _  <- bc.ioUpdate(Phase0Table.Spectroscopy.deleteFrom(instrument))
       _  <- bc.ioCopyIn(Phase0Table.Spectroscopy.copyFromStdin, toInputStream(rows.map(_._1)))
