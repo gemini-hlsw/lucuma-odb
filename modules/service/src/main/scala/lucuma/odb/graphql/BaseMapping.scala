@@ -263,6 +263,7 @@ trait BaseMapping[F[_]]
   lazy val RadialVelocityType                      = schema.ref("RadialVelocity")
   lazy val RecordAtomResultType                    = schema.ref("RecordAtomResult")
   lazy val RecordDatasetResultType                 = schema.ref("RecordDatasetResult")
+  lazy val RecordFlamingos2StepResultType          = schema.ref("RecordFlamingos2StepResult")
   lazy val RecordFlamingos2VisitResultType         = schema.ref("RecordFlamingos2VisitResult")
   lazy val RecordGmosNorthStepResultType           = schema.ref("RecordGmosNorthStepResult")
   lazy val RecordGmosNorthVisitResultType          = schema.ref("RecordGmosNorthVisitResult")
