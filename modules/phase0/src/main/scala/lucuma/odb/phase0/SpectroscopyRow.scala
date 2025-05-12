@@ -52,7 +52,7 @@ object SpectroscopyRow {
   val instrument: Parser[Instrument] =
     string.mapFilter { s =>
       Enumerated[Instrument].all.find { inst =>
-        inst.shortName === s || inst.longName === s || inst.tag === s
+        inst.shortName.equalsIgnoreCase(s) || inst.longName === s || inst.tag === s
       }
     }
 
