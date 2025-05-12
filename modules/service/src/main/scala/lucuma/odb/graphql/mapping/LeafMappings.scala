@@ -43,6 +43,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.EditType
@@ -146,6 +147,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
+      LeafMapping[CalculationState](CalculationStateType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),

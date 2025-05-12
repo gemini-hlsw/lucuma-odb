@@ -39,6 +39,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val groupElement                  = GroupElementPredicates(Path.from(GroupElementType))
     val createGroupResult             = CreateGroupResultPredicates(Path.from(CreateGroupResultType))
     val linkUserResult                = LinkUserResultPredicates(Path.from(LinkUserResultType))
+    val obscalcUpdate                 = ObscalcUpdatePredicates(Path.from(ObscalcUpdateType))
     val observation                   = ObservationPredicates(Path.from(ObservationType))
     val observationEdit               = ObservationEditPredicates(Path.from(ObservationEditType))
     val observingModeGroup            = ObservingModeGroupPredicates(Path.from(ObservingModeGroupType))

@@ -273,6 +273,15 @@ type BandedTime {
 }
 
 """
+A BandedTime that is automatically updated by a background process.
+"""
+type CalculatedBandedTime {
+  "The current state of the background calculation."
+  state: CalculationState!
+  value: BandedTime
+}
+
+"""
 Create or edit a band brightness value with integrated magnitude units.  When creating a new value, all fields except "error" are required.
 """
 input BandBrightnessIntegratedInput {
@@ -639,6 +648,15 @@ type CategorizedTimeRange {
   Maximum remaining time estimate.
   """
   maximum: CategorizedTime!
+}
+
+"""
+A CategorizedTimeRange that is automatically updated by a background process.
+"""
+type CalculatedCategorizedTimeRange {
+  "The current state of the background calculation."
+  state: CalculationState!
+  value: CategorizedTimeRange
 }
 
 """
@@ -4698,6 +4716,16 @@ type Subscription {
   datasetEdit(input: DatasetEditInput): DatasetEdit!
 
   """
+  Subscribes to an event that is generated whenever an observation calculation
+  is updated.  If a program id is provided then the event must correspond to an
+  observation referenced by that program.  If observation id is provided then
+  the event must correspond to that particular observation. The old and new
+  calculation states can also be matched to catch transitions, for example to
+  and from 'Ready'.
+  """
+  obscalcUpdate(input: ObscalcUpdateInput): ObscalcUpdate!
+
+  """
   Subscribes to an event that is generated whenever a(n) observation is
   created or updated.  If a(n) observation id is provided, the event is only
   generated for edits to that particular observation.  If a program id is
@@ -4736,6 +4764,112 @@ type Subscription {
   ): ConfigurationRequestEdit!
 
   executionEventAdded(input: ExecutionEventAddedInput): ExecutionEventAdded!
+
+}
+
+"""
+Observation background-update calculation states.
+"""
+enum CalculationState {
+
+  """
+  RETRY signifies that the observation update calculation failed and will be
+  automatically attempted again even if its properties are not modified.
+  """
+  RETRY
+
+  """
+  PENDING signifies that the observation will be updated by a background worker
+  in the future.  Calculated items like the execution digest may be updated at
+  that point.
+  """
+  PENDING
+
+  """
+  CALCULATING signifies that an observation background calculation is currently
+  ongoing.
+  """
+  CALCULATING
+
+  """
+  READY signifies that there are no pending calculation updates at the moment
+  and calculated values like the execution digest will not change.
+  """
+  READY
+}
+
+"""
+Input to the obscalcUpdate subscription.  Specify programId and/or observation
+id to filter events to that program and/or observation.  Specify the old and
+new states to limit events to only those transitions.
+"""
+input ObscalcUpdateInput {
+  programId:     ProgramId
+  observationId: ObservationId
+  oldState:      WhereOptionEqCalculationState
+  newState:      WhereOptionEqCalculationState
+}
+
+input WhereOptionEqCalculationState {
+
+  """
+  When `true`, matches if the CalculationState is not defined. When `false` matches
+  if the CalculationState is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: CalculationState
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: CalculationState
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [CalculationState!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [CalculationState!]
+
+}
+
+"""
+Result type of the obscalcUpdate subscription.
+"""
+type ObscalcUpdate {
+
+  """
+  Type of edit
+  """
+  editType: EditType!
+
+  """
+  Old calculation state, if any.
+  """
+  oldState: CalculationState
+
+  """
+  New calculation state, if any.
+  """
+  newState: CalculationState
+
+  """
+  Id of the observation that was updated.
+  """
+  observationId: ObservationId!
+
+  """
+  Updated observation, if not deleted.
+  """
+  value: Observation
+
 }
 
 input ExecutionEventAddedInput {
@@ -8622,6 +8756,9 @@ type Group {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  # OBSCALC TODO: replace original version above with this one
+  timeEstimateRange2: CalculatedCategorizedTimeRange
+
   """
   Prepared time by band ignoring `minimumRequired`, for observations that can be
   calculated.  In order for an observation to have an estimate, it must be
@@ -8629,6 +8766,9 @@ type Group {
   observations in every band present in the group are included.
   """
   timeEstimateBanded: [BandedTime!]!
+
+  # OBSCALC TODO: replace original version above with this one
+  timeEstimateBanded2: [CalculatedBandedTime!]!
 
   existence: Existence!
 
@@ -9835,6 +9975,9 @@ type Program {
   """
   timeEstimateRange: CategorizedTimeRange
 
+  # OBSCALC TODO: replace original version with this one
+  timeEstimateRange2: CalculatedCategorizedTimeRange
+
   """
   Prepared time by band ignoring `minimumRequired` in groups, for observations
   that can be calculated.  In order for an observation to have an estimate, it
@@ -9842,6 +9985,9 @@ type Program {
   defined observations in every band present in the program are included.
   """
   timeEstimateBanded: [BandedTime!]!
+
+  # OBSCALC TODO: replace original version with this one
+  timeEstimateBanded2: [CalculatedBandedTime!]!
 
   """
   Program-wide time charge, summing all corrected observation time charges.

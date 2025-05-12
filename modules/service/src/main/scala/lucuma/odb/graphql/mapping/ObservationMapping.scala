@@ -23,7 +23,6 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
@@ -118,18 +117,12 @@ trait ObservationMapping[F[_]]
   def itcQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    import ItcService.Error.ObservationDefinitionError
-
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[ItcService.AsterismResults]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService(itcClient)
             .lookup(pid, oid)
-            .map {
-              case Left(e@ObservationDefinitionError(_)) => OdbError.InvalidObservation(oid, e.format.some).asFailure
-              case Left(e)                               => OdbError.ItcError(e.format.some).asFailure
-              case Right(s)                              => s.success
-            }
+            .map(_.bimap(_.asFailure, _.success).merge)
         }
 
     effectHandler(readEnv, calculate)
