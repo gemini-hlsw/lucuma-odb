@@ -49,8 +49,9 @@ case class Config(
   corsOverHttps: Boolean,          // Whether to require CORS over HTTPS
   domain:        List[String],     // Domains, for CORS headers
   commitHash:    CommitHash,       // From Heroku Dyno Metadata
-  goaUsers:      Set[User.Id]      // Gemini Observatory Archive user id(s)
-) {
+  goaUsers:      Set[User.Id],     // Gemini Observatory Archive user id(s)
+  obscalcPoll:   FiniteDuration    // Obscalc poll period
+):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
   // verify the signature using the SSO server's public key, and then extract the user.
@@ -64,94 +65,86 @@ case class Config(
 
   // ITC client resource
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
-    httpClientResource[F].evalMap { httpClient =>
+    httpClientResource[F].evalMap: httpClient =>
       ItcClient.create(itc.root, httpClient)
-    }
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
-    httpClientResource[F].evalMap { httpClient =>
+    httpClientResource[F].evalMap: httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
         ssoRoot    = sso.root,
         jwtReader  = jwtReader[F],
         httpClient = NatchezMiddleware.client(httpClient), // Note!
       ) .map(_.map(_.user))
-    }
-
-}
 
 
-object Config {
+object Config:
 
   case class Itc(
     root:       Uri,             // Root URI for the ITC server we're using.
     pollPeriod: FiniteDuration   // How often to poll for ITC version updates.
   )
 
-  object Itc {
-
+  object Itc:
     lazy val fromCiris: ConfigValue[Effect, Itc] = (
       envOrProp("ODB_ITC_ROOT").as[Uri],
       envOrProp("ODB_ITC_POLL_PERIOD").as[FiniteDuration].default(5.minutes)
     ).parMapN(Itc.apply)
-
-  }
 
   case class Sso(
     root:      Uri,       // Root URI for the SSO server we're using.
     publicKey: PublicKey  // We need to verify user JWTs, which requires the SSO server's public key.
   )
 
-  object Sso {
-
+  object Sso:
     lazy val fromCiris: ConfigValue[Effect, Sso] = (
       envOrProp("ODB_SSO_ROOT").as[Uri],
       envOrProp("ODB_SSO_PUBLIC_KEY").as[PublicKey]
     ).parMapN(Sso.apply)
-
-  }
 
   case class Honeycomb(
     writeKey: String,
     dataset:  String
   )
 
-  object Honeycomb {
-
+  object Honeycomb:
     lazy val fromCiris: ConfigValue[Effect, Honeycomb] = (
       envOrProp("ODB_HONEYCOMB_WRITE_KEY"),
       envOrProp("ODB_HONEYCOMB_DATASET")
     ).parMapN(Honeycomb.apply)
 
-  }
-
   case class Database(
     maxConnections: Int,
     maxCalibrationConnections: Int,
+    maxObscalcConnections: Int,
     host: String,
     port: Int,
     database: String,
     user: String,
     password: String,
-  ) {
+  ):
     // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
     def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
-  }
 
-  object Database {
+  object Database:
 
     object Default:
       val MaxConnections = Runtime.getRuntime.availableProcessors * 2 + 1
-      val CalibrationConnections = 2
 
     // postgres://username:password@host:port/database name
-    def fromHerokuUri(maxConnections: Int, maxCalibrationConnections: Int, uri: URI): Option[Database] =
-      uri.getUserInfo.split(":") match {
+    def fromHerokuUri(
+      maxConnections: Int,
+      maxCalibrationConnections: Int,
+      maxObscalcConnections: Int,
+      uri: URI
+    ): Option[Database] =
+      uri.getUserInfo.split(":") match
         case Array(user, password) =>
           Some(Database(
-            maxConnections = maxConnections,
+            maxConnections            = maxConnections,
             maxCalibrationConnections = maxCalibrationConnections,
+            maxObscalcConnections     = maxObscalcConnections,
             host     = uri.getHost,
             port     = uri.getPort,
             database = uri.getPath.drop(1),
@@ -159,27 +152,24 @@ object Config {
             password = password,
           ))
         case _ => None
-      }
 
     private given ConfigDecoder[String, URI] =
-      ConfigDecoder[String].mapOption("URI") { s =>
+      ConfigDecoder[String].mapOption("URI"): s =>
         try Some(new URI(s))
         catch { case _: URISyntaxException => None }
-      }
 
     private given Show[URI] =
       Show.fromToString
 
-    private given ConfigDecoder[(Int, Int, URI), Database] =
-      ConfigDecoder[(Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
+    private given ConfigDecoder[(Int, Int, Int, URI), Database] =
+      ConfigDecoder[(Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] = (
       envOrProp("ODB_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("CALIBRATIONS_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
+      envOrProp("OBSCALC_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
-
-  }
 
   case class Aws(
     accessKey:       NonEmptyString,
@@ -187,7 +177,7 @@ object Config {
     basePath:        NonEmptyString,
     bucketName:      BucketName,
     fileUploadMaxMb: Int
-  ) {
+  ):
     // Within the ODB we work with the filepath, which is the S3 FileKey
     // minus the basePath. The s3FileService adds the basePath using
     // `fileKey` as needed.
@@ -196,9 +186,8 @@ object Config {
 
     def fileKey(path: NonEmptyString): FileKey =
       FileKey(NonEmptyString.unsafeFrom(s"$basePath/$path"))
-  }
 
-  object Aws {
+  object Aws:
     private given Show[Uri.Path] = Show.fromToString
 
     private given ConfigDecoder[Uri, Uri.Path] =
@@ -206,20 +195,17 @@ object Config {
 
     // The basePath must be nonEmpty
     private given ConfigDecoder[Uri.Path, NonEmptyString] =
-      ConfigDecoder[Uri.Path].mapOption("NonEmptyPath"){ p =>
+      ConfigDecoder[Uri.Path].mapOption("NonEmptyPath"): p =>
         val str = p.segments.map(_.encoded).mkString("/")
         NonEmptyString.from(str).toOption
-      }
 
     private given ConfigDecoder[Uri, BucketName] =
-      ConfigDecoder[Uri].mapOption("BucketName"){ uri =>
-        uri.host.flatMap{ h =>
-          h.value.split("\\.").headOption
-         }.flatMap { b =>
-          NonEmptyString.from(b).toOption
-          .map(BucketName.apply)
-        }
-      }
+      ConfigDecoder[Uri].mapOption("BucketName"): uri =>
+        uri
+          .host
+          .flatMap(_.value.split("\\.").headOption)
+          .flatMap: b =>
+            NonEmptyString.from(b).toOption.map(BucketName.apply)
 
     lazy val fromCiris: ConfigValue[Effect, Aws] = (
       envOrProp("CLOUDCUBE_ACCESS_KEY_ID").as[NonEmptyString],
@@ -228,7 +214,6 @@ object Config {
       envOrProp("CLOUDCUBE_URL").as[Uri].as[BucketName],
       envOrProp("FILE_UPLOAD_MAX_MB").as[Int]
     ).parMapN(Aws.apply)
-  }
 
   case class Email(
     apiKey:            NonEmptyString,
@@ -236,14 +221,13 @@ object Config {
     webhookSigningKey: NonEmptyString,
     invitationFrom:    EmailAddress,
     exploreUrl:        Uri
-  ) {
+  ):
     // add to environment?
     lazy val baseUri = uri"https://api.mailgun.net/v3"
     lazy val sendMessageUri = baseUri / domain.value / "messages"
     lazy val eventsUri = baseUri / domain.value / "events"
-  }
 
-  object Email {
+  object Email:
     lazy val fromCirrus: ConfigValue[Effect, Email] = (
       envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
       envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
@@ -253,20 +237,16 @@ object Config {
     ).parMapN(Email.apply)
 
     private given ConfigDecoder[String, EmailAddress] =
-      ConfigDecoder[String].mapOption("Email Address") { s =>
+      ConfigDecoder[String].mapOption("Email Address"): s =>
         EmailAddress.from(s).toOption
-      }
-  }
 
   private given ConfigDecoder[String, PublicKey] =
-    ConfigDecoder[String].mapOption("Public Key") { s =>
+    ConfigDecoder[String].mapOption("Public Key"): s =>
       GpgPublicKeyReader.publicKey(s).toOption
-    }
 
   private given ConfigDecoder[String, Uri] =
-    ConfigDecoder[String].mapOption("URI") { s =>
+    ConfigDecoder[String].mapOption("URI"): s =>
       Uri.fromString(s).toOption
-    }
 
   private given ConfigDecoder[Int, Port] =
     ConfigDecoder[Int].mapOption("Port")(Port.fromInt)
@@ -296,8 +276,6 @@ object Config {
     envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").as[List[String]],
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero),
-    envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty)
+    envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
+    envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds)
   ).parMapN(Config.apply)
-
-}
-

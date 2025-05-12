@@ -69,12 +69,17 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
@@ -87,6 +92,20 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 trait DatabaseOperations { this: OdbSuite =>
+
+  // Executes the obscalc update for an observation on demand.  In production,
+  // this is handled by a background worker but for testing it is useful to
+  // trigger an update on demand.
+  def runObscalcUpdateAs(user: User, pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    withServices(user): services =>
+      TimeEstimateCalculatorImplementation
+        .fromSession(services.session, services.enums)
+        .flatMap: tec =>
+          given Services[IO] = services
+          requireServiceAccessOrThrow:
+            obscalcService(CommitHash.Zero, itcClient, tec)
+              .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
+      .void
 
   def createCallForProposalsAs(
      user:        User,

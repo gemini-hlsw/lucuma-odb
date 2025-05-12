@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Monad
 import cats.effect.Resource
 import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.functor.*
@@ -21,12 +22,14 @@ import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
+import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.json.calculatedValue.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -57,8 +60,13 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       SqlObject("maximumInterval"),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
+
+      // OBSCALC TODO: replace with obscald version (2) below
       EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
       EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
+      EffectField("timeEstimateRange2", estimateRangeHandler2, List("id")),
+      EffectField("timeEstimateBanded2", estimateBandedHandler2, List("id")),
+
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
     )
@@ -78,15 +86,30 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
           )
       }
 
+  // OBSCALC TODO: Replace with obscalc version 2 below
   private lazy val estimateRangeHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, Option[CategorizedTimeRange]]("id"): gid =>
       services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
           .estimateGroupRange(gid)
 
+  // OBSCALC TODO: Replace with obscalc version 2 below
   private lazy val estimateBandedHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, List[BandedTime]]("id"): gid =>
       services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
           .estimateGroupBanded(gid)
           .map(_.toList.flatMap(_.toList.sortBy(_._1).map((b, t) => BandedTime(b, t))))
+
+  private lazy val estimateRangeHandler2: EffectHandler[F] =
+    keyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gid =>
+      services.useTransactionally:
+        timeEstimateService2(commitHash, itcClient, timeEstimateCalculator)
+          .estimateGroupRange(gid)
+
+  private lazy val estimateBandedHandler2: EffectHandler[F] =
+    keyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
+      services.useTransactionally:
+        timeEstimateService2(commitHash, itcClient, timeEstimateCalculator)
+          .estimateGroupBanded(gid)
+          .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))

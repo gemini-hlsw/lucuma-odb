@@ -4,6 +4,8 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.ApplicativeError
+import cats.MonadError
 import cats.Parallel
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
@@ -28,6 +30,7 @@ import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
+import lucuma.odb.logic.TimeEstimateService2
 import lucuma.odb.sequence.util.CommitHash
 import natchez.Trace
 import org.http4s.client.Client
@@ -187,11 +190,17 @@ trait Services[F[_]]:
   /** Construct a `Generator`, given a `CommitHash` and an `ItcClient`.*/
   def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): Generator[F]
 
+  def obscalcService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): ObscalcService[F]
+
   /** The `TimeAccounting` service. */
   def timeAccountingService: TimeAccountingService[F]
 
+  // OBSCALC TODO: version 1 of TimeEstimateService will be deleted and
+  // replaced with version 2.
+
   /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
   def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService[F]
+  def timeEstimateService2(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService2[F]
 
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): GuideService[F]
@@ -303,7 +312,9 @@ object Services:
       def attachmentFileService(s3: S3FileService[F]) = AttachmentFileService.instantiate(s3)
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
+      def obscalcService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = ObscalcService.instantiate(commitHash, itcClient, ptc)
       def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
+      def timeEstimateService2(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService2.instantiate(commitHash, itcClient, ptc)
       def guideService(httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = GuideService.instantiate(httpClient, itcClient, commitHash, ptc)
       def emailService(emailConfig: Config.Email, httpClient: Client[F]) = EmailService.fromConfigAndClient(emailConfig, httpClient)
       def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]) = UserInvitationService.instantiate(emailConfig, httpClient)
@@ -353,7 +364,9 @@ object Services:
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
+    def obscalcService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): ObscalcService[F] = summon[Services[F]].obscalcService(commitHash, itcClient, ptc)
     def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
+    def timeEstimateService2[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): TimeEstimateService2[F] = summon[Services[F]].timeEstimateService2(commitHash, itcClient, ptc)
     def guideService[F[_]](httpClient: Client[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(httpClient, itcClient, commitHash, ptc)
     def userInvitationService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService(emailConfig, httpClient)
     def emailService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]) = summon[Services[F]].emailService(emailConfig, httpClient)
@@ -373,6 +386,10 @@ object Services:
     def requireServiceAccess[F[_], A](fa: Services.ServiceAccess ?=> F[Result[A]])(using Services[F], Applicative[F]): F[Result[A]] =
       if user.role.access >= Access.Service then fa(using ())
       else OdbError.NotAuthorized(user.id).asFailureF
+
+    def requireServiceAccessOrThrow[F[_], A](fa: Services.ServiceAccess ?=> F[A])(using Services[F], MonadError[F, Throwable]): F[A] =
+      requireServiceAccess(fa.map(Result.success)).flatMap: r =>
+        ApplicativeError.liftFromOption(r.toOption, new RuntimeException(s"ServiceAccess required, ${user.id} not authorized."))
 
     // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
     // the service in which you want to use it. Like:

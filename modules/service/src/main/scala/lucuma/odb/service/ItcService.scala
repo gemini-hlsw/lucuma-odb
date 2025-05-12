@@ -49,9 +49,9 @@ import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
@@ -69,7 +69,6 @@ import scala.concurrent.duration.*
 sealed trait ItcService[F[_]] {
 
   import ItcService.AsterismResults
-  import ItcService.Error
 
   /**
    * Obtains the ITC results for a single target, first checking the cache and
@@ -78,7 +77,7 @@ sealed trait ItcService[F[_]] {
   def lookup(
     programId:     Program.Id,
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
 
   /**
    * Using the provided generator parameters, calls the remote ITC service to
@@ -88,7 +87,7 @@ sealed trait ItcService[F[_]] {
     programId:     Program.Id,
     observationId: Observation.Id,
     params:        GeneratorParams
-  )(using NoTransaction[F]): F[Either[Error, AsterismResults]]
+  )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]]
 
   /**
    * Selects the cached ITC results for a single observation, if available and
@@ -118,31 +117,29 @@ sealed trait ItcService[F[_]] {
 
 object ItcService {
 
-  sealed trait Error:
-    def format: String
-
   object Error:
-    case class ObservationDefinitionError(error: GeneratorParamsService.Error) extends Error:
-      def format: String =
-        error match
-          case GeneratorParamsService.Error.MissingData(p) =>
-            s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
-          case _                                           =>
-            error.format
+    def invalidObservation(
+      oid:   Observation.Id,
+      error: GeneratorParamsService.Error
+    ): OdbError =
+      val msg = error match
+        case GeneratorParamsService.Error.MissingData(p) =>
+          s"ITC cannot be queried until the following parameters are defined: ${p.params.map(_.name).intercalate(", ")}"
+        case _                                           =>
+          error.format
+      OdbError.InvalidObservation(oid, msg.some)
 
-    case class RemoteServiceErrors(
+    def itcError(
       problems: NonEmptyList[(Option[Target.Id], String)]
-    ) extends Error:
-      def format: String =
-        val ps = problems.map {
-          case (None, msg)      => s"Asterism: $msg"
-          case (Some(tid), msg) => s"Target '$tid': $msg"
-        }
-        s"ITC returned errors: ${ps.intercalate(", ")}"
+    ): OdbError =
+      val ps = problems.map:
+        case (None, msg)      => s"Asterism: $msg"
+        case (Some(tid), msg) => s"Target '$tid': $msg"
+      OdbError.ItcError(s"ITC returned errors: ${ps.intercalate(", ")}".some)
 
-    case object TargetMismatch extends Error:
-      def format: String =
-        s"ITC provided conflicting results"
+    def targetMismatch: OdbError =
+      OdbError.ItcError("ITC provided conflicting results".some)
+
   end Error
 
   case class TargetResult(targetId: Target.Id, value: IntegrationTime, signalToNoise: Option[SignalToNoiseAt]) {
@@ -217,6 +214,16 @@ object ItcService {
       }
   }
 
+  opaque type Result = Either[OdbError, AsterismResults]
+
+  object Result:
+    def apply(e: Either[OdbError, AsterismResults]): Result =
+      e
+
+  extension (r: Result)
+    def toEither: Either[OdbError, AsterismResults] =
+      r
+
   def pollVersionsForever[F[_]: Async: Logger](
     client:     Resource[F, ItcClient[F]],
     session:    Resource[F, Session[F]],
@@ -246,12 +253,10 @@ object ItcService {
   def instantiate[F[_]: Concurrent: Parallel](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
-      import Error.*
-
       override def lookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
@@ -262,9 +267,9 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => ObservationDefinitionError(GeneratorParamsService.Error.MissingData(m))))
+          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
           r <- EitherT(callRemoteItc(p))
           _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
         } yield r).value
@@ -273,10 +278,10 @@ object ItcService {
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[Error, (GeneratorParams, Option[AsterismResults])]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[AsterismResults])]] =
         services.transactionally {
           (for {
-            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(ObservationDefinitionError(_))))
+            p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
             r <- EitherT.liftF(selectOne(pid, oid, p))
           } yield (p, r)).value
         }
@@ -325,12 +330,12 @@ object ItcService {
                   yield pair
                 .toMap
 
-      private def convertRemoteErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): Error =
-        RemoteServiceErrors(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
+      private def convertErrors(targets: ItcInput)(itcErrors: NonEmptyChain[(lucuma.itc.Error, Int)]): OdbError =
+        Error.itcError(itcErrors.map { case (e, i) => (targets.targetVector.get(i).map(_._1), e.message) }.toNonEmptyList)
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
-      private def safeAcquisitionCall(targets: ItcInput): F[Either[Error, AsterismIntegrationTimes]] =
+      private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
         client
           .imaging(targets.imagingInput, useCache = false)
           .map:
@@ -345,14 +350,14 @@ object ItcService {
                     r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MinExposureTime))).asRight
                   case other => other
             .partitionErrors
-            .leftMap(convertRemoteErrors(targets))
+            .leftMap(convertErrors(targets))
 
       private def callRemoteItc(
         targets: ItcInput
-      )(using NoTransaction[F]): F[Either[Error, AsterismResults]] =
+      )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
           case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
-            val specResult = specOutcomes.partitionErrors.leftMap(convertRemoteErrors(targets))
+            val specResult = specOutcomes.partitionErrors.leftMap(convertErrors(targets))
 
             for
               img    <- imgResult
@@ -367,11 +372,11 @@ object ItcService {
                     val (targetId, targetInput) = targets.targetVector.getUnsafe(index)
                     TargetResult(targetId, /*(targets.spectroscopy, targetInput),*/ targetIntegrationTime.times.focus, targetIntegrationTime.signalToNoiseAt)
                   },
-                ).toRight[Error](Error.TargetMismatch)
+                ).toRight(Error.targetMismatch)
             yield result
         }
         .handleError: t =>
-          RemoteServiceErrors(NonEmptyList.one(None, t.getMessage)).asLeft
+          OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
       private def insertOrUpdate(
         pid:     Program.Id,
