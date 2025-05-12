@@ -597,6 +597,14 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case ObservingModeType.Flamingos2LongSlit =>
+        """{
+          flamingos2LongSlit: {
+            disperser: R1200_HK
+            filter: Y
+            fpu: LONG_SLIT_2
+          }
+        }"""
       case ObservingModeType.GmosNorthImaging |
            ObservingModeType.GmosSouthImaging =>
         """{}"""
@@ -616,14 +624,6 @@ trait DatabaseOperations { this: OdbSuite =>
             filter: R_PRIME
             fpu: LONG_SLIT_0_50
             centralWavelength: { nanometers: 500 }
-          }
-        }"""
-      case ObservingModeType.Flamingos2LongSlit =>
-        """{
-          flamingos2LongSlit: {
-            disperser: R1200_HK
-            filter: Y
-            fpu: LONG_SLIT_2
           }
         }"""
 

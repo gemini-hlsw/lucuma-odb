@@ -22,6 +22,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.RecordFlamingos2VisitInput
 import lucuma.odb.graphql.input.RecordGmosVisitInput
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
@@ -49,6 +50,10 @@ trait VisitService[F[_]]:
 
   def lookupOrInsert(
     observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
+
+  def recordFlamingos2(
+    input: RecordFlamingos2VisitInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordGmosNorth(
@@ -173,6 +178,17 @@ object VisitService:
           .recover:
             case SqlState.ForeignKeyViolation(_) =>
               OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
+
+      override def recordFlamingos2(
+        input: RecordFlamingos2VisitInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
+        insertWithStaticConfig(
+          input.observationId,
+          input.static,
+          Instrument.Flamingos2,
+          flamingos2SequenceService.selectStatic,
+          flamingos2SequenceService.insertStatic
+        )
 
       override def recordGmosNorth(
         input: RecordGmosVisitInput[GmosNorth]
