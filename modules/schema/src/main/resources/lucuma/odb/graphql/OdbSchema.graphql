@@ -7034,7 +7034,7 @@ type Flamingos2Dynamic {
   """
   Flamingos 2 Lyot Wheel.
   """
-  lyot: Flamingos2LyotWheel!
+  lyotWheel: Flamingos2LyotWheel!
 
   """
   Flamingos 2 mask, if any.
@@ -12439,6 +12439,12 @@ type StepRecord {
 
   "Step ID of the generated step, if any, that produced this step record."
   generatedId: StepId
+
+  """
+  Flamingos 2 instrument configuration for this step, if any.  This will be null
+  unless the `instrument` discriminator is "FLAMINGOS2".
+  """
+  flamingos2: Flamingos2Dynamic
 
   """
   GMOS North instrument configuration for this step, if any.  This will be null
