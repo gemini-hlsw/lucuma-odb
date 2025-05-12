@@ -157,8 +157,9 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
-          with F2LongSlitMapping[F]
+          with Flamingos2LongSlitMapping[F]
           with FilterTypeMetaMapping[F]
+          with Flamingos2StaticMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
@@ -207,6 +208,7 @@ object OdbMapping {
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
           with RecordAtomResultMapping[F]
+          with RecordFlamingos2VisitResultMapping[F]
           with RecordGmosNorthVisitResultMapping[F]
           with RecordGmosSouthVisitResultMapping[F]
           with RecordGmosStepResultMapping[F]
@@ -369,7 +371,8 @@ object OdbMapping {
                 ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
-                F2LongSlitMapping,
+                Flamingos2LongSlitMapping,
+                Flamingos2StaticMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
                 GmosSouthLongSlitMapping,
@@ -415,6 +418,7 @@ object OdbMapping {
                 RadialVelocityMapping,
                 RecordAtomResultMapping,
                 RecordDatasetResultMapping,
+                RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,
                 RecordGmosSouthStepResultMapping,

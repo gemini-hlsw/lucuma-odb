@@ -15,39 +15,39 @@ import lucuma.core.enums.F2ReadoutMode
 import lucuma.core.enums.F2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
-import lucuma.odb.graphql.input.F2LongSlitInput
+import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.f2.longslit.Config
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.F2Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
 import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait F2LongSlitService[F[_]] {
+trait Flamingos2LongSlitService[F[_]] {
 
   def select(
     which: List[Observation.Id]
   ): F[Map[Observation.Id, SourceProfile => Config]]
 
-  def insert(input: F2LongSlitInput.Create)(
+  def insert(input: Flamingos2LongSlitInput.Create)(
     which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  def update(SET: F2LongSlitInput.Edit)(
+  def update(SET: Flamingos2LongSlitInput.Edit)(
     which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 }
 
-object F2LongSlitService {
+object Flamingos2LongSlitService {
 
-  def instantiate[F[_]: {Concurrent as F, Services}]: F2LongSlitService[F] =
+  def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2LongSlitService[F] =
 
-    new F2LongSlitService[F] {
+    new Flamingos2LongSlitService[F] {
 
-      val f2LS: Decoder[F2LongSlitInput.Create] =
+      val f2LS: Decoder[Flamingos2LongSlitInput.Create] =
         (f2_disperser        *:
          f2_filter           *:
          f2_fpu              *:
@@ -55,7 +55,7 @@ object F2LongSlitService {
          f2_reads.opt        *:
          f2_decker.opt       *:
          f2_readout_mode.opt
-        ).to[F2LongSlitInput.Create]
+        ).to[Flamingos2LongSlitInput.Create]
 
       private def select[A](
         which:   List[Observation.Id],
@@ -74,18 +74,18 @@ object F2LongSlitService {
       override def select(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => Config]] =
-        select(which, Statements.selectF2LongSlit, f2LS)
+        select(which, Statements.selectFlamingos2LongSlit, f2LS)
           .map(_.map { case (oid, f2) => (oid, (_: SourceProfile) => f2.toObservingMode) }.toMap)
 
       override def insert(
-        input: F2LongSlitInput.Create,
+        input: Flamingos2LongSlitInput.Create,
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         which.traverse { oid => session.exec(Statements.insertF2LongSlit(oid, input)) }.void
 
       def delete(which: List[Observation.Id] )(using Transaction[F]): F[Unit] =
         Statements.deleteF2(which).fold(F.unit)(session.exec)
 
-      def update(SET: F2LongSlitInput.Edit)(
+      def update(SET: Flamingos2LongSlitInput.Edit)(
         which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
 
@@ -95,7 +95,7 @@ object F2LongSlitService {
 
   object Statements {
 
-    def selectF2LongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
+    def selectFlamingos2LongSlit(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT
           ls.c_observation_id,
@@ -163,7 +163,7 @@ object F2LongSlitService {
 
     def insertF2LongSlit(
       observationId: Observation.Id,
-      input:         F2LongSlitInput.Create
+      input:         Flamingos2LongSlitInput.Create
     ): AppliedFragment =
       InsertF2LongSlit.apply(
         observationId            ,
@@ -185,7 +185,7 @@ object F2LongSlitService {
           void"WHERE " |+| observationIdIn(oids)
       }
 
-    private def f2Updates(input: F2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
+    private def f2Updates(input: Flamingos2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
       val upDisperser   = sql"c_disperser    = $f2_disperser"
       val upFilter      = sql"c_filter       = $f2_filter"
@@ -210,7 +210,7 @@ object F2LongSlitService {
     }
 
     def updateF2LongSlit(
-      SET:   F2LongSlitInput.Edit,
+      SET:   Flamingos2LongSlitInput.Edit,
       which: List[Observation.Id]
     ): Option[AppliedFragment] =
       for {

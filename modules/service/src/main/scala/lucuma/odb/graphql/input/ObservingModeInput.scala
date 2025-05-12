@@ -15,7 +15,7 @@ object ObservingModeInput {
   final case class Create(
     gmosNorthLongSlit: Option[GmosLongSlitInput.Create.North],
     gmosSouthLongSlit: Option[GmosLongSlitInput.Create.South],
-    f2LongSlit: Option[F2LongSlitInput.Create]
+    f2LongSlit: Option[Flamingos2LongSlitInput.Create]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
@@ -32,7 +32,7 @@ object ObservingModeInput {
         case List(
           GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          F2LongSlitInput.Create.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
+          Flamingos2LongSlitInput.Create.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
         ) =>
           (rGmosNorthLongSlit, rGmosSouthLongSlit, rFlamingos2LongSlit).parTupled.flatMap {
             case (gmosNorthLongSlit, gmosSouthLongSlit, f2LongSlit) =>
@@ -50,7 +50,7 @@ object ObservingModeInput {
   final case class Edit(
     gmosNorthLongSlit: Option[GmosLongSlitInput.Edit.North],
     gmosSouthLongSlit: Option[GmosLongSlitInput.Edit.South],
-    flamingos2LongSlit: Option[F2LongSlitInput.Edit]
+    flamingos2LongSlit: Option[Flamingos2LongSlitInput.Edit]
   ) {
 
     def observingModeType: Option[ObservingModeType] =
@@ -67,7 +67,7 @@ object ObservingModeInput {
         case List(
           GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          F2LongSlitInput.Edit.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
+          Flamingos2LongSlitInput.Edit.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit)
         ) =>
           (rGmosNorthLongSlit, rGmosSouthLongSlit, rFlamingos2LongSlit).parTupled.flatMap {
             case (gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit) =>
