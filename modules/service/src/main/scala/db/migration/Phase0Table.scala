@@ -211,8 +211,8 @@ object Phase0Table {
         row.site
       )}
 
-
   }
+
   val ImagingGmosNorth = new Phase0Table[GmosImagingRow.GmosNorth] {
 
     override def name: String =
@@ -220,7 +220,7 @@ object Phase0Table {
 
     override def encoder: Encoder[GmosImagingRow.GmosNorth] =
       (
-        instrument   *:
+        instrument        *:
         gmos_north_filter
       ).contramap[GmosImagingRow.GmosNorth]{ row => (
         row.img.instrument,
@@ -230,10 +230,28 @@ object Phase0Table {
     override def columns: List[String] =
       List(
         "c_instrument",
-        "c_disperser",
         "c_filter",
-        "c_fpu"
       )
   }
 
+  val ImagingGmosSouth = new Phase0Table[GmosImagingRow.GmosSouth] {
+
+    override def name: String =
+      s"${Imaging.name}_gmos_south"
+
+    override def encoder: Encoder[GmosImagingRow.GmosSouth] =
+      (
+        instrument       *:
+        gmos_south_filter
+      ).contramap[GmosImagingRow.GmosSouth]{ row => (
+        row.img.instrument,
+        row.filter,
+      )}
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_filter",
+      )
+  }
 }

@@ -22,6 +22,10 @@ import org.postgresql.core.BaseConnection
 
 import java.io.InputStream
 
+enum ConfigModeVariant:
+  case Spectroscopy
+  case Imaging
+
 /**
  * Loads a Phase 0 configuration file into the corresponding tables.  There are
  * two tables: the general spectroscopy table (where for example the grating,
@@ -32,11 +36,11 @@ import java.io.InputStream
 class Phase0Loader[A, B <: ConfigurationRow](
   val instrument: Instrument,
   val pipe:       Pipe[IO, Byte, (A, PosInt)],
-  val specRow:    A => B,
+  val row:    A => B,
   val instTable:  Phase0Table[A]
 ) {
 
-  def load(bc: BaseConnection, is: IO[InputStream]): IO[Unit] = {
+  def load(bc: BaseConnection, mode: ConfigModeVariant, is: IO[InputStream]): IO[Unit] = {
 
     def toInputStream(s: Stream[IO, String]): Resource[IO, InputStream] =
       s.append(Stream("\\.\n"))
@@ -53,14 +57,19 @@ class Phase0Loader[A, B <: ConfigurationRow](
       readInputStream(is, ByteChunkSize, closeAfterUse = true)
         .through(pipe)
         .map { (a, idx) => (
-          specRow(a) match {
+          row(a) match {
             case s: SpectroscopyRow =>
-              Phase0Table.Spectroscopy.stdinLine(s, idx)
+              (Phase0Table.Spectroscopy.stdinLine(s, idx))
             case i: ImagingRow =>
-              Phase0Table.Imaging.stdinLine(i, idx)
+              (Phase0Table.Imaging.stdinLine(i, idx))
           },
           instTable.stdinLine(a, idx)
         )}
+
+    val loader = mode match {
+      case ConfigModeVariant.Spectroscopy => Phase0Table.Spectroscopy
+      case ConfigModeVariant.Imaging      => Phase0Table.Imaging
+    }
 
     // 1. Truncate the instrument table, it will be replaced with entries from
     //    the .tsv file.
@@ -70,10 +79,11 @@ class Phase0Loader[A, B <: ConfigurationRow](
     // 3. Bulk copy in to the spectroscopy table.
     // 4. Bulk copy in to the instrument table.
     for {
-      _  <- IO.println(s"Loading Phase 0 table for $instrument")
+      _  <- IO.println(s"Loading Phase 0 table for $instrument $mode ${instTable.name}")
+      p0 <- rows.compile.last.map(_.map(_._1))
       _  <- bc.ioUpdate(instTable.truncate)
-      _  <- bc.ioUpdate(Phase0Table.Spectroscopy.deleteFrom(instrument))
-      _  <- bc.ioCopyIn(Phase0Table.Spectroscopy.copyFromStdin, toInputStream(rows.map(_._1)))
+      _  <- bc.ioUpdate(loader.deleteFrom(instrument))
+      _  <- bc.ioCopyIn(loader.copyFromStdin, toInputStream(rows.map(_._1)))
       _  <- bc.ioCopyIn(instTable.copyFromStdin, toInputStream(rows.map(_._2)))
     } yield ()
 
@@ -89,14 +99,13 @@ object Phase0Loader {
       new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth),
       new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth),
       new Phase0Loader[F2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.f2Spectroscopy, _.spec, Phase0Table.SpectroscopyF2)
-    ).traverse_(_.load(bc, is))
+    ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 
   def imagingLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
     val rdr = FileReader[IO](fileName)
-    IO.unit
     List(
       new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth),
-    //   new Phase0Loader[GmosSpectroscopyRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouth, _.spec, Phase0Table.SpectroscopyGmosSouth),
-    ).traverse_(_.load(bc, is))
+      new Phase0Loader[GmosImagingRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouthImaging, _.img, Phase0Table.ImagingGmosSouth),
+    ).traverse_(_.load(bc, ConfigModeVariant.Imaging, is))
 
 }

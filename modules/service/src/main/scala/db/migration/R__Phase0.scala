@@ -29,7 +29,7 @@ class R__Phase0 extends RepeatableMigration("Phase 0 Instrument Options") {
     definitionFiles.map(_._2).toList match {
       case spec :: imaging :: Nil =>
         Phase0Loader.spectroscopyLoadAll(bc, spectroscopyFileName, spec) *>
-          Phase0Loader.spectroscopyLoadAll(bc, imagingFileName, imaging)
+          Phase0Loader.imagingLoadAll(bc, imagingFileName, imaging)
       case _ =>
         IO.raiseError(
           new RuntimeException(
