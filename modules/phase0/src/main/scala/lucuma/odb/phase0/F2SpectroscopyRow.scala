@@ -4,11 +4,14 @@
 package lucuma.odb.phase0
 
 import cats.parse.*
+import cats.parse.Rfc5234.sp
+import cats.parse.Rfc5234.vchar
 import cats.syntax.all.*
 import lucuma.core.enums.F2Disperser
 import lucuma.core.enums.F2Filter
 import lucuma.core.enums.F2Fpu
 import lucuma.core.enums.Instrument
+import lucuma.core.parser.MiscParsers.int
 import lucuma.core.util.Enumerated
 
 case class F2SpectroscopyRow(
@@ -19,6 +22,11 @@ case class F2SpectroscopyRow(
 )
 
 object F2SpectroscopyRow:
+
+  val fpuParser: Parser[Int] =
+    (int ~ sp.? ~ vchar.rep.?).mapFilter { case ((i, _), _) =>
+      i.some
+    }
 
   val f2: Parser[List[F2SpectroscopyRow]] =
     SpectroscopyRow.rows.flatMap: rs =>
@@ -31,7 +39,11 @@ object F2SpectroscopyRow:
                  .flatMap: f =>
                     Enumerated[F2Filter].all.find(a => a.shortName === f)
                       .toRight(s"Cannot find filter: $f. Does a non-obsolete value exist in the Enumerated?")
-          u <- Enumerated[F2Fpu].all.find(_.shortName === r.fpu).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
+          // In the table they are written as "n\s?pixels"
+          u <- Enumerated[F2Fpu]
+                 .all
+                 .find(f => fpuParser.parse(r.fpu).map(_._2).forall(_ === f.slitWidth.value))
+                 .toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
         } yield F2SpectroscopyRow(r, g, l, u)
         row.fold(Parser.failWith, Parser.pure)
 
