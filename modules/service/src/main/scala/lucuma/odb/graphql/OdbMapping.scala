@@ -160,9 +160,12 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
+          with Flamingos2CustomMaskMapping[F]
+          with Flamingos2DynamicMapping[F]
+          with Flamingos2FpuMaskMapping[F]
           with Flamingos2LongSlitMapping[F]
-          with FilterTypeMetaMapping[F]
           with Flamingos2StaticMapping[F]
+          with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
           with GmosDynamicMapping[F]
@@ -213,10 +216,8 @@ object OdbMapping {
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
           with RecordAtomResultMapping[F]
-          with RecordFlamingos2VisitResultMapping[F]
-          with RecordGmosNorthVisitResultMapping[F]
-          with RecordGmosSouthVisitResultMapping[F]
-          with RecordGmosStepResultMapping[F]
+          with RecordStepResultMapping[F]
+          with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -376,6 +377,7 @@ object OdbMapping {
                 ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
+                Flamingos2DynamicMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
                 GmosNorthLongSlitMapping,
@@ -427,6 +429,7 @@ object OdbMapping {
                 RadialVelocityMapping,
                 RecordAtomResultMapping,
                 RecordDatasetResultMapping,
+                RecordFlamingos2StepResultMapping,
                 RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,
@@ -514,7 +517,9 @@ object OdbMapping {
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
                 GmosCcdModeMappings,
-                GmosCustomMaskMapping,
+                Flamingos2CustomMaskMappings,
+                Flamingos2FpuMaskMappings,
+                GmosCustomMaskMappings,
                 GmosNorthDynamicMappings,
                 GmosNorthFpuMappings,
                 GmosNorthGratingConfigMappings,

@@ -99,6 +99,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       LinkUser,
       RecordAtom,
       RecordDataset,
+      RecordFlamingos2Step,
       RecordFlamingos2Visit,
       RecordGmosNorthStep,
       RecordGmosNorthVisit,
@@ -557,8 +558,18 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     action.nestMap: sid =>
       Unique(Filter(predicate.eql(sid), child))
 
+  private lazy val RecordFlamingos2Step: MutationField =
+    MutationField("recordFlamingos2Step", RecordStepInput.Flamingos2Binding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          recordStep(
+            sequenceService.insertFlamingos2StepRecord(input.atomId, input.instrument, input.stepConfig, input.telescopeConfig, input.observeClass, input.generatedId, timeEstimateCalculator.flamingos2),
+            Predicates.flamingos2Step.id,
+            child
+          )
+
   private lazy val RecordGmosNorthStep: MutationField =
-    MutationField("recordGmosNorthStep", RecordGmosStepInput.GmosNorthBinding): (input, child) =>
+    MutationField("recordGmosNorthStep", RecordStepInput.GmosNorthBinding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
@@ -568,7 +579,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           )
 
   private lazy val RecordGmosSouthStep: MutationField =
-    MutationField("recordGmosSouthStep", RecordGmosStepInput.GmosSouthBinding): (input, child) =>
+    MutationField("recordGmosSouthStep", RecordStepInput.GmosSouthBinding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           recordStep(
@@ -586,7 +597,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
 
   private lazy val RecordFlamingos2Visit: MutationField =
-    MutationField("recordFlamingos2Visit", RecordFlamingos2VisitInput.Binding): (input, child) =>
+    MutationField("recordFlamingos2Visit", RecordVisitInput.Flamingos2Binding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
@@ -596,7 +607,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           )
 
   private lazy val RecordGmosNorthVisit: MutationField =
-    MutationField("recordGmosNorthVisit", RecordGmosVisitInput.GmosNorthBinding): (input, child) =>
+    MutationField("recordGmosNorthVisit", RecordVisitInput.GmosNorthBinding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(
@@ -606,7 +617,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           )
 
   private lazy val RecordGmosSouthVisit: MutationField =
-    MutationField("recordGmosSouthVisit", RecordGmosVisitInput.GmosSouthBinding): (input, child) =>
+    MutationField("recordGmosSouthVisit", RecordVisitInput.GmosSouthBinding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           recordVisit(

@@ -12,7 +12,6 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -31,6 +30,8 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.f2.F2DynamicConfig
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -51,6 +52,10 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait SequenceService[F[_]] {
+
+  def selectFlamingos2StepRecords(
+    observationId: Observation.Id
+  ): Stream[F, StepRecord[F2DynamicConfig]]
 
   def selectGmosNorthStepRecords(
     observationId: Observation.Id
@@ -92,6 +97,16 @@ trait SequenceService[F[_]] {
     sequenceType: SequenceType,
     generatedId:  Option[Atom.Id]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Atom.Id]]
+
+  def insertFlamingos2StepRecord(
+    atomId:         Atom.Id,
+    instrument:     F2DynamicConfig,
+    step:           StepConfig,
+    telescope:      TelescopeConfig,
+    observeClass:   ObserveClass,
+    generatedId:    Option[Step.Id],
+    timeCalculator: TimeEstimateCalculator[F2StaticConfig, F2DynamicConfig]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
   def insertGmosNorthStepRecord(
     atomId:         Atom.Id,
@@ -149,6 +164,11 @@ object SequenceService {
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
 
+      override def selectFlamingos2StepRecords(
+        observationId: Observation.Id
+      ): Stream[F, StepRecord[F2DynamicConfig]] =
+        flamingos2SequenceService.selectStepRecords(observationId)
+
       override def selectGmosNorthStepRecords(
         observationId: Observation.Id
       ): Stream[F, StepRecord[GmosNorth]] =
@@ -185,6 +205,15 @@ object SequenceService {
               ProtoStep(d, stepConfig, telescopeConfig, observeClass)
             }
           )
+        )
+
+      private def selectFlamingos2EstimatorState(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[(F2StaticConfig, TimeEstimateCalculator.Last[F2DynamicConfig])]] =
+        selectEstimatorState(
+          observationId,
+          services.flamingos2SequenceService.selectStatic,
+          services.flamingos2SequenceService.selectDynamicForStep
         )
 
       private def selectGmosNorthEstimatorState(
@@ -318,6 +347,27 @@ object SequenceService {
           case AtomNotFound(id, instrument)  => OdbError.InvalidAtom(id, Some(s"Atom '$id' not found or is not a ${instrument.longName} atom")).asFailure
           case Success(sid)                  => Result(sid)
 
+      def insertFlamingos2StepRecord(
+        atomId:          Atom.Id,
+        dynamicConfig:   F2DynamicConfig,
+        stepConfig:      StepConfig,
+        telescopeConfig: TelescopeConfig,
+        observeClass:    ObserveClass,
+        generatedId:     Option[Step.Id],
+        timeCalculator:  TimeEstimateCalculator[F2StaticConfig, F2DynamicConfig]
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
+        insertStepRecord(
+          atomId,
+          Instrument.Flamingos2,
+          stepConfig,
+          telescopeConfig,
+          observeClass,
+          generatedId,
+          timeCalculator.estimateStep(_, _, ProtoStep(dynamicConfig, stepConfig, telescopeConfig, observeClass)),
+          selectFlamingos2EstimatorState,
+          sid => flamingos2SequenceService.insertDynamic(sid, dynamicConfig)
+        )
+
       override def insertGmosNorthStepRecord(
         atomId:          Atom.Id,
         dynamicConfig:   GmosNorth,
@@ -436,9 +486,6 @@ object SequenceService {
           ${step_id.opt},
           $time_span
       """.command.contramap { (s, a, i, st, tc, oc, g, d) => (s, a, a, i, st, tc, oc, g, d) }
-
-    def encodeColumns(prefix: Option[String], columns: List[String]): String =
-      columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""

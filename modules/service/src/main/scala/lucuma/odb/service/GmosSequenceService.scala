@@ -7,7 +7,6 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import fs2.Stream
@@ -181,9 +180,6 @@ object GmosSequenceService {
    }
 
   object Statements {
-
-    def encodeColumns(prefix: Option[String], columns: List[String]): String =
-      columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")
 
     val GmosDynamicColumns: List[String] =
       List(

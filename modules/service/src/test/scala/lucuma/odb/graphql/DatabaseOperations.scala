@@ -1101,7 +1101,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
     }
 
-  protected def dynamicConfig(instrument: Instrument): String =
+  protected def dynamicConfigGmos(instrument: Instrument): String =
     s"""
       ${instrument.fieldName}: {
         exposure: {
@@ -1132,6 +1132,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       }
     """
+
+  protected def dynamicConfigFlamingos2(instrument: Instrument): String =
+    s"""
+      ${instrument.fieldName}: {
+        exposure: {
+          seconds: 1200,
+        },
+        disperser: R1200_JH,
+        filter: Y,
+        readMode: MEDIUM,
+        lyotWheel: F16,
+        mask: {
+          builtin: LONG_SLIT_1
+        }
+      }
+    """
+
+  protected def dynamicConfig(instrument: Instrument): String =
+    instrument match
+      case Instrument.Flamingos2 => dynamicConfigFlamingos2(instrument)
+      case Instrument.GmosNorth  => dynamicConfigGmos(instrument)
+      case Instrument.GmosSouth  => dynamicConfigGmos(instrument)
+      case _                     => "Unexpected instrument"
 
   val stepConfigScienceInput: String =
     """
