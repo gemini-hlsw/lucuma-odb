@@ -10,8 +10,8 @@ import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.step_id
@@ -28,26 +28,26 @@ trait Flamingos2SequenceService[F[_]]:
 
   def insertDynamic(
     stepId:  Step.Id,
-    dynamic: F2DynamicConfig
+    dynamic: Flamingos2DynamicConfig
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def insertStatic(
     observationId: Observation.Id,
     visitId:       Option[Visit.Id],
-    static:        F2StaticConfig
+    static:        Flamingos2StaticConfig
   )(using Transaction[F], Services.ServiceAccess): F[Long]
 
   def selectDynamicForStep(
     stepId: Step.Id
-  )(using Transaction[F]): F[Option[F2DynamicConfig]]
+  )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]]
 
   def selectStatic(
     visitId: Visit.Id
-  )(using Transaction[F]): F[Option[F2StaticConfig]]
+  )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
   def selectStepRecords(
     observationId: Observation.Id
-  ): Stream[F, StepRecord[F2DynamicConfig]]
+  ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
 
 object Flamingos2SequenceService:
 
@@ -57,24 +57,24 @@ object Flamingos2SequenceService:
 
       override def insertDynamic(
         stepId:  Step.Id,
-        dynamic: F2DynamicConfig
+        dynamic: Flamingos2DynamicConfig
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         session.execute(Statements.InsertDynamic)(stepId, dynamic).void
 
       override def selectStatic(
         visitId: Visit.Id
-      )(using Transaction[F]): F[Option[F2StaticConfig]] =
+      )(using Transaction[F]): F[Option[Flamingos2StaticConfig]] =
         session.option(Statements.SelectStatic)(visitId)
 
       def selectDynamicForStep(
         stepId: Step.Id
-      )(using Transaction[F]): F[Option[F2DynamicConfig]] =
+      )(using Transaction[F]): F[Option[Flamingos2DynamicConfig]] =
         session.option(Statements.SelectDynamicForStep)(stepId)
 
       override def insertStatic(
         observationId: Observation.Id,
         visitId:       Option[Visit.Id],
-        static:        F2StaticConfig
+        static:        Flamingos2StaticConfig
       )(using Transaction[F], Services.ServiceAccess): F[Long] =
         session.unique(Statements.InsertStatic)(
           observationId,
@@ -84,7 +84,7 @@ object Flamingos2SequenceService:
 
       override def selectStepRecords(
         observationId: Observation.Id
-      ): Stream[F, StepRecord[F2DynamicConfig]] =
+      ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
         session.stream(
           SequenceService.Statements.selectStepRecord(
             "t_flamingos_2_dynamic",
@@ -110,7 +110,7 @@ object Flamingos2SequenceService:
         "c_reads"
       )
 
-    val InsertDynamic: Command[(Step.Id, F2DynamicConfig)] =
+    val InsertDynamic: Command[(Step.Id, Flamingos2DynamicConfig)] =
       sql"""
         INSERT INTO t_flamingos_2_dynamic (
           c_step_id,
@@ -120,7 +120,7 @@ object Flamingos2SequenceService:
           $flamingos_2_dynamic
       """.command
 
-    val InsertStatic: Query[(Observation.Id, Option[Visit.Id], F2StaticConfig), Long] =
+    val InsertStatic: Query[(Observation.Id, Option[Visit.Id], Flamingos2StaticConfig), Long] =
       sql"""
         INSERT INTO t_flamingos_2_static (
           c_observation_id,
@@ -134,7 +134,7 @@ object Flamingos2SequenceService:
         RETURNING c_static_id
       """.query(int8)
 
-    val SelectStatic: Query[Visit.Id, F2StaticConfig] =
+    val SelectStatic: Query[Visit.Id, Flamingos2StaticConfig] =
       sql"""
         SELECT
           c_mos_pre_imaging,
@@ -143,7 +143,7 @@ object Flamingos2SequenceService:
         WHERE c_visit_id = $visit_id
       """.query(flamingos_2_static)
 
-    val SelectDynamicForStep: Query[Step.Id, F2DynamicConfig] =
+    val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =
       sql"""
         SELECT
           #${encodeColumns(none, Flamingos2DynamicColumns)}

@@ -6,17 +6,17 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
+import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
-import lucuma.odb.sequence.f2.longslit.Config
+import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -48,13 +48,13 @@ object Flamingos2LongSlitService {
     new Flamingos2LongSlitService[F] {
 
       val f2LS: Decoder[Flamingos2LongSlitInput.Create] =
-        (f2_disperser        *:
-         f2_filter           *:
-         f2_fpu              *:
-         f2_read_mode.opt    *:
-         f2_reads.opt        *:
-         f2_decker.opt       *:
-         f2_readout_mode.opt
+        (flamingos_2_disperser        *:
+         flamingos_2_filter           *:
+         flamingos_2_fpu              *:
+         flamingos_2_read_mode.opt    *:
+         flamingos_2_reads.opt        *:
+         flamingos_2_decker.opt       *:
+         flamingos_2_readout_mode.opt
         ).to[Flamingos2LongSlitInput.Create]
 
       private def select[A](
@@ -118,16 +118,16 @@ object Flamingos2LongSlitService {
 
     val InsertF2LongSlit: Fragment[(
       Observation.Id       ,
-      F2Disperser          ,
-      F2Filter             ,
-      F2Fpu                ,
-      Option[F2ReadMode]   ,
-      Option[F2Reads]      ,
-      Option[F2Decker]     ,
-      Option[F2ReadoutMode],
-      F2Disperser          ,
-      F2Filter             ,
-      F2Fpu
+      Flamingos2Disperser          ,
+      Flamingos2Filter             ,
+      Flamingos2Fpu                ,
+      Option[Flamingos2ReadMode]   ,
+      Option[Flamingos2Reads]      ,
+      Option[Flamingos2Decker]     ,
+      Option[Flamingos2ReadoutMode],
+      Flamingos2Disperser          ,
+      Flamingos2Filter             ,
+      Flamingos2Fpu
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (
@@ -147,16 +147,16 @@ object Flamingos2LongSlitService {
         SELECT
           $observation_id,
           c_program_id,
-          $f2_disperser,
-          $f2_filter,
-          $f2_fpu,
-          ${f2_read_mode.opt},
-          ${f2_reads.opt},
-          ${f2_decker.opt},
-          ${f2_readout_mode.opt},
-          $f2_disperser,
-          $f2_filter,
-          $f2_fpu
+          $flamingos_2_disperser,
+          $flamingos_2_filter,
+          $flamingos_2_fpu,
+          ${flamingos_2_read_mode.opt},
+          ${flamingos_2_reads.opt},
+          ${flamingos_2_decker.opt},
+          ${flamingos_2_readout_mode.opt},
+          $flamingos_2_disperser,
+          $flamingos_2_filter,
+          $flamingos_2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
        """.contramap { (o, d, f, u, r, e, m, a, id, ii, iu) => (o, d, f, u, r, e, m, a, id, ii, iu, o)}
@@ -187,13 +187,13 @@ object Flamingos2LongSlitService {
 
     private def f2Updates(input: Flamingos2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upDisperser   = sql"c_disperser    = $f2_disperser"
-      val upFilter      = sql"c_filter       = $f2_filter"
-      val upFpu         = sql"c_fpu          = $f2_fpu"
-      val upReadMode    = sql"c_read_mode    = ${f2_read_mode.opt}"
-      val upReads       = sql"c_reads        = ${f2_reads.opt}"
-      val upDecker      = sql"c_decker       = ${f2_decker.opt}"
-      val upReadoutMode = sql"c_readout_mode = ${f2_readout_mode.opt}"
+      val upDisperser   = sql"c_disperser    = $flamingos_2_disperser"
+      val upFilter      = sql"c_filter       = $flamingos_2_filter"
+      val upFpu         = sql"c_fpu          = $flamingos_2_fpu"
+      val upReadMode    = sql"c_read_mode    = ${flamingos_2_read_mode.opt}"
+      val upReads       = sql"c_reads        = ${flamingos_2_reads.opt}"
+      val upDecker      = sql"c_decker       = ${flamingos_2_decker.opt}"
+      val upReadoutMode = sql"c_readout_mode = ${flamingos_2_readout_mode.opt}"
 
       val ups: List[AppliedFragment] =
         List(

@@ -5,18 +5,18 @@ package lucuma.odb.json
 
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
-import lucuma.core.model.sequence.f2.arb.ArbF2DynamicConfig
-import lucuma.core.model.sequence.f2.arb.ArbF2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.flamingos2.arb.ArbFlamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.arb.ArbFlamingos2StaticConfig
 import munit.DisciplineSuite
 
 class Flamingos2Suite extends DisciplineSuite with ArbitraryInstances:
 
-  import ArbF2DynamicConfig.given
-  import ArbF2StaticConfig.given
-  import f2.given
+  import ArbFlamingos2DynamicConfig.given
+  import ArbFlamingos2StaticConfig.given
+  import flamingos2.given
   import time.query.given
 
-  checkAll("Flamingos2Codec DynamicConfig", CodecTests[F2DynamicConfig].codec)
-  checkAll("Flamingos2Codec StaticConfig",  CodecTests[F2StaticConfig].codec)
+  checkAll("Flamingos2Codec DynamicConfig", CodecTests[Flamingos2DynamicConfig].codec)
+  checkAll("Flamingos2Codec StaticConfig",  CodecTests[Flamingos2StaticConfig].codec)

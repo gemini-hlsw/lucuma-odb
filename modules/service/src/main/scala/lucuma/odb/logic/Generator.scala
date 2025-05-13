@@ -32,8 +32,8 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynamic
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -47,7 +47,7 @@ import lucuma.odb.sequence.ExecutionConfigGenerator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ProtoExecutionConfig
 import lucuma.odb.sequence.data.StepRecord
-import lucuma.odb.sequence.f2
+import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gmos.longslit.LongSlit
 import lucuma.odb.sequence.syntax.hash.*
@@ -327,7 +327,7 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, OdbError, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
-      type ProtoFlamingos2 = ProtoExecutionConfig[F2StaticConfig,  Atom[F2DynamicConfig]]
+      type ProtoFlamingos2 = ProtoExecutionConfig[Flamingos2StaticConfig,  Atom[Flamingos2DynamicConfig]]
       type ProtoGmosNorth  = ProtoExecutionConfig[GmosNorthStatic, Atom[GmosNorthDynamic]]
       type ProtoGmosSouth  = ProtoExecutionConfig[GmosSouthStatic, Atom[GmosSouthDynamic]]
 
@@ -350,7 +350,7 @@ object Generator {
 
       private def flamingos2LongSlit(
         ctx:    Context,
-        config: lucuma.odb.sequence.f2.longslit.Config,
+        config: lucuma.odb.sequence.flamingos2.longslit.Config,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       ): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
@@ -390,7 +390,7 @@ object Generator {
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
-          case GeneratorParams(_, _, config: f2.longslit.Config, role, declaredComplete, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
             flamingos2LongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.flamingos2.estimateSetup))
 
@@ -420,7 +420,7 @@ object Generator {
         when:     Option[Timestamp]
       )(using NoTransaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
         ctx.params match
-          case GeneratorParams(_, _, config: f2.longslit.Config, role, _, _) =>
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.Flamingos2(executionConfig(p, lim))
 
