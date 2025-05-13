@@ -4,7 +4,7 @@ CREATE TABLE t_flamingos_2_dynamic (
   c_instrument    d_tag        NOT NULL DEFAULT ('Flamingos2'),
 
   FOREIGN KEY (c_step_id, c_instrument)
-  REFERENCES t_step (c_step_id, c_instrument),
+  REFERENCES t_step_record (c_step_id, c_instrument),
   CHECK (c_instrument = 'Flamingos2'),
 
   c_exposure_time interval NOT NULL,
@@ -29,5 +29,5 @@ CREATE TABLE t_flamingos_2_dynamic (
   ),
 
   c_readout_mode d_tag              REFERENCES t_f2_readout_mode(c_tag),
-  c_reads        c_tag              REFERENCES t_f2_reads(c_tag)
+  c_reads        d_tag              REFERENCES t_f2_reads(c_tag)
 );
