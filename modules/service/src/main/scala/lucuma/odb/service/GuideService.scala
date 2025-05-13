@@ -63,7 +63,7 @@ import lucuma.odb.json.target
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.f2
+import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
@@ -276,7 +276,7 @@ object GuideService {
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
       case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
-      case mode: f2.longslit.Config =>
+      case mode: flamingos2.longslit.Config =>
         ???
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime

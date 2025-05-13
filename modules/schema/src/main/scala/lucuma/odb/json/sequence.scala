@@ -171,7 +171,7 @@ trait SequenceCodec {
       )
     }
 
-  import lucuma.odb.json.f2.given
+  import lucuma.odb.json.flamingos2.given
   import lucuma.odb.json.gmos.given
 
   private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =

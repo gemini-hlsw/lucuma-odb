@@ -5,13 +5,13 @@ package lucuma.odb.logic
 
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.enums.F2ReadMode
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.odb.sequence.data.ProtoStep
@@ -36,14 +36,14 @@ object DetectorEstimator {
 
   class Applied private[DetectorEstimator] (private val ctx: TimeEstimateContext) {
 
-    extension (f2: F2DynamicConfig) {
+    extension (f2: Flamingos2DynamicConfig) {
       def datasetEstimate: DatasetEstimate =
         DatasetEstimate(
           f2.exposure,
           f2.readMode match
-            case F2ReadMode.Bright => ctx.enums.TimeEstimate.Flamingos2BrightReadout.time
-            case F2ReadMode.Medium => ctx.enums.TimeEstimate.Flamingos2MediumReadout.time
-            case F2ReadMode.Faint  => ctx.enums.TimeEstimate.Flamingos2FaintReadout.time,
+            case Flamingos2ReadMode.Bright => ctx.enums.TimeEstimate.Flamingos2BrightReadout.time
+            case Flamingos2ReadMode.Medium => ctx.enums.TimeEstimate.Flamingos2MediumReadout.time
+            case Flamingos2ReadMode.Faint  => ctx.enums.TimeEstimate.Flamingos2FaintReadout.time,
           ctx.enums.TimeEstimate.Flamingos2Write.time
         )
     }
@@ -72,8 +72,8 @@ object DetectorEstimator {
         )
     }
 
-    lazy val flamingos2: DetectorEstimator[F2StaticConfig, F2DynamicConfig] =
-      (static: F2StaticConfig, step: ProtoStep[F2DynamicConfig]) => List(
+    lazy val flamingos2: DetectorEstimator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
+      (static: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
         DetectorEstimate(
           "Flamingos2",
           s"Flamingos 2 Detector Array",

@@ -6,17 +6,17 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
+import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
-import lucuma.odb.sequence.f2.longslit.Config
+import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -118,16 +118,16 @@ object Flamingos2LongSlitService {
 
     val InsertF2LongSlit: Fragment[(
       Observation.Id       ,
-      F2Disperser          ,
-      F2Filter             ,
-      F2Fpu                ,
-      Option[F2ReadMode]   ,
-      Option[F2Reads]      ,
-      Option[F2Decker]     ,
-      Option[F2ReadoutMode],
-      F2Disperser          ,
-      F2Filter             ,
-      F2Fpu
+      Flamingos2Disperser          ,
+      Flamingos2Filter             ,
+      Flamingos2Fpu                ,
+      Option[Flamingos2ReadMode]   ,
+      Option[Flamingos2Reads]      ,
+      Option[Flamingos2Decker]     ,
+      Option[Flamingos2ReadoutMode],
+      Flamingos2Disperser          ,
+      Flamingos2Filter             ,
+      Flamingos2Fpu
     )] =
       sql"""
         INSERT INTO t_flamingos_2_long_slit (

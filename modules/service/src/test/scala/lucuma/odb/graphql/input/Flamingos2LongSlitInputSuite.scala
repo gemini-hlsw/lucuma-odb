@@ -4,9 +4,9 @@
 package lucuma.odb.graphql.input
 
 import io.circe.testing.ArbitraryInstances
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.data.Nullable
@@ -36,7 +36,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       assertEquals(e.observingModeType, ObservingModeType.Flamingos2LongSlit)
 
   test("Flamingos2LongSlitInput.Edit toCreate should handle optional values correctly"):
-    forAll: (e: Flamingos2LongSlitInput.Edit, grating: F2Disperser, fpu: F2Fpu, filter: F2Filter) =>
+    forAll: (e: Flamingos2LongSlitInput.Edit, grating: Flamingos2Disperser, fpu: Flamingos2Fpu, filter: Flamingos2Filter) =>
       val edit = e.copy(disperser = Some(grating), fpu = Some(fpu), filter = Some(filter))
       val createResult = edit.toCreate
 

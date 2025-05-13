@@ -10,7 +10,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.f2.F2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
@@ -44,7 +44,7 @@ object RecordStepInput:
       }
     }
 
-  val Flamingos2Binding: Matcher[RecordStepInput[F2DynamicConfig]] =
+  val Flamingos2Binding: Matcher[RecordStepInput[Flamingos2DynamicConfig]] =
     binding("flamingos2", Flamingos2DynamicInput.Binding)
 
   val GmosNorthBinding: Matcher[RecordStepInput[GmosNorth]] =

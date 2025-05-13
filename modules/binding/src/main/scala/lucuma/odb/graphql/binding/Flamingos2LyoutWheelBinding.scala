@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.F2CustomSlitWidth
+import lucuma.core.enums.Flamingos2LyotWheel
 
-val F2CustomSlitWidthBinding: Matcher[F2CustomSlitWidth] =
+val Flamingos2LyoutWheelBinding: Matcher[Flamingos2LyotWheel] =
   enumeratedBinding

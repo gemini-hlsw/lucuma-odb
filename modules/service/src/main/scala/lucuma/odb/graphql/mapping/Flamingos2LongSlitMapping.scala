@@ -5,8 +5,8 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.odb.graphql.table.*
 
 trait Flamingos2LongSlitMapping[F[_]]
@@ -24,11 +24,11 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("explicitReadMode", Flamingos2LongSlitView.ReadMode),
       SqlField("explicitReads", Flamingos2LongSlitView.Reads),
 
-      explicitOrElseDefault[F2Decker]("decker", "explicitDecker", "defaultDecker"),
+      explicitOrElseDefault[Flamingos2Decker]("decker", "explicitDecker", "defaultDecker"),
       SqlField("defaultDecker",  Flamingos2LongSlitView.DeckerDefault),
       SqlField("explicitDecker", Flamingos2LongSlitView.Decker),
 
-      explicitOrElseDefault[F2ReadoutMode]("readoutMode", "explicitReadoutMode", "defaultReadoutMode"),
+      explicitOrElseDefault[Flamingos2ReadoutMode]("readoutMode", "explicitReadoutMode", "defaultReadoutMode"),
       SqlField("defaultReadoutMode",  Flamingos2LongSlitView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2LongSlitView.ReadoutMode),
 

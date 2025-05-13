@@ -12,7 +12,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Instrument
-import lucuma.odb.phase0.F2SpectroscopyRow
+import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
@@ -156,18 +156,18 @@ object Phase0Table {
       enc(gmos_south_grating, gmos_south_filter, gmos_south_fpu)
   }
 
-  val SpectroscopyF2 = new Phase0Table[F2SpectroscopyRow] {
+  val SpectroscopyFlamingos2 = new Phase0Table[Flamingos2SpectroscopyRow] {
 
     override def name: String =
       s"${Spectroscopy.name}_f2"
 
-    override def encoder: Encoder[F2SpectroscopyRow] =
+    override def encoder: Encoder[Flamingos2SpectroscopyRow] =
       (
         instrument   *:
         f2_disperser *:
         f2_filter    *:
         f2_fpu
-      ).contramap[F2SpectroscopyRow] { row => (
+      ).contramap[Flamingos2SpectroscopyRow] { row => (
         row.spec.instrument,
         row.disperser,
         row.filter,
