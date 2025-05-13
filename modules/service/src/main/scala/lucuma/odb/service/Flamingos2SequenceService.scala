@@ -104,7 +104,7 @@ object Flamingos2SequenceService:
         "c_read_mode",
         "c_lyot_wheel",
         "c_fpu_custom_mask_filename",
-        "c_fpu_custom_mast_slit_width",
+        "c_fpu_custom_mask_slit_width",
         "c_fpu_builtin",
         "c_readout_mode",
         "c_reads"

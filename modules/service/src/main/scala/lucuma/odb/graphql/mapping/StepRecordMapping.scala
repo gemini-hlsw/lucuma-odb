@@ -20,7 +20,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
 import table.AtomRecordTable
-import table.Flamingos2DynamicTable
+import table.Flamingos2DynamicView
 import table.GmosDynamicTables
 import table.StepRecordView
 import table.VisitTable
@@ -29,7 +29,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with AtomRecordTable[F]
                                  with EventRangeEffectHandler[F]
                                  with KeyValueEffectHandler[F]
-                                 with Flamingos2DynamicTable[F]
+                                 with Flamingos2DynamicView[F]
                                  with GmosDynamicTables[F]
                                  with Predicates[F]
                                  with SelectSubquery
@@ -54,7 +54,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlField("generatedId",    StepRecordView.GeneratedId),
-      SqlObject("flamingos2",    Join(StepRecordView.Id, Flamingos2DynamicTable.Id)),
+      SqlObject("flamingos2",    Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
       SqlObject("gmosNorth",     Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
       SqlObject("gmosSouth",     Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
     )

@@ -8,9 +8,9 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.codec.text.varchar
 
-trait Flamingos2DynamicTable[F[_]] extends BaseMapping[F]:
+trait Flamingos2DynamicView[F[_]] extends BaseMapping[F]:
 
-  object Flamingos2DynamicTable extends TableDef("t_flamingos_2_dynamic"):
+  object Flamingos2DynamicView extends TableDef("v_flamingos_2_dynamic"):
     val Id: ColumnRef           = col("c_step_id",       step_id)
     val Instrument: ColumnRef   = col("c_instrument",    instrument)
     val ExposureTime: ColumnRef = col("c_exposure_time", time_span)

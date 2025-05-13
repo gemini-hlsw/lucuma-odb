@@ -60,45 +60,26 @@ class recordStep extends OdbSuite {
             ${dynamicConfig(Instrument.Flamingos2)},
             $stepConfigScienceInput,
             $telescopeConfigInput,
-            observeClass: ${ObserveClass.Acquisition.tag.toScreamingSnakeCase}
+            observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
           }) {
             stepRecord {
-              gmosNorth {
+              flamingos2 {
                 exposure {
                   seconds
                 }
-                readout {
-                  xBin
-                  yBin
-                  ampCount
-                  ampGain
-                  ampReadMode
-                }
-                dtax
-                roi
-                gratingConfig {
-                  grating
-                  order
-                  wavelength {
-                    nanometers
-                  }
-                }
+                disperser
                 filter
-                fpu {
+                readMode
+                lyotWheel
+                mask {
                   customMask {
                     filename
                     slitWidth
                   }
                   builtin
                 }
-                centralWavelength {
-                  nanometers
-                }
-              }
-              gmosSouth {
-                exposure {
-                  seconds
-                }
+                readoutMode
+                reads
               }
               observeClass
               estimate {
@@ -110,41 +91,26 @@ class recordStep extends OdbSuite {
       """,
       _ => json"""
         {
-          "recordGmosNorthStep": {
+          "recordFlamingos2Step": {
             "stepRecord": {
-              "gmosNorth": {
+              "flamingos2": {
                 "exposure": {
                   "seconds": 1200.000000
                 },
-                "readout": {
-                  "xBin": "ONE",
-                  "yBin": "ONE",
-                  "ampCount": "TWELVE",
-                  "ampGain": "LOW",
-                  "ampReadMode": "SLOW"
-                },
-                "dtax": "TWO",
-                "roi": "FULL_FRAME",
-                "gratingConfig": {
-                  "grating": "B1200_G5301",
-                  "order": "ONE",
-                  "wavelength": {
-                    "nanometers": 600.000
-                  }
-                },
-                "filter": null,
-                "fpu": {
+                "disperser": "R1200_JH",
+                "filter": "Y",
+                "readMode": "MEDIUM",
+                "lyotWheel": "F16",
+                "mask": {
                   "customMask": null,
-                  "builtin": "LONG_SLIT_0_50"
+                  "builtin": "LONG_SLIT_1"
                 },
-                "centralWavelength": {
-                  "nanometers": 600.000
-                }
+                "readoutMode": null,
+                "reads": null
               },
-              "gmosSouth": null,
-              "observeClass": "ACQUISITION",
+              "observeClass": "SCIENCE",
               "estimate": {
-                "seconds": 1299.562500
+                "seconds": 1231.062500
               }
             }
           }
