@@ -164,9 +164,9 @@ object Phase0Table {
     override def encoder: Encoder[Flamingos2SpectroscopyRow] =
       (
         instrument   *:
-        f2_disperser *:
-        f2_filter    *:
-        f2_fpu
+        flamingos_2_disperser *:
+        flamingos_2_filter    *:
+        flamingos_2_fpu
       ).contramap[Flamingos2SpectroscopyRow] { row => (
         row.spec.instrument,
         row.disperser,

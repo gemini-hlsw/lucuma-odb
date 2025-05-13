@@ -334,9 +334,9 @@ object SmartGcalService {
       sgt: SmartGcalType
     ): AppliedFragment = {
       val where = List(
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${f2_disperser.opt}"(f2.disperser),
-        sql"s.c_filter          IS NOT DISTINCT FROM $f2_filter"(f2.filter),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${f2_fpu.opt}"(f2.fpu),
+        sql"s.c_disperser       IS NOT DISTINCT FROM ${flamingos_2_disperser.opt}"(f2.disperser),
+        sql"s.c_filter          IS NOT DISTINCT FROM $flamingos_2_filter"(f2.filter),
+        sql"s.c_fpu             IS NOT DISTINCT FROM ${flamingos_2_fpu.opt}"(f2.fpu),
         whereSmartGcalType(sgt),
       )
 
@@ -480,9 +480,9 @@ object SmartGcalService {
           $instrument,
           $int4,
           $int8_pos,
-          ${f2_disperser.opt},
-          $f2_filter,
-          ${f2_fpu.opt},
+          ${flamingos_2_disperser.opt},
+          $flamingos_2_filter,
+          ${flamingos_2_fpu.opt},
           $time_span
       """
 

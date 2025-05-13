@@ -48,13 +48,13 @@ object Flamingos2LongSlitService {
     new Flamingos2LongSlitService[F] {
 
       val f2LS: Decoder[Flamingos2LongSlitInput.Create] =
-        (f2_disperser        *:
-         f2_filter           *:
-         f2_fpu              *:
-         f2_read_mode.opt    *:
-         f2_reads.opt        *:
-         f2_decker.opt       *:
-         f2_readout_mode.opt
+        (flamingos_2_disperser        *:
+         flamingos_2_filter           *:
+         flamingos_2_fpu              *:
+         flamingos_2_read_mode.opt    *:
+         flamingos_2_reads.opt        *:
+         flamingos_2_decker.opt       *:
+         flamingos_2_readout_mode.opt
         ).to[Flamingos2LongSlitInput.Create]
 
       private def select[A](
@@ -147,16 +147,16 @@ object Flamingos2LongSlitService {
         SELECT
           $observation_id,
           c_program_id,
-          $f2_disperser,
-          $f2_filter,
-          $f2_fpu,
-          ${f2_read_mode.opt},
-          ${f2_reads.opt},
-          ${f2_decker.opt},
-          ${f2_readout_mode.opt},
-          $f2_disperser,
-          $f2_filter,
-          $f2_fpu
+          $flamingos_2_disperser,
+          $flamingos_2_filter,
+          $flamingos_2_fpu,
+          ${flamingos_2_read_mode.opt},
+          ${flamingos_2_reads.opt},
+          ${flamingos_2_decker.opt},
+          ${flamingos_2_readout_mode.opt},
+          $flamingos_2_disperser,
+          $flamingos_2_filter,
+          $flamingos_2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
        """.contramap { (o, d, f, u, r, e, m, a, id, ii, iu) => (o, d, f, u, r, e, m, a, id, ii, iu, o)}
@@ -187,13 +187,13 @@ object Flamingos2LongSlitService {
 
     private def f2Updates(input: Flamingos2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upDisperser   = sql"c_disperser    = $f2_disperser"
-      val upFilter      = sql"c_filter       = $f2_filter"
-      val upFpu         = sql"c_fpu          = $f2_fpu"
-      val upReadMode    = sql"c_read_mode    = ${f2_read_mode.opt}"
-      val upReads       = sql"c_reads        = ${f2_reads.opt}"
-      val upDecker      = sql"c_decker       = ${f2_decker.opt}"
-      val upReadoutMode = sql"c_readout_mode = ${f2_readout_mode.opt}"
+      val upDisperser   = sql"c_disperser    = $flamingos_2_disperser"
+      val upFilter      = sql"c_filter       = $flamingos_2_filter"
+      val upFpu         = sql"c_fpu          = $flamingos_2_fpu"
+      val upReadMode    = sql"c_read_mode    = ${flamingos_2_read_mode.opt}"
+      val upReads       = sql"c_reads        = ${flamingos_2_reads.opt}"
+      val upDecker      = sql"c_decker       = ${flamingos_2_decker.opt}"
+      val upReadoutMode = sql"c_readout_mode = ${flamingos_2_readout_mode.opt}"
 
       val ups: List[AppliedFragment] =
         List(
