@@ -52,6 +52,7 @@ import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
 import lucuma.odb.graphql.input.WhereProgramNote
 import lucuma.odb.graphql.input.WhereProgramUser
+import lucuma.odb.graphql.input.WhereImagingConfigOption
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
 import lucuma.odb.graphql.input.WhereTarget
 import lucuma.odb.graphql.predicate.DatasetPredicates
@@ -100,6 +101,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("programUsers"),
       SqlObject("proposalStatusMeta"),
       SqlObject("spectroscopyConfigOptions"),
+      SqlObject("imagingConfigOptions"),
       SqlObject("target"),
       SqlObject("targetGroup"),
       SqlObject("targets"),
@@ -118,6 +120,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       FilterTypeMeta,
       GoaDataDownloadAccess,
       Group,
+      ImagingConfigOptions,
       Observation,
       Observations,
       ObservationsByWorkflowState,
@@ -800,6 +803,25 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
   }
 
+  private lazy val ImagingConfigOptions: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    val WhereOptions = WhereImagingConfigOption.binding(Path.from(ImagingConfigOptionType))
+    {
+      case (QueryType, "imagingConfigOptions", List(
+        WhereOptions.Option("WHERE", rWHERE)
+      )) =>
+        Elab.transformChild { child =>
+          rWHERE.map { where =>
+            OrderBy(
+              OrderSelections(List(
+                OrderSelection[Instrument](ImagingConfigOptionType / "instrument"),
+                OrderSelection[String](ImagingConfigOptionType / "filterLabel"),
+              )),
+              Filter(where.getOrElse(True), child)
+            )
+          }
+        }
+    }
+  }
   private lazy val Target: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "target", List(
       TargetIdBinding("targetId", rTid),

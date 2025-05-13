@@ -9137,11 +9137,13 @@ Describes an instrument configuration option for imaging.
 type ImagingConfigOption {
   instrument: Instrument!
 
-  filterLabel: NonEmptyString # e.g., 'JH'
+  filterLabel: NonEmptyString! # e.g., 'JH'
 
   adaptiveOptics: Boolean!
 
   site: Site!
+
+  fov: Angle!
 
   """
   For GMOS North options, the GMOS North configuration.  Null for other
@@ -16093,6 +16095,10 @@ input WhereImagingConfigOption {
   NOT: WhereImagingConfigOption
 
   adaptiveOptics: WhereBoolean
+
+  instrument: WhereEqInstrument
+
+  fov: WhereAngle
 
   site: WhereEqSite
 }
