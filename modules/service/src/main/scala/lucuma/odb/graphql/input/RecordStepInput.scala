@@ -10,11 +10,12 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.f2.F2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
 
-case class RecordGmosStepInput[A](
+case class RecordStepInput[A](
   atomId:          Atom.Id,
   instrument:      A,
   stepConfig:      StepConfig,
@@ -23,12 +24,12 @@ case class RecordGmosStepInput[A](
   generatedId:     Option[Step.Id]
 )
 
-object RecordGmosStepInput:
+object RecordStepInput:
 
   private def binding[A](
     instrumentName:    String,
     instrumentMatcher: Matcher[A]
-  ): Matcher[RecordGmosStepInput[A]] =
+  ): Matcher[RecordStepInput[A]] =
     ObjectFieldsBinding.rmap {
       case List(
         AtomIdBinding("atomId", rAtomId),
@@ -39,12 +40,15 @@ object RecordGmosStepInput:
         StepIdBinding.Option("generatedId", rGenerated)
       ) => (rAtomId, rInstrument, rStepConfig, rTelescopeConfig, rObserveClass, rGenerated).parMapN {
         (atomId, instrument, step, telescope, oclass, generated) =>
-        RecordGmosStepInput(atomId, instrument, step, telescope.getOrElse(TelescopeConfig.Default), oclass, generated)
+        RecordStepInput(atomId, instrument, step, telescope.getOrElse(TelescopeConfig.Default), oclass, generated)
       }
     }
 
-  val GmosNorthBinding: Matcher[RecordGmosStepInput[GmosNorth]] =
+  val Flamingos2Binding: Matcher[RecordStepInput[F2DynamicConfig]] =
+    binding("flamingos2", Flamingos2DynamicInput.Binding)
+
+  val GmosNorthBinding: Matcher[RecordStepInput[GmosNorth]] =
     binding("gmosNorth", GmosNorthDynamicInput.Binding)
 
-  val GmosSouthBinding: Matcher[RecordGmosStepInput[GmosSouth]] =
+  val GmosSouthBinding: Matcher[RecordStepInput[GmosSouth]] =
     binding("gmosSouth", GmosSouthDynamicInput.Binding)

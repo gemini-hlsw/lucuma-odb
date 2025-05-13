@@ -17,13 +17,13 @@ import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.graphql.input.RecordFlamingos2VisitInput
-import lucuma.odb.graphql.input.RecordGmosVisitInput
+import lucuma.odb.graphql.input.RecordVisitInput
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.{site as _, *}
@@ -53,15 +53,15 @@ trait VisitService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordFlamingos2(
-    input: RecordFlamingos2VisitInput
+    input: RecordVisitInput[F2StaticConfig]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordGmosNorth(
-    input: RecordGmosVisitInput[GmosNorth]
+    input: RecordVisitInput[GmosNorth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def recordGmosSouth(
-    input: RecordGmosVisitInput[GmosSouth]
+    input: RecordVisitInput[GmosSouth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
 
@@ -179,8 +179,8 @@ object VisitService:
             case SqlState.ForeignKeyViolation(_) =>
               OdbError.InvalidObservation(observationId, Some(s"Observation '$observationId' not found or is not a ${instrument.longName} observation")).asFailure
 
-      override def recordFlamingos2(
-        input: RecordFlamingos2VisitInput
+      def recordFlamingos2(
+        input: RecordVisitInput[F2StaticConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         insertWithStaticConfig(
           input.observationId,
@@ -191,7 +191,7 @@ object VisitService:
         )
 
       override def recordGmosNorth(
-        input: RecordGmosVisitInput[GmosNorth]
+        input: RecordVisitInput[GmosNorth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         insertWithStaticConfig(
           input.observationId,
@@ -202,7 +202,7 @@ object VisitService:
         )
 
       override def recordGmosSouth(
-        input: RecordGmosVisitInput[GmosSouth]
+        input: RecordVisitInput[GmosSouth]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         insertWithStaticConfig(
           input.observationId,

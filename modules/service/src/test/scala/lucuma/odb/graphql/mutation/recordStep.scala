@@ -49,6 +49,84 @@ class recordStep extends OdbSuite {
       _   <- expect(user, query(aid), expected(aid).leftMap(msg => List(msg)))
     } yield ()
 
+  test("recordStep - Flamingos 2"):
+    recordStepTest(
+      ObservingModeType.Flamingos2LongSlit,
+      service,
+      aid => s"""
+        mutation {
+          recordFlamingos2Step(input: {
+            atomId: ${aid.asJson},
+            ${dynamicConfig(Instrument.Flamingos2)},
+            $stepConfigScienceInput,
+            $telescopeConfigInput,
+            observeClass: ${ObserveClass.Science.tag.toScreamingSnakeCase}
+          }) {
+            stepRecord {
+              flamingos2 {
+                exposure {
+                  seconds
+                }
+                disperser
+                filter
+                readMode
+                lyotWheel
+                mask {
+                  customMask {
+                    filename
+                    slitWidth
+                  }
+                  builtin
+                }
+                readoutMode
+                reads
+              }
+              observeClass
+              estimate {
+                seconds
+              }
+            }
+          }
+        }
+      """,
+      _ => json"""
+        {
+          "recordFlamingos2Step": {
+            "stepRecord": {
+              "flamingos2": {
+                "exposure": {
+                  "seconds": 1200.000000
+                },
+                "disperser": "R1200_JH",
+                "filter": "Y",
+                "readMode": "MEDIUM",
+                "lyotWheel": "F16",
+                "mask": {
+                  "customMask": null,
+                  "builtin": "LONG_SLIT_1"
+                },
+                "readoutMode": null,
+                "reads": null
+              },
+              "observeClass": "SCIENCE",
+              "estimate": {
+                "seconds": 1231.062500
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+
+    // Step Time estimate:
+    // 1200.0     Exposure
+    //   82.5     Readout (HAMAMATSU, 1x1, 12 amp, Low gain, Slow read, FullFrame)
+    //   10.0     Writeout
+    //    7.0     Offset constant
+    //    0.06250 Offset distance (0.00625 sec / arcsec X 10 arcsec)
+    // ----------
+    // 1299.56250 seconds
+
   test("recordStep - GmosNorth") {
     recordStepTest(
       ObservingModeType.GmosNorthLongSlit,

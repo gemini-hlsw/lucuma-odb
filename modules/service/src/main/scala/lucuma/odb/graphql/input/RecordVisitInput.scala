@@ -6,33 +6,37 @@ package lucuma.odb.graphql.input
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.f2.F2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
 
-case class RecordGmosVisitInput[A](
+case class RecordVisitInput[A](
   observationId: Observation.Id,
   static:        A
 )
 
-object RecordGmosVisitInput {
+object RecordVisitInput {
 
   private def binding[A](
     instrumentName: String,
     staticMatcher:  Matcher[A]
-  ): Matcher[RecordGmosVisitInput[A]] =
+  ): Matcher[RecordVisitInput[A]] =
     ObjectFieldsBinding.rmap {
       case List(
         ObservationIdBinding("observationId", rObservationId),
         staticMatcher(`instrumentName`, rStatic)
       ) =>
-        (rObservationId, rStatic).parMapN(RecordGmosVisitInput(_, _))
+        (rObservationId, rStatic).parMapN(RecordVisitInput(_, _))
     }
 
-  val GmosNorthBinding: Matcher[RecordGmosVisitInput[GmosNorth]] =
+  val Flamingos2Binding: Matcher[RecordVisitInput[F2StaticConfig]] =
+    binding("flamingos2", Flamingos2StaticInput.Binding)
+
+  val GmosNorthBinding: Matcher[RecordVisitInput[GmosNorth]] =
     binding("gmosNorth", GmosNorthStaticInput.Binding)
 
-  val GmosSouthBinding: Matcher[RecordGmosVisitInput[GmosSouth]] =
+  val GmosSouthBinding: Matcher[RecordVisitInput[GmosSouth]] =
     binding("gmosSouth", GmosSouthStaticInput.Binding)
 
 }
