@@ -12,7 +12,7 @@ import fs2.Stream
 import fs2.io.readInputStream
 import lucuma.core.enums.Instrument
 import lucuma.odb.phase0.ConfigurationRow
-import lucuma.odb.phase0.F2SpectroscopyRow
+import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.FileReader
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
@@ -98,7 +98,7 @@ object Phase0Loader {
     List(
       new Phase0Loader[GmosSpectroscopyRow.GmosNorth, SpectroscopyRow](Instrument.GmosNorth, rdr.gmosNorthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosNorth),
       new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth),
-      new Phase0Loader[F2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.f2Spectroscopy, _.spec, Phase0Table.SpectroscopyF2)
+      new Phase0Loader[Flamingos2SpectroscopyRow, SpectroscopyRow](Instrument.Flamingos2, rdr.flamingos2Spectroscopy, _.spec, Phase0Table.SpectroscopyFlamingos2)
     ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 
   def imagingLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =

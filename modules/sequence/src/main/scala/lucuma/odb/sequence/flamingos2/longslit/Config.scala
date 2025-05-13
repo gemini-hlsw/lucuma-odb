@@ -1,18 +1,18 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.f2.longslit
+package lucuma.odb.sequence.flamingos2.longslit
 
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
+import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.odb.sequence.ObservingMode
 
 import java.io.ByteArrayOutputStream
@@ -23,21 +23,21 @@ import java.io.DataOutputStream
  * F2 long slit sequence may be generated.
  */
 case class Config private[longslit](
-  disperser: F2Disperser,
-  filter: F2Filter,
-  fpu: F2Fpu,
-  explicitReadMode: Option[F2ReadMode],
-  explicitReads: Option[F2Reads],
-  defaultDecker: F2Decker,
-  explicitDecker: Option[F2Decker],
-  defaultReadoutMode: F2ReadoutMode,
-  explicitReadoutMode: Option[F2ReadoutMode]
+  disperser: Flamingos2Disperser,
+  filter: Flamingos2Filter,
+  fpu: Flamingos2Fpu,
+  explicitReadMode: Option[Flamingos2ReadMode],
+  explicitReads: Option[Flamingos2Reads],
+  defaultDecker: Flamingos2Decker,
+  explicitDecker: Option[Flamingos2Decker],
+  defaultReadoutMode: Flamingos2ReadoutMode,
+  explicitReadoutMode: Option[Flamingos2ReadoutMode]
 ) derives Eq {
 
-  def decker: F2Decker =
+  def decker: Flamingos2Decker =
     explicitDecker.getOrElse(defaultDecker)
 
-  def readoutMode: F2ReadoutMode =
+  def readoutMode: Flamingos2ReadoutMode =
     explicitReadoutMode.getOrElse(defaultReadoutMode)
 
   def hashBytes: Array[Byte] = {
@@ -61,13 +61,13 @@ case class Config private[longslit](
 object Config:
 
   def apply(
-    disperser: F2Disperser,
-    filter: F2Filter,
-    fpu: F2Fpu,
-    explicitReadMode: Option[F2ReadMode] = None,
-    explicitReads: Option[F2Reads] = None,
-    explicitDecker: Option[F2Decker] = None,
-    explicitReadoutMode: Option[F2ReadoutMode] = None,
+    disperser: Flamingos2Disperser,
+    filter: Flamingos2Filter,
+    fpu: Flamingos2Fpu,
+    explicitReadMode: Option[Flamingos2ReadMode] = None,
+    explicitReads: Option[Flamingos2Reads] = None,
+    explicitDecker: Option[Flamingos2Decker] = None,
+    explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
   ): Config =
     new Config(
       disperser,
@@ -75,9 +75,9 @@ object Config:
       fpu,
       explicitReadMode,
       explicitReads,
-      F2Decker.LongSlit,
+      Flamingos2Decker.LongSlit,
       explicitDecker,
-      DefaultF2ReadoutMode,
+      DefaultFlamingos2ReadoutMode,
       explicitReadoutMode
     )
 

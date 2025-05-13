@@ -9,10 +9,10 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.model.sequence.f2.F2DynamicConfig
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import monocle.Focus
@@ -22,9 +22,9 @@ import monocle.Optional
 object Flamingos2:
 
   case class TableKey(
-    disperser: Option[F2Disperser],
-    filter:    F2Filter,
-    fpu:       Option[F2Fpu]
+    disperser: Option[Flamingos2Disperser],
+    filter:    Flamingos2Filter,
+    fpu:       Option[Flamingos2Fpu]
   ):
     def format: String =
       val d = s"disperser: ${disperser.fold("None"){d => s"$d, ${d.wavelength.nm.value.value} nm"}}"
@@ -33,20 +33,20 @@ object Flamingos2:
       s"Flamingos2 { $d, $f, $u }"
 
   object TableKey:
-    def fromDynamicConfig(f2: F2DynamicConfig): TableKey =
+    def fromDynamicConfig(f2: Flamingos2DynamicConfig): TableKey =
       TableKey(
         f2.disperser,
         f2.filter,
         f2.fpu.builtin.map(_.value)
       )
 
-    def disperser: Lens[TableKey, Option[F2Disperser]] =
+    def disperser: Lens[TableKey, Option[Flamingos2Disperser]] =
       Focus[TableKey](_.disperser)
 
-    def filter: Lens[TableKey, F2Filter] =
+    def filter: Lens[TableKey, Flamingos2Filter] =
       Focus[TableKey](_.filter)
 
-    def fpu: Lens[TableKey, Option[F2Fpu]] =
+    def fpu: Lens[TableKey, Option[Flamingos2Fpu]] =
       Focus[TableKey](_.fpu)
 
   case class TableRow(
@@ -66,7 +66,7 @@ object Flamingos2:
     def value: Lens[TableRow, SmartGcalValue.Legacy] =
       Focus[TableRow](_.value)
 
-    def disperser: Optional[TableRow, F2Disperser] =
+    def disperser: Optional[TableRow, Flamingos2Disperser] =
       TableRow.key
         .andThen(TableKey.disperser)
         .andThen(monocle.std.option.some)
@@ -81,9 +81,9 @@ object Flamingos2:
         .andThen(SmartGcalValue.stepCount)
 
   case class FileKey(
-    dispersers:      NonEmptyList[Option[F2Disperser]],
-    filters:         NonEmptyList[F2Filter],
-    fpus:            NonEmptyList[F2Fpu]
+    dispersers:      NonEmptyList[Option[Flamingos2Disperser]],
+    filters:         NonEmptyList[Flamingos2Filter],
+    fpus:            NonEmptyList[Flamingos2Fpu]
   ) {
 
     def tableKeys: NonEmptyList[TableKey] =

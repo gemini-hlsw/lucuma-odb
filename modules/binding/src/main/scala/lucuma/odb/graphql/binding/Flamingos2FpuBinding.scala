@@ -3,7 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.F2LyotWheel
+import lucuma.core.enums.Flamingos2Fpu
 
-val F2LyoutWheelBinding: Matcher[F2LyotWheel] =
+val Flamingos2FpuBinding: Matcher[Flamingos2Fpu] =
   enumeratedBinding
+

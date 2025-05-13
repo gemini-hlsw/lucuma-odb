@@ -3,8 +3,8 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.F2ReadoutMode
+import lucuma.core.enums.Flamingos2Decker
 
-val F2ReadoutModeBinding: Matcher[F2ReadoutMode] =
+val Flamingos2DeckerBinding: Matcher[Flamingos2Decker] =
   enumeratedBinding
 

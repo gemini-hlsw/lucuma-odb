@@ -3,8 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.F2WindowCover
+import lucuma.core.enums.Flamingos2CustomSlitWidth
 
-val F2WindowCoverBinding: Matcher[F2WindowCover] =
+val Flamingos2CustomSlitWidthBinding: Matcher[Flamingos2CustomSlitWidth] =
   enumeratedBinding
-

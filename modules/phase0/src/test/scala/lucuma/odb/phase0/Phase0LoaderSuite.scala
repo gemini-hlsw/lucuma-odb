@@ -55,7 +55,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       )
 
     stream
-      .through(rdr.f2Spectroscopy)
+      .through(rdr.flamingos2Spectroscopy)
       .compile
       .toList
       .map: rows =>

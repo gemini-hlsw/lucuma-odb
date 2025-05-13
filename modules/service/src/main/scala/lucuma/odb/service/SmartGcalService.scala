@@ -9,9 +9,9 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosGratingOrder
@@ -28,7 +28,7 @@ import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.StepConfig.Gcal
-import lucuma.core.model.sequence.f2.F2DynamicConfig as Flamingos2
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.util.TimeSpan
@@ -462,9 +462,9 @@ object SmartGcalService {
       Instrument         ,
       Int                ,
       PosLong            ,
-      Option[F2Disperser],
-      F2Filter           ,
-      Option[F2Fpu]      ,
+      Option[Flamingos2Disperser],
+      Flamingos2Filter           ,
+      Option[Flamingos2Fpu]      ,
       TimeSpan
     )] =
       sql"""
