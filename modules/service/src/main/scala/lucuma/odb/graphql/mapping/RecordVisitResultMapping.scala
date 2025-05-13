@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.TypeRef
+
 import table.VisitTable
 
 trait RecordVisitResultMapping[F[_]] extends VisitTable[F]:

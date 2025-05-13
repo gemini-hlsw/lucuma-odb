@@ -1138,11 +1138,14 @@ trait DatabaseOperations { this: OdbSuite =>
       ${instrument.fieldName}: {
         exposure: {
           seconds: 1200,
-          disperser: ,
-          filter: ,
-          readMode: ,
-          lyot
         },
+        disperser: R1200_JH,
+        filter: Y,
+        readMode: MEDIUM,
+        lyotWheel: F16,
+        mask: {
+          builtin: LONG_SLIT_1
+        }
       }
     """
 
