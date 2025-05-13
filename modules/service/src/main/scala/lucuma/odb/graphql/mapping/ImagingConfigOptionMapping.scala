@@ -18,6 +18,7 @@ trait ImagingConfigOptionMapping[F[_]] extends ImagingConfigOptionTable[F] {
 
       SqlField("adaptiveOptics", ImagingConfigOptionTable.Ao),
       SqlField("site",           ImagingConfigOptionTable.Site),
+      SqlObject("fov"),
 
       SqlObject("gmosNorth", Join(List(
         ImagingConfigOptionTable.Instrument -> ImagingConfigOptionGmosNorthTable.Instrument,
