@@ -11,6 +11,7 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
@@ -22,6 +23,7 @@ import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
+import lucuma.core.syntax.string.*
 
 
 class reference extends OdbSuite {
@@ -1216,5 +1218,12 @@ class reference extends OdbSuite {
       ref <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: POOR_WEATHER }""")
     } yield assertEquals(ref, "G-2025B-0002-P".programReference.some)
   }
+
+  test("there is a reference name in instrument_reference_name function for every instrument"):
+    Instrument.values.toList.traverse: inst =>
+      for
+        pid <- createProgramAs(pi)
+        ref <- setProgramReference(staff, pid, s"""engineering: { semester: "2025B", instrument: ${inst.tag.toScreamingSnakeCase} }""")
+      yield assert(ref.exists(_.label.startsWith(s"G-2025B-ENG-${inst.referenceName}-")))
 
 }

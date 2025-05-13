@@ -9040,6 +9040,11 @@ enum Instrument {
   GSAOI
 
   """
+  Instrument Igrins2
+  """
+  IGRINS2
+
+  """
   Instrument Niri
   """
   NIRI
