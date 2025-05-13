@@ -3,8 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.F2Disperser
+import lucuma.core.enums.Flamingos2Filter
 
-val F2DisperserBinding: Matcher[F2Disperser] =
+val Flamingos2FilterBinding: Matcher[Flamingos2Filter] =
   enumeratedBinding
-

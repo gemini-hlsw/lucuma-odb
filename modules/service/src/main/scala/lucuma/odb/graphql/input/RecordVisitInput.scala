@@ -6,7 +6,7 @@ package lucuma.odb.graphql.input
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
@@ -30,7 +30,7 @@ object RecordVisitInput {
         (rObservationId, rStatic).parMapN(RecordVisitInput(_, _))
     }
 
-  val Flamingos2Binding: Matcher[RecordVisitInput[F2StaticConfig]] =
+  val Flamingos2Binding: Matcher[RecordVisitInput[Flamingos2StaticConfig]] =
     binding("flamingos2", Flamingos2StaticInput.Binding)
 
   val GmosNorthBinding: Matcher[RecordVisitInput[GmosNorth]] =

@@ -7,8 +7,8 @@ import cats.MonadError
 import cats.syntax.functor.*
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepEstimate
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.odb.graphql.enums.Enums
@@ -43,7 +43,7 @@ object TimeEstimateCalculatorImplementation:
     private val cce = ConfigChangeEstimator.using(ctx.enums)
     private val de  = DetectorEstimator.using(ctx)
 
-    lazy val flamingos2: TimeEstimateCalculator[F2StaticConfig, F2DynamicConfig] =
+    lazy val flamingos2: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       fromEstimators(
         SetupTime(
           ctx.enums.TimeEstimate.Flamingos2LongslitSetup.time,

@@ -5,12 +5,12 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.MosPreImaging
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.graphql.binding.*
 
 object Flamingos2StaticInput:
 
-  val Binding: Matcher[F2StaticConfig] =
+  val Binding: Matcher[Flamingos2StaticConfig] =
     ObjectFieldsBinding.rmap:
       case List(
         MosPreImagingBinding.Option("mosPreImaging", rPreImaging),
@@ -18,7 +18,7 @@ object Flamingos2StaticInput:
       ) =>
         (rPreImaging, rEOffsetting)
           .parMapN: (preImage, eOffset) =>
-            F2StaticConfig(
+            Flamingos2StaticConfig(
               preImage.getOrElse(MosPreImaging.IsNotMosPreImaging),
               eOffset.getOrElse(false)
             )

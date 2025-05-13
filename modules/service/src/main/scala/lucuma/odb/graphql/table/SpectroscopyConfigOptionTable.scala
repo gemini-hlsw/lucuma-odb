@@ -55,13 +55,13 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Filter     = col("c_filter",  gmos_south_filter.opt)
   }
 
-  object SpectroscopyConfigOptionF2Table extends TableDef("t_spectroscopy_config_option_f2") {
+  object SpectroscopyConfigOptionFlamingos2Table extends TableDef("t_spectroscopy_config_option_f2") {
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
-    val Fpu        = col("c_fpu",       f2_fpu)
-    val Disperser  = col("c_disperser", f2_disperser)
-    val Filter     = col("c_filter",    f2_filter)
+    val Fpu        = col("c_fpu",       flamingos_2_fpu)
+    val Disperser  = col("c_disperser", flamingos_2_disperser)
+    val Filter     = col("c_filter",    flamingos_2_filter)
   }
 
 }

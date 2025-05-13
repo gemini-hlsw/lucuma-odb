@@ -7,28 +7,28 @@ package input
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import grackle.Result
-import lucuma.core.enums.F2Decker
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
-import lucuma.core.enums.F2ReadMode
-import lucuma.core.enums.F2ReadoutMode
-import lucuma.core.enums.F2Reads
+import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.f2.longslit.Config
+import lucuma.odb.sequence.flamingos2.longslit.Config
 
 object Flamingos2LongSlitInput {
 
   case class Create(
-    disperser: F2Disperser,
-    filter: F2Filter,
-    fpu: F2Fpu,
-    explicitReadMode: Option[F2ReadMode]       = None,
-    explicitReads: Option[F2Reads]             = None,
-    explicitDecker: Option[F2Decker]           = None,
-    explicitReadoutMode: Option[F2ReadoutMode] = None
+    disperser: Flamingos2Disperser,
+    filter: Flamingos2Filter,
+    fpu: Flamingos2Fpu,
+    explicitReadMode: Option[Flamingos2ReadMode]       = None,
+    explicitReads: Option[Flamingos2Reads]             = None,
+    explicitDecker: Option[Flamingos2Decker]           = None,
+    explicitReadoutMode: Option[Flamingos2ReadoutMode] = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -50,24 +50,24 @@ object Flamingos2LongSlitInput {
   }
 
   object Create {
-    private val F2Data: Matcher[(
-      F2Disperser,
-      F2Filter,
-      F2Fpu,
-      Option[F2ReadMode],
-      Option[F2Decker],
-      Option[F2ReadoutMode],
-      Option[F2Reads],
+    private val Flamingos2Data: Matcher[(
+      Flamingos2Disperser,
+      Flamingos2Filter,
+      Flamingos2Fpu,
+      Option[Flamingos2ReadMode],
+      Option[Flamingos2Decker],
+      Option[Flamingos2ReadoutMode],
+      Option[Flamingos2Reads],
     )] =
       ObjectFieldsBinding.rmap {
         case List(
-          F2DisperserBinding("disperser", rDisperser),
-          F2FilterBinding("filter", rFilter),
-          F2FpuBinding("fpu", rFpu),
-          F2ReadModeBinding.Option("explicitReadMode", rReadMode),
-          F2ReadsBinding.Option("explicitReads", rReads),
-          F2DeckerBinding.Option("explicitDecker", rDecker),
-          F2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode)
+          Flamingos2DisperserBinding("disperser", rDisperser),
+          Flamingos2FilterBinding("filter", rFilter),
+          Flamingos2FpuBinding("fpu", rFpu),
+          Flamingos2ReadModeBinding.Option("explicitReadMode", rReadMode),
+          Flamingos2ReadsBinding.Option("explicitReads", rReads),
+          Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
+          Flamingos2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode)
         ) => (
           rDisperser,
           rFilter,
@@ -80,7 +80,7 @@ object Flamingos2LongSlitInput {
       }
 
     val Binding: Matcher[Create] =
-      F2Data.rmap {
+      Flamingos2Data.rmap {
         case (
           disperser,
           filter,
@@ -104,13 +104,13 @@ object Flamingos2LongSlitInput {
   }
 
   case class Edit(
-    disperser: Option[F2Disperser],
-    filter: Option[F2Filter],
-    fpu: Option[F2Fpu],
-    explicitReadMode: Nullable[F2ReadMode],
-    explicitReads: Nullable[F2Reads],
-    explicitDecker: Nullable[F2Decker],
-    explicitReadoutMode: Nullable[F2ReadoutMode]
+    disperser: Option[Flamingos2Disperser],
+    filter: Option[Flamingos2Filter],
+    fpu: Option[Flamingos2Fpu],
+    explicitReadMode: Nullable[Flamingos2ReadMode],
+    explicitReads: Nullable[Flamingos2Reads],
+    explicitDecker: Nullable[Flamingos2Decker],
+    explicitReadoutMode: Nullable[Flamingos2ReadoutMode]
   ) {
 
     val observingModeType: ObservingModeType =
@@ -137,24 +137,24 @@ object Flamingos2LongSlitInput {
 
   object Edit {
 
-    private val F2EditData: Matcher[(
-      Option[F2Disperser],
-      Option[F2Filter],
-      Option[F2Fpu],
-      Nullable[F2ReadMode],
-      Nullable[F2Reads],
-      Nullable[F2Decker],
-      Nullable[F2ReadoutMode]
+    private val Flamingos2EditData: Matcher[(
+      Option[Flamingos2Disperser],
+      Option[Flamingos2Filter],
+      Option[Flamingos2Fpu],
+      Nullable[Flamingos2ReadMode],
+      Nullable[Flamingos2Reads],
+      Nullable[Flamingos2Decker],
+      Nullable[Flamingos2ReadoutMode]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
-          F2DisperserBinding.Option("disperser", rDisperser),
-          F2FilterBinding.Option("filter", rFilter),
-          F2FpuBinding.Option("fpu", rFpu),
-          F2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
-          F2ReadsBinding.Nullable("explicitReads", rReads),
-          F2DeckerBinding.Nullable("explicitDecker", rDecker),
-          F2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode)
+          Flamingos2DisperserBinding.Option("disperser", rDisperser),
+          Flamingos2FilterBinding.Option("filter", rFilter),
+          Flamingos2FpuBinding.Option("fpu", rFpu),
+          Flamingos2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
+          Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
+          Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
+          Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode)
         ) => (
           rDisperser,
           rFilter,
@@ -167,7 +167,7 @@ object Flamingos2LongSlitInput {
       }
 
     val Binding: Matcher[Edit] =
-      F2EditData.rmap {
+      Flamingos2EditData.rmap {
         case (
           grating,
           filter,

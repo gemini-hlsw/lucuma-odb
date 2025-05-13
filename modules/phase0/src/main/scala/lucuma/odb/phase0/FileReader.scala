@@ -67,8 +67,8 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
       .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
 
-  val f2Spectroscopy: Pipe[F, Byte, (F2SpectroscopyRow, PosInt)] =
-    read(Instrument.Flamingos2, F2SpectroscopyRow.f2)
+  val flamingos2Spectroscopy: Pipe[F, Byte, (Flamingos2SpectroscopyRow, PosInt)] =
+    read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
 
   val gmosNorthImaging: Pipe[F, Byte, (GmosImagingRow.GmosNorth, PosInt)] =

@@ -30,8 +30,8 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.f2.F2DynamicConfig
-import lucuma.core.model.sequence.f2.F2StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
@@ -55,7 +55,7 @@ trait SequenceService[F[_]] {
 
   def selectFlamingos2StepRecords(
     observationId: Observation.Id
-  ): Stream[F, StepRecord[F2DynamicConfig]]
+  ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
 
   def selectGmosNorthStepRecords(
     observationId: Observation.Id
@@ -100,12 +100,12 @@ trait SequenceService[F[_]] {
 
   def insertFlamingos2StepRecord(
     atomId:         Atom.Id,
-    instrument:     F2DynamicConfig,
+    instrument:     Flamingos2DynamicConfig,
     step:           StepConfig,
     telescope:      TelescopeConfig,
     observeClass:   ObserveClass,
     generatedId:    Option[Step.Id],
-    timeCalculator: TimeEstimateCalculator[F2StaticConfig, F2DynamicConfig]
+    timeCalculator: TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
   def insertGmosNorthStepRecord(
@@ -166,7 +166,7 @@ object SequenceService {
 
       override def selectFlamingos2StepRecords(
         observationId: Observation.Id
-      ): Stream[F, StepRecord[F2DynamicConfig]] =
+      ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
         flamingos2SequenceService.selectStepRecords(observationId)
 
       override def selectGmosNorthStepRecords(
@@ -209,7 +209,7 @@ object SequenceService {
 
       private def selectFlamingos2EstimatorState(
         observationId: Observation.Id
-      )(using Transaction[F]): F[Option[(F2StaticConfig, TimeEstimateCalculator.Last[F2DynamicConfig])]] =
+      )(using Transaction[F]): F[Option[(Flamingos2StaticConfig, TimeEstimateCalculator.Last[Flamingos2DynamicConfig])]] =
         selectEstimatorState(
           observationId,
           services.flamingos2SequenceService.selectStatic,
@@ -349,12 +349,12 @@ object SequenceService {
 
       def insertFlamingos2StepRecord(
         atomId:          Atom.Id,
-        dynamicConfig:   F2DynamicConfig,
+        dynamicConfig:   Flamingos2DynamicConfig,
         stepConfig:      StepConfig,
         telescopeConfig: TelescopeConfig,
         observeClass:    ObserveClass,
         generatedId:     Option[Step.Id],
-        timeCalculator:  TimeEstimateCalculator[F2StaticConfig, F2DynamicConfig]
+        timeCalculator:  TimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]] =
         insertStepRecord(
           atomId,

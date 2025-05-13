@@ -44,8 +44,8 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       ))),
 
       SqlObject("flamingos2", Join(List(
-        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionF2Table.Instrument,
-        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionF2Table.Index
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionFlamingos2Table.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionFlamingos2Table.Index
       )))
 
     )
@@ -75,14 +75,14 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
     )
 
   lazy val SpectroscopyConfigOptionF2Mapping: ObjectMapping =
-    ObjectMapping(SpectroscopyConfigOptionF2Type)(
+    ObjectMapping(SpectroscopyConfigOptionFlamingos2Type)(
 
-      SqlField("instrument", SpectroscopyConfigOptionF2Table.Instrument, key = true, hidden = true),
-      SqlField("index",      SpectroscopyConfigOptionF2Table.Index, key = true, hidden = true),
+      SqlField("instrument", SpectroscopyConfigOptionFlamingos2Table.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionFlamingos2Table.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectroscopyConfigOptionF2Table.Fpu),
-      SqlField("disperser",  SpectroscopyConfigOptionF2Table.Disperser),
-      SqlField("filter",     SpectroscopyConfigOptionF2Table.Filter)
+      SqlField("fpu",        SpectroscopyConfigOptionFlamingos2Table.Fpu),
+      SqlField("disperser",  SpectroscopyConfigOptionFlamingos2Table.Disperser),
+      SqlField("filter",     SpectroscopyConfigOptionFlamingos2Table.Filter)
 
     )
 }
