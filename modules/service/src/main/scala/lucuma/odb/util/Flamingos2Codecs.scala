@@ -28,31 +28,31 @@ trait Flamingos2Codecs:
   import Codecs.enumerated
   import Codecs.time_span
 
-  val f2_custom_slit_width: Codec[Flamingos2CustomSlitWidth] =
+  val flamingos_2_custom_slit_width: Codec[Flamingos2CustomSlitWidth] =
     enumerated(Type.varchar)
 
-  val f2_decker: Codec[Flamingos2Decker] =
+  val flamingos_2_decker: Codec[Flamingos2Decker] =
     enumerated(Type.varchar)
 
-  val f2_disperser: Codec[Flamingos2Disperser] =
+  val flamingos_2_disperser: Codec[Flamingos2Disperser] =
     enumerated(Type.varchar)
 
-  val f2_filter: Codec[Flamingos2Filter] =
+  val flamingos_2_filter: Codec[Flamingos2Filter] =
     enumerated(Type.varchar)
 
-  val f2_fpu: Codec[Flamingos2Fpu] =
+  val flamingos_2_fpu: Codec[Flamingos2Fpu] =
     enumerated(Type.varchar)
 
-  val f2_lyot_wheel: Codec[Flamingos2LyotWheel] =
+  val flamingos_2_lyot_wheel: Codec[Flamingos2LyotWheel] =
     enumerated(Type.varchar)
 
-  val f2_read_mode: Codec[Flamingos2ReadMode] =
+  val flamingos_2_read_mode: Codec[Flamingos2ReadMode] =
     enumerated(Type.varchar)
 
-  val f2_readout_mode: Codec[Flamingos2ReadoutMode] =
+  val flamingos_2_readout_mode: Codec[Flamingos2ReadoutMode] =
     enumerated(Type.varchar)
 
-  val f2_reads: Codec[Flamingos2Reads] =
+  val flamingos_2_reads: Codec[Flamingos2Reads] =
     enumerated(Type.varchar)
 
   val flamingos_2_static: Codec[Flamingos2StaticConfig] =
@@ -64,15 +64,15 @@ trait Flamingos2Codecs:
       f2.useElectronicOffseting
     )}
 
-  val f2_fpu_mask_custom: Codec[Flamingos2FpuMask.Custom] =
-    (varchar *: f2_custom_slit_width).eimap { case (n, w) =>
+  val flamingos_2_fpu_mask_custom: Codec[Flamingos2FpuMask.Custom] =
+    (varchar *: flamingos_2_custom_slit_width).eimap { case (n, w) =>
       NonEmptyString.from(n).leftMap(_ => "Custom mask filename cannot be empty").map { ne =>
         Flamingos2FpuMask.Custom(ne, w)
       }
     } { c => (c.filename.value, c.slitWidth)}
 
-  val f2_fpu_mask: Codec[Flamingos2FpuMask] =
-     (f2_fpu_mask_custom.opt *: f2_fpu.opt).eimap {
+  val flamingos_2_fpu_mask: Codec[Flamingos2FpuMask] =
+     (flamingos_2_fpu_mask_custom.opt *: flamingos_2_fpu.opt).eimap {
        case (None, None)       => Flamingos2FpuMask.Imaging.asRight.widen[Flamingos2FpuMask]
        case (Some(c), None)    => c.asRight.widen[Flamingos2FpuMask]
        case (None, Some(b))    => Flamingos2FpuMask.Builtin(b).asRight.widen[Flamingos2FpuMask]
@@ -81,14 +81,14 @@ trait Flamingos2Codecs:
 
   val flamingos_2_dynamic: Codec[Flamingos2DynamicConfig] =
     (
-      time_span           *:
-      f2_disperser.opt    *:
-      f2_filter           *:
-      f2_read_mode        *:
-      f2_lyot_wheel       *:
-      f2_fpu_mask         *:
-      f2_readout_mode.opt *:
-      f2_reads.opt
+      time_span                    *:
+      flamingos_2_disperser.opt    *:
+      flamingos_2_filter           *:
+      flamingos_2_read_mode        *:
+      flamingos_2_lyot_wheel       *:
+      flamingos_2_fpu_mask         *:
+      flamingos_2_readout_mode.opt *:
+      flamingos_2_reads.opt
     ).to[Flamingos2DynamicConfig]
 
 object Flamingos2Codecs extends Flamingos2Codecs
