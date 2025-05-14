@@ -42,7 +42,9 @@ import lucuma.odb.sequence.util.IndexTracker
 
 import java.util.UUID
 
-
+/**
+ * Flamingos 2 long slit acquisition.
+ */
 object Acquisition:
 
   case class Steps(
