@@ -6,8 +6,11 @@ package flamingos2
 package longslit
 
 import cats.Eq
+import cats.Monad
+import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -41,21 +44,23 @@ import java.util.UUID
 object Science:
 
   case class Steps(
-    a:    ProtoStep[F2],
-    b:    ProtoStep[F2],
-    flat: ProtoStep[F2],
-    arc:  ProtoStep[F2]
+    a:     ProtoStep[F2],
+    b:     ProtoStep[F2],
+    flats: NonEmptyList[ProtoStep[F2]],
+    arcs:  NonEmptyList[ProtoStep[F2]]
   ):
     val nominalSequence: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList.of(a, b, b, a, flat, arc)
+      NonEmptyList.of(NonEmptyList.of(a, b, b, a), flats, arcs).flatten
 
   object Steps extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
-    def compute(
-      config: Config,
-      time:   IntegrationTime
-    ): Steps =
-      eval:
+    def compute[F[_]: Monad](
+      oid:      Observation.Id,
+      config:   Config,
+      time:     IntegrationTime,
+      expander: SmartGcalExpander[F, F2]
+    ): EitherT[F, OdbError, Steps] =
+      val (a, b, f, r) = eval:
         for
           _ <- F2.exposure    := time.exposureTime
           _ <- F2.disperser   := config.disperser.some
@@ -69,7 +74,13 @@ object Science:
           b <- scienceStep(0.arcsec,  15.arcsec, ObserveClass.Science)
           f <- flatStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           r <- arcStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-        yield Steps(a, b, f, r)
+        yield (a, b, f, r)
+
+      (for
+        fs <- EitherT(expander.expandStep(f))
+        rs <- EitherT(expander.expandStep(r))
+      yield Steps(a, b, fs, rs)).leftMap: msg =>
+        OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
   case class ScienceState(
     steps:     Steps,
@@ -109,26 +120,38 @@ object Science:
                     else completed
       )
 
-  def instantiate(
+  def instantiate[F[_]: Monad](
     observationId: Observation.Id,
     estimator:     TimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
+    expander:      SmartGcalExpander[F, F2],
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
-  ): Either[OdbError, SequenceGenerator[F2]] =
-    time
-      .filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some))
-      .map: t =>
-        ScienceState(
-          Steps.compute(config, t),
-          AtomBuilder.instantiate(
-            estimator,
-            static,
-            namespace,
-            SequenceType.Science
-          ),
-          TimeEstimateCalculator.Last.empty[F2],
-          IndexTracker.Zero,
-          Map.empty
-        )
+  ): F[Either[OdbError, SequenceGenerator[F2]]] =
+
+    def usingTime(t: IntegrationTime): EitherT[F, OdbError, SequenceGenerator[F2]] =
+      Steps
+        .compute(observationId, config, t, expander)
+        .map: steps =>
+          ScienceState(
+            steps,
+            AtomBuilder.instantiate(
+              estimator,
+              static,
+              namespace,
+              SequenceType.Science
+            ),
+            TimeEstimateCalculator.Last.empty[F2],
+            IndexTracker.Zero,
+            Map.empty
+          )
+
+    val posTime: EitherT[F, OdbError, IntegrationTime] =
+      EitherT.fromEither:
+        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some))
+
+    (for
+      t <- posTime
+      g <- usingTime(t)
+    yield g).value
