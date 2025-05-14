@@ -18,7 +18,7 @@ import java.util.UUID
 
 /**
  * AtomBuilder encapsulates the complicated task of creating Atom from a list
- * of proto-steps.  This requires calculating the atom an step ids from indices
+ * of proto-steps.  This requires calculating the atom and step ids from indices
  * and estimating the step cost.
  */
 trait AtomBuilder[D]:
