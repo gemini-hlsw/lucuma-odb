@@ -11,6 +11,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2CustomSlitWidth
+import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -90,10 +91,11 @@ trait Flamingos2Codec:
         f <- c.downField("filter").as[Flamingos2Filter]
         r <- c.downField("readMode").as[Flamingos2ReadMode]
         l <- c.downField("lyotWheel").as[Flamingos2LyotWheel]
-        u <- c.downField("mask").as[Flamingos2FpuMask]
-        m <- c.downField("readoutMode").as[Option[Flamingos2ReadoutMode]]
-        s <- c.downField("reads").as[Option[Flamingos2Reads]]
-      yield Flamingos2DynamicConfig(e, d, f, r, l, u, m, s)
+        u <- c.downField("fpu").as[Flamingos2FpuMask]
+        k <- c.downField("decker").as[Flamingos2Decker]
+        m <- c.downField("readoutMode").as[Flamingos2ReadoutMode]
+        s <- c.downField("reads").as[Flamingos2Reads]
+      yield Flamingos2DynamicConfig(e, d, f, r, l, u, k, m, s)
 
   given (using Encoder[TimeSpan]): Encoder[Flamingos2DynamicConfig] =
     Encoder.instance[Flamingos2DynamicConfig]: a =>
@@ -102,8 +104,9 @@ trait Flamingos2Codec:
         "disperser"   -> a.disperser.asJson,
         "filter"      -> a.filter.asJson,
         "readMode"    -> a.readMode.asJson,
-        "lyotWheel"   -> a.lyot.asJson,
-        "mask"        -> a.fpu.asJson,
+        "lyotWheel"   -> a.lyotWheel.asJson,
+        "fpu"         -> a.fpu.asJson,
+        "decker"      -> a.decker.asJson,
         "readoutMode" -> a.readoutMode.asJson,
         "reads"       -> a.reads.asJson
       )

@@ -19,6 +19,7 @@ import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2LyotWheel
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -67,15 +68,17 @@ object Acquisition:
           _  <- F2.exposure    := exposureTime
           _  <- F2.disperser   := none[Flamingos2Disperser]
           _  <- F2.filter      := Flamingos2Filter.H
-          _  <- F2.readMode    := exposureTime.readMode
-          _  <- F2.lyot        := Flamingos2LyotWheel.F16
+          _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(exposureTime)
+          _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
-          _  <- F2.readoutMode := Flamingos2ReadoutMode.Science.some
-          _  <- F2.reads       := exposureTime.readMode.readCount.some
+          _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
+          _  <- F2.readoutMode := Flamingos2ReadoutMode.Science
+          _  <- F2.reads       := Flamingos2ReadMode.forExposureTime(exposureTime).readCount
           s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           _  <- F2.exposure    := 10.secondTimeSpan  // Fixed
           _  <- F2.fpu         := Flamingos2FpuMask.Builtin(builtin)
+          _  <- F2.decker      := Flamingos2FpuMask.Builtin(builtin).defaultDecker
           s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)

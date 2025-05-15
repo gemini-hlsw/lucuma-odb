@@ -17,6 +17,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.Flamingos2LyotWheel
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
@@ -65,11 +66,12 @@ object Science:
           _ <- F2.exposure    := time.exposureTime
           _ <- F2.disperser   := config.disperser.some
           _ <- F2.filter      := config.filter
-          _ <- F2.readMode    := time.exposureTime.readMode
-          _ <- F2.lyot        := Flamingos2LyotWheel.F16
+          _ <- F2.readMode    := Flamingos2ReadMode.forExposureTime(time.exposureTime)
+          _ <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _ <- F2.fpu         := Flamingos2FpuMask.builtin(config.fpu)
-          _ <- F2.readoutMode := config.readoutMode.some
-          _ <- F2.reads       := config.explicitReads.getOrElse(time.exposureTime.readMode.readCount).some
+          _ <- F2.decker      := config.decker
+          _ <- F2.readoutMode := config.readoutMode
+          _ <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
           a <- scienceStep(0.arcsec, -15.arcsec, ObserveClass.Science)
           b <- scienceStep(0.arcsec,  15.arcsec, ObserveClass.Science)
           f <- flatStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)

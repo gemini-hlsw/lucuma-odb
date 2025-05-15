@@ -71,13 +71,14 @@ class recordStep extends OdbSuite {
                 filter
                 readMode
                 lyotWheel
-                mask {
+                fpu {
                   customMask {
                     filename
                     slitWidth
                   }
                   builtin
                 }
+                decker
                 readoutMode
                 reads
               }
@@ -101,12 +102,13 @@ class recordStep extends OdbSuite {
                 "filter": "Y",
                 "readMode": "MEDIUM",
                 "lyotWheel": "F16",
-                "mask": {
+                "fpu": {
                   "customMask": null,
                   "builtin": "LONG_SLIT_1"
                 },
-                "readoutMode": null,
-                "reads": null
+                "decker": "LONG_SLIT",
+                "readoutMode": "SCIENCE",
+                "reads": "READS_4"
               },
               "observeClass": "SCIENCE",
               "estimate": {

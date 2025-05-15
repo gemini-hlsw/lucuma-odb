@@ -21,7 +21,7 @@ trait Flamingos2FpuMaskMapping[F[_]] extends Flamingos2DynamicView[F]:
 
   lazy val Flamingos2FpuMaskMappings: List[TypeMapping] =
     List(
-      fpuMappingAtPath(StepRecordType / "flamingos2" / "mask")
+      fpuMappingAtPath(StepRecordType / "flamingos2" / "fpu")
 
       // N.B. This will be required, but ultimately unused, when flamingos2 is
       // added to "type ExecutionConfig".
