@@ -153,7 +153,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
     Flamingos2Science.copy(
       exposure  = fakeItcImagingResult.exposureTime,
       disperser = none,
-      filter    = Flamingos2Filter.H,
+      filter    = Flamingos2Filter.J,
       fpu       = Flamingos2FpuMask.Imaging,
       decker    = Flamingos2Decker.Imaging
     )
