@@ -15,10 +15,10 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
-class ShortCut_2772 extends ExecutionTestSupport {
+class ShortCut_2772 extends ExecutionTestSupportForGmos {
 
   // specify 2 exposures per atom (30 min x 2 fills a 1 hour block)
   override def fakeItcSpectroscopyResult: IntegrationTime =

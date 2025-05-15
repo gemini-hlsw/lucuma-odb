@@ -11,9 +11,9 @@ import grackle.Value
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.LongBinding
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class ShortCut_5331 extends ExecutionTestSupport:
+class ShortCut_5331 extends ExecutionTestSupportForGmos:
   // Works up to 2147 seconds
   val secs: Long = 2148000000L
 

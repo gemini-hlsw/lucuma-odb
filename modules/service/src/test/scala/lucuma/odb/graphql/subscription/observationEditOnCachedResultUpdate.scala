@@ -9,14 +9,14 @@ import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
 // OBSCALC TODO: At least some of these tests will be irrelevant and should be
 // removed.  They are about triggering obs edit events on cached execution
 // digest update but the cache itself will be deleted and replaced with the
 // obscalc backgroup update version.
 
-class observationEditOnCachedResultUpdate extends ExecutionTestSupport with SubscriptionUtils:
+class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos with SubscriptionUtils:
 
   def observationUpdateSubscription(oid: Observation.Id): String =
     s"""

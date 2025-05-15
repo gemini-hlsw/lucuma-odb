@@ -18,7 +18,7 @@ import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
 
-class guideTargetName extends ExecutionTestSupport {
+class guideTargetName extends ExecutionTestSupportForGmos {
   
   val targetName1: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 

@@ -28,13 +28,13 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
 
 //https://app.shortcut.com/lucuma/story/4596/api-should-prevent-editing-of-observations-for-which-execution-has-started
 class ShortCut_4596 extends OdbSuite 
-  with ExecutionTestSupport 
+  with ExecutionTestSupportForGmos
   with ObservingModeSetupOperations 
   with UpdateConstraintSetOps {
 

@@ -21,7 +21,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 
-class executionState extends ExecutionTestSupport {
+class executionState extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(

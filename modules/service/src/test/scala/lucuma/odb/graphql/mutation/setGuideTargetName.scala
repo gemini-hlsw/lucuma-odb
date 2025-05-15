@@ -18,7 +18,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 
-class setGuideTargetName extends query.ExecutionTestSupport {
+class setGuideTargetName extends query.ExecutionTestSupportForGmos {
   val targetName1: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
   val Now: Timestamp = Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
