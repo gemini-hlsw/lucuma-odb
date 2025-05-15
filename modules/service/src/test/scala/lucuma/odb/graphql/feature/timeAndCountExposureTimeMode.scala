@@ -11,9 +11,9 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class timeAndCountExposureTimeMode extends ExecutionTestSupport:
+class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
 
   def createGmosNorthLongSlitObservation(
     p: Program.Id,

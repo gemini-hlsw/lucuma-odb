@@ -22,7 +22,7 @@ import lucuma.odb.json.timeaccounting.given
 
 import java.time.Instant
 
-class executionTwilight extends ExecutionTestSupport {
+class executionTwilight extends ExecutionTestSupportForGmos {
 
   // Need a timestamp to call the calibrations service
   val when: Instant =

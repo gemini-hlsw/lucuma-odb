@@ -16,7 +16,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 
-class executionFailures extends ExecutionTestSupport {
+class executionFailures extends ExecutionTestSupportForGmos {
 
   test("ITC failure") {
     // Creates an observation with a central wavelength of 666, which prompts

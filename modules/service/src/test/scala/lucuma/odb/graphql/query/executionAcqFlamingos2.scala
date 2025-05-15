@@ -12,7 +12,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 
-class executionAcqFlamingos2 extends ExecutionTestSupport {
+class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
 
   def acqTelescopeConfig(p: Int): TelescopeConfig =
     telescopeConfig(p, 0, StepGuideState.Enabled)

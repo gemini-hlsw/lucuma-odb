@@ -25,7 +25,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.input.AllocationInput
 
 
-class programPlannedTime extends ExecutionTestSupport:
+class programPlannedTime extends ExecutionTestSupportForGmos:
 
   extension (s: String)
     def sec: BigDecimal =

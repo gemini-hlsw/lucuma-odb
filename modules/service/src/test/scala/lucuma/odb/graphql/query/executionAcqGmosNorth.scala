@@ -23,7 +23,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.json.all.transport.given
 
-class executionAcqGmosNorth extends ExecutionTestSupport {
+class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
 
   def acqTelescopeConfig(p: Int): TelescopeConfig =
     telescopeConfig(p, 0, StepGuideState.Enabled)

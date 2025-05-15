@@ -8,9 +8,9 @@ import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.literal.*
 import lucuma.core.model.Observation
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class GitHub_1023 extends ExecutionTestSupport {
+class GitHub_1023 extends ExecutionTestSupportForGmos {
 
   test("one inline fragment") {
 
