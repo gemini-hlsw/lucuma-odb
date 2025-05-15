@@ -4309,6 +4309,11 @@ input ScienceRequirementsInput {
   The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   spectroscopy: SpectroscopyScienceRequirementsInput
+
+  """
+  The imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  imaging: SpectroscopyScienceRequirementsInput
 }
 
 """
@@ -9174,6 +9179,81 @@ type SpectroscopyConfigOptionFlamingos2 {
 }
 
 """
+Edit or create imaging science requirements
+"""
+input ImagingScienceRequirementsInput {
+  """
+  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  minimumFov, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  minimumFov: AngleInput
+
+  """
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  narrowFilters: Boolean
+
+  """
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  broadFilters: Boolean
+
+}
+
+type ImagingScienceRequirements {
+  """
+  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  exposureTimeMode: ExposureTimeMode
+
+  """
+  minimumFov, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  minimumFov: Angle
+
+  """
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  narrowFilters: Boolean
+
+  """
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  broadFilters: Boolean
+
+  """
+  The GMOS North configuration.  Null for other instruments.
+  """
+  gmosNorth: ImagingScienceRequirementsGmosNorth
+
+  """
+  The GMOS South configuration.  Null for other instruments.
+  """
+  gmosSouth: ImagingScienceRequirementsGmosSouth
+
+}
+
+type ImagingScienceRequirementsGmosNorth {
+  filters: [GmosNorthFilter!]!
+}
+
+type ImagingScienceRequirementsGmosSouth {
+  filters: [GmosSouthFilter!]!
+}
+
+"""
 Describes an instrument configuration option for imaging.
 """
 type ImagingConfigOption {
@@ -10993,9 +11073,14 @@ type ScienceRequirements {
   mode: ScienceMode!
 
   """
-  Spectroscopy requirements
+  Spectroscopy requirements, if mode is Spectroscopy, this mode must be set
   """
-  spectroscopy: SpectroscopyScienceRequirements!
+  spectroscopy: SpectroscopyScienceRequirements
+
+  """
+  Imaging requirements, if mode is Imaging, this mode must be set
+  """
+  imaging: ImagingScienceRequirements
 }
 
 type ScienceRequirementsGroup {

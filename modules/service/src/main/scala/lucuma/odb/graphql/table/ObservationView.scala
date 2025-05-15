@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GmosCodecs.*
 import skunk.circe.codec.all.*
 import skunk.codec.all.*
 
@@ -103,6 +104,37 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val Resolution: ColumnRef    = col("c_spec_resolution",          int4_pos.opt)
           val FocalPlane: ColumnRef    = col("c_spec_focal_plane",         focal_plane.opt)
           val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capabilities.opt)
+
+        object Imaging:
+
+          object MinimumFovAngle:
+            val SyntheticId: ColumnRef = col("c_img_minimum_fov_id", observation_id.embedded)
+            val Value: ColumnRef       = col("c_img_minumum_fov",    angle_µas.embedded)
+
+          val NarrowFilters: ColumnRef   = col("c_img_narrow_filters", bool.opt)
+          val BroadFilters: ColumnRef    = col("c_img_broad_filters",  bool.opt)
+
+          object ExposureTimeMode:
+            val SyntheticId: ColumnRef   = col("c_exp_time_mode_id", observation_id.embedded)
+
+            object SignalToNoise:
+              val SyntheticId: ColumnRef = col("c_etm_signal_to_noise_id", observation_id.embedded)
+              val Value: ColumnRef       = col("c_etm_signal_to_noise",    signal_to_noise.embedded)
+              val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
+
+            object TimeAndCount:
+              val SyntheticId: ColumnRef = col("c_etm_time_and_count_id",  observation_id.embedded)
+              val Time: ColumnRef        = col("c_etm_exp_time",           time_span.embedded)
+              val Count: ColumnRef       = col("c_etm_exp_count",          int4_nonneg.embedded)
+              val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
+
+          object ImagingGmosNorthTable extends TableDef("t_imaging_requirements_gmos_north"):
+            val Id: ColumnRef = col("c_observation_id", observation_id)
+            val Filter        = col("c_filter",         gmos_north_filter)
+
+          object ImagingGmosSouthTable extends TableDef("t_imaging_requirements_gmos_south"):
+            val Id: ColumnRef = col("c_observation_id", observation_id)
+            val Filter        = col("c_filter",         gmos_south_filter)
 
       end ScienceRequirements
 
