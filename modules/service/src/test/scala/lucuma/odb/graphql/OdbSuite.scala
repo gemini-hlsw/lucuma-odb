@@ -246,6 +246,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       override def spectroscopy(input: SpectroscopyInput, useCache: Boolean): IO[ClientCalculationResult] = {
         val signal = lucuma.core.math.Wavelength.fromIntNanometers(666).get
         val wavelength = input.mode match
+          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(d, _, _)         => d.wavelength
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(w, _, _, _, _, _) => w
           case _                                                                        => signal

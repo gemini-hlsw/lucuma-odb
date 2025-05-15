@@ -20,6 +20,10 @@ import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2LyotWheel
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
@@ -53,11 +57,14 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
@@ -288,6 +295,40 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def twilightTargets: IO[List[Target.Id]] =
     calibrationTargets(CalibrationRole.Twilight)
 
+  val Flamingos2AtomQuery: String =
+    s"""
+      description
+      observeClass
+      steps {
+        instrumentConfig {
+          exposure { seconds }
+          disperser
+          filter
+          readMode
+          lyotWheel
+          mask { builtin }
+          readoutMode
+          reads
+        }
+        stepConfig {
+          stepType
+          ... on Gcal {
+            continuum
+            arcs
+          }
+        }
+        telescopeConfig {
+          offset {
+            p { arcseconds }
+            q { arcseconds }
+          }
+          guiding
+        }
+        observeClass
+        breakpoint
+      }
+    """
+
   val GmosAtomQuery: String =
     s"""
       description
@@ -346,6 +387,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
+  def flamingos2AcquisitionQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, futureLimit)
+
+  def flamingos2ScienceQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("flamingos2", "science", Flamingos2AtomQuery, futureLimit)
+
   def gmosNorthAcquisitionQuery(futureLimit: Option[Int]): String =
     excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
 
@@ -358,6 +405,18 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def obsWavelengthAt(ditherNm: Int): Wavelength =
     ObsWavelength.unsafeOffset(
       WavelengthDither.decimalNanometers.unsafeGet(BigDecimal(ditherNm))
+    )
+
+  val Flamingos2Science: Flamingos2DynamicConfig =
+    Flamingos2DynamicConfig(
+      fakeItcSpectroscopyResult.exposureTime,
+      Flamingos2Disperser.R1200JH.some,
+      Flamingos2Filter.JH,
+      Flamingos2ReadMode.Bright,
+      Flamingos2LyotWheel.F16,
+      Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
+      Flamingos2ReadoutMode.Science.some,
+      Flamingos2ReadMode.Bright.readCount.some
     )
 
   def gmosNorthScience(ditherNm: Int): GmosNorth =
@@ -376,6 +435,32 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
 
   def gmosNorthFlat(ditherNm: Int): GmosNorth =
     gmosNorthScience(ditherNm).copy(exposure = gn_flat.instrumentConfig.exposureTime)
+
+  val Flamingos2Acq0: Flamingos2DynamicConfig =
+    Flamingos2Science.copy(
+      exposure  = fakeItcImagingResult.exposureTime,
+      disperser = none,
+      filter    = Flamingos2Filter.H,
+      fpu       = Flamingos2FpuMask.Imaging
+    )
+
+  val Flamingos2Acq1: Flamingos2DynamicConfig =
+    Flamingos2Acq0.copy(
+      exposure  = 10.secondTimeSpan,
+      fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1)
+    )
+
+  val Flamingos2Acq2: Flamingos2DynamicConfig =
+    Flamingos2Acq1.copy(
+      exposure = fakeItcImagingResult.exposureTime
+    )
+
+  def flamingos2Acq(step: Int): Flamingos2DynamicConfig =
+    step match
+      case 0 => Flamingos2Acq0
+      case 1 => Flamingos2Acq1
+      case 2 => Flamingos2Acq2
+      case _ => sys.error("Only 3 steps in a Flamingos 2 Acq")
 
   val GmosNorthAcq0: GmosNorth =
     gmosNorthScience(0).copy(
@@ -433,6 +518,36 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           "q": { "arcseconds": ${Angle.signedDecimalArcseconds.get(t.offset.q.toAngle)} }
         },
         "guiding": ${t.guiding}
+      }
+    """
+
+  protected def flamingos2ExpectedInstrumentConfig(f2: Flamingos2DynamicConfig): Json =
+    json"""
+      {
+        "exposure": { "seconds": ${f2.exposure.toSeconds} },
+        "disperser": ${f2.disperser.fold(Json.Null)(_.asJson)},
+        "filter": ${f2.filter},
+        "readMode": ${f2.readMode},
+        "lyotWheel": ${f2.lyot},
+        "mask": ${
+          f2.fpu match
+            case Flamingos2FpuMask.Imaging      => Json.Null
+            case Flamingos2FpuMask.Builtin(f)   => json"""{ "builtin": $f }"""
+            case Flamingos2FpuMask.Custom(f, w) => json"""{ "filename": ${f.value}, "slitWidth": $w }"""
+        },
+        "readoutMode": ${f2.readoutMode.fold(Json.Null)(_.asJson)},
+        "reads": ${f2.reads.fold(Json.Null)(_.asJson)}
+      }
+    """
+
+  protected def flamingos2ExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
+    json"""
+      {
+        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(flamingos2Acq(step))},
+        "stepConfig" : { "stepType":  "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
+        "observeClass" : "ACQUISITION",
+        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
     """
 
