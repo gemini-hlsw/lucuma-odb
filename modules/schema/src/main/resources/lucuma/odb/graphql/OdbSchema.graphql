@@ -7043,19 +7043,24 @@ type Flamingos2Dynamic {
   lyotWheel: Flamingos2LyotWheel!
 
   """
-  Flamingos 2 mask, if any.
+  Flamingos 2 FPU, if any.
   """
-  mask: Flamingos2Mask
+  fpu: Flamingos2FpuMask
 
   """
-  Readout mode, if specified.
+  Flamingos 2 decker.
   """
-  readoutMode: Flamingos2ReadoutMode
+  decker: Flamingos2Decker!
 
   """
-  Reads, if specified.
+  Flamingos 2 readout mode.
   """
-  reads: Flamingos2Reads
+  readoutMode: Flamingos2ReadoutMode!
+
+  """
+  Flamingos 2 reads.
+  """
+  reads: Flamingos2Reads!
 }
 
 """
@@ -7073,17 +7078,19 @@ input Flamingos2DynamicInput {
 
   lyotWheel: Flamingos2LyotWheel!
 
-  mask: Flamingos2MaskInput
+  fpu: Flamingos2FpuMaskInput
 
-  readoutMode: Flamingos2ReadoutMode
+  decker: Flamingos2Decker!
 
-  reads: Flamingos2Reads
+  readoutMode: Flamingos2ReadoutMode!
+
+  reads: Flamingos2Reads!
 }
 
 """
 Flamingos 2 mask option, either builtin or custom mask
 """
-type Flamingos2Mask {
+type Flamingos2FpuMask {
 
   """
   The custom mask, if in use
@@ -7100,7 +7107,7 @@ type Flamingos2Mask {
 """
 Flamingos 2 mask input parameters (choose custom or builtin).
 """
-input Flamingos2MaskInput {
+input Flamingos2FpuMaskInput {
   """
   Custom mask FPU option
   """

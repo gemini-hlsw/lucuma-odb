@@ -17,6 +17,7 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -306,7 +307,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
           filter
           readMode
           lyotWheel
-          mask { builtin }
+          fpu { builtin }
+          decker
           readoutMode
           reads
         }
@@ -415,8 +417,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       Flamingos2ReadMode.Bright,
       Flamingos2LyotWheel.F16,
       Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
-      Flamingos2ReadoutMode.Science.some,
-      Flamingos2ReadMode.Bright.readCount.some
+      Flamingos2Decker.LongSlit,
+      Flamingos2ReadoutMode.Science,
+      Flamingos2ReadMode.Bright.readCount
     )
 
   def gmosNorthScience(ditherNm: Int): GmosNorth =
@@ -441,13 +444,15 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       exposure  = fakeItcImagingResult.exposureTime,
       disperser = none,
       filter    = Flamingos2Filter.H,
-      fpu       = Flamingos2FpuMask.Imaging
+      fpu       = Flamingos2FpuMask.Imaging,
+      decker    = Flamingos2Decker.Imaging
     )
 
   val Flamingos2Acq1: Flamingos2DynamicConfig =
     Flamingos2Acq0.copy(
       exposure  = 10.secondTimeSpan,
-      fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1)
+      fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
+      decker    = Flamingos2Decker.LongSlit
     )
 
   val Flamingos2Acq2: Flamingos2DynamicConfig =
@@ -528,15 +533,16 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         "disperser": ${f2.disperser.fold(Json.Null)(_.asJson)},
         "filter": ${f2.filter},
         "readMode": ${f2.readMode},
-        "lyotWheel": ${f2.lyot},
-        "mask": ${
+        "lyotWheel": ${f2.lyotWheel},
+        "fpu": ${
           f2.fpu match
             case Flamingos2FpuMask.Imaging      => Json.Null
             case Flamingos2FpuMask.Builtin(f)   => json"""{ "builtin": $f }"""
             case Flamingos2FpuMask.Custom(f, w) => json"""{ "filename": ${f.value}, "slitWidth": $w }"""
         },
-        "readoutMode": ${f2.readoutMode.fold(Json.Null)(_.asJson)},
-        "reads": ${f2.reads.fold(Json.Null)(_.asJson)}
+        "decker": ${f2.decker},
+        "readoutMode": ${f2.readoutMode},
+        "reads": ${f2.reads}
       }
     """
 

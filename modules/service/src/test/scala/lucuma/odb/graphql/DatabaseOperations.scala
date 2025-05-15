@@ -1143,9 +1143,12 @@ trait DatabaseOperations { this: OdbSuite =>
         filter: Y,
         readMode: MEDIUM,
         lyotWheel: F16,
-        mask: {
+        fpu: {
           builtin: LONG_SLIT_1
-        }
+        },
+        decker: LONG_SLIT,
+        readoutMode: SCIENCE,
+        reads: READS_4
       }
     """
 

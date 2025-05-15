@@ -106,6 +106,7 @@ object Flamingos2SequenceService:
         "c_fpu_custom_mask_filename",
         "c_fpu_custom_mask_slit_width",
         "c_fpu_builtin",
+        "c_decker",
         "c_readout_mode",
         "c_reads"
       )
