@@ -88,7 +88,8 @@ object ServerMiddleware {
     Kleisli { req =>
       val putFields: F[Unit] =
         client.find(req).flatMap {
-          case None    => Monad[F].unit
+          case None    => 
+            Monad[F].unit
           case Some(u) =>
             Trace[F].put(
               "user.id"          -> u.id.toString,
@@ -96,7 +97,9 @@ object ServerMiddleware {
               "user.displayName" -> u.displayName,
             )
         }
-      OptionT.liftF(putFields) >> routes(req)
+      OptionT:
+        Trace[F].span("http"):
+          putFields >> routes(req).value
     }
 
   /** A middleware that composes all the others defined in this module. */

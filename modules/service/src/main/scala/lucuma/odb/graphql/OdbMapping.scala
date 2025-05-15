@@ -57,7 +57,7 @@ object OdbMapping {
   )
 
   object Topics {
-    def apply[F[_]: Concurrent: Logger](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
+    def apply[F[_]: Concurrent: Logger: Trace](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
       for {
         sup <- Supervisor[F]
         ses <- pool

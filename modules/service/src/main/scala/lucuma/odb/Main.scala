@@ -34,7 +34,6 @@ import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
-import natchez.http4s.implicits.*
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
@@ -123,8 +122,8 @@ object Main extends CommandIOApp(
 
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
-        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
-        e <- FMain.runF[IO](reset, skipMigration)
+        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))     
+        e <- FMain.runF[IO](reset, skipMigration, Trace.ioTraceForEntryPoint)
       } yield e
     })
 
@@ -312,7 +311,8 @@ object FMain extends MainParams {
    */
   def server[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
     reset:         ResetDatabase,
-    skipMigration: SkipMigration
+    skipMigration: SkipMigration,
+    mkTrace:       EntryPoint[F] => F[Trace[F]]
   ): Resource[F, ExitCode] =
     for {
       c  <- Resource.eval(Config.fromCiris.load[F])
@@ -320,7 +320,8 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       ep <- entryPointResource(c)
-      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
+      t  <- Resource.eval(mkTrace(ep))
+      ap <- { given Trace[F] = t; routesResource(c).map(_.map(_.orNotFound)) }
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
@@ -328,9 +329,10 @@ object FMain extends MainParams {
   /** Our logical entry point. */
   def runF[F[_]: Async: Parallel: Logger: Console: Network: SecureRandom](
     reset:         ResetDatabase,
-    skipMigration: SkipMigration
+    skipMigration: SkipMigration,
+    mkTrace:       EntryPoint[F] => F[Trace[F]]
   ): F[ExitCode] =
-    server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
+    server(reset, skipMigration, mkTrace).use(_ => Concurrent[F].never[ExitCode])
 
 }
 
