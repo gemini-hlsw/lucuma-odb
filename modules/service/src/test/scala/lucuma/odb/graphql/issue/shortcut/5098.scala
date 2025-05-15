@@ -6,9 +6,9 @@ package issue.shortcut
 
 import lucuma.core.model.Target
 import lucuma.odb.data.OdbError
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class ShortCut_5098 extends ExecutionTestSupport:
+class ShortCut_5098 extends ExecutionTestSupportForGmos:
 
   def removeSED(t: Target.Id) = query(pi,
     s"""

@@ -26,10 +26,10 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.json.all.transport.given
 
-class ShortCut_5017 extends ExecutionTestSupport:
+class ShortCut_5017 extends ExecutionTestSupportForGmos:
 
   def gcalTelescopeConfig(q: Int): TelescopeConfig =
     telescopeConfig(0, q, StepGuideState.Disabled)

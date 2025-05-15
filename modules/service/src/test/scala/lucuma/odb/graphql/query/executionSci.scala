@@ -39,7 +39,7 @@ import lucuma.odb.util.Codecs.step_id
 import skunk.*
 import skunk.implicits.*
 
-class executionSci extends ExecutionTestSupport {
+class executionSci extends ExecutionTestSupportForGmos {
 
   def gcalTelescopeConfig(q: Int): TelescopeConfig =
     telescopeConfig(0, q, StepGuideState.Disabled)

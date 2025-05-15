@@ -24,7 +24,7 @@ import lucuma.odb.service.GuideService.AvailabilityPeriod
 import org.http4s.Request
 import org.http4s.Response
 
-class guideAvailability extends ExecutionTestSupport {
+class guideAvailability extends ExecutionTestSupportForGmos {
 
   val oct15_2023 = "2023-10-15T00:00:00Z"
   val oct25_2023 = "2023-10-25T00:00:00Z"

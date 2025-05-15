@@ -18,7 +18,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 
 
-class executionPlannedTime extends ExecutionTestSupport {
+class executionPlannedTime extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
