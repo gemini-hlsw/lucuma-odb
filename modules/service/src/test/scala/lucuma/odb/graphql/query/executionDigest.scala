@@ -34,7 +34,7 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.graphql.input.AddStepEventInput
 
 
-class executionDigest extends ExecutionTestSupport {
+class executionDigest extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(

@@ -31,7 +31,7 @@ import lucuma.odb.json.wavelength.transport.given
 import munit.Assertions.*
 
 class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
-                                            with ExecutionTestSupport {
+                                            with ExecutionTestSupportForGmos {
 
   val mode    = ObservingModeType.GmosNorthLongSlit
 

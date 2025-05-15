@@ -20,12 +20,12 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
 
 class setObservationWorkflowState
-  extends ExecutionTestSupport
+  extends ExecutionTestSupportForGmos
      with ObservingModeSetupOperations
      with UpdateConstraintSetOps {
 

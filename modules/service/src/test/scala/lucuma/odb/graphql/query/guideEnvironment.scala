@@ -21,7 +21,7 @@ import lucuma.core.util.Timestamp
 import org.http4s.Request
 import org.http4s.Response
 
-class guideEnvironment extends ExecutionTestSupport {
+class guideEnvironment extends ExecutionTestSupportForGmos {
 
   val gaiaSuccess = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
   val gaiaEmpty   = Timestamp.FromString.getOption("3000-01-30T04:00:00Z").get

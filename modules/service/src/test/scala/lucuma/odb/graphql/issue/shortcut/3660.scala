@@ -8,7 +8,7 @@ import cats.effect.IO
 import cats.syntax.option.*
 import lucuma.core.model.Observation
 import lucuma.odb.data.OdbError
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import munit.IgnoreSuite
 
 /**
@@ -19,7 +19,7 @@ import munit.IgnoreSuite
  * returned.
  */
 @IgnoreSuite
-class ShortCut_3660 extends ExecutionTestSupport {
+class ShortCut_3660 extends ExecutionTestSupportForGmos {
 
   test("cannot generate, missing mode + failed itc query") {
     val setup: IO[Observation.Id] =

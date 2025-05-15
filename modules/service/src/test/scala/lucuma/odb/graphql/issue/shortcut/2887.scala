@@ -13,10 +13,10 @@ import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.logic.Generator.SequenceAtomLimit
 
-class ShortCut_2887 extends ExecutionTestSupport {
+class ShortCut_2887 extends ExecutionTestSupportForGmos {
 
   lazy val atomCount: Ref[IO, Int] =
     Ref.unsafe(0)

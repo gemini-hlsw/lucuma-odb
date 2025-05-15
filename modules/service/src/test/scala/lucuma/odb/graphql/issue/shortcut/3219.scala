@@ -11,9 +11,9 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.sequence.Atom
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
-class ShortCut_3219 extends ExecutionTestSupport {
+class ShortCut_3219 extends ExecutionTestSupportForGmos {
 
   import lucuma.odb.testsyntax.execution.*
 

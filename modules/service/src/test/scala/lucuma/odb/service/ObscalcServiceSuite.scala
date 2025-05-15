@@ -25,7 +25,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
-import lucuma.odb.graphql.query.ExecutionTestSupport
+import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
@@ -38,7 +38,7 @@ import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
 
-trait ObscalcServiceSuiteSupport extends ExecutionTestSupport:
+trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
   def instantiate(services: Services[IO]): IO[ObscalcService[IO]] =
       TimeEstimateCalculatorImplementation

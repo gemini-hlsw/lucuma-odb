@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import org.http4s.Request
 import org.http4s.Response
 
-class guideEnvironments extends ExecutionTestSupport {
+class guideEnvironments extends ExecutionTestSupportForGmos {
 
   val aug2023 = "2023-08-30T00:00:00Z"
   val aug3000 = "3000-08-30T00:00:00Z"
