@@ -17,6 +17,13 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2LyotWheel
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
@@ -50,11 +57,14 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
@@ -63,9 +73,8 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import lucuma.odb.smartgcal.data.Gmos.GratingConfigKey
-import lucuma.odb.smartgcal.data.Gmos.TableKey
-import lucuma.odb.smartgcal.data.Gmos.TableRow
+import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import natchez.Trace.Implicits.noop
@@ -87,9 +96,46 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   val createProgram: IO[Program.Id] =
     createProgramAs(pi, "Sequence Testing")
 
-  val key_0_50: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-    TableKey(
-      GratingConfigKey(
+  val f2_key_JH1: Flamingos2.TableKey =
+    Flamingos2.TableKey(
+      Flamingos2Disperser.R1200JH.some,
+      Flamingos2Filter.JH,
+      Flamingos2Fpu.LongSlit1.some
+    )
+
+  val f2_flat_JH1 =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh),
+        GcalFilter.Nd20,
+        GcalDiffuser.Ir,
+        GcalShutter.Open
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(15_000_000L)
+      )
+    )
+
+  val f2_arc_JH1 =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.ArArc)),
+        GcalFilter.Nir,
+        GcalDiffuser.Ir,
+        GcalShutter.Closed
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(
+        TimeSpan.unsafeFromMicroseconds(32_000_000L)
+      )
+    )
+
+  val gn_key_0_50: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
         GmosNorthGrating.R831_G5302,
         GmosGratingOrder.One,
         BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
@@ -102,9 +148,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     )
 
   // NB: 2x4, no filter
-  val key_1_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-    TableKey(
-      GratingConfigKey(
+  val gn_key_1_00: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
         GmosNorthGrating.R831_G5302,
         GmosGratingOrder.One,
         BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
@@ -116,9 +162,9 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       GmosAmpGain.Low
     )
 
-  val key_5_00: TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
-    TableKey(
-      GratingConfigKey(
+  val gn_key_5_00: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
         GmosNorthGrating.R831_G5302,
         GmosGratingOrder.One,
         BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
@@ -130,7 +176,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       GmosAmpGain.Low
     )
 
-  val flat =
+  val gn_flat =
     SmartGcalValue(
       Gcal(
         Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W),
@@ -145,7 +191,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       )
     )
 
-  val arc =
+  val gn_arc =
     SmartGcalValue(
       Gcal(
         Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)),
@@ -161,24 +207,32 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
-    val tableRows: List[TableRow.North] =
+    val flamingos2TableRows: List[Flamingos2.TableRow] =
       List(
-        TableRow(PosLong.unsafeFrom(1), key_0_50, flat),
-        TableRow(PosLong.unsafeFrom(1), key_0_50, arc),
-        TableRow(PosLong.unsafeFrom(1), key_1_00, flat),
-        TableRow(PosLong.unsafeFrom(1), key_1_00, arc),
-        TableRow(PosLong.unsafeFrom(1), key_5_00, flat),
-        TableRow(PosLong.unsafeFrom(1), key_5_00, arc)
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_flat_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1)
       )
 
-    Enums.load(s).flatMap { e =>
+    val gmosNorthTableRows: List[Gmos.TableRow.North] =
+      List(
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_0_50, gn_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gn_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gn_arc)
+      )
+
+    Enums.load(s).flatMap: e =>
       val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
-      services.transactionally {
-        tableRows.zipWithIndex.traverse_ { (r, i) =>
-          services.smartGcalService.insertGmosNorth(i, r)
-        }
-      }
-    }
+      services.transactionally:
+        (
+          flamingos2TableRows.zipWithIndex.traverse_ : (r, i) =>
+            services.smartGcalService.insertFlamingos2(i, r)
+        ) *> (
+          gmosNorthTableRows.zipWithIndex.traverse_ : (r, i) =>
+            services.smartGcalService.insertGmosNorth(i, r)
+        )
   }
 
   def calibrationProgram(role: CalibrationRole): IO[Program.Id] =
@@ -241,6 +295,40 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def twilightTargets: IO[List[Target.Id]] =
     calibrationTargets(CalibrationRole.Twilight)
 
+  val Flamingos2AtomQuery: String =
+    s"""
+      description
+      observeClass
+      steps {
+        instrumentConfig {
+          exposure { seconds }
+          disperser
+          filter
+          readMode
+          lyotWheel
+          mask { builtin }
+          readoutMode
+          reads
+        }
+        stepConfig {
+          stepType
+          ... on Gcal {
+            continuum
+            arcs
+          }
+        }
+        telescopeConfig {
+          offset {
+            p { arcseconds }
+            q { arcseconds }
+          }
+          guiding
+        }
+        observeClass
+        breakpoint
+      }
+    """
+
   val GmosAtomQuery: String =
     s"""
       description
@@ -299,6 +387,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
+  def flamingos2AcquisitionQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, futureLimit)
+
+  def flamingos2ScienceQuery(futureLimit: Option[Int]): String =
+    excutionConfigQuery("flamingos2", "science", Flamingos2AtomQuery, futureLimit)
+
   def gmosNorthAcquisitionQuery(futureLimit: Option[Int]): String =
     excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
 
@@ -313,6 +407,18 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       WavelengthDither.decimalNanometers.unsafeGet(BigDecimal(ditherNm))
     )
 
+  val Flamingos2Science: Flamingos2DynamicConfig =
+    Flamingos2DynamicConfig(
+      fakeItcSpectroscopyResult.exposureTime,
+      Flamingos2Disperser.R1200JH.some,
+      Flamingos2Filter.JH,
+      Flamingos2ReadMode.Bright,
+      Flamingos2LyotWheel.F16,
+      Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
+      Flamingos2ReadoutMode.Science.some,
+      Flamingos2ReadMode.Bright.readCount.some
+    )
+
   def gmosNorthScience(ditherNm: Int): GmosNorth =
     GmosNorth(
       fakeItcSpectroscopyResult.exposureTime,
@@ -325,10 +431,36 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
     )
 
   def gmosNorthArc(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = arc.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gn_arc.instrumentConfig.exposureTime)
 
   def gmosNorthFlat(ditherNm: Int): GmosNorth =
-    gmosNorthScience(ditherNm).copy(exposure = flat.instrumentConfig.exposureTime)
+    gmosNorthScience(ditherNm).copy(exposure = gn_flat.instrumentConfig.exposureTime)
+
+  val Flamingos2Acq0: Flamingos2DynamicConfig =
+    Flamingos2Science.copy(
+      exposure  = fakeItcImagingResult.exposureTime,
+      disperser = none,
+      filter    = Flamingos2Filter.H,
+      fpu       = Flamingos2FpuMask.Imaging
+    )
+
+  val Flamingos2Acq1: Flamingos2DynamicConfig =
+    Flamingos2Acq0.copy(
+      exposure  = 10.secondTimeSpan,
+      fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1)
+    )
+
+  val Flamingos2Acq2: Flamingos2DynamicConfig =
+    Flamingos2Acq1.copy(
+      exposure = fakeItcImagingResult.exposureTime
+    )
+
+  def flamingos2Acq(step: Int): Flamingos2DynamicConfig =
+    step match
+      case 0 => Flamingos2Acq0
+      case 1 => Flamingos2Acq1
+      case 2 => Flamingos2Acq2
+      case _ => sys.error("Only 3 steps in a Flamingos 2 Acq")
 
   val GmosNorthAcq0: GmosNorth =
     gmosNorthScience(0).copy(
@@ -389,6 +521,36 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
       }
     """
 
+  protected def flamingos2ExpectedInstrumentConfig(f2: Flamingos2DynamicConfig): Json =
+    json"""
+      {
+        "exposure": { "seconds": ${f2.exposure.toSeconds} },
+        "disperser": ${f2.disperser.fold(Json.Null)(_.asJson)},
+        "filter": ${f2.filter},
+        "readMode": ${f2.readMode},
+        "lyotWheel": ${f2.lyot},
+        "mask": ${
+          f2.fpu match
+            case Flamingos2FpuMask.Imaging      => Json.Null
+            case Flamingos2FpuMask.Builtin(f)   => json"""{ "builtin": $f }"""
+            case Flamingos2FpuMask.Custom(f, w) => json"""{ "filename": ${f.value}, "slitWidth": $w }"""
+        },
+        "readoutMode": ${f2.readoutMode.fold(Json.Null)(_.asJson)},
+        "reads": ${f2.reads.fold(Json.Null)(_.asJson)}
+      }
+    """
+
+  protected def flamingos2ExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
+    json"""
+      {
+        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(flamingos2Acq(step))},
+        "stepConfig" : { "stepType":  "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
+        "observeClass" : "ACQUISITION",
+        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
+      }
+    """
+
   protected def gmosNorthExpectedInstrumentConfig(gn: GmosNorth): Json =
     json"""
       {
@@ -429,7 +591,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         "stepConfig" : {
           "stepType": "GCAL",
           "continuum" : null,
-          "arcs" : ${arc.gcalConfig.lamp.arcs.map(_.toList) }
+          "arcs" : ${gn_arc.gcalConfig.lamp.arcs.map(_.toList) }
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
         "observeClass" : "NIGHT_CAL",
@@ -443,7 +605,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(gmosNorthFlat(ditherNm))},
         "stepConfig" : {
           "stepType": "GCAL",
-          "continuum" : ${flat.gcalConfig.lamp.continuum},
+          "continuum" : ${gn_flat.gcalConfig.lamp.continuum},
           "arcs" : []
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
