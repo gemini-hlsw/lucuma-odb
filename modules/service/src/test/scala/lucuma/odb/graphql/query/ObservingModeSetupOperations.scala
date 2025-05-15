@@ -19,6 +19,25 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
   private def formatExplicitOffsetsInput(arcsecs: List[Int]): String =
     arcsecs.map(a => s"{ arcseconds: $a }").mkString("explicitSpatialOffsets: [", ", ", "]")
 
+  def createFlamingos2LongSlitObservationAs(
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    offsetArcsec: Option[List[Int]] = None
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      s"""
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: JH
+          fpu: LONG_SLIT_1
+        }
+      """
+    )
+
   def createGmosNorthLongSlitObservationAs(
     user:         User,
     pid:          Program.Id,

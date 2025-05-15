@@ -354,7 +354,13 @@ object Generator {
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       ): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
-        EitherT.leftT(Error.sequenceUnavailable(ctx.oid, s"F2 longslit not implemented ($ctx, $config, $role, $when)"))
+        import lucuma.odb.sequence.flamingos2.longslit.LongSlit
+        val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+        val srs = services.flamingos2SequenceService.selectStepRecords(ctx.oid)
+        for
+          g <- EitherT(gen)
+          p <- protoExecutionConfig(ctx, g, srs, when)
+        yield p
 
       private def gmosNorthLongSlit(
         ctx:    Context,
@@ -364,10 +370,10 @@ object Generator {
       ): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
         val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
-        for {
+        for
           g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
-        } yield p
+        yield p
 
       private def gmosSouthLongSlit(
         ctx:    Context,
@@ -377,10 +383,10 @@ object Generator {
       ): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
         val gen = LongSlit.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
-        for {
+        for
           g <- EitherT(gen)
           p <- protoExecutionConfig(ctx, g, srs, when)
-        } yield p
+        yield p
 
       private def calcDigestFromContext(
         ctx:  Context,
