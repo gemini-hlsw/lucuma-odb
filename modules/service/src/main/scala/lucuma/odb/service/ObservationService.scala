@@ -704,11 +704,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -835,11 +835,11 @@ object ObservationService {
 
       val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
       val upResolution         = sql"c_spec_resolution = ${int4_pos.opt}"
-      val upExpTimeModeType    = sql"c_spec_exp_time_mode = ${exposure_time_mode_type.opt}"
-      val upSignalToNoiseAt    = sql"c_spec_signal_to_noise_at = ${wavelength_pm.opt}"
-      val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
-      val upExpTime            = sql"c_spec_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_spec_exp_count = ${int4_nonneg.opt}"
+      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
+      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
@@ -997,11 +997,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
@@ -1035,11 +1035,11 @@ object ObservationService {
           c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
