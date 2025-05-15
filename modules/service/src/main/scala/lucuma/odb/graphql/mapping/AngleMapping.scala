@@ -54,6 +54,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
     )
 
   import ObservationView.ScienceRequirements.Spectroscopy
+  import ObservationView.ScienceRequirements.Imaging
 
   lazy val AngleMappings: List[TypeMapping] =
     List(
@@ -64,7 +65,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(ConditionsMeasurementType / "azimuth", ChronConditionsEntryView.Measurement.Pointing.Azimuth, ChronConditionsEntryView.Measurement.Pointing.SyntheticId),
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitWidth", SpectroscopyConfigOptionTable.SlitWidth, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
-      angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index)
+      angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index),
+      angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId)
     )
 
 }

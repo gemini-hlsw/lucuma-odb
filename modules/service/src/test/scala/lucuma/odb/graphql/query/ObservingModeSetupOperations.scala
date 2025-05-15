@@ -121,7 +121,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
   def createObservationWithNoModeAs(
     user:         User,
     pid:          Program.Id,
-    tid:          Target.Id,    
+    tid:          Target.Id,
   ): IO[Observation.Id] =
     query(
       user  = user,
@@ -236,7 +236,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               lineWidth: 850,
               lineFlux: {
                 value: 1e-13,
-                units:ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED 
+                units:ERa_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
               }
             }
           ],
