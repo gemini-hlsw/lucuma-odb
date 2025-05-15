@@ -18,8 +18,9 @@ trait Flamingos2DynamicView[F[_]] extends BaseMapping[F]:
     val Filter: ColumnRef       = col("c_filter",        flamingos_2_filter)
     val ReadMode: ColumnRef     = col("c_read_mode",     flamingos_2_read_mode)
     val LyotWheel: ColumnRef    = col("c_lyot_wheel",    flamingos_2_lyot_wheel)
-    val ReadoutMode: ColumnRef  = col("c_readout_mode",  flamingos_2_readout_mode.opt)
-    val Reads: ColumnRef        = col("c_reads",         flamingos_2_reads.opt)
+    val Decker: ColumnRef       = col("c_decker",        flamingos_2_decker)
+    val ReadoutMode: ColumnRef  = col("c_readout_mode",  flamingos_2_readout_mode)
+    val Reads: ColumnRef        = col("c_reads",         flamingos_2_reads)
 
     object Fpu:
       val SyntheticId: ColumnRef   = col("c_fpu_id",                     step_id.embedded)

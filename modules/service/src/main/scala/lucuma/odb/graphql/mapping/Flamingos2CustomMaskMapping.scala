@@ -21,9 +21,9 @@ trait Flamingos2CustomMaskMapping[F[_]] extends Flamingos2DynamicView[F]:
 
   lazy val Flamingos2CustomMaskMappings: List[TypeMapping] =
     List(
-      customMaskMappingAt(StepRecordType / "flamingos2" / "mask" / "customMask")
+      customMaskMappingAt(StepRecordType / "flamingos2" / "fpu" / "customMask")
 
       // N.B. This will be required, but ultimately unused, when flamingos2 is
       // added to "type ExecutionConfig".
-//      customMaskMappingAt(Flamingos2StepType / "instrumentConfig" / "mask" / "customMask")
+//      customMaskMappingAt(Flamingos2StepType / "instrumentConfig" / "fpu" / "customMask")
     )

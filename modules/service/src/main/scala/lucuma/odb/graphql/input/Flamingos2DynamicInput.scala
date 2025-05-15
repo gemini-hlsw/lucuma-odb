@@ -19,17 +19,19 @@ object Flamingos2DynamicInput:
         Flamingos2FilterBinding("filter", rFilter),
         Flamingos2ReadModeBinding("readMode", rReadMode),
         Flamingos2LyoutWheelBinding("lyotWheel", rLyotWheel),
-        Flamingos2FpuMaskInput.Binding.Option("mask", rMask),
-        Flamingos2ReadoutModeBinding.Option("readoutMode", rReadoutMode),
-        Flamingos2ReadsBinding.Option("reads", rReads)
-      ) => (rExposure, rDisperser, rFilter, rReadMode, rLyotWheel, rMask, rReadoutMode, rReads).parMapN: (exposure, disperser, filter, readMode, lyotWheel, mask, readoutMode, reads) =>
+        Flamingos2FpuMaskInput.Binding.Option("fpu", rFpu),
+        Flamingos2DeckerBinding("decker", rDecker),
+        Flamingos2ReadoutModeBinding("readoutMode", rReadoutMode),
+        Flamingos2ReadsBinding("reads", rReads)
+      ) => (rExposure, rDisperser, rFilter, rReadMode, rLyotWheel, rFpu, rDecker, rReadoutMode, rReads).parMapN: (exposure, disperser, filter, readMode, lyotWheel, fpu, decker, readoutMode, reads) =>
         Flamingos2DynamicConfig(
           exposure,
           disperser,
           filter,
           readMode,
           lyotWheel,
-          mask.getOrElse(Flamingos2FpuMask.Imaging),
+          fpu.getOrElse(Flamingos2FpuMask.Imaging),
+          decker,
           readoutMode,
           reads
         )
