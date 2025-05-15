@@ -138,3 +138,89 @@ class recordVisit extends OdbSuite:
       """,
       ((oid: Observation.Id) => s"Observation '$oid' not found or is not a GMOS South observation").asLeft
     )
+
+  test("recordFlamingos2Visit"):
+
+    recordVisitTest(
+      ObservingModeType.Flamingos2LongSlit,
+      service,
+      oid => s"""
+        mutation {
+          recordFlamingos2Visit(input: {
+            observationId: "$oid",
+            flamingos2: {
+              useElectronicOffsetting: true
+            }
+          }) {
+            visit {
+              flamingos2 {
+                mosPreImaging
+                useElectronicOffsetting
+              }
+              gmosNorth {
+                stageMode
+              }
+              gmosSouth {
+                stageMode
+              }
+            }
+          }
+        }
+      """,
+      json"""
+      {
+        "recordFlamingos2Visit": {
+          "visit": {
+            "flamingos2": {
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
+              "useElectronicOffsetting": true
+            },
+            "gmosNorth": null,
+            "gmosSouth": null
+          }
+        }
+      }
+      """.asRight
+    )
+
+  test("recordFlamingos2Visit (defaults)"):
+
+    recordVisitTest(
+      ObservingModeType.Flamingos2LongSlit,
+      service,
+      oid => s"""
+        mutation {
+          recordFlamingos2Visit(input: {
+            observationId: "$oid",
+            flamingos2: {}
+          }) {
+            visit {
+              flamingos2 {
+                mosPreImaging
+                useElectronicOffsetting
+              }
+              gmosNorth {
+                stageMode
+              }
+              gmosSouth {
+                stageMode
+              }
+            }
+          }
+        }
+      """,
+      json"""
+      {
+        "recordFlamingos2Visit": {
+          "visit": {
+            "flamingos2": {
+              "mosPreImaging": "IS_NOT_MOS_PRE_IMAGING",
+              "useElectronicOffsetting": false
+            },
+            "gmosNorth": null,
+            "gmosSouth": null
+          }
+        }
+      }
+      """.asRight
+    )

@@ -132,7 +132,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
   }
 
   test("missing target") {
-    val expected = expectObsError(oid => s"Could not generate a sequence for the observation $oid: observation is missing target")
+    val expected = expectObsError(oid => s"Could not generate a sequence for $oid: observation is missing target")
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -141,7 +141,7 @@ class setGuideTargetName extends query.ExecutionTestSupport {
   }
 
   test("missing observing mode") {
-    val expected = expectObsError(oid => s"Could not generate a sequence for the observation $oid: observation is missing observing mode")
+    val expected = expectObsError(oid => s"Could not generate a sequence for $oid: observation is missing observing mode")
     for
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)

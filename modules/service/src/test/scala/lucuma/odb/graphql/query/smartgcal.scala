@@ -14,9 +14,9 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.F2Disperser
-import lucuma.core.enums.F2Filter
-import lucuma.core.enums.F2Fpu
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
@@ -158,9 +158,9 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           Flamingos2.TableRow(
             PosLong.unsafeFrom(1),
             Flamingos2.TableKey(
-              F2Disperser.R3000.some,
-              F2Filter.JH,
-              F2Fpu.LongSlit8.some
+              Flamingos2Disperser.R3000.some,
+              Flamingos2Filter.JH,
+              Flamingos2Fpu.LongSlit8.some
             ),
             s
           )
@@ -820,7 +820,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
              }
            """,
         expected = List(
-          "Could not generate a sequence for the observation o-104: missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
+          s"Could not generate a sequence for $oid: missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
         ).asLeft
       )
   }

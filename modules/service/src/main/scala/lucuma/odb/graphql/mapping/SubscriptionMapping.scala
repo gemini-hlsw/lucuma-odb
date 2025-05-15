@@ -27,6 +27,7 @@ import lucuma.odb.graphql.input.ConfigurationRequestEditInput
 import lucuma.odb.graphql.input.DatasetEditInput
 import lucuma.odb.graphql.input.ExecutionEventAddedInput
 import lucuma.odb.graphql.input.GroupEditInput
+import lucuma.odb.graphql.input.ObscalcUpdateInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.input.TargetEditInput
@@ -49,6 +50,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
       DatasetEdit,
       ExecutionEventAdded,
       GroupEdit,
+      ObscalcUpdate,
       ObservationEdit,
       ProgramEdit,
       TargetEdit,
@@ -135,6 +137,43 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           )
         ))
     }
+
+  private val ObscalcUpdate =
+    SubscriptionField("obscalcUpdate", ObscalcUpdateInput.Binding.Option): (input, child) =>
+      topics
+        .obscalc
+        .subscribe(1024)
+        .filter: e =>
+          e.canRead(user)                                              &&
+          input.flatMap(_.programId).forall(_ === e.programId)         &&
+          input.flatMap(_.observationId).forall(_ === e.observationId) &&
+          input.flatMap(_.oldState).forall(_.matches(e.oldState))      &&
+          input.flatMap(_.newState).forall(_.matches(e.newState))
+        .map: e =>
+          Result(
+            Environment(
+              Env(
+                "editType"      -> e.editType,
+                "observationId" -> e.observationId,
+                "oldState"      -> e.oldState,
+                "newState"      -> e.newState
+              ),
+              Filter(
+                Predicates.obscalcUpdate.programId.eql(e.programId),
+                Query.mapSomeFields(child):
+                  case Select("value", a, c) =>
+                    Select("value", a,
+                      // This predicate needs to be down here
+                      Filter(
+                        if e.editType === EditType.DeletedCal
+                        then Predicates.observation.id.isNull(true)
+                        else Predicates.observation.id.eql(e.observationId),
+                        c
+                      )
+                    )
+              )
+            )
+          )
 
   private val ObservationEdit =
     SubscriptionField("observationEdit", ObservationEditInput.Binding.Option) { (input, child) =>

@@ -26,6 +26,7 @@ import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
+import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
@@ -47,6 +48,7 @@ object OdbMapping {
   case class Topics[F[_]](
     program:              Topic[F, ProgramTopic.Element],
     observation:          Topic[F, ObservationTopic.Element],
+    obscalc:              Topic[F, ObscalcTopic.Element],
     target:               Topic[F, TargetTopic.Element],
     group:                Topic[F, GroupTopic.Element],
     configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
@@ -61,12 +63,13 @@ object OdbMapping {
         ses <- pool
         pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
         obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
+        oc  <- Resource.eval(ObscalcTopic(ses, 65536, sup))
         tar <- Resource.eval(TargetTopic(ses, 1024, sup))
         grp <- Resource.eval(GroupTopic(ses, 1024, sup))
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
         exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
         dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, tar, grp, cr, exe, dst)
+      } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
   }
 
   // Loads a GraphQL file from the classpath, relative to this Class.
@@ -157,7 +160,11 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
-          with F2LongSlitMapping[F]
+          with Flamingos2CustomMaskMapping[F]
+          with Flamingos2DynamicMapping[F]
+          with Flamingos2FpuMaskMapping[F]
+          with Flamingos2LongSlitMapping[F]
+          with Flamingos2StaticMapping[F]
           with FilterTypeMetaMapping[F]
           with GmosCcdModeMapping[F]
           with GmosCustomMaskMapping[F]
@@ -172,11 +179,13 @@ object OdbMapping {
           with GroupEditMapping[F]
           with GroupElementMapping[F]
           with HourAngleRangeMapping[F]
+          with ImagingConfigOptionMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
           with NonsiderealMapping[F]
           with AttachmentMapping[F]
+          with ObscalcUpdateMapping[F]
           with ObservationEditMapping[F]
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
@@ -207,9 +216,8 @@ object OdbMapping {
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
           with RecordAtomResultMapping[F]
-          with RecordGmosNorthVisitResultMapping[F]
-          with RecordGmosSouthVisitResultMapping[F]
-          with RecordGmosStepResultMapping[F]
+          with RecordStepResultMapping[F]
+          with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -369,7 +377,9 @@ object OdbMapping {
                 ExposureTimeModeMapping,
                 FastTurnaroundMapping,
                 FilterTypeMetaMapping,
-                F2LongSlitMapping,
+                Flamingos2DynamicMapping,
+                Flamingos2LongSlitMapping,
+                Flamingos2StaticMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
                 GmosSouthLongSlitMapping,
@@ -378,6 +388,9 @@ object OdbMapping {
                 GroupMapping,
                 GroupEditMapping,
                 GroupElementMapping,
+                ImagingConfigOptionMapping,
+                ImagingConfigOptionGmosNorthMapping,
+                ImagingConfigOptionGmosSouthMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,
                 LibraryProgramReferenceMapping,
@@ -385,6 +398,7 @@ object OdbMapping {
                 MonitoringProgramReferenceMapping,
                 MutationMapping,
                 NonsiderealMapping,
+                ObscalcUpdateMapping,
                 ObservationEditMapping,
                 ObservationMapping,
                 ObservationReferenceMapping,
@@ -415,6 +429,8 @@ object OdbMapping {
                 RadialVelocityMapping,
                 RecordAtomResultMapping,
                 RecordDatasetResultMapping,
+                RecordFlamingos2StepResultMapping,
+                RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthStepResultMapping,
                 RecordGmosNorthVisitResultMapping,
                 RecordGmosSouthStepResultMapping,
@@ -501,7 +517,9 @@ object OdbMapping {
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
                 GmosCcdModeMappings,
-                GmosCustomMaskMapping,
+                Flamingos2CustomMaskMappings,
+                Flamingos2FpuMaskMappings,
+                GmosCustomMaskMappings,
                 GmosNorthDynamicMappings,
                 GmosNorthFpuMappings,
                 GmosNorthGratingConfigMappings,

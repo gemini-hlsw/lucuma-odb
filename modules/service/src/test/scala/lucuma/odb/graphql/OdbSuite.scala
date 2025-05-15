@@ -313,6 +313,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Config.Database(
       maxConnections = 10,
       maxCalibrationConnections = 10,
+      maxObscalcConnections = 10,
       host     = container.containerIpAddress,
       port     = container.mappedPort(POSTGRESQL_PORT),
       user     = PostgreSQLContainer.defaultUsername,

@@ -9,12 +9,14 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.util.MappingExtras
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]
+                            with ImagingConfigOptionTable[F]
                             with SpectroscopyConfigOptionTable[F]
                             with MappingExtras[F] {
 
@@ -61,7 +63,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(ConditionsMeasurementType / "elevation", ChronConditionsEntryView.Measurement.Pointing.Elevation, ChronConditionsEntryView.Measurement.Pointing.SyntheticId),
       angleMappingAtPath(ConditionsMeasurementType / "azimuth", ChronConditionsEntryView.Measurement.Pointing.Azimuth, ChronConditionsEntryView.Measurement.Pointing.SyntheticId),
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitWidth", SpectroscopyConfigOptionTable.SlitWidth, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
-      angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index)
+      angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
+      angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index)
     )
 
 }

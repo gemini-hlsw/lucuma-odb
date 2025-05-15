@@ -1128,12 +1128,8 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
-                readMode
-                defaultReadMode
                 explicitReadMode
-                defaultReads
                 explicitReads
-                reads
                 decker
                 defaultDecker
                 explicitDecker
@@ -1156,43 +1152,35 @@ class createObservation extends OdbSuite {
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
         assertIO(
-          (longSlit.downIO[F2Disperser]("disperser"),
-           longSlit.downIO[Option[F2Filter]]("filter"),
-           longSlit.downIO[F2Fpu]("fpu"),
-           longSlit.downIO[F2ReadMode]("readMode"),
-           longSlit.downIO[F2ReadMode]("defaultReadMode"),
-           longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
-           longSlit.downIO[F2Reads]("defaultReads"),
-           longSlit.downIO[Option[F2Reads]]("explicitReads"),
-           longSlit.downIO[F2Reads]("reads"),
-           longSlit.downIO[F2Decker]("decker"),
-           longSlit.downIO[F2Decker]("defaultDecker"),
-           longSlit.downIO[Option[F2Decker]]("explicitDecker"),
-           longSlit.downIO[F2ReadoutMode]("readoutMode"),
-           longSlit.downIO[F2ReadoutMode]("defaultReadoutMode"),
-           longSlit.downIO[Option[F2ReadoutMode]]("explicitReadoutMode"),
-           longSlit.downIO[F2Disperser]("initialDisperser"),
-           longSlit.downIO[Option[F2Filter]]("initialFilter"),
-           longSlit.downIO[F2Fpu]("initialFpu")
+          (longSlit.downIO[Flamingos2Disperser]("disperser"),
+           longSlit.downIO[Option[Flamingos2Filter]]("filter"),
+           longSlit.downIO[Flamingos2Fpu]("fpu"),
+           longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
+           longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
+           longSlit.downIO[Flamingos2Decker]("decker"),
+           longSlit.downIO[Flamingos2Decker]("defaultDecker"),
+           longSlit.downIO[Option[Flamingos2Decker]]("explicitDecker"),
+           longSlit.downIO[Flamingos2ReadoutMode]("readoutMode"),
+           longSlit.downIO[Flamingos2ReadoutMode]("defaultReadoutMode"),
+           longSlit.downIO[Option[Flamingos2ReadoutMode]]("explicitReadoutMode"),
+           longSlit.downIO[Flamingos2Disperser]("initialDisperser"),
+           longSlit.downIO[Option[Flamingos2Filter]]("initialFilter"),
+           longSlit.downIO[Flamingos2Fpu]("initialFpu")
           ).tupled,
-          (F2Disperser.R1200HK,
-           Some(F2Filter.Y),
-           F2Fpu.LongSlit2,
-           F2ReadMode.Faint,
-           F2ReadMode.Faint, // default read mode is faint
+          (Flamingos2Disperser.R1200HK,
+           Some(Flamingos2Filter.Y),
+           Flamingos2Fpu.LongSlit2,
            None,
-           F2Reads.Reads_8,  // faint reamd mode default reads to 8
            None,
-           F2Reads.Reads_8,
-           F2Decker.LongSlit,
-           F2Decker.LongSlit,
+           Flamingos2Decker.LongSlit,
+           Flamingos2Decker.LongSlit,
            None,
-           F2ReadoutMode.Science,
-           F2ReadoutMode.Science,
+           Flamingos2ReadoutMode.Science,
+           Flamingos2ReadoutMode.Science,
            None,
-           F2Disperser.R1200HK,
-           Some(F2Filter.Y),
-           F2Fpu.LongSlit2
+           Flamingos2Disperser.R1200HK,
+           Some(Flamingos2Filter.Y),
+           Flamingos2Fpu.LongSlit2
           )
         )
 
@@ -1202,12 +1190,12 @@ class createObservation extends OdbSuite {
 
   private def createObsWithF2ObservingModeAllParams(
     pid:                 Program.Id,
-    disperser:           F2Disperser,
-    fpu:                 F2Fpu,
-    explicitReadMode:    Option[F2ReadMode],
-    explicitDecker:      Option[F2Decker],
-    explicitReadoutMode: Option[F2ReadoutMode],
-    explicitReads:       Option[F2Reads]
+    disperser:           Flamingos2Disperser,
+    fpu:                 Flamingos2Fpu,
+    explicitReadMode:    Option[Flamingos2ReadMode],
+    explicitDecker:      Option[Flamingos2Decker],
+    explicitReadoutMode: Option[Flamingos2ReadoutMode],
+    explicitReads:       Option[Flamingos2Reads]
   ): String =
     s"""
       mutation {
@@ -1233,11 +1221,7 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
-                readMode
-                defaultReadMode
                 explicitReadMode
-                reads
-                defaultReads
                 explicitReads
                 decker
                 defaultDecker
@@ -1257,47 +1241,39 @@ class createObservation extends OdbSuite {
       query(pi,
         createObsWithF2ObservingModeAllParams(
           pid,
-          F2Disperser.R1200HK,
-          F2Fpu.LongSlit2,
-          explicitReadMode = Some(F2ReadMode.Bright),
+          Flamingos2Disperser.R1200HK,
+          Flamingos2Fpu.LongSlit2,
+          explicitReadMode = Some(Flamingos2ReadMode.Bright),
           explicitReads = None,
-          explicitDecker = Some(F2Decker.MOS),
-          explicitReadoutMode = Some(F2ReadoutMode.Engineering)
+          explicitDecker = Some(Flamingos2Decker.MOS),
+          explicitReadoutMode = Some(Flamingos2ReadoutMode.Engineering)
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
           assertIO((
-            longSlit.downIO[F2Disperser]("disperser"),
-            longSlit.downIO[Option[F2Filter]]("filter"),
-            longSlit.downIO[F2Fpu]("fpu"),
-            longSlit.downIO[F2ReadMode]("readMode"),
-            longSlit.downIO[F2ReadMode]("defaultReadMode"),
-            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
-            longSlit.downIO[F2Reads]("defaultReads"),
-            longSlit.downIO[Option[F2Reads]]("explicitReads"),
-            longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[F2Decker]("decker"),
-            longSlit.downIO[F2Decker]("defaultDecker"),
-            longSlit.downIO[Option[F2Decker]]("explicitDecker"),
-            longSlit.downIO[F2ReadoutMode]("readoutMode"),
-            longSlit.downIO[F2ReadoutMode]("defaultReadoutMode"),
-            longSlit.downIO[Option[F2ReadoutMode]]("explicitReadoutMode")
+            longSlit.downIO[Flamingos2Disperser]("disperser"),
+            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
+            longSlit.downIO[Flamingos2Fpu]("fpu"),
+            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
+            longSlit.downIO[Flamingos2Decker]("decker"),
+            longSlit.downIO[Flamingos2Decker]("defaultDecker"),
+            longSlit.downIO[Option[Flamingos2Decker]]("explicitDecker"),
+            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode"),
+            longSlit.downIO[Flamingos2ReadoutMode]("defaultReadoutMode"),
+            longSlit.downIO[Option[Flamingos2ReadoutMode]]("explicitReadoutMode")
           ).tupled, (
-            F2Disperser.R1200HK,
-            Some(F2Filter.Y),
-            F2Fpu.LongSlit2,
-            F2ReadMode.Bright,              // Explicitly set read mode
-            F2ReadMode.Faint,
-            Some(F2ReadMode.Bright),        // Explicitly set read mode
-            F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
+            Flamingos2Disperser.R1200HK,
+            Some(Flamingos2Filter.Y),
+            Flamingos2Fpu.LongSlit2,
+            Some(Flamingos2ReadMode.Bright),        // Explicitly set read mode
             None,                           // Explicit reads is Empty
-            F2Reads.Reads_1,                // Default reads is 1 as por bright read mode
-            F2Decker.MOS,                   // Explicitly set
-            F2Decker.LongSlit,              // default to long slit
-            Some(F2Decker.MOS),             // Explicitly set
-            F2ReadoutMode.Engineering,      // Explicitly set
-            F2ReadoutMode.Science,          // Science bf default
-            Some(F2ReadoutMode.Engineering) // Explicitly set
+            Flamingos2Decker.MOS,                   // Explicitly set
+            Flamingos2Decker.LongSlit,              // default to long slit
+            Some(Flamingos2Decker.MOS),             // Explicitly set
+            Flamingos2ReadoutMode.Engineering,      // Explicitly set
+            Flamingos2ReadoutMode.Science,          // Science bf default
+            Some(Flamingos2ReadoutMode.Engineering) // Explicitly set
           )
         )
 
@@ -1310,39 +1286,31 @@ class createObservation extends OdbSuite {
       query(pi,
         createObsWithF2ObservingModeAllParams(
           pid,
-          F2Disperser.R1200HK,
-          F2Fpu.LongSlit2,
+          Flamingos2Disperser.R1200HK,
+          Flamingos2Fpu.LongSlit2,
           explicitReadMode = None,
-          explicitReads = Some(F2Reads.Reads_4),
+          explicitReads = Some(Flamingos2Reads.Reads_4),
           explicitDecker = None,
           explicitReadoutMode = None
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
           assertIO((
-            longSlit.downIO[F2Disperser]("disperser"),
-            longSlit.downIO[Option[F2Filter]]("filter"),
-            longSlit.downIO[F2Fpu]("fpu"),
-            longSlit.downIO[F2ReadMode]("readMode"),
-            longSlit.downIO[F2ReadMode]("defaultReadMode"),
-            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
-            longSlit.downIO[F2Reads]("defaultReads"),
-            longSlit.downIO[Option[F2Reads]]("explicitReads"),
-            longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[F2Decker]("decker"),
-            longSlit.downIO[F2ReadoutMode]("readoutMode")
+            longSlit.downIO[Flamingos2Disperser]("disperser"),
+            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
+            longSlit.downIO[Flamingos2Fpu]("fpu"),
+            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
+            longSlit.downIO[Flamingos2Decker]("decker"),
+            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode")
           ).tupled, (
-            F2Disperser.R1200HK,
-            Some(F2Filter.Y),
-            F2Fpu.LongSlit2,
-            F2ReadMode.Faint,
-            F2ReadMode.Faint,
+            Flamingos2Disperser.R1200HK,
+            Some(Flamingos2Filter.Y),
+            Flamingos2Fpu.LongSlit2,
             None,
-            F2Reads.Reads_8,                // Default reads is 8 for faint read mode
-            Some(F2Reads.Reads_4),          // Explicit reads set to 4
-            F2Reads.Reads_4,                // Default reads is 1 as por bright read mode
-            F2Decker.LongSlit,              // default to long slit
-            F2ReadoutMode.Science           // Science bf default
+            Some(Flamingos2Reads.Reads_4),          // Explicit reads set to 4
+            Flamingos2Decker.LongSlit,              // default to long slit
+            Flamingos2ReadoutMode.Science           // Science bf default
           )
         )
 
@@ -1355,39 +1323,31 @@ class createObservation extends OdbSuite {
       query(pi,
         createObsWithF2ObservingModeAllParams(
           pid,
-          F2Disperser.R1200HK,
-          F2Fpu.LongSlit2,
-          explicitReadMode = Some(F2ReadMode.Medium),
-          explicitReads = Some(F2Reads.Reads_16),
+          Flamingos2Disperser.R1200HK,
+          Flamingos2Fpu.LongSlit2,
+          explicitReadMode = Some(Flamingos2ReadMode.Medium),
+          explicitReads = Some(Flamingos2Reads.Reads_16),
           explicitDecker = None,
           explicitReadoutMode = None
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
           assertIO((
-            longSlit.downIO[F2Disperser]("disperser"),
-            longSlit.downIO[Option[F2Filter]]("filter"),
-            longSlit.downIO[F2Fpu]("fpu"),
-            longSlit.downIO[F2ReadMode]("readMode"),
-            longSlit.downIO[F2ReadMode]("defaultReadMode"),
-            longSlit.downIO[Option[F2ReadMode]]("explicitReadMode"),
-            longSlit.downIO[F2Reads]("defaultReads"),
-            longSlit.downIO[Option[F2Reads]]("explicitReads"),
-            longSlit.downIO[F2Reads]("reads"),
-            longSlit.downIO[F2Decker]("decker"),
-            longSlit.downIO[F2ReadoutMode]("readoutMode")
+            longSlit.downIO[Flamingos2Disperser]("disperser"),
+            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
+            longSlit.downIO[Flamingos2Fpu]("fpu"),
+            longSlit.downIO[Option[Flamingos2ReadMode]]("explicitReadMode"),
+            longSlit.downIO[Option[Flamingos2Reads]]("explicitReads"),
+            longSlit.downIO[Flamingos2Decker]("decker"),
+            longSlit.downIO[Flamingos2ReadoutMode]("readoutMode")
           ).tupled, (
-            F2Disperser.R1200HK,
-            Some(F2Filter.Y),
-            F2Fpu.LongSlit2,
-            F2ReadMode.Medium,       // Read mode use the explicit value
-            F2ReadMode.Faint,
-            Some(F2ReadMode.Medium), // Explicitly set read mode
-            F2Reads.Reads_4,         // Default reads is 4 for faint read mode
-            Some(F2Reads.Reads_16),  // Explicit reads is 16
-            F2Reads.Reads_16,        // reads is 16
-            F2Decker.LongSlit,       // default to long slit
-            F2ReadoutMode.Science    // Science bf default
+            Flamingos2Disperser.R1200HK,
+            Some(Flamingos2Filter.Y),
+            Flamingos2Fpu.LongSlit2,
+            Some(Flamingos2ReadMode.Medium), // Explicitly set read mode
+            Some(Flamingos2Reads.Reads_16),  // Explicit reads is 16
+            Flamingos2Decker.LongSlit,       // default to long slit
+            Flamingos2ReadoutMode.Science    // Science bf default
           )
         )
 

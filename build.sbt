@@ -16,10 +16,10 @@ val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.0"
-val lucumaItcVersion           = "0.34.4"
-val lucumaCoreVersion          = "0.126.0"
+val lucumaItcVersion           = "0.35.0"
+val lucumaCoreVersion          = "0.128.0"
 val lucumaGraphQLRoutesVersion = "0.9.0"
-val lucumaSsoVersion           = "0.8.12"
+val lucumaSsoVersion           = "0.8.14"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -31,7 +31,7 @@ val pprintVersion              = "0.9.0"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.19"
+ThisBuild / tlBaseVersion      := "0.21"
 ThisBuild / scalaVersion       := "3.6.4"
 ThisBuild / crossScalaVersions := Seq("3.6.4")
 
@@ -189,6 +189,16 @@ lazy val service = project
     reStartArgs += "serve"
   )
 
+lazy val obscalc = project
+  .in(file("modules/obscalc"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "obscalc-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082"
+  )
+
 lazy val calibrations = project
   .in(file("modules/calibrations"))
   .dependsOn(service)
@@ -212,6 +222,7 @@ lazy val phase0 = project
       "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion      % Test,
       "org.scalameta" %% "munit"               % munitVersion           % Test,
       "org.scalameta" %% "munit-scalacheck"    % munitVersion           % Test,
+      "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectVersion % Test,
       "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion % Test
     )
   )

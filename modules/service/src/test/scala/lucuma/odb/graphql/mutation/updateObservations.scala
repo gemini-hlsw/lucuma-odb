@@ -1393,11 +1393,7 @@ class updateObservations extends OdbSuite
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
                   "disperser": "R1200_HK",
-                  "readMode": "FAINT",
-                  "defaultReadMode": "FAINT",
                   "explicitReadMode": null,
-                  "reads": "READS_8",
-                  "defaultReads": "READS_8",
                   "explicitReads": null,
                   "decker": "LONG_SLIT",
                   "defaultDecker": "LONG_SLIT",
@@ -1423,11 +1419,7 @@ class updateObservations extends OdbSuite
           }
           flamingos2LongSlit {
             disperser
-            readMode
-            defaultReadMode
             explicitReadMode
-            reads
-            defaultReads
             explicitReads
             decker
             defaultDecker
@@ -1463,11 +1455,7 @@ class updateObservations extends OdbSuite
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
                   "disperser": "R1200_HK",
-                  "readMode": "BRIGHT",
-                  "defaultReadMode": "FAINT",
                   "explicitReadMode": "BRIGHT",
-                  "reads": "READS_1",
-                  "defaultReads": "READS_1",
                   "explicitReads": null,
                   "decker": "MOS",
                   "defaultDecker": "LONG_SLIT",

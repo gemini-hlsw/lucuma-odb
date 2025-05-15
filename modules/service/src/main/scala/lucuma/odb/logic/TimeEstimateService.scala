@@ -26,6 +26,7 @@ import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.GroupTree
+import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GeneratorParamsService
@@ -124,10 +125,9 @@ object TimeEstimateService:
                 itcService(itcClient)
                   .callRemote(pid, oid, data.generatorParams)
                   .map:
-                    case Left(ItcService.Error.ObservationDefinitionError(GeneratorParamsService.Error.MissingData(p))) =>
-                      p.asLeft[AsterismResults].some
-                    case Left(_)   => none
-                    case Right(ar) => ar.asRight.some
+                    case Left(e@OdbError.InvalidObservation(_, _)) => e.asLeft[AsterismResults].some
+                    case Left(_)                                   => none
+                    case Right(ar)                                 => ar.asRight.some
               )
 
               // Calculate time estimate using provided ITC result and params.
@@ -194,7 +194,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using NoTransaction[F]): F[Option[CategorizedTimeRange]] =
         (for
-          p <- OptionT(groupService.selectPid(gid))
+          p <- OptionT(services.transactionally(groupService.selectPid(gid)))
           d <- OptionT.liftF(load(p))
           (tree, dataMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))
@@ -231,7 +231,7 @@ object TimeEstimateService:
         gid: Group.Id
       )(using NoTransaction[F]): F[Option[Map[Option[ScienceBand], CategorizedTime]]] =
         (for
-          p <- OptionT(groupService.selectPid(gid))
+          p <- OptionT(services.transactionally(groupService.selectPid(gid)))
           d <- OptionT.liftF(load(p))
           (tree, dataMap) = d
           t <- OptionT.fromOption(tree.findGroup(gid))

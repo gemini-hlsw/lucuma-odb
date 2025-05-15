@@ -13,11 +13,12 @@ import lucuma.core.enums.GmosNorthStageMode
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthStageMode
 import lucuma.core.enums.MosPreImaging
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
-import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.data.OdbError
 
 import java.util.UUID
 
@@ -41,44 +42,46 @@ object LongSlit:
 
   private def instantiate[F[_]: Monad, S, D](
     static:      S,
-    acquisition: Either[String, SequenceGenerator[D]],
-    science:     F[Either[String, SequenceGenerator[D]]]
-  ): F[Either[String, ExecutionConfigGenerator[S, D]]] =
+    acquisition: Either[OdbError, SequenceGenerator[D]],
+    science:     F[Either[OdbError, SequenceGenerator[D]]]
+  ): F[Either[OdbError, ExecutionConfigGenerator[S, D]]] =
     (for
       a <- EitherT.fromEither(acquisition)
       s <- EitherT(science)
     yield ExecutionConfigGenerator(static, a, s)).value
 
   def gmosNorth[F[_]: Monad](
+    observationId:  Observation.Id,
     estimator:      TimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosNorth],
     config:         Config.GmosNorth,
-    acquisitionItc: Either[MissingParamSet, IntegrationTime],
-    scienceItc:     Either[MissingParamSet, IntegrationTime],
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
+  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth]]] =
     instantiate(
       GmosNorthStatic,
-      Acquisition.gmosNorth(estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosNorth(estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
+      Acquisition.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
+      Science.gmosNorth(observationId, estimator, GmosNorthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
   def gmosSouth[F[_]: Monad](
+    observationId:  Observation.Id,
     estimator:      TimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
     namespace:      UUID,
     expander:       SmartGcalExpander[F, DynamicConfig.GmosSouth],
     config:         Config.GmosSouth,
-    acquisitionItc: Either[MissingParamSet, IntegrationTime],
-    scienceItc:     Either[MissingParamSet, IntegrationTime],
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
-  ): F[Either[String, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
+  ): F[Either[OdbError, ExecutionConfigGenerator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth]]] =
     instantiate(
       GmosSouthStatic,
-      Acquisition.gmosSouth(estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
-      Science.gmosSouth(estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
+      Acquisition.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, config, acquisitionItc, calRole, lastAcqReset),
+      Science.gmosSouth(observationId, estimator, GmosSouthStatic, namespace, expander, config, scienceItc, calRole)
     )
 
 end LongSlit

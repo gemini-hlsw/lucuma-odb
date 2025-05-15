@@ -171,10 +171,14 @@ trait SequenceCodec {
       )
     }
 
+  import lucuma.odb.json.flamingos2.given
   import lucuma.odb.json.gmos.given
 
   private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { _.as[ExecutionConfig[S, D]].map(instrumentExecutionConfig) }
+
+  given Decoder[InstrumentExecutionConfig.Flamingos2] =
+    rootDecoder(InstrumentExecutionConfig.Flamingos2.apply)
 
   given Decoder[InstrumentExecutionConfig.GmosNorth] =
     rootDecoder(InstrumentExecutionConfig.GmosNorth.apply)
@@ -187,6 +191,9 @@ trait SequenceCodec {
   ): Encoder[R] =
     Encoder.instance { (a: R) => root(a).asJson }
 
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Flamingos2] =
+    rootEncoder(_.executionConfig)
+
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =
     rootEncoder(_.executionConfig)
 
@@ -198,25 +205,26 @@ trait SequenceCodec {
       for {
         i <- c.downField("instrument").as[Instrument]
         r <- i match {
-          case Instrument.GmosNorth => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
-          case Instrument.GmosSouth => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
-          case _                    => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
+          case Instrument.Flamingos2 => c.downField("flamingos2").as[InstrumentExecutionConfig.Flamingos2]
+          case Instrument.GmosNorth  => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
+          case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
+          case _                     => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
         }
       } yield r
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig] =
-    Encoder.instance { (a: InstrumentExecutionConfig) =>
+    Encoder.instance: (a: InstrumentExecutionConfig) =>
       Json.obj(
         "instrument" -> a.instrument.asJson,
+        "flamingos2" -> Json.Null, // one of these will be replaced
         "gmosNorth"  -> Json.Null, // one of these will be replaced
         "gmosSouth"  -> Json.Null, // one of these will be replaced
-        a match {
-          case i@InstrumentExecutionConfig.GmosNorth(_) => "gmosNorth" -> i.asJson
-          case i@InstrumentExecutionConfig.GmosSouth(_) => "gmosSouth" -> i.asJson
-        }
+        a match
+          case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
+          case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
+          case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
       )
-    }
 
 }
 
