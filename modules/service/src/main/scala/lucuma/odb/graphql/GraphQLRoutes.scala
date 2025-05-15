@@ -27,6 +27,7 @@ import lucuma.odb.service.UserService
 import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
 import natchez.Trace
+import natchez.TraceValue
 import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
@@ -95,29 +96,34 @@ object GraphQLRoutes {
                   Logger[F].debug(s"Cache hit for $a").as(opt) // it was in the cache
                 case None    =>           // It was not in the cache
                   Logger[F].debug(s"Cache miss for $a") *>
-                  {
-                    for {
-                      user <- OptionT(ssoClient.get(a))
+                  Trace[F].span("newServiceInstance"):
+                    {
+                      for {
+                        user <- OptionT(ssoClient.get(a))
+                        props = List[(String, TraceValue)](
+                          "lucuma.user.id"          -> user.id.toString, 
+                          "lucuma.user.displayName" -> user.displayName
+                        )
 
-                      // If the user has never hit the ODB using http then there will be no user
-                      // entry in the database. So go ahead and [re]canonicalize here to be sure.
-                      _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
+                        // If the user has never hit the ODB using http then there will be no user
+                        // entry in the database. So go ahead and [re]canonicalize here to be sure.
+                        _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
-                      _    <- OptionT.liftF(info(user, s"New service instance."))
-                      map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
-                      svc   = new GraphQLService(map) {
-                        override def query(request: Operation): F[Result[Json]] =
-                          super.query(request).retryOnInvalidCursorName
-                            .handleError(Result.InternalError.apply)
-                            .flatTap {
-                              case Result.InternalError(t)  => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                              case _ => debug(user, s"Query (success).")
-                            }
-                      }
-                    } yield svc
-                  } .widen[GraphQLService[F]]
-                    .value
-                    .flatTap(os => cache.put(a, os))
+                        _    <- OptionT.liftF(info(user, s"New service instance."))
+                        map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
+                        svc   = new GraphQLService(map, props*) {
+                          override def query(request: Operation): F[Result[Json]] =
+                            super.query(request).retryOnInvalidCursorName
+                              .handleError(Result.InternalError.apply)
+                              .flatTap {
+                                case Result.InternalError(t)  => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                case _ => debug(user, s"Query (success).")
+                              }
+                        }
+                      } yield svc
+                    } .widen[GraphQLService[F]]
+                      .value
+                      .flatTap(os => cache.put(a, os))
               }
           },
           wsb,
