@@ -394,13 +394,13 @@ object GeneratorParamsService {
           case ExposureTimeModeType.SignalToNoiseMode =>
             (s2n, at)
               .mapN(ExposureTimeMode.SignalToNoiseMode.apply)
-              .toRight("Both c_spec_signal_to_noise and c_spec_signal_to_noise_at must be defined for the SignalToNoise exposure time mode.")
+              .toRight("Both c_etm_signal_to_noise and c_etm_signal_to_noise_at must be defined for the SignalToNoise exposure time mode.")
               .map(_.some)
 
           case ExposureTimeModeType.TimeAndCountMode  =>
             (time, count, at)
               .mapN(ExposureTimeMode.TimeAndCountMode.apply)
-              .toRight("c_spec_exp_time, c_spec_exp_count and c_spec_signal_to_noise_at must be defined for the TimeAndCount exposure time mode.")
+              .toRight("c_etm_exp_time, c_etm_exp_count and c_etm_signal_to_noise_at must be defined for the TimeAndCount exposure time mode.")
               .map(_.some)
         }
 
@@ -432,11 +432,11 @@ object GeneratorParamsService {
         $tab.c_air_mass_max,
         $tab.c_hour_angle_min,
         $tab.c_hour_angle_max,
-        $tab.c_spec_exp_time_mode,
-        $tab.c_spec_signal_to_noise_at,
-        $tab.c_spec_signal_to_noise,
-        $tab.c_spec_exp_time,
-        $tab.c_spec_exp_count,
+        $tab.c_exp_time_mode,
+        $tab.c_etm_signal_to_noise_at,
+        $tab.c_etm_signal_to_noise,
+        $tab.c_etm_exp_time,
+        $tab.c_etm_exp_count,
         $tab.c_observing_mode_type,
         $tab.c_science_band,
         $tab.c_target_id,
