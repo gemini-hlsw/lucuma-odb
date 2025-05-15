@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 
 import cats.data.Ior
 import cats.data.NonEmptyChain
-import cats.effect.*
+import cats.effect.Async
+import cats.effect.IO
+import cats.effect.Resource
 import cats.effect.std.Supervisor
 import cats.effect.std.UUIDGen
 import cats.effect.unsafe.IORuntime
@@ -74,7 +76,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.refined.*
 import munit.CatsEffectSuite
 import munit.internal.console.AnsiColors
-import natchez.Trace.Implicits.noop
+import natchez.Trace
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -349,7 +351,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def goaUsers: Set[User.Id] =
     Set.empty
 
-  private def httpApp: Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -366,7 +368,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping: Resource[IO, Mapping[IO]] =
+  def mapping(using Trace[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -378,9 +380,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
+  protected def trace: Resource[IO, Trace[IO]] =    
+    Resource.pure(Trace.Implicits.noop)
+
   protected def server: Resource[IO, Server] =
     for {
-      a <- httpApp
+      t <- trace
+      a <- httpApp(using t)
       s <- BlazeServerBuilder[IO]
              .withHttpWebSocketApp(a)
              .bindAny()
@@ -447,6 +453,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     super.beforeAll()
 
     dbInitialization.foreach { init =>
+      import Trace.Implicits.noop
       FMain
         .databasePoolResource[IO](databaseConfig)
         .flatten
@@ -652,6 +659,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Resource.eval(IO(sessionFixture())).use(f)
 
   def withServices[A](u: User)(f: Services[IO] => IO[A]): IO[A] =
+    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use { s =>
       Enums.load(s).flatMap(e =>
         f(Services.forUser(u, e, None)(s))
@@ -668,6 +676,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // RCN: We had a lot of calls in the calibrations tests that now require ServiceAcces, so
   // instead of changing all the callsites I added this overload.
   def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
+    import Trace.Implicits.noop
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
         given services: Services[IO] = Services.forUser(u, e, None)(s)

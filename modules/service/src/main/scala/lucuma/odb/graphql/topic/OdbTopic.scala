@@ -13,13 +13,14 @@ import fs2.concurrent.Topic
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.util.Codecs.user_id
+import natchez.Trace
 import org.typelevel.log4cats.Logger
 import skunk.Session
 import skunk.data.Identifier
 import skunk.implicits.*
 
 trait OdbTopic[E]:
-  def create[F[_]](
+  def create[F[_]: Trace](
     s:         Session[F],
     maxQueued: Int,
     sup:       Supervisor[F]
@@ -31,15 +32,16 @@ object OdbTopic:
   // in fs2 or skunk that releases the portal too early and you get portal not found
   // asynchronously when doing other things. This is a workaround for now that just
   // interpolates the strings directly rather than preparing a statement.
-  def selectProgramUsers[F[_]: Concurrent: Logger](
+  def selectProgramUsers[F[_]: Concurrent: Logger: Trace](
     s:   Session[F],
     pid: Program.Id,
   ): F[List[User.Id]] =
-    s.execute(
-      sql"""
-        select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
-      """.query(user_id)
-    )
+    Trace[F].span("topic.selectProgramUsers"):
+      s.execute(
+        sql"""
+          select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
+        """.query(user_id)
+      )
 
   def define[U, E](
     name:    String,
@@ -59,7 +61,7 @@ object OdbTopic:
             .flatten
             .fold(Stream.exec(Logger[F].warn(s"Invalid $name event: $n")))(Stream(_))
 
-      def elements[F[_]: Concurrent: Logger](
+      def elements[F[_]: Concurrent: Logger: Trace](
         s:         Session[F],
         maxQueued: Int
       ): Stream[F, E] =
@@ -70,7 +72,7 @@ object OdbTopic:
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
 
-      def create[F[_]](
+      def create[F[_]: Trace](
         s:         Session[F],
         maxQueued: Int,
         sup:       Supervisor[F]

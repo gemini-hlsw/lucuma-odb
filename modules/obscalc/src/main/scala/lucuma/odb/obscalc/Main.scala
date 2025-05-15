@@ -120,7 +120,7 @@ object CalcMain extends MainParams:
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
-  def topic[F[_]: Concurrent: Logger](
+  def topic[F[_]: Concurrent: Logger: Trace](
     pool: Resource[F, Session[F]]
   ): Resource[F, Topic[F, ObscalcTopic.Element]] =
       for

@@ -142,8 +142,8 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
-  def createProgramAs(user: User, name: String = null): IO[Program.Id] =
-    query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }").flatMap { js =>
+  def createProgramAs(user: User, name: String = null, clientOption: ClientOption = ClientOption.Default): IO[Program.Id] =
+    query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }", client = clientOption).flatMap { js =>
       js.hcursor
         .downFields("createProgram", "program", "id")
         .as[Program.Id]
