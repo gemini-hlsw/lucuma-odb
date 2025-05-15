@@ -48,7 +48,7 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
 
   def read[A](i: Instrument, p: Parser[List[A]]): Pipe[F, Byte, (A, PosInt)] =
     _.through(entryLines)
-     .filter { case (s, _) => s.startsWith(i.shortName) }
+     .filter { case (s, _) => s.startsWith(i.shortName.toUpperCase()) }
      .flatMap { case (s, idx) =>
        p.parseAll(s) match {
          case Left(e)   => Stream.raiseError[F](new ReadException(idx, e))
@@ -57,18 +57,23 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]) {
      }
      .through(zipWithLineNumber)
 
-  val gmosNorth: Pipe[F, Byte, (GmosSpectroscopyRow.GmosNorth, PosInt)] =
+  val gmosNorthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosNorth, PosInt)] =
     read(Instrument.GmosNorth, GmosSpectroscopyRow.gmosNorth)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
       .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
 
-  val gmosSouth: Pipe[F, Byte, (GmosSpectroscopyRow.GmosSouth, PosInt)] =
+  val gmosSouthSpectroscopy: Pipe[F, Byte, (GmosSpectroscopyRow.GmosSouth, PosInt)] =
     read(Instrument.GmosSouth, GmosSpectroscopyRow.gmosSouth)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
       .andThen(_.filter(_._1.spec.capability.isEmpty))                 // for now no N&S
 
-  val f2: Pipe[F, Byte, (F2SpectroscopyRow, PosInt)] =
-    read(Instrument.Flamingos2, F2SpectroscopyRow.f2)
+  val flamingos2Spectroscopy: Pipe[F, Byte, (Flamingos2SpectroscopyRow, PosInt)] =
+    read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
       .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
 
+  val gmosNorthImaging: Pipe[F, Byte, (GmosImagingRow.GmosNorth, PosInt)] =
+    read(Instrument.GmosNorth, GmosImagingRow.gmosNorth)
+
+  val gmosSouthImaging: Pipe[F, Byte, (GmosImagingRow.GmosSouth, PosInt)] =
+    read(Instrument.GmosSouth, GmosImagingRow.gmosSouth)
 }

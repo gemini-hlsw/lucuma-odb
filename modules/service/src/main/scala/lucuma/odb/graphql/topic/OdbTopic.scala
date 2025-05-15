@@ -51,7 +51,7 @@ object OdbTopic:
   )(update: PartialFunction[Array[String], Option[U]]): OdbTopic[E] =
     new OdbTopic[E]:
 
-      def updates[F[_]: Logger](
+      def updates[F[_]: Concurrent: Logger](
         s:         Session[F],
         maxQueued: Int
       ): Stream[F, U] =
@@ -79,10 +79,28 @@ object OdbTopic:
       )(using Concurrent[F], Logger[F]): F[Topic[F, E]] =
         for
           top <- Topic[F, E]
-          els  = elements(s, maxQueued).through(top.publish)
+          es   = elements(s, maxQueued).through(top.publish)
           _   <- sup.supervise(
-                   els.compile.drain.onError { case e => Logger[F].error(e)(s"$name Event Stream crashed!") } >>
-                     Logger[F].info(s"$name Event Stream terminated.")
+                   (es
+                     .compile
+                     .drain
+                     .onError:
+                        case e => Logger[F].error(e)(s"$name Event Stream crashed!")
+                   ) >> Logger[F].info(s"$name Event Stream terminated.")
                  )
+
+          // Add a no-op subscriber to guarantee that there is at least one
+          // subscriber consuming events at all times.
+          _   <- sup.supervise(
+                   (top
+                     .subscribe(1024)
+                     .evalTap(e => Logger[F].debug(s"$name Event Consumer received $e"))
+                     .compile
+                     .drain
+                     .onError:
+                       case e => Logger[F].error(e)(s"$name Event Consumer crashed!")
+                   ) >> Logger[F].info(s"$name Event Consumer terminated.")
+                 )
+                   
           _   <- Logger[F].info(s"Started topic for ${channel.value}")
         yield top

@@ -12,11 +12,13 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Instrument
-import lucuma.odb.phase0.F2SpectroscopyRow
+import lucuma.odb.phase0.Flamingos2SpectroscopyRow
+import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.F2Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
@@ -154,18 +156,18 @@ object Phase0Table {
       enc(gmos_south_grating, gmos_south_filter, gmos_south_fpu)
   }
 
-  val SpectroscopyF2 = new Phase0Table[F2SpectroscopyRow] {
+  val SpectroscopyFlamingos2 = new Phase0Table[Flamingos2SpectroscopyRow] {
 
     override def name: String =
       s"${Spectroscopy.name}_f2"
 
-    override def encoder: Encoder[F2SpectroscopyRow] =
+    override def encoder: Encoder[Flamingos2SpectroscopyRow] =
       (
         instrument   *:
-        f2_disperser *:
-        f2_filter    *:
-        f2_fpu
-      ).contramap[F2SpectroscopyRow] { row => (
+        flamingos_2_disperser *:
+        flamingos_2_filter    *:
+        flamingos_2_fpu
+      ).contramap[Flamingos2SpectroscopyRow] { row => (
         row.spec.instrument,
         row.disperser,
         row.filter,
@@ -181,4 +183,75 @@ object Phase0Table {
       )
   }
 
+  val Imaging = new Phase0Table[ImagingRow] {
+    override def name: String =
+      "t_imaging_config_option"
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_fov",
+        "c_filter_label",
+        "c_ao",
+        "c_site"
+      )
+
+    override def encoder: Encoder[ImagingRow] =
+      (
+        instrument    *:
+        angle_µas     *:
+        text          *:
+        bool          *:
+        site
+      ).contramap[ImagingRow] { row => (
+        row.instrument,
+        row.fov,
+        row.filter,
+        row.ao,
+        row.site
+      )}
+
+  }
+
+  val ImagingGmosNorth = new Phase0Table[GmosImagingRow.GmosNorth] {
+
+    override def name: String =
+      s"${Imaging.name}_gmos_north"
+
+    override def encoder: Encoder[GmosImagingRow.GmosNorth] =
+      (
+        instrument        *:
+        gmos_north_filter
+      ).contramap[GmosImagingRow.GmosNorth]{ row => (
+        row.img.instrument,
+        row.filter,
+      )}
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_filter",
+      )
+  }
+
+  val ImagingGmosSouth = new Phase0Table[GmosImagingRow.GmosSouth] {
+
+    override def name: String =
+      s"${Imaging.name}_gmos_south"
+
+    override def encoder: Encoder[GmosImagingRow.GmosSouth] =
+      (
+        instrument       *:
+        gmos_south_filter
+      ).contramap[GmosImagingRow.GmosSouth]{ row => (
+        row.img.instrument,
+        row.filter,
+      )}
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_filter",
+      )
+  }
 }

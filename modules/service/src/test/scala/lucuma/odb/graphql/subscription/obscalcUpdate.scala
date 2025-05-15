@@ -1,0 +1,168 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package subscription
+
+import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.syntax.either.*
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.core.model.Observation
+import lucuma.core.util.CalculationState
+import lucuma.odb.data.EditType
+import lucuma.odb.service.ObscalcServiceSuiteSupport
+
+import scala.concurrent.duration.*
+
+class obscalcUpdate extends ObscalcServiceSuiteSupport:
+  protected val sleep: IO[Unit] =
+    IO.sleep(5000.millis)
+
+  test("trigger for new observations"):
+    val setup = for
+      p <- createProgramAs(pi, "foo")
+      t <- createTargetWithProfileAs(pi, p)
+    yield (p, t)
+
+    setup.flatMap: (pid, tid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value {
+                title
+              }
+            }
+          }
+        """,
+        mutations = createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> Json.Null,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Created.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "title" -> "V1647 Orionis".asJson  // Target title
+              )
+            )
+          )
+        )
+      )
+
+  val setup = for
+    _ <- cleanup
+    p <- createProgramAs(pi, "foo")
+    t <- createTargetWithProfileAs(pi, p)
+    o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
+  yield o
+
+  test("trigger for transition to calculating"):
+    setup.flatMap: oid =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = load.asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Calculating.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+
+  def deleteCalibrationObservation(oid: Observation.Id): IO[Unit] =
+    withServices(pi): services =>
+      services.transactionally:
+        services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))
+    .void
+
+  test("trigger for hard delete"):
+    setup.flatMap: oid =>
+      subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          obscalcUpdate {
+            observationId
+            oldState
+            newState
+            editType
+            value { id }
+          }
+        }
+      """,
+      mutations = (deleteCalibrationObservation(oid) >> sleep).asRight,
+      expected  = List(
+        // The first update comes from when the asterism is deleted (the
+        // observation is gone by then so value is null).
+        Json.obj(
+          "obscalcUpdate" -> Json.obj(
+            "observationId" -> oid.asJson,
+            "oldState" -> CalculationState.Pending.asJson,
+            "newState" -> CalculationState.Pending.asJson,
+            "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+            "value" -> Json.Null
+          )
+        ),
+        // The second update comes when the t_obscalc entry itself is cleaned up
+        // via the ON DELETE CASCADE in the FK reference to t_observation.
+        Json.obj(
+          "obscalcUpdate" -> Json.obj(
+            "observationId" -> oid.asJson,
+            "oldState" -> CalculationState.Pending.asJson,
+            "newState" -> Json.Null,
+            "editType" -> EditType.DeletedCal.tag.toUpperCase.asJson,
+            "value" -> Json.Null
+          )
+        )
+      )
+    )
+
+  test("trigger only on transition to ready"):
+    subscriptionExpect(
+      user      = pi,
+      query     = s"""
+        subscription {
+          obscalcUpdate(input: {
+            newState: { EQ: READY }
+          }) {
+            oldState
+            newState
+            editType
+          }
+        }
+      """,
+      mutations = (setup.flatMap(oid => load.flatMap(lst => calculateAndUpdate(lst.head)))).asRight,
+      expected  = List(
+        // Just one event -- when moving from calculating to ready
+        Json.obj(
+          "obscalcUpdate" -> Json.obj(
+            "oldState" -> CalculationState.Calculating.asJson,
+            "newState" -> CalculationState.Ready.asJson,
+            "editType" -> EditType.Updated.tag.toUpperCase.asJson
+          )
+        )
+      )
+    )

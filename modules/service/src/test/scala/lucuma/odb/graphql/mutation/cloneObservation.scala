@@ -62,8 +62,6 @@ class cloneObservation extends OdbSuite {
           disperser
           filter
           fpu
-          readMode
-          reads
         }
       }
       targetEnvironment {
@@ -75,8 +73,15 @@ class cloneObservation extends OdbSuite {
     }
     """
 
+  // Until these are implemented we need to filter them out.
+  val NotImplemented: Set[ObservingModeType] = Set(
+    ObservingModeType.GmosNorthImaging,
+    ObservingModeType.GmosSouthImaging
+  )
+  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet -- NotImplemented
+
   test("clones should have the same properties, for all observing modes") {
-    ObservingModeType.values.toList.traverse { obsMode =>
+    ObservingModeType.values.toList.filter(IsImplemented.apply).traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
         (t, t).tupled.flatMap { (tid1, tid2) =>

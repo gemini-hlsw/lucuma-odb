@@ -739,7 +739,7 @@ class guideEnvironment extends ExecutionTestSupport {
       expect(
         pi,
         guideEnvironmentQuery(oid),
-        expected = List(s"Could not generate a sequence for the observation $oid: observation is missing observing mode").asLeft)
+        expected = List(s"Could not generate a sequence for $oid: observation is missing observing mode").asLeft)
     }
   }
 

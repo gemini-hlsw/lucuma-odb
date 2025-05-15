@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.Monad
 import cats.effect.Resource
 import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.all.*
@@ -28,8 +29,10 @@ import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
+import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.calculatedValue.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -84,8 +87,13 @@ trait ProgramMapping[F[_]]
       SqlObject("groupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramTable.Id, GroupElementView.ProgramId)),
       SqlObject("attachments", Join(ProgramTable.Id, AttachmentTable.ProgramId)),
+
+      // OBSCALC TODO: replace with new estimate versions below
       EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
       EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
+      EffectField("timeEstimateRange2", estimateRangeHandler2, List("id")),
+      EffectField("timeEstimateBanded2", estimateBandedHandler2, List("id")),
+
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
@@ -221,18 +229,33 @@ trait ProgramMapping[F[_]]
 
   }
 
+  // OBSCALC TODO: replace with estimateRangeHandler2 below
   private lazy val estimateRangeHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, Option[CategorizedTimeRange]]("id"): pid =>
       services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
           .estimateProgramRange(pid)
 
+  private lazy val estimateRangeHandler2: EffectHandler[F] =
+    keyValueEffectHandler[Program.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): pid =>
+      services.useTransactionally:
+        timeEstimateService2(commitHash, itcClient, timeEstimateCalculator)
+          .estimateProgramRange(pid)
+
+  // OBSCALC TODO: replace with estimateBandedHandler2 below
   private lazy val estimateBandedHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, List[BandedTime]]("id"): gid =>
       services.useNonTransactionally:
         timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
           .estimateProgramBanded(gid)
           .map(_.toList.flatMap(_.toList.sortBy(_._1).map((b, t) => BandedTime(b, t))))
+
+  private lazy val estimateBandedHandler2: EffectHandler[F] =
+    keyValueEffectHandler[Program.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
+      services.useTransactionally:
+        timeEstimateService2(commitHash, itcClient, timeEstimateCalculator)
+          .estimateProgramBanded(gid)
+          .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))
 
   private val timeChargeHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, List[BandedTime]]("id") { pid =>
@@ -242,3 +265,6 @@ trait ProgramMapping[F[_]]
     }
 
 }
+
+/*
+*/

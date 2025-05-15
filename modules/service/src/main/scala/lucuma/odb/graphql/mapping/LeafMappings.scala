@@ -43,6 +43,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.EditType
@@ -102,13 +103,15 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Tag](FilterTypeType),
-      LeafMapping[F2Disperser](F2DisperserType),
-      LeafMapping[F2Filter](F2FilterType),
-      LeafMapping[F2Fpu](F2FpuType),
-      LeafMapping[F2ReadMode](F2ReadModeType),
-      LeafMapping[F2Decker](F2DeckerType),
-      LeafMapping[F2ReadoutMode](F2ReadoutModeType),
-      LeafMapping[F2Reads](F2ReadsType),
+      LeafMapping[Flamingos2CustomSlitWidth](Flamingos2CustomSlitWidthType),
+      LeafMapping[Flamingos2Disperser](Flamingos2DisperserType),
+      LeafMapping[Flamingos2Filter](Flamingos2FilterType),
+      LeafMapping[Flamingos2Fpu](Flamingos2FpuType),
+      LeafMapping[Flamingos2LyotWheel](Flamingos2LyotWheelType),
+      LeafMapping[Flamingos2ReadMode](Flamingos2ReadModeType),
+      LeafMapping[Flamingos2Decker](Flamingos2DeckerType),
+      LeafMapping[Flamingos2ReadoutMode](Flamingos2ReadoutModeType),
+      LeafMapping[Flamingos2Reads](Flamingos2ReadsType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),
@@ -146,6 +149,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
+      LeafMapping[CalculationState](CalculationStateType),
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),

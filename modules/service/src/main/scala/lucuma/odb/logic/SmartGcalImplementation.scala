@@ -12,12 +12,14 @@ import cats.syntax.traverse.*
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
 
 object SmartGcalImplementation {
@@ -90,6 +92,13 @@ object SmartGcalImplementation {
   }
 
   class ForInstrument[F[_]: Concurrent](service: SmartGcalService[F]) {
+
+    val flamingos2: SmartGcalExpander[F, Flamingos2DynamicConfig] =
+      new Expander[F, Flamingos2.TableKey, Flamingos2DynamicConfig](
+        Flamingos2.TableKey.fromDynamicConfig,
+        _.format,
+        service.selectFlamingos2
+      )
 
     val gmosNorth: SmartGcalExpander[F, GmosNorth] =
       new Expander[F, Gmos.SearchKey.North, GmosNorth](

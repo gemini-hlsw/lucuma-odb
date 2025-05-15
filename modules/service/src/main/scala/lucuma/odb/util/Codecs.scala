@@ -38,6 +38,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -334,6 +335,9 @@ trait Codecs {
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
+
+  val calculation_state: Codec[CalculationState] =
+    enumerated(Type("e_calculation_state"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]

@@ -43,3 +43,6 @@ def observationIdIn(
   void"c_observation_id IN (" |+|
     oids.map(sql"$observation_id").intercalate(void", ") |+|
   void")"
+
+def encodeColumns(prefix: Option[String], columns: List[String]): String =
+  columns.map(c => s"${prefix.foldMap(_ + ".")}$c").intercalate(",\n")

@@ -69,12 +69,17 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
+import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
 import lucuma.odb.json.stepconfig.given
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.CalibrationsService
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.Services
+import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
@@ -87,6 +92,20 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 trait DatabaseOperations { this: OdbSuite =>
+
+  // Executes the obscalc update for an observation on demand.  In production,
+  // this is handled by a background worker but for testing it is useful to
+  // trigger an update on demand.
+  def runObscalcUpdateAs(user: User, pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    withServices(user): services =>
+      TimeEstimateCalculatorImplementation
+        .fromSession(services.session, services.enums)
+        .flatMap: tec =>
+          given Services[IO] = services
+          requireServiceAccessOrThrow:
+            obscalcService(CommitHash.Zero, itcClient, tec)
+              .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
+      .void
 
   def createCallForProposalsAs(
      user:        User,
@@ -556,6 +575,26 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
+      case ObservingModeType.Flamingos2LongSlit =>
+        """{
+        mode: SPECTROSCOPY
+        spectroscopy: {
+          wavelength: { nanometers: 1200 }
+          resolution: 100
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }"""
+      case ObservingModeType.GmosNorthImaging |
+           ObservingModeType.GmosSouthImaging =>
+        """{}"""
       case ObservingModeType.GmosNorthLongSlit |
            ObservingModeType.GmosSouthLongSlit =>
         """{
@@ -574,26 +613,20 @@ trait DatabaseOperations { this: OdbSuite =>
           focalPlaneAngle: { microarcseconds: 0 }
         }
       }"""
-      case ObservingModeType.Flamingos2LongSlit =>
-        """{
-        mode: SPECTROSCOPY
-        spectroscopy: {
-          wavelength: { nanometers: 1200 }
-          resolution: 100
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0
-              at: { nanometers: 1210 }
-            }
-          }
-          wavelengthCoverage: { nanometers: 20 }
-          focalPlane: SINGLE_SLIT
-          focalPlaneAngle: { microarcseconds: 0 }
-        }
-      }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case ObservingModeType.Flamingos2LongSlit =>
+        """{
+          flamingos2LongSlit: {
+            disperser: R1200_HK
+            filter: Y
+            fpu: LONG_SLIT_2
+          }
+        }"""
+      case ObservingModeType.GmosNorthImaging |
+           ObservingModeType.GmosSouthImaging =>
+        """{}"""
       case ObservingModeType.GmosNorthLongSlit =>
         """{
           gmosNorthLongSlit: {
@@ -610,14 +643,6 @@ trait DatabaseOperations { this: OdbSuite =>
             filter: R_PRIME
             fpu: LONG_SLIT_0_50
             centralWavelength: { nanometers: 500 }
-          }
-        }"""
-      case ObservingModeType.Flamingos2LongSlit =>
-        """{
-          flamingos2LongSlit: {
-            disperser: R1200_HK
-            filter: Y
-            fpu: LONG_SLIT_2
           }
         }"""
 
@@ -1076,7 +1101,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
     }
 
-  protected def dynamicConfig(instrument: Instrument): String =
+  protected def dynamicConfigGmos(instrument: Instrument): String =
     s"""
       ${instrument.fieldName}: {
         exposure: {
@@ -1107,6 +1132,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       }
     """
+
+  protected def dynamicConfigFlamingos2(instrument: Instrument): String =
+    s"""
+      ${instrument.fieldName}: {
+        exposure: {
+          seconds: 1200,
+        },
+        disperser: R1200_JH,
+        filter: Y,
+        readMode: MEDIUM,
+        lyotWheel: F16,
+        mask: {
+          builtin: LONG_SLIT_1
+        }
+      }
+    """
+
+  protected def dynamicConfig(instrument: Instrument): String =
+    instrument match
+      case Instrument.Flamingos2 => dynamicConfigFlamingos2(instrument)
+      case Instrument.GmosNorth  => dynamicConfigGmos(instrument)
+      case Instrument.GmosSouth  => dynamicConfigGmos(instrument)
+      case _                     => "Unexpected instrument"
 
   val stepConfigScienceInput: String =
     """
