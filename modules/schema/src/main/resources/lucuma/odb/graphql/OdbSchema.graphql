@@ -6737,6 +6737,12 @@ type ExecutionConfig {
   instrument: Instrument!
 
   """
+  Flamingos 2 execution config.  This will be null unless the `instrument` is
+  `FLAMINGOS2`.
+  """
+  flamingos2: Flamingos2ExecutionConfig
+
+  """
   GMOS North execution config.  This will be null unless the `instrument` is
   `GMOS_NORTH`.
   """

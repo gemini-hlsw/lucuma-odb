@@ -89,7 +89,7 @@ trait Flamingos2Codec:
         d <- c.downField("disperser").as[Option[Flamingos2Disperser]]
         f <- c.downField("filter").as[Flamingos2Filter]
         r <- c.downField("readMode").as[Flamingos2ReadMode]
-        l <- c.downField("lyot").as[Flamingos2LyotWheel]
+        l <- c.downField("lyotWheel").as[Flamingos2LyotWheel]
         u <- c.downField("mask").as[Flamingos2FpuMask]
         m <- c.downField("readoutMode").as[Option[Flamingos2ReadoutMode]]
         s <- c.downField("reads").as[Option[Flamingos2Reads]]
@@ -102,7 +102,7 @@ trait Flamingos2Codec:
         "disperser"   -> a.disperser.asJson,
         "filter"      -> a.filter.asJson,
         "readMode"    -> a.readMode.asJson,
-        "lyot"        -> a.lyot.asJson,
+        "lyotWheel"   -> a.lyot.asJson,
         "mask"        -> a.fpu.asJson,
         "readoutMode" -> a.readoutMode.asJson,
         "reads"       -> a.reads.asJson
