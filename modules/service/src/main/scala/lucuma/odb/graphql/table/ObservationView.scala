@@ -79,18 +79,18 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
             val Value: ColumnRef       = col("c_spec_wavelength",    wavelength_pm.embedded)
 
           object ExposureTimeMode:
-            val SyntheticId: ColumnRef   = col("c_spec_exp_time_mode_id", observation_id.embedded)
+            val SyntheticId: ColumnRef   = col("c_exp_time_mode_id", observation_id.embedded)
 
             object SignalToNoise:
-              val SyntheticId: ColumnRef = col("c_spec_signal_to_noise_id", observation_id.embedded)
-              val Value: ColumnRef       = col("c_spec_signal_to_noise",    signal_to_noise.embedded)
-              val At: ColumnRef          = col("c_spec_signal_to_noise_at", wavelength_pm.embedded)
+              val SyntheticId: ColumnRef = col("c_etm_signal_to_noise_id", observation_id.embedded)
+              val Value: ColumnRef       = col("c_etm_signal_to_noise",    signal_to_noise.embedded)
+              val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
 
             object TimeAndCount:
-              val SyntheticId: ColumnRef = col("c_spec_time_and_count_id",  observation_id.embedded)
-              val Time: ColumnRef        = col("c_spec_exp_time",           time_span.embedded)
-              val Count: ColumnRef       = col("c_spec_exp_count",          int4_nonneg.embedded)
-              val At: ColumnRef          = col("c_spec_signal_to_noise_at", wavelength_pm.embedded)
+              val SyntheticId: ColumnRef = col("c_etm_time_and_count_id",  observation_id.embedded)
+              val Time: ColumnRef        = col("c_etm_exp_time",           time_span.embedded)
+              val Count: ColumnRef       = col("c_etm_exp_count",          int4_nonneg.embedded)
+              val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
 
           object WavelengthCoverage:
             val SyntheticId: ColumnRef = col("c_spec_wavelength_coverage_id", observation_id.embedded)

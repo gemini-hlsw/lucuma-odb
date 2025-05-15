@@ -322,7 +322,7 @@ object CalibrationsService extends CalibrationObservations {
           .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
           .traverse { (oid, props) =>
             val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(sql"c_spec_signal_to_noise_at <> $wavelength_pm")
+            val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(
