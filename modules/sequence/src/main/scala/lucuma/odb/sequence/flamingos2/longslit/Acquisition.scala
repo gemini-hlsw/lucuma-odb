@@ -6,6 +6,7 @@ package flamingos2
 package longslit
 
 import cats.Eq
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
@@ -23,6 +24,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -47,6 +49,10 @@ import java.util.UUID
  */
 object Acquisition:
 
+  extension (scienceFilter: Flamingos2Filter)
+    def toAcquisitionFilter: Flamingos2Filter =
+      Flamingos2Filter.acquisition.toList.minBy(f => scienceFilter.wavelength.diff(f.wavelength).abs)
+
   case class Steps(
     image: ProtoStep[F2],
     p10:   ProtoStep[F2],
@@ -60,14 +66,15 @@ object Acquisition:
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
-      builtin:      Flamingos2Fpu,
-      exposureTime: TimeSpan
+      exposureTime:  TimeSpan,
+      scienceFilter: Flamingos2Filter,
+      builtin:       Flamingos2Fpu
     ): Steps =
       eval:
         for
           _  <- F2.exposure    := exposureTime
           _  <- F2.disperser   := none[Flamingos2Disperser]
-          _  <- F2.filter      := Flamingos2Filter.H
+          _  <- F2.filter      := scienceFilter.toAcquisitionFilter
           _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(exposureTime)
           _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
@@ -194,5 +201,5 @@ object Acquisition:
             namespace,
             SequenceType.Acquisition
           ),
-          StepComputer.compute(config.fpu, t.exposureTime)
+          StepComputer.compute(t.exposureTime, config.filter, config.fpu)
         )
