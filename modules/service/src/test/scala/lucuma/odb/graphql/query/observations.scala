@@ -174,7 +174,7 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
-                  mode: SPECTROSCOPY
+                  spectroscopy: null
                 }
               }
             }) {
@@ -198,7 +198,6 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
-                  mode: SPECTROSCOPY
                   spectroscopy: {
                     wavelength: {
                       angstroms: 42

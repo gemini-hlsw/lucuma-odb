@@ -4301,11 +4301,6 @@ Edit science requirements
 """
 input ScienceRequirementsInput {
   """
-  The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  """
-  mode: ScienceMode
-
-  """
   The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   spectroscopy: SpectroscopyScienceRequirementsInput
@@ -4313,7 +4308,7 @@ input ScienceRequirementsInput {
   """
   The imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  imaging: SpectroscopyScienceRequirementsInput
+  imaging: ImagingScienceRequirementsInput
 }
 
 """

@@ -577,7 +577,6 @@ trait DatabaseOperations { this: OdbSuite =>
     observingMode match
       case ObservingModeType.Flamingos2LongSlit =>
         """{
-        mode: SPECTROSCOPY
         spectroscopy: {
           wavelength: { nanometers: 1200 }
           resolution: 100
@@ -598,7 +597,6 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthLongSlit |
            ObservingModeType.GmosSouthLongSlit =>
         """{
-        mode: SPECTROSCOPY
         spectroscopy: {
           wavelength: { nanometers: 500 }
           resolution: 100

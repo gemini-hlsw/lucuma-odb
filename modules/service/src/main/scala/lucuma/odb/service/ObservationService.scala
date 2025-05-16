@@ -620,7 +620,7 @@ object ObservationService {
            ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)) ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                           ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
-           scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ,
+           scienceRequirements.flatMap(_.scienceMode).getOrElse(ScienceMode.Spectroscopy)  ,
            spectroscopy.flatMap(_.wavelength.toOption)                              ,
            spectroscopy.flatMap(_.resolution.toOption)                              ,
            specExposureTimeModeType                                                 ,
@@ -866,7 +866,7 @@ object ObservationService {
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
       val upMode = sql"c_science_mode = $science_mode"
-      val ups    = in.mode.map(upMode).toList
+      val ups    = in.scienceMode.map(upMode).toList
 
       ups ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
 
