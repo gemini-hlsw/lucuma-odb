@@ -9,6 +9,7 @@ object all {
     extends CalculatedValueCodec
        with CatalogInfoCodec
        with EpochCodec
+       with Flamingos2Codec
        with GmosCodec
        with NumericCodec
        with PartnerLinkCodec
