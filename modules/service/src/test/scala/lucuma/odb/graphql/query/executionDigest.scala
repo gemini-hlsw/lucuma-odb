@@ -25,7 +25,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
@@ -645,12 +644,6 @@ class executionDigest extends ExecutionTestSupportForGmos {
             }
           """.asRight
         )
-
-  def gcalTelescopeConfig(q: Int): TelescopeConfig =
-    telescopeConfig(0, q, StepGuideState.Disabled)
-
-  def sciTelescopeConfig(q: Int): TelescopeConfig =
-    telescopeConfig(0, q, StepGuideState.Enabled)
 
   test("executionState - COMPLETED"):
     def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
