@@ -15,18 +15,13 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.json.all.transport.given
 
 class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
-
-  def acqTelescopeConfig(p: Int): TelescopeConfig =
-    telescopeConfig(p, 0, StepGuideState.Enabled)
 
   val InitialAcquisition: Json =
     json"""

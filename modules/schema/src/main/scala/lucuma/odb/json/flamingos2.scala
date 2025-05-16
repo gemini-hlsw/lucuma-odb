@@ -43,7 +43,9 @@ trait Flamingos2Codec:
         "useElectronicOffsetting" -> a.useElectronicOffseting.asJson
       )
 
-  given Decoder[Flamingos2FpuMask.Custom] =
+  // This needs an explicit name because the default, given_Decoder_Custom
+  // would clash with the default for the GMOS custom mask.
+  given given_Decoder_Flamingos2FpuMask_Custom: Decoder[Flamingos2FpuMask.Custom] =
     Decoder.instance: c =>
       for
         f <- c.downField("filename").as[String].flatMap: s =>
@@ -52,7 +54,7 @@ trait Flamingos2Codec:
         s <- c.downField("slitWidth").as[Flamingos2CustomSlitWidth]
       yield Flamingos2FpuMask.Custom(f, s)
 
-  given Encoder[Flamingos2FpuMask.Custom] =
+  given given_Encoder_Flamingos2FpuMask_Custom: Encoder[Flamingos2FpuMask.Custom] =
     Encoder.instance: a =>
       Json.obj(
         "filename"  -> a.filename.value.asJson,
