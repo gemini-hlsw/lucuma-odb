@@ -151,6 +151,12 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def acqTelescopeConfig(p: Int): TelescopeConfig =
     telescopeConfig(p, 0, StepGuideState.Enabled)
 
+  def gcalTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Disabled)
+
+  def sciTelescopeConfig(q: Int): TelescopeConfig =
+    telescopeConfig(0, q, StepGuideState.Enabled)
+
   protected def expectedTelescopeConfig(p: Int, q: Int, g: StepGuideState): Json =
     expectedTelescopeConfig(telescopeConfig(p, q, g))
 

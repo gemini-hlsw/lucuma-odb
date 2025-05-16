@@ -72,8 +72,8 @@ object Science:
           _ <- F2.decker      := config.decker
           _ <- F2.readoutMode := config.readoutMode
           _ <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
-          a <- scienceStep(0.arcsec, -15.arcsec, ObserveClass.Science)
-          b <- scienceStep(0.arcsec,  15.arcsec, ObserveClass.Science)
+          a <- scienceStep(0.arcsec,  15.arcsec, ObserveClass.Science)
+          b <- scienceStep(0.arcsec, -15.arcsec, ObserveClass.Science)
           f <- flatStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           r <- arcStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
         yield (a, b, f, r)
