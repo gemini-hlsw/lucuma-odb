@@ -3,19 +3,24 @@
 
 package lucuma.odb.graphql.query
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.enums.StepGuideState
+import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.Program
+import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
+import lucuma.odb.json.all.transport.given
 
-class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
-
-  def acqTelescopeConfig(p: Int): TelescopeConfig =
-    telescopeConfig(p, 0, StepGuideState.Enabled)
+class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
   val InitialAcquisition: Json =
     json"""
@@ -85,15 +90,15 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
       }
     """
 
-  test("initial generation") {
+  test("initial generation"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
@@ -106,20 +111,18 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
            """,
         expected = InitialAcquisition.asRight
       )
-    }
-  }
-/*
+
   test("execute first step only, reset"):
     val setup: IO[Observation.Id] =
       for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // Record the first atom and one of its steps
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
         _  <- resetAcquisitionAs(serviceUser, o)
       yield o
@@ -131,72 +134,69 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
         expected = InitialAcquisition.asRight
       )
 
-  test("execute first atom - repeat of last acq step") {
+  test("execute first atom - repeat of last acq step"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // Record the first atom with 3 steps
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Now the last acquisition step should be generated as the nextAtom
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
         expected = FineAdjustments.asRight
       )
-    }
-  }
 
-  test("execute first step only") {
+  test("execute first step only"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // Record the first atom and one of its steps
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
+      yield o
 
-      } yield o
-
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
@@ -206,14 +206,14 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
               "observation": {
                 "execution": {
                   "config": {
-                    "gmosNorth": {
+                    "flamingos2": {
                       "acquisition": {
                         "nextAtom": {
                           "description": "Initial Acquisition",
                           "observeClass": "ACQUISITION",
                           "steps": [
-                            ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                            ${flamingos2ExpectedAcq(1, 10)},
+                            ${flamingos2ExpectedAcq(2,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -221,7 +221,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                              ${flamingos2ExpectedAcq(2, 0, Breakpoint.Disabled)}
                             ]
                           }
                         ],
@@ -234,151 +234,97 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
             }
           """.asRight
       )
-    }
-  }
 
-  test("execute first and second atoms - 2nd repeat of last acq step") {
+  test("execute first and second atoms - 2nd repeat of last acq step"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // First atom with 3 steps.
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Second atom with just the last acq step
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Now we should expect to generate (again) the last acq step
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
         expected = FineAdjustments.asRight
       )
-    }
-  }
 
-  test("execute acquisition, switch to science, back to acquisition") {
+  test("execute acquisition, reset"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // Acquisition Sequence
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
-
-        // Do a science step
-        a2 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s4 <- recordStepAs(serviceUser, a2, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Science)
-        _  <- addEndStepEvent(s4)
 
         // Reset acquisition to take it from the top.
         _  <- resetAcquisitionAs(serviceUser, o)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
         expected = InitialAcquisition.asRight
       )
-    }
-  }
 
-  test("execute acquisition, make a new visit, back to acquisition") {
+  test("execute first step, second step, fail second step only"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v0 <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        // Acquisition Sequence
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v0, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
-
-        // Record a new visit, but don't execute anything
-        _  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        // Reset acquisition
-        _  <- resetAcquisitionAs(serviceUser, o)
-      } yield o
-
-    setup.flatMap { oid =>
-      expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
-        expected = InitialAcquisition.asRight
-      )
-    }
-  }
-
-  test("execute first step, second step, fail second step only") {
-    val setup: IO[Observation.Id] =
-      for {
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         // Record the first atom and two of its steps
-        a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
         // Fail the second step
@@ -386,16 +332,16 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
         _  <- setQaState(d, DatasetQaState.Usable)
 
         // We'll have to repeat the second step (index 1)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
+                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
                }
              }
            """,
@@ -405,14 +351,14 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
               "observation": {
                 "execution": {
                   "config": {
-                    "gmosNorth": {
+                    "flamingos2": {
                       "acquisition": {
                         "nextAtom": {
                           "description": "Initial Acquisition",
                           "observeClass": "ACQUISITION",
                           "steps": [
-                            ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                            ${flamingos2ExpectedAcq(1, 10)},
+                            ${flamingos2ExpectedAcq(2,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -420,7 +366,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${gmosNorthExpectedAcq(2, 0)}
+                              ${flamingos2ExpectedAcq(2, 0)}
                             ]
                           }
                         ],
@@ -433,72 +379,29 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
             }
           """.asRight
       )
-    }
-  }
-
-  def firstScienceStepId(p: Program.Id, o: Observation.Id): IO[Step.Id] =
-    import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.gmosNorthScience.nextAtom.steps.head.id)
-
-  test("science step ids do not change while executing acquisition"):
-    val execAcq: IO[Set[Step.Id]] =
-      for
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-
-        x0 <- firstScienceStepId(p, o)
-
-        // First atom with 3 steps.
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s0)
-
-        x1 <- firstScienceStepId(p, o)
-
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s1)
-
-        x1 <- firstScienceStepId(p, o)
-
-        s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s2)
-
-        x2 <- firstScienceStepId(p, o)
-
-        // Second atom with just the last acq step
-        a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthAcq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
-        _  <- addEndStepEvent(s3)
-
-        x3 <- firstScienceStepId(p, o)
-      yield Set(x0, x1, x2, x3)
-
-    assertIO(execAcq.map(_.size), 1)
 
   def nextAtomStepIds(p: Program.Id, o: Observation.Id): IO[NonEmptyList[Step.Id]] =
     import lucuma.odb.testsyntax.execution.*
-    generateOrFail(p, o, 5.some).map(_.gmosNorthAcquisition.nextAtom.steps.map(_.id))
+    generateOrFail(p, o, 5.some).map(_.flamingos2Acquisition.nextAtom.steps.map(_.id))
 
   test("nextAtom step ids don't change while executing"):
     val execAcq: IO[List[NonEmptyList[Step.Id]]] =
       for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
-        o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
+        o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        v  <- recordVisitAs(serviceUser, Instrument.Flamingos2, o)
 
         x0 <- nextAtomStepIds(p, o)
 
         // First atom with 3 steps.
-        a0 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
 
         x1 <- nextAtomStepIds(p, o)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthAcq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
         x2 <- nextAtomStepIds(p, o)
@@ -507,27 +410,3 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2 {
     execAcq.map: ids =>
       ids.zip(ids.tail).foreach: (before, after) =>
         assertEquals(before.tail, after.toList, s"before: $before, after: $after")
-
-  test("reset can only be done by staff or better"):
-    for
-      p <- createProgram
-      t <- createTargetWithProfileAs(pi, p)
-      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _ <- expect(
-        user  = pi,
-        query = s"""
-          mutation {
-            resetAcquisition(input: {
-              observationId: "$o"
-            }) {
-              observation { id }
-            }
-          }
-        """,
-        expected = List(
-          s"User ${pi.id} is not authorized to perform this operation."
-        ).asLeft
-      )
-    yield ()
-*/
-}
