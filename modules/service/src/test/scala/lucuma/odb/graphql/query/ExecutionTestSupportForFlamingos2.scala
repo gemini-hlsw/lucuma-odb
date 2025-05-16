@@ -6,6 +6,7 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -34,6 +35,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
@@ -43,6 +45,12 @@ import natchez.Trace.Implicits.noop
 import skunk.Session
 
 trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
+
+  override def fakeItcSpectroscopyResult: IntegrationTime =
+    IntegrationTime(
+      20.secondTimeSpan,
+      NonNegInt.unsafeFrom(4)
+    )
 
   val f2_key_JH1: Flamingos2.TableKey =
     Flamingos2.TableKey(
@@ -149,6 +157,12 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       Flamingos2ReadMode.Bright.readCount
     )
 
+  val Flamingos2Arc: Flamingos2DynamicConfig =
+    Flamingos2Science.copy(exposure = f2_arc_JH1.instrumentConfig.exposureTime)
+
+  val Flamingos2Flat: Flamingos2DynamicConfig =
+    Flamingos2Science.copy(exposure = f2_flat_JH1.instrumentConfig.exposureTime)
+
   val Flamingos2Acq0: Flamingos2DynamicConfig =
     Flamingos2Science.copy(
       exposure  = fakeItcImagingResult.exposureTime,
@@ -178,10 +192,10 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       case _ => sys.error("Only 3 steps in a Flamingos 2 Acq")
 
   val Flamingos2FlatStep: StepConfig.Gcal =
-    StepConfig.Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Nd20, GcalDiffuser.Ir, GcalShutter.Open)
+    f2_flat_JH1.gcalConfig
 
   val Flamingos2ArcStep: StepConfig.Gcal  =
-    StepConfig.Gcal(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed)
+    f2_arc_JH1.gcalConfig
 
   protected def flamingos2ExpectedInstrumentConfig(f2: Flamingos2DynamicConfig): Json =
     json"""
@@ -213,3 +227,55 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
         "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
     """
+
+  protected def flamingos2ExpectedArc(p: Int, q: Int): Json =
+    json"""
+      {
+        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(Flamingos2Arc)},
+        "stepConfig" : {
+          "stepType": "GCAL",
+          "continuum" : null,
+          "arcs" : ${f2_arc_JH1.gcalConfig.lamp.arcs.map(_.toList) }
+        },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
+        "observeClass" : "NIGHT_CAL",
+        "breakpoint": "DISABLED"
+      }
+    """
+
+  protected def flamingos2ExpectedFlat(p: Int, q: Int): Json =
+    json"""
+      {
+        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(Flamingos2Flat)},
+        "stepConfig" : {
+          "stepType": "GCAL",
+          "continuum" : ${f2_flat_JH1.gcalConfig.lamp.continuum},
+          "arcs" : []
+        },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Disabled)},
+        "observeClass" : "NIGHT_CAL",
+        "breakpoint": "DISABLED"
+      }
+
+    """
+
+  protected def flamingos2ExpectedScience(p: Int, q: Int): Json =
+    json"""
+      {
+        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(Flamingos2Science)},
+        "stepConfig": { "stepType": "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
+        "observeClass": "SCIENCE",
+        "breakpoint": "DISABLED"
+      }
+    """
+
+  protected def flamingos2ExpectedScienceAtom(a: (Int, Int), b: (Int, Int)): Json =
+    val sciSteps  = List(a, b, b, a).map((p, q) => flamingos2ExpectedScience(p, q))
+    val gcalSteps = List(flamingos2ExpectedFlat(a._1, a._2), flamingos2ExpectedArc(a._1, a._2))
+
+    Json.obj(
+      "description" -> s"Long Slit 1px, JH, R1200JH".asJson,
+      "observeClass" -> "SCIENCE".asJson,
+      "steps" -> (sciSteps ++ gcalSteps).asJson
+    )
