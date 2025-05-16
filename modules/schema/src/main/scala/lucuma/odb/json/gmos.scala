@@ -123,7 +123,9 @@ trait GmosCodec {
       } yield GmosCcdMode(x, y, n, g, m)
     }
 
-  given Decoder[GmosFpuMask.Custom] =
+  // This needs an explicit name because the default, given_Decoder_Custom
+  // would clash with the default for the Flamingos2 custom mask.
+  given given_Decoder_GmosFpuMask_Custom: Decoder[GmosFpuMask.Custom] =
     Decoder.instance { c =>
       for {
         f <- c.downField("filename").as[String].flatMap { s =>
@@ -196,7 +198,7 @@ trait GmosCodec {
       )
     }
 
-  given Encoder[GmosFpuMask.Custom] =
+  given given_Encoder_GmosFpuMask_Custom: Encoder[GmosFpuMask.Custom] =
     Encoder.instance { (a: GmosFpuMask.Custom) =>
       Json.obj(
         "filename"  -> a.filename.value.asJson,
