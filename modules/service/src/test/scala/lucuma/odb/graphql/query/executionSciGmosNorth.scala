@@ -15,7 +15,6 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -26,7 +25,6 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -39,13 +37,7 @@ import lucuma.odb.util.Codecs.step_id
 import skunk.*
 import skunk.implicits.*
 
-class executionSci extends ExecutionTestSupportForGmos {
-
-  def gcalTelescopeConfig(q: Int): TelescopeConfig =
-    telescopeConfig(0, q, StepGuideState.Disabled)
-
-  def sciTelescopeConfig(q: Int): TelescopeConfig =
-    telescopeConfig(0, q, StepGuideState.Enabled)
+class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
