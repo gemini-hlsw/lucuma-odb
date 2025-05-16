@@ -332,7 +332,6 @@ object CalibrationsService extends CalibrationObservations {
                     scienceBand         = Nullable.orAbsent(props.band),
                     scienceRequirements = props.wavelengthAt.map: w =>
                       ScienceRequirementsInput(
-                        mode         = None,
                         spectroscopy = Some(
                           SpectroscopyScienceRequirementsInput.Default.copy(
                             exposureTimeMode = Nullable.NonNull(
@@ -342,7 +341,8 @@ object CalibrationsService extends CalibrationObservations {
                               )
                             )
                           )
-                        )
+                        ),
+                        imaging      = None
                       )
                   ),
                   // Important: Only update the obs that need it or it will produce a cascade of infinite updates
