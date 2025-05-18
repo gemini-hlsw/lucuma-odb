@@ -9201,6 +9201,15 @@ input ImagingScienceRequirementsInput {
   """
   broadFilters: Boolean
 
+  """
+  The GMOS North configuration.  Null for other instruments.
+  """
+  gmosNorth: ImagingScienceRequirementsGmosNorthInput
+
+  """
+  The GMOS South configuration.  Null for other instruments.
+  """
+  gmosSouth: ImagingScienceRequirementsGmosSouthInput
 }
 
 type ImagingScienceRequirements {
@@ -9208,7 +9217,7 @@ type ImagingScienceRequirements {
   ExposureTimeMode, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  exposureTimeMode: ExposureTimeMode
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   minimumFov, which may be unset by assigning a null value, or ignored by
@@ -9240,8 +9249,16 @@ type ImagingScienceRequirements {
 
 }
 
+input ImagingScienceRequirementsGmosNorthInput {
+  filters: [GmosNorthFilter!]!
+}
+
 type ImagingScienceRequirementsGmosNorth {
   filters: [GmosNorthFilter!]!
+}
+
+input ImagingScienceRequirementsGmosScienceInput {
+  filters: [GmosSouthFilter!]!
 }
 
 type ImagingScienceRequirementsGmosSouth {

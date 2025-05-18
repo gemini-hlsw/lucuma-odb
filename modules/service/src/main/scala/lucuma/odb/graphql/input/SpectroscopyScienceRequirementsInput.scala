@@ -7,6 +7,7 @@ package input
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
@@ -25,7 +26,9 @@ final case class SpectroscopyScienceRequirementsInput(
   focalPlane:         Nullable[FocalPlane],
   focalPlaneAngle:    Nullable[Angle],
   capability:         Nullable[SpectroscopyCapabilities]
-)
+) {
+  val scienceMode: ScienceMode = ScienceMode.Spectroscopy
+}
 
 object SpectroscopyScienceRequirementsInput:
 
