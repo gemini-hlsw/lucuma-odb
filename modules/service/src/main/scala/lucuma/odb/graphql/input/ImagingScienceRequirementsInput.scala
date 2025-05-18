@@ -5,51 +5,81 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.ScienceMode
 import lucuma.core.math.Angle
-import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.odb.data.Nullable
+import lucuma.odb.graphql.binding.BooleanBinding
+import lucuma.odb.graphql.binding.GmosNorthFilterBinding
+import lucuma.odb.graphql.binding.GmosSouthFilterBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.PosIntBinding
-import lucuma.odb.graphql.binding.enumeratedBinding
 
-final case class ImagingScienceRequirementsInput(
-  wavelength:         Nullable[Wavelength],
-  resolution:         Nullable[PosInt],
-  exposureTimeMode:   Nullable[ExposureTimeMode],
-  wavelengthCoverage: Nullable[Wavelength],
-  focalPlane:         Nullable[FocalPlane],
-  focalPlaneAngle:    Nullable[Angle],
-)
+case class ImagingScienceRequirementsInput(
+  exposureTimeMode: Nullable[ExposureTimeMode],
+  minimumFov:   Nullable[Angle],
+  narrowFilters: Nullable[Boolean],
+  broadFilters:  Nullable[Boolean],
+  gmosNorth:    Nullable[ImagingGmosNorthScienceRequirementsInput],
+  gmosSouth:    Nullable[ImagingGmosSouthScienceRequirementsInput]
+) {
+  val scienceMode: ScienceMode = ScienceMode.Imaging
+}
 
 object ImagingScienceRequirementsInput:
 
   val Default: ImagingScienceRequirementsInput =
     ImagingScienceRequirementsInput(
-      wavelength         = Nullable.Null,
-      resolution         = Nullable.Null,
-      exposureTimeMode   = Nullable.Null,
-      wavelengthCoverage = Nullable.Null,
-      focalPlane         = Nullable.Null,
-      focalPlaneAngle    = Nullable.Null,
+      exposureTimeMode = Nullable.Null,
+      minimumFov       = Nullable.Null,
+      narrowFilters    = Nullable.Null,
+      broadFilters     = Nullable.Null,
+      gmosNorth        = Nullable.Null,
+      gmosSouth        = Nullable.Null
     )
-
-  val FocalPlaneBinding: Matcher[FocalPlane] =
-    enumeratedBinding[FocalPlane]
 
   val Binding: Matcher[ImagingScienceRequirementsInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        WavelengthInput.Binding.Nullable("wavelength", rWavelength),
-        PosIntBinding.Nullable("resolution", rResolution),
         ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rExposureTimeMode),
-        WavelengthInput.Binding.Nullable("wavelengthCoverage", rWavelengthCoverage),
-        FocalPlaneBinding.Nullable("focalPlane", rFocalPlane),
-        AngleInput.Binding.Nullable("focalPlaneAngle", rFocalPlaneAngle),
+        AngleInput.Binding.Nullable("minimumFov", rMinimumFov),
+        BooleanBinding.Nullable("narrowFilters", rNarrowFilter),
+        BooleanBinding.Nullable("broadFilters", rBroadFilter),
+        ImagingGmosNorthScienceRequirementsInput.Binding.Nullable("gmosNorth", rGmosNorth),
+        ImagingGmosSouthScienceRequirementsInput.Binding.Nullable("gmosSouth", rGmosSouth)
       ) =>
-        (rWavelength, rResolution, rExposureTimeMode, rWavelengthCoverage, rFocalPlane, rFocalPlaneAngle)
+        (rExposureTimeMode, rMinimumFov, rNarrowFilter, rBroadFilter, rGmosNorth, rGmosSouth)
           .parMapN(ImagingScienceRequirementsInput.apply)
+    }
+
+case class ImagingGmosNorthScienceRequirementsInput(filters: Option[List[GmosNorthFilter]])
+
+object ImagingGmosNorthScienceRequirementsInput:
+
+  val Default: ImagingGmosNorthScienceRequirementsInput =
+    ImagingGmosNorthScienceRequirementsInput(None)
+
+  val Binding: Matcher[ImagingGmosNorthScienceRequirementsInput] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        GmosNorthFilterBinding.List.Option("filters", rFilters),
+      ) =>
+        rFilters.map(ImagingGmosNorthScienceRequirementsInput.apply)
+    }
+
+case class ImagingGmosSouthScienceRequirementsInput(filters: Option[List[GmosSouthFilter]])
+
+object ImagingGmosSouthScienceRequirementsInput:
+
+  val Default: ImagingGmosSouthScienceRequirementsInput =
+    ImagingGmosSouthScienceRequirementsInput(None)
+
+  val Binding: Matcher[ImagingGmosSouthScienceRequirementsInput] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        GmosSouthFilterBinding.List.Option("filters", rFilters),
+      ) =>
+        rFilters.map(ImagingGmosSouthScienceRequirementsInput.apply)
     }

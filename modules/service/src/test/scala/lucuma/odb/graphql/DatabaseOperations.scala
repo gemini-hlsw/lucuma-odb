@@ -593,7 +593,21 @@ trait DatabaseOperations { this: OdbSuite =>
       }"""
       case ObservingModeType.GmosNorthImaging |
            ObservingModeType.GmosSouthImaging =>
-        """{}"""
+        """{
+        imaging: {
+          minimumFov: {
+            arcseconds: 100
+          },
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          narrowFilters: false,
+          broadFilters: false
+        }
+      }"""
       case ObservingModeType.GmosNorthLongSlit |
            ObservingModeType.GmosSouthLongSlit =>
         """{
@@ -624,7 +638,7 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GmosNorthImaging |
            ObservingModeType.GmosSouthImaging =>
-        """{}"""
+        """null"""
       case ObservingModeType.GmosNorthLongSlit =>
         """{
           gmosNorthLongSlit: {

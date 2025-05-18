@@ -57,6 +57,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
+import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ObservingModeInput
@@ -69,6 +70,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.boolean.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -589,17 +591,20 @@ object ObservationService {
         val spectroscopy: Option[SpectroscopyScienceRequirementsInput] =
           scienceRequirements.flatMap(_.spectroscopy)
 
-        val specExposureTimeMode: Option[ExposureTimeMode] =
-          spectroscopy.flatMap(_.exposureTimeMode.toOption)
+        val imaging: Option[ImagingScienceRequirementsInput] =
+          scienceRequirements.flatMap(_.imaging)
 
-        val specExposureTimeModeType: Option[ExposureTimeModeType] =
-          specExposureTimeMode.map(_.tpe)
+        val exposureTimeMode: Option[ExposureTimeMode] =
+          spectroscopy.flatMap(_.exposureTimeMode.toOption).orElse(imaging.flatMap(_.exposureTimeMode.toOption)) //.flatMap(_.exposureTimeMode.toOption)
 
-        val specSignalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
-          specExposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
+        val exposureTimeModeType: Option[ExposureTimeModeType] =
+          exposureTimeMode.map(_.tpe)
 
-        val specTimeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
-          specExposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
+        val signalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
+          exposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
+
+        val timeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
+          exposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
 
         InsertObservation.apply(
           programId    ,
@@ -623,15 +628,18 @@ object ObservationService {
            scienceRequirements.flatMap(_.scienceMode).getOrElse(ScienceMode.Spectroscopy)  ,
            spectroscopy.flatMap(_.wavelength.toOption)                              ,
            spectroscopy.flatMap(_.resolution.toOption)                              ,
-           specExposureTimeModeType                                                 ,
-           specExposureTimeMode.map(_.at)                                           ,
-           specSignalToNoiseExposureTimeMode.map(_.value)                           ,
-           specTimeAndCountExposureTimeMode.map(_.time)                             ,
-           specTimeAndCountExposureTimeMode.map(_.count)                            ,
+           exposureTimeModeType                                                 ,
+           exposureTimeMode.map(_.at)                                           ,
+           signalToNoiseExposureTimeMode.map(_.value)                           ,
+           timeAndCountExposureTimeMode.map(_.time)                             ,
+           timeAndCountExposureTimeMode.map(_.count)                            ,
            spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ,
            spectroscopy.flatMap(_.focalPlane.toOption)                              ,
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
            spectroscopy.flatMap(_.capability.toOption)                              ,
+           imaging.flatMap(_.minimumFov.toOption)                         ,
+           imaging.flatMap(_.narrowFilters.toOption)                         ,
+           imaging.flatMap(_.broadFilters.toOption)                         ,
            modeType                                                                 ,
            instrument                                                               ,
            observerNotes                                                            ,
@@ -657,8 +665,8 @@ object ObservationService {
       Angle                            ,
       Option[RightAscension]           ,
       Option[Declination]              ,
-      CloudExtinction.Preset            ,
-      ImageQuality.Preset               ,
+      CloudExtinction.Preset           ,
+      ImageQuality.Preset              ,
       SkyBackground                    ,
       WaterVapor                       ,
       Option[PosBigDecimal]            ,
@@ -677,6 +685,9 @@ object ObservationService {
       Option[FocalPlane]               ,
       Option[Angle]                    ,
       Option[SpectroscopyCapabilities] ,
+      Option[Angle]                    ,
+      Option[Boolean]                  ,
+      Option[Boolean]                  ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
@@ -713,6 +724,9 @@ object ObservationService {
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters,
           c_observing_mode_type,
           c_instrument,
           c_observer_notes
@@ -748,6 +762,9 @@ object ObservationService {
           ${focal_plane.opt},
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
+          ${angle_µas.opt},
+          ${bool.opt},
+          ${bool.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
           ${text_nonempty.opt}
