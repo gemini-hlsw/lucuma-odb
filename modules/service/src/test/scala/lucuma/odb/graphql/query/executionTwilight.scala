@@ -291,7 +291,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       query = s"""
         query {
           program(programId: "$p") {
-            timeEstimateRange2 {
+            timeEstimateRange {
               value {
                 maximum {
                   program { seconds }
@@ -304,7 +304,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
         }
       """
     ).map: json =>
-      json.hcursor.downFields("program", "timeEstimateRange2", "value", "maximum").require[CategorizedTime]
+      json.hcursor.downFields("program", "timeEstimateRange", "value", "maximum").require[CategorizedTime]
 
   // OBSCALC TODO: this will be work with the obscalc digest when the API is updated
   def obsTimeEstimate(oid: Observation.Id): IO[CategorizedTime] =
