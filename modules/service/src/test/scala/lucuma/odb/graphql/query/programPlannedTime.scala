@@ -137,7 +137,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -150,7 +150,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : $ShortTime }
@@ -182,7 +182,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -195,7 +195,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": null,
@@ -228,7 +228,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -241,7 +241,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": "BAND2",
@@ -274,7 +274,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -287,7 +287,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : 0.000000 }
@@ -321,7 +321,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -334,7 +334,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : ${ShortTime * 2} }
@@ -369,7 +369,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -382,7 +382,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": "BAND1",
@@ -417,7 +417,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -430,7 +430,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": "BAND1",
@@ -473,7 +473,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -486,7 +486,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": null,
@@ -529,7 +529,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -542,7 +542,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : $ShortTime }
@@ -576,7 +576,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -589,7 +589,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                 "timeEstimateRange2": {
+                 "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : $ShortTime }
@@ -623,7 +623,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -636,7 +636,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : $ShortTime }
@@ -672,7 +672,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange2 {
+                     timeEstimateRange {
                        value {
                          minimum { total { seconds } }
                          maximum { total { seconds } }
@@ -690,7 +690,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange2": {
+                      "timeEstimateRange": {
                         "value": {
                           "minimum": {
                             "total": { "seconds" : $ShortTime }
@@ -728,7 +728,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -741,7 +741,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": "BAND3",
@@ -777,7 +777,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -790,7 +790,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : ${ShortTime * 2} }
@@ -827,7 +827,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateBanded2 {
+                 timeEstimateBanded {
                    value {
                      band
                      time { total { seconds } }
@@ -840,7 +840,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateBanded2": [
+                "timeEstimateBanded": [
                   {
                     "value": {
                       "band": "BAND1",
@@ -876,7 +876,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -889,7 +889,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : $ShortTime }
@@ -927,7 +927,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange2 {
+                     timeEstimateRange {
                        value {
                          minimum { total { seconds } }
                          maximum { total { seconds } }
@@ -945,7 +945,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange2": {
+                      "timeEstimateRange": {
                         "value": {
                           "minimum": {
                             "total": { "seconds" : $ShortTime }
@@ -984,7 +984,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -997,7 +997,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : 0.000000 }
@@ -1039,7 +1039,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           s"""
              query {
                program(programId: "$pid") {
-                 timeEstimateRange2 {
+                 timeEstimateRange {
                    value {
                      minimum { total { seconds } }
                      maximum { total { seconds } }
@@ -1052,7 +1052,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           json"""
             {
               "program": {
-                "timeEstimateRange2": {
+                "timeEstimateRange": {
                   "value": {
                     "minimum": {
                       "total": { "seconds" : ${ShortTime * 2} }
@@ -1096,7 +1096,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateRange2 {
+                     timeEstimateRange {
                        value {
                          minimum { total { seconds } }
                          maximum { total { seconds } }
@@ -1114,7 +1114,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateRange2": {
+                      "timeEstimateRange": {
                         "value": {
                           "minimum": {
                             "total" : {
@@ -1132,7 +1132,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                   },
                   {
                     "group": {
-                      "timeEstimateRange2": {
+                      "timeEstimateRange": {
                         "value": {
                           "minimum": {
                             "total": { "seconds" : $ShortTime }
@@ -1180,7 +1180,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                program(programId: "$pid") {
                  groupElements {
                    group {
-                     timeEstimateBanded2 {
+                     timeEstimateBanded {
                        value {
                          band
                          time { total { seconds } }
@@ -1198,7 +1198,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                 "groupElements": [
                   {
                     "group": {
-                      "timeEstimateBanded2": [
+                      "timeEstimateBanded": [
                         {
                           "value": {
                             "band": null,
@@ -1216,7 +1216,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
                   },
                   {
                     "group": {
-                      "timeEstimateBanded2": [
+                      "timeEstimateBanded": [
                         {
                           "value": {
                             "band": null,
