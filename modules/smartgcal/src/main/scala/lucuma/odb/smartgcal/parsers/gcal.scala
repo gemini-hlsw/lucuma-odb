@@ -55,6 +55,7 @@ trait GcalParsers:
       "ND2.0"        -> GcalFilter.Nd20,
       "ND3.0"        -> GcalFilter.Nd30,
       "ND4.0"        -> GcalFilter.Nd40,
+      "ND4.5"        -> GcalFilter.Nd45,
       "ND4-5"        -> GcalFilter.Nd45,
       "ND5.0"        -> GcalFilter.Nd45, // 5.0 was removed
       "GMOS balance" -> GcalFilter.Gmos,

@@ -12,7 +12,6 @@ import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.Legacy
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 
-
 trait SmartGcalFileParsers {
   import common.*
 
