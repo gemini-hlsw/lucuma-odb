@@ -1739,7 +1739,7 @@ class createObservation extends OdbSuite {
                       at: { micrometers: 2.5 }
                     }
                   }
-                  minimumFov: { picometers: 100000 }
+                  minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
                 }
@@ -1750,13 +1750,7 @@ class createObservation extends OdbSuite {
               scienceRequirements {
                 mode
                 imaging {
-                  minimumFov { picometers }
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at { nanometers }
-                    }
-                  }
+                  minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
                 }
@@ -1769,29 +1763,23 @@ class createObservation extends OdbSuite {
         val reqs: ACursor =
           js.hcursor.downPath("createObservation", "observation", "scienceRequirements")
 
-        val spectroscopy: ACursor =
-          reqs.downField("spectroscopy")
+        val imaging: ACursor =
+          reqs.downField("imaging")
+
+        println(imaging.focus)
 
         assertIO(
           (reqs.downIO[ScienceMode]("mode"),
-           spectroscopy.downIO[Long]("wavelength", "picometers"),
-           spectroscopy.downIO[Int]("resolution"),
-           spectroscopy.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
-           spectroscopy.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
-           spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
-           spectroscopy.downIO[FocalPlane]("focalPlane"),
-           spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),
-           spectroscopy.downIO[Option[SpectroscopyCapabilities]]("capability")
+           // imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           // imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
+           imaging.downIO[Boolean]("narrowFilters"),
+           imaging.downIO[Boolean]("broadFilters"),
           ).tupled,
-          (ScienceMode.Spectroscopy,
-           400_000L,
-           200,
-           BigDecimal("75.50"),
-           2_500L,
-           BigDecimal("0.1"),
-           FocalPlane.SingleSlit,
-           3,
-           Option.empty[SpectroscopyCapabilities]
+          (ScienceMode.Imaging,
+           BigDecimal("330"),
+           true,
+           true
           )
         )
       }
