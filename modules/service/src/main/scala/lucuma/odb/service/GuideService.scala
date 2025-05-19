@@ -22,6 +22,7 @@ import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
 import lucuma.catalog.votable.*
+import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.PortDisposition
@@ -46,6 +47,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -276,8 +278,8 @@ object GuideService {
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
       case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
-      case mode: flamingos2.longslit.Config =>
-        ???
+      case mode: flamingos2.longslit.Config     =>
+        (Site.GS, AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(mode.fpu), PortDisposition.Side), mode.filter.wavelength)
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
     def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
