@@ -1652,7 +1652,6 @@ class createObservation extends OdbSuite {
             programId: ${pid.asJson}
             SET: {
               scienceRequirements: {
-                mode: SPECTROSCOPY
                 spectroscopy: {
                   wavelength: { nanometers: 400 }
                   resolution: 200
@@ -1686,6 +1685,80 @@ class createObservation extends OdbSuite {
                   focalPlane
                   focalPlaneAngle { microarcseconds }
                   capability
+                }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+
+        val reqs: ACursor =
+          js.hcursor.downPath("createObservation", "observation", "scienceRequirements")
+
+        val spectroscopy: ACursor =
+          reqs.downField("spectroscopy")
+
+        assertIO(
+          (reqs.downIO[ScienceMode]("mode"),
+           spectroscopy.downIO[Long]("wavelength", "picometers"),
+           spectroscopy.downIO[Int]("resolution"),
+           spectroscopy.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           spectroscopy.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
+           spectroscopy.downIO[FocalPlane]("focalPlane"),
+           spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),
+           spectroscopy.downIO[Option[SpectroscopyCapabilities]]("capability")
+          ).tupled,
+          (ScienceMode.Spectroscopy,
+           400_000L,
+           200,
+           BigDecimal("75.50"),
+           2_500L,
+           BigDecimal("0.1"),
+           FocalPlane.SingleSlit,
+           3,
+           Option.empty[SpectroscopyCapabilities]
+          )
+        )
+      }
+    }
+  }
+
+  test("[general] created observation accepts imaging requirements") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                imaging: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.5
+                      at: { micrometers: 2.5 }
+                    }
+                  }
+                  minimumFov: { picometers: 100000 }
+                  narrowFilters: true
+                  broadFilters: true
+                }
+              }
+            }
+          }) {
+            observation {
+              scienceRequirements {
+                mode
+                imaging {
+                  minimumFov { picometers }
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
+                  narrowFilters
+                  broadFilters
                 }
               }
             }
