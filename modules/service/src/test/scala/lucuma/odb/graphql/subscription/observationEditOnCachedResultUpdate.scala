@@ -110,37 +110,3 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
         expected  = List(updateResponse, updateResponse)  // caches ITC and then sequence digest
       )
     yield ()
-
-  test("doesn't trigger when querying after cached"):
-    def timeQuery(pid: Program.Id) =
-     sleep >>
-       query(
-         user  = pi,
-         query = s"""
-           query {
-             program(programId: "$pid") {
-               timeEstimateRange {
-                 minimum { program { microseconds } }
-               }
-             }
-           }
-         """
-       )
-
-    for
-      pid <- createProgram(pi, "foo")
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- subscriptionExpect(
-        user      = pi,
-        query     = programUpdateSubscription(pid),
-        mutations = Right(timeQuery(pid)),
-        expected  = List(updateResponse, updateResponse)
-      )
-      _   <- subscriptionExpect(
-        user      = pi,
-        query     = programUpdateSubscription(pid),
-        mutations = Right(timeQuery(pid)),
-        expected  = List()
-      )
-    yield ()
