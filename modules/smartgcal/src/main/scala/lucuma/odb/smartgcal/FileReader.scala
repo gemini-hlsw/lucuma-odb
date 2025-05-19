@@ -49,4 +49,6 @@ object FileReader {
   def gmosSouth[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gmos.FileEntry.South)] =
     read(fileName, parsers.gmosSouth.fileEntry.map(Current.apply))
 
+  def flamingos2[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Flamingos2.FileEntry)] =
+    read(fileName, parsers.flamingos2.fileEntry.map(Current.apply))
 }

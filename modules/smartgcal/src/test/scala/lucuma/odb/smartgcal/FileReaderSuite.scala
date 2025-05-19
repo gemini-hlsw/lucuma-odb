@@ -7,14 +7,14 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.parse.Parser
 import fs2.Stream
-import lucuma.odb.smartgcal.data.Gmos.FileEntry
+import lucuma.odb.smartgcal.data.Gmos.FileEntry as GmosFileEntry
 import lucuma.odb.smartgcal.parsers.Availability
 
 final class FileReaderSuite extends munit.FunSuite:
 
-  private def loadGmos[G, L, U](
+  private def loadInstrument[A](
     filename:    String,
-    entryParser: Parser[Availability[FileEntry[G, L, U]]]
+    entryParser: String => Either[Parser.Error, Availability[A]]
   ): Unit =
 
     val r  = s"smartgcal/$filename.csv"
@@ -24,7 +24,7 @@ final class FileReaderSuite extends munit.FunSuite:
     val (obsolete, current) =
        s.through(FileReader.entryLines)
         .flatMap: (lineNumber, s) =>
-          entryParser.parseAll(s) match
+          entryParser(s) match
             case Left(e)  => Stream.raiseError[IO](new RuntimeException(s"$filename $lineNumber: $s"))
             case Right(a) => Stream.emit(a)
         .fold((0L, 0L)) { case ((o, c), a) =>
@@ -41,6 +41,15 @@ final class FileReaderSuite extends munit.FunSuite:
     // the number of entry lines.
     assertEquals((obsolete + current), rawLineCount)
 
+  private def loadGmos[G, L, U](
+    filename:    String,
+    entryParser: Parser[Availability[GmosFileEntry[G, L, U]]]
+  ): Unit =
+    loadInstrument(filename, entryParser.parseAll)
+
+  private def loadF2(filename:    String): Unit =
+    loadInstrument(filename, parsers.flamingos2.fileEntry.map(Availability.Current.apply).parseAll)
+
   test("GMOS-N_ARC"):
     loadGmos("GMOS-N_ARC", parsers.gmosNorth.fileEntry)
 
@@ -52,3 +61,9 @@ final class FileReaderSuite extends munit.FunSuite:
 
   test("GMOS-S_FLAT"):
     loadGmos("GMOS-S_FLAT", parsers.gmosSouth.fileEntry.map(Availability.Current.apply))
+
+  test("Flamingos2_ARC"):
+    loadF2("Flamingos2_ARC")
+
+  test("Flamingos2_FLAT"):
+    loadF2("Flamingos2_FLAT")
