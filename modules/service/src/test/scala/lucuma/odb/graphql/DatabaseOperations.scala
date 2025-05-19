@@ -1614,6 +1614,44 @@ trait DatabaseOperations { this: OdbSuite =>
       )
     )
 
+  def moveGroupAs(user: User, groupToMove: Group.Id, newParent: Option[Group.Id]): IO[Unit] =
+    expect(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            SET: {
+              parentGroup: ${newParent.asJson}
+            }
+            WHERE: {
+              id: {
+                EQ: ${groupToMove.asJson}
+              }
+            }
+          }) {
+            groups {
+              id
+              parentId
+            }
+          }
+        }
+      """,
+      expected = Right(
+        json"""
+          {
+            "updateGroups": {
+              "groups": [
+                {
+                  "id": $groupToMove,
+                  "parentId": $newParent
+                }
+              ]
+            }
+          }
+        """
+      )
+    )
+
   def addProgramUserAs(
     user:        User,
     pid:         Program.Id,
