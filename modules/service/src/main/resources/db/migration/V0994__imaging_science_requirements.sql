@@ -1,16 +1,16 @@
 -- Add imaging science requirements tables
 ALTER TABLE t_observation
-  ADD COLUMN c_img_minimum_fov d_angle_µas null default null,
-  ADD COLUMN c_img_narrow_filters boolean null default null,
-  ADD COLUMN c_img_broad_filters boolean null default null;
+  ADD COLUMN c_img_minimum_fov    d_angle_µas null default null,
+  ADD COLUMN c_img_narrow_filters boolean     null default null,
+  ADD COLUMN c_img_broad_filters  boolean     null default null;
 
 -- Rename spec constraint
 -- the exposure time mode is shared between imaging and spectroscopy
-ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time_mode TO c_exp_time_mode;
-ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise TO c_etm_signal_to_noise;
+ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time_mode      TO c_exp_time_mode;
+ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise    TO c_etm_signal_to_noise;
 ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise_at TO c_etm_signal_to_noise_at;
-ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time TO c_etm_exp_time;
-ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count TO c_etm_exp_count;
+ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time           TO c_etm_exp_time;
+ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count          TO c_etm_exp_count;
 
 -- GMOS North imaging requirements
 CREATE TABLE t_imaging_requirements_gmos_north (

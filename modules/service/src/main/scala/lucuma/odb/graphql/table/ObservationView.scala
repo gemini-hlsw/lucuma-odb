@@ -109,7 +109,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
 
           object MinimumFovAngle:
             val SyntheticId: ColumnRef = col("c_img_minimum_fov_id", observation_id.embedded)
-            val Value: ColumnRef       = col("c_img_minumum_fov",    angle_µas.embedded)
+            val Value: ColumnRef       = col("c_img_minimum_fov",    angle_µas.embedded)
 
           val NarrowFilters: ColumnRef   = col("c_img_narrow_filters", bool.opt)
           val BroadFilters: ColumnRef    = col("c_img_broad_filters",  bool.opt)
