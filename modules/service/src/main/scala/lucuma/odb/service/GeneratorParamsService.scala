@@ -40,6 +40,7 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
+import lucuma.itc.client.InstrumentMode.Flamingos2Imaging
 import lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy
 import lucuma.itc.client.InstrumentMode.GmosNorthImaging
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
@@ -122,6 +123,8 @@ object GeneratorParamsService {
   extension (mode: InstrumentMode)
     def asImaging(λ: Wavelength): InstrumentMode =
       mode match
+        case Flamingos2Imaging(_)                    =>
+          mode
         case Flamingos2Spectroscopy(_, f, _)         =>
           InstrumentMode.Flamingos2Imaging(lucuma.odb.sequence.flamingos2.longslit.Acquisition.toAcquisitionFilter(f))
         case GmosNorthImaging(_, _)                  =>
@@ -132,8 +135,6 @@ object GeneratorParamsService {
           mode
         case GmosSouthSpectroscopy(_, _, _, _, _, _) =>
           InstrumentMode.GmosSouthImaging(Acquisition.filter(GmosSouthFilter.acquisition, λ, _.wavelength), none)
-        case _ =>
-          throw new NotImplementedError(s"Missing `InstrumentMode.asImaging` for $mode")
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
