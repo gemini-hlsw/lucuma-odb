@@ -35,7 +35,7 @@ import skunk.Transaction
  * A service that can estimate the time required to finish the unexecuted
  * remainder of a program.
  */
-sealed trait TimeEstimateService2[F[_]]:
+sealed trait TimeEstimateService[F[_]]:
 
   /**
    * Estimates the remaining time for all observations in the program that are
@@ -70,17 +70,17 @@ sealed trait TimeEstimateService2[F[_]]:
   )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]]
 
 
-object TimeEstimateService2:
+object TimeEstimateService:
 
   def instantiate[F[_]: Concurrent](
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
-  )(using Services[F]): TimeEstimateService2[F] =
+  )(using Services[F]): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
       services.obscalcService(commitHash, itcClient, calculator)
 
-    new TimeEstimateService2[F]:
+    new TimeEstimateService[F]:
 
       // OBSCALC TODO: In core, need to fiddle with `NotGiven` in `CalculatedValue`
       // to avoid the need to do this.
