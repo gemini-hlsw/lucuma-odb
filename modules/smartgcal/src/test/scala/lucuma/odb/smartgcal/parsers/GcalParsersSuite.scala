@@ -67,15 +67,15 @@ final class GcalParsersSuite extends munit.FunSuite {
   }
 
   test("simple failure") {
-    val definition = "2,ND4.5,Visible,Ar arc;Xe arc,Open,4.3,1,Day"
+    val definition = "2,ND45,Visible,Ar arc;Xe arc,Open,4.3,1,Day"
 
     assertEquals(
       legacyValue.parseAll(definition).leftMap(_.show),
       Left(
-        """2,ND4.5,Visible,Ar arc;Xe arc,Open,4.3,1,Day
+        """2,ND45,Visible,Ar arc;Xe arc,Open,4.3,1,Day
           |  ^
           |expectation:
-          |* context: Gcal filter, must match one of the strings: {"GMOS balance", "HROS balance", "ND1.0", "ND1.6", "ND2.0", "ND3.0", "ND4-5", "ND4.0", "ND5.0", "NIR balance", "None", "none"}""".stripMargin
+          |* context: Gcal filter, must match one of the strings: {"GMOS balance", "HROS balance", "ND1.0", "ND1.6", "ND2.0", "ND3.0", "ND4-5", "ND4.0", "ND4.5", "ND5.0", "NIR balance", "None", "none"}""".stripMargin
       )
     )
   }

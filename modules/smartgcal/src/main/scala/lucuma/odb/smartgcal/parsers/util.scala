@@ -83,6 +83,9 @@ trait UtilityParsers {
   def manyOfEnumerated[A](using e: Enumerated[A]): Parser[NonEmptyList[A]] =
     manyOf(enumeratedKv[A]*)
 
+  def manyOfEnumeratedBy[A](f: A => String)(using e: Enumerated[A]): Parser[NonEmptyList[A]] =
+    manyOf(e.all.fproductLeft(f)*)
+
   def manyOfOptionEnumerated[A](noneValue: String)(using e: Enumerated[A]): Parser[NonEmptyList[Option[A]]] =
     manyOf(optionKv(noneValue, enumeratedKv[A])*)
 

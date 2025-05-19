@@ -83,7 +83,7 @@ object Flamingos2:
   case class FileKey(
     dispersers:      NonEmptyList[Option[Flamingos2Disperser]],
     filters:         NonEmptyList[Flamingos2Filter],
-    fpus:            NonEmptyList[Flamingos2Fpu]
+    fpus:            NonEmptyList[Option[Flamingos2Fpu]]
   ) {
 
     def tableKeys: NonEmptyList[TableKey] =
@@ -92,7 +92,7 @@ object Flamingos2:
         c <- d.fold(NonEmptyList.one(none)) { g => NonEmptyList.one(g.some) }
         f <- filters
         u <- fpus
-      } yield TableKey(c, f, u.some)
+      } yield TableKey(c, f, u)
 
   }
 
