@@ -57,7 +57,6 @@ import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos.longslit.Acquisition
-import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.json.*
@@ -86,7 +85,7 @@ trait GeneratorParamsService[F[_]] {
 
   def selectMany(
     observationIds: List[Observation.Id]
-  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
+  )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]]
 
   def selectAll(
     programId: Program.Id,
@@ -157,7 +156,7 @@ object GeneratorParamsService {
 
       override def selectMany(
         oids: List[Observation.Id]
-      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
+      )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         doSelect(selectManyParams(oids))
 
       override def selectAll(
@@ -191,7 +190,7 @@ object GeneratorParamsService {
 
       private def selectManyParams(
         oids: List[Observation.Id]
-      )(using SuperUserAccess): F[List[ParamsRow]] =
+      ): F[List[ParamsRow]] =
         NonEmptyList
           .fromList(oids)
           .fold(List.empty[ParamsRow].pure[F]) { oids =>
@@ -475,7 +474,7 @@ object GeneratorParamsService {
 
     def selectManyParams(
       which: NonEmptyList[Observation.Id]
-    )(using SuperUserAccess): AppliedFragment =
+    ): AppliedFragment =
       sql"""
         SELECT
           #${ParamColumns("gp")}

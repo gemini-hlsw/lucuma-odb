@@ -80,6 +80,13 @@ sealed trait ObscalcService[F[_]]:
   )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]]
 
   /**
+   * Like `selectMany` but returns only results (not paired with metadata).
+   */
+  def selectManyResults(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Obscalc.Result]]]
+
+  /**
    * Select calculated categorized time for a single observation.
    */
   def selectOneCategorizedTime(
@@ -178,6 +185,19 @@ object ObscalcService:
         session
           .execute(Statements.SelectProgramCategorizedTime)(programId)
           .map(_.toMap)
+
+      override def selectManyResults(
+        observationIds: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Obscalc.Result]]] =
+        NonEmptyList.fromList(observationIds).fold(Map.empty[Observation.Id, CalculatedValue[Obscalc.Result]].pure[F]): nel =>
+          val af = Statements.selectResults(nel)
+          session
+            .prepareR(af.fragment.query(observation_id *: calculation_state *: Statements.obscalc_result_opt))
+            .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+            .map: lst =>
+              lst.collect:
+                case (id, cs, Some(r)) => id -> CalculatedValue(cs, r)
+              .toMap
 
       override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
@@ -331,16 +351,26 @@ object ObscalcService:
     val obscalc_entry: Codec[Obscalc.Entry] =
       (obscalc_meta *: obscalc_result_opt).to[Obscalc.Entry]
 
-    private def obscalcColumns(prefix: Option[String] = None): String =
-      List(
+    private def prefixedColumns(prefix: Option[String], colNames: String*): String =
+      colNames.toList.map: col =>
+        prefix.fold(col)(p => s"$p.$col")
+      .mkString("", "\n", "\n")
+
+    private def obscalcMetaDataColumns(prefix: Option[String] = None): String =
+      prefixedColumns(
+        prefix,
         "c_program_id",
         "c_observation_id",
         "c_obscalc_state",
         "c_last_invalidation",
         "c_last_update",
         "c_retry_at",
-        "c_failure_count",
+        "c_failure_count"
+      )
 
+    private def obscalcResultColumns(prefix: Option[String] = None): String =
+      prefixedColumns(
+        prefix,
         "c_odb_error",
 
         "c_img_target_id",
@@ -373,8 +403,10 @@ object ObscalcService:
         "c_sci_offsets",
         "c_sci_atom_count",
         "c_sci_execution_state"
-      ).map(col => prefix.fold(col)(p => s"$p.$col"))
-       .mkString("", ",\n", "\n")
+      )
+
+    private def obscalcColumns(prefix: Option[String] = None): String =
+      s"${obscalcMetaDataColumns(prefix)}\n${obscalcResultColumns(prefix)}"
 
     val SelectOne: Query[Observation.Id, Obscalc.Entry] =
       sql"""
@@ -444,6 +476,21 @@ object ObscalcService:
         .query(observation_id *: calculation_state *: full_categorized_time.opt)
         .map: (oid, state, catTime) =>
           oid -> CalculatedValue(state, catTime.getOrElse(CategorizedTime.Zero))
+
+    def selectResults(
+      which: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          c.c_observation_id,
+          c.c_obscalc_state,
+          #${obscalcResultColumns("c".some)}
+        FROM t_obscalc c
+        INNER JOIN t_observation o USING (c_observation_id)
+        WHERE o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+          AND c.c_observation_id IN ("""(Void) |+|
+            which.map(sql"$observation_id").intercalate(void", ") |+|
+          void")"
 
     val ResetCalculating: Command[Void] =
       sql"""
