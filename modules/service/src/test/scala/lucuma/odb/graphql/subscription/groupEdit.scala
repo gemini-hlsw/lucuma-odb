@@ -304,7 +304,7 @@ class groupEdit extends OdbSuite {
     }
   }
 
-  test("trigger on top-level observation creation") {
+  test("don't trigger on top-level observation creation") {
     Deferred[IO, Program.Id].flatMap { d =>
       subscriptionExpectF(
         user = pi,
@@ -332,19 +332,7 @@ class groupEdit extends OdbSuite {
           ),
         expectedF =
           d.get.map { pid =>
-            List(
-              json"""
-              {
-                "groupEdit": {
-                  "editType": "UPDATED",
-                  "program": {
-                    "id": $pid
-                  },
-                  "value": null
-                }
-              }
-              """
-            )  
+            List.empty[Json]
           }
       )
     }
@@ -408,7 +396,7 @@ class groupEdit extends OdbSuite {
     }
   }
 
-  test("trigger on observation move") {
+  test("trigger on observation move from root group") {
     Deferred[IO, (Program.Id, Group.Id)].flatMap { d =>
       subscriptionExpectF(
         user = pi,
@@ -450,26 +438,6 @@ class groupEdit extends OdbSuite {
                   }
                 }
               }""",
-              // observation added to root
-              json"""{
-                "groupEdit" : {
-                  "editType" : "UPDATED",
-                  "program" : {
-                    "id" : $pid
-                  },
-                  "value" : null
-                }
-              }""",
-              // observation removed from root
-              json"""{
-                "groupEdit" : {
-                  "editType" : "UPDATED",
-                  "program" : {
-                    "id" : $pid
-                  },
-                  "value" : null
-                }
-              }""",
               // observation inserted into group
               json"""{
                 "groupEdit" : {
@@ -488,7 +456,7 @@ class groupEdit extends OdbSuite {
     }
   }
 
-  test("trigger on observation move (limited selection)") {
+  test("trigger on observation move from root group (limited selection)") {
     Deferred[IO, (Program.Id, Group.Id)].flatMap { d =>
       subscriptionExpectF(
         user = pi,
@@ -522,23 +490,167 @@ class groupEdit extends OdbSuite {
                   }
                 }
               }""",
-              // observation added to root
-              json"""{
-                "groupEdit" : {
-                  "value" : null
-                }
-              }""",
-              // observation removed from root
-              json"""{
-                "groupEdit" : {
-                  "value" : null
-                }
-              }""",
               // observation inserted into group
               json"""{
                 "groupEdit" : {
                   "value" : {
                     "id" : $gid
+                  }
+                }
+              }"""
+            )
+          }
+      )
+    }
+  }
+
+  test("trigger on observation move between groups") {
+    Deferred[IO, (Program.Id, Group.Id, Group.Id)].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid  <- createProgramAs(pi)
+              gid1 <- createGroupAs(pi, pid, None, None, None)
+              gid2 <- createGroupAs(pi, pid, None, None, None)
+              oid  <- createObservationAs(pi, pid)
+              _    <- moveObservationAs(pi, oid, Some(gid1))
+              _    <- moveObservationAs(pi, oid, Some(gid2))
+              _    <- d.complete((pid, gid1, gid2))
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { (_, gid1, gid2) =>
+            List(
+              // group 1 created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid1
+                  }
+                }
+              }""",
+              // group 2 created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid2
+                  }
+                }
+              }""",
+              // observation inserted into group 1
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid1
+                  }
+                }
+              }""",
+              // observation inserted into group 2 - original group
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid1
+                  }
+                }
+              }""",
+              // observation moved into group 2 - new group
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid2
+                  }
+                }
+              }"""
+            )
+          }
+      )
+    }
+  }
+
+  test("trigger on group move between groups, including event for old parent") {
+    Deferred[IO, (Program.Id, Group.Id, Group.Id, Group.Id)].flatMap { d =>
+      subscriptionExpectF(
+        user = pi,
+        query     = s"""
+          subscription {
+            groupEdit {
+              value {
+                id
+              }
+            }
+          }
+        """,
+        mutations =
+          Right(
+            for {
+              pid  <- createProgramAs(pi)
+              gid1 <- createGroupAs(pi, pid, None, None, None)
+              gid2 <- createGroupAs(pi, pid, None, None, None)
+              gid3 <- createGroupAs(pi, pid, None, None, None)
+              _    <- moveGroupAs(pi, gid3, Some(gid2))
+              _    <- moveGroupAs(pi, gid3, Some(gid1))
+              _    <- d.complete((pid, gid1, gid2, gid3))
+            } yield ()
+          ),
+        expectedF =
+          d.get.map { (_, gid1, gid2, gid3) =>
+            List(
+              // group 1 created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid1
+                  }
+                }
+              }""",
+              // group 2 created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid2
+                  }
+                }
+              }""",
+              // group 3 created
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid3
+                  }
+                }
+              }""",
+              // group 3 moved into group 2
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid3
+                  }
+                }
+              }""",
+              // group 2 moved into group 1
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid3
+                  }
+                }
+              }""",
+              // the parent of the above move
+              json"""{
+                "groupEdit" : {
+                  "value" : {
+                    "id" : $gid2
                   }
                 }
               }"""
