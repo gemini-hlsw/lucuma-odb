@@ -6,6 +6,7 @@ package lucuma.odb.data
 import cats.syntax.monoid.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.data.Zipper
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
@@ -60,7 +61,12 @@ object Obscalc:
   final case class ItcResult(
     imaging:      ItcService.TargetResult,
     spectroscopy: ItcService.TargetResult
-  )
+  ):
+    def toAsterismResults: Option[ItcService.AsterismResults] =
+      ItcService.AsterismResults.fromResults(
+        Zipper.one(imaging),
+        Zipper.one(spectroscopy)
+      )
 
   /**
    * Obscalc calculation results.
