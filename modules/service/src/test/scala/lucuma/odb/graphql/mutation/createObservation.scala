@@ -1653,15 +1653,15 @@ class createObservation extends OdbSuite {
             programId: ${pid.asJson}
             SET: {
               scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 75.5
+                    at: { micrometers: 2.5 }
+                  }
+                }
                 spectroscopy: {
                   wavelength: { nanometers: 400 }
                   resolution: 200
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 75.5
-                      at: { micrometers: 2.5 }
-                    }
-                  }
                   wavelengthCoverage: { picometers: 100000 }
                   focalPlane: SINGLE_SLIT
                   focalPlaneAngle: { microarcseconds: 3 }
@@ -1673,15 +1673,15 @@ class createObservation extends OdbSuite {
             observation {
               scienceRequirements {
                 mode
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
+                  }
+                }
                 spectroscopy {
                   wavelength { picometers }
                   resolution
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at { nanometers }
-                    }
-                  }
                   wavelengthCoverage { micrometers }
                   focalPlane
                   focalPlaneAngle { microarcseconds }
@@ -1703,8 +1703,8 @@ class createObservation extends OdbSuite {
           (reqs.downIO[ScienceMode]("mode"),
            spectroscopy.downIO[Long]("wavelength", "picometers"),
            spectroscopy.downIO[Int]("resolution"),
-           spectroscopy.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
-           spectroscopy.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           reqs.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           reqs.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            spectroscopy.downIO[BigDecimal]("wavelengthCoverage", "micrometers"),
            spectroscopy.downIO[FocalPlane]("focalPlane"),
            spectroscopy.downIO[Int]("focalPlaneAngle", "microarcseconds"),
@@ -1733,13 +1733,13 @@ class createObservation extends OdbSuite {
             programId: ${pid.asJson}
             SET: {
               scienceRequirements: {
-                imaging: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 75.5
-                      at: { micrometers: 2.5 }
-                    }
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 75.5
+                    at: { micrometers: 2.5 }
                   }
+                }
+                imaging: {
                   minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
@@ -1753,13 +1753,13 @@ class createObservation extends OdbSuite {
             observation {
               scienceRequirements {
                 mode
-                imaging {
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at { nanometers }
-                    }
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
                   }
+                }
+                imaging {
                   minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
@@ -1781,8 +1781,8 @@ class createObservation extends OdbSuite {
 
         assertIO(
           (reqs.downIO[ScienceMode]("mode"),
-           imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
-           imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           reqs.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           reqs.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
@@ -1809,13 +1809,13 @@ class createObservation extends OdbSuite {
             programId: ${pid.asJson}
             SET: {
               scienceRequirements: {
-                imaging: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 75.5
-                      at: { micrometers: 2.5 }
-                    }
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 75.5
+                    at: { micrometers: 2.5 }
                   }
+                }
+                imaging: {
                   minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
@@ -1829,13 +1829,13 @@ class createObservation extends OdbSuite {
             observation {
               scienceRequirements {
                 mode
-                imaging {
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at { nanometers }
-                    }
+                exposureTimeMode {
+                  signalToNoise {
+                    value
+                    at { nanometers }
                   }
+                }
+                imaging {
                   minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
@@ -1857,8 +1857,8 @@ class createObservation extends OdbSuite {
 
         assertIO(
           (reqs.downIO[ScienceMode]("mode"),
-           imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
-           imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           reqs.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           reqs.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
@@ -1887,13 +1887,13 @@ class createObservation extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
-                  imaging: {
-                    exposureTimeMode: {
-                      signalToNoise: {
-                        value: 75.5
-                        at: { micrometers: 2.5 }
-                      }
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.5
+                      at: { micrometers: 2.5 }
                     }
+                  }
+                  imaging: {
                     minimumFov: { arcseconds: 330 }
                     narrowFilters: true
                     broadFilters: true
@@ -1910,13 +1910,13 @@ class createObservation extends OdbSuite {
               observation {
                 scienceRequirements {
                   mode
-                  imaging {
-                    exposureTimeMode {
-                      signalToNoise {
-                        value
-                        at { nanometers }
-                      }
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
                     }
+                  }
+                  imaging {
                     minimumFov { arcseconds }
                     narrowFilters
                     broadFilters

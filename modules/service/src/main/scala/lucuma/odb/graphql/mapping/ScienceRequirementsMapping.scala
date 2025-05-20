@@ -15,6 +15,7 @@ trait ScienceRequirementsMapping[F[_]] extends ObservationView[F] {
     ObjectMapping(ScienceRequirementsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("mode", ScienceRequirements.Mode),
+      SqlObject("exposureTimeMode"),
       SqlObject("spectroscopy"),
       SqlObject("imaging")
     )

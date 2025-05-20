@@ -17,7 +17,6 @@ trait SpectroscopyScienceRequirementsMapping[F[_]] extends ObservationView[F] {
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlObject("wavelength"),
       SqlField("resolution",           Spectroscopy.Resolution),
-      SqlObject("exposureTimeMode"),
       SqlObject("wavelengthCoverage"),
       SqlField("focalPlane",           Spectroscopy.FocalPlane),
       SqlObject("focalPlaneAngle"),

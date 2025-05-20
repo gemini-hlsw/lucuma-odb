@@ -332,16 +332,13 @@ object CalibrationsService extends CalibrationObservations {
                     scienceBand         = Nullable.orAbsent(props.band),
                     scienceRequirements = props.wavelengthAt.map: w =>
                       ScienceRequirementsInput(
-                        spectroscopy = Some(
-                          SpectroscopyScienceRequirementsInput.Default.copy(
-                            exposureTimeMode = Nullable.NonNull(
-                              ExposureTimeMode.SignalToNoiseMode(
-                                SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                                w
-                              )
-                            )
+                        exposureTimeMode = Nullable.NonNull(
+                          ExposureTimeMode.SignalToNoiseMode(
+                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                            w
                           )
                         ),
+                        spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                         imaging      = None
                       )
                   ),

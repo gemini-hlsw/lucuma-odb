@@ -577,15 +577,15 @@ trait DatabaseOperations { this: OdbSuite =>
     observingMode match
       case ObservingModeType.Flamingos2LongSlit =>
         """{
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 1210 }
+          }
+        }
         spectroscopy: {
           wavelength: { nanometers: 1200 }
           resolution: 100
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0
-              at: { nanometers: 1210 }
-            }
-          }
           wavelengthCoverage: { nanometers: 20 }
           focalPlane: SINGLE_SLIT
           focalPlaneAngle: { microarcseconds: 0 }
@@ -594,37 +594,37 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthImaging |
            ObservingModeType.GmosSouthImaging =>
         """{
-        imaging: {
-          minimumFov: {
-            arcseconds: 100
-          },
           exposureTimeMode: {
             signalToNoise: {
               value: 100.0
               at: { nanometers: 1210 }
             }
           }
-          narrowFilters: false,
-          broadFilters: false
-        }
-      }"""
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false,
+            broadFilters: false
+          }
+        }"""
       case ObservingModeType.GmosNorthLongSlit |
            ObservingModeType.GmosSouthLongSlit =>
         """{
-        spectroscopy: {
-          wavelength: { nanometers: 500 }
-          resolution: 100
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0
-              at: { nanometers: 510 }
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 100.0
+                at: { nanometers: 510 }
+              }
             }
-          }
-          wavelengthCoverage: { nanometers: 20 }
-          focalPlane: SINGLE_SLIT
-          focalPlaneAngle: { microarcseconds: 0 }
-        }
-      }"""
+            spectroscopy: {
+              wavelength: { nanometers: 500 }
+              resolution: 100
+              wavelengthCoverage: { nanometers: 20 }
+              focalPlane: SINGLE_SLIT
+              focalPlaneAngle: { microarcseconds: 0 }
+            }
+          }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match

@@ -198,15 +198,15 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { angstroms: 71 }
+                    }
+                  }
                   spectroscopy: {
                     wavelength: {
                       angstroms: 42
-                    }
-                    exposureTimeMode: {
-                      signalToNoise: {
-                        value: 100.0
-                        at: { angstroms: 71 }
-                      }
                     }
                     wavelengthCoverage: {
                       angstroms: 99
@@ -238,15 +238,15 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { angstroms: 71 }
+                    }
+                  }
                   spectroscopy: {
                     wavelength: {
                       angstroms: 42
-                    }
-                    exposureTimeMode: {
-                      signalToNoise: {
-                        value: 100.0
-                        at: { angstroms: 71 }
-                      }
                     }
                     wavelengthCoverage: {
                       angstroms: 99
@@ -285,14 +285,14 @@ class observations extends OdbSuite {
                   matches {
                     id
                     scienceRequirements {
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { picometers }
+                        }
+                      }
                       spectroscopy {
                         wavelength {
                           picometers
-                        }
-                        exposureTimeMode {
-                          signalToNoise {
-                            at { picometers }
-                          }
                         }
                         wavelengthCoverage {
                           picometers
@@ -314,16 +314,16 @@ class observations extends OdbSuite {
                     {
                       "id" : $oid1,
                       "scienceRequirements" : {
+                        "exposureTimeMode": {
+                          "signalToNoise": {
+                            "at": {
+                              "picometers": 7100
+                            }
+                          }
+                        },
                         "spectroscopy" : {
                           "wavelength" : {
                             "picometers" : 4200
-                          },
-                          "exposureTimeMode": {
-                            "signalToNoise": {
-                              "at": {
-                                "picometers": 7100
-                              }
-                            }
                           },
                           "wavelengthCoverage" : {
                             "picometers" : 9900
@@ -337,9 +337,9 @@ class observations extends OdbSuite {
                     {
                       "id" : $oid2,
                       "scienceRequirements" : {
+                        "exposureTimeMode" : null,
                         "spectroscopy" : {
                           "wavelength" : null,
-                          "exposureTimeMode" : null,
                           "wavelengthCoverage" : null,
                           "focalPlaneAngle" : null
                         }

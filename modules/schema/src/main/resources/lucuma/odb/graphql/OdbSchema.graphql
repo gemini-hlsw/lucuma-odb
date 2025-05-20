@@ -4301,6 +4301,12 @@ Edit science requirements
 """
 input ScienceRequirementsInput {
   """
+  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
   The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   spectroscopy: SpectroscopyScienceRequirementsInput
@@ -4570,12 +4576,6 @@ input SpectroscopyScienceRequirementsInput {
   The resolution field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   resolution: PosInt
-
-  """
-  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  exposureTimeMode: ExposureTimeModeInput
 
   """
   The wavelengthCoverage field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -9177,11 +9177,6 @@ type SpectroscopyConfigOptionFlamingos2 {
 Edit or create imaging science requirements
 """
 input ImagingScienceRequirementsInput {
-  """
-  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  exposureTimeMode: ExposureTimeModeInput
 
   """
   minimumFov, which may be unset by assigning a null value, or ignored by
@@ -9213,11 +9208,6 @@ input ImagingScienceRequirementsInput {
 }
 
 type ImagingScienceRequirements {
-  """
-  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  exposureTimeMode: ExposureTimeMode
 
   """
   minimumFov, which may be unset by assigning a null value, or ignored by
@@ -11085,6 +11075,11 @@ type ScienceRequirements {
   mode: ScienceMode!
 
   """
+  Requested exposure time mode.
+  """
+  exposureTimeMode: ExposureTimeMode
+
+  """
   Spectroscopy requirements, if mode is Spectroscopy, this mode must be set
   """
   spectroscopy: SpectroscopyScienceRequirements
@@ -11458,11 +11453,6 @@ type SpectroscopyScienceRequirements {
   Requested resolution
   """
   resolution: PosInt
-
-  """
-  Requested exposure time mode.
-  """
-  exposureTimeMode: ExposureTimeMode
 
   """
   Wavelength range

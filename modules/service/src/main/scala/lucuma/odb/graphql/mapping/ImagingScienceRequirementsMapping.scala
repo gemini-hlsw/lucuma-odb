@@ -15,7 +15,6 @@ trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
   lazy val ImagingScienceRequirementsMapping: ObjectMapping =
     ObjectMapping(ImagingScienceRequirementsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
-      SqlObject("exposureTimeMode"),
       SqlObject("minimumFov"),
       SqlField("narrowFilters", Imaging.NarrowFilters),
       SqlField("broadFilters", Imaging.BroadFilters),
