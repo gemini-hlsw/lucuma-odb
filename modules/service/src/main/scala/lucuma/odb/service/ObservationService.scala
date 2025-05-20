@@ -629,8 +629,6 @@ object ObservationService {
         val imaging: Option[ImagingScienceRequirementsInput] =
           scienceRequirements.flatMap(_.imaging)
 
-        println(imaging)
-
         val exposureTimeMode: Option[ExposureTimeMode] =
           spectroscopy.flatMap(_.exposureTimeMode.toOption)
             .orElse(imaging.flatMap(_.exposureTimeMode.toOption))
