@@ -14,19 +14,41 @@ ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count          TO c_etm_exp_c
 
 -- GMOS North imaging requirements
 CREATE TABLE t_imaging_requirements_gmos_north (
-  c_observation_id d_observation_id PRIMARY KEY REFERENCES t_observation(c_observation_id),
-  c_filter         d_tag            NOT NULL REFERENCES    t_gmos_north_filter(c_tag),
-  UNIQUE (c_observation_id, c_filter)
+  c_observation_id d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
+  c_filter         d_tag            NOT NULL REFERENCES t_gmos_north_filter(c_tag),
+  PRIMARY KEY (c_observation_id, c_filter)
 );
 COMMENT ON TABLE t_imaging_requirements_gmos_north IS 'GMOS North imaging requirements';
 
+-- A view to repackage the filters as an array value so Grackle can digest
+-- it. Seems overkill but well.
+CREATE VIEW v_imaging_requirements_gmos_north AS
+  SELECT
+    c_observation_id,
+    -- keep insertion order
+    array_remove(array_agg(c_filter), NULL) AS c_filters
+  FROM
+    t_imaging_requirements_gmos_north
+  GROUP BY
+    c_observation_id;
+
 -- GMOS South imaging requirements
 CREATE TABLE t_imaging_requirements_gmos_south (
-  c_observation_id d_observation_id PRIMARY KEY REFERENCES t_observation(c_observation_id),
-  c_filter         d_tag            NOT NULL REFERENCES    t_gmos_south_filter(c_tag),
-  UNIQUE (c_observation_id, c_filter)
+  c_observation_id d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
+  c_filter         d_tag            NOT NULL REFERENCES t_gmos_south_filter(c_tag),
+  PRIMARY KEY (c_observation_id, c_filter)
 );
 COMMENT ON TABLE t_imaging_requirements_gmos_south IS 'GMOS South imaging requirements';
+
+CREATE VIEW v_imaging_requirements_gmos_south AS
+  SELECT
+    c_observation_id,
+    -- keep insertion order
+    array_remove(array_agg(c_filter), NULL) AS c_filters
+  FROM
+    t_imaging_requirements_gmos_south
+  GROUP BY
+    c_observation_id;
 
 -- Update views to include imaging requirements
 DROP VIEW v_observation;
@@ -51,7 +73,6 @@ CREATE OR REPLACE VIEW v_observation AS
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id
   LEFT JOIN t_gmos_north_long_slit mode_gnls ON o.c_observation_id = mode_gnls.c_observation_id
   LEFT JOIN t_gmos_south_long_slit mode_gsls ON o.c_observation_id = mode_gsls.c_observation_id;
-
 
 -- Add acquisition reset to generator params view
 DROP VIEW v_generator_params;

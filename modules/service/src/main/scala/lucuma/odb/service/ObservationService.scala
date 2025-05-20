@@ -18,6 +18,7 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -57,6 +58,8 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
+import lucuma.odb.graphql.input.ImagingGmosNorthScienceRequirementsInput
+import lucuma.odb.graphql.input.ImagingGmosSouthScienceRequirementsInput
 import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -70,7 +73,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
-import skunk.codec.boolean.*
+import skunk.codec.all.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -223,9 +226,38 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Unit]] =
         timingWindows
           .traverse(timingWindowService.createFunction)
-          .map { optF =>
+          .traverse { optF =>
             optF.fold(().pure[F])( f => f(oids, transaction) )
-          }.sequence
+          }
+
+      private def setImagingRequirementFilters(
+        oids:    Observation.Id,
+        imaging: Option[ImagingScienceRequirementsInput],
+      )(using Transaction[F]): F[Result[Unit]] =
+        imaging match {
+          case None => Result.unit.pure[F]
+          case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
+            gn.fold(
+              session.execute(Statements.deleteGNImagingFilters.command)(oids).void,
+              Applicative[F].pure(()).void,
+              f =>
+                val af = Statements.setGmosNImagingFilters(oids, f)
+                session.prepareR(af.fragment.command).use { pq =>
+                  pq.execute(af.argument)
+                }.void
+            ).as(Result.unit)
+          case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
+            gs.fold(
+              session.execute(Statements.deleteGSImagingFilters.command)(oids).void,
+              Applicative[F].pure(()).void,
+              f =>
+                val af = Statements.setGmosSImagingFilters(oids, f)
+                session.prepareR(af.fragment.command).use { pq =>
+                  pq.execute(af.argument)
+                }.void
+            ).as(Result.unit)
+          case _ => Result.unit.pure[F]
+        }
 
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
@@ -250,6 +282,9 @@ object ObservationService {
                 }
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
+              }.flatTap { rOid =>
+                rOid.flatTraverse { oid =>
+                setImagingRequirementFilters(oid, SET.scienceRequirements.flatMap(_.imaging)) }
               }.flatMap { rOid =>
                 SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -594,8 +629,11 @@ object ObservationService {
         val imaging: Option[ImagingScienceRequirementsInput] =
           scienceRequirements.flatMap(_.imaging)
 
+        println(imaging)
+
         val exposureTimeMode: Option[ExposureTimeMode] =
-          spectroscopy.flatMap(_.exposureTimeMode.toOption).orElse(imaging.flatMap(_.exposureTimeMode.toOption)) //.flatMap(_.exposureTimeMode.toOption)
+          spectroscopy.flatMap(_.exposureTimeMode.toOption)
+            .orElse(imaging.flatMap(_.exposureTimeMode.toOption))
 
         val exposureTimeModeType: Option[ExposureTimeModeType] =
           exposureTimeMode.map(_.tpe)
@@ -879,6 +917,64 @@ object ObservationService {
         in.focalPlaneAngle.foldPresent(upFocalPlaneAngle),
         in.capability.foldPresent(upCapability)
       ).flattenOption
+    }
+
+    val deleteGNImagingFilters: Fragment[Observation.Id] =
+      sql"""DELETE from t_imaging_requirements_gmos_north
+        "WHERE t_observation.c_observation_id = $observation_id"""
+
+    val deleteGSImagingFilters: Fragment[Observation.Id] =
+      sql"""DELETE from t_imaging_requirements_gmos_south
+        "WHERE t_observation.c_observation_id = $observation_id"""
+
+    def setGmosNImagingFilters(
+      oid: Observation.Id,
+      in: ImagingGmosNorthScienceRequirementsInput,
+    ): AppliedFragment = {
+      import lucuma.odb.util.GmosCodecs.*
+
+      def insert: AppliedFragment =
+        void"""
+          INSERT INTO t_imaging_requirements_gmos_north (
+            c_observation_id,
+            c_filter
+          ) VALUES
+          """
+
+      def filterEntries =
+        for {
+          f <- in.filters.orEmpty
+        } yield sql"($observation_id, $gmos_north_filter)"(oid, f)
+
+      val values: AppliedFragment =
+        filterEntries.intercalate(void", ")
+
+      in.filters.fold(AppliedFragment.empty)(_ => insert |+| values)
+    }
+
+    def setGmosSImagingFilters(
+      oid: Observation.Id,
+      in: ImagingGmosSouthScienceRequirementsInput,
+    ): AppliedFragment = {
+      import lucuma.odb.util.GmosCodecs.*
+
+      def insert: AppliedFragment =
+        void"""
+          INSERT INTO t_imaging_requirements_gmos_south (
+            c_observation_id,
+            c_filter
+          ) VALUES
+          """
+
+      def filterEntries =
+        for {
+          f <- in.filters.orEmpty
+        } yield sql"($observation_id, $gmos_south_filter)"(oid, f)
+
+      val values: AppliedFragment =
+        filterEntries.intercalate(void", ")
+
+      in.filters.fold(AppliedFragment.empty)(_ => insert |+| values)
     }
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {

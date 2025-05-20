@@ -9217,7 +9217,7 @@ type ImagingScienceRequirements {
   ExposureTimeMode, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  exposureTimeMode: ExposureTimeModeInput
+  exposureTimeMode: ExposureTimeMode
 
   """
   minimumFov, which may be unset by assigning a null value, or ignored by
@@ -9257,7 +9257,7 @@ type ImagingScienceRequirementsGmosNorth {
   filters: [GmosNorthFilter!]!
 }
 
-input ImagingScienceRequirementsGmosScienceInput {
+input ImagingScienceRequirementsGmosSouthInput {
   filters: [GmosSouthFilter!]!
 }
 

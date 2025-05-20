@@ -128,13 +128,13 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
               val Count: ColumnRef       = col("c_etm_exp_count",          int4_nonneg.embedded)
               val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
 
-          object ImagingGmosNorthTable extends TableDef("t_imaging_requirements_gmos_north"):
+          object ImagingGmosNorthView extends TableDef("v_imaging_requirements_gmos_north"):
             val Id: ColumnRef = col("c_observation_id", observation_id)
-            val Filter        = col("c_filter",         gmos_north_filter)
+            val Filters       = col("c_filters",        _gmos_north_filter)
 
-          object ImagingGmosSouthTable extends TableDef("t_imaging_requirements_gmos_south"):
+          object ImagingGmosSouthView extends TableDef("v_imaging_requirements_gmos_south"):
             val Id: ColumnRef = col("c_observation_id", observation_id)
-            val Filter        = col("c_filter",         gmos_south_filter)
+            val Filters       = col("c_filters",        _gmos_south_filter)
 
       end ScienceRequirements
 
