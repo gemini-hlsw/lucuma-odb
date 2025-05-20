@@ -231,14 +231,19 @@ object ObservationService {
           }
 
       private def setImagingRequirementFilters(
-        oids:    Observation.Id,
+        oids:    List[Observation.Id],
         imaging: Option[ImagingScienceRequirementsInput],
       )(using Transaction[F]): F[Result[Unit]] =
+        val which = oids.map(oid => sql"$observation_id"(oid)).intercalate(void", ")
         imaging match {
           case None => Result.unit.pure[F]
           case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
-            gn.fold(
-              session.execute(Statements.deleteGNImagingFilters.command)(oids).void,
+            gn.fold( {
+                val af = Statements.deleteGNImagingFilters(which)
+                session.prepareR(af.fragment.command).use { pq =>
+                  pq.execute(af.argument).void
+                }.void
+            },
               Applicative[F].pure(()).void,
               f =>
                 val af = Statements.setGmosNImagingFilters(oids, f)
@@ -247,8 +252,12 @@ object ObservationService {
                 }.void
             ).as(Result.unit)
           case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
-            gs.fold(
-              session.execute(Statements.deleteGSImagingFilters.command)(oids).void,
+            gs.fold({
+                val af = Statements.deleteGSImagingFilters(which)
+                session.prepareR(af.fragment.command).use { pq =>
+                  pq.execute(af.argument).void
+                }.void
+              },
               Applicative[F].pure(()).void,
               f =>
                 val af = Statements.setGmosSImagingFilters(oids, f)
@@ -284,7 +293,7 @@ object ObservationService {
                 rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid =>
-                setImagingRequirementFilters(oid, SET.scienceRequirements.flatMap(_.imaging)) }
+                setImagingRequirementFilters(List(oid), SET.scienceRequirements.flatMap(_.imaging)) }
               }.flatMap { rOid =>
                 SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -447,6 +456,7 @@ object ObservationService {
                 _ <- validateBand(g.keys.toList)
                 _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
+                _ <- ResultT(setImagingRequirementFilters(u.foldMap(_.toList), SET.scienceRequirements.flatMap(_.imaging)))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
@@ -917,17 +927,44 @@ object ObservationService {
       ).flattenOption
     }
 
-    val deleteGNImagingFilters: Fragment[Observation.Id] =
-      sql"""DELETE from t_imaging_requirements_gmos_north
-        "WHERE t_observation.c_observation_id = $observation_id"""
+    def imagingRequirementsUpdates(in: ImagingScienceRequirementsInput): List[AppliedFragment] = {
 
-    val deleteGSImagingFilters: Fragment[Observation.Id] =
-      sql"""DELETE from t_imaging_requirements_gmos_south
-        "WHERE t_observation.c_observation_id = $observation_id"""
+      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
+      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
+      val upMinimumFov         = sql"c_img_minimum_fov = ${angle_µas.opt}"
+      val upNarrowFilters      = sql"c_img_narrow_filters = ${bool.opt}"
+      val upBroadFilters       = sql"c_img_broad_filters = ${bool.opt}"
+
+      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
+      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+
+      List(
+        expTimeModeType.foldPresent(upExpTimeModeType),
+        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
+        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
+        timeAndCountMode.map(_.time).foldPresent(upExpTime),
+        timeAndCountMode.map(_.count).foldPresent(upExpCount),
+        in.minimumFov.foldPresent(upMinimumFov),
+        in.narrowFilters.foldPresent(upNarrowFilters),
+        in.broadFilters.foldPresent(upBroadFilters),
+      ).flattenOption
+    }
+
+    def deleteGNImagingFilters(which: AppliedFragment): AppliedFragment =
+      void"""DELETE from t_imaging_requirements_gmos_north """ |+|
+          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") "
+
+    def deleteGSImagingFilters(which: AppliedFragment): AppliedFragment =
+      void"""DELETE from t_imaging_requirements_gmos_south""" |+|
+          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") "
 
     def setGmosNImagingFilters(
-      oid: Observation.Id,
-      in: ImagingGmosNorthScienceRequirementsInput,
+      oids: List[Observation.Id],
+      in:   ImagingGmosNorthScienceRequirementsInput,
     ): AppliedFragment = {
       import lucuma.odb.util.GmosCodecs.*
 
@@ -941,8 +978,9 @@ object ObservationService {
 
       def filterEntries =
         for {
+          o <- oids
           f <- in.filters.orEmpty
-        } yield sql"($observation_id, $gmos_north_filter)"(oid, f)
+        } yield sql"($observation_id, $gmos_north_filter)"(o, f)
 
       val values: AppliedFragment =
         filterEntries.intercalate(void", ")
@@ -951,7 +989,7 @@ object ObservationService {
     }
 
     def setGmosSImagingFilters(
-      oid: Observation.Id,
+      oids: List[Observation.Id],
       in: ImagingGmosSouthScienceRequirementsInput,
     ): AppliedFragment = {
       import lucuma.odb.util.GmosCodecs.*
@@ -966,8 +1004,9 @@ object ObservationService {
 
       def filterEntries =
         for {
+          o <- oids
           f <- in.filters.orEmpty
-        } yield sql"($observation_id, $gmos_south_filter)"(oid, f)
+        } yield sql"($observation_id, $gmos_south_filter)"(o, f)
 
       val values: AppliedFragment =
         filterEntries.intercalate(void", ")
@@ -980,6 +1019,7 @@ object ObservationService {
       val ups    = in.scienceMode.map(upMode).toList
 
       ups ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
+        ++ in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
     }
 
