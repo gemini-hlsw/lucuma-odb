@@ -167,13 +167,12 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                    exposureTimeMode = Nullable.orNull(wvAt).map: w =>
-                      ExposureTimeMode.SignalToNoiseMode(
-                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                        w
-                      )
-                  ).some,
+                  exposureTimeMode = Nullable.orNull(wvAt).map: w =>
+                    ExposureTimeMode.SignalToNoiseMode(
+                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                      w
+                    ),
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                   imaging      = none
                 ).some
               ),
@@ -207,14 +206,13 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                    exposureTimeMode = Nullable.NonNull(
-                      ExposureTimeMode.SignalToNoiseMode(
-                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                        cw
-                      )
+                  exposureTimeMode = Nullable.NonNull(
+                    ExposureTimeMode.SignalToNoiseMode(
+                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                      cw
                     )
-                  ).some,
+                  ),
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                   imaging = none
                 ).some
               ),

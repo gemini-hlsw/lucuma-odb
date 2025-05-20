@@ -832,15 +832,15 @@ class updateObservations extends OdbSuite
   private object spectroscopyScienceRequirements {
     val update: String = """
       scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
         spectroscopy: {
           wavelength: { nanometers: 400 }
           resolution: 10
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
-          }
           wavelengthCoverage: { picometers: 10 }
           focalPlane: SINGLE_SLIT
           focalPlaneAngle: { arcseconds: 5 }
@@ -853,15 +853,15 @@ class updateObservations extends OdbSuite
       observations {
         scienceRequirements {
           mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
           spectroscopy {
             wavelength { nanometers }
             resolution
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
-              }
-            }
             wavelengthCoverage { nanometers }
             focalPlane
             focalPlaneAngle { arcseconds }
@@ -878,19 +878,19 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "SPECTROSCOPY",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
                 "spectroscopy": {
                   "wavelength": {
                     "nanometers": 400.000
                   },
                   "resolution": 10,
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
-                    }
-                  },
                   "wavelengthCoverage": {
                     "nanometers": 0.010
                   },
@@ -964,13 +964,13 @@ class updateObservations extends OdbSuite
   private object imagingScienceRequirements {
     val update0: String = """
       scienceRequirements: {
-        imaging: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
           }
+        }
+        imaging: {
           minimumFov: {
             arcseconds: 150
           }
@@ -982,13 +982,13 @@ class updateObservations extends OdbSuite
 
     val update1: String = """
       scienceRequirements: {
-        imaging: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
           }
+        }
+        imaging: {
           minimumFov: {
             arcseconds: 200
           }
@@ -1004,13 +1004,13 @@ class updateObservations extends OdbSuite
 
     val update2: String = """
       scienceRequirements: {
-        imaging: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
           }
+        }
+        imaging: {
           minimumFov: {
             arcseconds: 200
           }
@@ -1026,13 +1026,13 @@ class updateObservations extends OdbSuite
 
     val update3: String = """
       scienceRequirements: {
-        imaging: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
           }
+        }
+        imaging: {
           minimumFov: {
             arcseconds: 200
           }
@@ -1050,13 +1050,13 @@ class updateObservations extends OdbSuite
       observations {
         scienceRequirements {
           mode
-          imaging {
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
-              }
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
             }
+          }
+          imaging {
             minimumFov { arcseconds }
             narrowFilters
             broadFilters
@@ -1078,15 +1078,15 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "IMAGING",
-                "imaging": {
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
                     }
-                  },
+                  }
+                },
+                "imaging": {
                   "minimumFov": {
                     "arcseconds": 150
                   },
@@ -1109,15 +1109,15 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "IMAGING",
-                "imaging": {
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
                     }
-                  },
+                  }
+                },
+                "imaging": {
                   "minimumFov": {
                     "arcseconds": 200
                   },
@@ -1142,15 +1142,15 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "IMAGING",
-                "imaging": {
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
                     }
-                  },
+                  }
+                },
+                "imaging": {
                   "minimumFov": {
                     "arcseconds": 200
                   },
@@ -1175,15 +1175,15 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "IMAGING",
-                "imaging": {
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
                     }
-                  },
+                  }
+                },
+                "imaging": {
                   "minimumFov": {
                     "arcseconds": 200
                   },

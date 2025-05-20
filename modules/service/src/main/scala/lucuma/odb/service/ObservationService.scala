@@ -237,7 +237,7 @@ object ObservationService {
         val which = oids.map(oid => sql"$observation_id"(oid)).intercalate(void", ")
         imaging match {
           case None => Result.unit.pure[F]
-          case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
+          case Some(ImagingScienceRequirementsInput(_, _, _, gn, Nullable.Absent)) =>
             gn.fold(session.exec(Statements.deleteGNImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
@@ -245,7 +245,7 @@ object ObservationService {
                   session.exec(Statements.deleteGNImagingFilters(which)) *>
                   session.exec(Statements.setGmosNImagingFilters(oids, f))
             ).as(Result.unit)
-          case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
+          case Some(ImagingScienceRequirementsInput(_, _, _, Nullable.Absent, gs)) =>
             gs.fold(session.exec(Statements.deleteGSImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
@@ -628,8 +628,7 @@ object ObservationService {
           scienceRequirements.flatMap(_.imaging)
 
         val exposureTimeMode: Option[ExposureTimeMode] =
-          spectroscopy.flatMap(_.exposureTimeMode.toOption)
-            .orElse(imaging.flatMap(_.exposureTimeMode.toOption))
+          scienceRequirements.flatMap(_.exposureTimeMode.toOption)
 
         val exposureTimeModeType: Option[ExposureTimeModeType] =
           exposureTimeMode.map(_.tpe)
@@ -886,28 +885,15 @@ object ObservationService {
 
       val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
       val upResolution         = sql"c_spec_resolution = ${int4_pos.opt}"
-      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
-      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
-      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
-      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
       val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
 
-      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
-      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
 
       List(
         in.wavelength.foldPresent(upWavelength),
         in.resolution.foldPresent(upResolution),
-        expTimeModeType.foldPresent(upExpTimeModeType),
-        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
-        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
-        timeAndCountMode.map(_.time).foldPresent(upExpTime),
-        timeAndCountMode.map(_.count).foldPresent(upExpCount),
         in.wavelengthCoverage.foldPresent(upWavelengthCoverage),
         in.focalPlane.foldPresent(upFocalPlane),
         in.focalPlaneAngle.foldPresent(upFocalPlaneAngle),
@@ -917,25 +903,11 @@ object ObservationService {
 
     def imagingRequirementsUpdates(in: ImagingScienceRequirementsInput): List[AppliedFragment] = {
 
-      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
-      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
-      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
-      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
       val upMinimumFov         = sql"c_img_minimum_fov = ${angle_µas.opt}"
       val upNarrowFilters      = sql"c_img_narrow_filters = ${bool.opt}"
       val upBroadFilters       = sql"c_img_broad_filters = ${bool.opt}"
 
-      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
-      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-
       List(
-        expTimeModeType.foldPresent(upExpTimeModeType),
-        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
-        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
-        timeAndCountMode.map(_.time).foldPresent(upExpTime),
-        timeAndCountMode.map(_.count).foldPresent(upExpCount),
         in.minimumFov.foldPresent(upMinimumFov),
         in.narrowFilters.foldPresent(upNarrowFilters),
         in.broadFilters.foldPresent(upBroadFilters),
@@ -1004,9 +976,27 @@ object ObservationService {
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
       val upMode = sql"c_science_mode = $science_mode"
+      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
+      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
+
+      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
+      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+
+      val fields = List(
+        expTimeModeType.foldPresent(upExpTimeModeType),
+        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
+        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
+        timeAndCountMode.map(_.time).foldPresent(upExpTime),
+        timeAndCountMode.map(_.count).foldPresent(upExpCount),
+      ).flattenOption
+
       val ups    = in.scienceMode.map(upMode).toList
 
-      ups ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
+      ups ++ fields ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
         ++ in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
     }

@@ -8,10 +8,13 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import lucuma.core.enums.ScienceMode
+import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 case class ScienceRequirementsInput(
+  exposureTimeMode: Nullable[ExposureTimeMode],
   spectroscopy: Option[SpectroscopyScienceRequirementsInput],
   imaging:      Option[ImagingScienceRequirementsInput]
 ) {
@@ -29,13 +32,14 @@ object ScienceRequirementsInput:
   val Binding: Matcher[ScienceRequirementsInput] =
     ObjectFieldsBinding.rmap:
       case List(
+        ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rExposureTimeMode),
         SpectroscopyScienceRequirementsInput.Binding.Option("spectroscopy", rSpectroscopy),
         ImagingScienceRequirementsInput.Binding.Option("imaging", rImaging)
       ) =>
-        (rSpectroscopy, rImaging).parTupled.flatMap:
-          case (spec, img) =>
+        (rExposureTimeMode, rSpectroscopy, rImaging).parTupled.flatMap:
+          case (expTimeMode, spec, img) =>
             atMostOne(
               spec -> "spectroscopy",
               img  -> "imaging"
-            ).as(ScienceRequirementsInput(spec, img))
+            ).as(ScienceRequirementsInput(expTimeMode, spec, img))
 

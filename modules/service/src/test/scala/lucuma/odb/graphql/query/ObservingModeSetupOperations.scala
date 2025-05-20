@@ -355,17 +355,17 @@ object ObservingModeSetupOperations {
   val SpectroscopyScienceRequirements: String =
     """
       scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0,
+            at: { nanometers: 500 }
+          }
+        },
         spectroscopy: {
           wavelength: {
             nanometers: 500
           },
           resolution: 100,
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0,
-              at: { nanometers: 500 }
-            }
-          },
           wavelengthCoverage: {
             nanometers: 20
           },
