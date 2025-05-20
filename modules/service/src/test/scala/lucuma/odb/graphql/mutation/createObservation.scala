@@ -25,6 +25,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 
@@ -1875,32 +1876,63 @@ class createObservation extends OdbSuite {
       }
     }
   }
-  test("[general] observation notes can be set") {
+
+  test("[general] cannot create an observation with imaging requirements for gmos north and south") {
     createProgramAs(pi).flatMap { pid =>
-      query(pi,
+      expectOdbError(
+        pi,
         s"""
           mutation {
             createObservation(input: {
-              programId: ${pid.asJson},
-              SET:{
-                observerNotes: "This is a note"
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  imaging: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 75.5
+                        at: { micrometers: 2.5 }
+                      }
+                    }
+                    minimumFov: { arcseconds: 330 }
+                    narrowFilters: true
+                    broadFilters: true
+                    gmosSouth: {
+                      filters: [ G_PRIME, Z, GG455 ]
+                    }
+                    gmosNorth: {
+                      filters: [ G_PRIME, Z, GG455 ]
+                    }
+                  }
+                }
               }
             }) {
               observation {
-                observerNotes
+                scienceRequirements {
+                  mode
+                  imaging {
+                    exposureTimeMode {
+                      signalToNoise {
+                        value
+                        at { nanometers }
+                      }
+                    }
+                    minimumFov { arcseconds }
+                    narrowFilters
+                    broadFilters
+                    gmosSouth {
+                      filters
+                    }
+                  }
+                }
               }
             }
           }
-          """).flatMap { js =>
-        val notes = js.hcursor
-          .downField("createObservation")
-          .downField("observation")
-          .downField("observerNotes")
-          .as[String]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-        assertIO(notes, "This is a note")
-      }
+        """,
+        expected = {
+          case OdbError.InvalidArgument(_)  => // expected
+        }
+      )
     }
   }
 

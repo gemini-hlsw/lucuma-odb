@@ -51,7 +51,14 @@ object ImagingScienceRequirementsInput:
         ImagingGmosSouthScienceRequirementsInput.Binding.Nullable("gmosSouth", rGmosSouth)
       ) =>
         (rExposureTimeMode, rMinimumFov, rNarrowFilter, rBroadFilter, rGmosNorth, rGmosSouth)
-          .parMapN(ImagingScienceRequirementsInput.apply)
+          .parTupled.flatMap(
+            (exposureTimeMode, minimumFov, narrowFilter, broadFilter, gmosNorth, gmosSouth) =>
+            atMostOne(
+              gmosNorth.toOption -> "gmosNorth",
+              gmosSouth.toOption -> "gmosSouth"
+            ).map(_ =>
+              ImagingScienceRequirementsInput(exposureTimeMode, minimumFov, narrowFilter, broadFilter, gmosNorth, gmosSouth)
+            ))
     }
 
 case class ImagingGmosNorthScienceRequirementsInput(filters: Option[List[GmosNorthFilter]])

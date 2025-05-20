@@ -113,7 +113,7 @@ class ShortCut_2772 extends ExecutionTestSupportForGmos {
                targetEnvironment: {
                  asterism: ${List(tid).asJson}
                },
-               ${ObservingModeSetupOperations.ScienceRequirements},
+               ${ObservingModeSetupOperations.SpectroscopyScienceRequirements},
                observingMode: {
                  gmosNorthLongSlit: {
                    grating: R831_G5302,
