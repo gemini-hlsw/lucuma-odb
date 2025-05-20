@@ -30,8 +30,10 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.util.Enumerated
 import skunk.*
 import skunk.codec.all.*
+import skunk.data.Arr
 import skunk.data.Type
 
 trait GmosCodecs {
@@ -61,6 +63,9 @@ trait GmosCodecs {
   val gmos_north_detector: Codec[GmosNorthDetector] =
     enumerated(Type.varchar)
 
+  val _gmos_north_filter: Codec[Arr[GmosNorthFilter]] =
+    Codec.array(_.tag, s => Enumerated[GmosNorthFilter].fromTag(s).toRight(s"Invalid GMOS-N filter tag: $s"), Type("_d_tag", List(Type("d_tag"))))
+
   val gmos_north_filter: Codec[GmosNorthFilter] =
     enumerated(Type.varchar)
 
@@ -78,6 +83,9 @@ trait GmosCodecs {
 
   val gmos_south_detector: Codec[GmosSouthDetector] =
     enumerated(Type.varchar)
+
+  val _gmos_south_filter: Codec[Arr[GmosSouthFilter]] =
+    Codec.array(_.tag, s => Enumerated[GmosSouthFilter].fromTag(s).toRight(s"Invalid GMOS-S filter tag: $s"), Type("_d_tag", List(Type("d_tag"))))
 
   val gmos_south_filter: Codec[GmosSouthFilter] =
     enumerated(Type.varchar)

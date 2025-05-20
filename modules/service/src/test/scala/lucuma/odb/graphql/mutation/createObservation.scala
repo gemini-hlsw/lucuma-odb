@@ -1724,7 +1724,7 @@ class createObservation extends OdbSuite {
     }
   }
 
-  test("[general] created observation accepts imaging requirements") {
+  test("[general] created observation accepts imaging gmos north requirements") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,s"""
         mutation {
@@ -1742,6 +1742,9 @@ class createObservation extends OdbSuite {
                   minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
+                  gmosNorth: {
+                    filters: [ G_PRIME, Z, GG455 ]
+                  }
                 }
               }
             }
@@ -1750,9 +1753,18 @@ class createObservation extends OdbSuite {
               scienceRequirements {
                 mode
                 imaging {
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
                   minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
+                  gmosNorth {
+                    filters
+                  }
                 }
               }
             }
@@ -1766,26 +1778,103 @@ class createObservation extends OdbSuite {
         val imaging: ACursor =
           reqs.downField("imaging")
 
-        println(imaging.focus)
-
         assertIO(
           (reqs.downIO[ScienceMode]("mode"),
-           // imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
-           // imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
+           imaging.downIO[List[String]]("gmosNorth", "filters"),
           ).tupled,
           (ScienceMode.Imaging,
+           BigDecimal("75.50"),
+           2_500L,
            BigDecimal("330"),
            true,
-           true
+           true,
+           List("G_PRIME", "Z", "GG455")
           )
         )
       }
     }
   }
 
+  test("[general] created observation accepts imaging gmos south requirements") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                imaging: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.5
+                      at: { micrometers: 2.5 }
+                    }
+                  }
+                  minimumFov: { arcseconds: 330 }
+                  narrowFilters: true
+                  broadFilters: true
+                  gmosSouth: {
+                    filters: [ G_PRIME, Z, GG455 ]
+                  }
+                }
+              }
+            }
+          }) {
+            observation {
+              scienceRequirements {
+                mode
+                imaging {
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
+                      at { nanometers }
+                    }
+                  }
+                  minimumFov { arcseconds }
+                  narrowFilters
+                  broadFilters
+                  gmosSouth {
+                    filters
+                  }
+                }
+              }
+            }
+          }
+        }
+      """).flatMap { js =>
+
+        val reqs: ACursor =
+          js.hcursor.downPath("createObservation", "observation", "scienceRequirements")
+
+        val imaging: ACursor =
+          reqs.downField("imaging")
+
+        assertIO(
+          (reqs.downIO[ScienceMode]("mode"),
+           imaging.downIO[BigDecimal]("exposureTimeMode", "signalToNoise", "value"),
+           imaging.downIO[Long]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
+           imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
+           imaging.downIO[Boolean]("narrowFilters"),
+           imaging.downIO[Boolean]("broadFilters"),
+           imaging.downIO[List[String]]("gmosSouth", "filters"),
+          ).tupled,
+          (ScienceMode.Imaging,
+           BigDecimal("75.50"),
+           2_500L,
+           BigDecimal("330"),
+           true,
+           true,
+           List("G_PRIME", "Z", "GG455")
+          )
+        )
+      }
+    }
+  }
   test("[general] observation notes can be set") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,

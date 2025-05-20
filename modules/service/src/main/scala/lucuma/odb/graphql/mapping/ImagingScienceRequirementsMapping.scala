@@ -20,22 +20,22 @@ trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
       SqlField("narrowFilters", Imaging.NarrowFilters),
       SqlField("broadFilters", Imaging.BroadFilters),
       SqlObject("gmosNorth", Join(List(
-        ObservationView.Id -> Imaging.ImagingGmosNorthTable.Id,
+        ObservationView.Id -> Imaging.ImagingGmosNorthView.Id,
       ))),
       SqlObject("gmosSouth", Join(List(
-        ObservationView.Id -> Imaging.ImagingGmosSouthTable.Id,
+        ObservationView.Id -> Imaging.ImagingGmosSouthView.Id,
       ))),
     )
 
   lazy val ImagingGmosNorthScienceRequirementsMapping: ObjectMapping =
     ObjectMapping(ImagingGmosNorthScienceRequirementsType)(
-      SqlField("id",      Imaging.ImagingGmosNorthTable.Id, key = true, hidden = true),
-      SqlField("filters", Imaging.ImagingGmosNorthTable.Filter),
+      SqlField("id",      Imaging.ImagingGmosNorthView.Id, key = true, hidden = true),
+      SqlField("filters", Imaging.ImagingGmosNorthView.Filters),
     )
 
   lazy val ImagingGmosSouthScienceRequirementsMapping: ObjectMapping =
     ObjectMapping(ImagingGmosSouthScienceRequirementsType)(
-      SqlField("id",      Imaging.ImagingGmosSouthTable.Id, key = true, hidden = true),
-      SqlField("filters", Imaging.ImagingGmosSouthTable.Filter),
+      SqlField("id",      Imaging.ImagingGmosSouthView.Id, key = true, hidden = true),
+      SqlField("filters", Imaging.ImagingGmosSouthView.Filters),
     )
 }
