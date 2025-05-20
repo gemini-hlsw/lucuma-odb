@@ -1001,6 +1001,51 @@ class updateObservations extends OdbSuite
         }
       }
     """
+
+    val update2: String = """
+      scienceRequirements: {
+        imaging: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 75
+              at: { nanometers: 410 }
+            }
+          }
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          gmosNorth: {
+            filters: [ OVI ]
+          }
+
+        }
+      }
+    """
+
+    val update3: String = """
+      scienceRequirements: {
+        imaging: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 75
+              at: { nanometers: 410 }
+            }
+          }
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          gmosSouth: {
+            filters: [ G_PRIME, Z, GG455 ]
+          }
+
+        }
+      }
+    """
+
     val query: String = """
       observations {
         scienceRequirements {
@@ -1090,6 +1135,71 @@ class updateObservations extends OdbSuite
       }
     """
 
+    val expected2: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "imaging": {
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 75.000,
+                      "at": {
+                        "nanometers": 410.000
+                      }
+                    }
+                  },
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "gmosNorth": {
+                    "filters": [ "OVI" ]
+                  },
+                  "gmosSouth": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected3: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "imaging": {
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 75.000,
+                      "at": {
+                        "nanometers": 410.000
+                      }
+                    }
+                  },
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "gmosNorth": null,
+                  "gmosSouth": {
+                    "filters": [ "G_PRIME", "Z", "GG455" ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
   }
 
   test("imaging science requirements: update") {
@@ -1106,7 +1216,9 @@ class updateObservations extends OdbSuite
       pi,
       List(
         (imagingScienceRequirements.update0, imagingScienceRequirements.query, imagingScienceRequirements.expected0.asRight),
-        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight)
+        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight),
+        (imagingScienceRequirements.update2, imagingScienceRequirements.query, imagingScienceRequirements.expected2.asRight),
+        (imagingScienceRequirements.update3, imagingScienceRequirements.query, imagingScienceRequirements.expected3.asRight)
       )
     )
   }

@@ -238,32 +238,20 @@ object ObservationService {
         imaging match {
           case None => Result.unit.pure[F]
           case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
-            gn.fold( {
-                val af = Statements.deleteGNImagingFilters(which)
-                session.prepareR(af.fragment.command).use { pq =>
-                  pq.execute(af.argument).void
-                }.void
-            },
+            gn.fold(session.exec(Statements.deleteGNImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
-                val af = Statements.setGmosNImagingFilters(oids, f)
-                session.prepareR(af.fragment.command).use { pq =>
-                  pq.execute(af.argument)
-                }.void
+                session.exec(Statements.deleteGSImagingFilters(which)) *>
+                  session.exec(Statements.deleteGNImagingFilters(which)) *>
+                  session.exec(Statements.setGmosNImagingFilters(oids, f))
             ).as(Result.unit)
           case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
-            gs.fold({
-                val af = Statements.deleteGSImagingFilters(which)
-                session.prepareR(af.fragment.command).use { pq =>
-                  pq.execute(af.argument).void
-                }.void
-              },
+            gs.fold(session.exec(Statements.deleteGSImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
-                val af = Statements.setGmosSImagingFilters(oids, f)
-                session.prepareR(af.fragment.command).use { pq =>
-                  pq.execute(af.argument)
-                }.void
+                session.exec(Statements.deleteGNImagingFilters(which)) *>
+                  session.exec(Statements.deleteGSImagingFilters(which)) *>
+                  session.exec(Statements.setGmosSImagingFilters(oids, f))
             ).as(Result.unit)
           case _ => Result.unit.pure[F]
         }
@@ -956,11 +944,11 @@ object ObservationService {
 
     def deleteGNImagingFilters(which: AppliedFragment): AppliedFragment =
       void"""DELETE from t_imaging_requirements_gmos_north """ |+|
-          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") "
+          void"WHERE c_observation_id IN (" |+| which |+| void") "
 
     def deleteGSImagingFilters(which: AppliedFragment): AppliedFragment =
-      void"""DELETE from t_imaging_requirements_gmos_south""" |+|
-          void"WHERE t_observation.c_observation_id IN (" |+| which |+| void") "
+      void"""DELETE from t_imaging_requirements_gmos_south """ |+|
+          void"WHERE c_observation_id IN (" |+| which |+| void") "
 
     def setGmosNImagingFilters(
       oids: List[Observation.Id],
