@@ -829,7 +829,7 @@ class updateObservations extends OdbSuite
     )
   }
 
-  private object scienceRequirements {
+  private object spectroscopyScienceRequirements {
     val update: String = """
       scienceRequirements: {
         spectroscopy: {
@@ -909,12 +909,12 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("science requirements: update") {
+  test("spectroscopy science requirements: update") {
     oneUpdateTest(
       pi,
-      scienceRequirements.update,
-      scienceRequirements.query,
-      scienceRequirements.expected.asRight
+      spectroscopyScienceRequirements.update,
+      spectroscopyScienceRequirements.query,
+      spectroscopyScienceRequirements.expected.asRight
     )
   }
 
@@ -922,7 +922,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- query(pi, updateObservationsMutation(oid, spectroscopyScienceRequirements.update, spectroscopyScienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
         oid    = oid,
@@ -961,6 +961,155 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 
+  private object imagingScienceRequirements {
+    val update0: String = """
+      scienceRequirements: {
+        imaging: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 75
+              at: { nanometers: 410 }
+            }
+          }
+          minimumFov: {
+            arcseconds: 150
+          }
+          narrowFilters: true
+          broadFilters: true
+        }
+      }
+    """
+
+    val update1: String = """
+      scienceRequirements: {
+        imaging: {
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 75
+              at: { nanometers: 410 }
+            }
+          }
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          gmosNorth: {
+            filters: [ G_PRIME, Z, GG455 ]
+          }
+
+        }
+      }
+    """
+    val query: String = """
+      observations {
+        scienceRequirements {
+          mode
+          imaging {
+            exposureTimeMode {
+              signalToNoise {
+                value
+                at { nanometers }
+              }
+            }
+            minimumFov { arcseconds }
+            narrowFilters
+            broadFilters
+            gmosNorth {
+              filters
+            }
+            gmosSouth {
+              filters
+            }
+          }
+        }
+      }
+    """
+
+    val expected0: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "imaging": {
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 75.000,
+                      "at": {
+                        "nanometers": 410.000
+                      }
+                    }
+                  },
+                  "minimumFov": {
+                    "arcseconds": 150
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": true,
+                  "gmosNorth": null,
+                  "gmosSouth": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected1: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "imaging": {
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 75.000,
+                      "at": {
+                        "nanometers": 410.000
+                      }
+                    }
+                  },
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "gmosNorth": {
+                    "filters": [ "G_PRIME", "Z", "GG455" ]
+                  },
+                  "gmosSouth": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+  }
+
+  test("imaging science requirements: update") {
+    oneUpdateTest(
+      pi,
+      imagingScienceRequirements.update0,
+      imagingScienceRequirements.query,
+      imagingScienceRequirements.expected0.asRight
+    )
+  }
+
+  test("imaging science requirements: update filters") {
+    multiUpdateTest(
+      pi,
+      List(
+        (imagingScienceRequirements.update0, imagingScienceRequirements.query, imagingScienceRequirements.expected0.asRight),
+        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight)
+      )
+    )
+  }
   /*
 
   [ERROR] lucuma-odb-test - Error computing GraphQL respon.ignorese.
