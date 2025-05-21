@@ -591,8 +591,7 @@ trait DatabaseOperations { this: OdbSuite =>
           focalPlaneAngle: { microarcseconds: 0 }
         }
       }"""
-      case ObservingModeType.GmosNorthImaging |
-           ObservingModeType.GmosSouthImaging =>
+      case ObservingModeType.GmosNorthImaging =>
         """{
           exposureTimeMode: {
             signalToNoise: {
@@ -606,6 +605,28 @@ trait DatabaseOperations { this: OdbSuite =>
             },
             narrowFilters: false,
             broadFilters: false
+            gmosNorth: {
+              filters: [I_PRIME, Y, G_PRIME_OG515]
+            }
+          }
+        }"""
+      case ObservingModeType.GmosSouthImaging =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false,
+            broadFilters: false
+            gmosSouth: {
+              filters: [G_PRIME, Y, I_PRIME_RG780]
+            }
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit |
