@@ -22,7 +22,7 @@ object LongSlit:
   val Static: F2Static =
     F2Static(
       mosPreImaging          = MosPreImaging.IsNotMosPreImaging,
-      useElectronicOffseting = false
+      useElectronicOffsetting = false
     )
 
   def instantiate[F[_]: Monad](

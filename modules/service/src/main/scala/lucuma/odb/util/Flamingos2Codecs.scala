@@ -61,7 +61,7 @@ trait Flamingos2Codecs:
       bool
     ).imap { case (m, e) => Flamingos2StaticConfig(m, e) } { f2 => (
       f2.mosPreImaging,
-      f2.useElectronicOffseting
+      f2.useElectronicOffsetting
     )}
 
   val flamingos_2_fpu_mask_custom: Codec[Flamingos2FpuMask.Custom] =
