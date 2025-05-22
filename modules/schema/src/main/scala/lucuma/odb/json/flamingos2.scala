@@ -40,7 +40,7 @@ trait Flamingos2Codec:
     Encoder.instance[Flamingos2StaticConfig]: a =>
       Json.obj(
         "mosPreImaging"           -> a.mosPreImaging.asJson,
-        "useElectronicOffsetting" -> a.useElectronicOffseting.asJson
+        "useElectronicOffsetting" -> a.useElectronicOffsetting.asJson
       )
 
   // This needs an explicit name because the default, given_Decoder_Custom
