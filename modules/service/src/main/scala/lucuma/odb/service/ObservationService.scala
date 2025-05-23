@@ -256,6 +256,13 @@ object ObservationService {
           case _ => Result.unit.pure[F]
         }
 
+      private def cloneImagingRequirements(
+        originalId: Observation.Id,
+        newId: Observation.Id,
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.cloneGmosNorthImagingRequirements(originalId, newId)) >>
+        session.exec(Statements.cloneGmosSouthImagingRequirements(originalId, newId))
+
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
         programId: Program.Id,
@@ -515,7 +522,8 @@ object ObservationService {
                   asterismService.cloneAsterism(observationId, oid2) >>
                   observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
                   timingWindowService.cloneTimingWindows(observationId, oid2) >>
-                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
+                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2) >>
+                  cloneImagingRequirements(observationId, oid2)
 
                 val doUpdate =
                   SET match
@@ -1135,7 +1143,10 @@ object ObservationService {
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
-          c_observing_mode_type
+          c_observing_mode_type,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters
         )
         SELECT
           c_program_id,
@@ -1173,7 +1184,10 @@ object ObservationService {
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
-          c_observing_mode_type
+          c_observing_mode_type,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters
       FROM t_observation
       WHERE c_observation_id = $observation_id
       """.apply(gix, oid) |+|
@@ -1212,6 +1226,24 @@ object ObservationService {
       void"DELETE FROM t_observation " |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
+    def cloneGmosImagingRequirements(originalId: Observation.Id, newId: Observation.Id, table: AppliedFragment): AppliedFragment =
+      void"INSERT INTO " |+| table |+| sql""" (
+          c_observation_id,
+          c_filter
+        )
+        SELECT
+          $observation_id,
+          c_filter
+        FROM """.apply(newId) |+| table |+| sql"""
+        WHERE c_observation_id = $observation_id
+      """.apply(originalId)
+
+    def cloneGmosNorthImagingRequirements(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      cloneGmosImagingRequirements(originalId, newId, void"t_imaging_requirements_gmos_north")
+
+    def cloneGmosSouthImagingRequirements(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
+      cloneGmosImagingRequirements(originalId, newId, void"t_imaging_requirements_gmos_south")
 
     val ResetAcquisition: Command[Observation.Id] =
       sql"""
