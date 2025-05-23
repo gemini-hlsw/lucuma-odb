@@ -279,7 +279,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                 case Left(gid) => gid
               }.headOption
       cg   <- cgid.map(queryGroup)
-                .getOrElse(IO.raiseError(new RuntimeException(s"$gr1 No calibration group")))
+                .getOrElse(IO.raiseError(new RuntimeException("No calibration group")))
       ob   <- queryObservations(pid)
     } yield {
       assertEquals(gr.size, 1)
