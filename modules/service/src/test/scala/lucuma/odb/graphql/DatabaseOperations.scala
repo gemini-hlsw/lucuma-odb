@@ -606,9 +606,6 @@ trait DatabaseOperations { this: OdbSuite =>
             narrowFilters: false
             broadFilters: false
             combinedFilters: true
-            gmosNorth: {
-              filters: [I_PRIME, Y, G_PRIME_OG515]
-            }
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
@@ -626,9 +623,6 @@ trait DatabaseOperations { this: OdbSuite =>
             narrowFilters: false
             broadFilters: false
             combinedFilters: true
-            gmosSouth: {
-              filters: [G_PRIME, Y, I_PRIME_RG780]
-            }
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit |

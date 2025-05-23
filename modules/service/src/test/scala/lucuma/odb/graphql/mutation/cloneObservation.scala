@@ -49,12 +49,6 @@ class cloneObservation extends OdbSuite {
           narrowFilters
           broadFilters
           combinedFilters
-          gmosNorth {
-            filters
-          }
-          gmosSouth {
-            filters
-          }
         }
       }
       observingMode {

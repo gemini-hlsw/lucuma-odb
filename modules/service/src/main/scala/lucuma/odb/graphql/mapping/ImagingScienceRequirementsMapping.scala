@@ -7,7 +7,7 @@ package mapping
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ObservationView
 
-trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
+trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F]:
 
   import ObservationView.ScienceRequirements.Imaging
 
@@ -18,23 +18,4 @@ trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
       SqlField("narrowFilters", Imaging.NarrowFilters),
       SqlField("broadFilters", Imaging.BroadFilters),
       SqlField("combinedFilters", Imaging.CombinedFilters),
-      SqlObject("gmosNorth", Join(List(
-        ObservationView.Id -> Imaging.ImagingGmosNorthView.Id,
-      ))),
-      SqlObject("gmosSouth", Join(List(
-        ObservationView.Id -> Imaging.ImagingGmosSouthView.Id,
-      ))),
     )
-
-  lazy val ImagingGmosNorthScienceRequirementsMapping: ObjectMapping =
-    ObjectMapping(ImagingGmosNorthScienceRequirementsType)(
-      SqlField("id",      Imaging.ImagingGmosNorthView.Id, key = true, hidden = true),
-      SqlField("filters", Imaging.ImagingGmosNorthView.Filters),
-    )
-
-  lazy val ImagingGmosSouthScienceRequirementsMapping: ObjectMapping =
-    ObjectMapping(ImagingGmosSouthScienceRequirementsType)(
-      SqlField("id",      Imaging.ImagingGmosSouthView.Id, key = true, hidden = true),
-      SqlField("filters", Imaging.ImagingGmosSouthView.Filters),
-    )
-}

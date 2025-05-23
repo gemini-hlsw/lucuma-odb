@@ -9201,18 +9201,6 @@ input ImagingScienceRequirementsInput {
   skipping it altogether.
   """
   combinedFilters: Boolean
-
-  """
-  gmosNorth, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  gmosNorth: ImagingScienceRequirementsGmosNorthInput
-
-  """
-  gmosSouth, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  gmosSouth: ImagingScienceRequirementsGmosSouthInput
 }
 
 type ImagingScienceRequirements {
@@ -9241,32 +9229,6 @@ type ImagingScienceRequirements {
   """
   combinedFilters: Boolean
 
-  """
-  The GMOS North configuration.  Null for other instruments.
-  """
-  gmosNorth: ImagingScienceRequirementsGmosNorth
-
-  """
-  The GMOS South configuration.  Null for other instruments.
-  """
-  gmosSouth: ImagingScienceRequirementsGmosSouth
-
-}
-
-input ImagingScienceRequirementsGmosNorthInput {
-  filters: [GmosNorthFilter!]!
-}
-
-type ImagingScienceRequirementsGmosNorth {
-  filters: [GmosNorthFilter!]!
-}
-
-input ImagingScienceRequirementsGmosSouthInput {
-  filters: [GmosSouthFilter!]!
-}
-
-type ImagingScienceRequirementsGmosSouth {
-  filters: [GmosSouthFilter!]!
 }
 
 """
