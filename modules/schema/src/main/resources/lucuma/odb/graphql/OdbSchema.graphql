@@ -9203,12 +9203,14 @@ input ImagingScienceRequirementsInput {
   combinedFilters: Boolean
 
   """
-  The GMOS North configuration.  Null for other instruments.
+  gmosNorth, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
   gmosNorth: ImagingScienceRequirementsGmosNorthInput
 
   """
-  The GMOS South configuration.  Null for other instruments.
+  gmosSouth, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
   gmosSouth: ImagingScienceRequirementsGmosSouthInput
 }
