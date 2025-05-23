@@ -17,12 +17,12 @@ import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 case class ImagingScienceRequirementsInput(
-  minimumFov:     Nullable[Angle],
-  narrowFilters:  Nullable[Boolean],
-  broadFilters:   Nullable[Boolean],
+  minimumFov:      Nullable[Angle],
+  narrowFilters:   Nullable[Boolean],
+  broadFilters:    Nullable[Boolean],
   combinedFilters: Nullable[Boolean],
-  gmosNorth:      Nullable[ImagingGmosNorthScienceRequirementsInput],
-  gmosSouth:      Nullable[ImagingGmosSouthScienceRequirementsInput]
+  gmosNorth:       Nullable[ImagingGmosNorthScienceRequirementsInput],
+  gmosSouth:       Nullable[ImagingGmosSouthScienceRequirementsInput]
 ) {
   val scienceMode: ScienceMode = ScienceMode.Imaging
 }

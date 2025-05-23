@@ -15,15 +15,15 @@ import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 case class ScienceRequirementsInput(
   exposureTimeMode: Nullable[ExposureTimeMode],
-  spectroscopy: Option[SpectroscopyScienceRequirementsInput],
-  imaging:      Option[ImagingScienceRequirementsInput]
+  spectroscopy:     Option[SpectroscopyScienceRequirementsInput],
+  imaging:          Option[ImagingScienceRequirementsInput]
 ) {
   require(!(spectroscopy.isDefined && imaging.isDefined))
   def scienceMode: Option[ScienceMode] =
     (spectroscopy, imaging) match {
-      case (Some(_), None)   => ScienceMode.Spectroscopy.some
-      case (None, Some(_))   => ScienceMode.Imaging.some
-      case _                 => none
+      case (Some(_), None) => ScienceMode.Spectroscopy.some
+      case (None, Some(_)) => ScienceMode.Imaging.some
+      case _               => none
     }
 }
 

@@ -7,7 +7,6 @@ package mapping
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ObservationView
 
-
 trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
 
   import ObservationView.ScienceRequirements.Imaging

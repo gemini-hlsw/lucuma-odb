@@ -18,7 +18,6 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.FocalPlane
-import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -288,7 +287,8 @@ object ObservationService {
                 rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid =>
-                setImagingRequirementFilters(List(oid), SET.scienceRequirements.flatMap(_.imaging)) }
+                  setImagingRequirementFilters(List(oid), SET.scienceRequirements.flatMap(_.imaging))
+                }
               }.flatMap { rOid =>
                 SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -928,65 +928,63 @@ object ObservationService {
       ).flattenOption
     }
 
+    private def deleteImagingFilters(which: AppliedFragment, table: AppliedFragment): AppliedFragment =
+      void"DELETE from " |+| table |+|
+          void" WHERE c_observation_id IN (" |+| which |+| void") "
+
     def deleteGNImagingFilters(which: AppliedFragment): AppliedFragment =
-      void"""DELETE from t_imaging_requirements_gmos_north """ |+|
-          void"WHERE c_observation_id IN (" |+| which |+| void") "
+      deleteImagingFilters(which, void"t_imaging_requirements_gmos_north")
 
     def deleteGSImagingFilters(which: AppliedFragment): AppliedFragment =
-      void"""DELETE from t_imaging_requirements_gmos_south """ |+|
-          void"WHERE c_observation_id IN (" |+| which |+| void") "
+      deleteImagingFilters(which, void"t_imaging_requirements_gmos_south")
+
+    private def setImagingFilters[A](
+      oids: List[Observation.Id],
+      filters: Option[List[A]],
+      enc: Encoder[A],
+      table: AppliedFragment,
+    ): AppliedFragment = {
+
+      def insert: AppliedFragment =
+        void"INSERT INTO " |+| table |+| void""" (
+            c_observation_id,
+            c_filter
+          ) VALUES
+          """
+
+      def filterEntries =
+        for {
+          o <- oids
+          f <- filters.orEmpty
+        } yield sql"($observation_id, $enc)"(o, f)
+
+      val values: AppliedFragment =
+        filterEntries.intercalate(void", ")
+
+      filters.fold(AppliedFragment.empty)(_ => insert |+| values)
+    }
 
     def setGmosNImagingFilters(
       oids: List[Observation.Id],
       in:   ImagingGmosNorthScienceRequirementsInput,
-    ): AppliedFragment = {
-      import lucuma.odb.util.GmosCodecs.*
-
-      def insert: AppliedFragment =
-        void"""
-          INSERT INTO t_imaging_requirements_gmos_north (
-            c_observation_id,
-            c_filter
-          ) VALUES
-          """
-
-      def filterEntries =
-        for {
-          o <- oids
-          f <- in.filters.orEmpty
-        } yield sql"($observation_id, $gmos_north_filter)"(o, f)
-
-      val values: AppliedFragment =
-        filterEntries.intercalate(void", ")
-
-      in.filters.fold(AppliedFragment.empty)(_ => insert |+| values)
-    }
+    ): AppliedFragment =
+      setImagingFilters(
+        oids,
+        in.filters,
+        lucuma.odb.util.GmosCodecs.gmos_north_filter,
+        void"t_imaging_requirements_gmos_north"
+      )
 
     def setGmosSImagingFilters(
       oids: List[Observation.Id],
       in: ImagingGmosSouthScienceRequirementsInput,
-    ): AppliedFragment = {
-      import lucuma.odb.util.GmosCodecs.*
-
-      def insert: AppliedFragment =
-        void"""
-          INSERT INTO t_imaging_requirements_gmos_south (
-            c_observation_id,
-            c_filter
-          ) VALUES
-          """
-
-      def filterEntries =
-        for {
-          o <- oids
-          f <- in.filters.orEmpty
-        } yield sql"($observation_id, $gmos_south_filter)"(o, f)
-
-      val values: AppliedFragment =
-        filterEntries.intercalate(void", ")
-
-      in.filters.fold(AppliedFragment.empty)(_ => insert |+| values)
-    }
+    ): AppliedFragment =
+      setImagingFilters(
+        oids,
+        in.filters,
+        lucuma.odb.util.GmosCodecs.gmos_south_filter,
+        void"t_imaging_requirements_gmos_south"
+      )
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
       val upMode = sql"c_science_mode = $science_mode"
