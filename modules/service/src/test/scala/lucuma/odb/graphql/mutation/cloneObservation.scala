@@ -44,6 +44,17 @@ class cloneObservation extends OdbSuite {
           focalPlane
           focalPlaneAngle { microarcseconds }
         }
+        imaging {
+          minimumFov { microarcseconds }
+          narrowFilters
+          broadFilters
+          gmosNorth {
+            filters
+          }
+          gmosSouth {
+            filters
+          }
+        }
       }
       observingMode {
         gmosNorthLongSlit {
@@ -78,7 +89,7 @@ class cloneObservation extends OdbSuite {
     ObservingModeType.GmosNorthImaging,
     ObservingModeType.GmosSouthImaging
   )
-  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet -- NotImplemented
+  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet // -- NotImplemented
 
   test("clones should have the same properties, for all observing modes") {
     ObservingModeType.values.toList.filter(IsImplemented.apply).traverse { obsMode =>
