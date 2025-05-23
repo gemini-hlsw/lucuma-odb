@@ -18,6 +18,7 @@ trait ImagingScienceRequirementsMapping[F[_]] extends ObservationView[F] {
       SqlObject("minimumFov"),
       SqlField("narrowFilters", Imaging.NarrowFilters),
       SqlField("broadFilters", Imaging.BroadFilters),
+      SqlField("combinedFilters", Imaging.CombinedFilters),
       SqlObject("gmosNorth", Join(List(
         ObservationView.Id -> Imaging.ImagingGmosNorthView.Id,
       ))),
