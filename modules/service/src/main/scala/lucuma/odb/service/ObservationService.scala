@@ -237,7 +237,7 @@ object ObservationService {
         val which = oids.map(oid => sql"$observation_id"(oid)).intercalate(void", ")
         imaging match {
           case None => Result.unit.pure[F]
-          case Some(ImagingScienceRequirementsInput(_, _, _, gn, Nullable.Absent)) =>
+          case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
             gn.fold(session.exec(Statements.deleteGNImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
@@ -245,7 +245,7 @@ object ObservationService {
                   session.exec(Statements.deleteGNImagingFilters(which)) *>
                   session.exec(Statements.setGmosNImagingFilters(oids, f))
             ).as(Result.unit)
-          case Some(ImagingScienceRequirementsInput(_, _, _, Nullable.Absent, gs)) =>
+          case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
             gs.fold(session.exec(Statements.deleteGSImagingFilters(which)),
               Applicative[F].pure(()).void,
               f =>
@@ -681,6 +681,7 @@ object ObservationService {
            imaging.flatMap(_.minimumFov.toOption)                         ,
            imaging.flatMap(_.narrowFilters.toOption)                         ,
            imaging.flatMap(_.broadFilters.toOption)                         ,
+           imaging.flatMap(_.combinedFilters.toOption)                         ,
            modeType                                                                 ,
            instrument                                                               ,
            observerNotes                                                            ,
@@ -729,6 +730,7 @@ object ObservationService {
       Option[Angle]                    ,
       Option[Boolean]                  ,
       Option[Boolean]                  ,
+      Option[Boolean]                  ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
@@ -768,6 +770,7 @@ object ObservationService {
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,
+          c_img_combined_filters,
           c_observing_mode_type,
           c_instrument,
           c_observer_notes
@@ -804,6 +807,7 @@ object ObservationService {
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
           ${angle_µas.opt},
+          ${bool.opt},
           ${bool.opt},
           ${bool.opt},
           ${observing_mode_type.opt},
@@ -914,11 +918,13 @@ object ObservationService {
       val upMinimumFov         = sql"c_img_minimum_fov = ${angle_µas.opt}"
       val upNarrowFilters      = sql"c_img_narrow_filters = ${bool.opt}"
       val upBroadFilters       = sql"c_img_broad_filters = ${bool.opt}"
+      val upCombinedFilters    = sql"c_img_combined_filters = ${bool.opt}"
 
       List(
         in.minimumFov.foldPresent(upMinimumFov),
         in.narrowFilters.foldPresent(upNarrowFilters),
         in.broadFilters.foldPresent(upBroadFilters),
+        in.combinedFilters.foldPresent(upCombinedFilters),
       ).flattenOption
     }
 
@@ -1146,7 +1152,8 @@ object ObservationService {
           c_observing_mode_type,
           c_img_minimum_fov,
           c_img_narrow_filters,
-          c_img_broad_filters
+          c_img_broad_filters,
+          c_img_combined_filters
         )
         SELECT
           c_program_id,
@@ -1187,7 +1194,8 @@ object ObservationService {
           c_observing_mode_type,
           c_img_minimum_fov,
           c_img_narrow_filters,
-          c_img_broad_filters
+          c_img_broad_filters,
+          c_img_combined_filters
       FROM t_observation
       WHERE c_observation_id = $observation_id
       """.apply(gix, oid) |+|

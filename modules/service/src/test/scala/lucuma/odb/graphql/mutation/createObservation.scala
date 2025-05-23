@@ -1743,6 +1743,7 @@ class createObservation extends OdbSuite {
                   minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
+                  combinedFilters: true
                   gmosNorth: {
                     filters: [ G_PRIME, Z, GG455 ]
                   }
@@ -1763,6 +1764,7 @@ class createObservation extends OdbSuite {
                   minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
+                  combinedFilters
                   gmosNorth {
                     filters
                   }
@@ -1786,12 +1788,14 @@ class createObservation extends OdbSuite {
            imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
+           imaging.downIO[Boolean]("combinedFilters"),
            imaging.downIO[List[String]]("gmosNorth", "filters"),
           ).tupled,
           (ScienceMode.Imaging,
            BigDecimal("75.50"),
            2_500L,
            BigDecimal("330"),
+           true,
            true,
            true,
            List("G_PRIME", "Z", "GG455")
@@ -1819,6 +1823,7 @@ class createObservation extends OdbSuite {
                   minimumFov: { arcseconds: 330 }
                   narrowFilters: true
                   broadFilters: true
+                  combinedFilters: true
                   gmosSouth: {
                     filters: [ G_PRIME, Z, GG455 ]
                   }
@@ -1839,6 +1844,7 @@ class createObservation extends OdbSuite {
                   minimumFov { arcseconds }
                   narrowFilters
                   broadFilters
+                  combinedFilters
                   gmosSouth {
                     filters
                   }
@@ -1862,12 +1868,14 @@ class createObservation extends OdbSuite {
            imaging.downIO[BigDecimal]("minimumFov", "arcseconds"),
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
+           imaging.downIO[Boolean]("combinedFilters"),
            imaging.downIO[List[String]]("gmosSouth", "filters"),
           ).tupled,
           (ScienceMode.Imaging,
            BigDecimal("75.50"),
            2_500L,
            BigDecimal("330"),
+           true,
            true,
            true,
            List("G_PRIME", "Z", "GG455")
@@ -1897,6 +1905,7 @@ class createObservation extends OdbSuite {
                     minimumFov: { arcseconds: 330 }
                     narrowFilters: true
                     broadFilters: true
+                    combinedFilters: true
                     gmosSouth: {
                       filters: [ G_PRIME, Z, GG455 ]
                     }
@@ -1920,6 +1929,7 @@ class createObservation extends OdbSuite {
                     minimumFov { arcseconds }
                     narrowFilters
                     broadFilters
+                    combinedFilters
                     gmosSouth {
                       filters
                     }

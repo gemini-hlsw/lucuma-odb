@@ -48,6 +48,7 @@ class cloneObservation extends OdbSuite {
           minimumFov { microarcseconds }
           narrowFilters
           broadFilters
+          combinedFilters
           gmosNorth {
             filters
           }

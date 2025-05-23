@@ -603,8 +603,9 @@ trait DatabaseOperations { this: OdbSuite =>
             minimumFov: {
               arcseconds: 100
             },
-            narrowFilters: false,
+            narrowFilters: false
             broadFilters: false
+            combinedFilters: true
             gmosNorth: {
               filters: [I_PRIME, Y, G_PRIME_OG515]
             }
@@ -622,8 +623,9 @@ trait DatabaseOperations { this: OdbSuite =>
             minimumFov: {
               arcseconds: 100
             },
-            narrowFilters: false,
+            narrowFilters: false
             broadFilters: false
+            combinedFilters: true
             gmosSouth: {
               filters: [G_PRIME, Y, I_PRIME_RG780]
             }

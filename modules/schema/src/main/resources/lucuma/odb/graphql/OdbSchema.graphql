@@ -9197,6 +9197,12 @@ input ImagingScienceRequirementsInput {
   broadFilters: Boolean
 
   """
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  combinedFilters: Boolean
+
+  """
   The GMOS North configuration.  Null for other instruments.
   """
   gmosNorth: ImagingScienceRequirementsGmosNorthInput
@@ -9226,6 +9232,12 @@ type ImagingScienceRequirements {
   skipping it altogether.
   """
   broadFilters: Boolean
+
+  """
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  combinedFilters: Boolean
 
   """
   The GMOS North configuration.  Null for other instruments.

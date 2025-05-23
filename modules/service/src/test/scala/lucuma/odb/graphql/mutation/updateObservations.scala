@@ -976,6 +976,7 @@ class updateObservations extends OdbSuite
           }
           narrowFilters: true
           broadFilters: true
+          combinedFilters: true
         }
       }
     """
@@ -994,6 +995,7 @@ class updateObservations extends OdbSuite
           }
           narrowFilters: true
           broadFilters: false
+          combinedFilters: true
           gmosNorth: {
             filters: [ G_PRIME, Z, GG455 ]
           }
@@ -1016,6 +1018,7 @@ class updateObservations extends OdbSuite
           }
           narrowFilters: true
           broadFilters: false
+          combinedFilters: false
           gmosNorth: {
             filters: [ OVI ]
           }
@@ -1038,6 +1041,7 @@ class updateObservations extends OdbSuite
           }
           narrowFilters: true
           broadFilters: false
+          combinedFilters: true
           gmosSouth: {
             filters: [ G_PRIME, Z, GG455 ]
           }
@@ -1060,6 +1064,7 @@ class updateObservations extends OdbSuite
             minimumFov { arcseconds }
             narrowFilters
             broadFilters
+            combinedFilters
             gmosNorth {
               filters
             }
@@ -1092,6 +1097,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": true,
+                  "combinedFilters": true,
                   "gmosNorth": null,
                   "gmosSouth": null
                 }
@@ -1123,6 +1129,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
+                  "combinedFilters": true,
                   "gmosNorth": {
                     "filters": [ "G_PRIME", "Z", "GG455" ]
                   },
@@ -1156,6 +1163,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
+                  "combinedFilters": false,
                   "gmosNorth": {
                     "filters": [ "OVI" ]
                   },
@@ -1189,6 +1197,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
+                  "combinedFilters": true,
                   "gmosNorth": null,
                   "gmosSouth": {
                     "filters": [ "G_PRIME", "Z", "GG455" ]

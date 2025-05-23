@@ -17,11 +17,12 @@ import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 case class ImagingScienceRequirementsInput(
-  minimumFov:   Nullable[Angle],
-  narrowFilters: Nullable[Boolean],
-  broadFilters:  Nullable[Boolean],
-  gmosNorth:    Nullable[ImagingGmosNorthScienceRequirementsInput],
-  gmosSouth:    Nullable[ImagingGmosSouthScienceRequirementsInput]
+  minimumFov:     Nullable[Angle],
+  narrowFilters:  Nullable[Boolean],
+  broadFilters:   Nullable[Boolean],
+  combinedFilters: Nullable[Boolean],
+  gmosNorth:      Nullable[ImagingGmosNorthScienceRequirementsInput],
+  gmosSouth:      Nullable[ImagingGmosSouthScienceRequirementsInput]
 ) {
   val scienceMode: ScienceMode = ScienceMode.Imaging
 }
@@ -33,6 +34,7 @@ object ImagingScienceRequirementsInput:
       minimumFov       = Nullable.Null,
       narrowFilters    = Nullable.Null,
       broadFilters     = Nullable.Null,
+      combinedFilters  = Nullable.Null,
       gmosNorth        = Nullable.Null,
       gmosSouth        = Nullable.Null
     )
@@ -43,17 +45,18 @@ object ImagingScienceRequirementsInput:
         AngleInput.Binding.Nullable("minimumFov", rMinimumFov),
         BooleanBinding.Nullable("narrowFilters", rNarrowFilter),
         BooleanBinding.Nullable("broadFilters", rBroadFilter),
+        BooleanBinding.Nullable("combinedFilters", rCombinedFilter),
         ImagingGmosNorthScienceRequirementsInput.Binding.Nullable("gmosNorth", rGmosNorth),
         ImagingGmosSouthScienceRequirementsInput.Binding.Nullable("gmosSouth", rGmosSouth)
       ) =>
-        (rMinimumFov, rNarrowFilter, rBroadFilter, rGmosNorth, rGmosSouth)
+        (rMinimumFov, rNarrowFilter, rBroadFilter, rCombinedFilter, rGmosNorth, rGmosSouth)
           .parTupled.flatMap(
-            (minimumFov, narrowFilter, broadFilter, gmosNorth, gmosSouth) =>
+            (minimumFov, narrowFilter, broadFilter, combinedFilter, gmosNorth, gmosSouth) =>
             atMostOne(
               gmosNorth.toOption -> "gmosNorth",
               gmosSouth.toOption -> "gmosSouth"
             ).map(_ =>
-              ImagingScienceRequirementsInput(minimumFov, narrowFilter, broadFilter, gmosNorth, gmosSouth)
+              ImagingScienceRequirementsInput(minimumFov, narrowFilter, broadFilter, combinedFilter, gmosNorth, gmosSouth)
             ))
     }
 

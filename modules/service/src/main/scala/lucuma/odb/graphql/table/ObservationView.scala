@@ -113,6 +113,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
 
           val NarrowFilters: ColumnRef   = col("c_img_narrow_filters", bool.opt)
           val BroadFilters: ColumnRef    = col("c_img_broad_filters",  bool.opt)
+          val CombinedFilters: ColumnRef = col("c_img_combined_filters", bool.opt)
 
           object ExposureTimeMode:
             val SyntheticId: ColumnRef   = col("c_exp_time_mode_id", observation_id.embedded)
