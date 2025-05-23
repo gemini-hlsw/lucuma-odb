@@ -996,9 +996,6 @@ class updateObservations extends OdbSuite
           narrowFilters: true
           broadFilters: false
           combinedFilters: true
-          gmosNorth: {
-            filters: [ G_PRIME, Z, GG455 ]
-          }
 
         }
       }
@@ -1019,9 +1016,6 @@ class updateObservations extends OdbSuite
           narrowFilters: true
           broadFilters: false
           combinedFilters: false
-          gmosNorth: {
-            filters: [ OVI ]
-          }
 
         }
       }
@@ -1042,9 +1036,6 @@ class updateObservations extends OdbSuite
           narrowFilters: true
           broadFilters: false
           combinedFilters: true
-          gmosSouth: {
-            filters: [ G_PRIME, Z, GG455 ]
-          }
 
         }
       }
@@ -1065,12 +1056,6 @@ class updateObservations extends OdbSuite
             narrowFilters
             broadFilters
             combinedFilters
-            gmosNorth {
-              filters
-            }
-            gmosSouth {
-              filters
-            }
           }
         }
       }
@@ -1097,9 +1082,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": true,
-                  "combinedFilters": true,
-                  "gmosNorth": null,
-                  "gmosSouth": null
+                  "combinedFilters": true
                 }
               }
             }
@@ -1129,11 +1112,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
-                  "combinedFilters": true,
-                  "gmosNorth": {
-                    "filters": [ "G_PRIME", "Z", "GG455" ]
-                  },
-                  "gmosSouth": null
+                  "combinedFilters": true
                 }
               }
             }
@@ -1163,11 +1142,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
-                  "combinedFilters": false,
-                  "gmosNorth": {
-                    "filters": [ "OVI" ]
-                  },
-                  "gmosSouth": null
+                  "combinedFilters": false
                 }
               }
             }
@@ -1197,11 +1172,7 @@ class updateObservations extends OdbSuite
                   },
                   "narrowFilters": true,
                   "broadFilters": false,
-                  "combinedFilters": true,
-                  "gmosNorth": null,
-                  "gmosSouth": {
-                    "filters": [ "G_PRIME", "Z", "GG455" ]
-                  }
+                  "combinedFilters": true
                 }
               }
             }
@@ -1220,17 +1191,6 @@ class updateObservations extends OdbSuite
     )
   }
 
-  test("imaging science requirements: update filters") {
-    multiUpdateTest(
-      pi,
-      List(
-        (imagingScienceRequirements.update0, imagingScienceRequirements.query, imagingScienceRequirements.expected0.asRight),
-        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight),
-        (imagingScienceRequirements.update2, imagingScienceRequirements.query, imagingScienceRequirements.expected2.asRight),
-        (imagingScienceRequirements.update3, imagingScienceRequirements.query, imagingScienceRequirements.expected3.asRight)
-      )
-    )
-  }
   /*
 
   [ERROR] lucuma-odb-test - Error computing GraphQL respon.ignorese.

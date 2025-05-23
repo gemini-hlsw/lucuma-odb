@@ -13,44 +13,6 @@ ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise_at TO c_etm_signa
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time           TO c_etm_exp_time;
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count          TO c_etm_exp_count;
 
--- GMOS North imaging requirements
-CREATE TABLE t_imaging_requirements_gmos_north (
-  c_observation_id d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
-  c_filter         d_tag            NOT NULL REFERENCES t_gmos_north_filter(c_tag),
-  PRIMARY KEY (c_observation_id, c_filter)
-);
-COMMENT ON TABLE t_imaging_requirements_gmos_north IS 'GMOS North imaging requirements';
-
--- A view to repackage the filters as an array value so Grackle can digest
--- it. Seems overkill but well.
-CREATE VIEW v_imaging_requirements_gmos_north AS
-  SELECT
-    c_observation_id,
-    -- keep insertion order
-    array_remove(array_agg(c_filter), NULL) AS c_filters
-  FROM
-    t_imaging_requirements_gmos_north
-  GROUP BY
-    c_observation_id;
-
--- GMOS South imaging requirements
-CREATE TABLE t_imaging_requirements_gmos_south (
-  c_observation_id d_observation_id NOT NULL REFERENCES t_observation(c_observation_id),
-  c_filter         d_tag            NOT NULL REFERENCES t_gmos_south_filter(c_tag),
-  PRIMARY KEY (c_observation_id, c_filter)
-);
-COMMENT ON TABLE t_imaging_requirements_gmos_south IS 'GMOS South imaging requirements';
-
-CREATE VIEW v_imaging_requirements_gmos_south AS
-  SELECT
-    c_observation_id,
-    -- keep insertion order
-    array_remove(array_agg(c_filter), NULL) AS c_filters
-  FROM
-    t_imaging_requirements_gmos_south
-  GROUP BY
-    c_observation_id;
-
 -- Update views to include imaging requirements
 DROP VIEW v_observation;
 CREATE OR REPLACE VIEW v_observation AS
@@ -112,31 +74,4 @@ LEFT JOIN t_target t
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
-
-CREATE OR REPLACE FUNCTION ch_observation_edit_img_requirements()
-  RETURNS trigger AS $$
-DECLARE
-  observation record;
-  program_id d_program_id;
-BEGIN
-  observation := COALESCE(NEW, OLD);
-  program_id := (SELECT c_program_id FROM t_observation WHERE c_observation_id = observation.c_observation_id);
-  IF ROW(NEW.*) IS DISTINCT FROM ROW(OLD.*) THEN
-    PERFORM pg_notify('ch_observation_edit', observation.c_observation_id || ',' || program_id  || ',' || 'UPDATE');
-  END IF;
-  RETURN observation;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER ch_observation_edit_img_gmos_north
-  AFTER INSERT OR UPDATE OR DELETE ON t_imaging_requirements_gmos_north
-  DEFERRABLE
-  FOR EACH ROW
-  EXECUTE PROCEDURE ch_observation_edit_img_requirements();
-
-CREATE CONSTRAINT TRIGGER ch_observation_edit_img_gmos_south
-  AFTER INSERT OR UPDATE OR DELETE ON t_imaging_requirements_gmos_south
-  DEFERRABLE
-  FOR EACH ROW
-  EXECUTE PROCEDURE ch_observation_edit_img_requirements();
 

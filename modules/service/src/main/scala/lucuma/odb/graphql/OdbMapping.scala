@@ -393,8 +393,6 @@ object OdbMapping {
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
                 ImagingScienceRequirementsMapping,
-                ImagingGmosNorthScienceRequirementsMapping,
-                ImagingGmosSouthScienceRequirementsMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,
                 LibraryProgramReferenceMapping,

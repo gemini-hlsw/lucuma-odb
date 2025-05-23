@@ -25,7 +25,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
-import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 
@@ -1744,9 +1743,6 @@ class createObservation extends OdbSuite {
                   narrowFilters: true
                   broadFilters: true
                   combinedFilters: true
-                  gmosNorth: {
-                    filters: [ G_PRIME, Z, GG455 ]
-                  }
                 }
               }
             }
@@ -1765,9 +1761,6 @@ class createObservation extends OdbSuite {
                   narrowFilters
                   broadFilters
                   combinedFilters
-                  gmosNorth {
-                    filters
-                  }
                 }
               }
             }
@@ -1789,7 +1782,6 @@ class createObservation extends OdbSuite {
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
            imaging.downIO[Boolean]("combinedFilters"),
-           imaging.downIO[List[String]]("gmosNorth", "filters"),
           ).tupled,
           (ScienceMode.Imaging,
            BigDecimal("75.50"),
@@ -1797,8 +1789,7 @@ class createObservation extends OdbSuite {
            BigDecimal("330"),
            true,
            true,
-           true,
-           List("G_PRIME", "Z", "GG455")
+           true
           )
         )
       }
@@ -1824,9 +1815,6 @@ class createObservation extends OdbSuite {
                   narrowFilters: true
                   broadFilters: true
                   combinedFilters: true
-                  gmosSouth: {
-                    filters: [ G_PRIME, Z, GG455 ]
-                  }
                 }
               }
             }
@@ -1845,9 +1833,6 @@ class createObservation extends OdbSuite {
                   narrowFilters
                   broadFilters
                   combinedFilters
-                  gmosSouth {
-                    filters
-                  }
                 }
               }
             }
@@ -1869,7 +1854,6 @@ class createObservation extends OdbSuite {
            imaging.downIO[Boolean]("narrowFilters"),
            imaging.downIO[Boolean]("broadFilters"),
            imaging.downIO[Boolean]("combinedFilters"),
-           imaging.downIO[List[String]]("gmosSouth", "filters"),
           ).tupled,
           (ScienceMode.Imaging,
            BigDecimal("75.50"),
@@ -1877,72 +1861,10 @@ class createObservation extends OdbSuite {
            BigDecimal("330"),
            true,
            true,
-           true,
-           List("G_PRIME", "Z", "GG455")
+           true
           )
         )
       }
-    }
-  }
-
-  test("[general] cannot create an observation with imaging requirements for gmos north and south") {
-    createProgramAs(pi).flatMap { pid =>
-      expectOdbError(
-        pi,
-        s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-              SET: {
-                scienceRequirements: {
-                  exposureTimeMode: {
-                    signalToNoise: {
-                      value: 75.5
-                      at: { micrometers: 2.5 }
-                    }
-                  }
-                  imaging: {
-                    minimumFov: { arcseconds: 330 }
-                    narrowFilters: true
-                    broadFilters: true
-                    combinedFilters: true
-                    gmosSouth: {
-                      filters: [ G_PRIME, Z, GG455 ]
-                    }
-                    gmosNorth: {
-                      filters: [ G_PRIME, Z, GG455 ]
-                    }
-                  }
-                }
-              }
-            }) {
-              observation {
-                scienceRequirements {
-                  mode
-                  exposureTimeMode {
-                    signalToNoise {
-                      value
-                      at { nanometers }
-                    }
-                  }
-                  imaging {
-                    minimumFov { arcseconds }
-                    narrowFilters
-                    broadFilters
-                    combinedFilters
-                    gmosSouth {
-                      filters
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = {
-          case OdbError.InvalidArgument(_)  => // expected
-        }
-      )
     }
   }
 

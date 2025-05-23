@@ -57,8 +57,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
-import lucuma.odb.graphql.input.ImagingGmosNorthScienceRequirementsInput
-import lucuma.odb.graphql.input.ImagingGmosSouthScienceRequirementsInput
 import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
@@ -229,39 +227,6 @@ object ObservationService {
             optF.fold(().pure[F])( f => f(oids, transaction) )
           }
 
-      private def setImagingRequirementFilters(
-        oids:    List[Observation.Id],
-        imaging: Option[ImagingScienceRequirementsInput],
-      )(using Transaction[F]): F[Result[Unit]] =
-        val which = oids.map(oid => sql"$observation_id"(oid)).intercalate(void", ")
-        imaging match {
-          case None => Result.unit.pure[F]
-          case Some(ImagingScienceRequirementsInput(_, _, _, _, gn, Nullable.Absent)) =>
-            gn.fold(session.exec(Statements.deleteGNImagingFilters(which)),
-              Applicative[F].pure(()).void,
-              f =>
-                session.exec(Statements.deleteGSImagingFilters(which)) *>
-                  session.exec(Statements.deleteGNImagingFilters(which)) *>
-                  session.exec(Statements.setGmosNImagingFilters(oids, f))
-            ).as(Result.unit)
-          case Some(ImagingScienceRequirementsInput(_, _, _, _, Nullable.Absent, gs)) =>
-            gs.fold(session.exec(Statements.deleteGSImagingFilters(which)),
-              Applicative[F].pure(()).void,
-              f =>
-                session.exec(Statements.deleteGNImagingFilters(which)) *>
-                  session.exec(Statements.deleteGSImagingFilters(which)) *>
-                  session.exec(Statements.setGmosSImagingFilters(oids, f))
-            ).as(Result.unit)
-          case _ => Result.unit.pure[F]
-        }
-
-      private def cloneImagingRequirements(
-        originalId: Observation.Id,
-        newId: Observation.Id,
-      )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.cloneGmosNorthImagingRequirements(originalId, newId)) >>
-        session.exec(Statements.cloneGmosSouthImagingRequirements(originalId, newId))
-
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
         programId: Program.Id,
@@ -285,10 +250,6 @@ object ObservationService {
                 }
               }.flatTap { rOid =>
                 rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
-              }.flatTap { rOid =>
-                rOid.flatTraverse { oid =>
-                  setImagingRequirementFilters(List(oid), SET.scienceRequirements.flatMap(_.imaging))
-                }
               }.flatMap { rOid =>
                 SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -451,7 +412,6 @@ object ObservationService {
                 _ <- validateBand(g.keys.toList)
                 _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
-                _ <- ResultT(setImagingRequirementFilters(u.foldMap(_.toList), SET.scienceRequirements.flatMap(_.imaging)))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
@@ -522,8 +482,7 @@ object ObservationService {
                   asterismService.cloneAsterism(observationId, oid2) >>
                   observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
                   timingWindowService.cloneTimingWindows(observationId, oid2) >>
-                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2) >>
-                  cloneImagingRequirements(observationId, oid2)
+                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
                 val doUpdate =
                   SET match
@@ -928,64 +887,6 @@ object ObservationService {
       ).flattenOption
     }
 
-    private def deleteImagingFilters(which: AppliedFragment, table: AppliedFragment): AppliedFragment =
-      void"DELETE from " |+| table |+|
-          void" WHERE c_observation_id IN (" |+| which |+| void") "
-
-    def deleteGNImagingFilters(which: AppliedFragment): AppliedFragment =
-      deleteImagingFilters(which, void"t_imaging_requirements_gmos_north")
-
-    def deleteGSImagingFilters(which: AppliedFragment): AppliedFragment =
-      deleteImagingFilters(which, void"t_imaging_requirements_gmos_south")
-
-    private def setImagingFilters[A](
-      oids: List[Observation.Id],
-      filters: Option[List[A]],
-      enc: Encoder[A],
-      table: AppliedFragment,
-    ): AppliedFragment = {
-
-      def insert: AppliedFragment =
-        void"INSERT INTO " |+| table |+| void""" (
-            c_observation_id,
-            c_filter
-          ) VALUES
-          """
-
-      def filterEntries =
-        for {
-          o <- oids
-          f <- filters.orEmpty
-        } yield sql"($observation_id, $enc)"(o, f)
-
-      val values: AppliedFragment =
-        filterEntries.intercalate(void", ")
-
-      filters.fold(AppliedFragment.empty)(_ => insert |+| values)
-    }
-
-    def setGmosNImagingFilters(
-      oids: List[Observation.Id],
-      in:   ImagingGmosNorthScienceRequirementsInput,
-    ): AppliedFragment =
-      setImagingFilters(
-        oids,
-        in.filters,
-        lucuma.odb.util.GmosCodecs.gmos_north_filter,
-        void"t_imaging_requirements_gmos_north"
-      )
-
-    def setGmosSImagingFilters(
-      oids: List[Observation.Id],
-      in: ImagingGmosSouthScienceRequirementsInput,
-    ): AppliedFragment =
-      setImagingFilters(
-        oids,
-        in.filters,
-        lucuma.odb.util.GmosCodecs.gmos_south_filter,
-        void"t_imaging_requirements_gmos_south"
-      )
-
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
       val upMode = sql"c_science_mode = $science_mode"
       val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
@@ -1232,24 +1133,6 @@ object ObservationService {
       void"DELETE FROM t_observation " |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-
-    def cloneGmosImagingRequirements(originalId: Observation.Id, newId: Observation.Id, table: AppliedFragment): AppliedFragment =
-      void"INSERT INTO " |+| table |+| sql""" (
-          c_observation_id,
-          c_filter
-        )
-        SELECT
-          $observation_id,
-          c_filter
-        FROM """.apply(newId) |+| table |+| sql"""
-        WHERE c_observation_id = $observation_id
-      """.apply(originalId)
-
-    def cloneGmosNorthImagingRequirements(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
-      cloneGmosImagingRequirements(originalId, newId, void"t_imaging_requirements_gmos_north")
-
-    def cloneGmosSouthImagingRequirements(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
-      cloneGmosImagingRequirements(originalId, newId, void"t_imaging_requirements_gmos_south")
 
     val ResetAcquisition: Command[Observation.Id] =
       sql"""
