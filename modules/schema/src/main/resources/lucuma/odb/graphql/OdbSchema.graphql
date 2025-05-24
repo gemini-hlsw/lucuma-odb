@@ -4301,14 +4301,20 @@ Edit science requirements
 """
 input ScienceRequirementsInput {
   """
-  The mode field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
-  mode: ScienceMode
+  exposureTimeMode: ExposureTimeModeInput
 
   """
   The spectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   spectroscopy: SpectroscopyScienceRequirementsInput
+
+  """
+  The imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  imaging: ImagingScienceRequirementsInput
 }
 
 """
@@ -4570,12 +4576,6 @@ input SpectroscopyScienceRequirementsInput {
   The resolution field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   resolution: PosInt
-
-  """
-  ExposureTimeMode, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
-  """
-  exposureTimeMode: ExposureTimeModeInput
 
   """
   The wavelengthCoverage field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -9174,6 +9174,64 @@ type SpectroscopyConfigOptionFlamingos2 {
 }
 
 """
+Edit or create imaging science requirements
+"""
+input ImagingScienceRequirementsInput {
+
+  """
+  minimumFov, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  minimumFov: AngleInput
+
+  """
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  narrowFilters: Boolean
+
+  """
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  broadFilters: Boolean
+
+  """
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  combinedFilters: Boolean
+}
+
+type ImagingScienceRequirements {
+
+  """
+  minimumFov, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  minimumFov: Angle
+
+  """
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  narrowFilters: Boolean
+
+  """
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  broadFilters: Boolean
+
+  """
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  combinedFilters: Boolean
+
+}
+
+"""
 Describes an instrument configuration option for imaging.
 """
 type ImagingConfigOption {
@@ -10993,9 +11051,19 @@ type ScienceRequirements {
   mode: ScienceMode!
 
   """
-  Spectroscopy requirements
+  Requested exposure time mode.
   """
-  spectroscopy: SpectroscopyScienceRequirements!
+  exposureTimeMode: ExposureTimeMode
+
+  """
+  Spectroscopy requirements, if mode is Spectroscopy, this mode must be set
+  """
+  spectroscopy: SpectroscopyScienceRequirements
+
+  """
+  Imaging requirements, if mode is Imaging, this mode must be set
+  """
+  imaging: ImagingScienceRequirements
 }
 
 type ScienceRequirementsGroup {
@@ -11361,11 +11429,6 @@ type SpectroscopyScienceRequirements {
   Requested resolution
   """
   resolution: PosInt
-
-  """
-  Requested exposure time mode.
-  """
-  exposureTimeMode: ExposureTimeMode
 
   """
   Wavelength range

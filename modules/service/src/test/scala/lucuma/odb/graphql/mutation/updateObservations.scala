@@ -829,18 +829,18 @@ class updateObservations extends OdbSuite
     )
   }
 
-  private object scienceRequirements {
+  private object spectroscopyScienceRequirements {
     val update: String = """
       scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
         spectroscopy: {
           wavelength: { nanometers: 400 }
           resolution: 10
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
-          }
           wavelengthCoverage: { picometers: 10 }
           focalPlane: SINGLE_SLIT
           focalPlaneAngle: { arcseconds: 5 }
@@ -853,15 +853,15 @@ class updateObservations extends OdbSuite
       observations {
         scienceRequirements {
           mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
           spectroscopy {
             wavelength { nanometers }
             resolution
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
-              }
-            }
             wavelengthCoverage { nanometers }
             focalPlane
             focalPlaneAngle { arcseconds }
@@ -878,19 +878,19 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "SPECTROSCOPY",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
                 "spectroscopy": {
                   "wavelength": {
                     "nanometers": 400.000
                   },
                   "resolution": 10,
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
-                    }
-                  },
                   "wavelengthCoverage": {
                     "nanometers": 0.010
                   },
@@ -909,12 +909,12 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("science requirements: update") {
+  test("spectroscopy science requirements: update") {
     oneUpdateTest(
       pi,
-      scienceRequirements.update,
-      scienceRequirements.query,
-      scienceRequirements.expected.asRight
+      spectroscopyScienceRequirements.update,
+      spectroscopyScienceRequirements.query,
+      spectroscopyScienceRequirements.expected.asRight
     )
   }
 
@@ -922,7 +922,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- query(pi, updateObservationsMutation(oid, spectroscopyScienceRequirements.update, spectroscopyScienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
         oid    = oid,
@@ -959,6 +959,236 @@ class updateObservations extends OdbSuite
         """.asRight
       )
     } yield ()
+  }
+
+  private object imagingScienceRequirements {
+    val update0: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 150
+          }
+          narrowFilters: true
+          broadFilters: true
+          combinedFilters: true
+        }
+      }
+    """
+
+    val update1: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+
+        }
+      }
+    """
+
+    val update2: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: false
+
+        }
+      }
+    """
+
+    val update3: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+
+        }
+      }
+    """
+
+    val query: String = """
+      observations {
+        scienceRequirements {
+          mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
+          imaging {
+            minimumFov { arcseconds }
+            narrowFilters
+            broadFilters
+            combinedFilters
+          }
+        }
+      }
+    """
+
+    val expected0: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 150
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": true,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected1: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected2: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected3: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+  }
+
+  test("imaging science requirements: update") {
+    oneUpdateTest(
+      pi,
+      imagingScienceRequirements.update0,
+      imagingScienceRequirements.query,
+      imagingScienceRequirements.expected0.asRight
+    )
   }
 
   /*

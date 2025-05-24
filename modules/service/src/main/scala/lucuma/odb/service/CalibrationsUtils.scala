@@ -8,7 +8,6 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -168,21 +167,20 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  mode         = ScienceMode.Spectroscopy.some,
-                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                    exposureTimeMode = Nullable.orNull(wvAt).map: w =>
-                      ExposureTimeMode.SignalToNoiseMode(
-                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                        w
-                      )
-                  ).some
+                  exposureTimeMode = Nullable.orNull(wvAt).map: w =>
+                    ExposureTimeMode.SignalToNoiseMode(
+                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                      w
+                    ),
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
+                  imaging      = none
                 ).some
               ),
               pid,
               Codecs.program_id
           )
       ).orError
-      
+
   def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:     Program.Id,
     gid:     Group.Id,
@@ -208,15 +206,14 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  mode = ScienceMode.Spectroscopy.some,
-                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.copy(
-                    exposureTimeMode = Nullable.NonNull(
-                      ExposureTimeMode.SignalToNoiseMode(
-                        SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                        cw
-                      )
+                  exposureTimeMode = Nullable.NonNull(
+                    ExposureTimeMode.SignalToNoiseMode(
+                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                      cw
                     )
-                  ).some
+                  ),
+                  spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
+                  imaging = none
                 ).some
               ),
               pid,

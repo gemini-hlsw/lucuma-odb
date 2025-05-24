@@ -180,6 +180,7 @@ object OdbMapping {
           with GroupElementMapping[F]
           with HourAngleRangeMapping[F]
           with ImagingConfigOptionMapping[F]
+          with ImagingScienceRequirementsMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
@@ -391,6 +392,7 @@ object OdbMapping {
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
+                ImagingScienceRequirementsMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,
                 LibraryProgramReferenceMapping,

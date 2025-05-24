@@ -34,16 +34,15 @@ class observation extends OdbSuite {
                   }
                   targetEnvironment: { asterism: ["$tid1", "$tid2"] }
                   scienceRequirements: {
-                    mode: SPECTROSCOPY
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 100.0
+                        at: { nanometers: 500 }
+                      }
+                    }
                     spectroscopy: {
                       wavelength: { nanometers: 500 }
                       resolution: 100
-                      exposureTimeMode: {
-                        signalToNoise: {
-                          value: 100.0
-                          at: { nanometers: 500 }
-                        }
-                      }
                       wavelengthCoverage: { nanometers: 20 }
                       focalPlane: SINGLE_SLIT
                       focalPlaneAngle: { microarcseconds: 0 }
