@@ -7447,7 +7447,7 @@ enum Flamingos2Reads {
 }
 
 """
-Flamingos2 South Long Slit mode
+Flamingos2 Long Slit mode
 """
 type Flamingos2LongSlit {
 
@@ -9185,20 +9185,17 @@ input ImagingScienceRequirementsInput {
   minimumFov: AngleInput
 
   """
-  narrowFilters, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
+  narrowFilters, can be ignored by skipping it altogether
   """
   narrowFilters: Boolean
 
   """
-  broadFilters, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
+  broadFilters, can be ignored by skipping it altogether defaults to false.
   """
   broadFilters: Boolean
 
   """
-  combinedFilters, which may be unset by assigning a null value, or ignored by
-  skipping it altogether.
+  combinedFilters, can be ignored by skipping it altogether
   """
   combinedFilters: Boolean
 }
@@ -9215,19 +9212,19 @@ type ImagingScienceRequirements {
   narrowFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  narrowFilters: Boolean
+  narrowFilters: Boolean!
 
   """
   broadFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  broadFilters: Boolean
+  broadFilters: Boolean!
 
   """
   combinedFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  combinedFilters: Boolean
+  combinedFilters: Boolean!
 
 }
 
