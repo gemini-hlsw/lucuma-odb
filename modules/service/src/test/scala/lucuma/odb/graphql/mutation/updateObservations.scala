@@ -1041,6 +1041,15 @@ class updateObservations extends OdbSuite
       }
     """
 
+    // update only broadFilters - other values should be preserved
+    val update4 = """
+      scienceRequirements: {
+        imaging: {
+          broadFilters: true
+        }
+      }
+    """
+
     val query: String = """
       observations {
         scienceRequirements {
@@ -1180,14 +1189,48 @@ class updateObservations extends OdbSuite
         }
       }
     """
+
+    val expected4: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": true,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
   }
 
-  test("imaging science requirements: update") {
-    oneUpdateTest(
+  test("imaging science requirements: multi updates") {
+    multiUpdateTest(
       pi,
-      imagingScienceRequirements.update0,
-      imagingScienceRequirements.query,
-      imagingScienceRequirements.expected0.asRight
+      List(
+        (imagingScienceRequirements.update0, imagingScienceRequirements.query, imagingScienceRequirements.expected0.asRight),
+        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight),
+        (imagingScienceRequirements.update2, imagingScienceRequirements.query, imagingScienceRequirements.expected2.asRight),
+        (imagingScienceRequirements.update3, imagingScienceRequirements.query, imagingScienceRequirements.expected3.asRight),
+        (imagingScienceRequirements.update4, imagingScienceRequirements.query, imagingScienceRequirements.expected4.asRight)
+      )
     )
   }
 

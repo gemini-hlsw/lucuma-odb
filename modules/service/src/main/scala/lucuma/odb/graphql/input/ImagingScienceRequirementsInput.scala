@@ -14,9 +14,9 @@ import lucuma.odb.graphql.binding.ObjectFieldsBinding
 
 case class ImagingScienceRequirementsInput(
   minimumFov:      Nullable[Angle],
-  narrowFilters:   Nullable[Boolean],
-  broadFilters:    Nullable[Boolean],
-  combinedFilters: Nullable[Boolean]
+  narrowFilters:   Option[Boolean],
+  broadFilters:    Option[Boolean],
+  combinedFilters: Option[Boolean]
 ) {
   val scienceMode: ScienceMode = ScienceMode.Imaging
 }
@@ -26,22 +26,27 @@ object ImagingScienceRequirementsInput:
   val Default: ImagingScienceRequirementsInput =
     ImagingScienceRequirementsInput(
       minimumFov       = Nullable.Null,
-      narrowFilters    = Nullable.Null,
-      broadFilters     = Nullable.Null,
-      combinedFilters  = Nullable.Null
+      narrowFilters    = None,
+      broadFilters     = None,
+      combinedFilters  = None
     )
 
   val Binding: Matcher[ImagingScienceRequirementsInput] =
     ObjectFieldsBinding.rmap {
       case List(
         AngleInput.Binding.Nullable("minimumFov", rMinimumFov),
-        BooleanBinding.Nullable("narrowFilters", rNarrowFilter),
-        BooleanBinding.Nullable("broadFilters", rBroadFilter),
-        BooleanBinding.Nullable("combinedFilters", rCombinedFilter)
+        BooleanBinding.Option("narrowFilters", rNarrowFilter),
+        BooleanBinding.Option("broadFilters", rBroadFilter),
+        BooleanBinding.Option("combinedFilters", rCombinedFilter)
       ) =>
         (rMinimumFov, rNarrowFilter, rBroadFilter, rCombinedFilter)
           .parTupled.map(
             (minimumFov, narrowFilter, broadFilter, combinedFilter) =>
-              ImagingScienceRequirementsInput(minimumFov, narrowFilter, broadFilter, combinedFilter)
+              ImagingScienceRequirementsInput(
+                minimumFov,
+                narrowFilter,
+                broadFilter,
+                combinedFilter
+              )
             )
     }
