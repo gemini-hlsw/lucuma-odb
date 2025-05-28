@@ -1,9 +1,9 @@
 -- Add imaging science requirements tables
 ALTER TABLE t_observation
   ADD COLUMN c_img_minimum_fov      d_angle_µas null default null,
-  ADD COLUMN c_img_narrow_filters   boolean     not null default false,
-  ADD COLUMN c_img_broad_filters    boolean     not null default false,
-  ADD COLUMN c_img_combined_filters boolean     not null default false;
+  ADD COLUMN c_img_narrow_filters   boolean     null default null,
+  ADD COLUMN c_img_broad_filters    boolean     null default null,
+  ADD COLUMN c_img_combined_filters boolean     null default null;
 
 -- Rename spec constraint
 -- the exposure time mode is shared between imaging and spectroscopy
@@ -12,6 +12,39 @@ ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise    TO c_etm_signa
 ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise_at TO c_etm_signal_to_noise_at;
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time           TO c_etm_exp_time;
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count          TO c_etm_exp_count;
+
+-- Add check constraint to ensure c_science_mode is consistent with spectroscopy and imaging fields
+ALTER TABLE t_observation
+  ADD CONSTRAINT science_mode_consistency CHECK (
+    CASE c_science_mode
+      -- If spectroscopy mode, all imaging fields must be NULL
+      WHEN 'spectroscopy' THEN
+        c_img_minimum_fov IS NULL AND
+        c_img_narrow_filters IS NULL AND
+        c_img_broad_filters IS NULL AND
+        c_img_combined_filters IS NULL
+      -- If imaging mode, all spectroscopy fields must be NULL
+      WHEN 'imaging' THEN
+        c_spec_wavelength IS NULL AND
+        c_spec_resolution IS NULL AND
+        c_spec_wavelength_coverage IS NULL AND
+        c_spec_focal_plane IS NULL AND
+        c_spec_focal_plane_angle IS NULL AND
+        c_spec_capability IS NULL
+      -- If science mode is NULL, all science requirement fields must be NULL
+      ELSE
+        c_spec_wavelength IS NULL AND
+        c_spec_resolution IS NULL AND
+        c_spec_wavelength_coverage IS NULL AND
+        c_spec_focal_plane IS NULL AND
+        c_spec_focal_plane_angle IS NULL AND
+        c_spec_capability IS NULL AND
+        c_img_minimum_fov IS NULL AND
+        c_img_narrow_filters IS NULL AND
+        c_img_broad_filters IS NULL AND
+        c_img_combined_filters IS NULL
+    END
+  );
 
 -- Update views to include imaging requirements
 DROP VIEW v_observation;
