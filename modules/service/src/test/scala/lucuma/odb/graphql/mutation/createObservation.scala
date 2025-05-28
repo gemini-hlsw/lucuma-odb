@@ -1868,6 +1868,50 @@ class createObservation extends OdbSuite {
     }
   }
 
+  test("[general] cannot create observation with both imaging and spectroscopy requirements") {
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL("Argument 'input.SET.scienceRequirements' is invalid: Expected at most one of spectroscopy, imaging") {
+        query(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.5
+                      at: { micrometers: 2.5 }
+                    }
+                  }
+                  spectroscopy: {
+                    wavelength: { nanometers: 400 }
+                    resolution: 200
+                    wavelengthCoverage: { picometers: 100000 }
+                    focalPlane: SINGLE_SLIT
+                    focalPlaneAngle: { microarcseconds: 3 }
+                    capability: null
+                  }
+                  imaging: {
+                    minimumFov: { arcseconds: 330 }
+                    narrowFilters: true
+                    broadFilters: true
+                    combinedFilters: true
+                  }
+                }
+              }
+            }) {
+              observation {
+                scienceRequirements {
+                  mode
+                }
+              }
+            }
+          }
+        """)
+      }
+    }
+  }
+
   test("[pi] pi can create an observation in their own program") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid)

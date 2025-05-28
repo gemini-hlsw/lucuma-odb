@@ -1234,6 +1234,161 @@ class updateObservations extends OdbSuite
     )
   }
 
+  test("science requirements: update from spectroscopy to imaging") {
+    val spectroscopyUpdate = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100
+            at: { nanometers: 500 }
+          }
+        }
+        spectroscopy: {
+          wavelength: { nanometers: 600 }
+          resolution: 5000
+          wavelengthCoverage: { nanometers: 100 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { arcseconds: 10 }
+          capability: CORONAGRAPHY
+        }
+      }
+    """
+
+    val imagingUpdate = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: { arcseconds: 120 }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        scienceRequirements {
+          mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
+          spectroscopy {
+            wavelength { nanometers }
+            resolution
+            wavelengthCoverage { nanometers }
+            focalPlane
+            focalPlaneAngle { arcseconds }
+            capability
+          }
+          imaging {
+            minimumFov { arcseconds }
+            narrowFilters
+            broadFilters
+            combinedFilters
+          }
+        }
+      }
+    """
+
+    val expectedSpectroscopy = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "SPECTROSCOPY",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 100.000,
+                    "at": {
+                      "nanometers": 500.000
+                    }
+                  }
+                },
+                "spectroscopy": {
+                  "wavelength": {
+                    "nanometers": 600.000
+                  },
+                  "resolution": 5000,
+                  "wavelengthCoverage": {
+                    "nanometers": 100.000
+                  },
+                  "focalPlane": "SINGLE_SLIT",
+                  "focalPlaneAngle": {
+                    "arcseconds": 10
+                  },
+                  "capability": "CORONAGRAPHY"
+                },
+                "imaging": {
+                  "minimumFov": null,
+                  "narrowFilters": null,
+                  "broadFilters": null,
+                  "combinedFilters": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expectedImaging = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "spectroscopy": {
+                  "wavelength": null,
+                  "resolution": null,
+                  "wavelengthCoverage": null,
+                  "focalPlane": null,
+                  "focalPlaneAngle": null,
+                  "capability": null
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 120
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      // First set spectroscopy requirements
+      _   <- updateObservation(pi, oid, spectroscopyUpdate, query, expectedSpectroscopy)
+      // Then update to imaging requirements - spectroscopy fields should be null
+      _   <- updateObservation(pi, oid, imagingUpdate, query, expectedImaging)
+    } yield ()
+  }
+
   /*
 
   [ERROR] lucuma-odb-test - Error computing GraphQL respon.ignorese.
