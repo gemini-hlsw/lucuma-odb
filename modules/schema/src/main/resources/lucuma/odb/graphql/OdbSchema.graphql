@@ -9185,17 +9185,20 @@ input ImagingScienceRequirementsInput {
   minimumFov: AngleInput
 
   """
-  narrowFilters, can be ignored by skipping it altogether
+  narrowFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
   narrowFilters: Boolean
 
   """
-  broadFilters, can be ignored by skipping it altogether defaults to false.
+  broadFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
   broadFilters: Boolean
 
   """
-  combinedFilters, can be ignored by skipping it altogether
+  combinedFilters, which may be unset by assigning a null value, or ignored by
+  skipping it altogether.
   """
   combinedFilters: Boolean
 }
@@ -9212,19 +9215,19 @@ type ImagingScienceRequirements {
   narrowFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  narrowFilters: Boolean!
+  narrowFilters: Boolean
 
   """
   broadFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  broadFilters: Boolean!
+  broadFilters: Boolean
 
   """
   combinedFilters, which may be unset by assigning a null value, or ignored by
   skipping it altogether.
   """
-  combinedFilters: Boolean!
+  combinedFilters: Boolean
 
 }
 

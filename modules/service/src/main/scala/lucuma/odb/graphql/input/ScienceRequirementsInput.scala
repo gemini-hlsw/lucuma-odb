@@ -18,7 +18,6 @@ case class ScienceRequirementsInput(
   spectroscopy:     Option[SpectroscopyScienceRequirementsInput],
   imaging:          Option[ImagingScienceRequirementsInput]
 ) {
-  require(!(spectroscopy.isDefined && imaging.isDefined))
   def scienceMode: Option[ScienceMode] =
     (spectroscopy, imaging) match {
       case (Some(_), None) => ScienceMode.Spectroscopy.some

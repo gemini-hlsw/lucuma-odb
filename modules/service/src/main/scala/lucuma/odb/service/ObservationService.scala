@@ -638,9 +638,9 @@ object ObservationService {
            spectroscopy.flatMap(_.focalPlaneAngle.toOption)                                                                        ,
            spectroscopy.flatMap(_.capability.toOption)                                                                             ,
            imaging.flatMap(_.minimumFov.toOption)                                                                                  ,
-           imaging.flatMap(_.narrowFilters).getOrElse(false)                                                                       ,
-           imaging.flatMap(_.broadFilters).getOrElse(false)                                                                        ,
-           imaging.flatMap(_.combinedFilters).getOrElse(false)                                                                     ,
+           imaging.flatMap(_.narrowFilters.toOption)                                                                               ,
+           imaging.flatMap(_.broadFilters.toOption)                                                                                ,
+           imaging.flatMap(_.combinedFilters.toOption)                                                                             ,
            modeType                                                                                                                ,
            instrument                                                                                                              ,
            observerNotes                                                                                                           ,
@@ -687,9 +687,9 @@ object ObservationService {
       Option[Angle]                    ,
       Option[SpectroscopyCapabilities] ,
       Option[Angle]                    ,
-      Boolean                          ,
-      Boolean                          ,
-      Boolean                          ,
+      Option[Boolean]                  ,
+      Option[Boolean]                  ,
+      Option[Boolean]                  ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
@@ -766,9 +766,9 @@ object ObservationService {
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
           ${angle_µas.opt},
-          $bool,
-          $bool,
-          $bool,
+          ${bool.opt},
+          ${bool.opt},
+          ${bool.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
           ${text_nonempty.opt}
@@ -875,15 +875,15 @@ object ObservationService {
     def imagingRequirementsUpdates(in: ImagingScienceRequirementsInput): List[AppliedFragment] = {
 
       val upMinimumFov         = sql"c_img_minimum_fov = ${angle_µas.opt}"
-      val upNarrowFilters      = sql"c_img_narrow_filters = $bool"
-      val upBroadFilters       = sql"c_img_broad_filters = $bool"
-      val upCombinedFilters    = sql"c_img_combined_filters = $bool"
+      val upNarrowFilters      = sql"c_img_narrow_filters = ${bool.opt}"
+      val upBroadFilters       = sql"c_img_broad_filters = ${bool.opt}"
+      val upCombinedFilters    = sql"c_img_combined_filters = ${bool.opt}"
 
       List(
         in.minimumFov.foldPresent(upMinimumFov),
-        in.narrowFilters.map(upNarrowFilters),
-        in.broadFilters.map(upBroadFilters),
-        in.combinedFilters.map(upCombinedFilters)
+        in.narrowFilters.foldPresent(upNarrowFilters),
+        in.broadFilters.foldPresent(upBroadFilters),
+        in.combinedFilters.foldPresent(upCombinedFilters)
       ).flattenOption
     }
 
@@ -909,8 +909,31 @@ object ObservationService {
 
       val ups    = in.scienceMode.map(upMode).toList
 
-      ups ++ fields ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
-        ++ in.imaging.toList.flatMap(imagingRequirementsUpdates)
+      // When changing modes, we need to clear fields from the other mode
+      val clearSpectroscopy = in.scienceMode.exists(_ == ScienceMode.Imaging) && in.spectroscopy.isEmpty
+      val clearImaging = in.scienceMode.exists(_ == ScienceMode.Spectroscopy) && in.imaging.isEmpty
+
+      val spectroscopyClear =
+        Option.when(clearSpectroscopy)(List(
+          void"c_spec_wavelength = NULL",
+          void"c_spec_resolution = NULL",
+          void"c_spec_wavelength_coverage = NULL",
+          void"c_spec_focal_plane = NULL",
+          void"c_spec_focal_plane_angle = NULL",
+          void"c_spec_capability = NULL"
+        )).orEmpty
+
+      val imagingClear =
+        Option.when(clearImaging)(List(
+          void"c_img_minimum_fov = NULL",
+          void"c_img_narrow_filters = NULL",
+          void"c_img_broad_filters = NULL",
+          void"c_img_combined_filters = NULL"
+        )).orEmpty
+
+      ups ++ fields ++ spectroscopyClear ++ imagingClear ++
+        in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
+        in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
     }
 
