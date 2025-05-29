@@ -71,9 +71,10 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       }
 
       object ScienceRequirements:
-        val Mode: ColumnRef = col("c_science_mode", science_mode.embedded)
+        val Mode: ColumnRef = col("c_science_mode", science_mode.embedded.opt)
 
         object Spectroscopy:
+          val SyntheticId: ColumnRef = col("c_spectroscopy_mode_id", observation_id.embedded)
 
           object Wavelength:
             val SyntheticId: ColumnRef = col("c_spec_wavelength_id", observation_id.embedded)
@@ -106,6 +107,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val Capability: ColumnRef    = col("c_spec_capability",          spectroscopy_capabilities.opt)
 
         object Imaging:
+          val SyntheticId: ColumnRef = col("c_imaging_mode_id", observation_id.embedded)
 
           object MinimumFovAngle:
             val SyntheticId: ColumnRef = col("c_img_minimum_fov_id", observation_id.embedded)
