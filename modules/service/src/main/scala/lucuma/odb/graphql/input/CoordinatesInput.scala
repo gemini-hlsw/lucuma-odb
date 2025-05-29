@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import grackle.Result
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension

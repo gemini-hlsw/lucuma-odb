@@ -47,7 +47,6 @@ import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.implicits.*
@@ -235,7 +234,7 @@ object ObservationWorkflowService {
       case _                             => ObservationValidation.configuration(ge.format)
 
   /* Construct an instance. */
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       // Make the enums available in a stable and implicit way
@@ -328,6 +327,7 @@ object ObservationWorkflowService {
               .toMap
 
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def validateConfigurations(infos: NonEmptyList[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
         ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
           rs.view
@@ -342,6 +342,7 @@ object ObservationWorkflowService {
                 }
             .toMap
 
+      @annotation.nowarn("msg=unused implicit parameter")
       // Computes the observation execution state if not cached
       private def executionStates(
         infos:      Map[Observation.Id, ObservationValidationInfo],
@@ -473,7 +474,7 @@ object ObservationWorkflowService {
 
         // Here are our composed validators
 
-        val calibrationValidator, engValidator: Validator = info =>
+        val calibrationValidator, engValidator: Validator = _ =>
           ObservationValidationMap.empty
 
         val scienceValidator1: Validator =
@@ -673,6 +674,7 @@ object ObservationWorkflowService {
           .flatMap: oids =>
             filterState(oids, states, commitHash, itcClient, ptc)
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
         services.transactionally:
           val af = Statements.selectObservationsForTargets(whichTargets)

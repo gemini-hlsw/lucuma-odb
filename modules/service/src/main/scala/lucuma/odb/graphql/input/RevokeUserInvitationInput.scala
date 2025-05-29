@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.all.*
 import lucuma.core.model.UserInvitation
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding

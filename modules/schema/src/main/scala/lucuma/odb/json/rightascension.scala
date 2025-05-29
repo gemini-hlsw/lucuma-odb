@@ -3,7 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.syntax.all.*
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder

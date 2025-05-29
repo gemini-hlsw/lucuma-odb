@@ -9,7 +9,6 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
-import grackle.Result
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Attachment
 import lucuma.core.model.Group

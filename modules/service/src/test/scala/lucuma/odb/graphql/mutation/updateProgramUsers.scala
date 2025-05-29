@@ -11,7 +11,6 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.Gender
-import lucuma.core.enums.Partner
 import lucuma.core.enums.Partner.US
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.PartnerLink
@@ -515,7 +514,7 @@ class updateProgramUsers extends OdbSuite:
           )
 
   test("cannot update another pi's partner as a PI"):
-    createProgramAs(piCharles).flatMap: pid =>
+    createProgramAs(piCharles).flatMap: _ =>
       expect(
         user     = piCharles,
         query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),

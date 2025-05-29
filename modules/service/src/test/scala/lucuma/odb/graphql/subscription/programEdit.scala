@@ -13,7 +13,6 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.ServiceUser
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 
 import scala.concurrent.duration.*
 

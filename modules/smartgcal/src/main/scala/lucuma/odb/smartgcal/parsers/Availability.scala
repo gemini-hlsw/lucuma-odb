@@ -4,7 +4,6 @@
 package lucuma.odb.smartgcal.parsers
 
 import cats.Monad
-import cats.syntax.functor.*
 
 /**
  * Availability is a small ADT, isomorphic with Option, that is used for parsing

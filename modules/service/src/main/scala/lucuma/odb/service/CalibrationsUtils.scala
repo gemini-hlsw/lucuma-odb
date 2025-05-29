@@ -41,7 +41,7 @@ import java.time.LocalTime
 
 trait CalibrationTargetLocator {
   def bestTargetInList(ref: Coordinates, tgts: List[(Target.Id, String, CalibrationRole, Coordinates)]): Option[(CalibrationRole, Target.Id)] =
-    tgts.minimumByOption(_._4.angularDistance(ref))(Angle.SignedAngleOrder).map(x => (x._3, x._1))
+    tgts.minimumByOption(_._4.angularDistance(ref))(using Angle.SignedAngleOrder).map(x => (x._3, x._1))
 
   def idealLocation(site: Site, referenceInstant: Instant): Coordinates
 

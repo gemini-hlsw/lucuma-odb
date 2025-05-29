@@ -101,7 +101,7 @@ class revokeUserInvitation extends OdbSuite:
                 }
               }
             """
-          ).flatMap: json =>
+          ).flatMap: _ =>
             expect(
               user     = pi,
               query    = revoke(inv.id),
@@ -129,7 +129,7 @@ class revokeUserInvitation extends OdbSuite:
               """.asRight
             )
 
-  def badInvitation(u: User): PartialFunction[OdbError, Unit] =
+  val badInvitation: PartialFunction[OdbError, Unit] =
     case OdbError.InvitationError(_, Some("Invitation does not exist, is no longer pending, or was issued by someone else.")) => ()
 
   List(true, false).foreach: accept =>
@@ -141,7 +141,7 @@ class revokeUserInvitation extends OdbSuite:
             expectOdbError(
               user     = pi,
               query    = revoke(inv.id),
-              expected = badInvitation(pi)
+              expected = badInvitation
             )
 
   test("can't revoke an invitation twice"):
@@ -152,7 +152,7 @@ class revokeUserInvitation extends OdbSuite:
           expectOdbError(
             user     = pi,
             query    = revoke(inv.id),
-            expected = badInvitation(pi)
+            expected = badInvitation
           )
 
   test("guest can't revoke an invitation"):
@@ -175,7 +175,7 @@ class revokeUserInvitation extends OdbSuite:
             expectOdbError(
               user     = u,
               query    = revoke(inv.id),
-              expected = badInvitation(u)
+              expected = badInvitation
             )
 
   List(admin, staff, service).foreach: u =>

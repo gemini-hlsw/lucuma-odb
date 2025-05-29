@@ -20,7 +20,6 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream

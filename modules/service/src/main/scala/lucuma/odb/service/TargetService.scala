@@ -63,7 +63,6 @@ object TargetService {
     case class ProgramNotFound(pid: Program.Id) extends CreateTargetResponse
     case class Success(id: Target.Id)           extends CreateTargetResponse
   }
-  import CreateTargetResponse._
 
   sealed trait UpdateTargetsResponse
   sealed trait UpdateTargetsError extends UpdateTargetsResponse
@@ -145,7 +144,7 @@ object TargetService {
           }
 
       private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
-        val stmt = Statements.cloneTarget(pid, targetId, user)
+        val stmt = Statements.cloneTarget(pid, targetId)
         session.prepareR(stmt.fragment.query(target_id)).use(_.unique(stmt.argument))
 
       override def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
@@ -168,6 +167,7 @@ object TargetService {
               case _ => replaceIn(tid) as Success(input.targetId, tid)
             }.map(cloneResultTranslation)
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
 
@@ -396,7 +396,7 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
-    def cloneTarget(pid: Program.Id, tid: Target.Id, user: User): AppliedFragment =
+    def cloneTarget(pid: Program.Id, tid: Target.Id): AppliedFragment =
       sql"""
         INSERT INTO t_target(
           c_program_id,

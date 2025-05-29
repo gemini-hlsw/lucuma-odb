@@ -73,7 +73,7 @@ object DetectorEstimator {
     }
 
     lazy val flamingos2: DetectorEstimator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
-      (static: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
+      (_: Flamingos2StaticConfig, step: ProtoStep[Flamingos2DynamicConfig]) => List(
         DetectorEstimate(
           "Flamingos2",
           s"Flamingos 2 Detector Array",

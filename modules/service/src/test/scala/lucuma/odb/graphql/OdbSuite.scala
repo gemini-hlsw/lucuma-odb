@@ -298,7 +298,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   // tests that require successfully sending invitations can assign this to httpRequestHandler
   protected val invitationEmailRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    req => {
+    _ => {
       val sio = UUIDGen[IO].randomUUID.map(uuid =>
         Json.obj(
           "id"      -> s"<$uuid>".asJson,
@@ -402,7 +402,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         auth <- Resource.eval(authorizationHeader(user))
         xbe  <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
         xc   <-
-          Resource.eval(Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(Async[IO], xbe, Logger[IO]))
+          Resource.eval(Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(using Async[IO], xbe, Logger[IO]))
       } yield xc
 
   private def streamingClient(user: User)(svr: Server): Resource[IO, WebSocketClient[IO, Nothing]] =

@@ -9,7 +9,6 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.util.arb.ArbEnumerated.given
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
 import munit.DisciplineSuite
 import org.scalacheck.Prop.forAll

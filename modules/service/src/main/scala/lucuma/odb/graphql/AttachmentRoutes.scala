@@ -47,19 +47,19 @@ object AttachmentRoutes {
     )
 
   // used by tests
-  def apply[F[_]: Async: Trace: SecureRandom](
+  def apply[F[_]: Async](
     service:     AttachmentFileService[F],
     ssoClient:   SsoClient[F, User],
     maxUploadMb: Int,
   ): HttpRoutes[F] =
     apply(
-      [A] => (u: User) => (fa: AttachmentFileService[F] => F[A]) => fa(service),
+      [A] => (_: User) => (fa: AttachmentFileService[F] => F[A]) => fa(service),
       ssoClient,
       maxUploadMb
     )
 
 
-  def apply[F[_]: Concurrent: Trace: UUIDGen](
+  def apply[F[_]: Concurrent](
     service:               [A] => User => (AttachmentFileService[F] => F[A]) => F[A],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int

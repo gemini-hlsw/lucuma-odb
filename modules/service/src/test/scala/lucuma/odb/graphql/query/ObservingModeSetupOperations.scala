@@ -22,8 +22,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
   def createFlamingos2LongSlitObservationAs(
     user:         User,
     pid:          Program.Id,
-    tids:         List[Target.Id],
-    offsetArcsec: Option[List[Int]] = None
+    tids:         List[Target.Id]
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,

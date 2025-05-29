@@ -12,13 +12,11 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.*
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
-import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.SingleSN
@@ -26,7 +24,6 @@ import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
-import lucuma.itc.client.GraphResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyGraphsInput
@@ -44,21 +41,18 @@ object TestItcClient {
     exposureTime:  TimeSpan,
     exposureCount: Int,
     bandOrLine:    Either[Band, Wavelength],
-    graphResult:   (NonEmptyList[ItcCcd], NonEmptyList[GraphResult])
   ): ItcClient[F] =
     withResult[F](
       IntegrationTime(
         exposureTime,
         NonNegInt.unsafeFrom(exposureCount),
       ),
-      bandOrLine,
-      graphResult
+      bandOrLine
     )
 
   def withResult[F[_]: Applicative](
     result:      IntegrationTime,
-    bandOrLine:  Either[Band, Wavelength],
-    graphResult: (NonEmptyList[ItcCcd], NonEmptyList[GraphResult])
+    bandOrLine:  Either[Band, Wavelength]
   ): ItcClient[F] =
     new ItcClient[F] {
 

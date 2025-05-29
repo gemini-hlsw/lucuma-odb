@@ -144,6 +144,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // fetch the workflow states for just those oids, then find the ones with the states we're
   // interested in and build a new query that's the same as the original but with a swapped
   // out predicate that explicitly matches the set of oids we have computed.
+  @annotation.nowarn("msg=unused explicit parameter")
   def observationsByWorkflowState(query: Query, p: Path, e: Env): F[Result[Query]] =
     query match {
       case Environment(env, Filter(pred, child)) =>
@@ -167,6 +168,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
           yield oids
 
         // given a list of oids, find their workflows
+        @annotation.nowarn("msg=unused implicit parameter")
         def stateMap(oids: List[model.Observation.Id])(using Services[F], NoTransaction[F]) : F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
           Services.asSuperUser:
             observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
@@ -187,6 +189,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
         // Ok here we go. Figure out which observations we're talking about, filter based on state, and return a
         // query that will just fetch the matches.
+        @annotation.nowarn("msg=unused implicit parameter")
         def go(using Services[F], NoTransaction[F]): ResultT[F, Query] =
           for
             states   <- ResultT.fromResult(env.getR[List[ObservationWorkflowState]]("states"))
@@ -205,7 +208,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
     }
 
-  private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (p, e) =>
+  private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (_, e) =>
     val notAuthorized = OdbError.NotAuthorized(user.id, "Only the GOA user may access this field.".some).asFailure
     val goaUserCheck  = user match
       case StandardUser(id, r, rs, _) => notAuthorized.unlessA(goaUsers.contains(id) || ((r::rs).map(_.access).max >= Access.Staff))
@@ -235,7 +238,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         mids  <- ResultT.fromResult(decode(json))
       yield mids
 
-    def go(using Services[F], Transaction[F]): ResultT[F, List[ProgramReference]] =
+    @annotation.nowarn("msg=unused implicit parameter")
+    def go(using Transaction[F]): ResultT[F, List[ProgramReference]] =
       for
         _     <- ResultT.fromResult(goaUserCheck)
         orcid <- ResultT.fromResult(e.getR[OrcidId]("orcidId"))

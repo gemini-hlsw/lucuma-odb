@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.Flamingos2Decker

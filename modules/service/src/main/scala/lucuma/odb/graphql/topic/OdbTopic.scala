@@ -32,7 +32,7 @@ object OdbTopic:
   // in fs2 or skunk that releases the portal too early and you get portal not found
   // asynchronously when doing other things. This is a workaround for now that just
   // interpolates the strings directly rather than preparing a statement.
-  def selectProgramUsers[F[_]: Concurrent: Logger: Trace](
+  def selectProgramUsers[F[_]: Trace](
     s:   Session[F],
     pid: Program.Id,
   ): F[List[User.Id]] =
@@ -51,7 +51,7 @@ object OdbTopic:
   )(update: PartialFunction[Array[String], Option[U]]): OdbTopic[E] =
     new OdbTopic[E]:
 
-      def updates[F[_]: Concurrent: Logger](
+      def updates[F[_]: Logger](
         s:         Session[F],
         maxQueued: Int
       ): Stream[F, U] =
@@ -61,7 +61,7 @@ object OdbTopic:
             .flatten
             .fold(Stream.exec(Logger[F].warn(s"Invalid $name event: $n")))(Stream(_))
 
-      def elements[F[_]: Concurrent: Logger: Trace](
+      def elements[F[_]: Logger: Trace](
         s:         Session[F],
         maxQueued: Int
       ): Stream[F, E] =

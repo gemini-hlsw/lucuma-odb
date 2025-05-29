@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.QueryCompiler.Elab

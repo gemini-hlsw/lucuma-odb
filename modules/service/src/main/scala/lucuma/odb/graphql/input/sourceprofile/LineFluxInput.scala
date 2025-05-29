@@ -8,7 +8,6 @@ package sourceprofile
 import grackle.Result
 import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.math.LineFluxValue
-import lucuma.core.math.dimensional.Measure
 import lucuma.core.util.*
 import lucuma.odb.graphql.binding.*
 

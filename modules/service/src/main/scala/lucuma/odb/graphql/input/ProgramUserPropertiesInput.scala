@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink

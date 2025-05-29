@@ -331,7 +331,7 @@ class groupEdit extends OdbSuite {
             } yield ()
           ),
         expectedF =
-          d.get.map { pid =>
+          d.get.map { _ =>
             List.empty[Json]
           }
       )

@@ -12,7 +12,6 @@ import cats.syntax.traverse.*
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset

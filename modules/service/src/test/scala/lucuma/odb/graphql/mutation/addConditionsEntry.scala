@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.User

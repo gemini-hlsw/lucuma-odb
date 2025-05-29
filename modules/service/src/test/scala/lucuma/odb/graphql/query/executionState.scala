@@ -17,7 +17,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 

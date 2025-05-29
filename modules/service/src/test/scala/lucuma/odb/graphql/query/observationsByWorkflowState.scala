@@ -15,10 +15,6 @@ class observationsByWorkflowState extends OdbSuite {
   val service = TestUsers.service(nextId)
   val validUsers = List(pi, service).toList
 
-  // Borrow some methods from this other test
-  val delegate = new observation_workflow()
-  import delegate.*
-
   test("ensure outer predicate works") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid)

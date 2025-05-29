@@ -164,13 +164,13 @@ object CMain extends MainParams {
             }.compile.drain.start.void)
     } yield ()
 
-  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger: SecureRandom](
+  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
     user: Option[User],
     enums: Enums
   )(pool: Session[F]): F[Services[F]] =
     user match {
       case Some(u) if u.role.access === Access.Service =>
-        Services.forUser(u, enums, None)(pool).pure[F].flatTap { s =>
+        Services.forUser(u, enums, None)(pool).pure[F].flatTap { _ =>
           val us = UserService.fromSession(pool)
           Services.asSuperUser(us.canonicalizeUser(u))
         }
