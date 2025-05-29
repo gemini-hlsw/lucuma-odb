@@ -1328,12 +1328,7 @@ class updateObservations extends OdbSuite
                   },
                   "capability": "CORONAGRAPHY"
                 },
-                "imaging": {
-                  "minimumFov": null,
-                  "narrowFilters": null,
-                  "broadFilters": null,
-                  "combinedFilters": null
-                }
+                "imaging": null
               }
             }
           ]
@@ -1356,14 +1351,7 @@ class updateObservations extends OdbSuite
                     }
                   }
                 },
-                "spectroscopy": {
-                  "wavelength": null,
-                  "resolution": null,
-                  "wavelengthCoverage": null,
-                  "focalPlane": null,
-                  "focalPlaneAngle": null,
-                  "capability": null
-                },
+                "spectroscopy": null,
                 "imaging": {
                   "minimumFov": {
                     "arcseconds": 120

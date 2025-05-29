@@ -1636,10 +1636,10 @@ class createObservation extends OdbSuite {
           .downField("observation")
           .downField("scienceRequirements")
           .downField("mode")
-          .as[ScienceMode]
+          .as[Option[ScienceMode]]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, ScienceMode.Spectroscopy)
+        assertIO(get, None)
       }
     }
   }

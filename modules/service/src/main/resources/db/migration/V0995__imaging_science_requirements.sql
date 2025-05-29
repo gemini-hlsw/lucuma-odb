@@ -63,6 +63,8 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
   CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
+  CASE WHEN o.c_science_mode = 'imaging'      THEN o.c_observation_id END AS c_imaging_mode_id,
+  CASE WHEN o.c_science_mode = 'spectroscopy' THEN o.c_observation_id END AS c_spectroscopy_mode_id,
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id

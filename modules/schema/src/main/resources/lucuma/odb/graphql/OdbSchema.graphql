@@ -11048,7 +11048,7 @@ type ScienceRequirements {
   """
   Science mode
   """
-  mode: ScienceMode!
+  mode: ScienceMode
 
   """
   Requested exposure time mode.
