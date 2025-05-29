@@ -11,7 +11,6 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
@@ -70,12 +69,14 @@ object AllocationService {
           validateObservations(bands, pid)
         }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
         session.execute(Statements.DeleteAllocations)(pid).void
 
       // If any observations have already been assigned bands which are not in
       // the given SetAllocationsInput, then generate a warning result listing
       // them.
+      @annotation.nowarn("msg=unused implicit parameter")
       private def validateObservations(bands: Set[ScienceBand], pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
         val noneBands  = session.execute(Statements.ObservationsWithNonNullBand)(pid)
         NonEmptyList.fromList(bands.toList).fold(noneBands) { nel =>

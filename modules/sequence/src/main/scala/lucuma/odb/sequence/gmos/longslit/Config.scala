@@ -29,7 +29,6 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.Picometer
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile

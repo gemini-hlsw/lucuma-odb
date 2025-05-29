@@ -11,7 +11,6 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.User
 import lucuma.core.util.DateInterval
 
 import java.time.LocalDate

@@ -177,7 +177,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           disperser:  GmosNorthGrating = GmosNorthGrating.R831_G5302,
           low:        Int              = Wavelength.Min.pm.value.value,
           high:       Int              = Wavelength.Max.pm.value.value,
-          expTimeSec: Int              = 1,
+          expTimeSec: Int,
           count:      Int              = 1
         ): IO[Unit] =
           defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosNorth)
@@ -189,7 +189,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
           disperser:  GmosSouthGrating = GmosSouthGrating.R600_G5324,
           low:        Int              = Wavelength.Min.pm.value.value,
           high:       Int              = Wavelength.Max.pm.value.value,
-          expTimeSec: Int              = 1,
+          expTimeSec: Int,
           count:      Int              = 1
         ): IO[Unit] =
           defineGmos(id, stepOrder, disperser, low, high, expTimeSec, count)(row, services.smartGcalService.insertGmosSouth)

@@ -89,6 +89,7 @@ object UserInvitationService:
           .use: pq =>
             pq.unique(emailId, invitationId).as(Result.unit)
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def createInvitationAsPi(
         input: CreateUserInvitationInput,
         pid:   Program.Id
@@ -102,6 +103,7 @@ object UserInvitationService:
                 case SqlState.UniqueViolation(ex) =>
                   OdbError.UpdateFailed(s"There is already a pending invitation for program user '${input.programUserId}'.".some).asFailureF
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def createInvitationAsSuperUser(
         input: CreateUserInvitationInput,
         pid:   Program.Id

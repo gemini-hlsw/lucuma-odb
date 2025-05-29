@@ -44,7 +44,6 @@ import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.SingleSN
-import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ItcClient
@@ -275,6 +274,7 @@ object ItcService {
         } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
+      @annotation.nowarn("msg=unused implicit parameter")
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
@@ -312,7 +312,7 @@ object ItcService {
             .flattenOption
             .toMap
 
-      def selectAll(
+      override def selectAll(
         params: Map[Observation.Id, GeneratorParams]
       )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, AsterismResults]] =
         NonEmptyList.fromList(params.keys.toList).fold(Map.empty.pure[F]): nel =>
@@ -352,6 +352,7 @@ object ItcService {
             .partitionErrors
             .leftMap(convertErrors(targets))
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
@@ -378,6 +379,7 @@ object ItcService {
         .handleError: t =>
           OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def insertOrUpdate(
         pid:     Program.Id,
         oid:     Observation.Id,

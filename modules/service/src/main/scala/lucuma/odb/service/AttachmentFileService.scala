@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.Applicative
 import cats.data.EitherT
 import cats.effect.Concurrent
-import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -117,6 +116,7 @@ object AttachmentFileService {
       EitherT.right(fa)
 
   extension [F[_]](svcs: Services[F])
+    @annotation.nowarn("msg=unused implicit parameter")
     def transactionallyEitherT[A](
       fa: (Transaction[F], Services[F]) ?=> EitherT[F, AttachmentException, A]
     )(using
@@ -145,7 +145,7 @@ object AttachmentFileService {
     if (fileSize <= 0) InvalidRequest("File cannot be empty").asLeft
     else ().asRight
 
-  def instantiate[F[_]: Concurrent: Trace: SecureRandom: UUIDGen](
+  def instantiate[F[_]: Concurrent: Trace: UUIDGen](
     s3FileSvc: S3FileService[F]
   )(using Services[F]): AttachmentFileService[F] = {
 

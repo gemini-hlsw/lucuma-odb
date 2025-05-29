@@ -646,7 +646,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         )
 
   test("executionState - COMPLETED"):
-    def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
+    def atom(v: Visit.Id, ditherNm: Int, q: Int): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
@@ -663,10 +663,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _ <- atom(v,  0,   0, 3)
-        _ <- atom(v,  5,  15, 3)
-        _ <- atom(v, -5, -15, 3)
-        _ <- atom(v,  0,   0, 1)
+        _ <- atom(v,  0,   0)
+        _ <- atom(v,  5,  15)
+        _ <- atom(v, -5, -15)
+        _ <- atom(v,  0,   0)
       yield o
 
     setup.flatMap: oid =>

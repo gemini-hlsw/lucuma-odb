@@ -10,7 +10,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.model.Program

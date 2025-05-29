@@ -176,7 +176,7 @@ class recordAtom extends OdbSuite {
           }
         }
       """,
-      vid => json"""
+      _ => json"""
         {
           "recordAtom": {
             "atomRecord": {

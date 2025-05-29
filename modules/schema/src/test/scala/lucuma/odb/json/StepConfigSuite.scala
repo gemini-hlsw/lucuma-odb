@@ -13,7 +13,6 @@ class StepConfigSuite extends DisciplineSuite with ArbitraryInstances {
 
   import ArbStepConfig.given
 
-  import offset.query.given
   import stepconfig.given
 
   checkAll("StepConfigCodec", CodecTests[StepConfig].codec)

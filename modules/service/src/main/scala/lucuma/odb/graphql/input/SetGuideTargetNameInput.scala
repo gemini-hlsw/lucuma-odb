@@ -7,7 +7,6 @@ package input
 
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
-import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.odb.graphql.binding.*

@@ -6,7 +6,6 @@ package flamingos2.longslit
 
 import cats.Monad
 import cats.data.EitherT
-import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
@@ -33,7 +32,6 @@ object LongSlit:
     config:         Config,
     acquisitionItc: Either[OdbError, IntegrationTime],
     scienceItc:     Either[OdbError, IntegrationTime],
-    calRole:        Option[CalibrationRole],
     lastAcqReset:   Option[Timestamp]
   ): F[Either[OdbError, ExecutionConfigGenerator[F2Static, F2Dynamic]]] =
     (for

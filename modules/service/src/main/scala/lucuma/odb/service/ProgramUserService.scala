@@ -46,7 +46,6 @@ import lucuma.odb.util.Codecs.program_user_id
 import lucuma.odb.util.Codecs.program_user_role
 import lucuma.odb.util.Codecs.user_id
 import lucuma.odb.util.Codecs.user_type
-import natchez.Trace
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.text.varchar
@@ -134,7 +133,7 @@ trait ProgramUserService[F[_]]:
   )(using Transaction[F]): F[Boolean]
 
 object ProgramUserService:
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProgramUserService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): ProgramUserService[F] =
     new ProgramUserService[F]:
 
       override def selectLinkData(
@@ -219,7 +218,7 @@ object ProgramUserService:
       override def linkInvitationAccept(
         id: ProgramUser.Id
       )(using Transaction[F]): F[Result[Unit]] =
-        linkUserImpl(id, user.id, (role, pid) => none.success)
+        linkUserImpl(id, user.id, (_, _) => none.success)
 
       override def linkUser(
         input: LinkUserInput
@@ -230,6 +229,7 @@ object ProgramUserService:
           (role, pid) => Statements.accessCheck("add", role, pid, user)
         )
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def linkUserImpl(
         targetProgramUserId: ProgramUser.Id,
         targetUserId:        User.Id,
@@ -261,7 +261,7 @@ object ProgramUserService:
                       case SqlState.ForeignKeyViolation(_) =>
                         OdbError.InvalidUser(targetUserId, s"User $targetUserId does not exist or is of a nonstandard type.".some).asFailure
 
-      def unlinkUser(
+      override def unlinkUser(
         mid: ProgramUser.Id
       )(using Transaction[F]): F[Result[Option[User.Id]]] =
         session.prepare(Statements.SelectLinkData).flatMap(_.option(mid)).flatMap:

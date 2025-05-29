@@ -164,6 +164,7 @@ object GroupService {
           } .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
         }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort])(using Transaction[F]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
 

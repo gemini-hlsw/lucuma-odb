@@ -47,7 +47,6 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.util.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import skunk.AppliedFragment
@@ -183,6 +182,7 @@ object CalibrationsService extends CalibrationObservations {
         }
 
       // Find all active observations in the program
+      @annotation.nowarn("msg=unused implicit parameter")
       private def activeObservations(pid: Program.Id)(using Transaction[F]): F[Set[Observation.Id]] =
         session.execute(Statements.selectActiveObservations)(pid).map(_.toSet)
 
@@ -271,6 +271,7 @@ object CalibrationsService extends CalibrationObservations {
       }
 
       // Set the calibration role of the observations in bulk
+      @annotation.nowarn("msg=unused implicit parameter")
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
         session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 

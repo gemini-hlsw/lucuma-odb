@@ -16,7 +16,6 @@ import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.NoTransaction
 import lucuma.refined.*
-import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
 

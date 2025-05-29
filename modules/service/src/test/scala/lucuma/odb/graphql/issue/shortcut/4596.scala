@@ -25,7 +25,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos

@@ -8,7 +8,6 @@ package input
 import cats.data.Ior
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
-import grackle.Result
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*

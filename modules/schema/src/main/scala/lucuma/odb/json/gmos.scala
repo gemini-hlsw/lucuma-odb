@@ -129,7 +129,7 @@ trait GmosCodec {
     Decoder.instance { c =>
       for {
         f <- c.downField("filename").as[String].flatMap { s =>
-          NonEmptyString.from(s).leftMap { m => DecodingFailure(s"GMOS custom mask file name cannot be empty", c.history) }
+          NonEmptyString.from(s).leftMap { _ => DecodingFailure(s"GMOS custom mask file name cannot be empty", c.history) }
         }
         s <- c.downField("slitWidth").as[GmosCustomSlitWidth]
       } yield GmosFpuMask.Custom(f, s)

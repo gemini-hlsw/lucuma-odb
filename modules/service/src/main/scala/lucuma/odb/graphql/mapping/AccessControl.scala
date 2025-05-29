@@ -129,15 +129,18 @@ object AccessControl:
   }
 
   /** Construct a `CheckedWithIds` (requires SuperUser access). */
+  @annotation.nowarn("msg=unused implicit parameter")
   def unchecked[A,B](SET: A, ids: List[B], enc: Encoder[B])(using SuperUserAccess): CheckedWithIds[A,B] =
     NonEmptyList.fromList(ids).fold(Checked.Empty): ids =>
       new Checked.NonEmptyWithIds(SET, ids, enc) {}
 
   /** Construct a `CheckedWithId` (requires SuperUser access). */
+  @annotation.nowarn("msg=unused implicit parameter")
   def unchecked[A,B](SET: A, id: B, enc: Encoder[B])(using SuperUserAccess): CheckedWithId[A,B] =
       new Checked.NonEmptyWithId(SET, id, enc) {}
 
   /** Construct a `Checked` (requires SuperUser access). */
+  @annotation.nowarn("msg=unused implicit parameter")
   def unchecked[A](SET: A, which: AppliedFragment)(using SuperUserAccess): Checked[A] =
     new Checked.NonEmpty(SET, which) {}
 
@@ -180,6 +183,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Select and return the ids of observations that are editable by the current user and meet
    * all the specified filters.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForObservationUpdateImpl(
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
@@ -201,6 +205,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Select and return the ids of observations that are clonable by the current user and meet
    * all the specified filters.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForObservationCloneImpl(
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
@@ -220,6 +225,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Select and return the ids of programs that are editable by the current user and meet
    * all the specified filters.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForProgramUpdateImpl(
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
@@ -250,6 +256,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   /**
    * Compute the subset of `pids` that identify programs which are editable by the current user.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForProgramUpdateImpl(
     includeDeleted: Option[Boolean],
     pids:           List[Program.Id]
@@ -263,6 +270,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Select and return the ids of targets that are editable by the current user and meet
    * all the specified filters.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForTargetUpdateImpl(
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
@@ -297,6 +305,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Given an operation that defines a set of targets and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateTargetsInput,
   )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithIds[TargetPropertiesInput.Edit, Target.Id]]] =
@@ -309,6 +318,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
         AccessControl.unchecked(input.SET, tids, target_id)
 
   /** Overload of `selectForObservationUpdateImpl` that takes a list of oids instead of a `Predicate`.  */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForObservationUpdateImpl(
     includeDeleted:      Option[Boolean],
     oids:                List[Observation.Id],
@@ -326,6 +336,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Given an operation that defines a set of observations and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateObservationsInput, 
     includeCalibrations: Boolean
@@ -367,6 +378,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Given an operation that defines a set of observations and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateAsterismsInput,
     includeCalibrations: Boolean
@@ -386,6 +398,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Given an operation that defines a set of observations and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateObservationsTimesInput,
     includeCalibrations: Boolean
@@ -405,6 +418,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * Given an operation that defines a set of observations and a proposed edit, select and filter this
    * set based on access control policies and return a checked edit that is valid for execution.
    */
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: SetGuideTargetNameInput,
     includeCalibrations: Boolean
@@ -539,6 +553,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
                 ResultT.pure(AccessControl.unchecked(input.SET, pid, program_id))
     ).value
 
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: SetProgramReferenceInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]]] =
@@ -550,6 +565,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
             Services.asSuperUser:
               Result(AccessControl.unchecked(input.SET, pid, program_id)).pure[F]
 
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateProgramsInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.Checked[ProgramPropertiesInput.Edit]]] =
@@ -577,6 +593,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
       Services.asSuperUser:
         Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
 
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateAttachmentsInput
   )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =
@@ -616,6 +633,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           Services.asSuperUser:
             Result(AccessControl.unchecked(input.SET, which)).pure[F]
 
+  @annotation.nowarn("msg=unused implicit parameter")
   private def selectForProgramNoteUpdateImpl(
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
@@ -651,6 +669,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
            Services.asSuperUser:
              AccessControl.unchecked(input.SET, nids, program_note_id)
         })
+
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: CloneTargetInput
   )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[CloneTargetInput, Program.Id]]] =

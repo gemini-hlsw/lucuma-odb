@@ -9,7 +9,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 
 class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
@@ -115,7 +114,7 @@ class executionDatasets extends OdbSuite with ExecutionQuerySetupOperations {
         }
       """
 
-      val matches = on.allDatasets.map(id => Json.obj("observation" -> Json.obj("id" -> on.id.asJson)))
+      val matches = on.allDatasets.map(_ => Json.obj("observation" -> Json.obj("id" -> on.id.asJson)))
 
       val e = json"""
       {

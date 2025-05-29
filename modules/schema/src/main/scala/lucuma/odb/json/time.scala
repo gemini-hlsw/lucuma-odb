@@ -64,7 +64,7 @@ object time {
 
   trait CommonEncoders {
     given Encoder[DateInterval] =
-      Encoder { (a: DateInterval) =>
+      Encoder.instance { (a: DateInterval) =>
         Json.obj(
           "start" -> a.start.asJson,
           "end"   -> a.end.asJson
@@ -74,7 +74,7 @@ object time {
 
   trait QueryCodec extends TimeDecoders with CommonEncoders {
     given Encoder_TimeSpan: Encoder[TimeSpan] =
-      Encoder { (ts: TimeSpan) =>
+      Encoder.instance { (ts: TimeSpan) =>
         Json.obj(
           "microseconds" -> TimeSpan.FromMicroseconds.reverseGet(ts).asJson,
           "milliseconds" -> TimeSpan.FromMilliseconds.reverseGet(ts).asJson,
@@ -86,7 +86,7 @@ object time {
       }
 
     given Encoder_TimestampInterval: Encoder[TimestampInterval] =
-      Encoder { (a: TimestampInterval) =>
+      Encoder.instance { (a: TimestampInterval) =>
         Json.obj(
           "start"    -> a.start.asJson,
           "end"      -> a.end.asJson,
@@ -106,7 +106,7 @@ object time {
       }
 
     given Encoder_TimestampInterval: Encoder[TimestampInterval] =
-      Encoder { (a: TimestampInterval) =>
+      Encoder.instance { (a: TimestampInterval) =>
         Json.obj(
           "start"    -> a.start.asJson,
           "end"      -> a.end.asJson

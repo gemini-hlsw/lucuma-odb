@@ -18,7 +18,6 @@ import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import org.tpolecat.sourcepos.SourcePos
-import org.typelevel.log4cats.Logger
 import skunk.Session
 
 /**
@@ -141,7 +140,7 @@ object Enums {
     unreferencedTypes: List[EnumType]
   )
 
-  def load[F[_]: Monad: Logger](s: Session[F]): F[Enums] =
+  def load[F[_]: Monad](s: Session[F]): F[Enums] =
     for {
       te  <- TimeEstimateMeta.select(s)
       ps  <- ProposalStatusMeta.select(s)

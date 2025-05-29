@@ -9,7 +9,6 @@ import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.data.State
-import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*

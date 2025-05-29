@@ -211,7 +211,7 @@ class recordDataset extends OdbSuite {
           }
         }
       """,
-      (oid, sid) => "The filename 'N18630101S0002.fits' is already assigned".asLeft
+      (_, _) => "The filename 'N18630101S0002.fits' is already assigned".asLeft
     )
   }
 
@@ -219,7 +219,7 @@ class recordDataset extends OdbSuite {
     recordDatasetTest(
       ObservingModeType.GmosNorthLongSlit,
       service,
-      sid => s"""
+      _ => s"""
         mutation {
           recordDataset(input: {
             stepId: "s-d506e5d9-e5d1-4fcc-964c-90afedabc9e8",
@@ -231,7 +231,7 @@ class recordDataset extends OdbSuite {
           }
         }
       """,
-      (oid, sid) => "Step id 's-d506e5d9-e5d1-4fcc-964c-90afedabc9e8' not found".asLeft
+      (_, _) => "Step id 's-d506e5d9-e5d1-4fcc-964c-90afedabc9e8' not found".asLeft
     )
   }
 

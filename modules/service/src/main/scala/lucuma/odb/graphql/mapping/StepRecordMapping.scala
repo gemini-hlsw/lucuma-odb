@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
