@@ -3,7 +3,10 @@ ALTER TABLE t_observation
   ADD COLUMN c_img_minimum_fov      d_angle_µas null default null,
   ADD COLUMN c_img_narrow_filters   boolean     null default null,
   ADD COLUMN c_img_broad_filters    boolean     null default null,
-  ADD COLUMN c_img_combined_filters boolean     null default null;
+  ADD COLUMN c_img_combined_filters boolean     null default null,
+-- Make c_science_mode nullable to support the case where no science requirements are set
+  ALTER COLUMN c_science_mode DROP NOT NULL,
+  ALTER COLUMN c_science_mode DROP DEFAULT;
 
 -- Rename spec constraint
 -- the exposure time mode is shared between imaging and spectroscopy
