@@ -85,6 +85,7 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       EffectField("workflow", workflowQueryHandler, List("id", "programId")),
+      EffectField("calculatedWorkflow", calculatedWorkflowQueryHandler, List("id", "programId")),
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -156,33 +157,53 @@ trait ObservationMapping[F[_]]
 
   }
 
-
-  lazy val workflowQueryHandler: EffectHandler[F] = { pairs =>
+  trait WorkflowEffectHandler extends EffectHandler[F]:
 
     // Here's the collection of stuff we need to deal with: an oid, the parent
     // cursor, and the child context.
-    val sequence: ResultT[F, List[(Observation.Id, Cursor, Context)]] =
+    protected def sequence(pairs: List[(Query, Cursor)]): ResultT[F, List[(Observation.Id, Cursor, Context)]] =
       ResultT.fromResult:
         pairs.traverse: (query, cursor) =>
-          for {
+          for
             o <- cursor.fieldAs[Observation.Id]("id")
             c <- Query.childContext(cursor.context, query)
-          } yield (o, cursor, c)
+          yield (o, cursor, c)
 
-    // Pass the oids to observationWorkflowService.getWorkflows to get the
-    // applicable workflows for each, then use this information to construct
-    // our list of outgoing cursors.
-    def query(using Services[F], SuperUserAccess): ResultT[F, List[Cursor]] =
-      sequence.flatMap: tuples =>
-        ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
-          tuples.map: (key, cursor, childContext) =>
-            CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+  lazy val workflowQueryHandler: EffectHandler[F] =
+    new WorkflowEffectHandler:
 
-    // Do it!
-    services.use: s => 
-      Services.asSuperUser:
-        query(using s).value
-    
-  }
+      def runEffects(pairs: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        // Pass the oids to observationWorkflowService.getWorkflows to get the
+        // applicable workflows for each, then use this information to construct
+        // our list of outgoing cursors.
+        def query(using Services[F], SuperUserAccess): ResultT[F, List[Cursor]] =
+          sequence(pairs).flatMap: tuples =>
+            ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
+              tuples.map: (key, cursor, childContext) =>
+                CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+
+        // Do it!
+        services.use: s =>
+          Services.asSuperUser:
+            query(using s).value
+
+  lazy val calculatedWorkflowQueryHandler: EffectHandler[F] =
+    new WorkflowEffectHandler:
+
+      def runEffects(pairs: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        import lucuma.odb.json.calculatedValue.given
+
+        // Pass the oids to observationWorkflowService.getCalculatedWorkflows to get the
+        // applicable workflows for each, then use this information to construct
+        // our list of outgoing cursors.
+        def query(using Services[F], Transaction[F]): ResultT[F, List[Cursor]] =
+          sequence(pairs).flatMap: tuples =>
+            ResultT(observationWorkflowService.getCalculatedWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
+              tuples.map: (key, cursor, childContext) =>
+                CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+
+        // Do it!
+        services.useTransactionally:
+          query.value
 
 }

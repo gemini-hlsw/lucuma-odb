@@ -103,8 +103,15 @@ trait DatabaseOperations { this: OdbSuite =>
         .flatMap: tec =>
           given Services[IO] = services
           requireServiceAccessOrThrow:
-            obscalcService(CommitHash.Zero, itcClient, tec)
-              .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
+            val srv  = obscalcService(CommitHash.Zero, itcClient, tec)
+            val when =
+              services.transactionally:
+                srv
+                  .selectOne(oid)
+                  .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
+
+            when.flatMap: t =>
+              srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
       .void
 
   def createCallForProposalsAs(

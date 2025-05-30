@@ -354,7 +354,7 @@ object ObscalcService:
     private def prefixedColumns(prefix: Option[String], colNames: String*): String =
       colNames.toList.map: col =>
         prefix.fold(col)(p => s"$p.$col")
-      .mkString("", "\n", "\n")
+      .mkString("", ",\n", "\n")
 
     private def obscalcMetaDataColumns(prefix: Option[String] = None): String =
       prefixedColumns(
@@ -406,7 +406,7 @@ object ObscalcService:
       )
 
     private def obscalcColumns(prefix: Option[String] = None): String =
-      s"${obscalcMetaDataColumns(prefix)}\n${obscalcResultColumns(prefix)}"
+      s"${obscalcMetaDataColumns(prefix)},${obscalcResultColumns(prefix)}"
 
     val SelectOne: Query[Observation.Id, Obscalc.Entry] =
       sql"""
