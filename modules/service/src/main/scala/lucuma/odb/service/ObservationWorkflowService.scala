@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.Semigroup
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
@@ -11,7 +10,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.{ ExecutionState => CoreExecutionState }
+import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
@@ -32,12 +31,11 @@ import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
-import lucuma.core.util.CalculationState
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.Obscalc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -590,22 +588,11 @@ object ObservationWorkflowService {
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using Transaction[F]): F[Result[Map[Observation.Id, CalculatedValue[ObservationWorkflow]]]] =
 
-        // TODO: Fix in core to obviate the need to disambiguate
-        given Semigroup[CalculatedValue[ObservationValidationMap]] =
-          lucuma.core.util.CalculatedValue.given_Semigroup_CalculatedValue
-
         (
           for
-            infos     <- ResultT.liftF(lookupObsDefinitions(oids))                                                             // Map[Observation.Id, ObsDefinition]
-            calcs     <- ResultT.liftF(obscalcService(commitHash, itcClient, ptc).selectManyResults(oids))                     // Map[Observation.Id, CalculatedValue[Obscalc.Result]]
-            errs      <- validateObsDefinition(infos, calcs.keySet.apply).map(_.view.mapValues(_.pure[CalculatedValue]).toMap) // Map[Observation.Id, CalculatedValue[ObservationValidationMap]]
-
-            calcErrs = calcs.collect:
-              case (oid, CalculatedValue(state, Obscalc.Result.Error(e))) =>
-                (oid, CalculatedValue(state, ObservationValidationMap.singleton(ObservationValidation.configuration(e.message))))
-
-            // Map[Observation.Id, CalculatedValue[ObservationValidationMap]]
-            allErrs  = errs |+| calcErrs
+            infos     <- ResultT.liftF(lookupObsDefinitions(oids))                                         // Map[Observation.Id, ObsDefinition]
+            calcs     <- ResultT.liftF(obscalcService(commitHash, itcClient, ptc).selectManyResults(oids)) // Map[Observation.Id, CalculatedValue[Obscalc.Result]]
+            errs      <- validateObsDefinition(infos, calcs.keySet.apply)                                  // Map[Observation.Id, CalculatedValue[ObservationValidationMap]]
 
             // Map[Observation.Id, CalculatedValue[ExecutionState]]
             execs =
@@ -616,13 +603,10 @@ object ObservationWorkflowService {
                   case (oid, CalculatedValue(s, Some(e))) => oid -> CalculatedValue(s, e)
                 .toMap
 
-            workflows <- ResultT.fromResult(computeWorkflows(infos, valueOnly(allErrs), valueOnly(execs)))
+            workflows <- ResultT.fromResult(computeWorkflows(infos, errs, valueOnly(execs)))
           yield
             workflows.map: (oid, wf) =>
-              // Figure out the calculation state
-              val cs = execs.get(oid).map(_.state).getOrElse(CalculationState.Ready) |+|
-                       allErrs.get(oid).map(_.state).getOrElse(CalculationState.Ready)
-              oid -> CalculatedValue(cs, wf)
+              oid -> CalculatedValue(execs.get(oid).map(_.state).getOrElse(CalculationState.Ready), wf)
             .toMap
 
         ).value

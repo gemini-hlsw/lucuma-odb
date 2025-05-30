@@ -9678,6 +9678,8 @@ type Observation {
   configurationRequests: [ConfigurationRequest!]!
 
   workflow: ObservationWorkflow!
+
+  calculatedWorkflow: CalculatedObservationWorkflow!
 }
 
 enum ExecutionState {
@@ -16380,4 +16382,10 @@ type ObservationWorkflow {
   state: ObservationWorkflowState!
   validTransitions: [ObservationWorkflowState!]!
   validationErrors: [ObservationValidation!]!
+}
+
+type CalculatedObservationWorkflow {
+  "The current state of the background calculation."
+  state: CalculationState!
+  value: ObservationWorkflow
 }
