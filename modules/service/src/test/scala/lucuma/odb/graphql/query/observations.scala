@@ -338,7 +338,11 @@ class observations extends OdbSuite {
                       "id" : $oid2,
                       "scienceRequirements" : {
                         "exposureTimeMode" : null,
-                        "spectroscopy" : null
+                        "spectroscopy" : {
+                          "wavelength" : null,
+                          "wavelengthCoverage" : null,
+                          "focalPlaneAngle" : null
+                        }
                       }
                     }
                   ]
