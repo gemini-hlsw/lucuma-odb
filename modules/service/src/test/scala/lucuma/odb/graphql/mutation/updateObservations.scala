@@ -2626,6 +2626,237 @@ class updateObservations extends OdbSuite
     } yield ()
   }
 
+  test("science mode auto-set: spectroscopy fields trigger spectroscopy mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                  resolution: 1000
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                  resolution
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "SPECTROSCOPY",
+            "spectroscopy": {
+              "wavelength": {
+                "micrometers": 1.5
+              },
+              "resolution": 1000
+            },
+            "imaging": null
+          }""")
+        )
+      }
+    }
+  }
+
+  test("science mode auto-set: imaging fields trigger imaging mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                imaging: {
+                  minimumFov: { microarcseconds: 1000000 }
+                  narrowFilters: true
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                  resolution
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "IMAGING",
+            "spectroscopy": null,
+            "imaging": {
+              "minimumFov": {
+                "microarcseconds": 1000000
+              },
+              "narrowFilters": true
+            }
+          }""")
+        )
+      }
+    }
+  }
+
+  test("science mode auto-set: clearing all fields sets mode to null") {
+    createProgramAs(pi).flatMap { pid =>
+      // First create observation with only one spectroscopy field
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                }
+              }
+            }
+          }) {
+            observation { id }
+          }
+        }
+      """).flatMap { js =>
+        js.hcursor.downFields("createObservation", "observation", "id").as[Observation.Id]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+      }.flatMap { oid =>
+        // Then update to clear the only field
+        query(pi, s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                scienceRequirements: {
+                  spectroscopy: {
+                    wavelength: null
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """).flatMap { _ =>
+          query(
+            pi,
+            s"""
+              query {
+                observation(observationId: "$oid") {
+                  scienceRequirements {
+                    mode
+                    spectroscopy {
+                      wavelength { micrometers }
+                      resolution
+                      wavelengthCoverage { micrometers }
+                      focalPlane
+                      focalPlaneAngle { microarcseconds }
+                      capability
+                    }
+                    imaging {
+                      minimumFov { microarcseconds }
+                      narrowFilters
+                    }
+                  }
+                }
+              }
+            """
+          ).map { result =>
+            // When all spectroscopy fields are null, the mode should be set to null
+            assertEquals(
+              result,
+              json"""
+                {
+                  "observation": {
+                    "scienceRequirements": {
+                      "mode": null,
+                      "spectroscopy": null,
+                      "imaging": null
+                    }
+                  }
+                }
+              """
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("science mode auto-set: spectroscopy fields always trigger spectroscopy mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "SPECTROSCOPY",
+            "spectroscopy": {
+              "wavelength": {
+                "micrometers": 1.5
+              }
+            },
+            "imaging": null
+          }""")
+        )
+      }
+    }
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

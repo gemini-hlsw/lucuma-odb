@@ -49,6 +49,41 @@ ALTER TABLE t_observation
     END
   );
 
+-- Create a trigger to automatically set science mode based on field values
+CREATE OR REPLACE FUNCTION auto_set_science_mode()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Check if any spectroscopy fields are set
+  IF NEW.c_spec_wavelength IS NOT NULL OR
+     NEW.c_spec_resolution IS NOT NULL OR
+     NEW.c_spec_wavelength_coverage IS NOT NULL OR
+     NEW.c_spec_focal_plane IS NOT NULL OR
+     NEW.c_spec_focal_plane_angle IS NOT NULL OR
+     NEW.c_spec_capability IS NOT NULL THEN
+    -- If spectroscopy fields exist, set mode to spectroscopy
+    NEW.c_science_mode := 'spectroscopy';
+    -- Check if any imaging fields are set
+  ELSIF NEW.c_img_minimum_fov IS NOT NULL OR
+        NEW.c_img_narrow_filters IS NOT NULL OR
+        NEW.c_img_broad_filters IS NOT NULL OR
+        NEW.c_img_combined_filters IS NOT NULL THEN
+    -- If imaging fields exist, set mode to imaging
+    NEW.c_science_mode := 'imaging';
+  ELSE
+    -- If no fields are set, set mode to null
+    NEW.c_science_mode := NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for inserts and updates
+CREATE TRIGGER observation_auto_science_mode
+  BEFORE INSERT OR UPDATE ON t_observation
+  FOR EACH ROW
+  EXECUTE FUNCTION auto_set_science_mode();
+
 -- Update views to include imaging requirements
 DROP VIEW v_observation;
 CREATE OR REPLACE VIEW v_observation AS
