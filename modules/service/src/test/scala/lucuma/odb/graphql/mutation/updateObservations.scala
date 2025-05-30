@@ -829,18 +829,18 @@ class updateObservations extends OdbSuite
     )
   }
 
-  private object scienceRequirements {
+  private object spectroscopyScienceRequirements {
     val update: String = """
       scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
         spectroscopy: {
           wavelength: { nanometers: 400 }
           resolution: 10
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 75
-              at: { nanometers: 410 }
-            }
-          }
           wavelengthCoverage: { picometers: 10 }
           focalPlane: SINGLE_SLIT
           focalPlaneAngle: { arcseconds: 5 }
@@ -853,15 +853,15 @@ class updateObservations extends OdbSuite
       observations {
         scienceRequirements {
           mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
           spectroscopy {
             wavelength { nanometers }
             resolution
-            exposureTimeMode {
-              signalToNoise {
-                value
-                at { nanometers }
-              }
-            }
             wavelengthCoverage { nanometers }
             focalPlane
             focalPlaneAngle { arcseconds }
@@ -878,19 +878,19 @@ class updateObservations extends OdbSuite
             {
               "scienceRequirements": {
                 "mode": "SPECTROSCOPY",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
                 "spectroscopy": {
                   "wavelength": {
                     "nanometers": 400.000
                   },
                   "resolution": 10,
-                  "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 75.000,
-                      "at": {
-                        "nanometers": 410.000
-                      }
-                    }
-                  },
                   "wavelengthCoverage": {
                     "nanometers": 0.010
                   },
@@ -909,12 +909,12 @@ class updateObservations extends OdbSuite
 
   }
 
-  test("science requirements: update") {
+  test("spectroscopy science requirements: update") {
     oneUpdateTest(
       pi,
-      scienceRequirements.update,
-      scienceRequirements.query,
-      scienceRequirements.expected.asRight
+      spectroscopyScienceRequirements.update,
+      spectroscopyScienceRequirements.query,
+      spectroscopyScienceRequirements.expected.asRight
     )
   }
 
@@ -922,7 +922,7 @@ class updateObservations extends OdbSuite
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- query(pi, updateObservationsMutation(oid, scienceRequirements.update, scienceRequirements.query))
+      _   <- query(pi, updateObservationsMutation(oid, spectroscopyScienceRequirements.update, spectroscopyScienceRequirements.query))
       _   <- updateObservation(
         user   = pi,
         oid    = oid,
@@ -958,6 +958,422 @@ class updateObservations extends OdbSuite
           }
         """.asRight
       )
+    } yield ()
+  }
+
+  private object imagingScienceRequirements {
+    val update0: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 150
+          }
+          narrowFilters: true
+          broadFilters: true
+          combinedFilters: true
+        }
+      }
+    """
+
+    val update1: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+
+        }
+      }
+    """
+
+    val update2: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: false
+
+        }
+      }
+    """
+
+    val update3: String = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: {
+            arcseconds: 200
+          }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+
+        }
+      }
+    """
+
+    // update only broadFilters - other values should be preserved
+    val update4 = """
+      scienceRequirements: {
+        imaging: {
+          broadFilters: true
+        }
+      }
+    """
+
+    val query: String = """
+      observations {
+        scienceRequirements {
+          mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
+          imaging {
+            minimumFov { arcseconds }
+            narrowFilters
+            broadFilters
+            combinedFilters
+          }
+        }
+      }
+    """
+
+    val expected0: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 150
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": true,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected1: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected2: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected3: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+    val expected4: Json = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 200
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": true,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+  }
+
+  test("imaging science requirements: multi updates") {
+    multiUpdateTest(
+      pi,
+      List(
+        (imagingScienceRequirements.update0, imagingScienceRequirements.query, imagingScienceRequirements.expected0.asRight),
+        (imagingScienceRequirements.update1, imagingScienceRequirements.query, imagingScienceRequirements.expected1.asRight),
+        (imagingScienceRequirements.update2, imagingScienceRequirements.query, imagingScienceRequirements.expected2.asRight),
+        (imagingScienceRequirements.update3, imagingScienceRequirements.query, imagingScienceRequirements.expected3.asRight),
+        (imagingScienceRequirements.update4, imagingScienceRequirements.query, imagingScienceRequirements.expected4.asRight)
+      )
+    )
+  }
+
+  test("science requirements: update from spectroscopy to imaging") {
+    val spectroscopyUpdate = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100
+            at: { nanometers: 500 }
+          }
+        }
+        spectroscopy: {
+          wavelength: { nanometers: 600 }
+          resolution: 5000
+          wavelengthCoverage: { nanometers: 100 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { arcseconds: 10 }
+          capability: CORONAGRAPHY
+        }
+      }
+    """
+
+    val imagingUpdate = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 75
+            at: { nanometers: 410 }
+          }
+        }
+        imaging: {
+          minimumFov: { arcseconds: 120 }
+          narrowFilters: true
+          broadFilters: false
+          combinedFilters: true
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        scienceRequirements {
+          mode
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+          }
+          spectroscopy {
+            wavelength { nanometers }
+            resolution
+            wavelengthCoverage { nanometers }
+            focalPlane
+            focalPlaneAngle { arcseconds }
+            capability
+          }
+          imaging {
+            minimumFov { arcseconds }
+            narrowFilters
+            broadFilters
+            combinedFilters
+          }
+        }
+      }
+    """
+
+    val expectedSpectroscopy = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "SPECTROSCOPY",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 100.000,
+                    "at": {
+                      "nanometers": 500.000
+                    }
+                  }
+                },
+                "spectroscopy": {
+                  "wavelength": {
+                    "nanometers": 600.000
+                  },
+                  "resolution": 5000,
+                  "wavelengthCoverage": {
+                    "nanometers": 100.000
+                  },
+                  "focalPlane": "SINGLE_SLIT",
+                  "focalPlaneAngle": {
+                    "arcseconds": 10
+                  },
+                  "capability": "CORONAGRAPHY"
+                },
+                "imaging": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val expectedImaging = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "scienceRequirements": {
+                "mode": "IMAGING",
+                "exposureTimeMode": {
+                  "signalToNoise": {
+                    "value": 75.000,
+                    "at": {
+                      "nanometers": 410.000
+                    }
+                  }
+                },
+                "spectroscopy": null,
+                "imaging": {
+                  "minimumFov": {
+                    "arcseconds": 120
+                  },
+                  "narrowFilters": true,
+                  "broadFilters": false,
+                  "combinedFilters": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      // First set spectroscopy requirements
+      _   <- updateObservation(pi, oid, spectroscopyUpdate, query, expectedSpectroscopy)
+      // Then update to imaging requirements - spectroscopy fields should be null
+      _   <- updateObservation(pi, oid, imagingUpdate, query, expectedImaging)
     } yield ()
   }
 
@@ -2208,6 +2624,237 @@ class updateObservations extends OdbSuite
         List(s"One or more programs have not been allocated time in BAND1: $pid").asLeft
       )
     } yield ()
+  }
+
+  test("science mode auto-set: spectroscopy fields trigger spectroscopy mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                  resolution: 1000
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                  resolution
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "SPECTROSCOPY",
+            "spectroscopy": {
+              "wavelength": {
+                "micrometers": 1.5
+              },
+              "resolution": 1000
+            },
+            "imaging": null
+          }""")
+        )
+      }
+    }
+  }
+
+  test("science mode auto-set: imaging fields trigger imaging mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                imaging: {
+                  minimumFov: { microarcseconds: 1000000 }
+                  narrowFilters: true
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                  resolution
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "IMAGING",
+            "spectroscopy": null,
+            "imaging": {
+              "minimumFov": {
+                "microarcseconds": 1000000
+              },
+              "narrowFilters": true
+            }
+          }""")
+        )
+      }
+    }
+  }
+
+  test("science mode auto-set: clearing all fields sets mode to null") {
+    createProgramAs(pi).flatMap { pid =>
+      // First create observation with only one spectroscopy field
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                }
+              }
+            }
+          }) {
+            observation { id }
+          }
+        }
+      """).flatMap { js =>
+        js.hcursor.downFields("createObservation", "observation", "id").as[Observation.Id]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+      }.flatMap { oid =>
+        // Then update to clear the only field
+        query(pi, s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                scienceRequirements: {
+                  spectroscopy: {
+                    wavelength: null
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: "$oid" }
+              }
+            }) {
+              observations { id }
+            }
+          }
+        """).flatMap { _ =>
+          query(
+            pi,
+            s"""
+              query {
+                observation(observationId: "$oid") {
+                  scienceRequirements {
+                    mode
+                    spectroscopy {
+                      wavelength { micrometers }
+                      resolution
+                      wavelengthCoverage { micrometers }
+                      focalPlane
+                      focalPlaneAngle { microarcseconds }
+                      capability
+                    }
+                    imaging {
+                      minimumFov { microarcseconds }
+                      narrowFilters
+                    }
+                  }
+                }
+              }
+            """
+          ).map { result =>
+            // When all spectroscopy fields are null, the mode should be set to null
+            assertEquals(
+              result,
+              json"""
+                {
+                  "observation": {
+                    "scienceRequirements": {
+                      "mode": null,
+                      "spectroscopy": null,
+                      "imaging": null
+                    }
+                  }
+                }
+              """
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("science mode auto-set: spectroscopy fields always trigger spectroscopy mode") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              scienceRequirements: {
+                spectroscopy: {
+                  wavelength: { micrometers: 1.5 }
+                }
+              }
+            }
+          }) {
+            observation {
+              id
+              scienceRequirements {
+                mode
+                spectroscopy {
+                  wavelength { micrometers }
+                }
+                imaging {
+                  minimumFov { microarcseconds }
+                  narrowFilters
+                }
+              }
+            }
+          }
+        }
+      """).map { result =>
+        assertEquals(
+          result.hcursor.downFields("createObservation", "observation", "scienceRequirements").focus,
+          Some(json"""{
+            "mode": "SPECTROSCOPY",
+            "spectroscopy": {
+              "wavelength": {
+                "micrometers": 1.5
+              }
+            },
+            "imaging": null
+          }""")
+        )
+      }
+    }
   }
 
 }

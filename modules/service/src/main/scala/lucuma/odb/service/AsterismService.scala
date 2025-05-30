@@ -233,6 +233,7 @@ object AsterismService {
           SELECT * FROM (
             VALUES
         """
+
       val links: NonEmptyList[AppliedFragment] =
         for {
           oid <- observationIds

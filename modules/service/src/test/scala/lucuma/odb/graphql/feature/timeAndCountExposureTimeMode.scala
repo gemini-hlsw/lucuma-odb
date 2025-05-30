@@ -36,19 +36,18 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
                  asterism: ${List(t).asJson}
                },
                scienceRequirements: {
-                 mode: SPECTROSCOPY,
+                 exposureTimeMode: {
+                   timeAndCount: {
+                     time: { minutes: 10 },
+                     count: 3,
+                     at: { nanometers: 500 }
+                   }
+                 },
                  spectroscopy: {
                    wavelength: {
                      nanometers: 500
                    },
                    resolution: 100,
-                   exposureTimeMode: {
-                     timeAndCount: {
-                       time: { minutes: 10 },
-                       count: 3,
-                       at: { nanometers: 500 }
-                     }
-                   },
                    wavelengthCoverage: {
                      nanometers: 20
                    },
@@ -91,13 +90,11 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
           query {
             observation(observationId: "$o") {
               scienceRequirements {
-                 spectroscopy {
-                   exposureTimeMode {
-                     timeAndCount {
-                       time { minutes }
-                       count
-                       at { nanometers }
-                     }
+                 exposureTimeMode {
+                   timeAndCount {
+                     time { minutes }
+                     count
+                     at { nanometers }
                    }
                  }
               }
@@ -108,13 +105,11 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
           {
             "observation": {
               "scienceRequirements": {
-                "spectroscopy": {
-                  "exposureTimeMode": {
-                    "timeAndCount": {
-                      "time": { "minutes":  10.000000 },
-                      "count": 3,
-                      "at": { "nanometers":  500.000 }
-                    }
+                "exposureTimeMode": {
+                  "timeAndCount": {
+                    "time": { "minutes":  10.000000 },
+                    "count": 3,
+                    "at": { "nanometers":  500.000 }
                   }
                 }
               }
@@ -132,9 +127,7 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
             updateObservations(input: {
               SET: {
                 scienceRequirements: {
-                  spectroscopy: {
-                    exposureTimeMode: null
-                  }
+                  exposureTimeMode: null
                 }
               },
               WHERE: {
@@ -143,11 +136,9 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
             }) {
               observations {
                 scienceRequirements {
-                  spectroscopy {
-                    exposureTimeMode {
-                      signalToNoise {
-                        value
-                      }
+                  exposureTimeMode {
+                    signalToNoise {
+                      value
                     }
                   }
                 }
@@ -161,9 +152,7 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
               "observations": [
                 {
                   "scienceRequirements": {
-                    "spectroscopy": {
-                      "exposureTimeMode": null
-                    }
+                    "exposureTimeMode": null
                   }
                 }
               ]
@@ -315,19 +304,18 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
                  asterism: ${List(t).asJson}
                },
                scienceRequirements: {
-                 mode: SPECTROSCOPY,
+                 exposureTimeMode: {
+                   timeAndCount: {
+                     time: { minutes: 0 },
+                     count: 3,
+                     at: { nanometers: 500 }
+                   }
+                 },
                  spectroscopy: {
                    wavelength: {
                      nanometers: 500
                    },
                    resolution: 100,
-                   exposureTimeMode: {
-                     timeAndCount: {
-                       time: { minutes: 0 },
-                       count: 3,
-                       at: { nanometers: 500 }
-                     }
-                   },
                    wavelengthCoverage: {
                      nanometers: 20
                    },
@@ -353,7 +341,7 @@ class timeAndCountExposureTimeMode extends ExecutionTestSupportForGmos:
          }
         """,
         expected = List(
-          "Argument 'input.SET.scienceRequirements.spectroscopy.exposureTimeMode.timeAndCount' is invalid: Exposure `time` parameter must be positive."
+          "Argument 'input.SET.scienceRequirements.exposureTimeMode.timeAndCount' is invalid: Exposure `time` parameter must be positive."
         ).asLeft
       )
     yield ()
