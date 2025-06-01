@@ -21,7 +21,6 @@ import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.WaterVapor
@@ -625,7 +624,6 @@ object ObservationService {
            ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)) ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                           ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
-           scienceRequirements.flatMap(_.scienceMode)                                                                             ,
            spectroscopy.flatMap(_.wavelength.toOption)                                                                             ,
            spectroscopy.flatMap(_.resolution.toOption)                                                                             ,
            exposureTimeModeType                                                                                                    ,
@@ -674,7 +672,6 @@ object ObservationService {
       Option[PosBigDecimal]            ,
       Option[BigDecimal]               ,
       Option[BigDecimal]               ,
-      Option[ScienceMode]              ,
       Option[Wavelength]               ,
       Option[PosInt]                   ,
       Option[ExposureTimeModeType]     ,
@@ -714,7 +711,6 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
           c_exp_time_mode,
@@ -753,7 +749,6 @@ object ObservationService {
           ${air_mass_range_value.opt},
           ${hour_angle_range_value.opt},
           ${hour_angle_range_value.opt},
-          ${science_mode.opt},
           ${wavelength_pm.opt},
           ${int4_pos.opt},
           ${exposure_time_mode_type.opt},
@@ -888,7 +883,6 @@ object ObservationService {
     }
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
-      val upMode = sql"c_science_mode = $science_mode"
       val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
       val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
       val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
@@ -907,11 +901,9 @@ object ObservationService {
         timeAndCountMode.map(_.count).foldPresent(upExpCount),
       ).flattenOption
 
-      val ups    = in.scienceMode.map(upMode).toList
-
-      // When changing modes, we need to clear fields from the other mode
-      val clearSpectroscopy = in.scienceMode.exists(_ == ScienceMode.Imaging) && in.spectroscopy.isEmpty
-      val clearImaging = in.scienceMode.exists(_ == ScienceMode.Spectroscopy) && in.imaging.isEmpty
+      // we clear fields based on the science mode that's being set
+      val clearSpectroscopy = in.imaging.isDefined && in.spectroscopy.isEmpty
+      val clearImaging = in.spectroscopy.isDefined && in.imaging.isEmpty
 
       val spectroscopyClear =
         Option.when(clearSpectroscopy)(List(
@@ -931,7 +923,7 @@ object ObservationService {
           void"c_img_combined_filters = NULL"
         )).orEmpty
 
-      ups ++ fields ++ spectroscopyClear ++ imagingClear ++
+      fields ++ spectroscopyClear ++ imagingClear ++
         in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
         in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
@@ -1059,7 +1051,6 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
           c_exp_time_mode,
@@ -1101,7 +1092,6 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
           c_exp_time_mode,
