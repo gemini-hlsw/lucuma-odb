@@ -879,6 +879,7 @@ object ObservationService {
     }
 
     def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
+      // Science mode is now a calculated field in the view, no need to update it
       val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
       val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
       val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
@@ -897,7 +898,7 @@ object ObservationService {
         timeAndCountMode.map(_.count).foldPresent(upExpCount),
       ).flattenOption
 
-      // we clear fields based on the science mode that's being set
+      // Since science mode is calculated, we clear fields based on what's being set
       val clearSpectroscopy = in.imaging.isDefined && in.spectroscopy.isEmpty
       val clearImaging = in.spectroscopy.isDefined && in.imaging.isEmpty
 
