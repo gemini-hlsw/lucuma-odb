@@ -115,6 +115,7 @@ object OdbMapping {
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
+          with CalculatedObservationWorkflowMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
@@ -506,6 +507,7 @@ object OdbMapping {
               ) ++ List(
                 AngleMappings,
                 AtomRecordSelectResultMappings,
+                CalculatedObservationWorkflowMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
@@ -630,8 +632,8 @@ object OdbMapping {
       override val typeMappings: TypeMappings =
         TypeMappings.unchecked(
           List(
-          FilterTypeMetaMapping,
-          ProposalStatusMetaMapping,
+            FilterTypeMetaMapping,
+            ProposalStatusMetaMapping,
             QueryMapping,
           ) ++ LeafMappings
         )
@@ -640,5 +642,31 @@ object OdbMapping {
         SelectElaborator(QueryElaborator)
 
     }
+
+  def forObscalc[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
+    database:   Resource[F, Session[F]],
+    monitor:    SkunkMonitor[F],
+    user:       User,
+    commitHash: CommitHash,
+    enums:      Enums,
+    httpClient: Client[F],
+    schema:     Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+  ): Mapping[F] =
+
+    apply(
+      database,
+      monitor,
+      user,
+      null,        // Topics[F]
+      null,        // ItcClient[F]
+      commitHash,
+      Set.empty,   // GOA users
+      enums,
+      null,        // TimeEstimateCalculatorImplementation.ForInstrumentMode
+      httpClient,
+      null,        // Config.Email
+      allowSub = false,
+      schema
+    )
 
 }

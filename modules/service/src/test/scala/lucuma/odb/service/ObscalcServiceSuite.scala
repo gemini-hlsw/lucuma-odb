@@ -10,10 +10,13 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationValidation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.CategorizedTime
@@ -46,12 +49,15 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         .map: tec =>
           services.obscalcService(CommitHash.Zero, itcClient, tec)
 
+//  override def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
+//    withServicesForObscalc(u)(f)
+
   def withObscalcService[A](f: ServiceAccess ?=> ObscalcService[IO] => IO[A]): IO[A] =
-    withServices(serviceUser): services =>
+    withServicesForObscalc(serviceUser): services =>
       instantiate(services).flatMap(f)
 
   def withObscalcServiceTransactionally[A](f: (ServiceAccess, Transaction[IO]) ?=> ObscalcService[IO] => IO[A]): IO[A] =
-    withServices(serviceUser): services =>
+    withServicesForObscalc(serviceUser): services =>
       services.transactionally:
         instantiate(services).flatMap(f)
 
@@ -170,7 +176,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
           )
-      )
+      ),
+      ObservationWorkflow(ObservationWorkflowState.Defined, List(ObservationWorkflowState.Inactive), Nil)
     )
 
   val randomTime = Timestamp.unsafeFromInstantTruncated(java.time.Instant.now)
@@ -181,7 +188,10 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       o <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
       _ <- assertIO(
             calculateOnly(Obscalc.PendingCalc(p, o, randomTime)),
-            Obscalc.Result.Error(OdbError.SequenceUnavailable(o, s"Could not generate a sequence for $o: observation is missing target".some))
+            Obscalc.Result.Error(
+              OdbError.SequenceUnavailable(o, s"Could not generate a sequence for $o: observation is missing target".some),
+              ObservationWorkflow(ObservationWorkflowState.Undefined, List(ObservationWorkflowState.Inactive), List(ObservationValidation.configuration("Missing target")))
+            )
           )
     yield ()
 

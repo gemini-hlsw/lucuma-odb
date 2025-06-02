@@ -9679,7 +9679,7 @@ type Observation {
 
   workflow: ObservationWorkflow!
 
-  calculatedWorkflow: CalculatedObservationWorkflow!
+  calculatedWorkflow: CalculatedObservationWorkflow
 }
 
 enum ExecutionState {

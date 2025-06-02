@@ -31,8 +31,6 @@ import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
-import lucuma.core.util.CalculatedValue
-import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Enumerated
 import lucuma.itc.client.ItcClient
@@ -67,33 +65,12 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
-  /**
-   * Computes the workflow for each observation using the current results of a
-   * background calculation instead of pausing the unfold the execution sequence.
-   * As such, the results may be stale and pending update.  Because there is no
-   * long-running calculation, `SuperUserAccess` is not required and we demand a
-   * `Transaction`.
-   */
-  def getCalculatedWorkflows(
-    oids: List[Observation.Id],
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-  )(using Transaction[F]): F[Result[Map[Observation.Id, CalculatedValue[ObservationWorkflow]]]]
-
   def getWorkflow(
     oid: Observation.Id,
     commitHash: CommitHash,
     itcClient: ItcClient[F],
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[ObservationWorkflow]]
-
-  def getCalculatedWorkflow(
-    oid: Observation.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-  )(using Transaction[F]): F[Result[CalculatedValue[ObservationWorkflow]]]
 
   def getWorkflows(
     pid: Program.Id,
@@ -102,12 +79,18 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
-  def getCalculatedWorkflows(
-    pid: Program.Id,
-    commitHash: CommitHash,
-    itcClient: ItcClient[F],
-    ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-  )(using Transaction[F]): F[Result[Map[Observation.Id, CalculatedValue[ObservationWorkflow]]]]
+  /**
+   * Computes the workflow for the observation using the current results of a
+   * background calculation instead of pausing the unfold the execution sequence.
+   * As such, the results may be stale and pending update.  Because there is no
+   * long-running calculation, `SuperUserAccess` is not required and we demand a
+   * `Transaction`.
+   */
+  def getCalculatedWorkflow(
+    oid:  Observation.Id,
+    itc:  Option[ItcService.AsterismResults],
+    exec: Option[CoreExecutionState]
+  )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
     oid: Observation.Id,
@@ -577,40 +560,6 @@ object ObservationWorkflowService {
           workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
         yield workflows).value
 
-      // Strips the CalculatedValue wrapper from a map with CalculatedValue values.
-      private def valueOnly[A, B](m: Map[A, CalculatedValue[B]]): Map[A, B] =
-        m.view.mapValues(_.value).toMap
-
-      def getCalculatedWorkflows(
-        oids:       List[Observation.Id],
-        commitHash: CommitHash,
-        itcClient:  ItcClient[F],
-        ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using Transaction[F]): F[Result[Map[Observation.Id, CalculatedValue[ObservationWorkflow]]]] =
-
-        (
-          for
-            infos     <- ResultT.liftF(lookupObsDefinitions(oids))                                         // Map[Observation.Id, ObsDefinition]
-            calcs     <- ResultT.liftF(obscalcService(commitHash, itcClient, ptc).selectManyResults(oids)) // Map[Observation.Id, CalculatedValue[Obscalc.Result]]
-            errs      <- validateObsDefinition(infos, calcs.keySet.apply)                                  // Map[Observation.Id, CalculatedValue[ObservationValidationMap]]
-
-            // Map[Observation.Id, CalculatedValue[ExecutionState]]
-            execs =
-              calcs
-                .view
-                .mapValues[CalculatedValue[Option[ExecutionState]]](_.map(_.digest.flatMap(_.science.executionState.workflowExecutionState)))
-                .collect[(Observation.Id, CalculatedValue[ExecutionState])]:
-                  case (oid, CalculatedValue(s, Some(e))) => oid -> CalculatedValue(s, e)
-                .toMap
-
-            workflows <- ResultT.fromResult(computeWorkflows(infos, errs, valueOnly(execs)))
-          yield
-            workflows.map: (oid, wf) =>
-              oid -> CalculatedValue(execs.get(oid).map(_.state).getOrElse(CalculationState.Ready), wf)
-            .toMap
-
-        ).value
-
       override def getWorkflow(
         oid: Observation.Id,
         commitHash: CommitHash,
@@ -624,16 +573,18 @@ object ObservationWorkflowService {
               case None     => OdbError.InvalidObservation(oid).asFailure
 
       override def getCalculatedWorkflow(
-        oid: Observation.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using Transaction[F]): F[Result[CalculatedValue[ObservationWorkflow]]] =
-        getCalculatedWorkflows(List(oid), commitHash, itcClient, ptc).map: result =>
-          result.flatMap: map =>
-            map.get(oid) match
-              case Some(cv) => Result(cv)
-              case None     => OdbError.InvalidObservation(oid).asFailure
+        oid:  Observation.Id,
+        itc:  Option[ItcService.AsterismResults],
+        exec: Option[CoreExecutionState]
+      )(using Transaction[F]): F[Result[ObservationWorkflow]] =
+        (for
+          infos <- ResultT.liftF(lookupObsDefinitions(List(oid)))
+          errs  <- validateObsDefinition(infos, _ => itc.isDefined)
+          wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
+          execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
+          wfs   <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+          res   <- ResultT.fromResult(Result.fromOption(wfs.get(oid), s"Invalid observation: $oid"))
+        yield res).value
 
       override def getWorkflows(
         pid: Program.Id,
@@ -646,15 +597,6 @@ object ObservationWorkflowService {
             session.prepareR(Statements.selectObservationIds).use: pq =>
               pq.stream(pid, 1024).compile.toList
           .flatMap(getWorkflows(_, commitHash, itcClient, ptc))
-
-      override def getCalculatedWorkflows(
-        pid: Program.Id,
-        commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using Transaction[F]): F[Result[Map[Observation.Id, CalculatedValue[ObservationWorkflow]]]] =
-        session.execute(Statements.selectObservationIds)(pid).flatMap: oids =>
-          getCalculatedWorkflows(oids, commitHash, itcClient, ptc)
 
       override def setWorkflowState(
         oid: Observation.Id,

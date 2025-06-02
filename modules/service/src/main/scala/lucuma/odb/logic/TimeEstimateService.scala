@@ -29,6 +29,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import org.typelevel.log4cats.Logger
 import skunk.Transaction
 
 /**
@@ -76,7 +77,7 @@ object TimeEstimateService:
     commitHash:   CommitHash,
     itcClient:    ItcClient[F],
     calculator:   TimeEstimateCalculatorImplementation.ForInstrumentMode,
-  )(using Services[F]): TimeEstimateService[F] =
+  )(using Services[F], Logger[F]): TimeEstimateService[F] =
     lazy val obscalcService: ObscalcService[F] =
       services.obscalcService(commitHash, itcClient, calculator)
 

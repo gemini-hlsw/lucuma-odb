@@ -16,6 +16,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
@@ -54,15 +55,18 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
+import lucuma.odb.json.observationvalidation.given
 import lucuma.odb.service.ObservationWorkflowService
 import monocle.Prism
 import skunk.*
+import skunk.circe.codec.json.*
 import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
@@ -333,8 +337,25 @@ trait Codecs {
       b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
     )(_.toBoolean)
 
+  val odb_error: Codec[OdbError] =
+    jsonb.eimap(
+      json => if json.isNull then s"Could not decode OdbError: unexpected NULL value.".asLeft
+              else json.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}.")
+    )(_.asJson)
+
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
+
+  val observation_validation: Codec[ObservationValidation] =
+    jsonb.eimap(
+      json => if json.isNull then s"Could not decode ObservationValidation: unexpected NULL value".asLeft
+              else json.as[ObservationValidation].leftMap(f => s"Could not decode ObservationValidation: ${f.message}.")
+    )(_.asJson)
+
+  val _observation_validation: Codec[List[ObservationValidation]] =
+    jsonb.eimap(
+      _.as[List[ObservationValidation]].leftMap(f => s"Could not decode ObservationValidation array: ${f.message}.")
+    )(_.asJson)
 
   val calculation_state: Codec[CalculationState] =
     enumerated(Type("e_calculation_state"))
@@ -467,7 +488,7 @@ trait Codecs {
     enumerated[SequenceType](Type("e_sequence_type"))
 
   val _site: Codec[Arr[Site]] =
-    Codec.array(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site"))
+    Codec.array(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site", List(Type("e_site"))))
 
   val site: Codec[Site] =
     `enum`(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase), Type("e_site"))
@@ -734,12 +755,15 @@ trait Codecs {
     enumerated(Type("e_invitation_status"))
 
   val observation_workflow_state: Codec[ObservationWorkflowState] =
-    enumerated[ObservationWorkflowState](Type("e_workflow_user_state"))
+    enumerated(Type("e_workflow_state"))
+
+  val observation_workflow_user_state: Codec[ObservationWorkflowState] =
+    enumerated(Type("e_workflow_user_state"))
 
   val user_state: Codec[ObservationWorkflowService.UserState] =
     import ObservationWorkflowService.UserState
     import ObservationWorkflowState.*
-    observation_workflow_state.eimap[UserState] {
+    observation_workflow_user_state.eimap[UserState] {
       case Inactive   => Right(Inactive)
       case Ready      => Right(Ready)
       case s          => Left(s"Invalid user state: $s")
@@ -749,8 +773,11 @@ trait Codecs {
     val lst = as.toList
     enc.list(lst).contramap(_ => lst)
 
+  val _observation_workflow_state: Codec[List[ObservationWorkflowState]] =
+    _enumerated(Type("_e_workflow_state", List(Type("e_workflow_state"))))
+
   val _science_band: Codec[List[ScienceBand]] =
-    _enumerated(Type("_e_science_band"))
+    _enumerated(Type("_e_science_band", List(Type("e_science_band"))))
 
 }
 

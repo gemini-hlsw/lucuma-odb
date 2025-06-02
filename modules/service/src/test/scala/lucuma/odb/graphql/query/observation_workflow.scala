@@ -16,8 +16,8 @@ import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.CloudExtinction
@@ -1038,23 +1038,6 @@ class observation_workflow
 
   }
 
-/*
-  import skunk.*
-  import skunk.implicits.*
-
-  val selectStates: IO[Map[Observation.Id, CalculationState]] =
-    withSession: session =>
-      val states: Query[Void, (Observation.Id, CalculationState)] = sql"""
-        SELECT
-          c_observation_id,
-          c_obscalc_state
-        FROM
-          t_obscalc
-      """.query(lucuma.odb.util.Codecs.observation_id *: lucuma.odb.util.Codecs.calculation_state)
-
-      session.execute(states).map(_.toMap)
-*/
-
   val OngoingSetup: IO[Observation.Id] =
     for
       p <- createProgram
@@ -1067,9 +1050,7 @@ class observation_workflow
       _ <- runObscalcUpdate(p, o)
     yield o
 
-
-
-  test("ongoing - calculated"):
+  test("calculated: ongoing"):
     OngoingSetup.flatMap: oid =>
       expect(
         pi,
@@ -1081,6 +1062,36 @@ class observation_workflow
               ObservationWorkflowState.Ongoing,
               List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Completed),
               Nil
+            )
+          )
+        ).asRight
+      )
+
+  test("calculated: missing target info, invalid instrument"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        c <- createCfp(List(Instrument.GmosSouth))
+        _ <- addProposal(pi, p, c.some)
+        t <- createIncompleteTargetAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        calculatedWorkflowQuery(oid),
+        expected = calculatedWorkflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              List(
+                ObservationValidation.configuration("Missing brightness measure, radial velocity"),
+                ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+              )
             )
           )
         ).asRight

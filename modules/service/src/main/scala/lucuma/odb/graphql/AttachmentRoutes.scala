@@ -24,6 +24,7 @@ import natchez.Trace
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.middleware.EntityLimiter
+import org.typelevel.log4cats.Logger
 import skunk.Session
 
 object AttachmentRoutes {
@@ -32,7 +33,7 @@ object AttachmentRoutes {
   }
 
   // the normal constructor
-  def apply[F[_]: Async: Parallel: Trace: SecureRandom](
+  def apply[F[_]: Async: Logger: Parallel: Trace: SecureRandom](
     pool:                  Resource[F, Session[F]],
     s3:                    S3FileService[F],
     ssoClient:             SsoClient[F, User],

@@ -12,6 +12,7 @@ object all {
        with Flamingos2Codec
        with GmosCodec
        with NumericCodec
+       with ObservationValidationCodec
        with PartnerLinkCodec
        with SequenceCodec
        with SourceProfileCodec
