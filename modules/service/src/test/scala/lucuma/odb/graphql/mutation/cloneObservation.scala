@@ -32,17 +32,23 @@ class cloneObservation extends OdbSuite {
       }
       scienceRequirements {
         mode
+        exposureTimeMode {
+          signalToNoise {
+            value
+          }
+        }
         spectroscopy {
           wavelength { nanometers }
           resolution
-          exposureTimeMode {
-            signalToNoise {
-              value
-            }
-          }
           wavelengthCoverage { nanometers }
           focalPlane
           focalPlaneAngle { microarcseconds }
+        }
+        imaging {
+          minimumFov { microarcseconds }
+          narrowFilters
+          broadFilters
+          combinedFilters
         }
       }
       observingMode {
@@ -73,12 +79,7 @@ class cloneObservation extends OdbSuite {
     }
     """
 
-  // Until these are implemented we need to filter them out.
-  val NotImplemented: Set[ObservingModeType] = Set(
-    ObservingModeType.GmosNorthImaging,
-    ObservingModeType.GmosSouthImaging
-  )
-  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet -- NotImplemented
+  val IsImplemented: Set[ObservingModeType] = ObservingModeType.values.toSet
 
   test("clones should have the same properties, for all observing modes") {
     ObservingModeType.values.toList.filter(IsImplemented.apply).traverse { obsMode =>

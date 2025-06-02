@@ -110,18 +110,17 @@ class calibrations extends OdbSuite with SubscriptionUtils {
             updateObservations(input: {
               SET: {
                 scienceRequirements: {
-                  mode: SPECTROSCOPY,
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.000,
+                      at: { nanometers: ${snAt.toNanometers} }
+                    }
+                  },
                   spectroscopy: {
                     wavelength: {
                       nanometers: 400.000
                     },
                     resolution: 10,
-                    exposureTimeMode: {
-                      signalToNoise: {
-                        value: 75.000,
-                        at: { nanometers: ${snAt.toNanometers} }
-                      }
-                    },
                     wavelengthCoverage: {
                       nanometers: 0.010
                     },
@@ -160,13 +159,13 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
+  // Utility classes used to decode group queries
   case class CalibTarget(id: Target.Id) derives Decoder
   case class CalibTE(firstScienceTarget: Option[CalibTarget]) derives Eq, Decoder
   case class CalibCE(cloudExtinction: CloudExtinction.Preset) derives Decoder
-  case class ScienceRequirements(spectroscopy: ExposureTimeMode) derives Decoder
-  case class ExposureTimeMode(exposureTimeMode: SignalToNoise) derives Decoder
-  case class SignalToNoise(signalToNoise: At) derives Decoder
-  case class At(at: Wavelength) derives Decoder
+  case class ExposureTimeMode(signalToNoise: SignalToNoise) derives Decoder
+  case class ScienceRequirements(exposureTimeMode: ExposureTimeMode) derives Decoder
+  case class SignalToNoise(at: Wavelength) derives Decoder
   case class CalibObs(
     id: Observation.Id,
     groupId: Option[Group.Id],
@@ -210,11 +209,9 @@ class calibrations extends OdbSuite with SubscriptionUtils {
                     cloudExtinction
                   }
                   scienceRequirements {
-                    spectroscopy {
-                      exposureTimeMode {
-                        signalToNoise {
-                          at { nanometers }
-                        }
+                    exposureTimeMode {
+                      signalToNoise {
+                        at { nanometers }
                       }
                     }
                   }
@@ -246,7 +243,6 @@ class calibrations extends OdbSuite with SubscriptionUtils {
     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
     ld.atStartOfDay().atOffset(ZoneOffset.UTC).format(formatter)
   }
-
 
   test("no calibrations group if not needed") {
     for {
@@ -540,7 +536,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   test("select calibration target") {
     for {
-      tpid <- withServices(service) { s =>                
+      tpid <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
                       s.programService
@@ -1024,7 +1020,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       ob   <- queryObservations(pid)
     } yield {
       val wv = ob.collect {
-        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(At(wv))))) => wv
+        case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
       }
       // 510 is the average across the science observations
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)

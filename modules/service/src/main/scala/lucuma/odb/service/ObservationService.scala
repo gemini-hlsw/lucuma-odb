@@ -21,7 +21,6 @@ import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapabilities
 import lucuma.core.enums.WaterVapor
@@ -57,6 +56,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.given
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
+import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ObservingModeInput
@@ -69,6 +69,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
+import skunk.codec.all.*
 import skunk.exception.PostgresErrorException
 import skunk.implicits.*
 
@@ -221,9 +222,9 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Unit]] =
         timingWindows
           .traverse(timingWindowService.createFunction)
-          .map { optF =>
+          .traverse { optF =>
             optF.fold(().pure[F])( f => f(oids, transaction) )
-          }.sequence
+          }
 
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
@@ -589,52 +590,58 @@ object ObservationService {
         val spectroscopy: Option[SpectroscopyScienceRequirementsInput] =
           scienceRequirements.flatMap(_.spectroscopy)
 
-        val specExposureTimeMode: Option[ExposureTimeMode] =
-          spectroscopy.flatMap(_.exposureTimeMode.toOption)
+        val imaging: Option[ImagingScienceRequirementsInput] =
+          scienceRequirements.flatMap(_.imaging)
 
-        val specExposureTimeModeType: Option[ExposureTimeModeType] =
-          specExposureTimeMode.map(_.tpe)
+        val exposureTimeMode: Option[ExposureTimeMode] =
+          scienceRequirements.flatMap(_.exposureTimeMode.toOption)
 
-        val specSignalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
-          specExposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
+        val exposureTimeModeType: Option[ExposureTimeModeType] =
+          exposureTimeMode.map(_.tpe)
 
-        val specTimeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
-          specExposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
+        val signalToNoiseExposureTimeMode: Option[ExposureTimeMode.SignalToNoiseMode] =
+          exposureTimeMode.flatMap(ExposureTimeMode.signalToNoise.getOption)
+
+        val timeAndCountExposureTimeMode: Option[ExposureTimeMode.TimeAndCountMode] =
+          exposureTimeMode.flatMap(ExposureTimeMode.timeAndCount.getOption)
 
         InsertObservation.apply(
-          programId    ,
-           groupId     ,
-           groupIndex  ,
-           subtitle    ,
-           existence   ,
-           scienceBand ,
-           posAngleConsMode              ,
-           posAngle                      ,
-           explicitBase.map(_.ra)        ,
-           explicitBase.map(_.dec)       ,
-           constraintSet.cloudExtinction ,
-           constraintSet.imageQuality    ,
-           constraintSet.skyBackground   ,
-           constraintSet.waterVapor      ,
-           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.toBigDecimal)) ,  // TODO: fix in core
+          programId                                                                                                                ,
+           groupId                                                                                                                 ,
+           groupIndex                                                                                                              ,
+           subtitle                                                                                                                ,
+           existence                                                                                                               ,
+           scienceBand                                                                                                             ,
+           posAngleConsMode                                                                                                        ,
+           posAngle                                                                                                                ,
+           explicitBase.map(_.ra)                                                                                                  ,
+           explicitBase.map(_.dec)                                                                                                 ,
+           constraintSet.cloudExtinction                                                                                           ,
+           constraintSet.imageQuality                                                                                              ,
+           constraintSet.skyBackground                                                                                             ,
+           constraintSet.waterVapor                                                                                                ,
+           ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.min.toBigDecimal)) , // TODO: fix in core
            ElevationRange.airMass.getOption(constraintSet.elevationRange).map(am => PosBigDecimal.unsafeFrom(am.max.toBigDecimal)) ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.minHours.toBigDecimal)                           ,
            ElevationRange.hourAngle.getOption(constraintSet.elevationRange).map(_.maxHours.toBigDecimal)                           ,
-           scienceRequirements.flatMap(_.mode).getOrElse(ScienceMode.Spectroscopy)  ,
-           spectroscopy.flatMap(_.wavelength.toOption)                              ,
-           spectroscopy.flatMap(_.resolution.toOption)                              ,
-           specExposureTimeModeType                                                 ,
-           specExposureTimeMode.map(_.at)                                           ,
-           specSignalToNoiseExposureTimeMode.map(_.value)                           ,
-           specTimeAndCountExposureTimeMode.map(_.time)                             ,
-           specTimeAndCountExposureTimeMode.map(_.count)                            ,
-           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                      ,
-           spectroscopy.flatMap(_.focalPlane.toOption)                              ,
-           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                         ,
-           spectroscopy.flatMap(_.capability.toOption)                              ,
-           modeType                                                                 ,
-           instrument                                                               ,
-           observerNotes                                                            ,
+           spectroscopy.flatMap(_.wavelength.toOption)                                                                             ,
+           spectroscopy.flatMap(_.resolution.toOption)                                                                             ,
+           exposureTimeModeType                                                                                                    ,
+           exposureTimeMode.map(_.at)                                                                                              ,
+           signalToNoiseExposureTimeMode.map(_.value)                                                                              ,
+           timeAndCountExposureTimeMode.map(_.time)                                                                                ,
+           timeAndCountExposureTimeMode.map(_.count)                                                                               ,
+           spectroscopy.flatMap(_.wavelengthCoverage.toOption)                                                                     ,
+           spectroscopy.flatMap(_.focalPlane.toOption)                                                                             ,
+           spectroscopy.flatMap(_.focalPlaneAngle.toOption)                                                                        ,
+           spectroscopy.flatMap(_.capability.toOption)                                                                             ,
+           imaging.flatMap(_.minimumFov.toOption)                                                                                  ,
+           imaging.flatMap(_.narrowFilters.toOption)                                                                               ,
+           imaging.flatMap(_.broadFilters.toOption)                                                                                ,
+           imaging.flatMap(_.combinedFilters.toOption)                                                                             ,
+           modeType                                                                                                                ,
+           instrument                                                                                                              ,
+           observerNotes                                                                                                           ,
         )
       }
 
@@ -657,15 +664,14 @@ object ObservationService {
       Angle                            ,
       Option[RightAscension]           ,
       Option[Declination]              ,
-      CloudExtinction.Preset            ,
-      ImageQuality.Preset               ,
+      CloudExtinction.Preset           ,
+      ImageQuality.Preset              ,
       SkyBackground                    ,
       WaterVapor                       ,
       Option[PosBigDecimal]            ,
       Option[PosBigDecimal]            ,
       Option[BigDecimal]               ,
       Option[BigDecimal]               ,
-      ScienceMode                      ,
       Option[Wavelength]               ,
       Option[PosInt]                   ,
       Option[ExposureTimeModeType]     ,
@@ -677,6 +683,10 @@ object ObservationService {
       Option[FocalPlane]               ,
       Option[Angle]                    ,
       Option[SpectroscopyCapabilities] ,
+      Option[Angle]                    ,
+      Option[Boolean]                  ,
+      Option[Boolean]                  ,
+      Option[Boolean]                  ,
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
@@ -701,18 +711,21 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters,
+          c_img_combined_filters,
           c_observing_mode_type,
           c_instrument,
           c_observer_notes
@@ -736,7 +749,6 @@ object ObservationService {
           ${air_mass_range_value.opt},
           ${hour_angle_range_value.opt},
           ${hour_angle_range_value.opt},
-          $science_mode,
           ${wavelength_pm.opt},
           ${int4_pos.opt},
           ${exposure_time_mode_type.opt},
@@ -748,6 +760,10 @@ object ObservationService {
           ${focal_plane.opt},
           ${angle_µas.opt},
           ${spectroscopy_capabilities.opt},
+          ${angle_µas.opt},
+          ${bool.opt},
+          ${bool.opt},
+          ${bool.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
           ${text_nonempty.opt}
@@ -835,28 +851,15 @@ object ObservationService {
 
       val upWavelength         = sql"c_spec_wavelength = ${wavelength_pm.opt}"
       val upResolution         = sql"c_spec_resolution = ${int4_pos.opt}"
-      val upExpTimeModeType    = sql"c_spec_exp_time_mode = ${exposure_time_mode_type.opt}"
-      val upSignalToNoiseAt    = sql"c_spec_signal_to_noise_at = ${wavelength_pm.opt}"
-      val upSignalToNoise      = sql"c_spec_signal_to_noise = ${signal_to_noise.opt}"
-      val upExpTime            = sql"c_spec_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_spec_exp_count = ${int4_nonneg.opt}"
       val upWavelengthCoverage = sql"c_spec_wavelength_coverage = ${wavelength_pm.opt}"
       val upFocalPlane         = sql"c_spec_focal_plane = ${focal_plane.opt}"
       val upFocalPlaneAngle    = sql"c_spec_focal_plane_angle = ${angle_µas.opt}"
       val upCapability         = sql"c_spec_capability = ${spectroscopy_capabilities.opt}"
 
-      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
-      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
-      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
 
       List(
         in.wavelength.foldPresent(upWavelength),
         in.resolution.foldPresent(upResolution),
-        expTimeModeType.foldPresent(upExpTimeModeType),
-        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
-        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
-        timeAndCountMode.map(_.time).foldPresent(upExpTime),
-        timeAndCountMode.map(_.count).foldPresent(upExpCount),
         in.wavelengthCoverage.foldPresent(upWavelengthCoverage),
         in.focalPlane.foldPresent(upFocalPlane),
         in.focalPlaneAngle.foldPresent(upFocalPlaneAngle),
@@ -864,11 +867,65 @@ object ObservationService {
       ).flattenOption
     }
 
-    def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
-      val upMode = sql"c_science_mode = $science_mode"
-      val ups    = in.mode.map(upMode).toList
+    def imagingRequirementsUpdates(in: ImagingScienceRequirementsInput): List[AppliedFragment] = {
 
-      ups ++ in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates)
+      val upMinimumFov         = sql"c_img_minimum_fov = ${angle_µas.opt}"
+      val upNarrowFilters      = sql"c_img_narrow_filters = ${bool.opt}"
+      val upBroadFilters       = sql"c_img_broad_filters = ${bool.opt}"
+      val upCombinedFilters    = sql"c_img_combined_filters = ${bool.opt}"
+
+      List(
+        in.minimumFov.foldPresent(upMinimumFov),
+        in.narrowFilters.foldPresent(upNarrowFilters),
+        in.broadFilters.foldPresent(upBroadFilters),
+        in.combinedFilters.foldPresent(upCombinedFilters)
+      ).flattenOption
+    }
+
+    def scienceRequirementsUpdates(in: ScienceRequirementsInput): List[AppliedFragment] = {
+      val upExpTimeModeType    = sql"c_exp_time_mode = ${exposure_time_mode_type.opt}"
+      val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
+      val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
+      val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
+
+      val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
+      val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+      val timeAndCountMode  = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.timeAndCount.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
+
+      val fields = List(
+        expTimeModeType.foldPresent(upExpTimeModeType),
+        in.exposureTimeMode.map(_.at).foldPresent(upSignalToNoiseAt),
+        signalToNoiseMode.map(_.value).foldPresent(upSignalToNoise),
+        timeAndCountMode.map(_.time).foldPresent(upExpTime),
+        timeAndCountMode.map(_.count).foldPresent(upExpCount),
+      ).flattenOption
+
+      // we clear fields based on the science mode that's being set
+      val clearSpectroscopy = in.imaging.isDefined && in.spectroscopy.isEmpty
+      val clearImaging = in.spectroscopy.isDefined && in.imaging.isEmpty
+
+      val spectroscopyClear =
+        Option.when(clearSpectroscopy)(List(
+          void"c_spec_wavelength = NULL",
+          void"c_spec_resolution = NULL",
+          void"c_spec_wavelength_coverage = NULL",
+          void"c_spec_focal_plane = NULL",
+          void"c_spec_focal_plane_angle = NULL",
+          void"c_spec_capability = NULL"
+        )).orEmpty
+
+      val imagingClear =
+        Option.when(clearImaging)(List(
+          void"c_img_minimum_fov = NULL",
+          void"c_img_narrow_filters = NULL",
+          void"c_img_broad_filters = NULL",
+          void"c_img_combined_filters = NULL"
+        )).orEmpty
+
+      fields ++ spectroscopyClear ++ imagingClear ++
+        in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
+        in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
     }
 
@@ -994,19 +1051,22 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
-          c_observing_mode_type
+          c_observing_mode_type,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters,
+          c_img_combined_filters
         )
         SELECT
           c_program_id,
@@ -1032,19 +1092,22 @@ object ObservationService {
           c_air_mass_max,
           c_hour_angle_min,
           c_hour_angle_max,
-          c_science_mode,
           c_spec_wavelength,
           c_spec_resolution,
-          c_spec_exp_time_mode,
-          c_spec_signal_to_noise_at,
-          c_spec_signal_to_noise,
-          c_spec_exp_time,
-          c_spec_exp_count,
+          c_exp_time_mode,
+          c_etm_signal_to_noise_at,
+          c_etm_signal_to_noise,
+          c_etm_exp_time,
+          c_etm_exp_count,
           c_spec_wavelength_coverage,
           c_spec_focal_plane,
           c_spec_focal_plane_angle,
           c_spec_capability,
-          c_observing_mode_type
+          c_observing_mode_type,
+          c_img_minimum_fov,
+          c_img_narrow_filters,
+          c_img_broad_filters,
+          c_img_combined_filters
       FROM t_observation
       WHERE c_observation_id = $observation_id
       """.apply(gix, oid) |+|

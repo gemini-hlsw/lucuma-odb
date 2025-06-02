@@ -577,42 +577,71 @@ trait DatabaseOperations { this: OdbSuite =>
     observingMode match
       case ObservingModeType.Flamingos2LongSlit =>
         """{
-        mode: SPECTROSCOPY
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 1210 }
+          }
+        }
         spectroscopy: {
           wavelength: { nanometers: 1200 }
           resolution: 100
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }"""
+      case ObservingModeType.GmosNorthImaging =>
+        """{
           exposureTimeMode: {
             signalToNoise: {
               value: 100.0
               at: { nanometers: 1210 }
             }
           }
-          wavelengthCoverage: { nanometers: 20 }
-          focalPlane: SINGLE_SLIT
-          focalPlaneAngle: { microarcseconds: 0 }
-        }
-      }"""
-      case ObservingModeType.GmosNorthImaging |
-           ObservingModeType.GmosSouthImaging =>
-        """{}"""
-      case ObservingModeType.GmosNorthLongSlit |
-           ObservingModeType.GmosSouthLongSlit =>
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
+          }
+        }"""
+      case ObservingModeType.GmosSouthImaging =>
         """{
-        mode: SPECTROSCOPY
-        spectroscopy: {
-          wavelength: { nanometers: 500 }
-          resolution: 100
           exposureTimeMode: {
             signalToNoise: {
               value: 100.0
-              at: { nanometers: 510 }
+              at: { nanometers: 1210 }
             }
           }
-          wavelengthCoverage: { nanometers: 20 }
-          focalPlane: SINGLE_SLIT
-          focalPlaneAngle: { microarcseconds: 0 }
-        }
-      }"""
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
+          }
+        }"""
+      case ObservingModeType.GmosNorthLongSlit |
+           ObservingModeType.GmosSouthLongSlit =>
+        """{
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 100.0
+                at: { nanometers: 510 }
+              }
+            }
+            spectroscopy: {
+              wavelength: { nanometers: 500 }
+              resolution: 100
+              wavelengthCoverage: { nanometers: 20 }
+              focalPlane: SINGLE_SLIT
+              focalPlaneAngle: { microarcseconds: 0 }
+            }
+          }"""
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
@@ -626,7 +655,7 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GmosNorthImaging |
            ObservingModeType.GmosSouthImaging =>
-        """{}"""
+        """null"""
       case ObservingModeType.GmosNorthLongSlit =>
         """{
           gmosNorthLongSlit: {

@@ -117,8 +117,7 @@ class ShortCut_5331 extends ExecutionTestSupportForGmos:
           "input": {
             "SET": {
               "scienceRequirements": {
-                "spectroscopy": {
-                  "exposureTimeMode": {
+                "exposureTimeMode": {
                     "timeAndCount": {
                       "time": {
                         "microseconds": $secs
@@ -135,7 +134,6 @@ class ShortCut_5331 extends ExecutionTestSupportForGmos:
             "WHERE": {
               "id": { "EQ": $t }
             }
-          }
         }
       """.asObject
   )
@@ -156,36 +154,32 @@ class ShortCut_5331 extends ExecutionTestSupportForGmos:
              query {
                observation(observationId: "$oid") {
                  scienceRequirements {
-                   spectroscopy {
-                     exposureTimeMode {
-                       timeAndCount {
-                         time {
-                           microseconds
-                         }
-                       }
-                     }
-                   }
+                    exposureTimeMode {
+                      timeAndCount {
+                        time {
+                          microseconds
+                        }
+                      }
+                    }
                  }
                }
              }
            """,
-            expected = Right(json"""
-              {
-                "observation" : {
-                  "scienceRequirements" : {
-                    "spectroscopy" : {
-                      "exposureTimeMode" : {
-                        "timeAndCount" : {
-                          "time" : {
-                            "microseconds" : $secs
-                          }
-                        }
+          expected = Right(json"""
+            {
+              "observation" : {
+                "scienceRequirements" : {
+                  "exposureTimeMode" : {
+                    "timeAndCount" : {
+                      "time" : {
+                        "microseconds" : $secs
                       }
                     }
                   }
                 }
               }
-            """)
+            }
+          """)
       )
     }
 
@@ -196,7 +190,7 @@ class ShortCut_5331 extends ExecutionTestSupportForGmos:
         LongBinding.unapply(("test", Value.FloatValue(long.toDouble))),
         Some(("test", Result(long)))
       )
-    
+
   test(s"LongBinding (1.23)"):
     assertEquals(
       LongBinding.unapply(("test", Value.FloatValue(1.23))),
