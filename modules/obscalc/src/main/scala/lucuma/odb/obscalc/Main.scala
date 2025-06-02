@@ -16,12 +16,15 @@ import com.monovore.decline.effect.CommandIOApp
 import fs2.Stream
 import fs2.concurrent.Topic
 import fs2.io.net.Network
+import grackle.Mapping
+import grackle.skunk.SkunkMonitor
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.Obscalc
+import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -116,9 +119,19 @@ object CalcMain extends MainParams:
         cb.setDataset(config.honeycomb.dataset)
         cb.build()
 
-  def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
-    c.ssoClient.use: sso =>
-      sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
+  def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[User] =
+    c.ssoClient
+     .use: sso =>
+       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
+     .flatMap:
+       case Some(u) if u.role.access === Access.Service =>
+         u.pure[F]
+       case Some(u) =>
+         Logger[F].error(s"User $u is not allowed to execute this service") *>
+           MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
+       case None    =>
+         Logger[F].error("Failed to get service user") *>
+           MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
   def topic[F[_]: Concurrent: Logger: Trace](
     pool: Resource[F, Session[F]]
@@ -200,20 +213,13 @@ object CalcMain extends MainParams:
     yield o
 
   def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger: SecureRandom](
-    user: Option[User],
-    enums: Enums
+    user:    User,
+    enums:   Enums,
+    mapping: Mapping[F]
   )(pool: Session[F]): F[Services[F]] =
-    user match
-      case Some(u) if u.role.access === Access.Service =>
-        Services.forUser(u, enums, None)(pool).pure[F].flatTap: s =>
-          val us = UserService.fromSession(pool)
-          Services.asSuperUser(us.canonicalizeUser(u))
-      case Some(u) =>
-        Logger[F].error(s"User $u is not allowed to execute this service") *>
-          MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
-      case None    =>
-        Logger[F].error("Failed to get service user") *>
-          MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
+    Services.forUser(user, enums, mapping.some)(pool).pure[F].flatTap: s =>
+      val us = UserService.fromSession(pool)
+      Services.asSuperUser(us.canonicalizeUser(user))
 
   /**
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
@@ -227,12 +233,14 @@ object CalcMain extends MainParams:
       pool  <- databasePoolResource[F](c.database)
       enums <- Resource.eval(pool.use(Enums.load))
 
+      http  <- c.httpClientResource
       itc   <- c.itcClient
       ptc   <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums)))
+      mapping = OdbMapping.forObscalc(pool, SkunkMonitor.noopMonitor[F], user, c.commitHash, enums, http)
+      o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, mapping)))
     yield o
 
   /** Our logical entry point. */

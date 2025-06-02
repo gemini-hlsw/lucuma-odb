@@ -8,6 +8,7 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.data.Zipper
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculationState
@@ -78,9 +79,9 @@ object Obscalc:
       withTarget:    Result.WithTarget    => A
     ): A =
       this match
-        case a@Result.Error(_)         => error(a)
-        case a@Result.WithoutTarget(_) => withoutTarget(a)
-        case a@Result.WithTarget(_, _) => withTarget(a)
+        case a@Result.Error(_, _)         => error(a)
+        case a@Result.WithoutTarget(_, _) => withoutTarget(a)
+        case a@Result.WithTarget(_, _, _) => withTarget(a)
 
     def odbError: Option[OdbError] =
       fold(_.e.some, _ => none, _ => none)
@@ -91,10 +92,13 @@ object Obscalc:
     def digest: Option[ExecutionDigest] =
       fold(_ => none, _.d.some, _.d.some)
 
+    def workflow: ObservationWorkflow =
+      fold(_.w, _.w, _.w)
+
   object Result:
-    case class Error(e: OdbError)                           extends Result
-    case class WithoutTarget(d: ExecutionDigest)            extends Result
-    case class WithTarget(i: ItcResult, d: ExecutionDigest) extends Result
+    case class Error(e: OdbError, w: ObservationWorkflow)                           extends Result
+    case class WithoutTarget(d: ExecutionDigest, w: ObservationWorkflow)            extends Result
+    case class WithTarget(i: ItcResult, d: ExecutionDigest, w: ObservationWorkflow) extends Result
 
   /**
    * The Obscalc Entry pairs metadata with a (possibily missing, possibly

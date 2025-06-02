@@ -17,12 +17,13 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import io.circe.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
@@ -44,8 +45,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.*
-import skunk.circe.codec.json.*
 import skunk.codec.numeric._int8
 import skunk.codec.numeric.int4
 import skunk.data.Arr
@@ -78,13 +79,6 @@ sealed trait ObscalcService[F[_]]:
   def selectProgram(
     programId: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Obscalc.Entry]]
-
-  /**
-   * Like `selectMany` but returns only results (not paired with metadata).
-   */
-  def selectManyResults(
-    observationIds: List[Observation.Id]
-  )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Obscalc.Result]]]
 
   /**
    * Select calculated categorized time for a single observation.
@@ -142,7 +136,13 @@ sealed trait ObscalcService[F[_]]:
 
 object ObscalcService:
 
-  def instantiate[F[_]: Concurrent](
+  val UndefinedWorkflow = ObservationWorkflow(
+    ObservationWorkflowState.Undefined,
+    List(ObservationWorkflowState.Inactive),
+    Nil
+  )
+
+  def instantiate[F[_]: Concurrent: Logger](
     commitHash: CommitHash,
     itcClient:  ItcClient[F],
     calculator: ForInstrumentMode
@@ -186,19 +186,6 @@ object ObscalcService:
           .execute(Statements.SelectProgramCategorizedTime)(programId)
           .map(_.toMap)
 
-      override def selectManyResults(
-        observationIds: List[Observation.Id]
-      )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Obscalc.Result]]] =
-        NonEmptyList.fromList(observationIds).fold(Map.empty[Observation.Id, CalculatedValue[Obscalc.Result]].pure[F]): nel =>
-          val af = Statements.selectResults(nel)
-          session
-            .prepareR(af.fragment.query(observation_id *: calculation_state *: Statements.obscalc_result_opt))
-            .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
-            .map: lst =>
-              lst.collect:
-                case (id, cs, Some(r)) => id -> CalculatedValue(cs, r)
-              .toMap
-
       override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
 
@@ -216,28 +203,43 @@ object ObscalcService:
         pending: Obscalc.PendingCalc
       )(using NoTransaction[F]): F[Obscalc.Result] =
 
+        def sequenceUnavailable(msg: String): OdbError =
+          OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: $msg".some)
+
         val params: EitherT[F, OdbError, GeneratorParams] =
           EitherT:
             services.transactionally:
               generatorParamsService
                 .selectOne(pending.programId, pending.observationId)
-                .map(_.leftMap(e => OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: ${e.format}".some)))
+                .map(_.leftMap(e => sequenceUnavailable(e.format)))
 
-        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): EitherT[F, OdbError, ExecutionDigest] =
-          for
+        def workflow(
+          itc: Option[ItcService.AsterismResults],
+          dig: Option[ExecutionDigest]
+        ): F[ObservationWorkflow] =
+          services
+            .transactionally:
+              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+            .flatMap: r =>
+              r.toOption.fold(Logger[F].warn(s"Failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
+
+        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, ExecutionDigest]] =
+          (for
             p <- params
             d <- EitherT(generator(commitHash, itcClient, calculator).calculateDigest(pending.programId, pending.observationId, itcResult, p))
-          yield d
+          yield d).value
 
         for
           r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
-          d <- digest(r).value
+          d <- digest(r)
+          w <- workflow(r.toOption, d.toOption)
         yield d.fold(
-          Obscalc.Result.Error.apply,
-          dig => r.fold(
-            _ => Obscalc.Result.WithoutTarget(dig),
-            i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig)
-          )
+          err => Obscalc.Result.Error(err, w),
+          dig =>
+            r.fold(
+              _ => Obscalc.Result.WithoutTarget(dig, w),
+              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig, w)
+            )
         )
 
       private def storeResult(
@@ -262,7 +264,7 @@ object ObscalcService:
                 case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, CalculationState.Retry)
                 case _                                        => storeResult(pending, result, CalculationState.Ready)
           .handleErrorWith: e =>
-            val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)))
+            val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
             services.transactionally:
               storeResult(pending, result, CalculationState.Retry)
 
@@ -279,12 +281,6 @@ object ObscalcService:
       core_timestamp.opt *: // c_retry_at
       int4_nonneg           // c_failure_count
     ).to[Obscalc.Meta]
-
-    val odb_error: Codec[OdbError] =
-      jsonb.eimap(
-        json => if json.isNull then s"Could not decode OdbError: unexpected NULL value.".asLeft
-                else json.as[OdbError].leftMap(f => s"Could not decode OdbError: ${f.message}.")
-      )(_.asJson)
 
     val integration_time: Codec[IntegrationTime] =
       (time_span *: int4_nonneg).to[IntegrationTime]
@@ -339,14 +335,17 @@ object ObscalcService:
     val execution_digest: Codec[ExecutionDigest] =
       (setup_time *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
+    val observation_workflow: Codec[ObservationWorkflow] =
+      (observation_workflow_state *: _observation_workflow_state *: _observation_validation).to[ObservationWorkflow]
+
     val obscalc_result_opt: Codec[Option[Obscalc.Result]] =
-      (odb_error.opt *: itc_result.opt *: execution_digest.opt).eimap {
-        case (None, None, None)       => none.asRight
-        case (Some(e), None, None)    => Obscalc.Result.Error(e).some.asRight
-        case (None, None, Some(d))    => Obscalc.Result.WithoutTarget(d).some.asRight
-        case (None, Some(i), Some(d)) => Obscalc.Result.WithTarget(i, d).some.asRight
-        case (e, i, d)                => s"Could not decode obscalc result: $e, $i, $d".asLeft
-      }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest)))
+      (odb_error.opt *: itc_result.opt *: execution_digest.opt *: observation_workflow).eimap {
+        case (None, None, None, _)        => none.asRight
+        case (Some(e), None, None, wf)    => Obscalc.Result.Error(e, wf).some.asRight
+        case (None, None, Some(d), wf)    => Obscalc.Result.WithoutTarget(d, wf).some.asRight
+        case (None, Some(i), Some(d), wf) => Obscalc.Result.WithTarget(i, d, wf).some.asRight
+        case (e, i, d, wf)                => s"Could not decode obscalc result: $e, $i, $d, $wf".asLeft
+      }(r => (r.flatMap(_.odbError), r.flatMap(_.itcResult), r.flatMap(_.digest), r.map(_.workflow).getOrElse(UndefinedWorkflow)))
 
     val obscalc_entry: Codec[Obscalc.Entry] =
       (obscalc_meta *: obscalc_result_opt).to[Obscalc.Entry]
@@ -402,11 +401,15 @@ object ObscalcService:
         "c_sci_program_time",
         "c_sci_offsets",
         "c_sci_atom_count",
-        "c_sci_execution_state"
+        "c_sci_execution_state",
+
+        "c_workflow_state",
+        "c_workflow_transitions",
+        "c_workflow_validations"
       )
 
     private def obscalcColumns(prefix: Option[String] = None): String =
-      s"${obscalcMetaDataColumns(prefix)},${obscalcResultColumns(prefix)}"
+      s"${obscalcMetaDataColumns(prefix)},\n${obscalcResultColumns(prefix)}"
 
     val SelectOne: Query[Observation.Id, Obscalc.Entry] =
       sql"""
@@ -476,21 +479,6 @@ object ObscalcService:
         .query(observation_id *: calculation_state *: full_categorized_time.opt)
         .map: (oid, state, catTime) =>
           oid -> CalculatedValue(state, catTime.getOrElse(CategorizedTime.Zero))
-
-    def selectResults(
-      which: NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      sql"""
-        SELECT
-          c.c_observation_id,
-          c.c_obscalc_state,
-          #${obscalcResultColumns("c".some)}
-        FROM t_obscalc c
-        INNER JOIN t_observation o USING (c_observation_id)
-        WHERE o.c_workflow_user_state IS DISTINCT FROM 'inactive'
-          AND c.c_observation_id IN ("""(Void) |+|
-            which.map(sql"$observation_id").intercalate(void", ") |+|
-          void")"
 
     val ResetCalculating: Command[Void] =
       sql"""
@@ -578,7 +566,12 @@ object ObscalcService:
         sql"c_sci_program_time     = ${time_span.opt}"(r.digest.map(_.science.timeEstimate(ChargeClass.Program))),
         sql"c_sci_offsets          = ${offset_array.opt}"(r.digest.map(_.science.offsets.toList)),
         sql"c_sci_atom_count       = ${int4_nonneg.opt}"(r.digest.map(_.science.atomCount)),
-        sql"c_sci_execution_state  = ${execution_state.opt}"(r.digest.map(_.science.executionState))
+        sql"c_sci_execution_state  = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
+
+        // Workflow
+        sql"c_workflow_state       = ${observation_workflow_state}"(r.workflow.state),
+        sql"c_workflow_transitions = ${_observation_workflow_state}"(r.workflow.validTransitions),
+        sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors)
       )
 
     val SelectLastInvalidationForUpdate: Query[Observation.Id, Timestamp] =

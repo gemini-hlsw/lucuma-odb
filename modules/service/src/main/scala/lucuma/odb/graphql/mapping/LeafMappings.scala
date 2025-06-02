@@ -153,6 +153,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservingModeType](ObservingModeTypeType),
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
+      LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[Partner](PartnerType),
       LeafMapping[PartnerLinkType](PartnerLinkTypeType),
