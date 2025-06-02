@@ -10,21 +10,8 @@ ALTER TABLE t_observation
   ADD COLUMN c_img_combined_filters boolean     null default null,
   DROP COLUMN c_science_mode;
 
--- Add constraint to ensure mutual exclusivity between imaging and spectroscopy fields
-ALTER TABLE t_observation ADD CONSTRAINT check_science_mode_exclusivity
-CHECK (
-  -- Either all spectroscopy fields are NULL (num_nulls = 6)
-  num_nulls(c_spec_wavelength, c_spec_resolution, c_spec_wavelength_coverage,
-            c_spec_focal_plane, c_spec_focal_plane_angle, c_spec_capability) = 6
-  OR
-  -- Or all imaging fields are NULL (num_nulls = 4)
-  num_nulls(c_img_minimum_fov, c_img_narrow_filters,
-            c_img_broad_filters, c_img_combined_filters) = 4
-  -- This allows all NULL
-);
-
--- Create function to check if spectroscopy mode is active
-CREATE OR REPLACE FUNCTION has_spectroscopy_mode(
+-- function to check if spectroscopy mode is active, any field not null
+CREATE OR REPLACE FUNCTION is_spectroscopy_mode(
   spec_wavelength          d_wavelength_pm,
   spec_resolution          integer,
   spec_wavelength_coverage d_wavelength_pm,
@@ -33,23 +20,36 @@ CREATE OR REPLACE FUNCTION has_spectroscopy_mode(
   spec_capability          d_tag
 ) RETURNS boolean AS $$
 BEGIN
-  RETURN num_nulls(spec_wavelength, spec_resolution, spec_wavelength_coverage,
-                   spec_focal_plane, spec_focal_plane_angle, spec_capability) < 6;
+  RETURN num_nonnulls(spec_wavelength, spec_resolution, spec_wavelength_coverage,
+                      spec_focal_plane, spec_focal_plane_angle, spec_capability) > 0;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- Create function to check if imaging mode is active
-CREATE OR REPLACE FUNCTION has_imaging_mode(
+-- function to check if imaging mode is active, any field not null
+CREATE OR REPLACE FUNCTION is_imaging_mode(
   img_minimum_fov          d_angle_µas,
   img_narrow_filters       boolean,
   img_broad_filters        boolean,
   img_combined_filters     boolean
 ) RETURNS boolean AS $$
 BEGIN
-  RETURN num_nulls(img_minimum_fov, img_narrow_filters,
-                   img_broad_filters, img_combined_filters) < 4;
+  RETURN num_nonnulls(img_minimum_fov, img_narrow_filters,
+                      img_broad_filters, img_combined_filters) > 0;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Add constraint to ensure mutual exclusivity between imaging and spectroscopy fields
+ALTER TABLE t_observation ADD CONSTRAINT check_science_mode_exclusivity
+CHECK (
+  -- Either spectroscopy mode is not active
+  NOT is_spectroscopy_mode(c_spec_wavelength, c_spec_resolution, c_spec_wavelength_coverage,
+                           c_spec_focal_plane, c_spec_focal_plane_angle, c_spec_capability)
+  OR
+  -- Or imaging mode is not active
+  NOT is_imaging_mode(c_img_minimum_fov, c_img_narrow_filters,
+                      c_img_broad_filters, c_img_combined_filters)
+  -- all null thus science_mode null is allowed
+);
 
 -- Create function to calculate science mode
 CREATE OR REPLACE FUNCTION calculate_science_mode(
@@ -66,11 +66,11 @@ CREATE OR REPLACE FUNCTION calculate_science_mode(
 ) RETURNS d_tag AS $$
 BEGIN
   -- Check if any spectroscopy fields are populated
-  IF has_spectroscopy_mode(spec_wavelength, spec_resolution, spec_wavelength_coverage,
+  IF is_spectroscopy_mode(spec_wavelength, spec_resolution, spec_wavelength_coverage,
                            spec_focal_plane, spec_focal_plane_angle, spec_capability) THEN
     RETURN 'spectroscopy'::d_tag;
   -- Check if any imaging fields are populated
-  ELSIF has_imaging_mode(img_minimum_fov, img_narrow_filters,
+  ELSIF is_imaging_mode(img_minimum_fov, img_narrow_filters,
                          img_broad_filters, img_combined_filters) THEN
     RETURN 'imaging'::d_tag;
   ELSE
@@ -87,16 +87,20 @@ ALTER TABLE t_observation RENAME COLUMN c_spec_signal_to_noise_at TO c_etm_signa
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_time           TO c_etm_exp_time;
 ALTER TABLE t_observation RENAME COLUMN c_spec_exp_count          TO c_etm_exp_count;
 
+-- Add science_mode as a generated column, thus not recalculated like in the view
+ALTER TABLE t_observation
+ADD COLUMN c_science_mode d_tag GENERATED ALWAYS AS (
+  calculate_science_mode(
+    c_spec_wavelength, c_spec_resolution, c_spec_wavelength_coverage,
+    c_spec_focal_plane, c_spec_focal_plane_angle, c_spec_capability,
+    c_img_minimum_fov, c_img_narrow_filters,
+    c_img_broad_filters, c_img_combined_filters
+  )
+) STORED;
+
 -- Update views to include imaging requirements
 CREATE OR REPLACE VIEW v_observation AS
   SELECT o.*,
-  -- Calculate science mode using function
-  calculate_science_mode(
-    o.c_spec_wavelength, o.c_spec_resolution, o.c_spec_wavelength_coverage,
-    o.c_spec_focal_plane, o.c_spec_focal_plane_angle, o.c_spec_capability,
-    o.c_img_minimum_fov, o.c_img_narrow_filters,
-    o.c_img_broad_filters, o.c_img_combined_filters
-  ) AS c_science_mode,
   CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
   CASE WHEN o.c_air_mass_min             IS NOT NULL THEN o.c_observation_id END AS c_air_mass_id,
   CASE WHEN o.c_hour_angle_min           IS NOT NULL THEN o.c_observation_id END AS c_hour_angle_id,
@@ -104,20 +108,14 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_spec_wavelength          IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_id,
 
   CASE WHEN o.c_exp_time_mode            IS NOT NULL THEN o.c_observation_id END AS c_exp_time_mode_id,
-  CASE WHEN o.c_exp_time_mode = 'signal_to_noise' THEN o.c_observation_id END AS c_etm_signal_to_noise_id,
-  CASE WHEN o.c_exp_time_mode = 'time_and_count'  THEN o.c_observation_id END AS c_etm_time_and_count_id,
+  CASE WHEN o.c_exp_time_mode = 'signal_to_noise'    THEN o.c_observation_id END AS c_etm_signal_to_noise_id,
+  CASE WHEN o.c_exp_time_mode = 'time_and_count'     THEN o.c_observation_id END AS c_etm_time_and_count_id,
   CASE WHEN o.c_spec_wavelength_coverage IS NOT NULL THEN o.c_observation_id END AS c_spec_wavelength_coverage_id,
   CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
   CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
-  -- Use functions for synthetic IDs
-  CASE WHEN has_imaging_mode(o.c_img_minimum_fov, o.c_img_narrow_filters,
-                             o.c_img_broad_filters, o.c_img_combined_filters)
-       THEN o.c_observation_id END AS c_imaging_mode_id,
-  -- Synthetic ID for spectroscopy object - null when all spectroscopy fields are null
-  CASE WHEN has_spectroscopy_mode(o.c_spec_wavelength, o.c_spec_resolution, o.c_spec_wavelength_coverage,
-                                  o.c_spec_focal_plane, o.c_spec_focal_plane_angle, o.c_spec_capability)
-       THEN o.c_observation_id END AS c_spectroscopy_mode_id,
+  CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
+  CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
