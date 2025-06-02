@@ -102,7 +102,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               targetEnvironment: {
                 asterism: ${tids.asJson}
               },
-              $ScienceRequirements,
+              $SpectroscopyScienceRequirements,
               observingMode: {
                 $mode
               }
@@ -121,7 +121,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
   def createObservationWithNoModeAs(
     user:         User,
     pid:          Program.Id,
-    tid:          Target.Id,    
+    tid:          Target.Id,
   ): IO[Observation.Id] =
     query(
       user  = user,
@@ -135,7 +135,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               targetEnvironment: {
                 asterism: ${List(tid).asJson}
               },
-              $ScienceRequirements,
+              $SpectroscopyScienceRequirements,
             }
           }) {
             observation {
@@ -236,7 +236,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               lineWidth: 850,
               lineFlux: {
                 value: 1e-13,
-                units:ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED 
+                units:ERG_PER_S_PER_CM_SQUARED_PER_ARCSEC_SQUARED
               }
             }
           ],
@@ -352,21 +352,20 @@ object ObservingModeSetupOperations {
       }
     """
 
-  val ScienceRequirements: String =
+  val SpectroscopyScienceRequirements: String =
     """
       scienceRequirements: {
-        mode: SPECTROSCOPY,
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0,
+            at: { nanometers: 500 }
+          }
+        },
         spectroscopy: {
           wavelength: {
             nanometers: 500
           },
           resolution: 100,
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 100.0,
-              at: { nanometers: 500 }
-            }
-          },
           wavelengthCoverage: {
             nanometers: 20
           },

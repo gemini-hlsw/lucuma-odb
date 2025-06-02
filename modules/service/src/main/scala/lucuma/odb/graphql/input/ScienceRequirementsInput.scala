@@ -4,29 +4,41 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
 import lucuma.core.enums.ScienceMode
+import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.graphql.binding.enumeratedBinding
 
-final case class ScienceRequirementsInput(
-  mode:         Option[ScienceMode],
-  spectroscopy: Option[SpectroscopyScienceRequirementsInput]
-)
+case class ScienceRequirementsInput(
+  exposureTimeMode: Nullable[ExposureTimeMode],
+  spectroscopy:     Option[SpectroscopyScienceRequirementsInput],
+  imaging:          Option[ImagingScienceRequirementsInput]
+) {
+  def scienceMode: Option[ScienceMode] =
+    (spectroscopy, imaging) match {
+      case (Some(_), None) => ScienceMode.Spectroscopy.some
+      case (None, Some(_)) => ScienceMode.Imaging.some
+      case _               => none
+    }
+}
 
-object ScienceRequirementsInput {
-
-  val ModeBinding: Matcher[ScienceMode] =
-    enumeratedBinding[ScienceMode]
+object ScienceRequirementsInput:
 
   val Binding: Matcher[ScienceRequirementsInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
-        ModeBinding.Option("mode", rMode),
-        SpectroscopyScienceRequirementsInput.Binding.Option("spectroscopy", rSpectroscopy)
+        ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rExposureTimeMode),
+        SpectroscopyScienceRequirementsInput.Binding.Option("spectroscopy", rSpectroscopy),
+        ImagingScienceRequirementsInput.Binding.Option("imaging", rImaging)
       ) =>
-        (rMode, rSpectroscopy).parMapN(apply)
-    }
+        (rExposureTimeMode, rSpectroscopy, rImaging).parTupled.flatMap:
+          case (expTimeMode, spec, img) =>
+            atMostOne(
+              spec -> "spectroscopy",
+              img  -> "imaging"
+            ).as(ScienceRequirementsInput(expTimeMode, spec, img))
 
-}

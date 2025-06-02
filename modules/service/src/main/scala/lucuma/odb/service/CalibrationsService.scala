@@ -322,7 +322,7 @@ object CalibrationsService extends CalibrationObservations {
           .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
           .traverse { (oid, props) =>
             val bandFragment = props.band.map(sql"c_science_band IS DISTINCT FROM $science_band")
-            val waveFragment = props.wavelengthAt.map(sql"c_spec_signal_to_noise_at <> $wavelength_pm")
+            val waveFragment = props.wavelengthAt.map(sql"c_etm_signal_to_noise_at <> $wavelength_pm")
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
             services.observationService.updateObservations(
@@ -332,17 +332,14 @@ object CalibrationsService extends CalibrationObservations {
                     scienceBand         = Nullable.orAbsent(props.band),
                     scienceRequirements = props.wavelengthAt.map: w =>
                       ScienceRequirementsInput(
-                        mode         = None,
-                        spectroscopy = Some(
-                          SpectroscopyScienceRequirementsInput.Default.copy(
-                            exposureTimeMode = Nullable.NonNull(
-                              ExposureTimeMode.SignalToNoiseMode(
-                                SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                                w
-                              )
-                            )
+                        exposureTimeMode = Nullable.NonNull(
+                          ExposureTimeMode.SignalToNoiseMode(
+                            SignalToNoise.unsafeFromBigDecimalExact(100.0),
+                            w
                           )
-                        )
+                        ),
+                        spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
+                        imaging      = None
                       )
                   ),
                   // Important: Only update the obs that need it or it will produce a cascade of infinite updates

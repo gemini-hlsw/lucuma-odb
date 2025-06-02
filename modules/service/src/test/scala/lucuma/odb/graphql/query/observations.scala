@@ -99,7 +99,7 @@ class observations extends OdbSuite {
     }
   }
 
-  test("simple observation selection") {
+  test("simple observation where selection") {
     createProgramAs(pi2).flatMap { pid =>
       createObservationAs(pi2, pid).flatMap { oid =>
         expect(
@@ -174,7 +174,7 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
-                  mode: SPECTROSCOPY
+                  spectroscopy: null
                 }
               }
             }) {
@@ -198,16 +198,55 @@ class observations extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 scienceRequirements: {
-                  mode: SPECTROSCOPY
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { angstroms: 71 }
+                    }
+                  }
                   spectroscopy: {
                     wavelength: {
                       angstroms: 42
                     }
-                    exposureTimeMode: {
-                      signalToNoise: {
-                        value: 100.0
-                        at: { angstroms: 71 }
-                      }
+                    wavelengthCoverage: {
+                      angstroms: 99
+                    }
+                    focalPlaneAngle: {
+                      arcseconds: 666
+                    }
+                  }
+                }
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+          """
+    ) map { json =>
+      json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+    }
+
+  def createObservationWithDefinedImgRequirements(user: User, pid: Program.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { angstroms: 71 }
+                    }
+                  }
+                  spectroscopy: {
+                    wavelength: {
+                      angstroms: 42
                     }
                     wavelengthCoverage: {
                       angstroms: 99
@@ -246,14 +285,14 @@ class observations extends OdbSuite {
                   matches {
                     id
                     scienceRequirements {
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { picometers }
+                        }
+                      }
                       spectroscopy {
                         wavelength {
                           picometers
-                        }
-                        exposureTimeMode {
-                          signalToNoise {
-                            at { picometers }
-                          }
                         }
                         wavelengthCoverage {
                           picometers
@@ -275,16 +314,16 @@ class observations extends OdbSuite {
                     {
                       "id" : $oid1,
                       "scienceRequirements" : {
+                        "exposureTimeMode": {
+                          "signalToNoise": {
+                            "at": {
+                              "picometers": 7100
+                            }
+                          }
+                        },
                         "spectroscopy" : {
                           "wavelength" : {
                             "picometers" : 4200
-                          },
-                          "exposureTimeMode": {
-                            "signalToNoise": {
-                              "at": {
-                                "picometers": 7100
-                              }
-                            }
                           },
                           "wavelengthCoverage" : {
                             "picometers" : 9900
@@ -298,12 +337,8 @@ class observations extends OdbSuite {
                     {
                       "id" : $oid2,
                       "scienceRequirements" : {
-                        "spectroscopy" : {
-                          "wavelength" : null,
-                          "exposureTimeMode" : null,
-                          "wavelengthCoverage" : null,
-                          "focalPlaneAngle" : null
-                        }
+                        "exposureTimeMode" : null,
+                        "spectroscopy" : null
                       }
                     }
                   ]
@@ -393,6 +428,8 @@ class observations extends OdbSuite {
       oid1    <- createObservationAs(pi3, pid, ObservingModeType.GmosNorthLongSlit.some)
       oid2    <- createObservationAs(pi3, pid, ObservingModeType.GmosSouthLongSlit.some)
       oid3    <- createObservationAs(pi3, pid)
+      oid4    <- createObservationAs(pi3, pid, ObservingModeType.GmosNorthImaging.some)
+      oid5    <- createObservationAs(pi3, pid, ObservingModeType.GmosSouthImaging.some)
       gn      <- observationsWhere(pi3, """site: { EQ: GN }""")
       gs      <- observationsWhere(pi3, """site: { EQ: GS }""")
       both    <- observationsWhere(pi3, """site: { IN: [ GN, GS] }""")
@@ -402,7 +439,7 @@ class observations extends OdbSuite {
       assertEquals(gn, List(oid1))
       assertEquals(gs, List(oid2))
       assertEquals(both,    List(oid1, oid2))
-      assertEquals(isNull,  List(oid3))
+      assertEquals(isNull,  List(oid3, oid4, oid5))
       assertEquals(notNull, List(oid1, oid2))
 
   test("filter on instrument"):
@@ -411,6 +448,8 @@ class observations extends OdbSuite {
       oid1    <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthLongSlit.some)
       oid2    <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
       oid3    <- createObservationAs(pi4, pid)
+      oid4    <- createObservationAs(pi4, pid, ObservingModeType.GmosNorthImaging.some)
+      oid5    <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthImaging.some)
       gn      <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }""")
       gs      <- observationsWhere(pi4, """instrument: { EQ: GMOS_SOUTH }""")
       both    <- observationsWhere(pi4, """instrument: { IN: [ GMOS_NORTH, GMOS_SOUTH ] }""")
@@ -420,7 +459,7 @@ class observations extends OdbSuite {
       assertEquals(gn, List(oid1))
       assertEquals(gs, List(oid2))
       assertEquals(both,    List(oid1, oid2))
-      assertEquals(isNull,  List(oid3))
+      assertEquals(isNull,  List(oid3, oid4, oid5))
       assertEquals(notNull, List(oid1, oid2))
 
   test("conflicting filter"):
