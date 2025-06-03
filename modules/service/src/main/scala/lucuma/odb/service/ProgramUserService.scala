@@ -37,6 +37,7 @@ import lucuma.odb.graphql.input.ChangeProgramUserRoleInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.util.Codecs.educational_status
+import lucuma.odb.util.Codecs.ft_support_role
 import lucuma.odb.util.Codecs.gender
 import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.partner_link
@@ -636,6 +637,7 @@ object ProgramUserService:
       val upThesis            = sql"c_thesis               = ${bool.opt}"
       val upGender            = sql"c_gender               = ${gender.opt}"
       val upDataAccess        = sql"c_has_data_access      = $bool"
+      val upFtSupportRole     = sql"c_ft_support_role      = ${ft_support_role.opt}"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
@@ -646,7 +648,8 @@ object ProgramUserService:
           SET.educationalStatus.foldPresent(upEducationalStatus),
           SET.thesis.foldPresent(upThesis),
           SET.gender.foldPresent(upGender),
-          SET.hasDataAccess.map(upDataAccess)
+          SET.hasDataAccess.map(upDataAccess),
+          SET.ftSupportRole.foldPresent(upFtSupportRole)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
           sql"c_partner_link = $partner_link_type"(pl.linkType),
@@ -662,15 +665,27 @@ object ProgramUserService:
           sql"WHERE #$alias.c_program_user_id IN ("(Void) |+| which |+| void")"
 
         // If updating the data access flag, you must be the PI (or staff).
+        // If updating the FT support role, you must be staff or better.
         // Otherwise normal access rules apply with the caveat that a user can
         // update their own record.
-        val access = (SET.hasDataAccess *> correlatedPiAccessOnly(user, alias, "i")).orElse:
-                       correlatedExistsUserAccess(user, alias, "i").map: ac =>
-                         void" ("                                     |+|
-                           sql"#$alias.c_user_id = $user_id"(user.id) |+| // updating our own user
-                           void" OR "                                 |+|
-                           ac                                         |+|
-                         void")"
+        val requiresStaffAccess = SET.ftSupportRole.isDefined
+        
+        val access = 
+          if (requiresStaffAccess) {
+            import Access.{Admin, Staff, Service}
+            user.role.access match {
+              case Admin | Staff | Service => none[AppliedFragment]
+              case _ => sql"false"(Void).some // Will fail the WHERE clause
+            }
+          } else {
+            (SET.hasDataAccess *> correlatedPiAccessOnly(user, alias, "i")).orElse:
+              correlatedExistsUserAccess(user, alias, "i").map: ac =>
+                void" ("                                     |+|
+                  sql"#$alias.c_user_id = $user_id"(user.id) |+| // updating our own user
+                  void" OR "                                 |+|
+                  ac                                         |+|
+                void")"
+          }
 
         (access.fold(up): exists =>
           up |+| void" AND " |+| exists

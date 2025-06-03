@@ -455,7 +455,8 @@ object ProposalService {
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
             call.minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
-            call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}")
+            call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
+            call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}")
           ).flatten
         }
 
@@ -483,7 +484,8 @@ object ProposalService {
           c_too_activation,
           c_min_percent,
           c_min_percent_total,
-          c_total_time
+          c_total_time,
+          c_reviewer_id
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -492,7 +494,8 @@ object ProposalService {
           ${too_activation},
           ${int_percent},
           ${int_percent.opt},
-          ${time_span.opt}
+          ${time_span.opt},
+          ${program_user_id.opt}
       """.apply(
         pid,
         c.callId,
@@ -501,7 +504,8 @@ object ProposalService {
         c.typeʹ.tooActivation,
         c.typeʹ.minPercentTime,
         c.typeʹ.minPercentTotal,
-        c.typeʹ.totalTime
+        c.typeʹ.totalTime,
+        c.typeʹ.reviewerId
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester], Option[NonNegInt])] =
