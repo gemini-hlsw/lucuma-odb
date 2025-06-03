@@ -29,6 +29,7 @@ import lucuma.core.model.ProgramUser
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole
 import lucuma.core.model.User
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.UserType
@@ -212,9 +213,81 @@ object ProgramUserService:
         SET:   ProgramUserPropertiesInput,
         which: AppliedFragment
       )(using Transaction[F]): F[Result[List[ProgramUser.Id]]] =
-        Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]): af =>
-          session.prepareR(af.fragment.query(program_user_id)).use: pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+        // Validate FT support role requirements at service layer
+        def validateFTSupportRoleRequirements(): F[Result[Unit]] = {
+          import lucuma.core.enums.{FTSupportRole, EducationalStatus}
+          
+          SET.ftSupportRole match {
+            case Nullable.NonNull(ftRole) =>
+              // First check if FT support roles can be assigned to this program (must have FT proposal)
+              val checkFTProposalFragment = sql"""
+                SELECT EXISTS (
+                  SELECT 1 FROM v_proposal
+                  WHERE c_program_id IN (
+                    SELECT DISTINCT c_program_id FROM t_program_user 
+                    WHERE c_program_user_id IN ("""(Void) |+| which |+| void""")
+                  )
+                  AND c_science_subtype = 'fast_turnaround'
+                )
+              """
+              
+              session.prepareR(checkFTProposalFragment.fragment.query(bool)).use(_.unique(checkFTProposalFragment.argument)).flatMap { hasFTProposal =>
+                if (!hasFTProposal) {
+                  val msg = "FT support roles can only be assigned to Fast Turnaround proposals"
+                  OdbError.InvalidArgument(msg.some).asFailureF
+                } else {
+                  // FT proposal exists, now check mentor-specific requirements
+                  ftRole match {
+                    case FTSupportRole.Mentor =>
+                      // Check if the educational status being set or already existing is PhD
+                      SET.educationalStatus match {
+                        case Nullable.NonNull(EducationalStatus.PhD) =>
+                          // User is setting both mentor role and PhD status - valid
+                          Result.unit.pure[F]
+                        case Nullable.NonNull(other) =>
+                          // User is setting mentor role but setting non-PhD educational status - invalid
+                          val msg = s"Users with mentor role must have PhD educational status, but ${other} was specified"
+                          OdbError.InvalidArgument(msg.some).asFailureF
+                        case Nullable.Null | Nullable.Absent =>
+                          // User is setting mentor role but not setting educational status
+                          // Need to check existing educational status from database
+                          val fragment = sql"""
+                            SELECT COALESCE(
+                              BOOL_AND(c_educational_status = 'phd'),
+                              false
+                            )
+                            FROM t_program_user 
+                            WHERE c_program_user_id IN ("""(Void) |+| which |+| void")"
+                          session.prepareR(fragment.fragment.query(bool)).use(_.unique(fragment.argument)).map { allHavePhD =>
+                            if (allHavePhD) Result.unit
+                            else {
+                              val msg = "Users with mentor role must have PhD educational status"
+                              OdbError.InvalidArgument(msg.some).asFailure
+                            }
+                          }
+                      }
+                    case FTSupportRole.Reviewer =>
+                      // No additional requirements for reviewer role
+                      Result.unit.pure[F]
+                  }
+                }
+              }
+            case _ =>
+              // Not setting FT support role, no validation needed
+              Result.unit.pure[F]
+          }
+        }
+
+        for {
+          validation <- validateFTSupportRoleRequirements()
+          result <- validation match {
+            case Result.Success(_) =>
+              Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]): af =>
+                session.prepareR(af.fragment.query(program_user_id)).use: pq =>
+                  pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+            case failure => failure.as(Nil).pure[F]
+          }
+        } yield result
 
       override def linkInvitationAccept(
         id: ProgramUser.Id

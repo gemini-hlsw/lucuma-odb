@@ -23,16 +23,16 @@ DROP VIEW v_proposal;
 CREATE VIEW v_proposal AS
   SELECT
     p.*,
-    CASE WHEN p.c_science_subtype = 'classical'           THEN c_program_id END AS c_program_id_c,
-    CASE WHEN p.c_science_subtype = 'demo_science'        THEN c_program_id END AS c_program_id_s,
-    CASE WHEN p.c_science_subtype = 'directors_time'      THEN c_program_id END AS c_program_id_d,
-    CASE WHEN p.c_science_subtype = 'fast_turnaround'     THEN c_program_id END AS c_program_id_f,
-    CASE WHEN p.c_science_subtype = 'large_program'       THEN c_program_id END AS c_program_id_l,
-    CASE WHEN p.c_science_subtype = 'poor_weather'        THEN c_program_id END AS c_program_id_p,
-    CASE WHEN p.c_science_subtype = 'queue'               THEN c_program_id END AS c_program_id_q,
-    CASE WHEN p.c_science_subtype = 'system_verification' THEN c_program_id END AS c_program_id_v,
-    -- For FT proposals, extract the partner if there's exactly one partner split
-    -- This represents the PI's affiliation for single-partner FT proposals
+    m.c_name AS c_title,
+    m.c_description AS c_abstract,
+    CASE WHEN p.c_science_subtype = 'classical'           THEN p.c_program_id END AS c_program_id_c,
+    CASE WHEN p.c_science_subtype = 'demo_science'        THEN p.c_program_id END AS c_program_id_s,
+    CASE WHEN p.c_science_subtype = 'directors_time'      THEN p.c_program_id END AS c_program_id_d,
+    CASE WHEN p.c_science_subtype = 'fast_turnaround'     THEN p.c_program_id END AS c_program_id_f,
+    CASE WHEN p.c_science_subtype = 'large_program'       THEN p.c_program_id END AS c_program_id_l,
+    CASE WHEN p.c_science_subtype = 'poor_weather'        THEN p.c_program_id END AS c_program_id_p,
+    CASE WHEN p.c_science_subtype = 'queue'               THEN p.c_program_id END AS c_program_id_q,
+    CASE WHEN p.c_science_subtype = 'system_verification' THEN p.c_program_id END AS c_program_id_v,
     CASE WHEN p.c_science_subtype = 'fast_turnaround' THEN
       (SELECT
         CASE WHEN COUNT(*) = 1 THEN MIN(ps.c_partner::d_tag) ELSE NULL::d_tag END
@@ -40,7 +40,8 @@ CREATE VIEW v_proposal AS
        WHERE ps.c_program_id = p.c_program_id)
     END AS c_ft_partner
   FROM
-    t_proposal p;
+    t_proposal p
+    INNER JOIN t_program m ON p.c_program_id = m.c_program_id;
 -- Trigger to validate FT support role assignments
 -- Ensures: 1) FT roles are only assigned to FT proposals
 --          2) Mentors must have PhD educational status
@@ -106,3 +107,22 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER proposal_check_reviewer_not_mentor_trigger
 BEFORE INSERT OR UPDATE OF c_reviewer_id ON t_proposal
 FOR EACH ROW EXECUTE FUNCTION proposal_check_reviewer_not_mentor();
+
+-- Trigger to clear reviewer when program user is removed
+-- This handles the case where c_reviewer_id foreign key is set to NULL by ON DELETE SET NULL
+-- but we also need to clear any FT support roles when a user is removed from a program
+CREATE OR REPLACE FUNCTION cleanup_ft_roles_on_user_removal()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Clear reviewer_id in proposals where this user was the reviewer
+  UPDATE t_proposal 
+  SET c_reviewer_id = NULL 
+  WHERE c_reviewer_id = OLD.c_program_user_id;
+  
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cleanup_ft_roles_trigger
+BEFORE DELETE ON t_program_user
+FOR EACH ROW EXECUTE FUNCTION cleanup_ft_roles_on_user_removal();

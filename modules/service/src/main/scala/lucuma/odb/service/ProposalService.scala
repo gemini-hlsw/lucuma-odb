@@ -288,7 +288,7 @@ object ProposalService {
         def updateProgram(p: ProposalContext, c: Option[CfpProperties]): ResultT[F, Unit] =
           ResultT.liftF(p.updateProgram(input.programId, input.SET.typeʹ.scienceSubtype.some, c.map(_.semester), c.map(_.proprietary)))
 
-        val insert: ResultT[F, Unit] =
+        def insertProposal: ResultT[F, Unit] =
           val af = Statements.insertProposal(input.programId, input.SET)
           val create = session.prepareR(af.fragment.command).use(_.execute(af.argument).void)
           ResultT(create.map(_.success).recover {
@@ -296,19 +296,19 @@ object ProposalService {
               error.creationFailed(input.programId).asFailure
           })
 
-        val insertSplits: ResultT[F, Unit] =
+        def insertSplits: ResultT[F, Unit] =
           ResultT.liftF(
             partnerSplitsService.insertSplits(input.SET.typeʹ.partnerSplits, input.programId)
           )
 
         (for {
-          c <- lookupCfpProperties
-          _ <- checkCfpCompatibility(c)
-          p <- ResultT(ProposalContext.lookup(input.programId))
-          _ <- ResultT.liftF(deferConstraints)
-          _ <- updateProgram(p, c)
-          _ <- insert
-          _ <- insertSplits
+          c           <- lookupCfpProperties
+          _           <- checkCfpCompatibility(c)
+          p           <- ResultT(ProposalContext.lookup(input.programId))
+          _           <- ResultT.liftF(deferConstraints)
+          _           <- updateProgram(p, c)
+          _           <- insertProposal
+          _           <- insertSplits
         } yield input.programId).value
 
       }

@@ -36,6 +36,8 @@ ThisBuild / tlBaseVersion      := "0.24"
 ThisBuild / scalaVersion       := "3.7.1"
 ThisBuild / crossScalaVersions := Seq("3.7.1")
 
+useReadableConsoleGit
+
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
