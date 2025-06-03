@@ -62,7 +62,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
-import lucuma.odb.json.observationvalidation.given
 import lucuma.odb.service.ObservationWorkflowService
 import monocle.Prism
 import skunk.*
