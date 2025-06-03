@@ -5,6 +5,7 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import grackle.Predicate
+import lucuma.core.enums.FTSupportRole
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser

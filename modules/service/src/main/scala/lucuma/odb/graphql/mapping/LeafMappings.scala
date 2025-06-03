@@ -56,7 +56,6 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
-import lucuma.odb.graphql.predicate.FTSupportRole
 
 trait LeafMappings[F[_]] extends BaseMapping[F] {
 
