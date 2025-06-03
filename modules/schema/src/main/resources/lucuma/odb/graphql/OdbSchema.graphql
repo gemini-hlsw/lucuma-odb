@@ -16387,5 +16387,5 @@ type ObservationWorkflow {
 type CalculatedObservationWorkflow {
   "The current state of the background calculation."
   state: CalculationState!
-  value: ObservationWorkflow
+  value: ObservationWorkflow!
 }

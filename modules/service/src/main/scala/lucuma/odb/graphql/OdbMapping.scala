@@ -643,6 +643,12 @@ object OdbMapping {
 
     }
 
+  /**
+   * A reduced mapping for use with the Obscalc service.  Obscalc computes the
+   * observation workflow, which makes a GraphQL call which in turn requires
+   * a `Services` instance that has a mapping.  This mapping ignores
+   * subscriptions.
+   */
   def forObscalc[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
     database:   Resource[F, Session[F]],
     monitor:    SkunkMonitor[F],
