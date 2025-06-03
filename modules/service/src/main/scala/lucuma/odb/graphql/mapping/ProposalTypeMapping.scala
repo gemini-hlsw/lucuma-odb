@@ -103,9 +103,8 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate),
-      // SqlObject("support",       Join(ProposalView.FastTurnaround.Id, ProgramUserTable.ProgramUserId)),
-      // SqlObject("reviewer",       Join(ProgramUserTable.ProgramUserId, ProposalView.FastTurnaround.ReviewerId)) //FTSupportTable.ProgramId))
-      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)) //FTSupportTable.ProgramId))
+      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)),
+      SqlObject("mentor")
     )
 
   lazy val LargeProgramMapping: ObjectMapping =
@@ -156,8 +155,12 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
 
     case (FastTurnaroundType, "reviewer", Nil) =>
       Elab.transformChild { child =>
-        println(child)
         Unique(Filter(Predicates.programUser.isReviewer, child))
+      }
+
+    case (FastTurnaroundType, "mentor", Nil) =>
+      Elab.transformChild { child =>
+        Unique(Filter(Predicates.programUser.isMentor, child))
       }
   }
 

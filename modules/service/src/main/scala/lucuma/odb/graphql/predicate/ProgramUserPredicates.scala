@@ -29,10 +29,9 @@ class ProgramUserPredicates(path: Path) {
   def isNotPi: Predicate =
     role.neql(ProgramUserRole.Pi)
 
-  // def isMentor: Predicate =
-  //   Predicate.and(List(ftSupportRole.isNull(false), ftSupportRole.eql(Some(FTSupportRole.Mentor))))
+  def isMentor: Predicate =
+    ftSupportRole.eql(Some(FTSupportRole.Mentor))
 
   def isReviewer: Predicate =
     ftSupportRole.eql(Some(FTSupportRole.Reviewer))
-    // Predicate.and(List(ftSupportRole.isNull(false), ftSupportRole.eql(Some(FTSupportRole.Reviewer))))
 }

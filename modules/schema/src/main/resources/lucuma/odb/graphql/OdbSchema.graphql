@@ -3604,6 +3604,12 @@ input ProgramUserPropertiesInput {
   update is ignored.
   """
   hasDataAccess: Boolean
+
+  """
+  The FT support role for this user (reviewer or mentor).
+  Only applicable for Fast Turnaround proposals.
+  """
+  ftSupportRole: FTSupportRole
 }
 
 """
@@ -3799,12 +3805,11 @@ type FastTurnaround implements ProposalType {
   """
   reviewer: ProgramUser!
 
-  # """
-  # Program User that will be selected as a mentor for this program
-  # """
-  # mentor: ProgramUser
-
-  # support: [ProgramUser!]
+  """
+  Program User that will be selected as a mentor for this program.
+  Required when the reviewer does not have PhD educational status.
+  """
+  mentor: ProgramUser
 }
 
 """
@@ -3988,7 +3993,11 @@ input FastTurnaroundInput {
   """
   piAffiliation: Partner
 
-  # TODO: Reviewer?
+  """
+  The program user ID to be designated as the reviewer for this FT proposal.
+  If not specified, the PI will be the default reviewer.
+  """
+  reviewerId: ProgramUserId
 }
 
 input LargeProgramInput {
