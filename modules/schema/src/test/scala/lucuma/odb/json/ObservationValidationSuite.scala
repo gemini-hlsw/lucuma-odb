@@ -3,12 +3,15 @@
 
 // Inexplicably, only works on the JVM?
 
-//package lucuma.odb.json
+package lucuma.odb.json
 
-//import io.circe.testing.ArbitraryInstances
-//import munit.DisciplineSuite
+import io.circe.testing.ArbitraryInstances
+import io.circe.testing.CodecTests
+import lucuma.core.model.ObservationValidation
+import lucuma.core.model.arb.ArbObservationValidation
+import munit.DisciplineSuite
 
-//class ObservationValidationSuite extends DisciplineSuite with ArbitraryInstances:
-//  import ArbObservationValidation.given
+class ObservationValidationSuite extends DisciplineSuite with ArbitraryInstances:
+  import ArbObservationValidation.given
 
-//  checkAll("ObservationValidationCodec", CodecTests[ObservationValidation].codec)
+  checkAll("ObservationValidationCodec", CodecTests[ObservationValidation].codec)
