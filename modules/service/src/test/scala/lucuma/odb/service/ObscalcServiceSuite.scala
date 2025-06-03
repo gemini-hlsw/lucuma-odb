@@ -49,9 +49,6 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         .map: tec =>
           services.obscalcService(CommitHash.Zero, itcClient, tec)
 
-//  override def withServices[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
-//    withServicesForObscalc(u)(f)
-
   def withObscalcService[A](f: ServiceAccess ?=> ObscalcService[IO] => IO[A]): IO[A] =
     withServicesForObscalc(serviceUser): services =>
       instantiate(services).flatMap(f)

@@ -81,7 +81,7 @@ sealed trait ObservationWorkflowService[F[_]] {
 
   /**
    * Computes the workflow for the observation using the current results of a
-   * background calculation instead of pausing the unfold the execution sequence.
+   * background calculation instead of pausing to unfold the execution sequence.
    * As such, the results may be stale and pending update.  Because there is no
    * long-running calculation, `SuperUserAccess` is not required and we demand a
    * `Transaction`.
