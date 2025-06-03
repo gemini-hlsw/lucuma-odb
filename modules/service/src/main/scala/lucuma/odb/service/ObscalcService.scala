@@ -136,6 +136,9 @@ sealed trait ObscalcService[F[_]]:
 
 object ObscalcService:
 
+  /**
+   * Default workflow instance to use when workflow cannot be computed.
+   */
   val UndefinedWorkflow = ObservationWorkflow(
     ObservationWorkflowState.Undefined,
     List(ObservationWorkflowState.Inactive),
