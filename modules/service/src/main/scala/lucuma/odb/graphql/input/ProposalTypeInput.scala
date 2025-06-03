@@ -18,6 +18,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.IntPercent
+import lucuma.core.model.ProgramUser
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
@@ -69,7 +70,8 @@ object ProposalTypeInput {
     minPercentTime:  IntPercent               = HundredPercent,
     minPercentTotal: Option[IntPercent]       = none,
     totalTime:       Option[TimeSpan]         = none,
-    partnerSplits:   Map[Partner, IntPercent] = Map.empty
+    partnerSplits:   Map[Partner, IntPercent] = Map.empty,
+    reviewerId:      Option[ProgramUser.Id]   = none
   ) {
 
     def asEdit: Edit =
@@ -79,7 +81,8 @@ object ProposalTypeInput {
         minPercentTime.some,
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
-        Nullable.NonNull(partnerSplits)
+        Nullable.NonNull(partnerSplits),
+        Nullable.orNull(reviewerId)
       )
 
     def update(s: State[Create, Unit]): Create =
@@ -105,6 +108,7 @@ object ProposalTypeInput {
     val minPercentTotal: Lens[Create, Option[IntPercent]] = Focus[Create](_.minPercentTotal)
     val totalTime: Lens[Create, Option[TimeSpan]]         = Focus[Create](_.totalTime)
     val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
+    val reviewerId: Lens[Create, Option[ProgramUser.Id]]  = Focus[Create](_.reviewerId)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -147,13 +151,15 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerBinding.Option("piAffiliation", rPartner)
-        ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
+          PartnerBinding.Option("piAffiliation", rPartner),
+          ProgramUserIdBinding.Option("reviewerId", rReviewerId)
+        ) => (rToo, rMin, rPartner, rReviewerId).parMapN { (too, min, partner, reviewerId) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for {
               _ <- tooActivation  := too
               _ <- minPercentTime := min
               _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
+              _ <- reviewerId     := reviewerId
             } yield ()
           )
         }
@@ -224,7 +230,8 @@ object ProposalTypeInput {
     minPercentTime:  Option[IntPercent]                 = None,
     minPercentTotal: Nullable[IntPercent]               = Nullable.Null,
     totalTime:       Nullable[TimeSpan]                 = Nullable.Null,
-    partnerSplits:   Nullable[Map[Partner, IntPercent]] = Nullable.Null
+    partnerSplits:   Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    reviewerId:      Nullable[ProgramUser.Id]           = Nullable.Null
   ) {
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update {
@@ -234,6 +241,7 @@ object ProposalTypeInput {
           _ <- Create.minPercentTotal := minPercentTotal.toOptionOption
           _ <- Create.totalTime       := totalTime.toOptionOption
           _ <- Create.partnerSplits   := partnerSplits.toOption
+          _ <- Create.reviewerId      := reviewerId.toOptionOption
         } yield ()
       }
   }
@@ -271,9 +279,10 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerBinding.Nullable("piAffiliation", rPartner)
-        ) => (rToo, rMin, rPartner).parMapN { (too, min, partner) =>
-          Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)))
+          PartnerBinding.Nullable("piAffiliation", rPartner),
+          ProgramUserIdBinding.Nullable("reviewerId", rReviewerId)
+        ) => (rToo, rMin, rPartner, rReviewerId).parMapN { (too, min, partner, reviewerId) =>
+          Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)), reviewerId = reviewerId)
         }
       }
 

@@ -11,6 +11,7 @@ import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.predicate.FTSupportRole
 import monocle.Focus
 import monocle.Lens
 
@@ -20,7 +21,8 @@ case class ProgramUserPropertiesInput(
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
-  hasDataAccess:     Option[Boolean]
+  hasDataAccess:     Option[Boolean],
+  ftSupportRole:     Nullable[FTSupportRole]
 )
 
 object ProgramUserPropertiesInput:
@@ -32,7 +34,8 @@ object ProgramUserPropertiesInput:
       Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
-      none
+      none,
+      Nullable.Absent
     )
 
   val partnerLink: Lens[ProgramUserPropertiesInput, Option[PartnerLink]] =
