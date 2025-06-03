@@ -44,6 +44,7 @@ CREATE VIEW v_proposal AS
 -- Trigger to validate FT support role assignments
 -- Ensures: 1) FT roles are only assigned to FT proposals
 --          2) Mentors must have PhD educational status
+--          3) Mentor cannot be the same as reviewer on the same proposal
 CREATE OR REPLACE FUNCTION program_user_check_ft_support_fields()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -63,6 +64,15 @@ BEGIN
     IF NEW.c_educational_status IS DISTINCT FROM 'phd' THEN
       RAISE EXCEPTION 'Users with mentor role must have PhD educational status';
     END IF;
+    
+    -- Check 3: Ensure mentor is not the same as reviewer
+    IF EXISTS (
+      SELECT 1 FROM t_proposal p
+      WHERE p.c_program_id = NEW.c_program_id
+      AND p.c_reviewer_id = NEW.c_program_user_id
+    ) THEN
+      RAISE EXCEPTION 'A user cannot be both reviewer and mentor on the same proposal';
+    END IF;
   END IF;
 
   RETURN NEW;
@@ -72,3 +82,27 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER program_user_check_ft_support_fields_trigger
 BEFORE INSERT OR UPDATE ON t_program_user
 FOR EACH ROW EXECUTE FUNCTION program_user_check_ft_support_fields();
+
+-- Additional constraint to prevent setting a reviewer who is already a mentor
+CREATE OR REPLACE FUNCTION proposal_check_reviewer_not_mentor()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only check for FT proposals
+  IF NEW.c_reviewer_id IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM t_program_user pu
+      WHERE pu.c_program_user_id = NEW.c_reviewer_id
+      AND pu.c_program_id = NEW.c_program_id
+      AND pu.c_ft_support_role = 'mentor'
+    ) THEN
+      RAISE EXCEPTION 'A user cannot be both reviewer and mentor on the same proposal';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER proposal_check_reviewer_not_mentor_trigger
+BEFORE INSERT OR UPDATE OF c_reviewer_id ON t_proposal
+FOR EACH ROW EXECUTE FUNCTION proposal_check_reviewer_not_mentor();

@@ -19,4 +19,7 @@ class FTSupportUserPredicates(path: Path) {
   def isReviewer: Predicate =
     role.eql(FTSupportRole.Reviewer)
 
+  def isMentor: Predicate =
+    role.eql(FTSupportRole.Mentor)
+
 }
