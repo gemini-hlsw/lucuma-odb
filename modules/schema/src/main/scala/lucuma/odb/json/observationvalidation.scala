@@ -5,7 +5,6 @@ package lucuma.odb.json
 
 import cats.data.NonEmptyChain
 import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -17,14 +16,13 @@ trait ObservationValidationCodec:
   given Decoder[ObservationValidation] = hc =>
     for
       c   <- hc.downField("code").as[ObservationValidationCode]
-      ms  <- hc.downField("messages").as[List[String]]
-      nec <- NonEmptyChain.fromSeq(ms).toRight(DecodingFailure("Missing messages", hc.history))
-    yield ObservationValidation(c, nec)
+      ms  <- hc.downField("messages").as[NonEmptyChain[String]]
+    yield ObservationValidation(c, ms)
 
   given Encoder[ObservationValidation] = c =>
     Json.obj(
       "code"     -> c.code.asJson,
-      "messages" -> c.messages.toNonEmptyList.toList.asJson
+      "messages" -> c.messages.asJson
     )
 
 object observationvalidation extends ObservationValidationCodec
