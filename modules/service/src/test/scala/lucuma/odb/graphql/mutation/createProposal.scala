@@ -8,8 +8,10 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
@@ -577,6 +579,7 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                     piAffiliation
                     reviewer {
                       id
+                      role
                     }
                   }
                 }
@@ -594,7 +597,6 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
                   "piAffiliation": "US",
-                  "support": null,
                   "reviewer": null
                 }
               }
@@ -651,6 +653,105 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             }
           }
         """.asRight
+      )
+    }
+  }
+
+  test("✓ fast turnaround with reviewer") {
+    for {
+      pid  <- createProgramAs(pi, "My Fast Turnaround Proposal")
+      // Add a COI who will be the reviewer
+      puId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "$puId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    toOActivation
+                    minPercentTime
+                    piAffiliation
+                    reviewer {
+                      id
+                      role
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          Json.obj(
+            "createProposal" -> Json.obj(
+              "proposal" -> Json.obj(
+                "category" -> Json.fromString("COSMOLOGY"),
+                "type" -> Json.obj(
+                  "scienceSubtype" -> Json.fromString("FAST_TURNAROUND"),
+                  "toOActivation" -> Json.fromString("NONE"),
+                  "minPercentTime" -> Json.fromInt(50),
+                  "piAffiliation" -> Json.fromString("US"),
+                  "reviewer" -> Json.obj(
+                    "id" -> Json.fromString(puId.toString),
+                    "role" -> Json.fromString("COI")
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    } yield ()
+  }
+
+  test("⨯ fast turnaround with non-existent reviewer") {
+    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "pu-ffff-ffff-ffff-ffff"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+              }
+            }
+          }
+        """,
+        expected = List("Argument 'input.SET.type.fastTurnaround.reviewerId' is invalid: 'pu-ffff-ffff-ffff-ffff' is not a valid program user id").asLeft
       )
     }
   }

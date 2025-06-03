@@ -159,7 +159,7 @@ object ProposalTypeInput {
               _ <- tooActivation  := too
               _ <- minPercentTime := min
               _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
-              _ <- reviewerId     := reviewerId
+              _ <- Create.reviewerId := reviewerId
             } yield ()
           )
         }

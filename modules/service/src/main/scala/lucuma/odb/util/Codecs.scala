@@ -75,7 +75,6 @@ import spire.math.interval.ValueBound
 
 import scala.util.control.Exception
 import scala.util.matching.Regex
-import lucuma.odb.graphql.predicate.FTSupportRole
 
 
 // Codecs for some atomic types.

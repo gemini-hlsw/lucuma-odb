@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.graphql.predicate.FTSupportRole
+import lucuma.core.enums.FTSupportRole
 
 val FTSupportRoleBinding: Matcher[FTSupportRole] =
   enumeratedBinding

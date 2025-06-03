@@ -7,11 +7,11 @@ package input
 
 import cats.syntax.all.*
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.FTSupportRole
 import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.predicate.FTSupportRole
 import monocle.Focus
 import monocle.Lens
 

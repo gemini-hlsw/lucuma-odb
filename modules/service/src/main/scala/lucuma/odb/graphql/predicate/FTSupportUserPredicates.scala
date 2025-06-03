@@ -5,12 +5,7 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import grackle.Predicate
-import lucuma.core.util.Enumerated
-
-enum FTSupportRole(val tag: String) derives Enumerated:
-  case Reviewer extends FTSupportRole("reviewer")
-  case Mentor   extends FTSupportRole("mentor")
-end FTSupportRole
+import lucuma.core.enums.FTSupportRole
 
 class FTSupportUserPredicates(path: Path) {
 
