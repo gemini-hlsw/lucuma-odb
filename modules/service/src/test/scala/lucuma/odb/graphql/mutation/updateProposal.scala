@@ -11,6 +11,8 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.util.DateInterval
 
@@ -823,6 +825,181 @@ class updateProposal extends OdbSuite {
           List(s"Program $pid is of type Engineering. Only Science programs can have proposals.").asLeft
       )
     }
+  }
+
+  test("✓ changing proposal type clears FT support roles and reviewer") {
+    for {
+      pid <- createProgramAs(pi, "My Fast Turnaround to Queue Proposal")
+      
+      // Create FT proposal with reviewer
+      coiId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi, education = EducationalStatus.PhD)
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "$coiId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { 
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    reviewer {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """
+      )
+      
+      // Add another user and assign as mentor
+      mentorId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi, education = EducationalStatus.PhD)
+      _ <- query(
+        user = staff,
+        query = s"""
+          mutation {
+            updateProgramUsers(
+              input: {
+                SET: {
+                  ftSupportRole: MENTOR
+                }
+                WHERE: {
+                  id: { EQ: "$mentorId" }
+                }
+              }
+            ) {
+              programUsers {
+                id
+                ftSupportRole
+              }
+            }
+          }
+        """
+      )
+      
+      // Now change the proposal type from FT to Queue
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 100
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Queue {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """
+      )
+      
+      // Verify that FT support roles are cleared (check specific users)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          query {
+            programUsers(
+              WHERE: {
+                program: { id: { EQ: "$pid" } }
+                id: { IN: ["$coiId", "$mentorId"] }
+              }
+            ) {
+              matches {
+                id
+                role
+                ftSupportRole
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "programUsers": {
+              "matches": [
+                {
+                  "id": $coiId,
+                  "role": "COI", 
+                  "ftSupportRole": null
+                },
+                {
+                  "id": $mentorId,
+                  "role": "COI", 
+                  "ftSupportRole": null
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+      
+      // Also verify the proposal itself has no reviewer
+      _ <- expect(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Queue {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "program": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "QUEUE",
+                  "minPercentTime": 50
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield ()
   }
 
 }
