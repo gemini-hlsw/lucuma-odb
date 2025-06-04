@@ -1038,6 +1038,31 @@ class observation_workflow
 
   }
 
+  test("calculated: default workflow"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        // no obscalc update, so it remains in pending state
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        calculatedWorkflowQuery(oid),
+        expected = calculatedWorkflowQueryResult(
+          CalculatedValue(
+            CalculationState.Pending,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              Nil
+            )
+          )
+        ).asRight
+      )
+
   val OngoingSetup: IO[Observation.Id] =
     for
       p <- createProgram
@@ -1067,18 +1092,18 @@ class observation_workflow
         ).asRight
       )
 
-  test("calculated: missing target info, invalid instrument"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgramAs(pi)
-        c <- createCfp(List(Instrument.GmosSouth))
-        _ <- addProposal(pi, p, c.some)
-        t <- createIncompleteTargetAs(pi, p)
-        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _ <- runObscalcUpdate(p, o)
-      yield o
+  val MissingTargetInvalidInstrumentSetup: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      c <- createCfp(List(Instrument.GmosSouth))
+      _ <- addProposal(pi, p, c.some)
+      t <- createIncompleteTargetAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- runObscalcUpdate(p, o)
+    yield o
 
-    setup.flatMap: oid =>
+  test("calculated: missing target info, invalid instrument"):
+    MissingTargetInvalidInstrumentSetup.flatMap: oid =>
       expect(
         pi,
         calculatedWorkflowQuery(oid),
@@ -1092,6 +1117,83 @@ class observation_workflow
                 ObservationValidation.configuration("Missing brightness measure, radial velocity"),
                 ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
               )
+            )
+          )
+        ).asRight
+      )
+
+  private def expectWhere(all: Observation.Id*)(
+    where:    String,
+    expected: List[Observation.Id]
+  ): IO[Unit] =
+    val matches = expected.map(id => Json.obj("id" -> id.asJson)).asJson
+
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          observations(WHERE: {
+            id: { IN: ${all.map(id => s"\"$id\"").mkString("[", ", ", "]")} }
+            workflow: { $where }
+          }) {
+            matches {
+              id
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "observations": {
+            "matches": $matches
+          }
+        }
+      """.asRight
+    )
+
+  val PendingSetup: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createIncompleteTargetAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+    yield o
+
+  test("calculated: where workflow"):
+    for
+      pending <- PendingSetup
+      ongoing <- OngoingSetup
+      invalid <- MissingTargetInvalidInstrumentSetup
+      matches  = expectWhere(pending, ongoing, invalid)
+      _       <- matches("workflowState: { GTE: READY }", List(ongoing))
+      _       <- matches("workflowState: { EQ: UNDEFINED }", List(pending, invalid))
+      _       <- matches("calculationState: { EQ: READY }", List(ongoing, invalid))
+      _       <- matches("calculationState: { LT: READY }", List(pending))
+      _       <- matches("IS_NULL: false", List(pending, ongoing, invalid))
+    yield ()
+
+  // Note, this differs from the "normal" workflow calculation because that
+  // does not do the ITC query whereas this version will do it before the
+  // workflow is computed.
+  test("calculated: otherwise ok, but no itc results in cache"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        calculatedWorkflowQuery(oid),
+        expected = calculatedWorkflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Defined,
+              List(ObservationWorkflowState.Inactive),
+              Nil
             )
           )
         ).asRight

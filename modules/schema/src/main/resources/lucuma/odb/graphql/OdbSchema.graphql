@@ -4818,6 +4818,49 @@ input ObscalcUpdateInput {
   newState:      WhereOptionEqCalculationState
 }
 
+input WhereOrderCalculationState {
+
+  """
+  Matches if the calculation state is exactly the supplied value.
+  """
+  EQ: CalculationState
+
+  """
+  Matches if the calculation state is not the supplied value.
+  """
+  NEQ: CalculationState
+
+  """
+  Matches if the calculation state is any of the supplied options.
+  """
+  IN: [CalculationState!]
+
+  """
+  Matches if the calculation state is none of the supplied values.
+  """
+  NIN: [CalculationState!]
+
+  """
+  Matches if the calculation state is ordered after (>) the supplied value.
+  """
+  GT: CalculationState
+
+  """
+  Matches if the calculation state is ordered before (<) the supplied value.
+  """
+  LT: CalculationState
+
+  """
+  Matches if the calculation state is ordered after or equal (>=) the supplied value.
+  """
+  GTE: CalculationState
+
+  """
+  Matches if the calculation state is ordered before or equal (<=) the supplied value.
+  """
+  LTE: CalculationState
+}
+
 input WhereOptionEqCalculationState {
 
   """
@@ -9677,8 +9720,17 @@ type Observation {
   """
   configurationRequests: [ConfigurationRequest!]!
 
-  workflow: ObservationWorkflow!
+  workflow: ObservationWorkflow! @deprecated(reason: "will be updated with a CalculatedObservationWorkflow result, use calculatedWorkflow for now")
 
+  """
+  Obtains the current observation workflow state and valid transitions (and any
+  validation errors). Because this calculation is expensive, it is performed in
+  the background when something relevant changes and may be in a state of flux
+  when queried.  The calculation state in the result can be used to determine
+  whether a pending update is expected.
+
+  NOTE: Temporary - will replace the 'workflow' field.
+  """
   calculatedWorkflow: CalculatedObservationWorkflow
 }
 
@@ -10613,7 +10665,7 @@ type Query {
   observationsByWorkflowState(
     WHERE: WhereObservation
     states: [ObservationWorkflowState!]
-  ): [Observation!]!
+  ): [Observation!]! @deprecated(reason: "use 'workflow' field in WhereObservation filter")
 
   """
   Selects the first `LIMIT` matching configuration requests based on the provided `WHERE` parameter, if any.
@@ -14280,6 +14332,11 @@ input WhereObservation {
   Matches on the site associated with the observation's instrument, if any.
   """
   site: WhereOptionEqSite
+
+  """
+  Matches on the observation workflow state.
+  """
+  workflow: WhereCalculatedObservationWorkflow
 }
 
 """
@@ -16339,6 +16396,73 @@ input WhereWavelength {
   nanometers: WhereOrderPosBigDecimal
 
   micrometers: WhereOrderPosBigDecimal
+}
+
+"""
+Filters on equality or order comparisons of the workflow state.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderObservationWorkflowState {
+  """
+  Matches if the workflow state is exactly the supplied value.
+  """
+  EQ: ObservationWorkflowState
+
+  """
+  Matches if the workflow state is not the supplied value.
+  """
+  NEQ: ObservationWorkflowState
+
+  """
+  Matches if the workflow state value is any of the supplied options.
+  """
+  IN: [ObservationWorkflowState!]
+
+  """
+  Matches if the workflow state is none of the supplied values.
+  """
+  NIN: [ObservationWorkflowState!]
+
+  """
+  Matches if the workflow state is ordered after (>) the supplied value.
+  """
+  GT: ObservationWorkflowState
+
+  """
+  Matches if the workflow state is ordered before (<) the supplied value.
+  """
+  LT: ObservationWorkflowState
+
+  """
+  Matches if the workflow state is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ObservationWorkflowState
+
+  """
+  Matches if the workflow state is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ObservationWorkflowState
+}
+
+"""
+Matches on the current state of the ObservationWorkflow, which may be in the
+process of being updated on the server.  Use the 'calculationState' if, for
+example, only interested in results for which no pending change is expected.
+"""
+input WhereCalculatedObservationWorkflow {
+
+  """
+  When `true`, matches if the calculated workflow is not defined. When `false`
+  matches if the calculated workflow is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches the current state of the background calculation."
+  calculationState: WhereOrderCalculationState
+
+  "Matchs the workflow state itself."
+  workflowState: WhereOrderObservationWorkflowState
+
 }
 
 type OffsetQ {
