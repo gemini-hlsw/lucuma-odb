@@ -328,8 +328,8 @@ object ObservationWorkflowService {
               .toMap
 
 
-      private def validateConfigurations(infos: List[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-        ResultT(configurationService.selectRequests(infos.map(i => (i.pid, i.oid)))).map: rs =>
+      private def validateConfigurations(infos: NonEmptyList[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
+        ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
           rs.view
             .map:
               case ((_, oid), lst) =>
@@ -511,7 +511,9 @@ object ObservationWorkflowService {
             info.isAccepted.toOption.forall(_ === true) && prelimV.get(info.oid).forall(_.isEmpty)
 
         val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-          validateConfigurations(toCheck)
+          NonEmptyList
+            .fromList(toCheck)
+            .fold(ResultT.pure(Map.empty[Observation.Id, ObservationValidationMap]))(validateConfigurations)
 
         configValidations.map(prelimV |+| _)
 
