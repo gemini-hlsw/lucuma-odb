@@ -18,109 +18,6 @@ class fastTurnaroundTests extends OdbSuite {
 
   val validUsers = List(pi, coi, staff)
 
-  test("✓ create FT proposal with null reviewer by default") {
-    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  category: COSMOLOGY
-                  type: {
-                    fastTurnaround: {
-                      toOActivation: NONE
-                      minPercentTime: 50
-                      piAffiliation: US
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                type {
-                  ... on FastTurnaround {
-                    scienceSubtype
-                    reviewer {
-                      role
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "createProposal": {
-              "proposal": {
-                "type": {
-                  "scienceSubtype": "FAST_TURNAROUND",
-                  "reviewer": null
-                }
-              }
-            }
-          }
-        """.asRight
-      )
-    }
-  }
-
-  test("✓ fast turnaround proposal returns null mentor by default") {
-    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: {
-                  category: COSMOLOGY
-                  type: {
-                    fastTurnaround: {
-                      toOActivation: NONE
-                      minPercentTime: 50
-                      piAffiliation: US
-                    }
-                  }
-                }
-              }
-            ) {
-              proposal {
-                type {
-                  ... on FastTurnaround {
-                    scienceSubtype
-                    reviewer {
-                      role
-                    }
-                    mentor {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }
-        """,
-        expected = json"""
-          {
-            "createProposal": {
-              "proposal": {
-                "type": {
-                  "scienceSubtype": "FAST_TURNAROUND",
-                  "reviewer": null,
-                  "mentor": null
-                }
-              }
-            }
-          }
-        """.asRight
-      )
-    }
-  }
 
   test("⨯ cannot assign mentor role to non-PhD user") {
     for {
@@ -329,4 +226,5 @@ class fastTurnaroundTests extends OdbSuite {
       )
     } yield ()
   }
+
 }

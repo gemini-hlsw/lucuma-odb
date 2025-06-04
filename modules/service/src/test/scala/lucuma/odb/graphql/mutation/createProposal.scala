@@ -1291,4 +1291,108 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     }
   }
 
+  test("✓ fast turnaround with null reviewer by default") {
+    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on FastTurnaround {
+                    scienceSubtype
+                    reviewer {
+                      role
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "FAST_TURNAROUND",
+                  "reviewer": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ fast turnaround returns null mentor by default") {
+    createProgramAs(pi, "My Fast Turnaround Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on FastTurnaround {
+                    scienceSubtype
+                    reviewer {
+                      role
+                    }
+                    mentor {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "FAST_TURNAROUND",
+                  "reviewer": null,
+                  "mentor": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
 }
