@@ -126,3 +126,28 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER cleanup_ft_roles_trigger
 BEFORE DELETE ON t_program_user
 FOR EACH ROW EXECUTE FUNCTION cleanup_ft_roles_on_user_removal();
+
+-- Trigger to clear FT support roles and reviewer when proposal type changes away from FT
+CREATE OR REPLACE FUNCTION cleanup_ft_fields_on_type_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Check if we're changing away from Fast Turnaround
+  IF OLD.c_science_subtype = 'fast_turnaround' AND NEW.c_science_subtype != 'fast_turnaround' THEN
+    -- Clear the reviewer field in the proposal
+    NEW.c_reviewer_id := NULL;
+    
+    -- Clear FT support roles from all program users in this program
+    UPDATE t_program_user 
+    SET c_ft_support_role = NULL 
+    WHERE c_program_id = NEW.c_program_id
+    AND c_ft_support_role IS NOT NULL;
+    
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cleanup_ft_fields_on_type_change_trigger
+BEFORE UPDATE OF c_science_subtype ON t_proposal
+FOR EACH ROW EXECUTE FUNCTION cleanup_ft_fields_on_type_change();
