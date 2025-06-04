@@ -435,28 +435,28 @@ object GuideService {
       def callGaia(
         oid:   Observation.Id,
         query: ADQLQuery
-      ): F[Result[List[GuideStarCandidate]]] = {
-        val MaxTargets                     = 100
-        given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
-        given ci: ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
-        val request                        = Request[F](Method.GET,
-                                 CatalogSearch.gaiaSearchUri(query),
-                                 headers = Headers(("x-requested-with", "XMLHttpRequest"))
-        )
-        httpClient
-          .stream(request)
-          .flatMap(
-            _.body
-              .through(utf8.decode)
-              .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
-              .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
+      ): F[Result[List[GuideStarCandidate]]] = 
+        Trace[F].span("callGaia"):
+          val MaxTargets                     = 100
+          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
+          given ci: ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
+          val request                        = Request[F](Method.GET,
+                                  CatalogSearch.gaiaSearchUri(query),
+                                  headers = Headers(("x-requested-with", "XMLHttpRequest"))
           )
-          .compile
-          .toList
-          .map(_.success)
-          // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
-          .handleError(e => gaiaError(e.getMessage()).asFailure)
-      }
+          httpClient
+            .stream(request)
+            .flatMap(
+              _.body
+                .through(utf8.decode)
+                .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
+                .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
+            )
+            .compile
+            .toList
+            .map(_.success)
+            // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
+            .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
         oid:         Observation.Id,
