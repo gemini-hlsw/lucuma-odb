@@ -50,7 +50,8 @@ case class Config(
   domain:        List[String],     // Domains, for CORS headers
   commitHash:    CommitHash,       // From Heroku Dyno Metadata
   goaUsers:      Set[User.Id],     // Gemini Observatory Archive user id(s)
-  obscalcPoll:   FiniteDuration    // Obscalc poll period
+  obscalcPoll:   FiniteDuration,   // Obscalc poll period
+  httpClient:    Config.HttpClient // Configuration for HTTP requests made by the ODB
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -61,7 +62,7 @@ case class Config(
   // People also send us their API keys. We need to be able to exchange them for [longer-lived] JWTs
   // via an API call to SSO, so we need an HTTP client for that.
   def httpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
-    EmberClientBuilder.default[F].build
+    EmberClientBuilder.default[F].withTimeout(httpClient.timeout).build
 
   // ITC client resource
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
@@ -228,7 +229,7 @@ object Config:
     lazy val eventsUri = baseUri / domain.value / "events"
 
   object Email:
-    lazy val fromCirrus: ConfigValue[Effect, Email] = (
+    lazy val fromCiris: ConfigValue[Effect, Email] = (
       envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
       envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
       envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString],
@@ -239,6 +240,15 @@ object Config:
     private given ConfigDecoder[String, EmailAddress] =
       ConfigDecoder[String].mapOption("Email Address"): s =>
         EmailAddress.from(s).toOption
+
+  case class HttpClient(
+    timeout: Duration
+  )
+
+  object HttpClient:
+    lazy val fromCiris: ConfigValue[Effect, HttpClient] = (
+      envOrProp("HTTP_CLIENT_TIMEOUT").as[Duration].default(45.seconds) // 45s is Ember's default
+    ).map(HttpClient.apply)
 
   private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key"): s =>
@@ -272,10 +282,11 @@ object Config:
     Honeycomb.fromCiris,
     Database.fromCiris,
     Aws.fromCiris,
-    Email.fromCirrus,
+    Email.fromCiris,
     envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").as[List[String]],
     envOrProp("HEROKU_SLUG_COMMIT").as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
-    envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds)
+    envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds),
+    HttpClient.fromCiris
   ).parMapN(Config.apply)
