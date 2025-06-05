@@ -16,16 +16,16 @@ trait CategorizedTimeMapping[F[_]] extends ObscalcView[F] with VisitTable[F]:
     List(
         categorizedTimeMappingAtPath(
           ExecutionDigestType / "acquisition" / "timeEstimate",
-          ObscalcTable.ObservationId,
-          ObscalcTable.Digest.Acquisition.NonChargedTime,
-          ObscalcTable.Digest.Acquisition.ProgramTime
+          ObscalcView.ObservationId,
+          ObscalcView.Digest.Acquisition.NonChargedTime,
+          ObscalcView.Digest.Acquisition.ProgramTime
         ),
 
         categorizedTimeMappingAtPath(
           ExecutionDigestType / "science" / "timeEstimate",
-          ObscalcTable.ObservationId,
-          ObscalcTable.Digest.Science.NonChargedTime,
-          ObscalcTable.Digest.Science.ProgramTime
+          ObscalcView.ObservationId,
+          ObscalcView.Digest.Science.NonChargedTime,
+          ObscalcView.Digest.Science.ProgramTime
         ),
 
         categorizedTimeMappingAtPath(

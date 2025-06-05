@@ -10,7 +10,7 @@ import skunk.codec.numeric._int8
 
 trait ObscalcView[F[_]] extends BaseMapping[F]:
 
-  object ObscalcTable extends TableDef("v_obscalc"):
+  object ObscalcView extends TableDef("v_obscalc"):
     val ProgramId: ColumnRef           = col("c_program_id",           program_id)
     val ObservationId: ColumnRef       = col("c_observation_id",       observation_id)
     val CalculationState: ColumnRef    = col("c_obscalc_state",        calculation_state)

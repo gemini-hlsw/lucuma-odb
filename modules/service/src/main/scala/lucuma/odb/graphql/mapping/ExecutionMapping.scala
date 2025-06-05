@@ -60,7 +60,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     ObjectMapping(ExecutionType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
-      SqlObject("digest", Join(ObservationView.Id, ObscalcTable.ObservationId)),
+      SqlObject("digest", Join(ObservationView.Id, ObscalcView.Digest.Id)),
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
