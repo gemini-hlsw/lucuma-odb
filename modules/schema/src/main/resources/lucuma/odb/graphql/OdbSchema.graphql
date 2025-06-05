@@ -3604,12 +3604,6 @@ input ProgramUserPropertiesInput {
   update is ignored.
   """
   hasDataAccess: Boolean
-
-  """
-  The FT support role for this user (reviewer or mentor).
-  Only applicable for Fast Turnaround proposals.
-  """
-  ftSupportRole: FTSupportRole
 }
 
 """
@@ -3640,15 +3634,6 @@ enum ProgramUserSupportRoleType {
   PARTNER
 }
 
-"""
-The type of support role in an FT program.
-"""
-enum FTSupportRole {
-  "Reviewer"
-  REVIEWER
-  "Mentor"
-  MENTOR
-}
 
 """
 An assignment of a user to a program.
@@ -3684,8 +3669,6 @@ type ProgramUser {
   "Has access to data."
   hasDataAccess: Boolean!
 
-  "Role of the user on an FT program (reviwer/mentor/none)."
-  ftSupportRole: FTSupportRole
 }
 
 """
@@ -3998,6 +3981,12 @@ input FastTurnaroundInput {
   If not specified, the PI will be the default reviewer.
   """
   reviewerId: ProgramUserId
+
+  """
+  The program user ID to be designated as the mentor for this FT proposal.
+  If not specified, no mentor will be assigned.
+  """
+  mentorId: ProgramUserId
 }
 
 input LargeProgramInput {

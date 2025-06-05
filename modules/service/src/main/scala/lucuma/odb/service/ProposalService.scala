@@ -294,6 +294,8 @@ object ProposalService {
           ResultT(create.map(_.success).recover {
             case SqlState.UniqueViolation(e) =>
               error.creationFailed(input.programId).asFailure
+            case SqlState.CheckViolation(e) if e.constraintName == Some("chk_reviewer_mentor_different") =>
+              OdbError.InvalidArgument("The same user cannot be both reviewer and mentor on a proposal".some).asFailure
           })
 
         def insertSplits: ResultT[F, Unit] =
@@ -345,6 +347,10 @@ object ProposalService {
               .map {
                 case Update(1) => ().success
                 case _         => error.updateFailed(pid).asFailure
+              }
+              .recover {
+                case SqlState.CheckViolation(e) if e.constraintName == Some("chk_reviewer_mentor_different") =>
+                  OdbError.InvalidArgument("The same user cannot be both reviewer and mentor on a proposal".some).asFailure
               }
           })
 
@@ -456,7 +462,8 @@ object ProposalService {
             call.minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
             call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
-            call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}")
+            call.reviewerId.foldPresent(sql"c_reviewer_id = ${program_user_id.opt}"),
+            call.mentorId.foldPresent(sql"c_mentor_id = ${program_user_id.opt}")
           ).flatten
         }
 
@@ -485,7 +492,8 @@ object ProposalService {
           c_min_percent,
           c_min_percent_total,
           c_total_time,
-          c_reviewer_id
+          c_reviewer_id,
+          c_mentor_id
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -495,6 +503,7 @@ object ProposalService {
           ${int_percent},
           ${int_percent.opt},
           ${time_span.opt},
+          ${program_user_id.opt},
           ${program_user_id.opt}
       """.apply(
         pid,
@@ -505,7 +514,8 @@ object ProposalService {
         c.typeʹ.minPercentTime,
         c.typeʹ.minPercentTotal,
         c.typeʹ.totalTime,
-        c.typeʹ.reviewerId
+        c.typeʹ.reviewerId,
+        c.typeʹ.mentorId
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester], Option[NonNegInt])] =

@@ -177,7 +177,6 @@ class programUsers extends OdbSuite:
                 user { id }
                 educationalStatus
                 thesis
-                ftSupportRole
               }
             }
           }
@@ -191,8 +190,7 @@ class programUsers extends OdbSuite:
                       "program"           -> Json.obj("id" -> id.asJson),
                       "user"              -> Json.obj("id" -> piPhd.id.asJson),
                       "educationalStatus" -> Json.Null,
-                      "thesis"            -> Json.Null,
-                      "ftSupportRole"     -> Json.Null
+                      "thesis"            -> Json.Null
                     )
                   }
               )
