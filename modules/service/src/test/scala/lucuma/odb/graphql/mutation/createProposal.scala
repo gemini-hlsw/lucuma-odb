@@ -1581,4 +1581,60 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     } yield ()
   }
 
+  test("⨯ queue proposal cannot have reviewerId") {
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    queue: {
+                      reviewerId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'reviewerId' for input object value of type QueueInput in field 'createProposal' of type 'Mutation'").asLeft
+      )
+    }
+  }
+
+  test("⨯ queue proposal cannot have mentorId") {
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    queue: {
+                      mentorId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'mentorId' for input object value of type QueueInput in field 'createProposal' of type 'Mutation'").asLeft
+      )
+    }
+  }
+
 }

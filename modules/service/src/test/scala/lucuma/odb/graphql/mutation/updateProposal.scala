@@ -1200,4 +1200,32 @@ class updateProposal extends OdbSuite {
     } yield ()
   }
 
+  test("⨯ cannot update queue proposal to have reviewerId") {
+    createProgramAs(pi, "My Queue Proposal").flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      reviewerId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'reviewerId' for input object value of type QueueInput in field 'updateProposal' of type 'Mutation'").asLeft
+      )
+    }
+  }
+
 }
