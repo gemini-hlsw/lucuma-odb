@@ -3634,7 +3634,6 @@ enum ProgramUserSupportRoleType {
   PARTNER
 }
 
-
 """
 An assignment of a user to a program.
 """
@@ -3668,7 +3667,6 @@ type ProgramUser {
 
   "Has access to data."
   hasDataAccess: Boolean!
-
 }
 
 """
