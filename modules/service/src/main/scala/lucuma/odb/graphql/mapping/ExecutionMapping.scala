@@ -34,7 +34,7 @@ import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
-import lucuma.odb.graphql.table.ObscalcTable
+import lucuma.odb.graphql.table.ObscalcView
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -43,7 +43,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
-                                with ObscalcTable[F]
+                                with ObscalcView[F]
                                 with Predicates[F]
                                 with SelectSubquery {
 
@@ -60,8 +60,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
     ObjectMapping(ExecutionType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
-      EffectField("digest", digestHandler, List("id", "programId")),
-      SqlObject("calculatedDigest", Join(ObservationView.Id, ObscalcTable.ObservationId)),
+      SqlObject("digest", Join(ObservationView.Id, ObscalcTable.ObservationId)),
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
@@ -151,19 +150,6 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       }
 
     effectHandler(_ => ().success, calculate)
-
-  private lazy val digestHandler: EffectHandler[F] = {
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) => {
-        services.use { s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .digest(pid, oid)
-           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
-        }
-      }
-
-    effectHandler(_ => ().success, calculate)
-  }
 
   private lazy val timeChargeHandler: EffectHandler[F] = {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =

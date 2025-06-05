@@ -4,9 +4,9 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.ObscalcTable
+import lucuma.odb.graphql.table.ObscalcView
 
-trait CalculatedObservationWorkflowMapping[F[_]] extends ObscalcTable[F]:
+trait CalculatedObservationWorkflowMapping[F[_]] extends ObscalcView[F]:
 
   private lazy val ObservationWorkflowMapping: TypeMapping =
     ObjectMapping(CalculatedObservationWorkflowType / "value")(
