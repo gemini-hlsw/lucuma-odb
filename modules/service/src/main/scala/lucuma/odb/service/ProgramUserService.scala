@@ -664,14 +664,13 @@ object ProgramUserService:
         // If updating the data access flag, you must be the PI (or staff).
         // Otherwise normal access rules apply with the caveat that a user can
         // update their own record.
-        val access = 
-          (SET.hasDataAccess *> correlatedPiAccessOnly(user, alias, "i")).orElse:
-            correlatedExistsUserAccess(user, alias, "i").map: ac =>
-              void" ("                                     |+|
-                sql"#$alias.c_user_id = $user_id"(user.id) |+| // updating our own user
-                void" OR "                                 |+|
-                ac                                         |+|
-              void")"
+        val access = (SET.hasDataAccess *> correlatedPiAccessOnly(user, alias, "i")).orElse:
+                       correlatedExistsUserAccess(user, alias, "i").map: ac =>
+                         void" ("                                     |+|
+                           sql"#$alias.c_user_id = $user_id"(user.id) |+| // updating our own user
+                           void" OR "                                 |+|
+                           ac                                         |+|
+                         void")"
 
         (access.fold(up): exists =>
           up |+| void" AND " |+| exists

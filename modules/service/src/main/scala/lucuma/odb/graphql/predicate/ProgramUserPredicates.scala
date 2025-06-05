@@ -27,4 +27,5 @@ class ProgramUserPredicates(path: Path) {
 
   def isNotPi: Predicate =
     role.neql(ProgramUserRole.Pi)
+
 }
