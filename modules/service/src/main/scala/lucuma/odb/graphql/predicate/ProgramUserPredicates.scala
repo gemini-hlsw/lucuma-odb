@@ -5,7 +5,6 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 import grackle.Predicate
-import lucuma.core.enums.FTSupportRole
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
@@ -20,7 +19,6 @@ class ProgramUserPredicates(path: Path) {
   lazy val program       = ProgramPredicates(path / "program")
   lazy val programId     = LeafPredicates[Program.Id](programIdPath)
   lazy val role          = LeafPredicates[ProgramUserRole](path / "role")
-  lazy val ftSupportRole = LeafPredicates[Option[FTSupportRole]](path / "ftSupportRole")
   lazy val userId        = LeafPredicates[User.Id](userIdPath)
   lazy val hasDataAccess = LeafPredicates[Boolean](path / "hasDataAccess")
 
@@ -29,10 +27,4 @@ class ProgramUserPredicates(path: Path) {
 
   def isNotPi: Predicate =
     role.neql(ProgramUserRole.Pi)
-
-  def isMentor: Predicate =
-    ftSupportRole.eql(Some(FTSupportRole.Mentor))
-
-  def isReviewer: Predicate =
-    ftSupportRole.eql(Some(FTSupportRole.Reviewer))
 }

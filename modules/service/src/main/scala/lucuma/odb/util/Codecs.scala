@@ -453,8 +453,6 @@ trait Codecs {
   val program_user_role: Codec[ProgramUserRole] =
     enumerated(Type("e_program_user_role"))
 
-  val ft_support_role: Codec[FTSupportRole] =
-    enumerated(Type("e_ft_support_role"))
 
   val radial_velocity: Codec[RadialVelocity] =
     numeric.eimap(
