@@ -10,7 +10,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
@@ -79,6 +79,19 @@ sealed trait ObservationWorkflowService[F[_]] {
     ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
+  /**
+   * Computes the workflow for the observation using the current results of a
+   * background calculation instead of pausing to unfold the execution sequence.
+   * As such, the results may be stale and pending update.  Because there is no
+   * long-running calculation, `SuperUserAccess` is not required and we demand a
+   * `Transaction`.
+   */
+  def getCalculatedWorkflow(
+    oid:  Observation.Id,
+    itc:  Option[ItcService.AsterismResults],
+    exec: Option[CoreExecutionState]
+  )(using Transaction[F]): F[Result[ObservationWorkflow]]
+
   def setWorkflowState(
     oid: Observation.Id,
     state: ObservationWorkflowState,
@@ -115,22 +128,21 @@ sealed trait ObservationWorkflowService[F[_]] {
 
 /* Validation Info Record */
 case class ObservationValidationInfo(
-  pid: Program.Id,
-  tpe: ProgramType,
-  oid: Observation.Id,
-  instrument: Option[Instrument],
-  ra: Option[RightAscension],
-  dec: Option[Declination],
-  role: Option[CalibrationRole],
-  userState: Option[ObservationWorkflowService.UserState],
-  declaredComplete: Boolean,
-  proposalStatus: Tag,
-  cfpid: Option[CallForProposals.Id],
-  scienceBand: Option[ScienceBand],
-  asterism: List[Target],
-  generatorParams: Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
-  itcResults: Option[ItcService.AsterismResults] = None,
-  cfpInfo: Option[CfpInfo] = None,
+  pid:                Program.Id,
+  tpe:                ProgramType,
+  oid:                Observation.Id,
+  instrument:         Option[Instrument],
+  ra:                 Option[RightAscension],
+  dec:                Option[Declination],
+  role:               Option[CalibrationRole],
+  userState:          Option[ObservationWorkflowService.UserState],
+  declaredComplete:   Boolean,
+  proposalStatus:     Tag,
+  cfpid:              Option[CallForProposals.Id],
+  scienceBand:        Option[ScienceBand],
+  asterism:           List[Target],
+  generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
+  cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
 ) {
 
@@ -158,9 +170,9 @@ case class ObservationValidationInfo(
 }
 
 case class CfpInfo(
-  cfpid: CallForProposals.Id,
-  limits: CallCoordinatesLimits,
-  active: DateInterval,
+  cfpid:       CallForProposals.Id,
+  limits:      CallCoordinatesLimits,
+  active:      DateInterval,
   instruments: List[Instrument]
 ) {
 
@@ -201,6 +213,13 @@ object ObservationWorkflowService {
   extension (ws: ObservationWorkflowState) def isUserState: Boolean =
     ws.asUserState.isDefined
 
+  extension (es: CoreExecutionState) def workflowExecutionState: Option[ExecutionState] =
+    es match
+      case CoreExecutionState.Completed        => Completed.some
+      case CoreExecutionState.DeclaredComplete => Completed.some
+      case CoreExecutionState.Ongoing          => Ongoing.some
+      case _                                   => none
+
   extension [A,B,C](m: Map[A, Either[B, C]]) def separateValues: (Map[A, B], Map[A, C]) =
     m.foldLeft((Map.empty[A,B], Map.empty[A,C])):
       case ((ls, rs), (a, Left(b)))  => (ls + (a -> b), rs)
@@ -222,7 +241,9 @@ object ObservationWorkflowService {
       // Make the enums available in a stable and implicit way
       given Enums = enums
 
-      private def obsInfos(oids: List[Observation.Id], itcClient: ItcClient[F])(using Transaction[F], SuperUserAccess): ResultT[F, Map[Observation.Id, ObservationValidationInfo]] = {
+      private def lookupObsDefinitions(
+        oids: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationInfo]] = {
 
         def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] =
           val enc = observation_id.nel(oids)
@@ -282,34 +303,33 @@ object ObservationWorkflowService {
                   input.map: (oid, info) =>
                     oid -> info.copy(programAllocations = result.get(info.pid))
 
-        def addItcResults(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          itcService(itcClient)
-            .selectAll:
-              input
-                .view
-                .mapValues(_.generatorParams)
-                .collect:
-                  case (id, Some(Right(params))) => id -> params
-                .toMap
-            .map: results =>
-              input.map: (oid, info) =>
-                oid -> info.copy(itcResults = results.get(oid))
-
-        ResultT.liftF:
-          NonEmptyList.fromList(oids) match
-            case None => Map.empty.pure
-            case Some(nel) =>
-              partialObsInfos(nel)
-                .flatMap(addAsterisms)
-                .flatMap(addGeneratorParams)
-                .flatMap(addCfpInfos)
-                .flatMap(addProgramAllocations)
-                .flatMap(addItcResults)
-
+        NonEmptyList.fromList(oids) match
+          case None      =>
+            Map.empty.pure
+          case Some(nel) =>
+            partialObsInfos(nel)
+              .flatMap(addAsterisms)
+              .flatMap(addGeneratorParams)
+              .flatMap(addCfpInfos)
+              .flatMap(addProgramAllocations)
       }
 
-      private def validateConfigurations(infos: List[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-        ResultT(configurationService.selectRequests(infos.map(i => (i.pid, i.oid)))).map: rs =>
+      private def lookupCachedItcResults(
+        input:      Map[Observation.Id, ObservationValidationInfo],
+        itcClient:  ItcClient[F]
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ItcService.AsterismResults]] =
+        itcService(itcClient)
+          .selectAll:
+            input
+              .view
+              .mapValues(_.generatorParams)
+              .collect:
+                case (id, Some(Right(params))) => id -> params
+              .toMap
+
+
+      private def validateConfigurations(infos: NonEmptyList[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
+        ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
           rs.view
             .map:
               case ((_, oid), lst) =>
@@ -322,32 +342,35 @@ object ObservationWorkflowService {
                 }
             .toMap
 
+      // Computes the observation execution state if not cached
       private def executionStates(
-        infos: List[ObservationValidationInfo],
+        infos:      Map[Observation.Id, ObservationValidationInfo],
+        itcResults: Map[Observation.Id, ItcService.AsterismResults],
         commitHash: CommitHash,
-        itcClient: ItcClient[F],
-        ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
+        itcClient:  ItcClient[F],
+        ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]] =
         generator(commitHash, itcClient, ptc)
           .executionStates:
             infos
-              .flatMap: info =>
-                (info.itcResults, info.generatorParams.flatMap(_.toOption)).mapN: (itc, gps) =>
-                  info.oid -> (info.pid, itc, gps)
-              .toMap      
+              .toList
+              .flatMap: (oid, info) =>
+                (itcResults.get(oid), info.generatorParams.flatMap(_.toOption)).mapN: (itc, gps) =>
+                  oid -> (info.pid, itc, gps)
+              .toMap
           .map: result =>
             result
+              .view
+              .mapValues(_.workflowExecutionState)
               .collect[(Observation.Id, ExecutionState)]:
-                case (oid, ExecutionState.Ongoing) => oid -> Ongoing
-                case (oid, ExecutionState.Completed) => oid -> Completed
-                case (oid, ExecutionState.DeclaredComplete) => oid -> Completed
+                case (oid, Some(es)) => oid -> es
               .toMap
 
       // Compute the observation status, as well as a list of legal transitions,
       private def workflowStateAndTransitions(
-        info: ObservationValidationInfo,
+        info:           ObservationValidationInfo,
         executionState: Option[ExecutionState],
-        codes: List[ObservationValidationCode]
+        codes:          List[ObservationValidationCode]
       )(using Enums): Result[(ObservationWorkflowState, List[ObservationWorkflowState])] =
         info.isAccepted.map { isAccepted =>
 
@@ -406,13 +429,14 @@ object ObservationWorkflowService {
 
         }
 
-      private def observationValidationsImpl(
-        infos: Map[Observation.Id, ObservationValidationInfo],
+      private def validateObsDefinition(
+        infos:  Map[Observation.Id, ObservationValidationInfo],
+        hasItc: Observation.Id => Boolean
       )(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
 
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
-        val (cals, other) = infos.partition(_._2.role.isDefined)
+        val (cals, other)         = infos.partition(_._2.role.isDefined)
         val (nonScience, science) = other.partition(_._2.tpe =!= ProgramType.Science)
 
         // Here are our simple validators
@@ -444,9 +468,8 @@ object ObservationWorkflowService {
             else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
         val itcValidator: Validator = info =>
-          info.itcResults match
-            case Some(_) => ObservationValidationMap.empty
-            case None    => ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+          if hasItc(info.oid) then ObservationValidationMap.empty
+          else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
         // Here are our composed validators
 
@@ -488,21 +511,27 @@ object ObservationWorkflowService {
             info.isAccepted.toOption.forall(_ === true) && prelimV.get(info.oid).forall(_.isEmpty)
 
         val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-          validateConfigurations(toCheck)
+          NonEmptyList
+            .fromList(toCheck)
+            .fold(ResultT.pure(Map.empty[Observation.Id, ObservationValidationMap]))(validateConfigurations)
 
         configValidations.map(prelimV |+| _)
 
       }
 
-      private def getInfoAndValidations(
-        oids: List[Observation.Id],
-        itcClient: ItcClient[F]
-      )(using NoTransaction[F], SuperUserAccess): ResultT[F, Map[Observation.Id, (ObservationValidationInfo, ObservationValidationMap)]] =
-        services.transactionallyT:
-          for
-            infos <- obsInfos(oids, itcClient)
-            ress  <- observationValidationsImpl(infos)
-          yield (infos, ress).tupled
+      private def computeWorkflows(
+        infos: Map[Observation.Id, ObservationValidationInfo],
+        errs:  Map[Observation.Id, ObservationValidationMap],
+        execs: Map[Observation.Id, ExecutionState]
+      ): Result[Map[Observation.Id, ObservationWorkflow]] =
+        infos
+          .toList
+          .traverse: (oid, info) =>
+            val obsErrors = errs.get(oid).toList.flatMap(_.toList)
+            workflowStateAndTransitions(info, execs.get(oid), obsErrors.map(_.code))
+              .map: (s, ss) =>
+                 oid -> ObservationWorkflow(s, ss, obsErrors)
+          .map(_.toMap)
 
       override def getWorkflows(
         oids: List[Observation.Id],
@@ -510,21 +539,28 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
-        getInfoAndValidations(oids, itcClient)
-          .flatMap: map =>
-            val infos = map.values.map(_._1).toList
-            ResultT.liftF(executionStates(infos, commitHash, itcClient, ptc)).flatMap: exs =>
-              ResultT.fromResult:
-                map
-                  .toList
-                  .traverse:
-                    case (oid, (info, errMap)) =>
-                      val errs = errMap.toList
-                      workflowStateAndTransitions(info, exs.get(oid), errs.map(_.code))
-                        .map: (s, ss) =>
-                          oid -> ObservationWorkflow(s, ss, errs)
-                  .map(_.toMap)
-          .value
+
+        // Data obtained from the database, requiring a transaction.
+        val select: F[Result[(
+          Map[Observation.Id, ObservationValidationInfo],
+          Map[Observation.Id, ObservationValidationMap],
+          Map[Observation.Id, ItcService.AsterismResults]
+        )]] =
+          services.transactionally:
+            (
+              for
+                infos  <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
+                itcRes <- ResultT.liftF(lookupCachedItcResults(infos, itcClient)) // Map[Observation.Id, ItcService.AsterismResults]
+                errs   <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
+              yield (infos, errs, itcRes)
+            ).value
+
+        (for
+          (infos, errs, itcRes) <- ResultT(select)
+          errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
+          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, itcClient, ptc))
+          workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+        yield workflows).value
 
       override def getWorkflow(
         oid: Observation.Id,
@@ -537,6 +573,20 @@ object ObservationWorkflowService {
             map.get(oid) match
               case Some(wf) => Result(wf)
               case None     => OdbError.InvalidObservation(oid).asFailure
+
+      override def getCalculatedWorkflow(
+        oid:  Observation.Id,
+        itc:  Option[ItcService.AsterismResults],
+        exec: Option[CoreExecutionState]
+      )(using Transaction[F]): F[Result[ObservationWorkflow]] =
+        (for
+          infos <- ResultT.liftF(lookupObsDefinitions(List(oid)))
+          errs  <- validateObsDefinition(infos, _ => itc.isDefined)
+          wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
+          execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
+          wfs   <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+          res   <- ResultT.fromResult(Result.fromOption(wfs.get(oid), s"Invalid observation: $oid"))
+        yield res).value
 
       override def getWorkflows(
         pid: Program.Id,

@@ -162,13 +162,16 @@ object ConfigurationService {
       pids: List[Program.Id], 
       oids: List[Observation.Id]
     ): ResultT[F, (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
-      ResultT:
-        services.runGraphQLQuery(Queries.RequestsAndConfigurations(pids, oids)).map: r =>
-          r.flatMap: json =>            
-            import Queries.RequestsAndConfigurations.given
-            json.hcursor.as[Queries.RequestsAndConfigurations.Response] match
-              case Right(r)    => Result(r)
-              case Left(other) => Result.internalError(other.getMessage)
+      if pids.isEmpty && oids.isEmpty then
+        ResultT.pure((Map.empty[Program.Id, List[ConfigurationRequest]], Map.empty[(Program.Id, Observation.Id), Configuration]))
+      else
+        ResultT:
+          services.runGraphQLQuery(Queries.RequestsAndConfigurations(pids, oids)).map: r =>
+            r.flatMap: json =>
+              import Queries.RequestsAndConfigurations.given
+              json.hcursor.as[Queries.RequestsAndConfigurations.Response] match
+                case Right(r)    => Result(r)
+                case Left(other) => Result.internalError(other.getMessage)
 
     private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       ResultT.liftF:
@@ -217,13 +220,16 @@ object ConfigurationService {
     def queryRequestsAndObservations(
       rids: List[ConfigurationRequest.Id]
     ): ResultT[F, List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]] =
-      ResultT:
-        services.runGraphQLQuery(Queries.SelectRequestsAndObservations(rids)).map: r =>
-          r.flatMap: json =>
-            import Queries.SelectRequestsAndObservations.given
-            json.hcursor.as[Queries.SelectRequestsAndObservations.Response] match
-              case Right(r)    => Result(r)
-              case Left(other) => Result.internalError(other.getMessage)
+      if rids.isEmpty then
+        ResultT.pure(List.empty)
+      else
+        ResultT:
+          services.runGraphQLQuery(Queries.SelectRequestsAndObservations(rids)).map: r =>
+            r.flatMap: json =>
+              import Queries.SelectRequestsAndObservations.given
+              json.hcursor.as[Queries.SelectRequestsAndObservations.Response] match
+                case Right(r)    => Result(r)
+                case Left(other) => Result.internalError(other.getMessage)
 
     def selectObservations(rids: List[ConfigurationRequest.Id]): ResultT[F, Map[ConfigurationRequest.Id, List[Observation.Id]]] =
       queryRequestsAndObservations(rids.distinct).map: result =>         

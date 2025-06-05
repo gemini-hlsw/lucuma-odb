@@ -419,7 +419,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private lazy val serverFixture: Fixture[Server] =
     ResourceSuiteLocalFixture("server", server)
 
-  private lazy val sessionFixture: Fixture[Session[IO]] =
+  protected lazy val sessionFixture: Fixture[Session[IO]] =
     ResourceSuiteLocalFixture("session", session)
 
   override def munitFixtures = List(serverFixture, sessionFixture)
@@ -680,6 +680,33 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     Resource.eval(IO(sessionFixture())).use: s =>
       Enums.load(s).flatMap: e =>
         given services: Services[IO] = Services.forUser(u, e, None)(s)
+        requireServiceAccess:
+          f(services).map(Result.success)
+        .flatMap(_.get)
+
+  // Provides a `Services` instance for testing that includes enough of a GraphQL mapping
+  // to perform the observation workflow calculation (which uses the configuration service
+  // which in turn does a GraphQL call).
+  def withServicesForObscalc[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
+    import Trace.Implicits.noop
+
+    val res =
+      for
+        http <- JdkHttpClient.simple[IO]
+        sess <- Resource.eval(IO(sessionFixture()))
+      yield (http, sess)
+
+    res.use: (http, s) =>
+      Enums.load(s).flatMap: e =>
+        val mapping = OdbMapping.forObscalc(
+          Resource.pure(s),
+          SkunkMonitor.noopMonitor[IO],
+          u,
+          CommitHash.Zero,
+          e,
+          http
+        )
+        given services: Services[IO] = Services.forUser(u, e, mapping.some)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

@@ -52,6 +52,7 @@ import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
@@ -63,6 +64,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.string.*
+import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -96,16 +98,35 @@ trait DatabaseOperations { this: OdbSuite =>
   // Executes the obscalc update for an observation on demand.  In production,
   // this is handled by a background worker but for testing it is useful to
   // trigger an update on demand.
-  def runObscalcUpdateAs(user: User, pid: Program.Id, oid: Observation.Id): IO[Unit] =
-    withServices(user): services =>
+  def runObscalcUpdateAs(user: ServiceUser, pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    withServicesForObscalc(user): services =>
       TimeEstimateCalculatorImplementation
         .fromSession(services.session, services.enums)
         .flatMap: tec =>
           given Services[IO] = services
           requireServiceAccessOrThrow:
-            obscalcService(CommitHash.Zero, itcClient, tec)
-              .calculateAndUpdate(Obscalc.PendingCalc(pid, oid, Timestamp.Min))
+            val srv  = obscalcService(CommitHash.Zero, itcClient, tec)
+            val when =
+              services.transactionally:
+                srv
+                  .selectOne(oid)
+                  .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
+
+            when.flatMap: t =>
+              srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
       .void
+
+  def selectCalculationStates: IO[Map[Observation.Id, CalculationState]] =
+    withSession: session =>
+      val states: Query[Void, (Observation.Id, CalculationState)] = sql"""
+        SELECT
+          c_observation_id,
+          c_obscalc_state
+        FROM
+          t_obscalc
+      """.query(lucuma.odb.util.Codecs.observation_id *: lucuma.odb.util.Codecs.calculation_state)
+
+      session.execute(states).map(_.toMap)
 
   def createCallForProposalsAs(
      user:        User,
