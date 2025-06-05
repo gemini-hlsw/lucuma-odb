@@ -44,7 +44,6 @@ import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
-import lucuma.core.model.Target.Sidereal
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
