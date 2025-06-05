@@ -18,6 +18,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.RadialVelocity
+import lucuma.core.math.Region
 import lucuma.core.math.RightAscension
 import lucuma.core.model.CatalogInfo
 import lucuma.core.model.EphemerisKey
@@ -25,6 +26,7 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.Target.Nonsidereal
+import lucuma.core.model.Target.Opportunity
 import lucuma.core.model.Target.Sidereal
 
 object target {
@@ -38,6 +40,7 @@ object target {
     import radialvelocity.decoder.given
     import rightascension.decoder.given
     import sourceprofile.given
+    import region.decoder.given
 
     given Decoder[Coordinates] =
       Decoder.instance(c =>
@@ -78,10 +81,20 @@ object target {
         } yield Target.Nonsidereal(name, ephemerisKey, sourceProfile)
       )
 
+    given Decoder[Target.Opportunity] =
+      Decoder.instance(c =>
+        for {
+          name          <- c.downField("name").as[NonEmptyString]
+          region        <- c.downField("opportunity").downField("region").as[Region]
+          sourceProfile <- c.downField("sourceProfile").as[SourceProfile]
+        } yield Target.Opportunity(name, region, sourceProfile)
+      )
+
     given Decoder[Target] =
       List[Decoder[Target]](
         Decoder[Target.Sidereal].widen,
-        Decoder[Target.Nonsidereal].widen
+        Decoder[Target.Nonsidereal].widen,
+        Decoder[Target.Opportunity].widen,
       ).reduceLeft(_ or _)
   }
 
@@ -111,7 +124,7 @@ object target {
         )
       }
 
-    // This only encodes the part that goes under "sidereal" in the API
+    // This only encodes the part that goes under "nonsidereal" in the API
     val nonsiderealDefinitionEncoder: Encoder[Target.Nonsidereal] =
       Encoder.instance { n =>
         Json.obj(
@@ -121,7 +134,13 @@ object target {
         )
       }
 
-    protected def siderealOrNonJsonInternal(target: Target)(using
+    // This only encodes the part that goes under "opportunity" in the API
+    val opportunityDefinitionEncoder: Encoder[Target.Opportunity] =
+      import region.query.given
+      Encoder.instance: o =>
+        Json.obj("region" -> o.region.asJson)
+
+    protected def subtypeSlice(target: Target)(using
       Encoder[RightAscension],
       Encoder[Declination],
       Encoder[Epoch],
@@ -133,6 +152,7 @@ object target {
       target match
         case s @ Sidereal(_, _, _, _) => "sidereal"    -> s.asJson(siderealDefinitionEncoderInternal)
         case n @ Nonsidereal(_, _, _) => "nonsidereal" -> n.asJson(nonsiderealDefinitionEncoder)
+        case o @ Opportunity(_, _, _) => "opportunity" -> o.asJson(opportunityDefinitionEncoder)
 
     // NOTE: This does not include the id, existence and program that are part of the Target in the API
     protected def encoderTargetInternal(using
@@ -151,7 +171,8 @@ object target {
           "sourceProfile" -> t.sourceProfile.asJson,
           "sidereal"      -> Json.Null, // one of these will be replaced
           "nonsidereal"   -> Json.Null, // one of these will be replaced
-          siderealOrNonJsonInternal(t)
+          "opportunity"   -> Json.Null, // one of these will be replaced
+          subtypeSlice(t)
         )
       }
   }
@@ -164,7 +185,7 @@ object target {
 
     // Returns the JSON for either "sidereal" or "nonsidereal". 
     // ie. either ("sidereal", JSON) or ("nonsidereal", JSON)
-    def siderealOrNonJson(target: Target): (String, Json) = siderealOrNonJsonInternal(target)
+    def siderealOrNonJson(target: Target): (String, Json) = subtypeSlice(target)
 
     // NOTE: This does not include the id, existence and program that are part of the Target in the API
     given Encoder_Target: Encoder[Target] = encoderTargetInternal
@@ -181,7 +202,7 @@ object target {
 
     // Returns the JSON for either "sidereal" or "nonsidereal". 
     // ie. either ("sidereal", JSON) or ("nonsidereal", JSON)
-    def siderealOrNonJson(target: Target): (String, Json) = siderealOrNonJsonInternal(target)
+    def siderealOrNonJson(target: Target): (String, Json) = subtypeSlice(target)
 
     // NOTE: This does not include the id, existence and program that are part of the Target in the API
     given Encoder_Target: Encoder[Target] = encoderTargetInternal
