@@ -6,23 +6,23 @@ package lucuma.odb.graphql.mapping
 import grackle.Path
 import io.circe.syntax.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.table.ObscalcTable
+import lucuma.odb.graphql.table.ObscalcView
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends ObscalcTable[F] with VisitTable[F]:
+trait CategorizedTimeMapping[F[_]] extends ObscalcView[F] with VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
         categorizedTimeMappingAtPath(
-          CalculatedExecutionDigestType / "value" / "acquisition" / "timeEstimate",
+          ExecutionDigestType / "acquisition" / "timeEstimate",
           ObscalcTable.ObservationId,
           ObscalcTable.Digest.Acquisition.NonChargedTime,
           ObscalcTable.Digest.Acquisition.ProgramTime
         ),
 
         categorizedTimeMappingAtPath(
-          CalculatedExecutionDigestType / "value" / "science" / "timeEstimate",
+          ExecutionDigestType / "science" / "timeEstimate",
           ObscalcTable.ObservationId,
           ObscalcTable.Digest.Science.NonChargedTime,
           ObscalcTable.Digest.Science.ProgramTime

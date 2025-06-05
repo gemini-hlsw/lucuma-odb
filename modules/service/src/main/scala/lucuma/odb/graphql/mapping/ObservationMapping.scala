@@ -36,7 +36,7 @@ import skunk.Transaction
 
 import table.AttachmentTable
 import table.ObsAttachmentAssignmentTable
-import table.ObscalcTable
+import table.ObscalcView
 import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
@@ -47,7 +47,7 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with AttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
-     with ObscalcTable[F]
+     with ObscalcView[F]
      with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
