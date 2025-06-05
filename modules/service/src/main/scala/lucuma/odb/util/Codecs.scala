@@ -6,9 +6,7 @@ package lucuma.odb.util
 import cats.data.NonEmptyList
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegBigDecimal
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
@@ -647,25 +645,6 @@ trait Codecs {
     (angle_µas *: angle_µas).imap { (p, q) =>
       Offset(Offset.P(p), Offset.Q(q))
     }(o => (o.p.toAngle, o.q.toAngle))
-
-  val offset_array: Codec[List[Offset]] =
-     _int8.eimap { arr =>
-       val len = arr.size / 2
-       if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
-       else arr.reshape(len, 2).fold("Quite unexpectedly, cannot reshape offsets to an Nx2 array".asLeft[List[Offset]]): arr =>
-         Either.fromOption(
-           (0 until len).toList.traverse: index =>
-             (arr.get(index, 0), arr.get(index, 1)).mapN: (p, q) =>
-               Offset.signedMicroarcseconds.reverseGet((p, q))
-           ,
-           "Invalid offset array"
-         )
-     } { offsets =>
-       Arr
-         .fromFoldable(offsets.flatMap(o => Offset.signedMicroarcseconds.get(o).toList))
-         .reshape(offsets.size, 2)
-         .get
-     }
 
   val partner_link: Codec[PartnerLink] =
     (partner_link_type *: partner.opt).eimap { (l, p) =>

@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
@@ -43,7 +44,9 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
+import skunk.codec.numeric._int8
 import skunk.codec.numeric.int4
+import skunk.data.Arr
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
@@ -297,6 +300,27 @@ object ObscalcService:
 
     val setup_time: Codec[SetupTime] =
       (time_span *: time_span).to[SetupTime]
+
+    val offset_array: Codec[List[Offset]] =
+      _int8.eimap { arr =>
+        val len = arr.size / 2
+        if (arr.size % 2 =!= 0) "Expected an even number of offset coordinates".asLeft
+        else arr.reshape(len, 2).fold("Quite unexpectedly, cannot reshape offsets to an Nx2 array".asLeft[List[Offset]]) { arr =>
+          Either.fromOption(
+            (0 until len).toList.traverse { index =>
+              (arr.get(index, 0), arr.get(index, 1)).mapN { (p, q) =>
+                Offset.signedMicroarcseconds.reverseGet((p, q))
+              }
+            },
+            "Invalid offset array"
+          )
+        }
+      } { offsets =>
+        Arr
+          .fromFoldable(offsets.flatMap(o => Offset.signedMicroarcseconds.get(o).toList))
+          .reshape(offsets.size, 2)
+          .get
+      }
 
     val sequence_digest: Codec[SequenceDigest] =
       (obs_class *: categorized_time *: offset_array *: int4_nonneg *: execution_state).imap { case (oClass, pTime, offsets, aCount, execState) =>

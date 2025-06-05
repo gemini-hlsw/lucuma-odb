@@ -16,6 +16,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
@@ -77,7 +78,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         ss <- recordAndExecuteScienceStep(c, a, ditherNm, q).replicateA(stepCount)
       yield (a, (sa, da) :: (sf, df) :: ss)
 
-    val setup: IO[(Observation.Id, (Atom.Id, List[(Step.Id, Dataset.Id)]))] =
+    val setup: IO[(Program.Id, Observation.Id, (Atom.Id, List[(Step.Id, Dataset.Id)]))] =
       for
         p <- createProgram
         _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_NORTH }""")
@@ -89,67 +90,52 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         _ <- executeAtom(c, v,  5,  15, 3).void
         _ <- executeAtom(c, v, -5, -15, 3).void
         a <- executeAtom(c, v,  0,   0, 1)
-      yield (o, a)
+      yield (p, o, a)
 
     def currentStateQuery(o: Observation.Id): String = s"""
       query {
         observation(observationId: "$o") {
           execution {
             digest {
-              science {
-                timeEstimate {
-                  total { microseconds }
-                }
-              }
-            }
-          }
-          workflow { state }
-        }
-      }
-    """
-
-    def cacheItc(o: Observation.Id): IO[Unit] =
-      query(
-        user  = pi,
-        query = s"""
-          query {
-            observation(observationId: "$o") {
-              itc {
+              value {
                 science {
-                  selected {
-                    exposureTime { seconds }
+                  timeEstimate {
+                    total { microseconds }
                   }
                 }
               }
             }
           }
-        """
-      ).void
+          calculatedWorkflow { value { state } }
+        }
+      }
+    """
 
     // workflow state and remaining time (microseconds)
-    def currentState(o: Observation.Id): IO[(ObservationWorkflowState, Long)] =
+    def currentState(p: Program.Id, o: Observation.Id): IO[(ObservationWorkflowState, Long)] =
+      runObscalcUpdate(p, o) *>
       query(
-        user = pi,
+        user  = pi,
         query = currentStateQuery(o)
       ).flatMap: json =>
         val c = json.hcursor.downField("observation")
         (for
-          s <- c.downFields("workflow", "state").as[ObservationWorkflowState]
-          t <- c.downFields("execution", "digest", "science", "timeEstimate", "total", "microseconds").as[Long]
+          s <- c.downFields("calculatedWorkflow", "value", "state").as[ObservationWorkflowState]
+          t <- c.downFields("execution", "digest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
         yield (s, t)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
     val result =
       for
         // Execute the observation completely and ask for the current state
         init      <- setup
-        obs        = init._1
-        _         <- cacheItc(obs) // required for workflow computation
-        completed <- currentState(obs)
+        prog       = init._1
+        obs        = init._2
+        completed <- currentState(prog, obs)
 
         // Now mark a dataset failed and ask for the state again
-        dataset    = init._2._2.map(_._2).last  // last science dataset
+        dataset    = init._3._2.map(_._2).last  // last science dataset
         _         <- setQaState(dataset, DatasetQaState.Fail)
-        ongoing   <- currentState(obs)
+        ongoing   <- currentState(prog, obs)
       yield (completed, ongoing)
 
     assertIOBoolean(
