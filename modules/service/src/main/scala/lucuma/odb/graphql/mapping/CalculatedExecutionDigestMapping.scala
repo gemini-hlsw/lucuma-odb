@@ -13,14 +13,14 @@ trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcView[F]:
 
   private lazy val SetupTimeMapping: TypeMapping =
     ObjectMapping(SetupTimeType)(
-      SqlField("synthetic_id", ObscalcTable.Digest.Id, hidden = true, key = true),
+      SqlField("synthetic_id", ObscalcView.Digest.Id, hidden = true, key = true),
       SqlObject("full"),
       SqlObject("reacquisition")
     )
 
   private def sequenceDigestMapping(
     fieldName: String,
-    cols:      ObscalcTable.Digest.SequenceDigest
+    cols:      ObscalcView.Digest.SequenceDigest
   ): TypeMapping =
     ObjectMapping(ExecutionDigestType / fieldName)(
       SqlField("synthetic_id", cols.Id, hidden = true, key = true),
@@ -42,14 +42,14 @@ trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcView[F]:
     )
 
   private lazy val AcquisitionSequenceDigestMapping: TypeMapping =
-    sequenceDigestMapping("acquisition", ObscalcTable.Digest.Acquisition)
+    sequenceDigestMapping("acquisition", ObscalcView.Digest.Acquisition)
 
   private lazy val ScienceSequenceDigestMapping: TypeMapping =
-    sequenceDigestMapping("science", ObscalcTable.Digest.Science)
+    sequenceDigestMapping("science", ObscalcView.Digest.Science)
 
   private lazy val ExecutionDigestMapping: TypeMapping =
     ObjectMapping(ExecutionDigestType)(
-      SqlField("synthetic_id",     ObscalcTable.Digest.Id, hidden = true, key = true),
+      SqlField("synthetic_id",     ObscalcView.Digest.Id, hidden = true, key = true),
       SqlObject("setup"),
       SqlObject("acquisition"),
       SqlObject("science")
@@ -57,8 +57,8 @@ trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcView[F]:
 
   private lazy val CalculatedExecutionDigestMapping: TypeMapping =
     ObjectMapping(CalculatedExecutionDigestType)(
-      SqlField("synthetic_id",     ObscalcTable.ObservationId, hidden = true, key = true),
-      SqlField("state",            ObscalcTable.CalculationState),
+      SqlField("synthetic_id",     ObscalcView.ObservationId, hidden = true, key = true),
+      SqlField("state",            ObscalcView.CalculationState),
       SqlObject("value")
     )
 

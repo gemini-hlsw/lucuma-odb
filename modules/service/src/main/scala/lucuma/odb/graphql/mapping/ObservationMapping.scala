@@ -87,7 +87,7 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       EffectField("workflow", workflowQueryHandler, List("id", "programId")),
-      SqlObject("calculatedWorkflow", Join(ObservationView.Id, ObscalcTable.ObservationId))
+      SqlObject("calculatedWorkflow", Join(ObservationView.Id, ObscalcView.ObservationId))
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

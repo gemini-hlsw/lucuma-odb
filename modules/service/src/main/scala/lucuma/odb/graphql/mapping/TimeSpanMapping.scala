@@ -68,12 +68,12 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId),
-      timeSpanMappingAtPath(SetupTimeType / "full", ObscalcTable.Digest.FullSetupTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(SetupTimeType / "reacquisition", ObscalcTable.Digest.ReacqSetupTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Acquisition.NonChargedTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "program", ObscalcTable.Digest.Acquisition.ProgramTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Science.NonChargedTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "program", ObscalcTable.Digest.Science.ProgramTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(SetupTimeType / "full", ObscalcView.Digest.FullSetupTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(SetupTimeType / "reacquisition", ObscalcView.Digest.ReacqSetupTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "nonCharged", ObscalcView.Digest.Acquisition.NonChargedTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "program", ObscalcView.Digest.Acquisition.ProgramTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "nonCharged", ObscalcView.Digest.Science.NonChargedTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "program", ObscalcView.Digest.Science.ProgramTime)(ObscalcView.ObservationId),
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =
