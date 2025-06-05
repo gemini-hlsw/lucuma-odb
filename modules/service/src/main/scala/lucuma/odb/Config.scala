@@ -62,7 +62,10 @@ case class Config(
   // People also send us their API keys. We need to be able to exchange them for [longer-lived] JWTs
   // via an API call to SSO, so we need an HTTP client for that.
   def httpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
-    EmberClientBuilder.default[F].withTimeout(httpClient.timeout).build
+    EmberClientBuilder.default[F]
+      .withTimeout(httpClient.timeout)
+      .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
+      .build
 
   // ITC client resource
   def itcClient[F[_]: Async: Logger: Network]: Resource[F, ItcClient[F]] =
@@ -242,13 +245,19 @@ object Config:
         EmailAddress.from(s).toOption
 
   case class HttpClient(
-    timeout: Duration
-  )
+    timeout: Duration,
+    idleConnectionTime: Duration
+  ):
+    val effectiveIdleConnectionTime: Duration =
+      if idleConnectionTime > timeout
+        then idleConnectionTime
+        else timeout.plus(1.second)
 
   object HttpClient:
     lazy val fromCiris: ConfigValue[Effect, HttpClient] = (
-      envOrProp("HTTP_CLIENT_TIMEOUT").as[Duration].default(45.seconds) // 45s is Ember's default
-    ).map(HttpClient.apply)
+      envOrProp("HTTP_CLIENT_TIMEOUT").as[Duration].default(45.seconds), // 45s is Ember's default
+      envOrProp("HTTP_CLIENT_IDLE_CONNECTION_TIME").as[Duration].default(60.seconds) // 60s is Ember's default
+    ).parMapN(HttpClient.apply)
 
   private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key"): s =>
