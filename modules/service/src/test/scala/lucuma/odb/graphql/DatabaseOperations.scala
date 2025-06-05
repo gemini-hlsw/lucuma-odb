@@ -72,6 +72,7 @@ import lucuma.odb.FMain
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Obscalc
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.json.offset.transport.given
@@ -2042,5 +2043,276 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def computeItcResultAs(user: User, oid: Observation.Id): IO[Unit] =
     query(user, itcQuery(oid)).void
+
+  def createFastTurnaroundProposal(
+    user: User,
+    pid: Program.Id,
+    reviewerId: Option[String] = None,
+    mentorId: Option[String] = None
+  ): IO[Unit] = {
+    val reviewerField = reviewerId.foldMap(id => s"""reviewerId: "$id"""")
+    val mentorField = mentorId.foldMap(id => s"""mentorId: "$id"""")
+    val additionalFields = List(reviewerField, mentorField).filter(_.nonEmpty).mkString("\n")
+    
+    val query = s"""
+      mutation {
+        createProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              category: COSMOLOGY
+              type: {
+                fastTurnaround: {
+                  toOActivation: NONE
+                  minPercentTime: 50
+                  piAffiliation: US
+                  $additionalFields
+                }
+              }
+            }
+          }
+        ) {
+          proposal {
+            category
+            type {
+              scienceSubtype
+              ... on FastTurnaround {
+                toOActivation
+                minPercentTime
+                piAffiliation
+                reviewer {
+                  id
+                  role
+                }
+                mentor {
+                  id
+                  role
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expectedReviewer: Json = reviewerId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
+    val expectedMentor: Json = mentorId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
+    
+    expect(
+      user = user,
+      query = query,
+      expected = json"""
+        {
+          "createProposal": {
+            "proposal": {
+              "category": "COSMOLOGY",
+              "type": {
+                "scienceSubtype": "FAST_TURNAROUND",
+                "toOActivation": "NONE",
+                "minPercentTime": 50,
+                "piAffiliation": "US",
+                "reviewer": $expectedReviewer,
+                "mentor": $expectedMentor
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  def createFastTurnaroundProposalError(
+    user: User,
+    pid: Program.Id,
+    userId: String
+  ): IO[Unit] = {
+    val query = s"""
+      mutation {
+        createProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              category: COSMOLOGY
+              type: {
+                fastTurnaround: {
+                  toOActivation: NONE
+                  minPercentTime: 50
+                  piAffiliation: US
+                  reviewerId: "$userId"
+                  mentorId: "$userId"
+                }
+              }
+            }
+          }
+        ) {
+          proposal {
+            category
+          }
+        }
+      }
+    """
+
+    expectOdbError(
+      user = user,
+      query = query,
+      expected = {
+        case OdbError.InvalidArgument(Some("The same user cannot be both reviewer and mentor on a proposal")) => // expected
+      }
+    )
+  }
+
+  def createFastTurnaroundProposalForUpdate(
+    user: User,
+    pid: Program.Id,
+    reviewerId: Option[String] = None,
+    mentorId: Option[String] = None
+  ): IO[Unit] = {
+    val reviewerField = reviewerId.foldMap(id => s"""reviewerId: "$id"""")
+    val mentorField = mentorId.foldMap(id => s"""mentorId: "$id"""")
+    val additionalFields = List(reviewerField, mentorField).filter(_.nonEmpty).mkString("\n")
+    
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createProposal(
+            input: {
+              programId: "$pid"
+              SET: {
+                category: COSMOLOGY
+                type: {
+                  fastTurnaround: {
+                    toOActivation: NONE
+                    minPercentTime: 50
+                    piAffiliation: US
+                    $additionalFields
+                  }
+                }
+              }
+            }
+          ) {
+            proposal {
+              category
+            }
+          }
+        }
+      """
+    ).void
+  }
+
+  def updateFastTurnaroundProposal(
+    user: User,
+    pid: Program.Id,
+    reviewerId: Option[String] = None,
+    mentorId: Option[String] = None
+  ): IO[Unit] = {
+    val reviewerField = reviewerId match {
+      case Some(id) => s"""reviewerId: "$id""""
+      case None => "reviewerId: null"
+    }
+    val mentorField = mentorId match {
+      case Some(id) => s"""mentorId: "$id""""
+      case None => "mentorId: null"
+    }
+    
+    val query = s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              type: {
+                fastTurnaround: {
+                  $reviewerField
+                  $mentorField
+                }
+              }
+            }
+          }
+        ) {
+          proposal {
+            type {
+              scienceSubtype
+              ... on FastTurnaround {
+                toOActivation
+                minPercentTime
+                piAffiliation
+                reviewer {
+                  id
+                  role
+                }
+                mentor {
+                  id
+                  role
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expectedReviewer: Json = reviewerId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
+    val expectedMentor: Json = mentorId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
+    
+    expect(
+      user = user,
+      query = query,
+      expected = json"""
+        {
+          "updateProposal": {
+            "proposal": {
+              "type": {
+                "scienceSubtype": "FAST_TURNAROUND",
+                "toOActivation": "NONE",
+                "minPercentTime": 50,
+                "piAffiliation": "US",
+                "reviewer": $expectedReviewer,
+                "mentor": $expectedMentor
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+  }
+
+  def updateFastTurnaroundProposalError(
+    user: User,
+    pid: Program.Id,
+    userId: String
+  ): IO[Unit] = {
+    val query = s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: {
+              type: {
+                fastTurnaround: {
+                  reviewerId: "$userId"
+                  mentorId: "$userId"
+                }
+              }
+            }
+          }
+        ) {
+          proposal {
+            type {
+              scienceSubtype
+            }
+          }
+        }
+      }
+    """
+
+    expectOdbError(
+      user = user,
+      query = query,
+      expected = {
+        case OdbError.InvalidArgument(Some("The same user cannot be both reviewer and mentor on a proposal")) => // expected
+      }
+    )
+  }
 
 }

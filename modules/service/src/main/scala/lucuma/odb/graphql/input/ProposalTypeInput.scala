@@ -157,14 +157,14 @@ object ProposalTypeInput {
           PartnerBinding.Option("piAffiliation", rPartner),
           ProgramUserIdBinding.Option("reviewerId", rReviewerId),
           ProgramUserIdBinding.Option("mentorId", rMentorId)
-        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewerId, mentorId) =>
+        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewer, mentor) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for {
               _ <- tooActivation  := too
               _ <- minPercentTime := min
               _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
-              _ <- Create.reviewerId := reviewerId
-              _ <- Create.mentorId := mentorId
+              _ <- reviewerId     := reviewer
+              _ <- mentorId       := mentor
             } yield ()
           )
         }
