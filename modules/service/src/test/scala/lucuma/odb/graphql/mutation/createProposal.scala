@@ -1395,4 +1395,190 @@ class createProposal extends OdbSuite with DatabaseOperations  {
     }
   }
 
+  test("✓ fast turnaround with reviewer and mentor") {
+    for {
+      pid        <- createProgramAs(pi, "My Fast Turnaround Proposal")
+      // Add a COI who will be the reviewer
+      reviewerId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      // Add another COI who will be the mentor
+      mentorId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _          <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "$reviewerId"
+                      mentorId: "$mentorId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    toOActivation
+                    minPercentTime
+                    piAffiliation
+                    reviewer {
+                      id
+                      role
+                    }
+                    mentor {
+                      id
+                      role
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          Json.obj(
+            "createProposal" -> Json.obj(
+              "proposal" -> Json.obj(
+                "category" -> Json.fromString("COSMOLOGY"),
+                "type" -> Json.obj(
+                  "scienceSubtype" -> Json.fromString("FAST_TURNAROUND"),
+                  "toOActivation" -> Json.fromString("NONE"),
+                  "minPercentTime" -> Json.fromInt(50),
+                  "piAffiliation" -> Json.fromString("US"),
+                  "reviewer" -> Json.obj(
+                    "id" -> Json.fromString(reviewerId.toString),
+                    "role" -> Json.fromString("COI")
+                  ),
+                  "mentor" -> Json.obj(
+                    "id" -> Json.fromString(mentorId.toString),
+                    "role" -> Json.fromString("COI")
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    } yield ()
+  }
+
+  test("⨯ fast turnaround with same user as reviewer and mentor") {
+    for {
+      pid    <- createProgramAs(pi, "My Fast Turnaround Proposal")
+      // Add a COI who will be both reviewer and mentor (should fail)
+      puId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _      <- expectOdbError(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "$puId"
+                      mentorId: "$puId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+              }
+            }
+          }
+        """,
+        expected = {
+          case OdbError.InvalidArgument(Some("The same user cannot be both reviewer and mentor on a proposal")) => // expected
+        }
+      )
+    } yield ()
+  }
+
+  test("✓ fast turnaround with only mentor") {
+    for {
+      pid      <- createProgramAs(pi, "My Fast Turnaround Proposal")
+      // Add a COI who will be the mentor only
+      mentorId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _        <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      mentorId: "$mentorId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    toOActivation
+                    minPercentTime
+                    piAffiliation
+                    reviewer {
+                      id
+                    }
+                    mentor {
+                      id
+                      role
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          Json.obj(
+            "createProposal" -> Json.obj(
+              "proposal" -> Json.obj(
+                "category" -> Json.fromString("COSMOLOGY"),
+                "type" -> Json.obj(
+                  "scienceSubtype" -> Json.fromString("FAST_TURNAROUND"),
+                  "toOActivation" -> Json.fromString("NONE"),
+                  "minPercentTime" -> Json.fromInt(50),
+                  "piAffiliation" -> Json.fromString("US"),
+                  "reviewer" -> Json.Null,
+                  "mentor" -> Json.obj(
+                    "id" -> Json.fromString(mentorId.toString),
+                    "role" -> Json.fromString("COI")
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    } yield ()
+  }
+
 }

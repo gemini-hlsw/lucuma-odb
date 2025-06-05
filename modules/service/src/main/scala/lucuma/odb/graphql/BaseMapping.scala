@@ -143,7 +143,6 @@ trait BaseMapping[F[_]]
   lazy val FilterTypeMetaType                      = schema.ref("FilterTypeMeta")
   lazy val FilterTypeType                          = schema.ref("FilterType")
   lazy val FocalPlaneType                          = schema.ref("FocalPlane")
-  lazy val FTSupportRoleType                       = schema.ref("FTSupportRole")
   lazy val GcalArcType                             = schema.ref("GcalArc")
   lazy val GcalContinuumType                       = schema.ref("GcalContinuum")
   lazy val GcalDiffuserType                        = schema.ref("GcalDiffuser")

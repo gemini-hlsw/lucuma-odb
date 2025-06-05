@@ -7,7 +7,6 @@ package input
 
 import cats.syntax.all.*
 import lucuma.core.enums.EducationalStatus
-import lucuma.core.enums.FTSupportRole
 import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
 import lucuma.odb.data.Nullable
@@ -21,8 +20,7 @@ case class ProgramUserPropertiesInput(
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
-  hasDataAccess:     Option[Boolean],
-  ftSupportRole:     Nullable[FTSupportRole]
+  hasDataAccess:     Option[Boolean]
 )
 
 object ProgramUserPropertiesInput:
@@ -34,8 +32,7 @@ object ProgramUserPropertiesInput:
       Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
-      none,
-      Nullable.Absent
+      none
     )
 
   val partnerLink: Lens[ProgramUserPropertiesInput, Option[PartnerLink]] =

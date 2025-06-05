@@ -10,11 +10,9 @@ import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
 import grackle.Query.Binding
-import grackle.Query.Filter
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
-import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.Type
@@ -102,7 +100,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate),
       SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)),
-      SqlObject("mentor",         Join(ProposalView.FastTurnaround.Id, ProgramUserTable.ProgramId))
+      SqlObject("mentor",         Join(ProposalView.FastTurnaround.MentorId, ProgramUserTable.ProgramUserId))
     )
 
   lazy val LargeProgramMapping: ObjectMapping =
@@ -150,11 +148,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (ClassicalType, "partnerSplits", Nil) => SortSplits
     case (QueueType,     "partnerSplits", Nil) => SortSplits
-
-    case (FastTurnaroundType, "mentor", Nil) =>
-      Elab.transformChild { child =>
-        Unique(Filter(Predicates.programUser.isMentor, child))
-      }
   }
 
 }

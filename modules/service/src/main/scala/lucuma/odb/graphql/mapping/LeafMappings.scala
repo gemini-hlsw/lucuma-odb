@@ -113,7 +113,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Flamingos2ReadoutMode](Flamingos2ReadoutModeType),
       LeafMapping[Flamingos2Reads](Flamingos2ReadsType),
       LeafMapping[FocalPlane](FocalPlaneType),
-      LeafMapping[FTSupportRole](FTSupportRoleType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),
       LeafMapping[GcalContinuum](GcalContinuumType),

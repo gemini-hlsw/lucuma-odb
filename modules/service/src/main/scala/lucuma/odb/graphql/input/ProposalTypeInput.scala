@@ -71,7 +71,8 @@ object ProposalTypeInput {
     minPercentTotal: Option[IntPercent]       = none,
     totalTime:       Option[TimeSpan]         = none,
     partnerSplits:   Map[Partner, IntPercent] = Map.empty,
-    reviewerId:      Option[ProgramUser.Id]   = none
+    reviewerId:      Option[ProgramUser.Id]   = none,
+    mentorId:        Option[ProgramUser.Id]   = none
   ) {
 
     def asEdit: Edit =
@@ -82,7 +83,8 @@ object ProposalTypeInput {
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
         Nullable.NonNull(partnerSplits),
-        Nullable.orNull(reviewerId)
+        Nullable.orNull(reviewerId),
+        Nullable.orNull(mentorId)
       )
 
     def update(s: State[Create, Unit]): Create =
@@ -109,6 +111,7 @@ object ProposalTypeInput {
     val totalTime: Lens[Create, Option[TimeSpan]]         = Focus[Create](_.totalTime)
     val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
     val reviewerId: Lens[Create, Option[ProgramUser.Id]]  = Focus[Create](_.reviewerId)
+    val mentorId: Lens[Create, Option[ProgramUser.Id]]    = Focus[Create](_.mentorId)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap {
@@ -152,14 +155,16 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerBinding.Option("piAffiliation", rPartner),
-          ProgramUserIdBinding.Option("reviewerId", rReviewerId)
-        ) => (rToo, rMin, rPartner, rReviewerId).parMapN { (too, min, partner, reviewerId) =>
+          ProgramUserIdBinding.Option("reviewerId", rReviewerId),
+          ProgramUserIdBinding.Option("mentorId", rMentorId)
+        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewerId, mentorId) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for {
               _ <- tooActivation  := too
               _ <- minPercentTime := min
               _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
               _ <- Create.reviewerId := reviewerId
+              _ <- Create.mentorId := mentorId
             } yield ()
           )
         }
@@ -231,7 +236,8 @@ object ProposalTypeInput {
     minPercentTotal: Nullable[IntPercent]               = Nullable.Null,
     totalTime:       Nullable[TimeSpan]                 = Nullable.Null,
     partnerSplits:   Nullable[Map[Partner, IntPercent]] = Nullable.Null,
-    reviewerId:      Nullable[ProgramUser.Id]           = Nullable.Null
+    reviewerId:      Nullable[ProgramUser.Id]           = Nullable.Null,
+    mentorId:        Nullable[ProgramUser.Id]           = Nullable.Null
   ) {
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update {
@@ -242,6 +248,7 @@ object ProposalTypeInput {
           _ <- Create.totalTime       := totalTime.toOptionOption
           _ <- Create.partnerSplits   := partnerSplits.toOption
           _ <- Create.reviewerId      := reviewerId.toOptionOption
+          _ <- Create.mentorId        := mentorId.toOptionOption
         } yield ()
       }
   }
@@ -280,9 +287,10 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerBinding.Nullable("piAffiliation", rPartner),
-          ProgramUserIdBinding.Nullable("reviewerId", rReviewerId)
-        ) => (rToo, rMin, rPartner, rReviewerId).parMapN { (too, min, partner, reviewerId) =>
-          Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)), reviewerId = reviewerId)
+          ProgramUserIdBinding.Nullable("reviewerId", rReviewerId),
+          ProgramUserIdBinding.Nullable("mentorId", rMentorId)
+        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewerId, mentorId) =>
+          Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)), reviewerId = reviewerId, mentorId = mentorId)
         }
       }
 
