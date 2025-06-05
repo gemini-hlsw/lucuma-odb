@@ -4,17 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
-import grackle.Path
-import lucuma.odb.graphql.table.ObscalcTable
+import io.circe.syntax.*
+import lucuma.core.math.Offset
+import lucuma.odb.graphql.table.ObscalcView
+import lucuma.odb.json.offset.query.given
 
-trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcTable[F]:
-
-  private lazy val DigestPath: Path =
-    CalculatedExecutionDigestType / "value"
+trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcView[F]:
 
   private lazy val SetupTimeMapping: TypeMapping =
-    ObjectMapping(DigestPath / "setup")(
-      SqlField("synthetic_id", ObscalcTable.ObservationId, hidden = true, key = true),
+    ObjectMapping(SetupTimeType)(
+      SqlField("synthetic_id", ObscalcTable.Digest.Id, hidden = true, key = true),
       SqlObject("full"),
       SqlObject("reacquisition")
     )
@@ -23,11 +22,21 @@ trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcTable[F]:
     fieldName: String,
     cols:      ObscalcTable.Digest.SequenceDigest
   ): TypeMapping =
-    ObjectMapping(DigestPath / fieldName)(
-      SqlField("synthetic_id", ObscalcTable.ObservationId, hidden = true, key = true),
+    ObjectMapping(ExecutionDigestType / fieldName)(
+      SqlField("synthetic_id", cols.Id, hidden = true, key = true),
       SqlField("observeClass", cols.ObsClass),
       SqlObject("timeEstimate"),
-      SqlField("offsets", cols.Offsets),
+      SqlField("_offsets", cols.Offsets, hidden = true),
+      CursorFieldJson("offsets", c =>
+        c.fieldAs[List[Long]]("_offsets")
+         .map: os =>
+           os.sliding(2, 2)
+             .collect:
+               case List(p, q) => Offset.signedMicroarcseconds.reverseGet((p, q))
+             .toList
+         .map(_.asJson),
+        List("_offsets")
+      ),
       SqlField("atomCount", cols.AtomCount),
       SqlField("executionState", cols.ExecutionState)
     )
@@ -39,8 +48,8 @@ trait CalculatedExecutionDigestMapping[F[_]] extends ObscalcTable[F]:
     sequenceDigestMapping("science", ObscalcTable.Digest.Science)
 
   private lazy val ExecutionDigestMapping: TypeMapping =
-    ObjectMapping(DigestPath)(
-      SqlField("synthetic_id",     ObscalcTable.ObservationId, hidden = true, key = true),
+    ObjectMapping(ExecutionDigestType)(
+      SqlField("synthetic_id",     ObscalcTable.Digest.Id, hidden = true, key = true),
       SqlObject("setup"),
       SqlObject("acquisition"),
       SqlObject("science")

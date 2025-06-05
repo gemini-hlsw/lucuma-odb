@@ -11,7 +11,7 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
-import lucuma.odb.graphql.table.ObscalcTable
+import lucuma.odb.graphql.table.ObscalcView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalView
@@ -26,7 +26,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
                                with ProgramTable[F]
                                with ProposalView[F]
-                               with ObscalcTable[F]
+                               with ObscalcView[F]
                                with ObservationView[F]
                                with GroupView[F]
                                with StepRecordView[F]
@@ -68,12 +68,12 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "setup" / "full", ObscalcTable.Digest.FullSetupTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "setup" / "reacquisition", ObscalcTable.Digest.ReacqSetupTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "acquisition" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Acquisition.NonChargedTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "acquisition" / "timeEstimate" / "program", ObscalcTable.Digest.Acquisition.ProgramTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "science" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Science.NonChargedTime)(ObscalcTable.ObservationId),
-      timeSpanMappingAtPath(CalculatedExecutionDigestType / "value" / "science" / "timeEstimate" / "program", ObscalcTable.Digest.Science.ProgramTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(SetupTimeType / "full", ObscalcTable.Digest.FullSetupTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(SetupTimeType / "reacquisition", ObscalcTable.Digest.ReacqSetupTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Acquisition.NonChargedTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "program", ObscalcTable.Digest.Acquisition.ProgramTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "nonCharged", ObscalcTable.Digest.Science.NonChargedTime)(ObscalcTable.ObservationId),
+      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "program", ObscalcTable.Digest.Science.ProgramTime)(ObscalcTable.ObservationId),
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =

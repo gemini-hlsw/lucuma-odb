@@ -6702,12 +6702,8 @@ scalar EpochString
 type Execution {
   """
   Calculations dependent on the sequence, such as planned time and offsets.
-  If a sequence cannot be generated for this observation, `null` is returned
-  along with warning messages.
   """
-  digest: ExecutionDigest
-
-  calculatedDigest: CalculatedExecutionDigest
+  digest: CalculatedExecutionDigest
 
   """
   Full execution config, including acquisition and science sequences.  If a
@@ -6857,6 +6853,7 @@ enum Existence {
 
 "Summarizes the execution setup time and sequences."
 type ExecutionDigest {
+
   "Setup time calculations."
   setup: SetupTime!
 
@@ -6865,6 +6862,7 @@ type ExecutionDigest {
 
   "Science sequence summary."
   science: SequenceDigest
+
 }
 
 """
@@ -6876,7 +6874,7 @@ type CalculatedExecutionDigest {
   state: CalculationState!
 
   "The current execution digest itself."
-  value: ExecutionDigest!
+  value: ExecutionDigest
 }
 
 """

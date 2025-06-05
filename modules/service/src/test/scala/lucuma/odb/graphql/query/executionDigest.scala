@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package query
 
-import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -95,22 +94,25 @@ class executionDigest extends ExecutionTestSupportForGmos {
         observation(observationId: "$oid") {
           execution {
             digest {
-              setup {
-                full { seconds }
-                reacquisition { seconds }
-              }
-              science {
-                observeClass
-                timeEstimate {
-                  program { seconds }
-                  nonCharged { seconds }
-                  total { seconds }
+              state
+              value {
+                setup {
+                  full { seconds }
+                  reacquisition { seconds }
                 }
-                offsets {
-                  p { arcseconds }
-                  q { arcseconds }
+                science {
+                  observeClass
+                  timeEstimate {
+                    program { seconds }
+                    nonCharged { seconds }
+                    total { seconds }
+                  }
+                  offsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                  atomCount
                 }
-                atomCount
               }
             }
           }
@@ -124,54 +126,57 @@ class executionDigest extends ExecutionTestSupportForGmos {
         "observation": {
           "execution": {
             "digest": {
-              "setup" : {
-                "full" : {
-                  "seconds" : 960.000000
+              "state": "READY",
+              "value": {
+                "setup" : {
+                  "full" : {
+                    "seconds" : 960.000000
+                  },
+                  "reacquisition" : {
+                    "seconds" : 300.000000
+                  }
                 },
-                "reacquisition" : {
-                  "seconds" : 300.000000
+                "science" : {
+                  "observeClass" : "SCIENCE",
+                  "timeEstimate" : {
+                    "program" : {
+                      "seconds" : ${ProgramTime.asJson}
+                    },
+                    "nonCharged" : {
+                      "seconds" : 0.000000
+                    },
+                    "total" : {
+                      "seconds" : ${ProgramTime.asJson}
+                    }
+                  },
+                  "offsets" : [
+                    {
+                      "p" : {
+                        "arcseconds" : 0.000000
+                      },
+                      "q" : {
+                        "arcseconds" : -15.000000
+                      }
+                    },
+                    {
+                      "p" : {
+                        "arcseconds" : 0.000000
+                      },
+                      "q" : {
+                        "arcseconds" : 0.000000
+                      }
+                    },
+                    {
+                      "p" : {
+                        "arcseconds" : 0.000000
+                      },
+                      "q" : {
+                        "arcseconds" : 15.000000
+                      }
+                    }
+                  ],
+                  "atomCount": 4
                 }
-              },
-              "science" : {
-                "observeClass" : "SCIENCE",
-                "timeEstimate" : {
-                  "program" : {
-                    "seconds" : ${ProgramTime.asJson}
-                  },
-                  "nonCharged" : {
-                    "seconds" : 0.000000
-                  },
-                  "total" : {
-                    "seconds" : ${ProgramTime.asJson}
-                  }
-                },
-                "offsets" : [
-                  {
-                    "p" : {
-                      "arcseconds" : 0.000000
-                    },
-                    "q" : {
-                      "arcseconds" : -15.000000
-                    }
-                  },
-                  {
-                    "p" : {
-                      "arcseconds" : 0.000000
-                    },
-                    "q" : {
-                      "arcseconds" : 0.000000
-                    }
-                  },
-                  {
-                    "p" : {
-                      "arcseconds" : 0.000000
-                    },
-                    "q" : {
-                      "arcseconds" : 15.000000
-                    }
-                  }
-                ],
-                "atomCount": 4
               }
             }
           }
@@ -179,66 +184,93 @@ class executionDigest extends ExecutionTestSupportForGmos {
       }
     """
 
-  test("digest - point band normalized") {
+  test("digest - pending"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
-    setup.flatMap { oid =>
+      yield o
+
+    setup.flatMap: oid =>
       expect(
         user  = pi,
         query = digestQuery(oid),
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "digest": {
+                  "state": "PENDING",
+                  "value": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("digest - point band normalized"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = digestQuery(oid),
         expected = successDigestResult.asRight
       )
-    }
-  }
 
-  test("digest - point emission lines") {
+  test("digest - point emission lines"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p, PointEmissionLinesProfile)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
-    setup.flatMap { oid =>
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query = digestQuery(oid),
+        user     = pi,
+        query    = digestQuery(oid),
         expected = successDigestResult.asRight
       )
-    }
-  }
 
-  test("digest - uniform emission lines") {
+  test("digest - uniform emission lines"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p, UniformEmissionLinesProfile)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
-    setup.flatMap { oid =>
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query = digestQuery(oid),
+        user     = pi,
+        query    = digestQuery(oid),
         expected = successDigestResult.asRight
       )
-    }
-  }
 
-  test("digest: deleted target") {
+  test("digest: deleted target"):
 
     val setup: IO[(Program.Id, Observation.Id)] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- deleteTargetAs(pi, t)
-      } yield (p, o)
+        _ <- runObscalcUpdate(p, o)
+      yield (p, o)
 
-    setup.flatMap { (pid, oid) =>
-      expectIor(
+    setup.flatMap: (pid, oid) =>
+      expect(
         user  = pi,
         query =
           s"""
@@ -249,8 +281,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         setup {
-                           full { seconds }
+                         value {
+                           setup {
+                             full { seconds }
+                           }
                          }
                        }
                      }
@@ -259,8 +293,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected = Ior.both(
-          List(s"Could not generate a sequence for $oid: observation is missing target"),
+        expected =
           json"""
             {
               "program": {
@@ -269,30 +302,30 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid,
                       "execution": {
-                        "digest": null
+                        "digest": {
+                          "value": null
+                        }
                       }
                     }
                   ]
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
-    }
-  }
 
-  test("digest: one bad") {
+  test("digest: one bad"):
 
     val setup: IO[(Program.Id, Observation.Id)] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)
-      } yield (p, o)
+        _ <- runObscalcUpdate(p, o)
+      yield (p, o)
 
-    setup.flatMap { (pid, oid) =>
-      expectIor(
+    setup.flatMap: (pid, oid) =>
+      expect(
         user  = pi,
         query =
           s"""
@@ -303,8 +336,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         setup {
-                           full { seconds }
+                         value {
+                           setup {
+                             full { seconds }
+                           }
                          }
                        }
                      }
@@ -313,8 +348,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected = Ior.both(
-          List(s"Could not generate a sequence for $oid: observation is missing observing mode"),
+        expected =
           json"""
             {
               "program": {
@@ -323,31 +357,32 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid,
                       "execution": {
-                        "digest": null
+                        "digest": {
+                          "value": null
+                        }
                       }
                     }
                   ]
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
-    }
-  }
 
-  test("digest: one good, one bad") {
+  test("digest: one good, one bad"):
 
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         o1 <- createObservationWithNoModeAs(pi, p, t)
-      } yield (p, o0, o1)
+        _ <- runObscalcUpdate(p, o0)
+        _ <- runObscalcUpdate(p, o1)
+      yield (p, o0, o1)
 
-    setup.flatMap { (pid, oid0, oid1) =>
-      expectIor(
+    setup.flatMap: (pid, oid0, oid1) =>
+      expect(
         user  = pi,
         query =
           s"""
@@ -358,8 +393,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         setup {
-                           full { seconds }
+                         value {
+                           setup {
+                             full { seconds }
+                           }
                          }
                        }
                      }
@@ -368,8 +405,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected = Ior.both(
-          List(s"Could not generate a sequence for $oid1: observation is missing observing mode"),
+        expected =
           json"""
             {
               "program": {
@@ -379,9 +415,11 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       "id": $oid0,
                       "execution": {
                         "digest": {
-                          "setup" : {
-                            "full" : {
-                              "seconds" : 960.000000
+                          "value": {
+                            "setup" : {
+                              "full" : {
+                                "seconds" : 960.000000
+                              }
                             }
                           }
                         }
@@ -390,31 +428,32 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "digest": null
+                        "digest": {
+                          "value": null
+                        }
                       }
                     }
                   ]
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
-    }
-  }
 
-  test("digest: one bad, one good") {
+  test("digest: one bad, one good"):
 
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o0 <- createObservationWithNoModeAs(pi, p, t)
         o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield (p, o0, o1)
+        _ <- runObscalcUpdate(p, o0)
+        _ <- runObscalcUpdate(p, o1)
+      yield (p, o0, o1)
 
-    setup.flatMap { (pid, oid0, oid1) =>
-      expectIor(
+    setup.flatMap: (pid, oid0, oid1) =>
+      expect(
         user  = pi,
         query =
           s"""
@@ -425,8 +464,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
                      id
                      execution {
                        digest {
-                         setup {
-                           full { seconds }
+                         value {
+                           setup {
+                             full { seconds }
+                           }
                          }
                        }
                      }
@@ -435,8 +476,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected = Ior.both(
-          List(s"Could not generate a sequence for $oid0: observation is missing observing mode"),
+        expected =
           json"""
             {
               "program": {
@@ -445,16 +485,20 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "digest": null
+                        "digest": {
+                          "value": null
+                        }
                       }
                     },
                     {
                       "id": $oid1,
                       "execution": {
                         "digest": {
-                          "setup" : {
-                            "full" : {
-                              "seconds" : 960.000000
+                          "value": {
+                            "setup" : {
+                              "full" : {
+                                "seconds" : 960.000000
+                              }
                             }
                           }
                         }
@@ -464,47 +508,41 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
-    }
-  }
 
-  test("clear execution digest") {
+  test("clear execution digest"):
 
-    val setup: IO[(Program.Id, Observation.Id, Step.Id)] = {
+    val setup: IO[(Program.Id, Observation.Id, Step.Id)] =
       import lucuma.odb.json.all.transport.given
 
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v)
         s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled))
-      } yield (p, o, s)
-    }
+      yield (p, o, s)
 
-    val isEmpty = setup.flatMap { case (p, o, s) =>
-      withServices(pi) { services =>
-        services.session.transaction.use { xa =>
-          for {
-            _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-            _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
-            d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
-          } yield d.isEmpty
-        }
-      }
-    }
+    val isEmpty = setup.flatMap:
+      case (p, o, s) =>
+        withServices(pi): services =>
+          services.session.transaction.use: xa =>
+            for
+              _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+              d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
+            yield d.isEmpty
 
     assertIOBoolean(isEmpty, "The execution digest should be removed")
-  }
+
 
   def executionStateQuery(oid: Observation.Id): String =
     s"""
       query {
         observation(observationId: "$oid") {
-          execution { digest { science { executionState } } }
+          execution { digest { value { science { executionState } } } }
         }
       }
     """
@@ -515,8 +553,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
         "observation": {
           "execution": {
             "digest": {
-              "science" : {
-                "executionState": ${e.tag.toScreamingSnakeCase}
+              "value": {
+                "science" : {
+                  "executionState": ${e.tag.toScreamingSnakeCase}
+                }
               }
             }
           }
@@ -532,6 +572,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       yield o
 
     setup.flatMap: oid =>
@@ -551,6 +592,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         // We now need to record at least a single step to count as ONGOING
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         _ <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
+        _ <- runObscalcUpdate(p, o)
       yield o
 
     setup.flatMap: oid =>
@@ -576,6 +618,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s2)
         _  <- computeItcResultAs(pi, o)
         _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
+        _ <- runObscalcUpdate(p, o)
       yield o
 
     setup.flatMap: oid =>
@@ -602,6 +645,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s2)
         _  <- computeItcResultAs(pi, o)
         _  <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Completed)
+        _ <- runObscalcUpdate(p, o)
       yield (p, o)
 
     setup.flatMap: (_, oid) =>
@@ -614,29 +658,32 @@ class executionDigest extends ExecutionTestSupportForGmos {
               "observation": {
                 "execution": {
                   "digest": {
-                    "setup" : {
-                      "full" : {
-                        "seconds" : 0.000000
-                      },
-                      "reacquisition" : {
-                        "seconds" : 0.000000
-                      }
-                    },
-                    "science" : {
-                      "observeClass" : "DAY_CAL",
-                      "timeEstimate" : {
-                        "program" : {
+                    "state": "READY",
+                    "value": {
+                      "setup" : {
+                        "full" : {
                           "seconds" : 0.000000
                         },
-                        "nonCharged" : {
-                          "seconds" : 0.000000
-                        },
-                        "total" : {
+                        "reacquisition" : {
                           "seconds" : 0.000000
                         }
                       },
-                      "offsets" : [],
-                      "atomCount": 0
+                      "science" : {
+                        "observeClass" : "DAY_CAL",
+                        "timeEstimate" : {
+                          "program" : {
+                            "seconds" : 0.000000
+                          },
+                          "nonCharged" : {
+                            "seconds" : 0.000000
+                          },
+                          "total" : {
+                            "seconds" : 0.000000
+                          }
+                        },
+                        "offsets" : [],
+                        "atomCount": 0
+                      }
                     }
                   }
                 }
@@ -646,14 +693,14 @@ class executionDigest extends ExecutionTestSupportForGmos {
         )
 
   test("executionState - COMPLETED"):
-    def atom(v: Visit.Id, ditherNm: Int, q: Int): IO[Unit] =
+    def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
         c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(c)
         f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
         _ <- addEndStepEvent(f)
-        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(3)
+        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(n)
         _ <- s.traverse(addEndStepEvent)
       yield ()
 
@@ -663,10 +710,11 @@ class executionDigest extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _ <- atom(v,  0,   0)
-        _ <- atom(v,  5,  15)
-        _ <- atom(v, -5, -15)
-        _ <- atom(v,  0,   0)
+        _ <- atom(v,  0,   0, 3)
+        _ <- atom(v,  5,  15, 3)
+        _ <- atom(v, -5, -15, 3)
+        _ <- atom(v,  0,   0, 1)
+        _ <- runObscalcUpdate(p, o)
       yield o
 
     setup.flatMap: oid =>
