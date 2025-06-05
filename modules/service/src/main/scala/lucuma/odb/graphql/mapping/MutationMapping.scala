@@ -139,10 +139,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   def services: Resource[F, Services[F]]
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
-  val httpClient: Client[F]
-  val itcClient: ItcClient[F]
+  def httpClient: Client[F]
+  def itcClient: ItcClient[F]
   def emailConfig: Config.Email
-  val commitHash: CommitHash
+  def commitHash: CommitHash
 
   // Convenience for constructing a SqlRoot and corresponding 1-arg elaborator.
   private trait MutationField {
