@@ -1292,7 +1292,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ fast turnaround returns null reviewer and mentor by default") {
-    createProgramAs(pi, "A Fast Turnaround Proposal").flatMap { pid =>
+    createProgramAs(pi, "Fast Turnaround Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""

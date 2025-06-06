@@ -296,6 +296,8 @@ object ProposalService {
               error.creationFailed(input.programId).asFailure
             case SqlState.CheckViolation(e) if e.constraintName == Some("chk_reviewer_mentor_different") =>
               OdbError.InvalidArgument("The same user cannot be both reviewer and mentor on a proposal".some).asFailure
+            case SqlState.RaiseException(ex) =>
+              OdbError.InvalidArgument(ex.message.some).asFailure
           })
 
         val insertSplits: ResultT[F, Unit] =
@@ -351,6 +353,8 @@ object ProposalService {
               .recover {
                 case SqlState.CheckViolation(e) if e.constraintName == Some("chk_reviewer_mentor_different") =>
                   OdbError.InvalidArgument("The same user cannot be both reviewer and mentor on a proposal".some).asFailure
+                case SqlState.RaiseException(ex) =>
+                  OdbError.InvalidArgument(ex.message.some).asFailure
               }
           })
 
