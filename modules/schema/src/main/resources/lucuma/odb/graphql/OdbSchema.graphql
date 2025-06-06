@@ -1464,12 +1464,12 @@ type GmosCcdMode {
   """
   GMOS X-binning
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   GMOS Y-binning
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   GMOS Amp Count
@@ -8090,13 +8090,13 @@ type GmosNorthLongSlit {
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   Default GMOS X-Binning, calculated from the effective slit size which in
   turn is based on the selected FPU, target source profile and image quality.
   """
-  defaultXBin: GmosXBinning!
+  defaultXBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS X-Binning. If set it overrides the
@@ -8108,12 +8108,12 @@ type GmosNorthLongSlit {
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   Default GMOS Y-Binning (TWO).
   """
-  defaultYBin: GmosYBinning!
+  defaultYBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
@@ -8574,13 +8574,13 @@ type GmosSouthLongSlit {
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   Default GMOS X-Binning, calculated from the effective slit size which in
   turn is based on the selected FPU, target source profile and image quality.
   """
-  defaultXBin: GmosXBinning!
+  defaultXBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS X-Binning. If set it overrides the
@@ -8592,12 +8592,12 @@ type GmosSouthLongSlit {
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   Default GMOS Y-Binning (TWO).
   """
-  defaultYBin: GmosYBinning!
+  defaultYBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
@@ -8712,46 +8712,6 @@ type GmosSouthLongSlit {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
-}
-
-"""
-GMOS X Binning
-"""
-enum GmosXBinning {
-  """
-  GmosXBinning One
-  """
-  ONE
-
-  """
-  GmosXBinning Two
-  """
-  TWO
-
-  """
-  GmosXBinning Four
-  """
-  FOUR
-}
-
-"""
-GMOS Y Binning
-"""
-enum GmosYBinning {
-  """
-  GmosYBinning One
-  """
-  ONE
-
-  """
-  GmosYBinning Two
-  """
-  TWO
-
-  """
-  GmosYBinning Four
-  """
-  FOUR
 }
 
 """
