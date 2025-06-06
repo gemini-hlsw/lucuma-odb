@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -46,7 +47,6 @@ import skunk.codec.numeric.int4
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.core.enums.GmosBinning
 
 trait SmartGcalService[F[_]] {
 
