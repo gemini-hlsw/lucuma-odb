@@ -1494,12 +1494,12 @@ input GmosCcdModeInput {
   """
   X Binning, defaults to 'ONE'.
   """
-  xBin: GmosXBinning
+  xBin: GmosBinning
 
   """
   Y Binning, defaults to 'ONE'.
   """
-  yBin: GmosYBinning
+  yBin: GmosBinning
 
   """
   Amp Count, defaults to 'TWELVE'.
@@ -2008,12 +2008,12 @@ input GmosNorthLongSlitInput {
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2403,12 +2403,12 @@ input GmosSouthLongSlitInput {
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8102,7 +8102,7 @@ type GmosNorthLongSlit {
   Optional explicitly specified GMOS X-Binning. If set it overrides the
   default.
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
@@ -8119,7 +8119,7 @@ type GmosNorthLongSlit {
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
   default.
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -8586,7 +8586,7 @@ type GmosSouthLongSlit {
   Optional explicitly specified GMOS X-Binning. If set it overrides the
   default.
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
@@ -8603,7 +8603,7 @@ type GmosSouthLongSlit {
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
   default.
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -8750,6 +8750,26 @@ enum GmosYBinning {
 
   """
   GmosYBinning Four
+  """
+  FOUR
+}
+
+"""
+GMOS Binning (used for both X and Y axes)
+"""
+enum GmosBinning {
+  """
+  GmosBinning One
+  """
+  ONE
+
+  """
+  GmosBinning Two
+  """
+  TWO
+
+  """
+  GmosBinning Four
   """
   FOUR
 }

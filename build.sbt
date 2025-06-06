@@ -17,8 +17,8 @@ val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.0"
-val lucumaItcVersion           = "0.36.0"
-val lucumaCoreVersion          = "0.132.0"
+val lucumaItcVersion           = "0.36.0-1-ad7b987-20250606T175910Z-SNAPSHOT"
+val lucumaCoreVersion          = "0.132.0-2-18f46a9-20250606T175529Z-SNAPSHOT"
 val lucumaGraphQLRoutesVersion = "0.9.0"
 val lucumaSsoVersion           = "0.8.18"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
@@ -40,6 +40,8 @@ ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
+
+useReadableConsoleGit
 
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(

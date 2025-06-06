@@ -19,8 +19,8 @@ object GmosCcdModeInput {
   val Binding: Matcher[GmosCcdMode] =
     ObjectFieldsBinding.rmap {
       case List(
-        GmosXBinningBinding.Option("xBin", rXBin),
-        GmosYBinningBinding.Option("yBin", rYBin),
+        GmosBinningBinding.ToX.Option("xBin", rXBin),
+        GmosBinningBinding.ToY.Option("yBin", rYBin),
         GmosAmpCountBinding.Option("ampCount", rAmpCount),
         GmosAmpGainBinding.Option("ampGain", rAmpGain),
         GmosAmpReadModeBinding.Option("ampReadMode", rAmpReadMode)
