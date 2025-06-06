@@ -49,8 +49,8 @@ object SmartGmosLoader {
       k.grating         ,
       k.filter          ,
       k.fpu             ,
-      k.xBin.value            ,
-      k.yBin.value            ,
+      k.xBin.value      ,
+      k.yBin.value      ,
       k.wavelengthRange ,
       k.order           ,
       k.gain
