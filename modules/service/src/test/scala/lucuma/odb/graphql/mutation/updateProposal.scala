@@ -15,6 +15,7 @@ import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.util.DateInterval
+import lucuma.odb.data.OdbError
 
 import java.time.LocalDate
 import java.time.Month
@@ -942,6 +943,39 @@ class updateProposal extends OdbSuite with DatabaseOperations {
       puId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
       _      <- createFastTurnaroundProposalForUpdate(pi, pid)
       _      <- updateFastTurnaroundProposalError(pi, pid, puId.toString)
+    } yield ()
+  }
+
+  test("⨯ fast turnaround cannot update to reviewer from different program") {
+    for {
+      pid1       <- createProgramAs(pi, "p1")
+      pid2       <- createProgramAs(pi, "p2")
+      reviewerId <- addProgramUserAs(pi, pid2, role = ProgramUserRole.Coi) // reviewer in different program
+      _          <- createFastTurnaroundProposalForUpdate(pi, pid1)
+      _          <- expectOdbError(
+                      user = pi,
+                      query = s"""
+                        mutation {
+                          updateProposal(
+                            input: {
+                              programId: "$pid1"
+                              SET: {
+                                type: {
+                                  fastTurnaround: {
+                                    reviewerId: "$reviewerId"
+                                  }
+                                }
+                              }
+                            }
+                          ) {
+                            proposal { category }
+                          }
+                        }
+                      """,
+                      expected = {
+                        case OdbError.InvalidArgument(Some("Reviewer must belong to the same program as the proposal.")) => // expected
+                      }
+                    )
     } yield ()
   }
 

@@ -9,6 +9,41 @@ ALTER TABLE t_proposal
 ADD CONSTRAINT chk_reviewer_mentor_different
 CHECK (c_reviewer_id IS NULL OR c_mentor_id IS NULL OR c_reviewer_id != c_mentor_id);
 
+-- Function to validate reviewer/mentor belong to the same program
+CREATE OR REPLACE FUNCTION validate_ft_roles_same_program()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Check reviewer belongs to same program if set
+  IF NEW.c_reviewer_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM t_program_user
+      WHERE c_program_user_id = NEW.c_reviewer_id
+      AND c_program_id = NEW.c_program_id
+    ) THEN
+      RAISE EXCEPTION 'Reviewer must belong to the same program as the proposal';
+    END IF;
+  END IF;
+
+  -- Check mentor belongs to same program if set
+  IF NEW.c_mentor_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM t_program_user
+      WHERE c_program_user_id = NEW.c_mentor_id
+      AND c_program_id = NEW.c_program_id
+    ) THEN
+      RAISE EXCEPTION 'Mentor must belong to the same program as the proposal';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to validate reviewer/mentor on insert or update
+CREATE TRIGGER validate_ft_roles_trigger
+BEFORE INSERT OR UPDATE OF c_reviewer_id, c_mentor_id, c_program_id ON t_proposal
+FOR EACH ROW EXECUTE FUNCTION validate_ft_roles_same_program();
+
 DROP VIEW v_proposal;
 CREATE VIEW v_proposal AS
   SELECT
