@@ -44,7 +44,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Nullable
@@ -204,9 +203,6 @@ object ObservationService {
 
   def instantiate[F[_]: Concurrent: Trace](using Services[F]): ObservationService[F] =
     new ObservationService[F] {
-
-      // A stable identifier (ie. a `val`) is needed for the enums.
-      val enumsVal = enums
 
       val resolver = new IdResolver("observation", Statements.selectOid, _.label)
 

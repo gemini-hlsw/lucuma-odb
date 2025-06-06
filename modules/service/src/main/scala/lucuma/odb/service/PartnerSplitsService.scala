@@ -10,7 +10,6 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import skunk.*
 import skunk.syntax.all.*
 
@@ -30,7 +29,7 @@ object PartnerSplitsService {
    * Construct a `PartnerSplitsService` using the specified `Session`. This service is intended for
   * indirect use by `ProposalService`.
    */
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): PartnerSplitsService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): PartnerSplitsService[F] =
     new PartnerSplitsService[F] {
 
       def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
@@ -44,6 +43,7 @@ object PartnerSplitsService {
           _ <- insertSplits(splits, pid)
         } yield ()
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def deleteSplits(pid: Program.Id)(using Transaction[F]): F[Unit] =
         session.prepareR(Statements.DeleteSplits).use(_.execute(pid)).void
 

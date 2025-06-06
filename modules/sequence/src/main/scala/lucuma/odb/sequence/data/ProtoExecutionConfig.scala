@@ -3,7 +3,6 @@
 
 package lucuma.odb.sequence.data
 
-import cats.syntax.apply.*
 import fs2.Pure
 import fs2.Stream
 

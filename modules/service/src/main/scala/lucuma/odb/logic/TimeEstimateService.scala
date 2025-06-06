@@ -90,7 +90,7 @@ object TimeEstimateService:
 
       // CategorizedTime Ordering that sorts longest to shortest.
       val longestToShortest: Ordering[CategorizedTime] =
-        catsKernelOrderingForOrder(Order.reverse(Order[CategorizedTime]))
+        catsKernelOrderingForOrder(using Order.reverse(Order[CategorizedTime]))
 
       def combine(
         minRequired: Int,
@@ -103,12 +103,11 @@ object TimeEstimateService:
               // Combines the first minRequired elements after sorting by ascending min CategorizedTime
               children.map(_.value.min).sorted.take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero),
               // Combines the first minRequired elements after sorting by descending max CategorizedTime
-              children.map(_.value.max).sorted(longestToShortest).take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero)
+              children.map(_.value.max).sorted(using longestToShortest).take(minRequired).combineAllOption.getOrElse(CategorizedTime.Zero)
             )
           )
 
       def leafRange(
-        pid: Program.Id,
         oid: Observation.Id,
         m:   Map[Observation.Id, CalculatedValue[CategorizedTime]]
       ): Option[CalculatedValue[CategorizedTimeRange]] =
@@ -135,7 +134,7 @@ object TimeEstimateService:
         m:    Map[Observation.Id, CalculatedValue[CategorizedTime]]
       ): Option[CalculatedValue[CategorizedTimeRange]] =
         root match
-          case GroupTree.Leaf(oid)                                  => leafRange(pid, oid, m)
+          case GroupTree.Leaf(oid)                                  => leafRange(oid, m)
           case GroupTree.Branch(_, min, _, children, _, _, _, _, _) => parentRange(pid, min, children, m)
           case GroupTree.Root(_, children)                          => parentRange(pid, None, children, m)
 

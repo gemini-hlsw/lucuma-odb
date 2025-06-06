@@ -26,7 +26,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   object updateConfigurationRequestAs {
 
-    def query(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): String =
+    def query(rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): String =
       s"""
         mutation {
           updateConfigurationRequests(input: {
@@ -49,7 +49,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
     def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): IO[Unit] =
       expect(
         user = user,
-        query = query(user, rid, status, justification),
+        query = query(rid, status, justification),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {
@@ -95,7 +95,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
     setup.flatMap: rid =>
       expect(
         user = pi2,
-        query = updateConfigurationRequestAs.query(pi2, rid, ConfigurationRequestStatus.Withdrawn),
+        query = updateConfigurationRequestAs.query(rid, ConfigurationRequestStatus.Withdrawn),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {

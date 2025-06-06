@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.parallel.*
 import lucuma.core.model.ProgramReference
 import lucuma.odb.graphql.binding.DescriptionBinding
 import lucuma.odb.graphql.binding.Matcher

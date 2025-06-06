@@ -31,7 +31,6 @@ import natchez.TraceValue
 import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
-import org.http4s.Request
 import org.http4s.Response
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl

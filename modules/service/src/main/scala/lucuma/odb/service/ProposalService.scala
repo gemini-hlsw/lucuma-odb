@@ -17,7 +17,6 @@ import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
@@ -34,7 +33,6 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Completion.Delete
@@ -154,7 +152,7 @@ object ProposalService {
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): ProposalService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): ProposalService[F] =
     new ProposalService[F] {
 
       import error.*
@@ -334,7 +332,7 @@ object ProposalService {
         def updateProgram(pid: Program.Id, before: ProposalContext, after: ProposalContext): ResultT[F, Unit] =
           ResultT.liftF(before.updateProgram(pid, after.scienceSubtype, after.semester, after.proprietary.some))
 
-        def handleTypeChange(pid: Program.Id, before: ProposalContext): ProposalPropertiesInput.Edit =
+        def handleTypeChange(before: ProposalContext): ProposalPropertiesInput.Edit =
           input.SET.typeʹ.filterNot(c => before.scienceSubtype.exists(_ === c.scienceSubtype)).fold(input.SET) { call =>
             input.SET.copy(typeʹ = call.asCreate.asEdit.some)
           }
@@ -363,7 +361,7 @@ object ProposalService {
           _      <- checkUserAccess(pid, after)
           _      <- ResultT.fromResult(after.status.flatMap(s => after.validateSubmission(pid, s)))
           _      <- ResultT.liftF(deferConstraints)
-          set     = handleTypeChange(pid, before)
+          set     = handleTypeChange(before)
           _      <- updateProposal(pid, set)
           _      <- updateProgram(pid, before, after)
           _      <- updateSplits(pid, set)

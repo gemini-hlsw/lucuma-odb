@@ -10,7 +10,6 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.User
 
 class datasets extends OdbSuite with DatasetSetupOperations {
 

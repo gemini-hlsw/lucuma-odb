@@ -34,7 +34,6 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
 
   def assertObservation(
     user:        User,
-    pid:         Program.Id,
     oid:         Observation.Id,
     attachments: (Attachment.Id, TestAttachment)*
   ): IO[Unit] =
@@ -230,7 +229,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask).toAttachmentId
       oid <- createObservation(pi, pid, (aid, mosMask))
-      _   <- assertObservation(pi, pid, oid, (aid, mosMask))
+      _   <- assertObservation(pi, oid, (aid, mosMask))
     } yield ()
   }
 
@@ -240,7 +239,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid1 <- insertAttachment(pi, pid, mosMask).toAttachmentId
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid  <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
-      _    <- assertObservation(pi, pid, oid, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid, (aid1, mosMask), (aid2, finder))
     } yield ()
   }
 
@@ -251,8 +250,8 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
       oid2 <- createObservation(pi, pid, (aid2, finder))
-      _    <- assertObservation(pi, pid, oid1, (aid1, mosMask), (aid2, finder))
-      _    <- assertObservation(pi, pid, oid2, (aid2, finder))
+      _    <- assertObservation(pi, oid1, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid2, (aid2, finder))
     } yield ()
   }
 
@@ -260,7 +259,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
     for {
       pid <- createProgramAs(pi)
       oid <- createObservation(pi, pid)
-      _   <- assertObservation(pi, pid, oid)
+      _   <- assertObservation(pi, oid)
     } yield ()
   }
 
@@ -289,7 +288,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask).toAttachmentId
       oid <- createObservation(pi, pid, (aid, mosMask))
-      _   <- assertObservation(pi, pid, oid, (aid, mosMask))
+      _   <- assertObservation(pi, oid, (aid, mosMask))
       _   <- updateObservation(pi, oid, UpdateInput.Null)
     } yield ()
   }
@@ -299,7 +298,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask).toAttachmentId
       oid <- createObservation(pi, pid, (aid, mosMask))
-      _   <- assertObservation(pi, pid, oid, (aid, mosMask))
+      _   <- assertObservation(pi, oid, (aid, mosMask))
       _   <- updateObservation(pi, oid, updateEmpty)
     } yield ()
   }
@@ -342,9 +341,9 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid1 <- insertAttachment(pi, pid, mosMask).toAttachmentId
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid  <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
-      _    <- assertObservation(pi, pid, oid, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid, (aid1, mosMask), (aid2, finder))
       _    <- deleteAttachment(pi, aid1).expectOk
-      _    <- assertObservation(pi, pid, oid, (aid2, finder))
+      _    <- assertObservation(pi, oid, (aid2, finder))
     } yield ()
   }
 
@@ -355,8 +354,8 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
       oid2 <- createObservation(pi, pid, (aid2, finder))
-      _    <- assertObservation(pi, pid, oid1, (aid1, mosMask), (aid2, finder))
-      _    <- assertObservation(pi, pid, oid2, (aid2, finder))
+      _    <- assertObservation(pi, oid1, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid2, (aid2, finder))
       _    <- deleteObservation(pi, oid1)
     } yield ()
   }
@@ -367,9 +366,9 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid1 <- insertAttachment(pi, pid, mosMask).toAttachmentId
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, mosMask), (aid2, finder))
-      _    <- assertObservation(pi, pid, oid1, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid1, (aid1, mosMask), (aid2, finder))
       oid2 <- cloneObservationAs(pi, oid1)
-      _    <- assertObservation(pi, pid, oid2, (aid1, mosMask), (aid2, finder))
+      _    <- assertObservation(pi, oid2, (aid1, mosMask), (aid2, finder))
     } yield ()
   }
 
@@ -379,9 +378,9 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid1 <- insertAttachment(pi, pid, mosMask).toAttachmentId
       aid2 <- insertAttachment(pi, pid, finder).toAttachmentId
       oid1 <- createObservation(pi, pid, (aid1, mosMask))
-      _    <- assertObservation(pi, pid, oid1, (aid1, mosMask))
+      _    <- assertObservation(pi, oid1, (aid1, mosMask))
       oid2 <- cloneObservationWithAttachments(pi, oid1, aid2)
-      _    <- assertObservation(pi, pid, oid2, (aid2, finder))
+      _    <- assertObservation(pi, oid2, (aid2, finder))
     } yield ()
   }
 
@@ -410,7 +409,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       aid  <- insertAttachment(pi, pid1, mosMask).toAttachmentId
       pid2 <- createProgramAs(pi)
       oid  <- createObservationAs(pi, pid2)
-      _    <- assertObservation(pi, pid2, oid)
+      _    <- assertObservation(pi, oid)
       _    <- cloneObservationWithAttachmentsWithError(pi, oid, ObsAttachmentAssignmentService.ForeignKeyViolationMessage(pid2, NonEmptyList.one(aid)), aid)
     } yield ()
   }
@@ -437,7 +436,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, customSed).toAttachmentId
       oid <- createObservationAs(pi, pid)
-      _   <- assertObservation(pi, pid, oid)
+      _   <- assertObservation(pi, oid)
       _   <- cloneObservationWithAttachmentsWithError(pi, oid, ObsAttachmentAssignmentService.NonObservationAttachmentMessage(NonEmptyList.one(aid)), aid)
     } yield ()
   }

@@ -14,7 +14,6 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.StandardRole
-import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.service.Services

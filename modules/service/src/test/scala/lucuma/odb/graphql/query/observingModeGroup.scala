@@ -40,8 +40,8 @@ class observingModeGroup extends OdbSuite:
     fpu:      String = "LONG_SLIT_0_25",
     xbin:     Option[GmosXBinning] = None,
     ybin:     Option[GmosYBinning] = None,
-    iq:       ImageQuality.Preset = ImageQuality.Preset.TwoPointZero,
-    asterism: List[Target.Id] = Nil
+    iq:       ImageQuality.Preset,
+    asterism: List[Target.Id]
   ): IO[Observation.Id] =
     query(
       user  = user,

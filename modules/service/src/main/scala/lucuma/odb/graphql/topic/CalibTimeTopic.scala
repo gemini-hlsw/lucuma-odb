@@ -44,7 +44,7 @@ object CalibTimeTopic {
       }
     }
 
-  def elements[F[_]: Concurrent: Logger](
+  def elements[F[_]: Logger](
     s:         Session[F],
     maxQueued: Int,
   ): Stream[F, Element] =

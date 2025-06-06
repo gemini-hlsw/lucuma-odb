@@ -63,7 +63,7 @@ trait StepConfigCodec:
         s <- c.downField("shutter").as[GcalShutter]
       yield StepConfig.Gcal(l, f, d, s)
 
-  given (using Encoder[Offset]): Encoder[StepConfig.Gcal] =
+  given Encoder[StepConfig.Gcal] =
     Encoder.instance: a =>
       given_Encoder_Lamp(a.lamp).mapObject { jo =>
         jo.add("filter",    a.filter.asJson)
@@ -75,7 +75,7 @@ trait StepConfigCodec:
     Decoder.instance: c =>
       c.downField("smartGcalType").as[SmartGcalType].map(StepConfig.SmartGcal.apply)
 
-  given (using Encoder[Offset]): Encoder[StepConfig.SmartGcal] =
+  given Encoder[StepConfig.SmartGcal] =
     Encoder.instance: a =>
       Json.obj(
         "smartGcalType" -> a.smartGcalType.asJson
@@ -91,7 +91,7 @@ trait StepConfigCodec:
         case StepType.SmartGcal => c.as[StepConfig.SmartGcal]
       }
 
-  given (using Encoder[Offset]): Encoder[StepConfig] =
+  given Encoder[StepConfig] =
     Encoder.instance: a =>
       (a match {
         case _: StepConfig.Bias.type    => Json.obj()

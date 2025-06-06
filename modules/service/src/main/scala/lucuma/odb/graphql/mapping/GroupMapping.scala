@@ -10,7 +10,6 @@ import cats.effect.Resource
 import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.NonNegShort
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.Query.FilterOrderByOffsetLimit

@@ -43,9 +43,6 @@ object CommitHash {
     def format: String =
       hexFormat.formatHex(c)
 
-    def toString: String =
-      format
-
   }
 
   given Show[CommitHash] =

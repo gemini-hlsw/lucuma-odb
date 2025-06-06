@@ -18,9 +18,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.ChargeClass
-import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
@@ -31,7 +29,6 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
-import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
@@ -245,6 +242,7 @@ object ObscalcService:
             )
         )
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def storeResult(
         pending:  Obscalc.PendingCalc,
         result:   Obscalc.Result,
@@ -358,7 +356,7 @@ object ObscalcService:
         prefix.fold(col)(p => s"$p.$col")
       .mkString("", ",\n", "\n")
 
-    private def obscalcMetaDataColumns(prefix: Option[String] = None): String =
+    private def obscalcMetaDataColumns(prefix: Option[String]): String =
       prefixedColumns(
         prefix,
         "c_program_id",
@@ -370,7 +368,7 @@ object ObscalcService:
         "c_failure_count"
       )
 
-    private def obscalcResultColumns(prefix: Option[String] = None): String =
+    private def obscalcResultColumns(prefix: Option[String]): String =
       prefixedColumns(
         prefix,
         "c_odb_error",

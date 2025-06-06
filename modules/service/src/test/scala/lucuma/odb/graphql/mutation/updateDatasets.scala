@@ -8,8 +8,6 @@ import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.Observation
-import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 
 class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
@@ -106,7 +104,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
                 f"N18630101S00$i%02d.fits"
               }
               .toList
-              .map(f => Json.obj("comment" -> "such very pass".asJson))
+              .map(_ => Json.obj("comment" -> "such very pass".asJson))
             )
           )
         ).asRight

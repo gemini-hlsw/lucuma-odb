@@ -12,7 +12,6 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Predicate
 import grackle.Predicate.*
-import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef

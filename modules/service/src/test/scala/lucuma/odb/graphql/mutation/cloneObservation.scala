@@ -314,7 +314,7 @@ class cloneObservation extends OdbSuite {
     }
 
   test("can specify the observation to clone using its reference") {
-    referenceTest { (oid, ref) =>
+    referenceTest { (_, ref) =>
       s"""
          observationReference: ${ref.asJson}
       """

@@ -57,8 +57,8 @@ object configurationrequest:
       hc.downField("grating").as[GmosSouthGrating].map(GmosSouthLongSlit(_))
 
     given Decoder[ObservingMode] = hc =>
-      hc.downField("gmosNorthLongSlit").as(DecodeGmosNorthLongSlit) orElse
-      hc.downField("gmosSouthLongSlit").as(DecodeGmosSouthLongSlit)
+      hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
+      hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit)
 
     given Encoder[ObservingMode] = m => 
       Json.obj(

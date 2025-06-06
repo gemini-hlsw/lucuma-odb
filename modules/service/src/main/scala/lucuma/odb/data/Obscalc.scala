@@ -3,7 +3,6 @@
 
 package lucuma.odb.data
 
-import cats.syntax.monoid.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.data.Zipper

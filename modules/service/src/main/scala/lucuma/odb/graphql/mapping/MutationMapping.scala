@@ -7,7 +7,6 @@ package mapping
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Resource
-import cats.kernel.Order
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -187,7 +186,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
 
   }
 
-  def mutationResultSubquery[A: Order](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
+  def mutationResultSubquery[A](predicate: Predicate, order: OrderSelection[A], limit: Option[NonNegInt], collectionField: String, child: Query): Result[Query] =
     val limitʹ = limit.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
     ResultMapping.mutationResult(child, limitʹ, collectionField) { q =>
       FilterOrderByOffsetLimit(
@@ -588,11 +587,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             child
           )
 
+  
+  @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
     predicate: LeafPredicates[Visit.Id],
     child:     Query
-  )(using Services[F], Transaction[F]): F[Result[Query]] =
+  )(using Transaction[F]): F[Result[Query]] =
     ResultT(response).map(vid => Unique(Filter(predicate.eql(vid), child))).value
 
 
@@ -686,6 +687,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def selectObservations(using Services[F], NoTransaction[F]): F[Result[(AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id], Query)]] =
         selectForUpdate(input, false /* exclude cals */).map { r =>
           r.flatMap { update =>

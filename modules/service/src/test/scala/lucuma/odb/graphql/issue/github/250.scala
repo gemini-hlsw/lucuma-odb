@@ -10,14 +10,13 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 class GitHub_250 extends OdbSuite {
 
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  def deleteTarget(user: User, tid: Target.Id): IO[Unit] =
+  def deleteTarget(tid: Target.Id): IO[Unit] =
     query(
       user = pi,
       query = s"""
@@ -38,7 +37,7 @@ class GitHub_250 extends OdbSuite {
       """
     ).void
 
-  def renameTarget(user: User, tid: Target.Id, name: String): IO[Unit] =
+  def renameTarget(tid: Target.Id, name: String): IO[Unit] =
     query(
       user = pi,
       query = s"""
@@ -67,7 +66,7 @@ class GitHub_250 extends OdbSuite {
       oid2 <- createObservationAs(pi, pid, tids(1), tids(2), tids(3))
       oid3 <- createObservationAs(pi, pid, tids(2))
       oid4 <- createObservationAs(pi, pid)
-      _    <- renameTarget(pi, tids(1), "fnord")
+      _    <- renameTarget(tids(1), "fnord")
       _  <- expect(
         user = pi,
         query =
@@ -122,7 +121,7 @@ class GitHub_250 extends OdbSuite {
       oid2 <- createObservationAs(pi, pid, tids(1), tids(2), tids(3))
       oid3 <- createObservationAs(pi, pid, tids(2))
       oid4 <- createObservationAs(pi, pid)
-      _    <- deleteTarget(pi, tids(1))
+      _    <- deleteTarget(tids(1))
       _  <- expect(
         user = pi,
         query =
