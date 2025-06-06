@@ -103,10 +103,10 @@ trait GmosCodecs {
   val gmos_binning: Codec[GmosBinning] =
     enumerated(Type.varchar)
 
-  val gmos_x_binning: Codec[GmosXBinning] =
+  private val gmos_x_binning: Codec[GmosXBinning] =
     enumerated(Type.varchar)
 
-  val gmos_y_binning: Codec[GmosYBinning] =
+  private val gmos_y_binning: Codec[GmosYBinning] =
     enumerated(Type.varchar)
 
   val gmos_ccd_mode: Codec[GmosCcdMode] =

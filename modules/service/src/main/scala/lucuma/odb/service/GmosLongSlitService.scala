@@ -16,6 +16,7 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
@@ -84,8 +85,8 @@ object GmosLongSlitService {
 
       val common: Decoder[GmosLongSlitInput.Create.Common] =
         (wavelength_pm          ~
-         gmos_x_binning.opt     ~
-         gmos_y_binning.opt     ~
+         gmos_binning.opt     ~
+         gmos_binning.opt     ~
          gmos_amp_read_mode.opt ~
          gmos_amp_gain.opt      ~
          gmos_roi.opt           ~
@@ -95,7 +96,7 @@ object GmosLongSlitService {
           for {
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
             spatialDithers    <- osd.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as a spatial offsets list."))
-          } yield GmosLongSlitInput.Create.Common(w, x, y, arm, ag, roi, wavelengthDithers, spatialDithers)
+          } yield GmosLongSlitInput.Create.Common(w, x.map(GmosXBinning(_)), y.map(GmosYBinning(_)), arm, ag, roi, wavelengthDithers, spatialDithers)
         }
 
       val north: Decoder[GmosLongSlitInput.Create.North] =
@@ -264,8 +265,8 @@ object GmosLongSlitService {
           ${gmos_north_filter.opt},
           $gmos_north_fpu,
           $wavelength_pm,
-          ${gmos_x_binning.opt},
-          ${gmos_y_binning.opt},
+          ${gmos_binning.opt},
+          ${gmos_binning.opt},
           ${gmos_amp_read_mode.opt},
           ${gmos_amp_gain.opt},
           ${gmos_roi.opt},
@@ -278,7 +279,7 @@ object GmosLongSlitService {
         FROM t_observation
         WHERE c_observation_id = $observation_id
        """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
+         o, g, l, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
        )}
 
     def insertGmosNorthLongSlit(
@@ -349,8 +350,8 @@ object GmosLongSlitService {
           ${gmos_south_filter.opt},
           $gmos_south_fpu,
           $wavelength_pm,
-          ${gmos_x_binning.opt},
-          ${gmos_y_binning.opt},
+          ${gmos_binning.opt},
+          ${gmos_binning.opt},
           ${gmos_amp_read_mode.opt},
           ${gmos_amp_gain.opt},
           ${gmos_roi.opt},
@@ -363,7 +364,7 @@ object GmosLongSlitService {
         FROM t_observation
         WHERE c_observation_id = $observation_id
        """.contramap { (o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw) => (
-         o, g, l, u, w, x, y, r, n, i, wd, so, ig, il, iu, iw, o
+         o, g, l, u, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, iu, iw, o
        )}
 
     def insertGmosSouthLongSlit(
@@ -409,8 +410,8 @@ object GmosLongSlitService {
       input: GmosLongSlitInput.Edit.Common
     ): List[AppliedFragment] = {
       val upCentralλ    = sql"c_central_wavelength = $wavelength_pm"
-      val upXBin        = sql"c_xbin               = ${gmos_x_binning.opt}"
-      val upYBin        = sql"c_ybin               = ${gmos_y_binning.opt}"
+      val upXBin        = sql"c_xbin               = ${gmos_binning.opt}"
+      val upYBin        = sql"c_ybin               = ${gmos_binning.opt}"
       val upAmpReadMode = sql"c_amp_read_mode      = ${gmos_amp_read_mode.opt}"
       val upAmpGain     = sql"c_amp_gain           = ${gmos_amp_gain.opt}"
       val upRoi         = sql"c_roi                = ${gmos_roi.opt}"
@@ -419,8 +420,8 @@ object GmosLongSlitService {
 
       List(
         input.centralWavelength.map(upCentralλ),
-        input.explicitXBin.toOptionOption.map(upXBin),
-        input.explicitYBin.toOptionOption.map(upYBin),
+        input.explicitXBin.toOptionOption.map(b => upXBin(b.map(_.value))),
+        input.explicitYBin.toOptionOption.map(b => upYBin(b.map(_.value))),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi),

@@ -40,8 +40,8 @@ object SmartGmosLoader {
       g.opt                    *:
       l.opt                    *:
       u.opt                    *:
-      gmos_x_binning           *:
-      gmos_y_binning           *:
+      gmos_binning             *:
+      gmos_binning             *:
       wavelength_pm_range.opt  *:
       gmos_grating_order.opt   *:
       gmos_amp_gain
@@ -49,8 +49,8 @@ object SmartGmosLoader {
       k.grating         ,
       k.filter          ,
       k.fpu             ,
-      k.xBin            ,
-      k.yBin            ,
+      k.xBin.value            ,
+      k.yBin.value            ,
       k.wavelengthRange ,
       k.order           ,
       k.gain

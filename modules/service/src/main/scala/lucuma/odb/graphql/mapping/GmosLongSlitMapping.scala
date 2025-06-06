@@ -14,8 +14,10 @@ import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.util.Enumerated
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
