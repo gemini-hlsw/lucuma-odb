@@ -34,6 +34,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -42,17 +43,45 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
           s"""
              query {
                observation(observationId: "$oid") {
+                 calculatedWorkflow {
+                   value {
+                     validationErrors {
+                       messages
+                     }
+                   }
+                 }
                  execution {
                    digest {
-                     science {
-                       observeClass
+                     state
+                     value {
+                       science {
+                         observeClass
+                       }
                      }
                    }
                  }
                }
              }
            """,
-        expected = List(s"Could not generate a sequence for $oid: The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
+        expected =
+          json"""
+            {
+              "observation": {
+                "calculatedWorkflow": {
+                  "value": {
+                    "validationErrors": [
+                      {
+                        "messages": [ "missing sequence too long error ...." ]
+                      }
+                    ]
+                  }
+                },
+                "execution": {
+                  "digest": null
+                }
+              }
+            }
+          """.asRight
       )
     }
   }
@@ -64,6 +93,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -74,29 +104,32 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
                observation(observationId: "$oid") {
                  execution {
                    digest {
-                     science {
-                       observeClass
+                     value {
+                       science {
+                         observeClass
+                       }
                      }
                    }
                  }
                }
              }
            """,
-        expected = Right(
+        expected =
           json"""
             {
               "observation": {
                 "execution": {
                   "digest": {
-                    "science" : {
-                      "observeClass" : "SCIENCE"
+                    "value": {
+                      "science" : {
+                        "observeClass" : "SCIENCE"
+                      }
                     }
                   }
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
     }
   }

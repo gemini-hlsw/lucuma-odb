@@ -4,8 +4,9 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
+import cats.syntax.either.*
+import io.circe.literal.*
 import lucuma.core.model.Target
-import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
 class ShortCut_5098 extends ExecutionTestSupportForGmos:
@@ -36,25 +37,35 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
 
   test("Detect if target has no SED before calling ITC"):
     val setup =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         _ <- removeSED(t)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield (t, o)
+        _ <- runObscalcUpdate(p, o)
+      yield (t, o)
     setup.flatMap { case (tid, oid) =>
-      expectOdbError(
+      expect(
         user  = pi,
         query =
           s"""
              query {
                observation(observationId: "$oid") {
+                 calculatedWorkflow {
+                   value {
+                     validationErrors {
+                       messages
+                     }
+                   }
+                 }
                  execution {
                    digest {
-                     science {
-                       timeEstimate {
-                         total {
-                           seconds
+                     value {
+                       science {
+                         timeEstimate {
+                           total {
+                             seconds
+                           }
                          }
                        }
                      }
@@ -63,11 +74,24 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                }
              }
            """,
-        expected = {
-          case OdbError.SequenceUnavailable(
-            _,
-            Some(s"Could not generate a sequence for $oid: target $tid is missing SED")
-          ) => // expected
-        }
+        expected =
+          json"""
+            {
+              "observation": {
+                "calculatedWorkflow": {
+                  "value": {
+                    "validationErrors": [
+                      {
+                        "messages": [ "Missing SED" ]
+                      }
+                    ]
+                  }
+                },
+                "execution": {
+                  "digest": null
+                }
+              }
+            }
+          """.asRight
       )
     }
