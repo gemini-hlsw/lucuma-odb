@@ -9,7 +9,6 @@ import lucuma.core.enums.Flamingos2LyotWheel.F16
 import lucuma.core.enums.Flamingos2ReadMode.Bright
 import lucuma.core.enums.Flamingos2ReadoutMode.Science
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
-import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask.Imaging
 import lucuma.core.util.TimeSpan
 

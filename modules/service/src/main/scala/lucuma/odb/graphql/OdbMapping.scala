@@ -603,7 +603,7 @@ object OdbMapping {
    * A minimal read-only mapping that only knows how to return enum metadata. Other queries will
    * fail with errors.
    */
-  def forMetadata[F[_]: Async: Trace: Logger](
+  def forMetadata[F[_]: Async](
     database: Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     enums:    Enums,

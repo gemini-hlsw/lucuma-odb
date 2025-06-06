@@ -147,6 +147,7 @@ trait ObservationMapping[F[_]]
     // Pass the pid+oid pairs to configurationService.selectRequests to get the
     // applicable configuration requests for each pair, then use this information
     // to construct our list of outgoing cursors.
+    @annotation.nowarn("msg=unused implicit parameter")
     def query(using Services[F], Transaction[F]): ResultT[F, List[Cursor]] =
       sequence.flatMap: pairs =>
         ResultT(configurationService.selectRequests(pairs.map(_._1))).map: reqs =>

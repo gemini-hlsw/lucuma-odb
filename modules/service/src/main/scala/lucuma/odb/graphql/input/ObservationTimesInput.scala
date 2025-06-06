@@ -6,7 +6,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable

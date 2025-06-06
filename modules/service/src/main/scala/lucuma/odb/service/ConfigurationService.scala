@@ -14,7 +14,6 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Configuration
@@ -126,6 +125,7 @@ object ConfigurationService {
       Monoid.instance(Result(Map.empty), (a, b) => (a, b).mapN(_ ++ _))
 
     /** Select the configurations for many observations, warning for any that are invalid. */
+    @annotation.nowarn("msg=unused implicit parameter")
     private def selectConfigurationsImpl(graphQLQuery: String)(using Transaction[F]): F[Result[Map[Observation.Id, Configuration]]] =
       services.runGraphQLQuery(graphQLQuery).map: r =>
         r.flatMap: json =>
@@ -150,6 +150,7 @@ object ConfigurationService {
             if res.toOption.exists(_.contains(oid)) then res
             else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asWarning(Map.empty)
 
+    @annotation.nowarn("msg=unused implicit parameter")
     private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
@@ -173,6 +174,7 @@ object ConfigurationService {
                 case Right(r)    => Result(r)
                 case Left(other) => Result.internalError(other.getMessage)
 
+    @annotation.nowarn("msg=unused implicit parameter")
     private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       ResultT.liftF:
         session.prepareR(Statements.InsertRequest).use: pq =>
@@ -474,18 +476,18 @@ object ConfigurationService {
       private given da: Decoder[Option[(Observation.Id, Configuration)]] = hc =>
         for
           id  <- hc.downField("id").as[Observation.Id]
-          cfg <- hc.downField("configuration").as(dc)
+          cfg <- hc.downField("configuration").as(using dc)
         yield cfg.tupleLeft(id)
 
       private given db: Decoder[(ConfigurationRequest, List[(Observation.Id, Configuration)])] = hc =>
         for
           req <- hc.as[ConfigurationRequest]
-          obs <- hc.downFields("program", "observations", "matches").as(Decoder.decodeList(da))
+          obs <- hc.downFields("program", "observations", "matches").as(using Decoder.decodeList(using da))
         yield (req, obs.flatten)
  
       given Decoder[Response] = hc =>
         hc.downFields("configurationRequests", "matches")
-          .as(Decoder.decodeList(db))
+          .as(using Decoder.decodeList(using db))
 
       def apply(rids: List[ConfigurationRequest.Id]) =
         s"""

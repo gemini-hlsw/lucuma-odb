@@ -1,9 +1,6 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
-// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
-
 package lucuma.odb.service
 
 import cats.effect.Concurrent
@@ -20,7 +17,6 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
@@ -169,7 +165,7 @@ object VisitService:
         val update = (for
           v0 <- ResultT(lookupOrInsert(observationId))
           os <- ResultT.liftF(lookupStatic(v0))
-          v1 <- os.fold(insertStaticForVisit(v0).as(v0)): s =>
+          v1 <- os.fold(insertStaticForVisit(v0).as(v0)): _ =>
                   insertNewVisit.flatMap: v =>
                     insertStaticForVisit(v).as(v)
         yield v1).value

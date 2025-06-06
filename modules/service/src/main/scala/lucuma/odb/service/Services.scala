@@ -10,7 +10,6 @@ import cats.Parallel
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
-import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import grackle.Mapping
@@ -225,7 +224,7 @@ object Services:
    * lazily.
    */
   def forUser[F[_]](u: User, e: Enums, m: Option[Mapping[F]])(s: Session[F])(
-    using tf: Trace[F], uf: UUIDGen[F], sr: SecureRandom[F], cf: Concurrent[F], par: Parallel[F], log: Logger[F]
+    using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F], log: Logger[F]
   ): Services[F[_]] =
     new Services[F]:
 
@@ -400,6 +399,7 @@ object Services:
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =

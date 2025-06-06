@@ -22,7 +22,6 @@ import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
-import lucuma.core.model.User
 import lucuma.odb.data.*
 import lucuma.odb.graphql.input.GoaPropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput

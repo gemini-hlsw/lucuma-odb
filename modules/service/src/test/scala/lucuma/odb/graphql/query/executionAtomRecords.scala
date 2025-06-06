@@ -28,7 +28,6 @@ import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.json.gmos.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.transport.given
-import munit.Assertions.*
 
 class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
                                             with ExecutionTestSupportForGmos {
@@ -385,7 +384,7 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
         Json.obj(
           "steps" -> Json.obj(
             "matches" ->
-              a.steps.map { s =>
+              a.steps.map { _ =>
                 Json.obj(
                   "gmosNorth" -> Json.obj(
                     "fpu" -> Json.obj("builtin" -> "LONG_SLIT_0_50".asJson)

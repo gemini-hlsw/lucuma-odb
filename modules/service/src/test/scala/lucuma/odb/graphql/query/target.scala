@@ -4,11 +4,9 @@
 package lucuma.odb.graphql
 package query
 
-import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 class target extends OdbSuite {
 

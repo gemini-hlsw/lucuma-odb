@@ -140,7 +140,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
   private lazy val executionStateHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, limit) => {
+      (pid, oid, _) => {
         services.use: s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
            .executionState(pid, oid)

@@ -142,7 +142,7 @@ object CalcMain extends MainParams:
         t <- Resource.eval(ObscalcTopic(p, 65536, s))
       yield t
 
-  def runObscalcDaemon[F[_]: Async: Parallel: Logger](
+  def runObscalcDaemon[F[_]: Async: Logger](
     connectionsLimit: Int,
     commitHash:       CommitHash,
     pollPeriod:       FiniteDuration,
@@ -212,12 +212,12 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream.compile.drain.background
     yield o
 
-  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger: SecureRandom](
+  def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
     user:    User,
     enums:   Enums,
     mapping: Mapping[F]
   )(pool: Session[F]): F[Services[F]] =
-    Services.forUser(user, enums, mapping.some)(pool).pure[F].flatTap: s =>
+    Services.forUser(user, enums, mapping.some)(pool).pure[F].flatTap: _ =>
       val us = UserService.fromSession(pool)
       Services.asSuperUser(us.canonicalizeUser(user))
 

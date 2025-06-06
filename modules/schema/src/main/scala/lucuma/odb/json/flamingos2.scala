@@ -49,7 +49,7 @@ trait Flamingos2Codec:
     Decoder.instance: c =>
       for
         f <- c.downField("filename").as[String].flatMap: s =>
-               NonEmptyString.from(s).leftMap: m =>
+               NonEmptyString.from(s).leftMap: _ =>
                  DecodingFailure(s"Flamingos 2 custom mask file name cannot be empty", c.history)
         s <- c.downField("slitWidth").as[Flamingos2CustomSlitWidth]
       yield Flamingos2FpuMask.Custom(f, s)

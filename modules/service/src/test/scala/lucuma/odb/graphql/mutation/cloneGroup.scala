@@ -6,7 +6,6 @@ package mutation
 
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.literal.*
-import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 

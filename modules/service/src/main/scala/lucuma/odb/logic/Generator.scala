@@ -21,7 +21,6 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
@@ -236,11 +235,13 @@ object Generator {
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
+        @annotation.nowarn("msg=unused implicit parameter")
         def checkCache(using NoTransaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
           EitherT.right(services.transactionally {
             executionDigestService.selectOne(oid, hash)
           })
 
+        @annotation.nowarn("msg=unused implicit parameter")
         def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, OdbError, Unit] =
           EitherT.right(services.transactionally {
             executionDigestService.insertOrUpdate(pid, oid, hash, digest)
@@ -249,6 +250,7 @@ object Generator {
 
       private object Context {
 
+        @annotation.nowarn("msg=unused implicit parameter")
         def lookup(
           pid: Program.Id,
           oid: Observation.Id
@@ -293,6 +295,7 @@ object Generator {
       )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def digestWithParamsAndHash(
         context: Context,
         when: Option[Timestamp]
@@ -321,6 +324,7 @@ object Generator {
       )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
         calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def calcDigestThenCache(
         ctx:  Context,
         when: Option[Timestamp]
@@ -351,11 +355,10 @@ object Generator {
       private def flamingos2LongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.flamingos2.longslit.Config,
-        role:   Option[CalibrationRole],
         when:   Option[Timestamp]
       ): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
         import lucuma.odb.sequence.flamingos2.longslit.LongSlit
-        val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
+        val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, ctx.params.acqResetTime)
         val srs = services.flamingos2SequenceService.selectStepRecords(ctx.oid)
         for
           g <- EitherT(gen)
@@ -388,6 +391,7 @@ object Generator {
           p <- protoExecutionConfig(ctx, g, srs, when)
         yield p
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def calcDigestFromContext(
         ctx:  Context,
         when: Option[Timestamp]
@@ -397,7 +401,7 @@ object Generator {
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
         (ctx.params match
           case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
-            flamingos2LongSlit(ctx, config, role, when).flatMap: (p, e) =>
+            flamingos2LongSlit(ctx, config, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.flamingos2.estimateSetup))
 
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
@@ -420,6 +424,7 @@ object Generator {
           x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def calcExecutionConfigFromContext(
         ctx:      Context,
         lim:      FutureLimit,
@@ -427,7 +432,7 @@ object Generator {
       )(using NoTransaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
         ctx.params match
           case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
-            flamingos2LongSlit(ctx, config, role, when).map: (p, _) =>
+            flamingos2LongSlit(ctx, config, when).map: (p, _) =>
               InstrumentExecutionConfig.Flamingos2(executionConfig(p, lim))
 
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, _, _) =>
@@ -480,7 +485,7 @@ object Generator {
         proto:       ProtoExecutionConfig[S, Atom[D]],
         futureLimit: FutureLimit
       ): ExecutionConfig[S, D] =
-        def executionSequence(s: Stream[Pure, Atom[D]], t: SequenceType): Option[ExecutionSequence[D]] =
+        def executionSequence(s: Stream[Pure, Atom[D]]): Option[ExecutionSequence[D]] =
           val atoms: List[(Atom[D], Boolean)] =
             s.zipWithNext
              .map(_.map(_.isDefined))
@@ -493,8 +498,8 @@ object Generator {
 
         ExecutionConfig(
           proto.static,
-          executionSequence(proto.acquisition, SequenceType.Acquisition),
-          executionSequence(proto.science,     SequenceType.Science)
+          executionSequence(proto.acquisition),
+          executionSequence(proto.science)
         )
 
       def executionState(

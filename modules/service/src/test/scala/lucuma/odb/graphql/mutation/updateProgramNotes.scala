@@ -9,7 +9,6 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.model.User
 
 class updateProgramNotes extends OdbSuite:
 

@@ -187,6 +187,7 @@ object SequenceService {
        * can compare a new step being recorded with the previous state and
        * determine the cost of making the prescribed changes.
        */
+      @annotation.nowarn("msg=unused implicit parameter")
       private def selectEstimatorState[S, D](
         observationId: Observation.Id,
         staticConfig:  Visit.Id => F[Option[S]],
@@ -287,6 +288,7 @@ object SequenceService {
           _ <- session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, stepId)
         } yield ()
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def insertAtomRecordImpl(
         visitId:      Visit.Id,
         instrument:   Instrument,
@@ -322,6 +324,7 @@ object SequenceService {
           case s @ StepConfig.SmartGcal(_)     => session.execute(Statements.InsertStepConfigSmartGcal)(stepId, s).void
         }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       private def insertStepRecord[S, D](
         atomId:              Atom.Id,
         instrument:          Instrument,

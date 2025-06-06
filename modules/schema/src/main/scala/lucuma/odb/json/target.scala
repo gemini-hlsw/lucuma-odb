@@ -150,9 +150,9 @@ object target {
       Encoder[CatalogInfo]
     ): (String, Json) =
       target match
-        case s @ Sidereal(_, _, _, _) => "sidereal"    -> s.asJson(siderealDefinitionEncoderInternal)
-        case n @ Nonsidereal(_, _, _) => "nonsidereal" -> n.asJson(nonsiderealDefinitionEncoder)
-        case o @ Opportunity(_, _, _) => "opportunity" -> o.asJson(opportunityDefinitionEncoder)
+        case s @ Sidereal(_, _, _, _) => "sidereal"    -> s.asJson(using siderealDefinitionEncoderInternal)
+        case n @ Nonsidereal(_, _, _) => "nonsidereal" -> n.asJson(using nonsiderealDefinitionEncoder)
+        case o @ Opportunity(_, _, _) => "opportunity" -> o.asJson(using opportunityDefinitionEncoder)
 
     // NOTE: This does not include the id, existence and program that are part of the Target in the API
     protected def encoderTargetInternal(using

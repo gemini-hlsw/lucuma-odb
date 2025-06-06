@@ -2,7 +2,6 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 import cats.effect.IO
-import cats.syntax.all.*
 import lucuma.odb.phase0.FileReader
 import munit.CatsEffectSuite
 

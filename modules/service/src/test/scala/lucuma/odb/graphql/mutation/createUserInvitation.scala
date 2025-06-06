@@ -381,7 +381,7 @@ class createUserInvitation extends OdbSuite:
           ).asLeft
         )
 
-  def invitationsQuery(user: User, pid: Program.Id): String =
+  def invitationsQuery(pid: Program.Id): String =
     s"""
       query {
         programUsers(
@@ -406,7 +406,7 @@ class createUserInvitation extends OdbSuite:
       inv0 <- createUserInvitationAs(pi, mid)
       _    <- expect(
         user     = pi,
-        query    = invitationsQuery(pi, pid),
+        query    = invitationsQuery(pid),
         expected =
           json"""
             {
@@ -442,7 +442,7 @@ class createUserInvitation extends OdbSuite:
         _    <- redeemUserInvitationAs(pi2, inv1, true)
         _    <- expect(
           user     = pi,
-          query    = invitationsQuery(pi, pid),
+          query    = invitationsQuery(pid),
           expected =
             json"""
               {
@@ -472,7 +472,7 @@ class createUserInvitation extends OdbSuite:
         _    <- redeemUserInvitationAs(pi2, inv1, true)
         _    <- expect(
           user     = pi,
-          query    = invitationsQuery(pi, pid),
+          query    = invitationsQuery(pid),
           expected =
             json"""
               {
@@ -510,7 +510,7 @@ class createUserInvitation extends OdbSuite:
       _   <- deleteProgramUserAs(pi, mid)
       _   <- expect(
           user     = pi,
-          query    = invitationsQuery(pi, pid),
+          query    = invitationsQuery(pid),
           expected =
             json"""
               {

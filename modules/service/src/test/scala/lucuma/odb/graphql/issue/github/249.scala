@@ -12,7 +12,6 @@ import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 // https://github.com/gemini-hlsw/lucuma-odb/issues/249
 class GitHub_249 extends OdbSuite {
@@ -20,7 +19,7 @@ class GitHub_249 extends OdbSuite {
   val pi       = TestUsers.Standard.pi(1, 30)
   val validUsers = List(pi)
 
-  def deleteTarget(user: User, tid: Target.Id): IO[Unit] =
+  def deleteTarget(tid: Target.Id): IO[Unit] =
     query(
       user = pi,
       query = s"""
@@ -51,7 +50,7 @@ class GitHub_249 extends OdbSuite {
         oid2 <- createObservationAs(user, pid, tids(0), tids(1))
         oid3 <- createObservationAs(user, pid, tids(0), tids(1), tids(2))
         oid4 <- createObservationAs(user, pid)
-        _    <- deleteTarget(user, tids(0))
+        _    <- deleteTarget(tids(0))
         _    <- expect(
           user = user,
           query =

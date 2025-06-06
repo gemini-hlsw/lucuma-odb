@@ -9,7 +9,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Partner
-import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
@@ -276,7 +275,7 @@ class programUsers extends OdbSuite:
     yield ()
 
   test("program user selection limited by visibility"):
-    createProgramAs(guest1).flatMap: pid =>
+    createProgramAs(guest1).flatMap: _ =>
       expect(
         user = guest2,
         query = s"""

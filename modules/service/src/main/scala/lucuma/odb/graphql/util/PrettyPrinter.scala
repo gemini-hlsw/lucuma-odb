@@ -37,7 +37,7 @@ object PrettyPrinter {
   def prop(key: String, value: Doc): Doc =
     (text(key) + char(':') + space + value)
 
-  def elems(ds: List[Doc], delim: Doc = Comma): Doc =
+  def elems(ds: List[Doc]): Doc =
     intercalate(Comma + line, ds).grouped
 
   def quoted(s: String): Doc =

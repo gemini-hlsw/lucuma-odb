@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
-import cats.syntax.all.*
 import grackle.Problem
 import grackle.Result
 import grackle.Value

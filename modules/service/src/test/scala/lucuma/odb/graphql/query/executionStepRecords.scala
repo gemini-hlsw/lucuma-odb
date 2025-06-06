@@ -14,7 +14,6 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
-import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
 import lucuma.odb.data.StepExecutionState
 

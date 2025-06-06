@@ -9,7 +9,6 @@ import cats.Eq
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.option.*
 import eu.timepit.refined.*

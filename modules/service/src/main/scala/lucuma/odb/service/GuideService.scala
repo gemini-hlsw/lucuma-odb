@@ -202,7 +202,7 @@ object GuideService {
       optObsDuration.toResult(generalError(s"Observation duration not set for observation $id.").asProblem)
 
     def validGuideStarName(generatorHash:Md5Hash): Option[GuideStarName] =
-      (guideStarName, guideStarHash).flatMapN { (name, hash) =>
+      guideStarHash.flatMap { hash =>
         val newHash = newGuideStarHash(generatorHash)
         if (hash === newHash) guideStarName
         else none
@@ -299,6 +299,7 @@ object GuideService {
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[NonEmptyList[Target]]] =
@@ -312,6 +313,7 @@ object GuideService {
               .toResult(generalError(s"No targets have been defined for observation $oid.").asProblem)
           )
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def getObservationInfo(oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[ObservationInfo]] = {
@@ -325,6 +327,7 @@ object GuideService {
           )
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Option[Md5Hash]] = {
@@ -334,6 +337,7 @@ object GuideService {
           .use(_.option(af.argument))
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def insertOrUpdateAvailabilityHash(pid: Program.Id, oid: Observation.Id, hash: Md5Hash)(using
         Transaction[F]
       ): F[Unit] = {
@@ -343,6 +347,7 @@ object GuideService {
           .use(_.execute(af.argument).void)
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[List[AvailabilityPeriod]] = {
@@ -352,15 +357,17 @@ object GuideService {
           .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def insertAvailabilityPeriods(pid: Program.Id, oid: Observation.Id, aps: List[AvailabilityPeriod])(using
         Transaction[F]
       ): F[Unit] = {
-        val af = Statements.insertManyAvailabilityPeriods(user, pid, oid, aps)
+        val af = Statements.insertManyAvailabilityPeriods(pid, oid, aps)
         session
           .prepareR(af.fragment.command)
           .use(_.execute(af.argument).void)
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def deleteAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using Transaction[F]): F[Unit] = {
         val af = Statements.deleteAvailabilityPeriods(user, pid, oid)
         session
@@ -380,6 +387,7 @@ object GuideService {
           .use(_.option(af.argument))
           .map(_.fold(OdbError.InvalidObservation(oid).asFailure)(_.success))
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
       ): F[ContiguousTimestampMap[List[Angle]]] =
@@ -432,7 +440,6 @@ object GuideService {
           )
 
       def callGaia(
-        oid:   Observation.Id,
         query: ADQLQuery
       ): F[Result[List[GuideStarCandidate]]] = 
         Trace[F].span("callGaia"):
@@ -469,7 +476,7 @@ object GuideService {
           query      <- ResultT.fromResult(
                           getGaiaQuery(oid, start, end, tracking, candidatesArea.candidatesArea, wavelength, constraints)
                         )
-          candidates <- ResultT(callGaia(oid, query))
+          candidates <- ResultT(callGaia(query))
         } yield candidates).value
 
       def getAllCandidatesNonEmpty(
@@ -608,7 +615,6 @@ object GuideService {
 
       def buildAvailabilityAndCache(
         pid:             Program.Id,
-        requestedPeriod: TimestampInterval,
         neededPeriods:   NonEmptyList[TimestampInterval],
         obsInfo:         ObservationInfo,
         genInfo:         GeneratorInfo,
@@ -912,7 +918,7 @@ object GuideService {
                             else (NonEmptyList.fromList(missingPeriods), currentAvail)
             // if we don't need anything, then we already have what we need
             fullAvail     <- neededPeriods.fold(ResultT.pure(startAvail))(nel =>
-                              ResultT(buildAvailabilityAndCache(pid, period, nel, obsInfo, genInfo, startAvail, newHash))
+                              ResultT(buildAvailabilityAndCache(pid, nel, obsInfo, genInfo, startAvail, newHash))
                             )
             availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
           } yield availability).value
@@ -1015,7 +1021,6 @@ object GuideService {
       """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
 
     def insertManyAvailabilityPeriods(
-      user: User,
       pid: Program.Id,
       oid: Observation.Id,
       periods: List[AvailabilityPeriod]): AppliedFragment =

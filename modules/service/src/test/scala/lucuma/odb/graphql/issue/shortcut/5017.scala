@@ -22,7 +22,6 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.json.all.transport.given

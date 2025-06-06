@@ -180,7 +180,7 @@ class setGuideTargetName extends query.ExecutionTestSupportForGmos {
   }
 
   test("user must have access to the program") {
-    val expected = expectObsError(oid => OdbError.InvalidArgument().message)
+    val expected = expectObsError(_ => OdbError.InvalidArgument().message)
     for
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)

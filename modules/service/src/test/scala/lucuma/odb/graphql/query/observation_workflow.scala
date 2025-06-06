@@ -12,7 +12,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
@@ -31,7 +30,6 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
-import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.json.all.transport.given

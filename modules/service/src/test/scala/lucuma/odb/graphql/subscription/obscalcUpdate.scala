@@ -154,7 +154,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
           }
         }
       """,
-      mutations = (setup.flatMap(oid => load.flatMap(lst => calculateAndUpdate(lst.head)))).asRight,
+      mutations = (setup.flatMap(_ => load.flatMap(lst => calculateAndUpdate(lst.head)))).asRight,
       expected  = List(
         // Just one event -- when moving from calculating to ready
         Json.obj(

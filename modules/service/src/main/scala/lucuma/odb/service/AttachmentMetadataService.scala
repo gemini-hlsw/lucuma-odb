@@ -13,7 +13,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
-import natchez.Trace
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -31,7 +30,7 @@ trait AttachmentMetadataService [F[_]] {
 
 object AttachmentMetadataService {
 
-  def instantiate[F[_]: Concurrent: Trace](using Services[F]): AttachmentMetadataService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): AttachmentMetadataService[F] =
     new AttachmentMetadataService[F] {
 
       override def updateAttachments(

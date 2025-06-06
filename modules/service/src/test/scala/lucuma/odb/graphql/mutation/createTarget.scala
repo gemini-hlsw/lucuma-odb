@@ -14,7 +14,6 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
-import lucuma.core.model.User
 
 class createTarget extends OdbSuite {
   import createTarget.FullTargetGraph
