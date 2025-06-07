@@ -8,14 +8,16 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 
-class createProposal extends OdbSuite with DatabaseOperations  {
-  
+class createProposal extends OdbSuite with DatabaseOperations {
+
   val pi       = TestUsers.Standard.pi(1, 101)
   val pi2      = TestUsers.Standard.pi(2, 102)
   val staff    = TestUsers.Standard.staff(3, 103)
@@ -575,6 +577,10 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                     toOActivation
                     minPercentTime
                     piAffiliation
+                    reviewer {
+                      id
+                      role
+                    }
                   }
                 }
               }
@@ -590,7 +596,8 @@ class createProposal extends OdbSuite with DatabaseOperations  {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
-                  "piAffiliation": "US"
+                  "piAffiliation": "US",
+                  "reviewer": null
                 }
               }
             }
@@ -646,6 +653,105 @@ class createProposal extends OdbSuite with DatabaseOperations  {
             }
           }
         """.asRight
+      )
+    }
+  }
+
+  test("✓ fast turnaround with reviewer") {
+    for {
+      pid  <- createProgramAs(pi, "Fast Turnaround Proposal")
+      // Add a COI who will be the reviewer
+      puId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "$puId"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                type {
+                  scienceSubtype
+                  ... on FastTurnaround {
+                    toOActivation
+                    minPercentTime
+                    piAffiliation
+                    reviewer {
+                      id
+                      role
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "category": "COSMOLOGY",
+                "type": {
+                  "scienceSubtype": "FAST_TURNAROUND",
+                  "toOActivation": "NONE",
+                  "minPercentTime": 50,
+                  "piAffiliation": "US",
+                  "reviewer": {
+                    "id": ${puId.toString},
+                    "role": "COI"
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield ()
+  }
+
+  test("⨯ fast turnaround with non-existent reviewer") {
+    createProgramAs(pi, "Fast Turnaround Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                      reviewerId: "pu-ffff-ffff-ffff-ffff"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+              }
+            }
+          }
+        """,
+        expected = List("Argument 'input.SET.type.fastTurnaround.reviewerId' is invalid: 'pu-ffff-ffff-ffff-ffff' is not a valid program user id").asLeft
       )
     }
   }
@@ -1181,6 +1287,142 @@ class createProposal extends OdbSuite with DatabaseOperations  {
           }
         """,
         expected = List(s"Program $pid is of type Example. Only Science programs can have proposals.").asLeft
+      )
+    }
+  }
+
+  test("✓ fast turnaround returns null reviewer and mentor by default") {
+    createProgramAs(pi, "Fast Turnaround Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    fastTurnaround: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      piAffiliation: US
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  ... on FastTurnaround {
+                    scienceSubtype
+                    reviewer {
+                      role
+                    }
+                    mentor {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "FAST_TURNAROUND",
+                  "reviewer": null,
+                  "mentor": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+
+  test("✓ fast turnaround with reviewer and mentor") {
+    for {
+      pid        <- createProgramAs(pi, "Fast Turnaround Proposal")
+      reviewerId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      mentorId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _          <- createFastTurnaroundProposal(pi, pid, Some(reviewerId.toString), Some(mentorId.toString))
+    } yield ()
+  }
+
+  test("⨯ fast turnaround with same user as reviewer and mentor") {
+    for {
+      pid  <- createProgramAs(pi, "Fast Turnaround Proposal")
+      puId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _    <- createFastTurnaroundProposalError(pi, pid, puId.toString)
+    } yield ()
+  }
+
+  test("✓ fast turnaround with only mentor") {
+    for {
+      pid      <- createProgramAs(pi, "Fast Turnaround Proposal")
+      mentorId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _        <- createFastTurnaroundProposal(pi, pid, None, Some(mentorId.toString))
+    } yield ()
+  }
+
+  test("⨯ queue proposal cannot have reviewerId") {
+    createProgramAs(pi, "ueue Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    queue: {
+                      reviewerId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'reviewerId' for input object value of type QueueInput in field 'createProposal' of type 'Mutation'").asLeft
+      )
+    }
+  }
+
+  test("⨯ queue proposal cannot have mentorId") {
+    createProgramAs(pi, "Queue Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    queue: {
+                      mentorId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'mentorId' for input object value of type QueueInput in field 'createProposal' of type 'Mutation'").asLeft
       )
     }
   }
