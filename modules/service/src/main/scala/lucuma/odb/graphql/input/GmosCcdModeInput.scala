@@ -19,15 +19,15 @@ object GmosCcdModeInput {
   val Binding: Matcher[GmosCcdMode] =
     ObjectFieldsBinding.rmap {
       case List(
-        GmosXBinningBinding.Option("xBin", rXBin),
-        GmosYBinningBinding.Option("yBin", rYBin),
+        GmosBinningBinding.Option("xBin", rXBin),
+        GmosBinningBinding.Option("yBin", rYBin),
         GmosAmpCountBinding.Option("ampCount", rAmpCount),
         GmosAmpGainBinding.Option("ampGain", rAmpGain),
         GmosAmpReadModeBinding.Option("ampReadMode", rAmpReadMode)
       ) => (rXBin, rYBin, rAmpCount, rAmpGain, rAmpReadMode).parMapN { (xBin, yBin, ampCount, ampGain, ampReadMode) =>
         GmosCcdMode(
-          xBin.getOrElse(GmosXBinning.One),
-          yBin.getOrElse(GmosYBinning.One),
+          xBin.fold(GmosXBinning.One)(GmosXBinning.apply),
+          yBin.fold(GmosYBinning.One)(GmosYBinning.apply),
           ampCount.getOrElse(GmosAmpCount.Twelve),
           ampGain.getOrElse(GmosAmpGain.Low),
           ampReadMode.getOrElse(GmosAmpReadMode.Slow)

@@ -10,16 +10,17 @@ import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.util.Enumerated
 
 trait GmosCommonParsers {
 
   import util.*
 
   val xBinning: Parser[GmosXBinning] =
-    oneOf(GmosXBinning.values.toList.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
+    oneOf(Enumerated[GmosXBinning].all.fproductLeft(_.count.toString)*).withContext("GMOS X-Binning")
 
   val yBinning: Parser[GmosYBinning] =
-    oneOf(GmosYBinning.values.toList.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
+    oneOf(Enumerated[GmosYBinning].all.fproductLeft(_.count.toString)*).withContext("GMOS Y-Binning")
 
   val order: Parser[NonEmptyList[GmosGratingOrder]] =
     manyOf(GmosGratingOrder.all.fproductLeft(_.count.toString)*).withContext("GMOS grating order")

@@ -140,8 +140,8 @@ object GmosReadoutTime {
       (
         for {
           d <- GmosNorthDetector.all.map(_.asLeft[GmosSouthDetector]) ++ GmosSouthDetector.values.map(_.asRight[GmosNorthDetector])
-          x <- GmosXBinning.values
-          y <- GmosYBinning.values
+          x <- Enumerated[GmosXBinning].all
+          y <- Enumerated[GmosYBinning].all
           c <- d.fold(_.ampCounts.toNonEmptyList.toList, _.ampCounts.toNonEmptyList.toList)
           g <- Enumerated[GmosAmpGain].all
           o <- Enumerated[GmosAmpReadMode].all

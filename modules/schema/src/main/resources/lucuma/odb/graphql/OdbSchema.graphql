@@ -1464,12 +1464,12 @@ type GmosCcdMode {
   """
   GMOS X-binning
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   GMOS Y-binning
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   GMOS Amp Count
@@ -1494,12 +1494,12 @@ input GmosCcdModeInput {
   """
   X Binning, defaults to 'ONE'.
   """
-  xBin: GmosXBinning
+  xBin: GmosBinning
 
   """
   Y Binning, defaults to 'ONE'.
   """
-  yBin: GmosYBinning
+  yBin: GmosBinning
 
   """
   Amp Count, defaults to 'TWELVE'.
@@ -2008,12 +2008,12 @@ input GmosNorthLongSlitInput {
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2403,12 +2403,12 @@ input GmosSouthLongSlitInput {
   """
   The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8090,36 +8090,36 @@ type GmosNorthLongSlit {
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   Default GMOS X-Binning, calculated from the effective slit size which in
   turn is based on the selected FPU, target source profile and image quality.
   """
-  defaultXBin: GmosXBinning!
+  defaultXBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS X-Binning. If set it overrides the
   default.
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   Default GMOS Y-Binning (TWO).
   """
-  defaultYBin: GmosYBinning!
+  defaultYBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
   default.
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -8574,36 +8574,36 @@ type GmosSouthLongSlit {
   GMOS X-Binning, either explicitly specified in explicitXBin or else taken
   from the defaultXBin.
   """
-  xBin: GmosXBinning!
+  xBin: GmosBinning!
 
   """
   Default GMOS X-Binning, calculated from the effective slit size which in
   turn is based on the selected FPU, target source profile and image quality.
   """
-  defaultXBin: GmosXBinning!
+  defaultXBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS X-Binning. If set it overrides the
   default.
   """
-  explicitXBin: GmosXBinning
+  explicitXBin: GmosBinning
 
   """
   GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
   from the defaultYBin.
   """
-  yBin: GmosYBinning!
+  yBin: GmosBinning!
 
   """
   Default GMOS Y-Binning (TWO).
   """
-  defaultYBin: GmosYBinning!
+  defaultYBin: GmosBinning!
 
   """
   Optional explicitly specified GMOS Y-Binning. If set it overrides the
   default.
   """
-  explicitYBin: GmosYBinning
+  explicitYBin: GmosBinning
 
   """
   GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
@@ -8715,41 +8715,21 @@ type GmosSouthLongSlit {
 }
 
 """
-GMOS X Binning
+GMOS Binning (used for both X and Y axes)
 """
-enum GmosXBinning {
+enum GmosBinning {
   """
-  GmosXBinning One
+  GmosBinning One
   """
   ONE
 
   """
-  GmosXBinning Two
+  GmosBinning Two
   """
   TWO
 
   """
-  GmosXBinning Four
-  """
-  FOUR
-}
-
-"""
-GMOS Y Binning
-"""
-enum GmosYBinning {
-  """
-  GmosYBinning One
-  """
-  ONE
-
-  """
-  GmosYBinning Two
-  """
-  TWO
-
-  """
-  GmosYBinning Four
+  GmosBinning Four
   """
   FOUR
 }
