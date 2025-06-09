@@ -7,6 +7,7 @@ package mapping
 import cats.effect.Resource
 import cats.syntax.bifunctor.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
 import grackle.Env
 import grackle.Query
@@ -26,6 +27,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
@@ -34,14 +36,17 @@ import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.ObscalcTable
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import org.typelevel.log4cats.Logger
 
-trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
+trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
+                                with ObscalcTable[F]
                                 with Predicates[F]
                                 with SelectSubquery {
 
@@ -59,6 +64,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
+      EffectField("calculatedDigest", calculatedDigestHandler, List("id", "programId")),
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
@@ -149,18 +155,32 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
     effectHandler(_ => ().success, calculate)
 
-  private lazy val digestHandler: EffectHandler[F] = {
+  private lazy val digestHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) => {
-        services.use { s =>
+      (pid, oid, _) =>
+        services.use: s =>
           s.generator(commitHash, itcClient, timeEstimateCalculator)
            .digest(pid, oid)
            .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
-        }
-      }
 
     effectHandler(_ => ().success, calculate)
-  }
+
+  private lazy val calculatedDigestHandler: EffectHandler[F] =
+    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
+      (_, oid, _) =>
+        services.useTransactionally:
+          obscalcService(commitHash, itcClient, timeEstimateCalculator)
+           .selectExecutionDigest(oid)
+           .map:
+             _.fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
+               cv
+                 .map: res =>
+                   res.map(_.asJson) match
+                     case Result.Failure(ps) => Result.Warning(ps, Json.Null)
+                     case r                  => r
+                 .sequence.map(_.asJson)
+
+    effectHandler(_ => ().success, calculate)
 
   private lazy val timeChargeHandler: EffectHandler[F] = {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
