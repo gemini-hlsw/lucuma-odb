@@ -115,7 +115,6 @@ object OdbMapping {
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
-          with CalculatedExecutionDigestMapping[F]
           with CalculatedObservationWorkflowMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
@@ -508,7 +507,6 @@ object OdbMapping {
               ) ++ List(
                 AngleMappings,
                 AtomRecordSelectResultMappings,
-                CalculatedExecutionDigestMappings,
                 CalculatedObservationWorkflowMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,

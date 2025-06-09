@@ -8,9 +8,9 @@ import lucuma.odb.util.Codecs.*
 import skunk.circe.codec.all.*
 import skunk.codec.numeric._int8
 
-trait ObscalcView[F[_]] extends BaseMapping[F]:
+trait ObscalcTable[F[_]] extends BaseMapping[F]:
 
-  object ObscalcView extends TableDef("v_obscalc"):
+  object ObscalcTable extends TableDef("t_obscalc"):
     val ProgramId: ColumnRef           = col("c_program_id",           program_id)
     val ObservationId: ColumnRef       = col("c_observation_id",       observation_id)
     val CalculationState: ColumnRef    = col("c_obscalc_state",        calculation_state)

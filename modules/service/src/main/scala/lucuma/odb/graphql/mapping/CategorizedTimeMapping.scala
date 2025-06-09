@@ -6,42 +6,27 @@ package lucuma.odb.graphql.mapping
 import grackle.Path
 import io.circe.syntax.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.table.ObscalcView
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends ObscalcView[F] with VisitTable[F]:
+trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
-        categorizedTimeMappingAtPath(
-          ExecutionDigestType / "acquisition" / "timeEstimate",
-          ObscalcView.ObservationId,
-          ObscalcView.Digest.Acquisition.NonChargedTime,
-          ObscalcView.Digest.Acquisition.ProgramTime
-        ),
+      categorizedTimeMappingAtPath(
+        TimeChargeInvoiceType / "executionTime",
+        VisitTable.Id,
+        VisitTable.Raw.NonChargedTime,
+        VisitTable.Raw.ProgramTime
+      ),
 
-        categorizedTimeMappingAtPath(
-          ExecutionDigestType / "science" / "timeEstimate",
-          ObscalcView.ObservationId,
-          ObscalcView.Digest.Science.NonChargedTime,
-          ObscalcView.Digest.Science.ProgramTime
-        ),
-
-        categorizedTimeMappingAtPath(
-          TimeChargeInvoiceType / "executionTime",      
-          VisitTable.Id,
-          VisitTable.Raw.NonChargedTime,
-          VisitTable.Raw.ProgramTime
-        ),
-
-        categorizedTimeMappingAtPath(
-          TimeChargeInvoiceType / "finalCharge",      
-          VisitTable.Id,
-          VisitTable.Final.NonChargedTime,
-          VisitTable.Final.ProgramTime
-        )
+      categorizedTimeMappingAtPath(
+        TimeChargeInvoiceType / "finalCharge",
+        VisitTable.Id,
+        VisitTable.Final.NonChargedTime,
+        VisitTable.Final.ProgramTime
       )
+    )
 
   private def categorizedTimeMappingAtPath(
     path:       Path,
