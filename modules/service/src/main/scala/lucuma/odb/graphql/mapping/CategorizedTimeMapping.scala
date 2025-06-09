@@ -13,20 +13,20 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
-        categorizedTimeMappingAtPath(
-          TimeChargeInvoiceType / "executionTime",      
-          VisitTable.Id,
-          VisitTable.Raw.NonChargedTime,
-          VisitTable.Raw.ProgramTime
-        ),
+      categorizedTimeMappingAtPath(
+        TimeChargeInvoiceType / "executionTime",
+        VisitTable.Id,
+        VisitTable.Raw.NonChargedTime,
+        VisitTable.Raw.ProgramTime
+      ),
 
-        categorizedTimeMappingAtPath(
-          TimeChargeInvoiceType / "finalCharge",      
-          VisitTable.Id,
-          VisitTable.Final.NonChargedTime,
-          VisitTable.Final.ProgramTime
-        )
+      categorizedTimeMappingAtPath(
+        TimeChargeInvoiceType / "finalCharge",
+        VisitTable.Id,
+        VisitTable.Final.NonChargedTime,
+        VisitTable.Final.ProgramTime
       )
+    )
 
   private def categorizedTimeMappingAtPath(
     path:       Path,

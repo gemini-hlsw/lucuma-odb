@@ -34,6 +34,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -43,16 +44,19 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              query {
                observation(observationId: "$oid") {
                  execution {
-                   digest {
-                     science {
-                       observeClass
+                   calculatedDigest {
+                     value {
+                       science {
+                         observeClass
+                       }
                      }
                    }
                  }
                }
              }
            """,
-        expected = List(s"Could not generate a sequence for $oid: The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
+        expected =
+          List(s"Could not generate a sequence for $oid: The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
       )
     }
   }
@@ -64,6 +68,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -73,30 +78,33 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              query {
                observation(observationId: "$oid") {
                  execution {
-                   digest {
-                     science {
-                       observeClass
+                   calculatedDigest {
+                     value {
+                       science {
+                         observeClass
+                       }
                      }
                    }
                  }
                }
              }
            """,
-        expected = Right(
+        expected =
           json"""
             {
               "observation": {
                 "execution": {
-                  "digest": {
-                    "science" : {
-                      "observeClass" : "SCIENCE"
+                  "calculatedDigest": {
+                    "value": {
+                      "science" : {
+                        "observeClass" : "SCIENCE"
+                      }
                     }
                   }
                 }
               }
             }
-          """
-        )
+          """.asRight
       )
     }
   }

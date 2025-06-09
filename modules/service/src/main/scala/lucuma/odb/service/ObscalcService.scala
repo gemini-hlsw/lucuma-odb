@@ -17,6 +17,8 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.math.Offset
@@ -35,6 +37,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -90,6 +93,20 @@ sealed trait ObscalcService[F[_]]:
   def selectProgramCategorizedTime(
     programId: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[CategorizedTime]]]
+
+  /**
+   * Selects the execution digest corresponding to the given observation id.
+   */
+  def selectExecutionDigest(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[CalculatedValue[Result[ExecutionDigest]]]]
+
+  /**
+   * Selects the execution digests corresponding to the given observation ids.
+   */
+  def selectManyExecutionDigest(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Result[ExecutionDigest]]]]
 
   /**
    * Marks all 'calculating' observations as 'pending' (or 'retry' if
@@ -185,6 +202,40 @@ object ObscalcService:
         session
           .execute(Statements.SelectProgramCategorizedTime)(programId)
           .map(_.toMap)
+
+      override def selectExecutionDigest(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[CalculatedValue[Result[ExecutionDigest]]]] =
+        selectManyExecutionDigest(List(observationId))
+          .map(_.get(observationId))
+
+      override def selectManyExecutionDigest(
+        observationIds: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, CalculatedValue[Result[ExecutionDigest]]]] =
+        NonEmptyList
+          .fromList(observationIds)
+          .fold(Map.empty[Observation.Id, CalculatedValue[Result[ExecutionDigest]]].pure[F]): nel =>
+            val af = Statements.selectManyExecutionDigest(nel)
+            session
+              .prepareR(af.fragment.query(
+                observation_id                  *:
+                calculation_state               *:
+                odb_error.opt                   *:
+                Statements.execution_digest.opt
+              ))
+              .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
+              .map: lst =>
+                lst
+                  .map:
+                    case (oid, state, None, None)                =>
+                      oid -> CalculatedValue(state, OdbError.SequenceUnavailable(oid, s"The background calculation has not (yet) produced a value for observation $oid".some).asFailure)
+                    case (oid, state, Some(error), None)         =>
+                      oid -> CalculatedValue(state, error.asFailure)
+                    case (oid, state, None, Some(digest))        =>
+                      oid -> CalculatedValue(state, digest.success)
+                    case (oid, state, Some(error), Some(digest)) =>
+                      oid -> CalculatedValue(state, error.asWarning(digest))
+                  .toMap
 
       override def reset(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.ResetCalculating).void
@@ -437,13 +488,13 @@ object ObscalcService:
       """.query(obscalc_entry)
 
     private def categorizedTimeColumns(prefix: String): String =
-      List(
+      prefixedColumns(prefix.some,
         "c_obscalc_state",
         "c_full_setup_time",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time"
-      ).map(s => s"$prefix.$s").mkString("", ",\n", "\n")
+      )
 
     val full_categorized_time: Decoder[CategorizedTime] =
        (time_span *: obs_class *: time_span *: time_span).map: (setup, obsclass, nonCharged, program) =>
@@ -480,6 +531,42 @@ object ObscalcService:
         .query(observation_id *: calculation_state *: full_categorized_time.opt)
         .map: (oid, state, catTime) =>
           oid -> CalculatedValue(state, catTime.getOrElse(CategorizedTime.Zero))
+
+    private def executionDigestColumns: String =
+      prefixedColumns(none,
+        "c_full_setup_time",
+        "c_reacq_setup_time",
+
+        "c_acq_obs_class",
+        "c_acq_non_charged_time",
+        "c_acq_program_time",
+        "c_acq_offsets",
+        "c_acq_atom_count",
+        "c_acq_execution_state",
+
+        "c_sci_obs_class",
+        "c_sci_non_charged_time",
+        "c_sci_program_time",
+        "c_sci_offsets",
+        "c_sci_atom_count",
+        "c_sci_execution_state"
+      )
+
+    def selectManyExecutionDigest(
+      which: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_obscalc_state,
+          c_odb_error,
+          #${executionDigestColumns}
+        FROM t_obscalc
+        WHERE
+      """(Void) |+|
+        void"c_observation_id IN (" |+|
+          which.map(sql"$observation_id").intercalate(void", ") |+|
+        void")"
 
     val ResetCalculating: Command[Void] =
       sql"""
