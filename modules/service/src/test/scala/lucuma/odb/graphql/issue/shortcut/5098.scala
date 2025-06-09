@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package issue.shortcut
 
-import cats.syntax.either.*
+import cats.data.Ior
 import io.circe.literal.*
 import lucuma.core.model.Target
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
@@ -45,7 +45,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
         _ <- runObscalcUpdate(p, o)
       yield (t, o)
     setup.flatMap { case (tid, oid) =>
-      expect(
+      expectIor(
         user  = pi,
         query =
           s"""
@@ -59,7 +59,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                    }
                  }
                  execution {
-                   digest {
+                   calculatedDigest {
                      value {
                        science {
                          timeEstimate {
@@ -74,7 +74,8 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                }
              }
            """,
-        expected =
+        expected = Ior.both(
+          List(s"ITC cannot be queried until the following parameters are defined: SED"),
           json"""
             {
               "observation": {
@@ -88,10 +89,13 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                   }
                 },
                 "execution": {
-                  "digest": null
+                  "calculatedDigest": {
+                    "value": null
+                  }
                 }
               }
             }
-          """.asRight
+          """
+        )
       )
     }

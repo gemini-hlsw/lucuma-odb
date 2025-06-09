@@ -11,7 +11,6 @@ import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GroupView
-import lucuma.odb.graphql.table.ObscalcView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramTable
 import lucuma.odb.graphql.table.ProposalView
@@ -26,7 +25,6 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
                                with ProgramTable[F]
                                with ProposalView[F]
-                               with ObscalcView[F]
                                with ObservationView[F]
                                with GroupView[F]
                                with StepRecordView[F]
@@ -67,13 +65,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimeChargeInvoiceType / "finalCharge" / "program", VisitTable.Final.ProgramTime)(VisitTable.Id),
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
-      timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId),
-      timeSpanMappingAtPath(SetupTimeType / "full", ObscalcView.Digest.FullSetupTime)(ObscalcView.ObservationId),
-      timeSpanMappingAtPath(SetupTimeType / "reacquisition", ObscalcView.Digest.ReacqSetupTime)(ObscalcView.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "nonCharged", ObscalcView.Digest.Acquisition.NonChargedTime)(ObscalcView.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "acquisition" / "timeEstimate" / "program", ObscalcView.Digest.Acquisition.ProgramTime)(ObscalcView.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "nonCharged", ObscalcView.Digest.Science.NonChargedTime)(ObscalcView.ObservationId),
-      timeSpanMappingAtPath(ExecutionDigestType / "science" / "timeEstimate" / "program", ObscalcView.Digest.Science.ProgramTime)(ObscalcView.ObservationId),
+      timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId)
     )
 
   private def valueAs[A: io.circe.Encoder](name: String)(f: Format[A, TimeSpan]): CursorField[A] =

@@ -43,16 +43,8 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
           s"""
              query {
                observation(observationId: "$oid") {
-                 calculatedWorkflow {
-                   value {
-                     validationErrors {
-                       messages
-                     }
-                   }
-                 }
                  execution {
-                   digest {
-                     state
+                   calculatedDigest {
                      value {
                        science {
                          observeClass
@@ -64,24 +56,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              }
            """,
         expected =
-          json"""
-            {
-              "observation": {
-                "calculatedWorkflow": {
-                  "value": {
-                    "validationErrors": [
-                      {
-                        "messages": [ "missing sequence too long error ...." ]
-                      }
-                    ]
-                  }
-                },
-                "execution": {
-                  "digest": null
-                }
-              }
-            }
-          """.asRight
+          List(s"Could not generate a sequence for $oid: The generated sequence is too long (more than ${SequenceAtomLimit} atoms).").asLeft
       )
     }
   }
@@ -103,7 +78,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              query {
                observation(observationId: "$oid") {
                  execution {
-                   digest {
+                   calculatedDigest {
                      value {
                        science {
                          observeClass
@@ -119,7 +94,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
             {
               "observation": {
                 "execution": {
-                  "digest": {
+                  "calculatedDigest": {
                     "value": {
                       "science" : {
                         "observeClass" : "SCIENCE"

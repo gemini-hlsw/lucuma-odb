@@ -36,7 +36,7 @@ import skunk.Transaction
 
 import table.AttachmentTable
 import table.ObsAttachmentAssignmentTable
-import table.ObscalcView
+import table.ObscalcTable
 import table.ObservationReferenceView
 import table.ProgramTable
 import Services.Syntax.*
@@ -47,7 +47,7 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with AttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
-     with ObscalcView[F]
+     with ObscalcTable[F]
      with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
@@ -87,7 +87,7 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       EffectField("workflow", workflowQueryHandler, List("id", "programId")),
-      SqlObject("calculatedWorkflow", Join(ObservationView.Id, ObscalcView.ObservationId))
+      SqlObject("calculatedWorkflow", Join(ObservationView.Id, ObscalcTable.ObservationId))
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

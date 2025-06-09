@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -93,7 +94,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       query {
         observation(observationId: "$oid") {
           execution {
-            digest {
+            calculatedDigest {
               state
               value {
                 setup {
@@ -125,7 +126,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "digest": {
+            "calculatedDigest": {
               "state": "READY",
               "value": {
                 "setup" : {
@@ -184,7 +185,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       }
     """
 
-  test("digest - pending"):
+  test("digest - pending first calculation"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -194,20 +195,9 @@ class executionDigest extends ExecutionTestSupportForGmos {
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query = digestQuery(oid),
-        expected = json"""
-          {
-            "observation": {
-              "execution": {
-                "digest": {
-                  "state": "PENDING",
-                  "value": null
-                }
-              }
-            }
-          }
-        """.asRight
+        user     = pi,
+        query    = digestQuery(oid),
+        expected = List(s"The background calculation has not (yet) produced a value for observation $oid").asLeft
       )
 
   test("digest - point band normalized"):
@@ -270,7 +260,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       yield (p, o)
 
     setup.flatMap: (pid, oid) =>
-      expect(
+      expectIor(
         user  = pi,
         query =
           s"""
@@ -280,7 +270,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       digest {
+                       calculatedDigest {
+                         state
                          value {
                            setup {
                              full { seconds }
@@ -294,24 +285,28 @@ class executionDigest extends ExecutionTestSupportForGmos {
              }
            """,
         expected =
-          json"""
-            {
-              "program": {
-                "observations": {
-                  "matches": [
-                    {
-                      "id": $oid,
-                      "execution": {
-                        "digest": {
-                          "value": null
+          Ior.both(
+            List(s"Could not generate a sequence for $oid: observation is missing target"),
+            json"""
+              {
+                "program": {
+                  "observations": {
+                    "matches": [
+                      {
+                        "id": $oid,
+                        "execution": {
+                          "calculatedDigest": {
+                            "state": "READY",
+                            "value": null
+                          }
                         }
                       }
-                    }
-                  ]
+                    ]
+                  }
                 }
               }
-            }
-          """.asRight
+            """
+          )
       )
 
   test("digest: one bad"):
@@ -325,7 +320,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       yield (p, o)
 
     setup.flatMap: (pid, oid) =>
-      expect(
+      expectIor(
         user  = pi,
         query =
           s"""
@@ -335,7 +330,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       digest {
+                       calculatedDigest {
+                         state
                          value {
                            setup {
                              full { seconds }
@@ -348,7 +344,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected =
+        expected = Ior.both(
+          List(s"Could not generate a sequence for $oid: observation is missing observing mode"),
           json"""
             {
               "program": {
@@ -357,7 +354,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid,
                       "execution": {
-                        "digest": {
+                        "calculatedDigest": {
+                          "state": "READY",
                           "value": null
                         }
                       }
@@ -366,7 +364,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 }
               }
             }
-          """.asRight
+          """
+        )
       )
 
   test("digest: one good, one bad"):
@@ -382,7 +381,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       yield (p, o0, o1)
 
     setup.flatMap: (pid, oid0, oid1) =>
-      expect(
+      expectIor(
         user  = pi,
         query =
           s"""
@@ -392,7 +391,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       digest {
+                       calculatedDigest {
                          value {
                            setup {
                              full { seconds }
@@ -405,7 +404,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected =
+        expected = Ior.both(
+          List(s"Could not generate a sequence for $oid1: observation is missing observing mode"),
           json"""
             {
               "program": {
@@ -414,7 +414,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "digest": {
+                        "calculatedDigest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -428,7 +428,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "digest": {
+                        "calculatedDigest": {
                           "value": null
                         }
                       }
@@ -437,7 +437,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 }
               }
             }
-          """.asRight
+          """
+        )
       )
 
   test("digest: one bad, one good"):
@@ -453,7 +454,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       yield (p, o0, o1)
 
     setup.flatMap: (pid, oid0, oid1) =>
-      expect(
+      expectIor(
         user  = pi,
         query =
           s"""
@@ -463,7 +464,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       digest {
+                       calculatedDigest {
                          value {
                            setup {
                              full { seconds }
@@ -476,7 +477,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected =
+        expected = Ior.both(
+          List(s"Could not generate a sequence for $oid0: observation is missing observing mode"),
           json"""
             {
               "program": {
@@ -485,7 +487,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "digest": {
+                        "calculatedDigest": {
                           "value": null
                         }
                       }
@@ -493,7 +495,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "digest": {
+                        "calculatedDigest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -508,7 +510,8 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 }
               }
             }
-          """.asRight
+          """
+        )
       )
 
   test("clear execution digest"):
@@ -542,7 +545,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
     s"""
       query {
         observation(observationId: "$oid") {
-          execution { digest { value { science { executionState } } } }
+          execution { calculatedDigest { value { science { executionState } } } }
         }
       }
     """
@@ -552,7 +555,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "digest": {
+            "calculatedDigest": {
               "value": {
                 "science" : {
                   "executionState": ${e.tag.toScreamingSnakeCase}
@@ -657,7 +660,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
             {
               "observation": {
                 "execution": {
-                  "digest": {
+                  "calculatedDigest": {
                     "state": "READY",
                     "value": {
                       "setup" : {
