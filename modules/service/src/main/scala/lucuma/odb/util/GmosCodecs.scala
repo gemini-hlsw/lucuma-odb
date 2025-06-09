@@ -9,6 +9,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
@@ -99,20 +100,19 @@ trait GmosCodecs {
   val gmos_south_stage_mode: Codec[GmosSouthStageMode] =
     enumerated(Type.varchar)
 
-  val gmos_x_binning: Codec[GmosXBinning] =
-    enumerated(Type.varchar)
-
-  val gmos_y_binning: Codec[GmosYBinning] =
+  val gmos_binning: Codec[GmosBinning] =
     enumerated(Type.varchar)
 
   val gmos_ccd_mode: Codec[GmosCcdMode] =
     (
-      gmos_x_binning *:
-      gmos_y_binning *:
+      gmos_binning   *:
+      gmos_binning   *:
       gmos_amp_count *:
       gmos_amp_gain  *:
       gmos_amp_read_mode
-    ).to[GmosCcdMode]
+    ).imap { case (x, y, c, g, r) => GmosCcdMode(GmosXBinning(x), GmosYBinning(y), c, g, r) } { m =>
+      (m.xBin.value, m.yBin.value, m.ampCount, m.ampGain, m.ampReadMode)
+    }
 
   val gmos_fpu_mask_custom: Codec[GmosFpuMask.Custom] =
     (varchar *: gmos_custom_slit_width).eimap { case (n, w) =>

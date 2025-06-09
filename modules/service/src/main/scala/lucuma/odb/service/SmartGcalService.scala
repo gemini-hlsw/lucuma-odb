@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -172,8 +173,8 @@ object SmartGcalService {
               row.key.gratingConfig.map(_.grating)         ,
               row.key.filter                               ,
               row.key.fpu                                  ,
-              row.key.xBin                                 ,
-              row.key.yBin                                 ,
+              row.key.xBin.value                           ,
+              row.key.yBin.value                           ,
               row.key.gratingConfig.map(_.wavelengthRange) ,
               row.key.gratingConfig.map(_.order)           ,
               row.key.gain                                 ,
@@ -205,8 +206,8 @@ object SmartGcalService {
               row.key.gratingConfig.map(_.grating)         ,
               row.key.filter                               ,
               row.key.fpu                                  ,
-              row.key.xBin                                 ,
-              row.key.yBin                                 ,
+              row.key.xBin.value                           ,
+              row.key.yBin.value                           ,
               row.key.gratingConfig.map(_.wavelengthRange) ,
               row.key.gratingConfig.map(_.order)           ,
               row.key.gain                                 ,
@@ -296,8 +297,8 @@ object SmartGcalService {
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_north_filter.opt}"(gn.filter),
         sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_north_fpu.opt}"(gn.fpu),
         sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gn.grating.map(_.order)),
-        sql"s.c_x_binning = ${gmos_x_binning}"(gn.xBin),
-        sql"s.c_y_binning = ${gmos_y_binning}"(gn.yBin),
+        sql"s.c_x_binning = ${gmos_binning}"(gn.xBin.value),
+        sql"s.c_y_binning = ${gmos_binning}"(gn.yBin.value),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gn.gain),
         gn.grating.map(_.wavelength).fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
@@ -317,8 +318,8 @@ object SmartGcalService {
         sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_south_filter.opt}"(gs.filter),
         sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_south_fpu.opt}"(gs.fpu),
         sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gs.grating.map(_.order)),
-        sql"s.c_x_binning = ${gmos_x_binning}"(gs.xBin),
-        sql"s.c_y_binning = ${gmos_y_binning}"(gs.yBin),
+        sql"s.c_x_binning = ${gmos_binning}"(gs.xBin.value),
+        sql"s.c_y_binning = ${gmos_binning}"(gs.yBin.value),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gs.gain),
         gs.grating.map(_.wavelength).fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
@@ -379,8 +380,8 @@ object SmartGcalService {
       Option[GmosNorthGrating]            ,
       Option[GmosNorthFilter]             ,
       Option[GmosNorthFpu]                ,
-      GmosXBinning                        ,
-      GmosYBinning                        ,
+      GmosBinning                         ,
+      GmosBinning                         ,
       Option[BoundedInterval[Wavelength]] ,
       Option[GmosGratingOrder]            ,
       GmosAmpGain                         ,
@@ -407,8 +408,8 @@ object SmartGcalService {
           ${gmos_north_grating.opt},
           ${gmos_north_filter.opt},
           ${gmos_north_fpu.opt},
-          $gmos_x_binning,
-          $gmos_y_binning,
+          $gmos_binning,
+          $gmos_binning,
           ${wavelength_pm_range.opt},
           ${gmos_grating_order.opt},
           $gmos_amp_gain,
@@ -422,8 +423,8 @@ object SmartGcalService {
       Option[GmosSouthGrating]            ,
       Option[GmosSouthFilter]             ,
       Option[GmosSouthFpu]                ,
-      GmosXBinning                        ,
-      GmosYBinning                        ,
+      GmosBinning                         ,
+      GmosBinning                         ,
       Option[BoundedInterval[Wavelength]] ,
       Option[GmosGratingOrder]            ,
       GmosAmpGain                         ,
@@ -450,8 +451,8 @@ object SmartGcalService {
           ${gmos_south_grating.opt},
           ${gmos_south_filter.opt},
           ${gmos_south_fpu.opt},
-          $gmos_x_binning,
-          $gmos_y_binning,
+          $gmos_binning,
+          $gmos_binning,
           ${wavelength_pm_range.opt},
           ${gmos_grating_order.opt},
           $gmos_amp_gain,
