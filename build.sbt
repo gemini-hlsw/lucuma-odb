@@ -41,8 +41,6 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
-useReadableConsoleGit
-
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
