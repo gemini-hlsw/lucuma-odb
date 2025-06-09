@@ -23,8 +23,8 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
     val ExposureTime: ColumnRef  = col("c_exposure_time",     time_span)
 
     object CcdMode {
-      val Xbin: ColumnRef        = col("c_xbin",              gmos_x_binning)
-      val Ybin: ColumnRef        = col("c_ybin",              gmos_y_binning)
+      val Xbin: ColumnRef        = col("c_xbin",              gmos_binning)
+      val Ybin: ColumnRef        = col("c_ybin",              gmos_binning)
       val AmpCount: ColumnRef    = col("c_amp_count",         gmos_amp_count)
       val AmpGain: ColumnRef     = col("c_amp_gain",          gmos_amp_gain)
       val AmpReadMode: ColumnRef = col("c_amp_read_mode",     gmos_amp_read_mode)
