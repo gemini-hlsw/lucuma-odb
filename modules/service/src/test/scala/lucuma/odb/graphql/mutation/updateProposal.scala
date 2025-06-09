@@ -11,14 +11,17 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.util.DateInterval
+import lucuma.odb.data.OdbError
 
 import java.time.LocalDate
 import java.time.Month
 
-class updateProposal extends OdbSuite {
-  
+class updateProposal extends OdbSuite with DatabaseOperations {
+
   val pi    = TestUsers.Standard.pi(nextId, nextId)
   val pi2   = TestUsers.Standard.pi(nextId, nextId)
   val guest = TestUsers.guest(nextId)
@@ -821,6 +824,185 @@ class updateProposal extends OdbSuite {
         """,
         expected =
           List(s"Program $pid is of type Engineering. Only Science programs can have proposals.").asLeft
+      )
+    }
+  }
+
+
+  test("✓ changing proposal type clears reviewer and mentor") {
+    for {
+      pid      <- createProgramAs(pi, "Fast Turnaround to Queue Proposal")
+      // Create FT proposal with reviewer and mentor
+      coiId    <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi, education = EducationalStatus.PhD)
+      mentorId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi, education = EducationalStatus.PhD)
+      _ <- createFastTurnaroundProposalForUpdate(pi, pid, Some(coiId.toString), Some(mentorId.toString))
+      // Now change the proposal type from FT to Queue
+      _ <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      toOActivation: NONE
+                      minPercentTime: 50
+                      partnerSplits: [
+                        {
+                          partner: US
+                          percent: 100
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Queue {
+                    minPercentTime
+                  }
+                }
+              }
+            }
+          }
+        """
+      )
+      // no reviewer or mentor after type change
+      _ <- expect(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Queue {
+                    minPercentTime
+                  }
+                  ... on FastTurnaround {
+                    reviewer {
+                      id
+                    }
+                    mentor {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "program": {
+              "proposal": {
+                "type": {
+                  "scienceSubtype": "QUEUE",
+                  "minPercentTime": 50
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield ()
+  }
+
+  test("✓ update fast turnaround proposal to set and clear reviewer and mentor") {
+    for {
+      pid        <- createProgramAs(pi, "Fast Turnaround Proposal")
+      reviewerId <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      mentorId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _          <- createFastTurnaroundProposalForUpdate(pi, pid, Some(reviewerId.toString), Some(mentorId.toString))
+      _          <- updateFastTurnaroundProposal(pi, pid, None, None)
+    } yield ()
+  }
+
+  test("✓ update fast turnaround proposal to change reviewer and mentor") {
+    for {
+      pid         <- createProgramAs(pi, "Fast Turnaround Proposal")
+      reviewerId1 <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      mentorId1   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      reviewerId2 <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      mentorId2   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      // First create a FT proposal with initial reviewer and mentor
+      _           <- createFastTurnaroundProposalForUpdate(pi, pid, Some(reviewerId1.toString), Some(mentorId1.toString))
+      // change reviewer and mentor to different users
+      _           <- updateFastTurnaroundProposal(pi, pid, Some(reviewerId2.toString), Some(mentorId2.toString))
+    } yield ()
+  }
+
+  test("⨯ fast turnaround cannot set same user as reviewer and mentor") {
+    for {
+      pid    <- createProgramAs(pi, "Fast Turnaround Proposal")
+      puId   <- addProgramUserAs(pi, pid, role = ProgramUserRole.Coi)
+      _      <- createFastTurnaroundProposalForUpdate(pi, pid)
+      _      <- updateFastTurnaroundProposalError(pi, pid, puId.toString)
+    } yield ()
+  }
+
+  test("⨯ fast turnaround cannot update to reviewer from different program") {
+    for {
+      pid1       <- createProgramAs(pi, "p1")
+      pid2       <- createProgramAs(pi, "p2")
+      reviewerId <- addProgramUserAs(pi, pid2, role = ProgramUserRole.Coi) // reviewer in different program
+      _          <- createFastTurnaroundProposalForUpdate(pi, pid1)
+      _          <- expectOdbError(
+                      user = pi,
+                      query = s"""
+                        mutation {
+                          updateProposal(
+                            input: {
+                              programId: "$pid1"
+                              SET: {
+                                type: {
+                                  fastTurnaround: {
+                                    reviewerId: "$reviewerId"
+                                  }
+                                }
+                              }
+                            }
+                          ) {
+                            proposal { category }
+                          }
+                        }
+                      """,
+                      expected = {
+                        case OdbError.InvalidArgument(Some("Reviewer must belong to the same program as the proposal.")) => // expected
+                      }
+                    )
+    } yield ()
+  }
+
+  test("⨯ cannot update queue proposal to have reviewerId") {
+    createProgramAs(pi, "Queue Proposal").flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    queue: {
+                      reviewerId: "pu-1234-5678-9abc-def0"
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected = List("Unknown field(s) 'reviewerId' for input object value of type QueueInput in field 'updateProposal' of type 'Mutation'").asLeft
       )
     }
   }
