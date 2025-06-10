@@ -5,11 +5,8 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import grackle.Result
-import grackle.syntax.*
-import lucuma.core.enums.{GmosAmpGain, GmosAmpReadMode, GmosNorthFilter, GmosRoi, GmosSouthFilter, GmosXBinning, GmosYBinning, ObservingModeType}
+import lucuma.core.enums.{GmosBinning, GmosNorthFilter, GmosSouthFilter}
 import lucuma.core.model.{Observation, SourceProfile}
-import lucuma.core.model.sequence.gmos.{DynamicConfig, GmosCcdMode}
 import lucuma.odb.data.{OdbError, OdbErrorExtensions}
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.util.Codecs.*
@@ -166,12 +163,20 @@ object GmosImagingService {
       override def insertNorth(
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosNorthImaging(which, input)).void
+        session.exec(Statements.insertGmosNorthImagingMode(which, input)) *>
+        (if (input.filters.nonEmpty) 
+           session.exec(Statements.insertGmosNorthImagingFilters(which, input))
+         else 
+           Concurrent[F].unit)
 
       override def insertSouth(
         input: GmosImagingInput.Create.South
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosSouthImaging(which, input)).void
+        session.exec(Statements.insertGmosSouthImagingMode(which, input)) *>
+        (if (input.filters.nonEmpty) 
+           session.exec(Statements.insertGmosSouthImagingFilters(which, input))
+         else 
+           Concurrent[F].unit)
 
       // override def deleteNorth(
       //   which: List[Observation.Id]
@@ -258,8 +263,8 @@ object GmosImagingService {
     //     WHERE c_observation_id = ANY($observation_id_array)
     //   """.query(observation_id *: DecodersSouth.decoder)
 
-    // Insert statements following the array pattern
-    def insertGmosNorthImaging(
+    // Insert statements following the array pattern - separate methods for mode and filters
+    def insertGmosNorthImagingMode(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.North,
     ): AppliedFragment = {
@@ -291,6 +296,14 @@ object GmosImagingService {
           )
         }
 
+      val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
+      insertMode |+| modeValues
+    }
+
+    def insertGmosNorthImagingFilters(
+      oids: List[Observation.Id],
+      input: GmosImagingInput.Create.North
+    ): AppliedFragment = {
       def insertFilters: AppliedFragment =
         void"""
           INSERT INTO t_gmos_north_imaging_filter (
@@ -305,17 +318,11 @@ object GmosImagingService {
           filter <- input.filters
         } yield sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
 
-      val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
       val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
-
-      if (input.filters.nonEmpty) {
-        insertMode |+| modeValues |+| void"; " |+| insertFilters |+| filterValues
-      } else {
-        insertMode |+| modeValues
-      }
+      insertFilters |+| filterValues
     }
 
-    def insertGmosSouthImaging(
+    def insertGmosSouthImagingMode(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.South
     ): AppliedFragment = {
@@ -347,6 +354,14 @@ object GmosImagingService {
           )
         }
 
+      val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
+      insertMode |+| modeValues
+    }
+
+    def insertGmosSouthImagingFilters(
+      oids: List[Observation.Id],
+      input: GmosImagingInput.Create.South
+    ): AppliedFragment = {
       def insertFilters: AppliedFragment =
         void"""
           INSERT INTO t_gmos_south_imaging_filter (
@@ -361,14 +376,8 @@ object GmosImagingService {
           filter <- input.filters
         } yield sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
 
-      val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
       val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
-
-      if (input.filters.nonEmpty) {
-        insertMode |+| modeValues |+| void"; " |+| insertFilters |+| filterValues
-      } else {
-        insertMode |+| modeValues
-      }
+      insertFilters |+| filterValues
     }
 
     // Delete statements

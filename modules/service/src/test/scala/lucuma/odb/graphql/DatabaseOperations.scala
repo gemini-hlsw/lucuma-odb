@@ -515,6 +515,12 @@ trait DatabaseOperations { this: OdbSuite =>
   def createObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationAs(user, pid, None, tids*)
 
+  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, Some(ObservingModeType.GmosNorthImaging), tids*)
+
+  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, Some(ObservingModeType.GmosSouthImaging), tids*)
+
   def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
     query(
       user,
@@ -675,9 +681,18 @@ trait DatabaseOperations { this: OdbSuite =>
             fpu: LONG_SLIT_2
           }
         }"""
-      case ObservingModeType.GmosNorthImaging |
-           ObservingModeType.GmosSouthImaging =>
-        """null"""
+      case ObservingModeType.GmosNorthImaging =>
+        """{
+          gmosNorthImaging: {
+            filters: [R_PRIME, G_PRIME]
+          }
+        }"""
+      case ObservingModeType.GmosSouthImaging =>
+        """{
+          gmosSouthImaging: {
+            filters: [R_PRIME, G_PRIME]
+          }
+        }"""
       case ObservingModeType.GmosNorthLongSlit =>
         """{
           gmosNorthLongSlit: {
