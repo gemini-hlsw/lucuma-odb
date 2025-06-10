@@ -9,6 +9,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.show.*
+import fs2.Stream
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
@@ -72,6 +73,10 @@ trait ExecutionEventService[F[_]] {
   def insertStepEvent(
     input: AddStepEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent]]
+
+  def selectSequenceEvents(
+    oid: Observation.Id
+  ): Stream[F, SequenceEvent]
 
 }
 
@@ -209,6 +214,11 @@ object ExecutionEventService {
           _ <- ResultT.liftF(services.sequenceService.abandonOngoingStepsExcept(oid, aid, input.stepId))
           _ <- ResultT.liftF(timeAccountingService.update(vid))
         yield StepEvent(eid, time, oid, vid, aid, input.stepId, input.stepStage)).value
+
+      override def selectSequenceEvents(
+        oid: Observation.Id
+      ): Stream[F, SequenceEvent] =
+        session.stream(Statements.SelectSequenceEvents)(oid, 256)
 
     }
 
@@ -414,6 +424,30 @@ object ExecutionEventService {
           c_atom_id
       """.query(execution_event_id *: core_timestamp *: observation_id *: visit_id *: atom_id)
          .contramap((s, t) => (s, t, s))
+
+
+    val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
+      sql"""
+        SELECT
+          c_execution_event_id,
+          c_received,
+          c_observation_id,
+          c_visit_id,
+          c_sequence_command
+        FROM
+          t_execution_event
+        WHERE
+          c_observation_id = $observation_id AND
+          c_sequence_command IS NOT NULL
+        ORDER BY
+          c_received
+      """.query((
+        execution_event_id *:
+        core_timestamp     *:
+        observation_id     *:
+        visit_id           *:
+        sequence_command
+      ).to[ExecutionEvent.SequenceEvent])
 
   }
 

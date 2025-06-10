@@ -632,7 +632,7 @@ object Science:
     records:     NonEmptyVector[BlockRecord[D]],
     tracker:     IndexTracker,
     pos:         Int
-  ) extends SequenceGenerator[D]:
+  ) extends SequenceGenerator.Base[D]:
 
     val length: Int = records.length
 
