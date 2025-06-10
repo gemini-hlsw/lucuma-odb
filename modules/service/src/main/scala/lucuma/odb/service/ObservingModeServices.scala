@@ -88,11 +88,11 @@ object ObservingModeServices {
         input: ObservingModeInput.Create
       )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
         List(
-          input.f2LongSlit.map(flamingos2LongSlitService.insert),
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
-          // input.gmosNorthImaging.map(gmosImagingService.insertNorth),
-          // input.gmosSouthImaging.map(gmosImagingService.insertSouth)
+          input.flamingos2LongSlit.map(flamingos2LongSlitService.insert),
+          input.gmosNorthImaging.map(gmosImagingService.insertNorth),
+          input.gmosSouthImaging.map(gmosImagingService.insertSouth)
         ).flattenOption match
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode creation parameters were provided.")
