@@ -1988,4 +1988,128 @@ class createObservation extends OdbSuite {
       ids  <- groupElementsAs(pi, pid, Some(gid))
     } yield assertEquals(ids, List(Right(o1), Right(o3), Right(o2)))
   }
+
+  test("[gmos imaging] can create GMOS North imaging observation") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      js  <- query(pi, s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode {
+              gmosNorthImaging {
+                filters
+                bin
+                ampReadMode
+                ampGain
+                roi
+              }
+            }
+            scienceRequirements {
+              imaging {
+                minimumFov { arcseconds }
+                narrowFilters
+                broadFilters
+                combinedFilters
+              }
+            }
+          }
+        }
+      """)
+    } yield {
+      val cursor = js.hcursor.downFields("observation")
+      val imaging = cursor.downFields("observingMode", "gmosNorthImaging")
+      val sciReq = cursor.downFields("scienceRequirements", "imaging")
+      
+      val filters = imaging.downField("filters").as[List[String]].toOption.get
+      assert(filters.contains("R_PRIME"), "Expected R_PRIME filter")
+      assert(filters.contains("G_PRIME"), "Expected G_PRIME filter")
+      assertEquals(imaging.downField("bin").as[String].toOption.get, "ONE")
+      assertEquals(imaging.downField("ampReadMode").as[String].toOption.get, "SLOW")
+      assertEquals(imaging.downField("ampGain").as[String].toOption.get, "LOW")
+      assertEquals(imaging.downField("roi").as[String].toOption.get, "FULL_FRAME")
+      
+      assertEquals(sciReq.downFields("minimumFov", "arcseconds").as[Int].toOption.get, 100)
+      assertEquals(sciReq.downField("narrowFilters").as[Boolean].toOption.get, false)
+      assertEquals(sciReq.downField("broadFilters").as[Boolean].toOption.get, false)
+      assertEquals(sciReq.downField("combinedFilters").as[Boolean].toOption.get, true)
+    }
+  }
+
+  test("[gmos imaging] can create GMOS South imaging observation") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosSouthImagingObservationAs(pi, pid, tid)
+      js  <- query(pi, s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode {
+              gmosSouthImaging {
+                filters
+                bin
+                ampReadMode
+                ampGain
+                roi
+              }
+            }
+            scienceRequirements {
+              imaging {
+                minimumFov { arcseconds }
+                narrowFilters
+                broadFilters
+                combinedFilters
+              }
+            }
+          }
+        }
+      """)
+    } yield {
+      val cursor = js.hcursor.downFields("observation")
+      val imaging = cursor.downFields("observingMode", "gmosSouthImaging")
+      val sciReq = cursor.downFields("scienceRequirements", "imaging")
+      
+      val filters = imaging.downField("filters").as[List[String]].toOption.get
+      assert(filters.contains("R_PRIME"), "Expected R_PRIME filter")
+      assert(filters.contains("G_PRIME"), "Expected G_PRIME filter")
+      assertEquals(imaging.downField("bin").as[String].toOption.get, "ONE")
+      assertEquals(imaging.downField("ampReadMode").as[String].toOption.get, "SLOW")
+      assertEquals(imaging.downField("ampGain").as[String].toOption.get, "LOW")
+      assertEquals(imaging.downField("roi").as[String].toOption.get, "FULL_FRAME")
+      
+      assertEquals(sciReq.downFields("minimumFov", "arcseconds").as[Int].toOption.get, 100)
+      assertEquals(sciReq.downField("narrowFilters").as[Boolean].toOption.get, false)
+      assertEquals(sciReq.downField("broadFilters").as[Boolean].toOption.get, false)
+      assertEquals(sciReq.downField("combinedFilters").as[Boolean].toOption.get, true)
+    }
+  }
+
+  test("[gmos imaging] GMOS imaging observation has correct observing mode type") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oidN <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      oidS <- createGmosSouthImagingObservationAs(pi, pid, tid)
+      js  <- query(pi, s"""
+        query {
+          observations(WHERE: { id: { IN: ["$oidN", "$oidS"] } }) {
+            matches {
+              id
+              observingMode {
+                mode
+              }
+            }
+          }
+        }
+      """)
+    } yield {
+      val observations = js.hcursor.downFields("observations", "matches").values.get.toList
+      assertEquals(observations.size, 2)
+      
+      val modes = observations.map(_.hcursor.downFields("observingMode", "mode").as[String].toOption.get)
+      assert(modes.contains("GMOS_NORTH_IMAGING"), "Expected GMOS_NORTH_IMAGING mode")
+      assert(modes.contains("GMOS_SOUTH_IMAGING"), "Expected GMOS_SOUTH_IMAGING mode")
+    }
+  }
 }

@@ -183,7 +183,7 @@ object GmosImagingInput:
   )] =
     ObjectFieldsBinding.rmap:
       case List(
-        GmosNorthFilterBinding.List.Nullable("filter", rFilters),
+        GmosNorthFilterBinding.List.Nullable("filters", rFilters),
         GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
@@ -205,7 +205,7 @@ object GmosImagingInput:
   )] =
     ObjectFieldsBinding.rmap:
       case List(
-        GmosSouthFilterBinding.List.Nullable("filter", rFilters),
+        GmosSouthFilterBinding.List.Nullable("filters", rFilters),
         GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
