@@ -69,6 +69,8 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput).some,
         none,
+        none,
+        none,
         none
       )
 
@@ -87,6 +89,8 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput).some,
+        none,
+        none,
         none
       )
 
