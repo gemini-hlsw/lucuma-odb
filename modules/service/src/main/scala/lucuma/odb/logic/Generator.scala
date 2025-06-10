@@ -345,11 +345,13 @@ object Generator {
           EitherT.pure:
             (ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
         else
+          val visits = services.visitService.selectAll(ctx.oid)
+          val events = services.executionEventService.selectSequenceEvents(ctx.oid)
           EitherT.liftF:
             services.transactionally:
               for
                 t <- when.fold(timeService.transactionTime)(_.pure[F])
-                p <- gen.executionConfig(steps, t)
+                p <- gen.executionConfig(visits, events, steps, t)
               yield p
 
       private def flamingos2LongSlit(

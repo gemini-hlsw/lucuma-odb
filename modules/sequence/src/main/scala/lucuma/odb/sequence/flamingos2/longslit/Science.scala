@@ -21,18 +21,21 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.math.syntax.int.*
+import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
 
@@ -42,6 +45,12 @@ import java.util.UUID
  * Flamingos 2 long slit science sequence generation.
  */
 object Science:
+
+  /**
+   * Maximum time that may pass between flats.
+   */
+  val FlatPeriod: TimeSpan =
+    2.hourTimeSpan
 
   case class Steps(
     a:     ProtoStep[F2],
@@ -111,7 +120,7 @@ object Science:
         val state = builder.build(NonEmptyString.unapply(name), tracker.atomCount, tracker.stepCount, ss)
         Stream.emit(state.runA(calcState).value)
 
-    def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
+    override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
       if step.isAcquisitionSequence then this
       else copy(
         calcState = calcState.next(step.protoStep),
@@ -120,6 +129,10 @@ object Science:
                     then completed.updatedWith(step.protoStep)(n => (n.getOrElse(0) + 1).some)
                     else completed
       )
+
+    override def recordVisit(visit: VisitRecord): SequenceGenerator[F2] = this
+
+    override def recordSequenceEvent(cmd: SequenceEvent): SequenceGenerator[F2] = this
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
