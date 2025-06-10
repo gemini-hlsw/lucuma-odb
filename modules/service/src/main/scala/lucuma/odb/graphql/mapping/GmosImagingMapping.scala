@@ -9,117 +9,75 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
-import lucuma.odb.graphql.table.*
 import lucuma.core.enums.GmosBinning
+import lucuma.odb.graphql.table.*
 
 trait GmosImagingMapping[F[_]]
   extends GmosImagingView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
 
   import GmosImagingMapping.*
 
-  private class CommonImagingMapping(cc: CommonImagingColumns) {
-      val defaultBin = SqlField("defaultBin", cc.BinDefault)
-      val explicitBin = SqlField("explicitBin", cc.Bin)
-      val bin = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
-
-
-      val roi: FieldMapping                 = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
-      val defaultRoi: FieldMapping          = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
-      val explicitRoi: FieldMapping         = SqlField("explicitRoi", cc.Roi)
-
-      val ampReadMode: FieldMapping         = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
-      val defaultAmpReadMode: FieldMapping  = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode))
-      val explicitAmpReadMode: FieldMapping = SqlField("explicitAmpReadMode", cc.AmpReadMode)
-
-      val ampGain: FieldMapping             = explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain")
-      val defaultAmpGain: FieldMapping      = CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain))
-      val explicitAmpGain: FieldMapping     = SqlField("explicitAmpGain", cc.AmpGain)
-  }
-
   lazy val GmosNorthImagingMapping: ObjectMapping =
-    val common = new CommonImagingMapping(GmosNorthImagingView.Common)
-
     ObjectMapping(GmosNorthImagingType)(
 
       SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
 
-      common.bin,
-      common.defaultBin,
-      common.explicitBin,
-
-      common.roi,
-      common.defaultRoi,
-      common.explicitRoi,
-
-      common.ampReadMode,
-      common.defaultAmpReadMode,
-      common.explicitAmpReadMode,
-
-      common.ampGain,
-      common.defaultAmpGain,
-      common.explicitAmpGain,
-
       SqlField("filters", GmosNorthImagingView.Filters),
 
+      // Binning (explicit override or default)
+      explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin"),
+      SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
+      CursorField[GmosBinning]("defaultBin", _ => Result(DefaultBin)),
+
+      // AmpReadMode (explicit override or default)
+      explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode"),
+      SqlField("explicitAmpReadMode", GmosNorthImagingView.ExplicitAmpReadMode),
+      CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode)),
+
+      // AmpGain (explicit override or default)
+      explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain"),
+      SqlField("explicitAmpGain", GmosNorthImagingView.ExplicitAmpGain),
+      CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain)),
+
+      // ROI (explicit override or default)
+      explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi"),
+      SqlField("explicitRoi", GmosNorthImagingView.ExplicitRoi),
+      CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
     )
 
   lazy val GmosSouthImagingMapping: ObjectMapping =
-    val common = new CommonImagingMapping(GmosNorthImagingView.Common)
-
     ObjectMapping(GmosSouthImagingType)(
 
       SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
-      common.bin,
-      common.defaultBin,
-      common.explicitBin,
-
-      common.roi,
-      common.defaultRoi,
-      common.explicitRoi,
-
-      common.ampReadMode,
-      common.defaultAmpReadMode,
-      common.explicitAmpReadMode,
-
-      common.ampGain,
-      common.defaultAmpGain,
-      common.explicitAmpGain,
 
       SqlField("filters", GmosSouthImagingView.Filters),
-  //
-  //     // Binning (explicit override or default)
-  //     SqlField("defaultBin", cc.BinDefault),
-  //     SqlField("explicitBin", cc.XBin),
-  //     explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
-  //
-  //     explicitOrElseDefault[GmosYBinning]("yBin", "explicitYBin", "defaultYBin"),
-  //     SqlField("explicitYBin", GmosSouthImagingView.ExplicitBin),
-  //     CursorField[GmosYBinning]("defaultYBin", _ => Result(DefaultYBin)),
-  //
-  //     // AmpReadMode (explicit override or default)
-  //     explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode"),
-  //     SqlField("explicitAmpReadMode", GmosSouthImagingView.ExplicitAmpReadMode),
-  //     CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode)),
-  //
-  //     // AmpGain (explicit override or default)
-  //     explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain"),
-  //     SqlField("explicitAmpGain", GmosSouthImagingView.ExplicitAmpGain),
-  //     CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain)),
-  //
-  //     // ROI (explicit override or default)
-  //     explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi"),
-  //     SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
-  //     CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
+
+      // Binning (explicit override or default)
+      explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin"),
+      SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
+      CursorField[GmosBinning]("defaultBin", _ => Result(DefaultBin)),
+
+      // AmpReadMode (explicit override or default)
+      explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode"),
+      SqlField("explicitAmpReadMode", GmosSouthImagingView.ExplicitAmpReadMode),
+      CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode)),
+
+      // AmpGain (explicit override or default)
+      explicitOrElseDefault[GmosAmpGain]("ampGain", "explicitAmpGain", "defaultAmpGain"),
+      SqlField("explicitAmpGain", GmosSouthImagingView.ExplicitAmpGain),
+      CursorField[GmosAmpGain]("defaultAmpGain", _ => Result(DefaultAmpGain)),
+
+      // ROI (explicit override or default)
+      explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi"),
+      SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
+      CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
     )
 }
 
 object GmosImagingMapping {
 
   // Default values for GMOS Imaging modes
-  private val DefaultXBin: GmosXBinning = GmosXBinning.One
-  private val DefaultYBin: GmosYBinning = GmosYBinning.One
+  private val DefaultBin: GmosBinning = GmosBinning.One
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame

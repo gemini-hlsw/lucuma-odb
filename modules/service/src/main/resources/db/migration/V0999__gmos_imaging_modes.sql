@@ -106,16 +106,6 @@ DROP VIEW IF EXISTS v_observation;
 -- Recreate observation view with imaging mode support
 CREATE OR REPLACE VIEW v_observation AS
   SELECT o.*,
-  -- Calculate science mode using num_nulls (updated from V0995 to include existing logic)
-  CASE
-    WHEN num_nulls(o.c_spec_wavelength, o.c_spec_resolution, o.c_spec_wavelength_coverage,
-                   o.c_spec_focal_plane, o.c_spec_focal_plane_angle, o.c_spec_capability) < 6
-         THEN 'spectroscopy'::d_tag
-    WHEN num_nulls(o.c_img_minimum_fov, o.c_img_narrow_filters,
-                   o.c_img_broad_filters, o.c_img_combined_filters) < 4
-         THEN 'imaging'::d_tag
-    ELSE NULL
-  END AS c_science_mode,
   CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
   CASE WHEN o.c_air_mass_min             IS NOT NULL THEN o.c_observation_id END AS c_air_mass_id,
   CASE WHEN o.c_hour_angle_min           IS NOT NULL THEN o.c_observation_id END AS c_hour_angle_id,
@@ -129,10 +119,8 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_spec_focal_plane_angle   IS NOT NULL THEN o.c_observation_id END AS c_spec_focal_plane_angle_id,
   CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
-  CASE WHEN num_nulls(o.c_img_minimum_fov, o.c_img_narrow_filters, o.c_img_broad_filters, o.c_img_combined_filters) < 4 THEN o.c_observation_id END AS c_imaging_mode_id,
-  CASE WHEN num_nulls(o.c_spec_wavelength, o.c_spec_resolution, o.c_spec_wavelength_coverage, o.c_spec_focal_plane, o.c_spec_focal_plane_angle, o.c_spec_capability) < 6 THEN o.c_observation_id END AS c_spectroscopy_mode_id,
-  CASE WHEN mode_gni.c_observation_id IS NOT NULL THEN o.c_observation_id END AS c_gmos_north_imaging_id,
-  CASE WHEN mode_gsi.c_observation_id IS NOT NULL THEN o.c_observation_id END AS c_gmos_south_imaging_id,
+  CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
+  CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
