@@ -172,6 +172,7 @@ object OdbMapping {
           with GmosDynamicMapping[F]
           with GmosFpuMapping[F]
           with GmosGratingConfigMapping[F]
+          with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
@@ -382,8 +383,10 @@ object OdbMapping {
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
+                GmosNorthImagingMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
+                GmosSouthImagingMapping,
                 GmosSouthLongSlitMapping,
                 GmosSouthStaticMapping,
                 GoaPropertiesMapping,
