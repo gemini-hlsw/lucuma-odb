@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.util.Codecs.*
@@ -32,22 +33,21 @@ sealed trait GmosImagingService[F[_]] {
     input: GmosImagingInput.Create.South
   )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
-  // def deleteNorth(
-  //   which: List[Observation.Id]
-  // )(using Transaction[F]): F[Unit]
-  //
-  // def deleteSouth(
-  //   which: List[Observation.Id]
-  // )(using Transaction[F]): F[Unit]
-  //
-  // def updateNorth(
-  //   input: GmosImagingInput.Edit.North
-  // )(which: List[Observation.Id])(using Transaction[F]): F[Result[Unit]]
-  //
-  // def updateSouth(
-  //   input: GmosImagingInput.Edit.South
-  // )(which: List[Observation.Id])(using Transaction[F]): F[Result[Unit]]
-  //
+  def deleteNorth(
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
+
+  def deleteSouth(
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
+
+  def updateNorth(
+    input: GmosImagingInput.Edit.North
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
+
+  def updateSouth(
+    input: GmosImagingInput.Edit.South
+  )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
   def cloneNorth(
     observationId: Observation.Id,
     newObservationId: Observation.Id
@@ -174,38 +174,45 @@ object GmosImagingService {
          else 
            Concurrent[F].unit)
 
-      // override def deleteNorth(
-      //   which: List[Observation.Id]
-      // )(using Transaction[F]): F[Unit] =
-      //   which.traverse_ { oid =>
-      //     session.executeCommand(deleteGmosNorthImaging(oid))
-      //   }
-      //
-      // override def deleteSouth(
-      //   which: List[Observation.Id]
-      // )(using Transaction[F]): F[Unit] =
-      //   which.traverse_ { oid =>
-      //     session.executeCommand(deleteGmosSouthImaging(oid))
-      //   }
-      //
-      // override def updateNorth(
-      //   input: GmosImagingInput.Edit.North
-      // )(which: List[Observation.Id])(using Transaction[F]): F[Result[Unit]] =
-      //   input.toCreate.traverse { createInput =>
-      //     which.traverse_ { oid =>
-      //       deleteNorth(List(oid)) *> insertNorth(createInput)(List(oid)).void
-      //     }
-      //   }
-      //
-      // override def updateSouth(
-      //   input: GmosImagingInput.Edit.South
-      // )(which: List[Observation.Id])(using Transaction[F]): F[Result[Unit]] =
-      //   input.toCreate.traverse { createInput =>
-      //     which.traverse_ { oid =>
-      //       deleteSouth(List(oid)) *> insertSouth(createInput)(List(oid)).void
-      //     }
-      //   }
-      //
+      override def deleteNorth(
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
+        which.traverse_ { oid =>
+          session.exec(Statements.deleteGmosNorthImagingMode(oid)) *>
+          session.exec(Statements.deleteGmosNorthImagingFilters(oid))
+        }
+
+      override def deleteSouth(
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Unit] =
+        which.traverse_ { oid =>
+          session.exec(Statements.deleteGmosSouthImagingMode(oid)) *>
+          session.exec(Statements.deleteGmosSouthImagingFilters(oid))
+        }
+
+      override def updateNorth(
+        input: GmosImagingInput.Edit.North
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        input.toCreate match {
+          case Result.Success(createInput) =>
+            which.traverse_ { oid =>
+              deleteNorth(List(oid)) *> insertNorth(createInput)(List(oid))
+            }
+          case Result.Failure(errors) =>
+            Concurrent[F].raiseError(new RuntimeException(errors.head.message))
+        }
+
+      override def updateSouth(
+        input: GmosImagingInput.Edit.South
+      )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
+        input.toCreate match {
+          case Result.Success(createInput) =>
+            which.traverse_ { oid =>
+              deleteSouth(List(oid)) *> insertSouth(createInput)(List(oid))
+            }
+          case Result.Failure(errors) =>
+            Concurrent[F].raiseError(new RuntimeException(errors.head.message))
+        }
       override def cloneNorth(
         observationId: Observation.Id,
         newObservationId: Observation.Id
@@ -378,18 +385,29 @@ object GmosImagingService {
     }
 
     // Delete statements
-    // def deleteGmosNorthImaging(oid: Observation.Id): Command[Observation.Id] =
-    //   sql"""
-    //     DELETE FROM t_gmos_north_imaging
-    //     WHERE c_observation_id = $observation_id
-    //   """.command
-    //
-    // def deleteGmosSouthImaging(oid: Observation.Id): Command[Observation.Id] =
-    //   sql"""
-    //     DELETE FROM t_gmos_south_imaging
-    //     WHERE c_observation_id = $observation_id
-    //   """.command
-    //
+    def deleteGmosNorthImagingMode(oid: Observation.Id): AppliedFragment =
+      sql"""
+        DELETE FROM t_gmos_north_imaging
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
+
+    def deleteGmosNorthImagingFilters(oid: Observation.Id): AppliedFragment =
+      sql"""
+        DELETE FROM t_gmos_north_imaging_filter
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
+
+    def deleteGmosSouthImagingMode(oid: Observation.Id): AppliedFragment =
+      sql"""
+        DELETE FROM t_gmos_south_imaging
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
+
+    def deleteGmosSouthImagingFilters(oid: Observation.Id): AppliedFragment =
+      sql"""
+        DELETE FROM t_gmos_south_imaging_filter
+        WHERE c_observation_id = $observation_id
+      """.apply(oid)
     // Clone statements
     def cloneGmosNorthImagingMode(
       originalId: Observation.Id,

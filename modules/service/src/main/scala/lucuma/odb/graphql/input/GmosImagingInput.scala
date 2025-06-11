@@ -6,9 +6,9 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.*
+import lucuma.core.enums.GmosBinning
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import lucuma.core.enums.GmosBinning
 
 object GmosImagingInput:
 
@@ -141,7 +141,11 @@ object GmosImagingInput:
     ):
 
       val toCreate: Result[Create.North] =
-        Result(Create.North(filters.orEmpty, common.toCreate))
+        val filterList = filters.orEmpty
+        if (filterList.isEmpty)
+          Result.failure("At least one filter must be specified for GMOS imaging observations.")
+        else
+          Result(Create.North(filterList, common.toCreate))
 
     object North:
 
@@ -164,7 +168,11 @@ object GmosImagingInput:
     ):
 
       val toCreate: Result[Create.South] =
-        Result(Create.South(filters.orEmpty, common.toCreate))
+        val filterList = filters.orEmpty
+        if (filterList.isEmpty)
+          Result.failure("At least one filter must be specified for GMOS imaging observations.")
+        else
+          Result(Create.South(filterList, common.toCreate))
 
     object South:
 
