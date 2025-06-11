@@ -436,11 +436,11 @@ class observations extends OdbSuite {
       isNull  <- observationsWhere(pi3, """site: { IS_NULL: true }""")
       notNull <- observationsWhere(pi3, """site: { IS_NULL: false }""")
     yield
-      assertEquals(gn, List(oid1))
-      assertEquals(gs, List(oid2))
-      assertEquals(both,    List(oid1, oid2))
-      assertEquals(isNull,  List(oid3, oid4, oid5))
-      assertEquals(notNull, List(oid1, oid2))
+      assertEquals(gn, List(oid1, oid4))
+      assertEquals(gs, List(oid2, oid5))
+      assertEquals(both,    List(oid1, oid2, oid4, oid5))
+      assertEquals(isNull,  List(oid3))
+      assertEquals(notNull, List(oid1, oid2, oid4, oid5))
 
   test("filter on instrument"):
     for
@@ -456,11 +456,11 @@ class observations extends OdbSuite {
       isNull  <- observationsWhere(pi4, """instrument: { IS_NULL: true }""")
       notNull <- observationsWhere(pi4, """instrument: { IS_NULL: false }""")
     yield
-      assertEquals(gn, List(oid1))
-      assertEquals(gs, List(oid2))
-      assertEquals(both,    List(oid1, oid2))
-      assertEquals(isNull,  List(oid3, oid4, oid5))
-      assertEquals(notNull, List(oid1, oid2))
+      assertEquals(gn, List(oid1, oid4))
+      assertEquals(gs, List(oid2, oid5))
+      assertEquals(both,    List(oid1, oid2, oid4, oid5))
+      assertEquals(isNull,  List(oid3))
+      assertEquals(notNull, List(oid1, oid2, oid4, oid5))
 
   test("conflicting filter"):
     for
@@ -469,5 +469,218 @@ class observations extends OdbSuite {
       oid2 <- createObservationAs(pi4, pid, ObservingModeType.GmosSouthLongSlit.some)
       res  <- observationsWhere(pi4, """instrument: { EQ: GMOS_NORTH }, site: { EQ: GS }""")
     yield assertEquals(res, Nil)
+
+  test("query GMOS North imaging observations") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observations(WHERE: { 
+                  instrument: { EQ: GMOS_NORTH }
+                }) {
+                  matches {
+                    id
+                    observingMode {
+                      gmosNorthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "observations": {
+                    "matches": [
+                      {
+                        "id": $oid,
+                        "observingMode": {
+                          "gmosNorthImaging": {
+                            "filters": ["G_PRIME", "R_PRIME"],
+                            "bin": "ONE",
+                            "ampReadMode": "SLOW",
+                            "ampGain": "LOW",
+                            "roi": "FULL_FRAME"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  test("query GMOS South imaging observations") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observations(WHERE: { 
+                  instrument: { EQ: GMOS_SOUTH }
+                }) {
+                  matches {
+                    id
+                    observingMode {
+                      gmosSouthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "observations": {
+                    "matches": [
+                      {
+                        "id": $oid,
+                        "observingMode": {
+                          "gmosSouthImaging": {
+                            "filters": ["G_PRIME", "R_PRIME"],
+                            "bin": "ONE",
+                            "ampReadMode": "SLOW",
+                            "ampGain": "LOW",
+                            "roi": "FULL_FRAME"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  test("filter observations by instrument - GMOS imaging") {
+    for {
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetAs(pi, pid)
+      oidGNI   <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      oidGSI   <- createGmosSouthImagingObservationAs(pi, pid, tid)
+      oidGNLS  <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      oidGSLS  <- createObservationAs(pi, pid, ObservingModeType.GmosSouthLongSlit.some, tid)
+      oidNone  <- createObservationAs(pi, pid, tid)
+      gnObs <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, instrument: { EQ: GMOS_NORTH }""")
+      gsObs <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, instrument: { EQ: GMOS_SOUTH }""")
+      allGmos <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, instrument: { IN: [ GMOS_NORTH, GMOS_SOUTH ] }""")
+      noInstrument <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, instrument: { IS_NULL: true }""")
+    } yield {
+      assertEquals(gnObs, List(oidGNI, oidGNLS))
+      assertEquals(gsObs, List(oidGSI, oidGSLS))
+      assertEquals(allGmos, List(oidGNI, oidGSI, oidGNLS, oidGSLS))
+      assertEquals(noInstrument, List(oidNone))
+    }
+  }
+
+  test("query GMOS imaging observations with complete configuration") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        (createGmosNorthImagingObservationAs(pi, pid, tid), createGmosSouthImagingObservationAs(pi, pid, tid))
+          .tupled
+          .flatMap { (oidNorth, oidSouth) =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observations(WHERE: { 
+                    program: { id: { EQ: "$pid" } }
+                    instrument: { IN: [ GMOS_NORTH, GMOS_SOUTH ] }
+                  }) {
+                    matches {
+                      id
+                      instrument
+                      observingMode {
+                        mode
+                        gmosNorthImaging {
+                          filters
+                          bin
+                          ampReadMode
+                          ampGain
+                          roi
+                        }
+                        gmosSouthImaging {
+                          filters
+                          bin
+                          ampReadMode
+                          ampGain
+                          roi
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "observations": {
+                      "matches": [
+                        {
+                          "id": $oidNorth,
+                          "instrument": "GMOS_NORTH",
+                          "observingMode": {
+                            "mode": "GMOS_NORTH_IMAGING",
+                            "gmosNorthImaging": {
+                              "filters": ["G_PRIME", "R_PRIME"],
+                              "bin": "ONE",
+                              "ampReadMode": "SLOW",
+                              "ampGain": "LOW",
+                              "roi": "FULL_FRAME"
+                            },
+                            "gmosSouthImaging": null
+                          }
+                        },
+                        {
+                          "id": $oidSouth,
+                          "instrument": "GMOS_SOUTH",
+                          "observingMode": {
+                            "mode": "GMOS_SOUTH_IMAGING",
+                            "gmosNorthImaging": null,
+                            "gmosSouthImaging": {
+                              "filters": ["G_PRIME", "R_PRIME"],
+                              "bin": "ONE",
+                              "ampReadMode": "SLOW",
+                              "ampGain": "LOW",
+                              "roi": "FULL_FRAME"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """
+              )
+            )
+          }
+      }
+    }
+  }
 
 }
