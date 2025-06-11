@@ -48,16 +48,15 @@ sealed trait GmosImagingService[F[_]] {
   //   input: GmosImagingInput.Edit.South
   // )(which: List[Observation.Id])(using Transaction[F]): F[Result[Unit]]
   //
-  // def cloneNorth(
-  //   observationId: Observation.Id,
-  //   newObservationId: Observation.Id
-  // )(using Transaction[F]): F[Unit]
-  //
-  // def cloneSouth(
-  //   observationId: Observation.Id,
-  //   newObservationId: Observation.Id
-  // )(using Transaction[F]): F[Unit]
-  //
+  def cloneNorth(
+    observationId: Observation.Id,
+    newObservationId: Observation.Id
+  )(using Transaction[F]): F[Unit]
+
+  def cloneSouth(
+    observationId: Observation.Id,
+    newObservationId: Observation.Id
+  )(using Transaction[F]): F[Unit]
 }
 
 object GmosImagingService {
@@ -207,18 +206,19 @@ object GmosImagingService {
       //     }
       //   }
       //
-      // override def cloneNorth(
-      //   observationId: Observation.Id,
-      //   newObservationId: Observation.Id
-      // )(using Transaction[F]): F[Unit] =
-      //   session.executeCommand(cloneGmosNorthImaging(observationId, newObservationId))
-      //
-      // override def cloneSouth(
-      //   observationId: Observation.Id,
-      //   newObservationId: Observation.Id
-      // )(using Transaction[F]): F[Unit] =
-      //   session.executeCommand(cloneGmosSouthImaging(observationId, newObservationId))
-      //
+      override def cloneNorth(
+        observationId: Observation.Id,
+        newObservationId: Observation.Id
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.cloneGmosNorthImagingMode(observationId, newObservationId)) *>
+        session.exec(Statements.cloneGmosNorthImagingFilters(observationId, newObservationId))
+
+      override def cloneSouth(
+        observationId: Observation.Id,
+        newObservationId: Observation.Id
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.cloneGmosSouthImagingMode(observationId, newObservationId)) *>
+        session.exec(Statements.cloneGmosSouthImagingFilters(observationId, newObservationId))
     }
 
   object Statements {
@@ -390,78 +390,82 @@ object GmosImagingService {
     //     WHERE c_observation_id = $observation_id
     //   """.command
     //
-    // // Clone statements
-    // def cloneGmosNorthImaging(
-    //   originalId: Observation.Id,
-    //   newId: Observation.Id
-    // ): Command[(Observation.Id, Observation.Id)] =
-    //   sql"""
-    //     INSERT INTO t_gmos_north_imaging (
-    //       c_observation_id,
-    //       c_observing_mode_type,
-    //       c_explicit_x_bin,
-    //       c_explicit_y_bin,
-    //       c_explicit_amp_read_mode,
-    //       c_explicit_amp_gain,
-    //       c_explicit_roi
-    //     )
-    //     SELECT
-    //       ${observation_id},
-    //       c_observing_mode_type,
-    //       c_explicit_x_bin,
-    //       c_explicit_y_bin,
-    //       c_explicit_amp_read_mode,
-    //       c_explicit_amp_gain,
-    //       c_explicit_roi
-    //     FROM t_gmos_north_imaging
-    //     WHERE c_observation_id = ${observation_id};
-    //
-    //     INSERT INTO t_gmos_north_imaging_filter (
-    //       c_observation_id,
-    //       c_filter
-    //     )
-    //     SELECT
-    //       ${observation_id},
-    //       c_filter
-    //     FROM t_gmos_north_imaging_filter
-    //     WHERE c_observation_id = ${observation_id}
-    //   """.command.contramap { case (newId, originalId) => (newId, originalId, newId, originalId) }
-    //
-    // def cloneGmosSouthImaging(
-    //   originalId: Observation.Id,
-    //   newId: Observation.Id
-    // ): Command[(Observation.Id, Observation.Id)] =
-    //   sql"""
-    //     INSERT INTO t_gmos_south_imaging (
-    //       c_observation_id,
-    //       c_observing_mode_type,
-    //       c_explicit_x_bin,
-    //       c_explicit_y_bin,
-    //       c_explicit_amp_read_mode,
-    //       c_explicit_amp_gain,
-    //       c_explicit_roi
-    //     )
-    //     SELECT
-    //       ${observation_id},
-    //       c_observing_mode_type,
-    //       c_explicit_x_bin,
-    //       c_explicit_y_bin,
-    //       c_explicit_amp_read_mode,
-    //       c_explicit_amp_gain,
-    //       c_explicit_roi
-    //     FROM t_gmos_south_imaging
-    //     WHERE c_observation_id = ${observation_id};
-    //
-    //     INSERT INTO t_gmos_south_imaging_filter (
-    //       c_observation_id,
-    //       c_filter
-    //     )
-    //     SELECT
-    //       ${observation_id},
-    //       c_filter
-    //     FROM t_gmos_south_imaging_filter
-    //     WHERE c_observation_id = ${observation_id}
-    //   """.command.contramap { case (newId, originalId) => (newId, originalId, newId, originalId) }
+    // Clone statements
+    def cloneGmosNorthImagingMode(
+      originalId: Observation.Id,
+      newId: Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_north_imaging (
+          c_observation_id,
+          c_explicit_bin,
+          c_explicit_amp_read_mode,
+          c_explicit_amp_gain,
+          c_explicit_roi
+        )
+        SELECT
+          $observation_id,
+          c_explicit_bin,
+          c_explicit_amp_read_mode,
+          c_explicit_amp_gain,
+          c_explicit_roi
+        FROM t_gmos_north_imaging
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, originalId)
+
+    def cloneGmosNorthImagingFilters(
+      originalId: Observation.Id,
+      newId: Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_north_imaging_filter (
+          c_observation_id,
+          c_filter
+        )
+        SELECT
+          $observation_id,
+          c_filter
+        FROM t_gmos_north_imaging_filter
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, originalId)
+
+    def cloneGmosSouthImagingMode(
+      originalId: Observation.Id,
+      newId: Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_south_imaging (
+          c_observation_id,
+          c_explicit_bin,
+          c_explicit_amp_read_mode,
+          c_explicit_amp_gain,
+          c_explicit_roi
+        )
+        SELECT
+          $observation_id,
+          c_explicit_bin,
+          c_explicit_amp_read_mode,
+          c_explicit_amp_gain,
+          c_explicit_roi
+        FROM t_gmos_south_imaging
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, originalId)
+
+    def cloneGmosSouthImagingFilters(
+      originalId: Observation.Id,
+      newId: Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO t_gmos_south_imaging_filter (
+          c_observation_id,
+          c_filter
+        )
+        SELECT
+          $observation_id,
+          c_filter
+        FROM t_gmos_south_imaging_filter
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, originalId)
 
   }
 

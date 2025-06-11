@@ -140,9 +140,9 @@ object ObservingModeServices {
         mode match
           case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth
-          case ObservingModeType.GmosNorthImaging   => ((_, _) => MonadCancelThrow[F].unit) // TODO: Implement
+          case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth
-          case ObservingModeType.GmosSouthImaging   => ((_, _) => MonadCancelThrow[F].unit) // TODO: Implement
+          case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth
 
     }
 
