@@ -3,9 +3,12 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import grackle.Result
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.util.Codecs.*
@@ -17,14 +20,6 @@ import Services.Syntax.*
 
 sealed trait GmosImagingService[F[_]] {
 
-  // def selectNorth(
-  //   which: List[Observation.Id]
-  // )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => DynamicConfig.GmosNorth]]
-  //
-  // def selectSouth(
-  //   which: List[Observation.Id]
-  // )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => DynamicConfig.GmosSouth]]
-  //
   def insertNorth(
     input: GmosImagingInput.Create.North
   )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
@@ -42,11 +37,11 @@ sealed trait GmosImagingService[F[_]] {
   )(using Transaction[F]): F[Unit]
 
   def updateNorth(
-    input: GmosImagingInput.Edit.North
+    SET: GmosImagingInput.Edit.North
   )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def updateSouth(
-    input: GmosImagingInput.Edit.South
+    SET: GmosImagingInput.Edit.South
   )(which: List[Observation.Id])(using Transaction[F]): F[Unit]
   def cloneNorth(
     observationId: Observation.Id,
@@ -64,98 +59,6 @@ object GmosImagingService {
   def instantiate[F[_]: Concurrent](using Services[F]): GmosImagingService[F] =
     new GmosImagingService[F] {
 
-      // object DecodersNorth {
-      //
-      //   val decoder: Decoder[SourceProfile => DynamicConfig.GmosNorth] =
-      //     (
-      //       _gmos_north_filter                *:
-      //        gmos_binning.opt                  *:
-      //        gmos_amp_read_mode.opt            *:
-      //        gmos_amp_gain.opt                 *:
-      //        gmos_roi.opt                      *:
-      //        gmos_binning                      *:
-      //        gmos_amp_read_mode                *:
-      //        gmos_amp_gain                     *:
-      //        gmos_roi
-      //     ).emap { case ((((((((filters, explicitBin), explicitAmpReadMode), explicitAmpGain), explicitRoi), bin), ampReadMode), ampGain), roi) =>
-      //       (_: SourceProfile) =>
-      //         val ccdMode = GmosCcdMode(
-      //           xBin    = GmosXBinning(bin),
-      //           yBin    = GmosYBinning(bin),
-      //           ampCount = if (filters.length > 3) gmos.GmosAmpCount.Twelve else gmos.GmosAmpCount.Six, // TODO: Calculate amp count based on requirements
-      //           ampGain = ampGain,
-      //           ampReadMode = ampReadMode
-      //         )
-      //
-      //         DynamicConfig.GmosNorth(
-      //           exposure   = core.util.TimeSpan.Zero, // TODO: Calculate from exposure time mode
-      //           readout    = ccdMode,
-      //           dtax       = gmos.GmosDtax.Zero,
-      //           roi        = roi,
-      //           gratingConfig = None, // No grating for imaging
-      //           filter     = filters.headOption, // Use first filter for now - TODO: Handle multiple filters
-      //           fpu        = None  // No FPU for imaging
-      //         )
-      //     }
-      //
-      // }
-      //
-      // object DecodersSouth {
-      //
-      //   val decoder: Decoder[SourceProfile => DynamicConfig.GmosSouth] =
-      //     (
-      //       (_gmos_south_filter                *:
-      //        gmos_binning.opt                  *:
-      //        gmos_amp_read_mode.opt            *:
-      //        gmos_amp_gain.opt                 *:
-      //        gmos_roi.opt                      *:
-      //        gmos_binning                      *:
-      //        gmos_amp_read_mode                *:
-      //        gmos_amp_gain                     *:
-      //        gmos_roi).tupled
-      //     ).map { case (filters, explicitBin, explicitAmpReadMode, explicitAmpGain, explicitRoi, bin, ampReadMode, ampGain, roi) =>
-      //       (_: SourceProfile) =>
-      //         val ccdMode = GmosCcdMode(
-      //           xBin    = GmosXBinning(bin),
-      //           yBin    = GmosYBinning(bin),
-      //           ampCount = if (filters.length > 3) gmos.GmosAmpCount.Twelve else gmos.GmosAmpCount.Six, // TODO: Calculate amp count based on requirements
-      //           ampGain = ampGain,
-      //           ampReadMode = ampReadMode
-      //         )
-      //
-      //         DynamicConfig.GmosSouth(
-      //           exposure   = core.util.TimeSpan.Zero, // TODO: Calculate from exposure time mode
-      //           readout    = ccdMode,
-      //           dtax       = gmos.GmosDtax.Zero,
-      //           roi        = roi,
-      //           gratingConfig = None, // No grating for imaging
-      //           filter     = filters.headOption, // Use first filter for now - TODO: Handle multiple filters
-      //           fpu        = None  // No FPU for imaging
-      //         )
-      //     }
-      //
-      // }
-
-      // override def selectNorth(
-      //   which: List[Observation.Id]
-      // )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => DynamicConfig.GmosNorth]] =
-      //   session.prepareR(selectGmosNorthImaging).use { pq =>
-      //     pq.stream(which, 1024)
-      //       .compile
-      //       .toList
-      //       .map(_.toMap)
-      //   }
-      //
-      // override def selectSouth(
-      //   which: List[Observation.Id]
-      // )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => DynamicConfig.GmosSouth]] =
-      //   session.prepareR(selectGmosSouthImaging).use { pq =>
-      //     pq.stream(which, 1024)
-      //       .compile
-      //       .toList
-      //       .map(_.toMap)
-      //   }
-      //
       override def insertNorth(
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
@@ -191,28 +94,39 @@ object GmosImagingService {
         }
 
       override def updateNorth(
-        input: GmosImagingInput.Edit.North
+        SET: GmosImagingInput.Edit.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        input.toCreate match {
-          case Result.Success(createInput) =>
+        val commonUpdates = Statements.updateGmosNorthImaging(SET, which).fold(Applicative[F].unit)(session.exec)
+        val filterUpdates = SET.filters match {
+          case Some(filters) =>
             which.traverse_ { oid =>
-              deleteNorth(List(oid)) *> insertNorth(createInput)(List(oid))
+              session.exec(Statements.deleteGmosNorthImagingFilters(oid)) *>
+              (if (filters.nonEmpty) 
+                 session.exec(Statements.insertGmosNorthImagingFiltersForUpdate(oid, filters))
+               else 
+                 Concurrent[F].unit)
             }
-          case Result.Failure(errors) =>
-            Concurrent[F].raiseError(new RuntimeException(errors.head.message))
+          case None => Applicative[F].unit
         }
+        commonUpdates *> filterUpdates
 
       override def updateSouth(
-        input: GmosImagingInput.Edit.South
+        SET: GmosImagingInput.Edit.South
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        input.toCreate match {
-          case Result.Success(createInput) =>
+        val commonUpdates = Statements.updateGmosSouthImaging(SET, which).fold(Applicative[F].unit)(session.exec)
+        val filterUpdates = SET.filters match {
+          case Some(filters) =>
             which.traverse_ { oid =>
-              deleteSouth(List(oid)) *> insertSouth(createInput)(List(oid))
+              session.exec(Statements.deleteGmosSouthImagingFilters(oid)) *>
+              (if (filters.nonEmpty) 
+                 session.exec(Statements.insertGmosSouthImagingFiltersForUpdate(oid, filters))
+               else 
+                 Concurrent[F].unit)
             }
-          case Result.Failure(errors) =>
-            Concurrent[F].raiseError(new RuntimeException(errors.head.message))
+          case None => Applicative[F].unit
         }
+        commonUpdates *> filterUpdates
+
       override def cloneNorth(
         observationId: Observation.Id,
         newObservationId: Observation.Id
@@ -229,43 +143,6 @@ object GmosImagingService {
     }
 
   object Statements {
-
-    // Select statements using the views
-    // val selectGmosNorthImaging: Query[List[Observation.Id], (Observation.Id, SourceProfile => DynamicConfig.GmosNorth)] =
-    //   sql"""
-    //     SELECT c_observation_id,
-    //            c_filters,
-    //            c_explicit_x_bin,
-    //            c_explicit_y_bin,
-    //            c_explicit_amp_read_mode,
-    //            c_explicit_amp_gain,
-    //            c_explicit_roi,
-    //            c_x_bin,
-    //            c_y_bin,
-    //            c_amp_read_mode,
-    //            c_amp_gain,
-    //            c_roi
-    //     FROM v_gmos_north_imaging
-    //     WHERE c_observation_id = ANY($observation_id_array)
-    //   """.query(observation_id *: DecodersNorth.decoder)
-    //
-    // val selectGmosSouthImaging: Query[List[Observation.Id], (Observation.Id, SourceProfile => DynamicConfig.GmosSouth)] =
-    //   sql"""
-    //     SELECT c_observation_id,
-    //            c_filters,
-    //            c_explicit_x_bin,
-    //            c_explicit_y_bin,
-    //            c_explicit_amp_read_mode,
-    //            c_explicit_amp_gain,
-    //            c_explicit_roi,
-    //            c_x_bin,
-    //            c_y_bin,
-    //            c_amp_read_mode,
-    //            c_amp_gain,
-    //            c_roi
-    //     FROM v_gmos_south_imaging
-    //     WHERE c_observation_id = ANY($observation_id_array)
-    //   """.query(observation_id *: DecodersSouth.decoder)
 
     // Insert statements following the array pattern - separate methods for mode and filters
     def insertGmosNorthImagingMode(
@@ -484,6 +361,104 @@ object GmosImagingService {
         FROM t_gmos_south_imaging_filter
         WHERE c_observation_id = $observation_id
       """.apply(newId, originalId)
+
+    // Update statements following the GmosLongSlitService pattern
+    def commonUpdates(
+      input: GmosImagingInput.Edit.Common
+    ): List[AppliedFragment] = {
+      val upBin = sql"c_explicit_bin = ${gmos_binning.opt}"
+      val upAmpReadMode = sql"c_explicit_amp_read_mode = ${gmos_amp_read_mode.opt}"
+      val upAmpGain = sql"c_explicit_amp_gain = ${gmos_amp_gain.opt}"
+      val upRoi = sql"c_explicit_roi = ${gmos_roi.opt}"
+
+      List(
+        input.explicitBin.toOptionOption.map(upBin),
+        input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
+        input.explicitAmpGain.toOptionOption.map(upAmpGain),
+        input.explicitRoi.toOptionOption.map(upRoi)
+      ).flatten
+    }
+
+    def gmosNorthImagingUpdates(
+      input: GmosImagingInput.Edit.North
+    ): Option[NonEmptyList[AppliedFragment]] = {
+      val ups: List[AppliedFragment] = commonUpdates(input.common)
+      NonEmptyList.fromList(ups)
+    }
+
+    def updateGmosNorthImaging(
+      SET: GmosImagingInput.Edit.North,
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      for {
+        us <- gmosNorthImagingUpdates(SET)
+        oids <- NonEmptyList.fromList(which)
+      } yield
+        void"UPDATE t_gmos_north_imaging " |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+          void"WHERE " |+| observationIdIn(oids)
+
+    def gmosSouthImagingUpdates(
+      input: GmosImagingInput.Edit.South
+    ): Option[NonEmptyList[AppliedFragment]] = {
+      val ups: List[AppliedFragment] = commonUpdates(input.common)
+      NonEmptyList.fromList(ups)
+    }
+
+    def updateGmosSouthImaging(
+      SET: GmosImagingInput.Edit.South,
+      which: List[Observation.Id]
+    ): Option[AppliedFragment] =
+      for {
+        us <- gmosSouthImagingUpdates(SET)
+        oids <- NonEmptyList.fromList(which)
+      } yield
+        void"UPDATE t_gmos_south_imaging " |+|
+          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+          void"WHERE " |+| observationIdIn(oids)
+
+    // Helper methods for updating single observation filters
+    def insertGmosNorthImagingFiltersForUpdate(
+      oid: Observation.Id,
+      filters: List[GmosNorthFilter]
+    ): AppliedFragment = {
+      def insertFilters: AppliedFragment =
+        void"""
+          INSERT INTO t_gmos_north_imaging_filter (
+            c_observation_id,
+            c_filter
+          ) VALUES
+        """
+
+      def filterEntries =
+        filters.map { filter => 
+          sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
+        }
+
+      val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
+      insertFilters |+| filterValues
+    }
+
+    def insertGmosSouthImagingFiltersForUpdate(
+      oid: Observation.Id,
+      filters: List[GmosSouthFilter]
+    ): AppliedFragment = {
+      def insertFilters: AppliedFragment =
+        void"""
+          INSERT INTO t_gmos_south_imaging_filter (
+            c_observation_id,
+            c_filter
+          ) VALUES
+        """
+
+      def filterEntries =
+        filters.map { filter => 
+          sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
+        }
+
+      val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
+      insertFilters |+| filterValues
+    }
 
   }
 
