@@ -145,58 +145,12 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         val Key: ColumnRef = col("c_mode_key", text)
         val SyntheticId: ColumnRef = col("c_observing_mode_id", observation_id.embedded)
         val ObservingModeType: ColumnRef = col("c_observing_mode_type", observing_mode_type.embedded)
-        
-        // GMOS Imaging Mode Synthetic IDs
-        val GmosNorthImagingId: ColumnRef = col("c_gmos_north_imaging_id", observation_id.embedded)
-        val GmosSouthImagingId: ColumnRef = col("c_gmos_south_imaging_id", observation_id.embedded)
       }
 
       object ObservationDuration {
         val SyntheticId: ColumnRef = col("c_observation_duration_id", observation_id.embedded)
         val ObservationDuration: ColumnRef = col("c_observation_duration", time_span.embedded)
       }
-
-      // GMOS Imaging Mode Tables and Views
-      
-      object GmosNorthImagingView extends TableDef("v_gmos_north_imaging"):
-        val Id: ColumnRef                   = col("c_observation_id",         observation_id)
-        val ObservingModeType: ColumnRef    = col("c_observing_mode_type",    observing_mode_type)
-        val ExplicitXBin: ColumnRef         = col("c_explicit_x_bin",         gmos_xbin.opt)
-        val ExplicitYBin: ColumnRef         = col("c_explicit_y_bin",         gmos_ybin.opt) 
-        val ExplicitAmpReadMode: ColumnRef  = col("c_explicit_amp_read_mode", gmos_amp_read_mode.opt)
-        val ExplicitAmpGain: ColumnRef      = col("c_explicit_amp_gain",      gmos_amp_gain.opt)
-        val ExplicitRoi: ColumnRef          = col("c_explicit_roi",           gmos_roi.opt)
-        val Filters: ColumnRef              = col("c_filters",                _gmos_north_filter)
-        val XBin: ColumnRef                 = col("c_x_bin",                  gmos_xbin)
-        val YBin: ColumnRef                 = col("c_y_bin",                  gmos_ybin)
-        val AmpReadMode: ColumnRef          = col("c_amp_read_mode",          gmos_amp_read_mode)
-        val AmpGain: ColumnRef              = col("c_amp_gain",               gmos_amp_gain)
-        val Roi: ColumnRef                  = col("c_roi",                    gmos_roi)
-        val DefaultXBin: ColumnRef          = col("c_default_x_bin",          gmos_xbin)
-        val DefaultYBin: ColumnRef          = col("c_default_y_bin",          gmos_ybin)
-        val DefaultAmpReadMode: ColumnRef   = col("c_default_amp_read_mode",  gmos_amp_read_mode)
-        val DefaultAmpGain: ColumnRef       = col("c_default_amp_gain",       gmos_amp_gain)
-        val DefaultRoi: ColumnRef           = col("c_default_roi",            gmos_roi)
-
-      object GmosSouthImagingView extends TableDef("v_gmos_south_imaging"):
-        val Id: ColumnRef                   = col("c_observation_id",         observation_id)
-        val ObservingModeType: ColumnRef    = col("c_observing_mode_type",    observing_mode_type)
-        val ExplicitXBin: ColumnRef         = col("c_explicit_x_bin",         gmos_xbin.opt)
-        val ExplicitYBin: ColumnRef         = col("c_explicit_y_bin",         gmos_ybin.opt)
-        val ExplicitAmpReadMode: ColumnRef  = col("c_explicit_amp_read_mode", gmos_amp_read_mode.opt)
-        val ExplicitAmpGain: ColumnRef      = col("c_explicit_amp_gain",      gmos_amp_gain.opt)
-        val ExplicitRoi: ColumnRef          = col("c_explicit_roi",           gmos_roi.opt)
-        val Filters: ColumnRef              = col("c_filters",                _gmos_south_filter)
-        val XBin: ColumnRef                 = col("c_x_bin",                  gmos_xbin)
-        val YBin: ColumnRef                 = col("c_y_bin",                  gmos_ybin)
-        val AmpReadMode: ColumnRef          = col("c_amp_read_mode",          gmos_amp_read_mode)
-        val AmpGain: ColumnRef              = col("c_amp_gain",               gmos_amp_gain)
-        val Roi: ColumnRef                  = col("c_roi",                    gmos_roi)
-        val DefaultXBin: ColumnRef          = col("c_default_x_bin",          gmos_xbin)
-        val DefaultYBin: ColumnRef          = col("c_default_y_bin",          gmos_ybin)
-        val DefaultAmpReadMode: ColumnRef   = col("c_default_amp_read_mode",  gmos_amp_read_mode)
-        val DefaultAmpGain: ColumnRef       = col("c_default_amp_gain",       gmos_amp_gain)
-        val DefaultRoi: ColumnRef           = col("c_default_roi",            gmos_roi)
 
     }
 

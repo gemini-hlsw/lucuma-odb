@@ -2724,7 +2724,7 @@ class updateObservations extends OdbSuite
     }
   }
 
-  test("science mode auto-set: clearing all fields sets mode to null") {
+  test("science mode auto-set: clearing all fields sets mode to null"):
     createProgramAs(pi).flatMap { pid =>
       // First create observation with only one spectroscopy field
       query(pi, s"""
@@ -2809,9 +2809,8 @@ class updateObservations extends OdbSuite
         }
       }
     }
-  }
 
-  test("science mode auto-set: spectroscopy fields always trigger spectroscopy mode") {
+  test("science mode auto-set: spectroscopy fields always trigger spectroscopy mode"):
     createProgramAs(pi).flatMap { pid =>
       query(pi, s"""
         mutation {
@@ -2855,9 +2854,8 @@ class updateObservations extends OdbSuite
         )
       }
     }
-  }
 
-  test("observing mode: create GMOS imaging in an existing observation") {
+  test("observing mode: create GMOS imaging in an existing observation"):
 
     val update = """
       observingMode: {
@@ -2917,9 +2915,8 @@ class updateObservations extends OdbSuite
     """.asRight
 
     oneUpdateTest(pi, update, query, expected)
-  }
 
-  test("observing mode: update existing GMOS imaging") {
+  test("observing mode: update existing GMOS imaging"):
 
     val update0 = """
       observingMode: {
@@ -3010,9 +3007,8 @@ class updateObservations extends OdbSuite
         (update1, query, expected1)
       )
     )
-  }
 
-  test("observing mode: switch from GMOS imaging to long slit") {
+  test("observing mode: switch from GMOS imaging to long slit"):
 
     val update0 = """
       observingMode: {
@@ -3098,9 +3094,8 @@ class updateObservations extends OdbSuite
     """.asRight
 
     multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
-  }
 
-  test("observing mode: delete GMOS imaging") {
+  test("observing mode: delete GMOS imaging"):
 
     val update0 = """
       observingMode: {
@@ -3165,9 +3160,8 @@ class updateObservations extends OdbSuite
         (update1, query, expected1)
       )
     )
-  }
 
-  test("observing mode: (fail to) create GMOS imaging without filters") {
+  test("observing mode: (fail to) create GMOS imaging without filters"):
 
     val update = """
       observingMode: {
@@ -3189,9 +3183,8 @@ class updateObservations extends OdbSuite
 
     val expected = "At least one filter must be specified for GMOS imaging observations.".asLeft
     oneUpdateTest(pi, update, query, expected)
-  }
 
-  test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes") {
+  test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
     createProgramAs(pi).flatMap { pid =>
       createGmosNorthImagingObservationAs(pi, pid).flatMap { oid =>
         val initialUpdate = """
@@ -3255,7 +3248,7 @@ class updateObservations extends OdbSuite
           )
           // Verify that ALL values remain unchanged (transaction rollback)
           _ <- expect(
-            user = pi, 
+            user = pi,
             query = s"""
               query {
                 observation(observationId: "$oid") {
@@ -3275,7 +3268,7 @@ class updateObservations extends OdbSuite
                   "observingMode": {
                     "gmosNorthImaging": {
                       "filters": ["G_PRIME", "R_PRIME"],
-                      "bin": "TWO", 
+                      "bin": "TWO",
                       "ampGain": "LOW"
                     }
                   }
@@ -3286,7 +3279,6 @@ class updateObservations extends OdbSuite
         } yield ()
       }
     }
-  }
 
 }
 
