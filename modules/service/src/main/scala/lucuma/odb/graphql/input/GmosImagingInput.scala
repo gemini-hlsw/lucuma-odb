@@ -56,16 +56,20 @@ object GmosImagingInput:
       val Binding: Matcher[North] =
         NorthData.rmap {
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            Result(
-              North(filters.toOption.orEmpty,
-                Common(
-                  exBin.toOption,
-                  exAmpReadMode.toOption,
-                  exAmpGain.toOption,
-                  exRoi.toOption
+            val filterList = filters.toOption.orEmpty
+            if (filterList.isEmpty)
+              Result.failure("At least one filter must be specified for GMOS imaging observations.")
+            else
+              Result(
+                North(filterList,
+                  Common(
+                    exBin.toOption,
+                    exAmpReadMode.toOption,
+                    exAmpGain.toOption,
+                    exRoi.toOption
+                  )
                 )
               )
-            )
         }
 
     case class South(
@@ -87,16 +91,20 @@ object GmosImagingInput:
       val Binding: Matcher[South] =
         SouthData.rmap {
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            Result(
-              South(filters.toOption.orEmpty,
-                Common(
-                  exBin.toOption,
-                  exAmpReadMode.toOption,
-                  exAmpGain.toOption,
-                  exRoi.toOption
+            val filterList = filters.toOption.orEmpty
+            if (filterList.isEmpty)
+              Result.failure("At least one filter must be specified for GMOS imaging observations.")
+            else
+              Result(
+                South(filterList,
+                  Common(
+                    exBin.toOption,
+                    exAmpReadMode.toOption,
+                    exAmpGain.toOption,
+                    exRoi.toOption
+                  )
                 )
               )
-            )
         }
   end Create
 
