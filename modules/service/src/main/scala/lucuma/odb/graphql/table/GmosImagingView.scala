@@ -6,8 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
-import skunk.circe.codec.json.*
-import skunk.codec.all.*
 
 trait GmosImagingView[F[_]] extends BaseMapping[F]:
 

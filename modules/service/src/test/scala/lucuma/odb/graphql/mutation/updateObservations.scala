@@ -3191,6 +3191,103 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
+  test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes") {
+    createProgramAs(pi).flatMap { pid =>
+      createGmosNorthImagingObservationAs(pi, pid).flatMap { oid =>
+        val initialUpdate = """
+          observingMode: {
+            gmosNorthImaging: {
+              filters: [G_PRIME, R_PRIME],
+              explicitBin: TWO,
+              explicitAmpGain: LOW
+            }
+          }
+        """
+
+        val failingUpdate = """
+          observingMode: {
+            gmosNorthImaging: {
+              filters: [],
+              explicitBin: FOUR,
+              explicitAmpGain: HIGH
+            }
+          }
+        """
+
+        val query = """
+          observations {
+            observingMode {
+              gmosNorthImaging {
+                filters
+                bin
+                ampGain
+              }
+            }
+          }
+        """
+
+        for {
+          _ <- expect(
+            user = pi,
+            query = updateObservationsMutation(oid, initialUpdate, query),
+            expected = json"""
+              {
+                "updateObservations": {
+                  "observations": [
+                    {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "filters": ["G_PRIME", "R_PRIME"],
+                          "bin": "TWO",
+                          "ampGain": "LOW"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """.asRight
+          )
+          _ <- expect(
+            user = pi,
+            query = updateObservationsMutation(oid, failingUpdate, query),
+            expected = List("At least one filter must be specified for GMOS imaging observations.").asLeft
+          )
+          // Verify that ALL values remain unchanged (transaction rollback)
+          _ <- expect(
+            user = pi, 
+            query = s"""
+              query {
+                observation(observationId: "$oid") {
+                  observingMode {
+                    gmosNorthImaging {
+                      filters
+                      bin
+                      ampGain
+                    }
+                  }
+                }
+              }
+            """,
+            expected = json"""
+              {
+                "observation": {
+                  "observingMode": {
+                    "gmosNorthImaging": {
+                      "filters": ["G_PRIME", "R_PRIME"],
+                      "bin": "TWO", 
+                      "ampGain": "LOW"
+                    }
+                  }
+                }
+              }
+            """.asRight
+          )
+        } yield ()
+      }
+    }
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
