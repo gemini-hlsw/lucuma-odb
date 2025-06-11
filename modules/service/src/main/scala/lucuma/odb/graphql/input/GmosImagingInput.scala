@@ -3,13 +3,13 @@
 
 package lucuma.odb.graphql.input
 
+import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosBinning
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
-import cats.data.NonEmptyList
 
 object GmosImagingInput:
 

@@ -26,16 +26,16 @@ trait ConfigurationObservingModeMappings[F[_]]
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
       SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
-      SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId)),
+      SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId))
     )
 
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
-      SqlField("mode", ConfigurationRequestView.ObservingModeType),
+      SqlField("mode", ConfigurationRequestView.ObservingModeType),      
       SqlObject("gmosNorthLongSlit"),
       SqlObject("gmosSouthLongSlit"),
     )
-
+    
 }

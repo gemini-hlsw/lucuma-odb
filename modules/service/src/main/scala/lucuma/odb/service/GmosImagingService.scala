@@ -62,20 +62,12 @@ object GmosImagingService {
       override def insertNorth(
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosNorthImagingMode(which, input)) *>
-        (if (input.filters.nonEmpty)
-           session.exec(Statements.insertGmosNorthImagingFilters(which, input))
-         else
-           Concurrent[F].unit)
+        session.exec(Statements.insertGmosNorthImaging(which, input))
 
       override def insertSouth(
         input: GmosImagingInput.Create.South
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        session.exec(Statements.insertGmosSouthImagingMode(which, input)) *>
-        (if (input.filters.nonEmpty)
-           session.exec(Statements.insertGmosSouthImagingFilters(which, input))
-         else
-           Concurrent[F].unit)
+        session.exec(Statements.insertGmosSouthImaging(which, input))
 
       override def deleteNorth(
         which: List[Observation.Id]
@@ -144,23 +136,15 @@ object GmosImagingService {
 
   object Statements {
 
-    // Insert statements following the array pattern - separate methods for mode and filters
-    def insertGmosNorthImagingMode(
+    // Generic helper for combined insert statements
+    private def insertGmosImaging(
+      modeTableName: String,
+      filterTableName: String,
       oids: List[Observation.Id],
-      input: GmosImagingInput.Create.North,
+      common: GmosImagingInput.Create.Common,
+      filterEntries: List[AppliedFragment]
     ): AppliedFragment = {
-      def insertMode: AppliedFragment =
-        void"""
-          INSERT INTO t_gmos_north_imaging (
-            c_observation_id,
-            c_explicit_bin,
-            c_explicit_amp_read_mode,
-            c_explicit_amp_gain,
-            c_explicit_roi
-          ) VALUES
-        """
-
-      def modeEntries =
+      val modeEntries =
         oids.map { oid =>
           sql"""(
             $observation_id,
@@ -170,95 +154,72 @@ object GmosImagingService {
             ${gmos_roi.opt}
           )"""(
             oid,
-            input.common.explicitBin,
-            input.common.explicitAmpReadMode,
-            input.common.explicitAmpGain,
-            input.common.explicitRoi
+            common.explicitBin,
+            common.explicitAmpReadMode,
+            common.explicitAmpGain,
+            common.explicitRoi
           )
         }
 
       val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
-      insertMode |+| modeValues
+      
+      if (filterEntries.nonEmpty) {
+        val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
+        sql"""
+          WITH mode_inserts AS (
+            INSERT INTO #$modeTableName (
+              c_observation_id,
+              c_explicit_bin,
+              c_explicit_amp_read_mode,
+              c_explicit_amp_gain,
+              c_explicit_roi
+            ) VALUES """.apply(Void) |+| modeValues |+| sql"""
+            RETURNING c_observation_id
+          )
+          INSERT INTO #$filterTableName (
+            c_observation_id,
+            c_filter
+          ) VALUES """.apply(Void) |+| filterValues
+      } else {
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi) VALUES ".apply(Void) |+| modeValues
+      }
     }
 
-    def insertGmosNorthImagingFilters(
+    // Combined insert statements - inserts both mode and filters in a single call
+    def insertGmosNorthImaging(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.North
     ): AppliedFragment = {
-      def insertFilters: AppliedFragment =
-        void"""
-          INSERT INTO t_gmos_north_imaging_filter (
-            c_observation_id,
-            c_filter
-          ) VALUES
-        """
+      val filterEntries = for {
+        oid <- oids
+        filter <- input.filters.toList
+      } yield sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
 
-      def filterEntries =
-        for {
-          oid <- oids
-          filter <- input.filters.toList
-        } yield sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
-
-      val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
-      insertFilters |+| filterValues
+      insertGmosImaging(
+        "t_gmos_north_imaging",
+        "t_gmos_north_imaging_filter",
+        oids,
+        input.common,
+        filterEntries
+      )
     }
 
-    def insertGmosSouthImagingMode(
+    def insertGmosSouthImaging(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.South
     ): AppliedFragment = {
-      def insertMode: AppliedFragment =
-        void"""
-          INSERT INTO t_gmos_south_imaging (
-            c_observation_id,
-            c_explicit_bin,
-            c_explicit_amp_read_mode,
-            c_explicit_amp_gain,
-            c_explicit_roi
-          ) VALUES
-        """
+      val filterEntries = for {
+        oid <- oids
+        filter <- input.filters.toList
+      } yield sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
 
-      def modeEntries =
-        oids.map { oid =>
-          sql"""(
-            $observation_id,
-            ${gmos_binning.opt},
-            ${gmos_amp_read_mode.opt},
-            ${gmos_amp_gain.opt},
-            ${gmos_roi.opt}
-          )"""(
-            oid,
-            input.common.explicitBin,
-            input.common.explicitAmpReadMode,
-            input.common.explicitAmpGain,
-            input.common.explicitRoi
-          )
-        }
-
-      val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
-      insertMode |+| modeValues
-    }
-
-    def insertGmosSouthImagingFilters(
-      oids: List[Observation.Id],
-      input: GmosImagingInput.Create.South
-    ): AppliedFragment = {
-      def insertFilters: AppliedFragment =
-        void"""
-          INSERT INTO t_gmos_south_imaging_filter (
-            c_observation_id,
-            c_filter
-          ) VALUES
-        """
-
-      def filterEntries =
-        for {
-          oid <- oids
-          filter <- input.filters.toList
-        } yield sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
-
-      val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
-      insertFilters |+| filterValues
+      insertGmosImaging(
+        "t_gmos_south_imaging",
+        "t_gmos_south_imaging_filter",
+        oids,
+        input.common,
+        filterEntries
+      )
     }
 
     // Delete statements
