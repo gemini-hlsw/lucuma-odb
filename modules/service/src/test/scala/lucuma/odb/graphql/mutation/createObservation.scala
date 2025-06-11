@@ -2108,7 +2108,7 @@ class createObservation extends OdbSuite {
     }
   }
 
-  test("[gmos imaging] can create GMOS North imaging observation with empty filters") {
+  test("[gmos imaging] cannot create GMOS North imaging observation with empty filters") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>
         expect(pi, s"""
@@ -2138,37 +2138,17 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosNorthImaging {
                     filters
-                    bin
-                    ampReadMode
-                    ampGain
-                    roi
                   }
                 }
               }
             }
           }
-        """, json"""
-          {
-            "createObservation": {
-              "observation": {
-                "observingMode": {
-                  "gmosNorthImaging": {
-                    "filters": [],
-                    "bin": "ONE",
-                    "ampReadMode": "SLOW",
-                    "ampGain": "LOW",
-                    "roi": "FULL_FRAME"
-                  }
-                }
-              }
-            }
-          }
-        """.asRight)
+        """, List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
       }
     }
   }
 
-  test("[gmos imaging] can create GMOS South imaging observation with empty filters") {
+  test("[gmos imaging] cannot create GMOS South imaging observation with empty filters") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>
         expect(pi, s"""
@@ -2198,32 +2178,12 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosSouthImaging {
                     filters
-                    bin
-                    ampReadMode
-                    ampGain
-                    roi
                   }
                 }
               }
             }
           }
-        """, json"""
-          {
-            "createObservation": {
-              "observation": {
-                "observingMode": {
-                  "gmosSouthImaging": {
-                    "filters": [],
-                    "bin": "ONE",
-                    "ampReadMode": "SLOW",
-                    "ampGain": "LOW",
-                    "roi": "FULL_FRAME"
-                  }
-                }
-              }
-            }
-          }
-        """.asRight)
+        """, List("Argument 'input.SET.observingMode.gmosSouthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
       }
     }
   }
