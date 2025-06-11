@@ -17,6 +17,7 @@ import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ImageQuality
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
@@ -1990,126 +1991,240 @@ class createObservation extends OdbSuite {
   }
 
   test("[gmos imaging] can create GMOS North imaging observation") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
-      js  <- query(pi, s"""
-        query {
-          observation(observationId: "$oid") {
-            observingMode {
-              gmosNorthImaging {
-                filters
-                bin
-                ampReadMode
-                ampGain
-                roi
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
               }
             }
-            scienceRequirements {
-              imaging {
-                minimumFov { arcseconds }
-                narrowFilters
-                broadFilters
-                combinedFilters
+          """, json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
               }
             }
-          }
+          """.asRight)
         }
-      """)
-    } yield {
-      val cursor = js.hcursor.downFields("observation")
-      val imaging = cursor.downFields("observingMode", "gmosNorthImaging")
-      val sciReq = cursor.downFields("scienceRequirements", "imaging")
-      
-      val filters = imaging.downField("filters").as[List[String]].toOption.get
-      assert(filters.contains("R_PRIME"), "Expected R_PRIME filter")
-      assert(filters.contains("G_PRIME"), "Expected G_PRIME filter")
-      assertEquals(imaging.downField("bin").as[String].toOption.get, "ONE")
-      assertEquals(imaging.downField("ampReadMode").as[String].toOption.get, "SLOW")
-      assertEquals(imaging.downField("ampGain").as[String].toOption.get, "LOW")
-      assertEquals(imaging.downField("roi").as[String].toOption.get, "FULL_FRAME")
-      
-      assertEquals(sciReq.downFields("minimumFov", "arcseconds").as[Int].toOption.get, 100)
-      assertEquals(sciReq.downField("narrowFilters").as[Boolean].toOption.get, false)
-      assertEquals(sciReq.downField("broadFilters").as[Boolean].toOption.get, false)
-      assertEquals(sciReq.downField("combinedFilters").as[Boolean].toOption.get, true)
+      }
     }
   }
 
   test("[gmos imaging] can create GMOS South imaging observation") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosSouthImagingObservationAs(pi, pid, tid)
-      js  <- query(pi, s"""
-        query {
-          observation(observationId: "$oid") {
-            observingMode {
-              gmosSouthImaging {
-                filters
-                bin
-                ampReadMode
-                ampGain
-                roi
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                observingMode {
+                  gmosSouthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
               }
             }
-            scienceRequirements {
-              imaging {
-                minimumFov { arcseconds }
-                narrowFilters
-                broadFilters
-                combinedFilters
+          """, json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
               }
             }
-          }
+          """.asRight)
         }
-      """)
-    } yield {
-      val cursor = js.hcursor.downFields("observation")
-      val imaging = cursor.downFields("observingMode", "gmosSouthImaging")
-      val sciReq = cursor.downFields("scienceRequirements", "imaging")
-      
-      val filters = imaging.downField("filters").as[List[String]].toOption.get
-      assert(filters.contains("R_PRIME"), "Expected R_PRIME filter")
-      assert(filters.contains("G_PRIME"), "Expected G_PRIME filter")
-      assertEquals(imaging.downField("bin").as[String].toOption.get, "ONE")
-      assertEquals(imaging.downField("ampReadMode").as[String].toOption.get, "SLOW")
-      assertEquals(imaging.downField("ampGain").as[String].toOption.get, "LOW")
-      assertEquals(imaging.downField("roi").as[String].toOption.get, "FULL_FRAME")
-      
-      assertEquals(sciReq.downFields("minimumFov", "arcseconds").as[Int].toOption.get, 100)
-      assertEquals(sciReq.downField("narrowFilters").as[Boolean].toOption.get, false)
-      assertEquals(sciReq.downField("broadFilters").as[Boolean].toOption.get, false)
-      assertEquals(sciReq.downField("combinedFilters").as[Boolean].toOption.get, true)
+      }
     }
   }
 
-  test("[gmos imaging] GMOS imaging observation has correct observing mode type") {
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid)
-      oidN <- createGmosNorthImagingObservationAs(pi, pid, tid)
-      oidS <- createGmosSouthImagingObservationAs(pi, pid, tid)
-      js  <- query(pi, s"""
-        query {
-          observations(WHERE: { id: { IN: ["$oidN", "$oidS"] } }) {
-            matches {
-              id
-              observingMode {
-                mode
+  test("[gmos imaging] GMOS imaging observations have correct observing mode type") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        for {
+          oidN <- createGmosNorthImagingObservationAs(pi, pid, tid)
+          oidS <- createGmosSouthImagingObservationAs(pi, pid, tid)
+          result <- expect(pi, s"""
+            query {
+              observations(WHERE: { id: { IN: ["$oidN", "$oidS"] } }) {
+                matches {
+                  id
+                  observingMode {
+                    mode
+                  }
+                }
+              }
+            }
+          """, json"""
+            {
+              "observations": {
+                "matches": [
+                  {
+                    "id": $oidN,
+                    "observingMode": {
+                      "mode": "GMOS_NORTH_IMAGING"
+                    }
+                  },
+                  {
+                    "id": $oidS,
+                    "observingMode": {
+                      "mode": "GMOS_SOUTH_IMAGING"
+                    }
+                  }
+                ]
+              }
+            }
+          """.asRight)
+        } yield result
+      }
+    }
+  }
+
+  test("[gmos imaging] can create GMOS North imaging observation with empty filters") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
               }
             }
           }
-        }
-      """)
-    } yield {
-      val observations = js.hcursor.downFields("observations", "matches").values.get.toList
-      assertEquals(observations.size, 2)
-      
-      val modes = observations.map(_.hcursor.downFields("observingMode", "mode").as[String].toOption.get)
-      assert(modes.contains("GMOS_NORTH_IMAGING"), "Expected GMOS_NORTH_IMAGING mode")
-      assert(modes.contains("GMOS_SOUTH_IMAGING"), "Expected GMOS_SOUTH_IMAGING mode")
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": [],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+      }
+    }
+  }
+
+  test("[gmos imaging] can create GMOS South imaging observation with empty filters") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosSouthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": [],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+      }
     }
   }
 }

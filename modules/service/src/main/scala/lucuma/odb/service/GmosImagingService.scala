@@ -5,14 +5,11 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import lucuma.core.enums.{GmosBinning, GmosNorthFilter, GmosSouthFilter}
-import lucuma.core.model.{Observation, SourceProfile}
-import lucuma.odb.data.{OdbError, OdbErrorExtensions}
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
-import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
