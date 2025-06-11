@@ -102,9 +102,9 @@ object ObservingModeServices {
         mode match
           case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
-          case ObservingModeType.GmosNorthImaging   => (_ => MonadCancelThrow[F].unit) // TODO: Implement
+          case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth
           case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth
-          case ObservingModeType.GmosSouthImaging   => (_ => MonadCancelThrow[F].unit) // TODO: Implement
+          case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth
 
       override def updateFunction(
         input: ObservingModeInput.Edit
@@ -113,8 +113,8 @@ object ObservingModeServices {
           input.flamingos2LongSlit.map(flamingos2LongSlitService.update),
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.updateSouth),
-          // input.gmosNorthImaging.map(gmosImagingService.updateNorth),
-          // input.gmosSouthImaging.map(gmosImagingService.updateSouth)
+          input.gmosNorthImaging.map(gmosImagingService.updateNorth),
+          input.gmosSouthImaging.map(gmosImagingService.updateSouth)
         ).flattenOption match
           case List(f) => Result(f)
           case Nil     => Result.failure("No observing mode edit parameters were provided.")

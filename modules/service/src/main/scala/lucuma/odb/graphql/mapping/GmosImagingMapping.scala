@@ -8,8 +8,8 @@ import grackle.Result
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosBinning
+import lucuma.core.enums.GmosRoi
 import lucuma.odb.graphql.table.*
 
 trait GmosImagingMapping[F[_]]

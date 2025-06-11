@@ -2857,6 +2857,340 @@ class updateObservations extends OdbSuite
     }
   }
 
+  test("observing mode: create GMOS imaging in an existing observation") {
+
+    val update = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [G_PRIME, R_PRIME]
+          explicitBin: TWO
+          explicitAmpReadMode: FAST
+          explicitAmpGain: HIGH
+          explicitRoi: CCD2
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthImaging {
+            filters
+            bin
+            ampReadMode
+            ampGain
+            roi
+          }
+          gmosSouthImaging {
+            filters
+            bin
+            ampReadMode
+            ampGain
+            roi
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": ["G_PRIME", "R_PRIME"],
+                  "bin": "TWO",
+                  "ampReadMode": "FAST",
+                  "ampGain": "HIGH",
+                  "roi": "CCD2"
+                },
+                "gmosSouthImaging": null
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("observing mode: update existing GMOS imaging") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [G_PRIME, R_PRIME]
+          explicitBin: ONE
+          explicitAmpReadMode: SLOW
+          explicitAmpGain: LOW
+          explicitRoi: FULL_FRAME
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthImaging {
+            filters
+            bin
+            ampReadMode
+            ampGain
+            roi
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": ["G_PRIME", "R_PRIME"],
+                  "bin": "ONE",
+                  "ampReadMode": "SLOW",
+                  "ampGain": "LOW",
+                  "roi": "FULL_FRAME"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [I_PRIME, Z_PRIME]
+          explicitBin: FOUR
+          explicitAmpReadMode: FAST
+          explicitAmpGain: HIGH
+          explicitRoi: CCD2
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": ["I_PRIME", "Z_PRIME"],
+                  "bin": "FOUR",
+                  "ampReadMode": "FAST",
+                  "ampGain": "HIGH",
+                  "roi": "CCD2"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+  }
+
+  test("observing mode: switch from GMOS imaging to long slit") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [G_PRIME, R_PRIME]
+        }
+      }
+    """
+
+    val query0 = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthImaging {
+            filters
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": ["G_PRIME", "R_PRIME"]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 500
+          }
+        }
+      }
+    """
+
+    val query1 = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthImaging {
+            filters
+          }
+          gmosNorthLongSlit {
+            grating
+          }
+        }
+      }
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": null,
+                "gmosNorthLongSlit": {
+                  "grating": "B1200_G5301"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi, List((update0, query0, expected0), (update1, query1, expected1)))
+  }
+
+  test("observing mode: delete GMOS imaging") {
+
+    val update0 = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [G_PRIME, R_PRIME]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          mode
+          gmosNorthImaging {
+            filters
+          }
+        }
+      }
+    """
+
+    val expected0 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "mode": "GMOS_NORTH_IMAGING",
+                "gmosNorthImaging": {
+                  "filters": ["G_PRIME", "R_PRIME"]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: null
+    """
+
+    val expected1 =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": null,
+              "observingMode": null
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1)
+      )
+    )
+  }
+
+  test("observing mode: (fail to) create GMOS imaging without filters") {
+
+    val update = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: []
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthImaging {
+            filters
+          }
+        }
+      }
+    """
+
+    val expected = "At least one filter must be specified for GMOS imaging observations.".asLeft
+    oneUpdateTest(pi, update, query, expected)
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
