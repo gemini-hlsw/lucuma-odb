@@ -58,7 +58,6 @@ CREATE TABLE t_gmos_south_imaging_filter (
   FOREIGN KEY (c_observation_id) REFERENCES t_observation(c_observation_id) ON DELETE CASCADE
 );
 
--- GMOS North Imaging filters view
 CREATE VIEW v_gmos_north_imaging_filter AS
   SELECT
     c_observation_id,
@@ -68,7 +67,6 @@ CREATE VIEW v_gmos_north_imaging_filter AS
   GROUP BY
     c_observation_id;
 
--- GMOS South Imaging filters view
 CREATE VIEW v_gmos_south_imaging_filter AS
   SELECT
     c_observation_id,
@@ -78,7 +76,6 @@ CREATE VIEW v_gmos_south_imaging_filter AS
   GROUP BY
     c_observation_id;
 
--- Complete views with computed defaults for GraphQL
 CREATE VIEW v_gmos_north_imaging AS
   SELECT
     i.*,
@@ -87,8 +84,6 @@ CREATE VIEW v_gmos_north_imaging AS
     t_gmos_north_imaging i
   LEFT JOIN v_gmos_north_imaging_filter f
     ON i.c_observation_id = f.c_observation_id;
-
-COMMENT ON VIEW v_gmos_north_imaging IS 'GMOS North Imaging complete view with computed defaults';
 
 CREATE VIEW v_gmos_south_imaging AS
   SELECT
@@ -121,9 +116,7 @@ CREATE OR REPLACE VIEW v_observation AS
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
   CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
   CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
-  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time,
-  CASE WHEN mode_gni.c_observation_id IS NOT NULL THEN o.c_observation_id END AS c_gmos_north_imaging_id,
-  CASE WHEN mode_gsi.c_observation_id IS NOT NULL THEN o.c_observation_id END AS c_gmos_south_imaging_id
+  c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id

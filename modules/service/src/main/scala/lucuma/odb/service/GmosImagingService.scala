@@ -63,18 +63,18 @@ object GmosImagingService {
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         session.exec(Statements.insertGmosNorthImagingMode(which, input)) *>
-        (if (input.filters.nonEmpty) 
+        (if (input.filters.nonEmpty)
            session.exec(Statements.insertGmosNorthImagingFilters(which, input))
-         else 
+         else
            Concurrent[F].unit)
 
       override def insertSouth(
         input: GmosImagingInput.Create.South
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         session.exec(Statements.insertGmosSouthImagingMode(which, input)) *>
-        (if (input.filters.nonEmpty) 
+        (if (input.filters.nonEmpty)
            session.exec(Statements.insertGmosSouthImagingFilters(which, input))
-         else 
+         else
            Concurrent[F].unit)
 
       override def deleteNorth(
@@ -101,9 +101,9 @@ object GmosImagingService {
           case Some(filters) =>
             which.traverse_ { oid =>
               session.exec(Statements.deleteGmosNorthImagingFilters(oid)) *>
-              (if (filters.nonEmpty) 
+              (if (filters.nonEmpty)
                  session.exec(Statements.insertGmosNorthImagingFiltersForUpdate(oid, filters))
-               else 
+               else
                  Concurrent[F].unit)
             }
           case None => Applicative[F].unit
@@ -118,9 +118,9 @@ object GmosImagingService {
           case Some(filters) =>
             which.traverse_ { oid =>
               session.exec(Statements.deleteGmosSouthImagingFilters(oid)) *>
-              (if (filters.nonEmpty) 
+              (if (filters.nonEmpty)
                  session.exec(Statements.insertGmosSouthImagingFiltersForUpdate(oid, filters))
-               else 
+               else
                  Concurrent[F].unit)
             }
           case None => Applicative[F].unit
@@ -196,7 +196,7 @@ object GmosImagingService {
       def filterEntries =
         for {
           oid <- oids
-          filter <- input.filters
+          filter <- input.filters.toList
         } yield sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
 
       val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
@@ -254,7 +254,7 @@ object GmosImagingService {
       def filterEntries =
         for {
           oid <- oids
-          filter <- input.filters
+          filter <- input.filters.toList
         } yield sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
 
       val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
@@ -420,7 +420,7 @@ object GmosImagingService {
     // Helper methods for updating single observation filters
     def insertGmosNorthImagingFiltersForUpdate(
       oid: Observation.Id,
-      filters: List[GmosNorthFilter]
+      filters: NonEmptyList[GmosNorthFilter]
     ): AppliedFragment = {
       def insertFilters: AppliedFragment =
         void"""
@@ -431,7 +431,7 @@ object GmosImagingService {
         """
 
       def filterEntries =
-        filters.map { filter => 
+        filters.map { filter =>
           sql"""($observation_id, $gmos_north_filter)"""(oid, filter)
         }
 
@@ -441,7 +441,7 @@ object GmosImagingService {
 
     def insertGmosSouthImagingFiltersForUpdate(
       oid: Observation.Id,
-      filters: List[GmosSouthFilter]
+      filters: NonEmptyList[GmosSouthFilter]
     ): AppliedFragment = {
       def insertFilters: AppliedFragment =
         void"""
@@ -452,7 +452,7 @@ object GmosImagingService {
         """
 
       def filterEntries =
-        filters.map { filter => 
+        filters.map { filter =>
           sql"""($observation_id, $gmos_south_filter)"""(oid, filter)
         }
 

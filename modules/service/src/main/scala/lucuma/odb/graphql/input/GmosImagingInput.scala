@@ -9,36 +9,26 @@ import lucuma.core.enums.*
 import lucuma.core.enums.GmosBinning
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
+import cats.data.NonEmptyList
 
 object GmosImagingInput:
 
   sealed trait Create[F] {
-    def filters: List[F]
+    def filters: NonEmptyList[F]
     def common:  Create.Common
   }
 
   object Create:
 
     case class Common(
-      explicitBin:      Option[GmosBinning],
+      explicitBin:         Option[GmosBinning],
       explicitAmpReadMode: Option[GmosAmpReadMode],
-      explicitAmpGain:   Option[GmosAmpGain],
-      explicitRoi:       Option[GmosRoi]
+      explicitAmpGain:     Option[GmosAmpGain],
+      explicitRoi:         Option[GmosRoi]
     )
 
-    object Common:
-
-      val Empty: Common =
-        Common(
-          explicitBin      = none,
-          explicitAmpReadMode = none,
-          explicitAmpGain   = none,
-          explicitRoi       = none
-        )
-
-
     case class North(
-      filters: List[GmosNorthFilter],
+      filters: NonEmptyList[GmosNorthFilter],
       common:  Common
     ) extends Create[GmosNorthFilter]:
 
@@ -47,21 +37,14 @@ object GmosImagingInput:
 
     object North:
 
-      val Empty: North =
-        North(
-          filters = List.empty,
-          common  = Common.Empty
-        )
-
       val Binding: Matcher[North] =
         NorthData.rmap {
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            val filterList = filters.toOption.orEmpty
-            if (filterList.isEmpty)
+            filters.flatMap(NonEmptyList.fromList).fold(
               Result.failure("At least one filter must be specified for GMOS imaging observations.")
-            else
+            )(filters =>
               Result(
-                North(filterList,
+                North(filters,
                   Common(
                     exBin.toOption,
                     exAmpReadMode.toOption,
@@ -70,10 +53,11 @@ object GmosImagingInput:
                   )
                 )
               )
+            )
         }
 
     case class South(
-      filters: List[GmosSouthFilter],
+      filters: NonEmptyList[GmosSouthFilter],
       common:  Common
     ) extends Create[GmosSouthFilter]:
 
@@ -82,21 +66,14 @@ object GmosImagingInput:
 
     object South:
 
-      val Empty: South =
-        South(
-          filters = List.empty,
-          common  = Common.Empty
-        )
-
       val Binding: Matcher[South] =
         SouthData.rmap {
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
-            val filterList = filters.toOption.orEmpty
-            if (filterList.isEmpty)
+            filters.flatMap(NonEmptyList.fromList).fold(
               Result.failure("At least one filter must be specified for GMOS imaging observations.")
-            else
+            )(filters =>
               Result(
-                South(filterList,
+                South(filters,
                   Common(
                     exBin.toOption,
                     exAmpReadMode.toOption,
@@ -105,93 +82,68 @@ object GmosImagingInput:
                   )
                 )
               )
+            )
         }
   end Create
 
   object Edit:
 
     case class Common(
-      explicitBin:      Nullable[GmosBinning],
+      explicitBin:         Nullable[GmosBinning],
       explicitAmpReadMode: Nullable[GmosAmpReadMode],
-      explicitAmpGain:   Nullable[GmosAmpGain],
-      explicitRoi:       Nullable[GmosRoi]
+      explicitAmpGain:     Nullable[GmosAmpGain],
+      explicitRoi:         Nullable[GmosRoi]
     ):
 
       def toCreate: Create.Common =
         Create.Common(
-          explicitBin      = explicitBin.toOption,
+          explicitBin         = explicitBin.toOption,
           explicitAmpReadMode = explicitAmpReadMode.toOption,
-          explicitAmpGain   = explicitAmpGain.toOption,
-          explicitRoi       = explicitRoi.toOption
-        )
-
-    object Common:
-
-      val Empty: Common =
-        Common(
-          explicitBin      = Nullable.Absent,
-          explicitAmpReadMode = Nullable.Absent,
-          explicitAmpGain   = Nullable.Absent,
-          explicitRoi       = Nullable.Absent
+          explicitAmpGain     = explicitAmpGain.toOption,
+          explicitRoi         = explicitRoi.toOption
         )
 
     case class North(
-      filters: Option[List[GmosNorthFilter]],
+      filters: Option[NonEmptyList[GmosNorthFilter]],
       common:  Common
     ):
 
       val toCreate: Result[Create.North] =
-        val filterList = filters.orEmpty
-        if (filterList.isEmpty)
+        filters.fold(
           Result.failure("At least one filter must be specified for GMOS imaging observations.")
-        else
-          Result(Create.North(filterList, common.toCreate))
+        )(filterList => Result(Create.North(filterList, common.toCreate)))
 
     object North:
-
-      val Empty: North =
-        North(
-          filters = none,
-          common  = Common.Empty
-        )
 
       val Binding: Matcher[North] =
         NorthData.rmap:
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
             Result(North(
-              filters.toOption,
+              filters.flatMap(NonEmptyList.fromList),
               Common(exBin, exAmpReadMode, exAmpGain, exRoi)))
 
     case class South(
-      filters: Option[List[GmosSouthFilter]],
+      filters: Option[NonEmptyList[GmosSouthFilter]],
       common:  Common
     ):
 
       val toCreate: Result[Create.South] =
-        val filterList = filters.orEmpty
-        if (filterList.isEmpty)
+        filters.fold(
           Result.failure("At least one filter must be specified for GMOS imaging observations.")
-        else
-          Result(Create.South(filterList, common.toCreate))
+        )(filterList => Result(Create.South(filterList, common.toCreate)))
 
     object South:
-
-      val Empty: South =
-        South(
-          filters = none,
-          common  = Common.Empty
-        )
 
       val Binding: Matcher[South] =
         SouthData.rmap:
           case (filters, exBin, exAmpReadMode, exAmpGain, exRoi) =>
             Result(South(
-              filters.toOption,
+              filters.flatMap(NonEmptyList.fromList),
               Common(exBin, exAmpReadMode, exAmpGain, exRoi)))
   end Edit
 
   private val NorthData: Matcher[(
-    Nullable[List[GmosNorthFilter]],
+    Option[List[GmosNorthFilter]],
     Nullable[GmosBinning],
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
@@ -199,7 +151,7 @@ object GmosImagingInput:
   )] =
     ObjectFieldsBinding.rmap:
       case List(
-        GmosNorthFilterBinding.List.Nullable("filters", rFilters),
+        GmosNorthFilterBinding.List.Option("filters", rFilters),
         GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
@@ -213,7 +165,7 @@ object GmosImagingInput:
       ).parTupled
 
   private val SouthData: Matcher[(
-    Nullable[List[GmosSouthFilter]],
+    Option[List[GmosSouthFilter]],
     Nullable[GmosBinning],
     Nullable[GmosAmpReadMode],
     Nullable[GmosAmpGain],
@@ -221,7 +173,7 @@ object GmosImagingInput:
   )] =
     ObjectFieldsBinding.rmap:
       case List(
-        GmosSouthFilterBinding.List.Nullable("filters", rFilters),
+        GmosSouthFilterBinding.List.Option("filters", rFilters),
         GmosBinningBinding.Nullable("explicitBin", rExplicitBin),
         GmosAmpReadModeBinding.Nullable("explicitAmpReadMode", rExplicitAmpReadMode),
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
