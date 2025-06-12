@@ -1,4 +1,4 @@
-val awsJavaSdkVersion          = "1.12.783"
+val awsJavaSdkVersion          = "1.12.786"
 val catsParseVersion           = "1.1.0"
 val catsTimeVersion            = "0.5.1"
 val circeVersion               = "0.14.13"
