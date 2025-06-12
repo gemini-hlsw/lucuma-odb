@@ -897,7 +897,7 @@ object ObservationService {
         timeAndCountMode.map(_.count).foldPresent(upExpCount),
       ).flattenOption
 
-      // we clear fields based on what's being set
+      // we clear fields based on the science mode that's being set
       val clearSpectroscopy = in.imaging.isDefined && in.spectroscopy.isEmpty
       val clearImaging = in.spectroscopy.isDefined && in.imaging.isEmpty
 
