@@ -444,7 +444,7 @@ object GuideService {
       ): F[Result[List[GuideStarCandidate]]] = 
         Trace[F].span("callGaia"):
           val MaxTargets                     = 100
-          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
+          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3LiteGavo
           given ci: ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
           val request                        = Request[F](Method.GET,
                                   CatalogSearch.gaiaSearchUri(query),
@@ -455,7 +455,7 @@ object GuideService {
             .flatMap(
               _.body
                 .through(utf8.decode)
-                .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
+                .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3LiteGavo))
                 .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
             )
             .compile
@@ -497,7 +497,7 @@ object GuideService {
 
       def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
         ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
-          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
+          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3LiteGavo
           val request = Request[F](Method.GET, CatalogSearch.gaiaSearchUriById(id),
                                   headers = Headers(("x-requested-with", "XMLHttpRequest"))
           )
@@ -507,7 +507,7 @@ object GuideService {
               .flatMap(
                 _.body
                   .through(utf8.decode)
-                  .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
+                  .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3LiteGavo))
                   .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
               )
               .compile
