@@ -3,9 +3,9 @@
 
 package lucuma.odb.service
 
-import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
@@ -72,77 +72,58 @@ object GmosImagingService {
       override def deleteNorth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        which.traverse_ { oid =>
-          session.exec(Statements.deleteGmosNorthImagingMode(oid)) *>
-          session.exec(Statements.deleteGmosNorthImagingFilters(oid))
-        }
+        Statements.deleteGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", which)
 
       override def deleteSouth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        which.traverse_ { oid =>
-          session.exec(Statements.deleteGmosSouthImagingMode(oid)) *>
-          session.exec(Statements.deleteGmosSouthImagingFilters(oid))
-        }
+        Statements.deleteGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", which)
 
       override def updateNorth(
         SET: GmosImagingInput.Edit.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        val commonUpdates = Statements.updateGmosNorthImaging(SET, which).fold(Applicative[F].unit)(session.exec)
-        val filterUpdates = SET.filters match {
-          case Some(filters) =>
-            which.traverse_ { oid =>
-              session.exec(Statements.deleteGmosNorthImagingFilters(oid)) *>
-              (if (filters.nonEmpty)
-                 session.exec(Statements.insertGmosNorthImagingFiltersForUpdate(oid, filters))
-               else
-                 Concurrent[F].unit)
-            }
-          case None => Applicative[F].unit
-        }
-        commonUpdates *> filterUpdates
+        Statements.updateGmosImaging(
+          "t_gmos_north_imaging",
+          "t_gmos_north_imaging_filter",
+          SET.common,
+          SET.filters,
+          which,
+          Statements.insertGmosNorthImagingFiltersForUpdate
+        )
 
       override def updateSouth(
         SET: GmosImagingInput.Edit.South
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
-        val commonUpdates = Statements.updateGmosSouthImaging(SET, which).fold(Applicative[F].unit)(session.exec)
-        val filterUpdates = SET.filters match {
-          case Some(filters) =>
-            which.traverse_ { oid =>
-              session.exec(Statements.deleteGmosSouthImagingFilters(oid)) *>
-              (if (filters.nonEmpty)
-                 session.exec(Statements.insertGmosSouthImagingFiltersForUpdate(oid, filters))
-               else
-                 Concurrent[F].unit)
-            }
-          case None => Applicative[F].unit
-        }
-        commonUpdates *> filterUpdates
+        Statements.updateGmosImaging(
+          "t_gmos_south_imaging",
+          "t_gmos_south_imaging_filter",
+          SET.common,
+          SET.filters,
+          which,
+          Statements.insertGmosSouthImagingFiltersForUpdate
+        )
 
       override def cloneNorth(
         observationId: Observation.Id,
         newObservationId: Observation.Id
       )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.cloneGmosNorthImagingMode(observationId, newObservationId)) *>
-        session.exec(Statements.cloneGmosNorthImagingFilters(observationId, newObservationId))
+        Statements.cloneGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", observationId, newObservationId)
 
       override def cloneSouth(
         observationId: Observation.Id,
         newObservationId: Observation.Id
       )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.cloneGmosSouthImagingMode(observationId, newObservationId)) *>
-        session.exec(Statements.cloneGmosSouthImagingFilters(observationId, newObservationId))
+        Statements.cloneGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", observationId, newObservationId)
     }
 
   object Statements {
 
-    // Generic helper for combined insert statements
     private def insertGmosImaging(
-      modeTableName: String,
+      modeTableName:   String,
       filterTableName: String,
-      oids: List[Observation.Id],
-      common: GmosImagingInput.Create.Common,
-      filterEntries: List[AppliedFragment]
+      oids:            List[Observation.Id],
+      common:          GmosImagingInput.Create.Common,
+      filterEntries:   List[AppliedFragment]
     ): AppliedFragment = {
       val modeEntries =
         oids.map { oid =>
@@ -162,7 +143,7 @@ object GmosImagingService {
         }
 
       val modeValues: AppliedFragment = modeEntries.intercalate(void", ")
-      
+
       if (filterEntries.nonEmpty) {
         val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
         sql"""
@@ -173,23 +154,23 @@ object GmosImagingService {
               c_explicit_amp_read_mode,
               c_explicit_amp_gain,
               c_explicit_roi
-            ) VALUES """.apply(Void) |+| modeValues |+| sql"""
+            ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
           )
           INSERT INTO #$filterTableName (
             c_observation_id,
             c_filter
-          ) VALUES """.apply(Void) |+| filterValues
+          ) VALUES """(Void) |+| filterValues
       } else {
-        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi) VALUES ".apply(Void) |+| modeValues
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi) VALUES "(Void) |+| modeValues
       }
     }
 
-    // Combined insert statements - inserts both mode and filters in a single call
+    // inserts both mode and filters in a single call
     def insertGmosNorthImaging(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.North
-    ): AppliedFragment = {
+    ): AppliedFragment =
       val filterEntries = for {
         oid <- oids
         filter <- input.filters.toList
@@ -202,7 +183,6 @@ object GmosImagingService {
         input.common,
         filterEntries
       )
-    }
 
     def insertGmosSouthImaging(
       oids: List[Observation.Id],
@@ -223,74 +203,45 @@ object GmosImagingService {
     }
 
     // Delete statements
-    def deleteGmosNorthImagingMode(oid: Observation.Id): AppliedFragment =
-      sql"""
-        DELETE FROM t_gmos_north_imaging
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
+    def deleteGmosImaging[F[_]: MonadCancelThrow](
+      modeTableName: String,
+      filterTableName: String,
+      which: List[Observation.Id]
+    )(using Services[F]): F[Unit] =
+      which.traverse_ { oid =>
+        session.exec(Statements.deleteGmosImagingMode(modeTableName, oid)) *>
+        session.exec(Statements.deleteGmosImagingFilters(filterTableName, oid))
+      }
+
+    private def deleteGmosImagingMode(tableName: String, oid: Observation.Id): AppliedFragment =
+      sql"DELETE FROM #$tableName WHERE c_observation_id = ".apply(Void) |+| sql"$observation_id".apply(oid)
+
+    def deleteGmosImagingFilters(tableName: String, oid: Observation.Id): AppliedFragment =
+      sql"DELETE FROM #$tableName WHERE c_observation_id = ".apply(Void) |+| sql"$observation_id".apply(oid)
 
     def deleteGmosNorthImagingFilters(oid: Observation.Id): AppliedFragment =
-      sql"""
-        DELETE FROM t_gmos_north_imaging_filter
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
-
-    def deleteGmosSouthImagingMode(oid: Observation.Id): AppliedFragment =
-      sql"""
-        DELETE FROM t_gmos_south_imaging
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
+      deleteGmosImagingFilters("t_gmos_north_imaging_filter", oid)
 
     def deleteGmosSouthImagingFilters(oid: Observation.Id): AppliedFragment =
-      sql"""
-        DELETE FROM t_gmos_south_imaging_filter
-        WHERE c_observation_id = $observation_id
-      """.apply(oid)
+      deleteGmosImagingFilters("t_gmos_south_imaging_filter", oid)
+
     // Clone statements
-    def cloneGmosNorthImagingMode(
-      originalId: Observation.Id,
-      newId: Observation.Id
-    ): AppliedFragment =
-      sql"""
-        INSERT INTO t_gmos_north_imaging (
-          c_observation_id,
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi
-        )
-        SELECT
-          $observation_id,
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi
-        FROM t_gmos_north_imaging
-        WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
+    def cloneGmosImaging[F[_]: MonadCancelThrow](
+      modeTableName: String,
+      filterTableName: String,
+      observationId: Observation.Id,
+      newObservationId: Observation.Id
+    )(using Services[F]): F[Unit] =
+      session.exec(Statements.cloneGmosImagingMode(modeTableName, observationId, newObservationId)) *>
+        session.exec(Statements.cloneGmosImagingFilters(filterTableName, observationId, newObservationId))
 
-    def cloneGmosNorthImagingFilters(
+    private def cloneGmosImagingMode(
+      tableName: String,
       originalId: Observation.Id,
       newId: Observation.Id
     ): AppliedFragment =
       sql"""
-        INSERT INTO t_gmos_north_imaging_filter (
-          c_observation_id,
-          c_filter
-        )
-        SELECT
-          $observation_id,
-          c_filter
-        FROM t_gmos_north_imaging_filter
-        WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
-
-    def cloneGmosSouthImagingMode(
-      originalId: Observation.Id,
-      newId: Observation.Id
-    ): AppliedFragment =
-      sql"""
-        INSERT INTO t_gmos_south_imaging (
+        INSERT INTO #$tableName (
           c_observation_id,
           c_explicit_bin,
           c_explicit_amp_read_mode,
@@ -298,30 +249,30 @@ object GmosImagingService {
           c_explicit_roi
         )
         SELECT
-          $observation_id,
+          """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
           c_explicit_bin,
           c_explicit_amp_read_mode,
           c_explicit_amp_gain,
           c_explicit_roi
-        FROM t_gmos_south_imaging
-        WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
+        FROM #$tableName
+        WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
-    def cloneGmosSouthImagingFilters(
+    private def cloneGmosImagingFilters(
+      tableName: String,
       originalId: Observation.Id,
       newId: Observation.Id
     ): AppliedFragment =
       sql"""
-        INSERT INTO t_gmos_south_imaging_filter (
+        INSERT INTO #$tableName (
           c_observation_id,
           c_filter
         )
         SELECT
-          $observation_id,
+          """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
           c_filter
-        FROM t_gmos_south_imaging_filter
-        WHERE c_observation_id = $observation_id
-      """.apply(newId, originalId)
+        FROM #$tableName
+        WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
+
 
     // Update statements following the GmosLongSlitService pattern
     def commonUpdates(
@@ -340,45 +291,34 @@ object GmosImagingService {
       ).flatten
     }
 
-    def gmosNorthImagingUpdates(
-      input: GmosImagingInput.Edit.North
-    ): Option[NonEmptyList[AppliedFragment]] = {
-      val ups: List[AppliedFragment] = commonUpdates(input.common)
-      NonEmptyList.fromList(ups)
-    }
+    def updateGmosImaging[F[_]: MonadCancelThrow, GF](
+      modeTableName:         String,
+      filterTableName:       String,
+      commonUpdates:         GmosImagingInput.Edit.Common,
+      filterUpdates:         Option[NonEmptyList[GF]],
+      which:                 List[Observation.Id],
+      insertFilterStatement: (Observation.Id, NonEmptyList[GF]) => AppliedFragment
+    )(using Services[F]): F[Unit] =
+      val modeUpdates = updateGmosImagingMode(modeTableName, commonUpdates, which).traverse(session.exec)
+      val filterUpdatesEffect = filterUpdates.traverse: filters =>
+          which.traverse_ { oid =>
+            session.exec(deleteGmosImagingFilters(filterTableName, oid)) *>
+              session.exec(insertFilterStatement(oid, filters)).whenA(filters.nonEmpty)
+          }
 
-    def updateGmosNorthImaging(
-      SET: GmosImagingInput.Edit.North,
+      modeUpdates *> filterUpdatesEffect.void
+
+    private def updateGmosImagingMode(
+      tableName: String,
+      input: GmosImagingInput.Edit.Common,
       which: List[Observation.Id]
     ): Option[AppliedFragment] =
       for {
-        us <- gmosNorthImagingUpdates(SET)
+        us <- NonEmptyList.fromList(commonUpdates(input))
         oids <- NonEmptyList.fromList(which)
       } yield
-        void"UPDATE t_gmos_north_imaging " |+|
-          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-          void"WHERE " |+| observationIdIn(oids)
+        sql"UPDATE #$tableName SET ".apply(Void) |+| us.intercalate(void", ") |+| void" WHERE " |+| observationIdIn(oids)
 
-    def gmosSouthImagingUpdates(
-      input: GmosImagingInput.Edit.South
-    ): Option[NonEmptyList[AppliedFragment]] = {
-      val ups: List[AppliedFragment] = commonUpdates(input.common)
-      NonEmptyList.fromList(ups)
-    }
-
-    def updateGmosSouthImaging(
-      SET: GmosImagingInput.Edit.South,
-      which: List[Observation.Id]
-    ): Option[AppliedFragment] =
-      for {
-        us <- gmosSouthImagingUpdates(SET)
-        oids <- NonEmptyList.fromList(which)
-      } yield
-        void"UPDATE t_gmos_south_imaging " |+|
-          void"SET " |+| us.intercalate(void", ") |+| void" " |+|
-          void"WHERE " |+| observationIdIn(oids)
-
-    // Helper methods for updating single observation filters
     def insertGmosNorthImagingFiltersForUpdate(
       oid: Observation.Id,
       filters: NonEmptyList[GmosNorthFilter]
