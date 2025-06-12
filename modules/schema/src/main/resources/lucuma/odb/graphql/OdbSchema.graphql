@@ -4370,11 +4370,6 @@ input ObservingModeInput {
   gmosSouthLongSlit: GmosSouthLongSlitInput
 
   """
-  The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  """
-  flamingos2LongSlit: Flamingos2LongSlitInput
-
-  """
   The gmosNorthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosNorthImaging: GmosNorthImagingInput
@@ -4383,6 +4378,11 @@ input ObservingModeInput {
   The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthImaging: GmosSouthImagingInput
+
+  """
+  The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  flamingos2LongSlit: Flamingos2LongSlitInput
 }
 
 """
@@ -11249,11 +11249,6 @@ type ObservingMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 
   """
-  Flamingos 2 Long Slit mode
-  """
-  flamingos2LongSlit: Flamingos2LongSlit
-
-  """
   GMOS North Imaging mode
   """
   gmosNorthImaging: GmosNorthImaging
@@ -11262,6 +11257,11 @@ type ObservingMode {
   GMOS South Imaging mode
   """
   gmosSouthImaging: GmosSouthImaging
+
+  """
+  Flamingos 2 Long Slit mode
+  """
+  flamingos2LongSlit: Flamingos2LongSlit
 
 }
 
