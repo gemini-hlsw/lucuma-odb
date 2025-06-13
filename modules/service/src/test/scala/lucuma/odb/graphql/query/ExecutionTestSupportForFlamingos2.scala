@@ -275,12 +275,27 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       }
     """
 
-  protected def flamingos2ExpectedScienceAtom(a: (Int, Int), b: (Int, Int)): Json =
-    val sciSteps  = List(a, b, b, a).map((p, q) => flamingos2ExpectedScience(p, q))
-    val gcalSteps = List(flamingos2ExpectedFlat(a._1, a._2), flamingos2ExpectedArc(a._1, a._2))
+  protected def flamingos2ExpectedScienceAtom(
+    a0: (Int, Int),
+    b0: (Int, Int),
+    b1: (Int, Int),
+    a1: (Int, Int)
+  ): Json =
+    val sciSteps  = List(a0, b0, b1, a1).map((p, q) => flamingos2ExpectedScience(p, q))
 
     Json.obj(
-      "description" -> s"Long Slit 1px, JH, R1200JH".asJson,
+      "description" -> s"ABBA Cycle".asJson,
       "observeClass" -> "SCIENCE".asJson,
-      "steps" -> (sciSteps ++ gcalSteps).asJson
+      "steps" -> sciSteps.asJson
+    )
+
+  protected def flamingos2ExpectedGcals(
+    offset: (Int, Int)
+  ): Json =
+    val gcalSteps = List(flamingos2ExpectedFlat(offset._1, offset._2), flamingos2ExpectedArc(offset._1, offset._2))
+
+    Json.obj(
+      "description" -> s"Nighttime Calibrations".asJson,
+      "observeClass" -> "NIGHT_CAL".asJson,
+      "steps" -> gcalSteps.asJson
     )
