@@ -39,6 +39,9 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     val GeneratedId: ColumnRef    = col("c_generated_id",    step_id.opt)
     val QaState: ColumnRef        = col("c_qa_state",        dataset_qa_state.opt)
 
+    val FirstEvent: ColumnRef     = col("c_first_event_time", core_timestamp.opt)
+    val LastEvent:  ColumnRef     = col("c_last_event_time",  core_timestamp.opt)
+
     object Gcal:
       val Continuum: ColumnRef = col("c_gcal_continuum", gcal_continuum.opt)
       val ArArc: ColumnRef     = col("c_gcal_ar_arc",    bool)

@@ -4,20 +4,21 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.syntax.apply.*
 import cats.effect.Resource
 import grackle.Query.Binding
-import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import io.circe.syntax.*
 import lucuma.core.model.User
-import lucuma.core.model.sequence.Step
+import lucuma.odb.json.time.query.given
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
-
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import table.AtomRecordTable
 import table.Flamingos2DynamicView
 import table.GmosDynamicTables
@@ -38,24 +39,32 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   lazy val StepRecordMapping: ObjectMapping =
     ObjectMapping(StepRecordType)(
-      SqlField("id",             StepRecordView.Id, key = true),
-      SqlField("index",          StepRecordView.StepIndex),
-      SqlField("instrument",     StepRecordView.Instrument, discriminator = true),
-      SqlObject("atom",          Join(StepRecordView.AtomId, AtomRecordTable.Id)),
-      SqlField("created",        StepRecordView.Created),
-      SqlField("executionState", StepRecordView.ExecutionState),
-      EffectField("interval",    intervalHandler, List("id")),
+      SqlField("id",              StepRecordView.Id, key = true),
+      SqlField("index",           StepRecordView.StepIndex),
+      SqlField("instrument",      StepRecordView.Instrument, discriminator = true),
+      SqlObject("atom",           Join(StepRecordView.AtomId, AtomRecordTable.Id)),
+      SqlField("created",         StepRecordView.Created),
+      SqlField("executionState",  StepRecordView.ExecutionState),
+      SqlField("_firstEventTime", StepRecordView.FirstEvent, hidden = true),
+      SqlField("_lastEventTime",  StepRecordView.LastEvent, hidden = true),
+      CursorFieldJson("interval", c =>
+        for
+          f <- c.fieldAs[Option[Timestamp]]("_firstEventTime")
+          l <- c.fieldAs[Option[Timestamp]]("_lastEventTime")
+        yield (f, l).mapN((first, last) => TimestampInterval.between(first, last)).asJson,
+        List("_firstEventTime", "_lastEventTime")
+      ),
       SqlObject("stepConfig"),
       SqlObject("telescopeConfig"),
-      SqlField("observeClass",   StepRecordView.ObserveClass),
+      SqlField("observeClass",    StepRecordView.ObserveClass),
       SqlObject("estimate"),
-      SqlField("qaState",        StepRecordView.QaState),
+      SqlField("qaState",         StepRecordView.QaState),
       SqlObject("datasets"),
       SqlObject("events"),
-      SqlField("generatedId",    StepRecordView.GeneratedId),
-      SqlObject("flamingos2",    Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
-      SqlObject("gmosNorth",     Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
-      SqlObject("gmosSouth",     Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
+      SqlField("generatedId",     StepRecordView.GeneratedId),
+      SqlObject("flamingos2",     Join(StepRecordView.Id, Flamingos2DynamicView.Id)),
+      SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
+      SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id))
     )
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -74,6 +83,4 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
 
   }
 
-  private lazy val intervalHandler: EffectHandler[F] =
-    eventRangeEffectHandler[Step.Id]("id", services, executionEventService.stepRange)
 }
