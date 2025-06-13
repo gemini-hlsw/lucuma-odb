@@ -13,6 +13,7 @@ import grackle.Operation
 import grackle.Result
 import grackle.skunk.SkunkMonitor
 import io.circe.Json
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.HttpRouteHandler
@@ -53,6 +54,7 @@ object GraphQLRoutes {
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
   def apply[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
+    gaiaClient:   GaiaClient[F],
     itcClient:    ItcClient[F],
     commitHash:   CommitHash,
     goaUsers:     Set[User.Id],
@@ -109,7 +111,7 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = OdbMapping(pool, monitor, user, topics, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
+                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, emailConfig)
                         svc   = new GraphQLService(map, props*) {
                           override def query(request: Operation): F[Result[Json]] =
                             super.query(request).retryOnInvalidCursorName

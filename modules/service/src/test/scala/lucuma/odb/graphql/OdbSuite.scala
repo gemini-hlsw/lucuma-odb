@@ -40,6 +40,8 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.votable.CatalogAdapter
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
@@ -351,6 +353,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def goaUsers: Set[User.Id] =
     Set.empty
 
+  private val gaiaAdapters: NonEmptyChain[CatalogAdapter.Gaia] =
+    NonEmptyChain.one(CatalogAdapter.Gaia3LiteEsa)
+
   private def httpApp(using Trace[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
@@ -364,7 +369,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       List("unused"),
       s3ClientOpsResource,
       s3PresignerResource,
-      httpClient.pure[Resource[IO, *]]
+      httpClient.pure[Resource[IO, *]],
+      gaiaAdapters
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -374,10 +380,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       mon  = SkunkMonitor.noopMonitor[IO]
       usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
+      gaia = GaiaClient.build(httpClient, adapters = gaiaAdapters)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, gaia, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =    
