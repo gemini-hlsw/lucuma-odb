@@ -16,6 +16,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.sequence.syntax.qastate.*
 
@@ -29,6 +30,7 @@ case class StepRecord[D](
   instrument:       Instrument,
   instrumentConfig: D,
   created:          Timestamp,
+  interval:         Option[TimestampInterval],
   sequenceType:     SequenceType,
   observeClass:     ObserveClass,
   executionState:   StepExecutionState,
