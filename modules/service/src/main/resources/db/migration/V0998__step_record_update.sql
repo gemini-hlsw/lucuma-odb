@@ -1,11 +1,12 @@
--- Add an updated timestamp to the step record table.
+-- Add first and last event times to the step record table.  These come from
+-- t_execution_event but are needed repeatedly for sequence generation so we'll
+-- denormalize them here and keep it up to date with a trigger.
 ALTER TABLE t_step_record
   ADD COLUMN c_first_event_time timestamp NULL,
   ADD COLUMN c_last_event_time  timestamp NULL;
 
-
--- Set the updated time for all the step records for which there were events.
-UPDATE t_step_record sr
+-- Set the event times for all the step records for which there were events.
+UPDATE t_step_record s
    SET c_first_event_time = e.first_received,
        c_last_event_time  = e.last_received
   FROM (
@@ -15,7 +16,7 @@ UPDATE t_step_record sr
       FROM t_execution_event
      WHERE c_step_id IS NOT NULL GROUP BY c_step_id
   ) e
-WHERE sr.c_step_id = e.c_step_id;
+WHERE s.c_step_id = e.c_step_id;
 
 DROP VIEW v_step_record;
 
