@@ -17,6 +17,7 @@ import lucuma.core.enums.CallForProposalsType.DemoScience
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ImageQuality
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.ServiceUser
@@ -1528,7 +1529,7 @@ class createObservation extends OdbSuite {
 
   test("[general] can't create an observation with two observing modes") {
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit, flamingos2LongSlit") {
+      interceptGraphQL(s"Argument 'input.SET.observingMode' is invalid: Expected exactly one of gmosNorthLongSlit, gmosSouthLongSlit, gmosNorthImaging, gmosSouthImaging, flamingos2LongSlit") {
         query(pi,
           s"""
           mutation {
@@ -1724,7 +1725,7 @@ class createObservation extends OdbSuite {
     }
   }
 
-  test("[general] created observation accepts imaging gmos north requirements") {
+  test("[general] created observation accepts imaging gmos north requirements"):
     createProgramAs(pi).flatMap { pid =>
       query(pi,s"""
         mutation {
@@ -1794,9 +1795,8 @@ class createObservation extends OdbSuite {
         )
       }
     }
-  }
 
-  test("[general] created observation accepts imaging gmos south requirements") {
+  test("[general] created observation accepts imaging gmos south requirements"):
     createProgramAs(pi).flatMap { pid =>
       query(pi,s"""
         mutation {
@@ -1866,9 +1866,8 @@ class createObservation extends OdbSuite {
         )
       }
     }
-  }
 
-  test("[general] cannot create observation with both imaging and spectroscopy requirements") {
+  test("[general] cannot create observation with both imaging and spectroscopy requirements"):
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL("Argument 'input.SET.scienceRequirements' is invalid: Expected at most one of spectroscopy, imaging") {
         query(pi, s"""
@@ -1910,23 +1909,20 @@ class createObservation extends OdbSuite {
         """)
       }
     }
-  }
 
-  test("[pi] pi can create an observation in their own program") {
+  test("[pi] pi can create an observation in their own program"):
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid)
     }
-  }
 
-  test("[pi] pi can't create an observation in someone else's program") {
+  test("[pi] pi can't create an observation in someone else's program"):
     createProgramAs(pi).flatMap { pid =>
       interceptGraphQL(s"User ${pi2.id} is not authorized to perform this operation.") {
         createObservationAs(pi2, pid)
       }
     }
-  }
 
-  test("[program] create many obs and then select them (in order)") {
+  test("[program] create many obs and then select them (in order)"):
     for {
       pid  <- createProgramAs(pi)
       o1   <- createObservationInGroupAs(pi, pid)
@@ -1934,9 +1930,8 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid)
       ids  <- groupElementsAs(pi, pid, None)
     } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
-  }
 
-  test("[program] insert obs at beginning") {
+  test("[program] insert obs at beginning"):
     for {
       pid  <- createProgramAs(pi)
       o1   <- createObservationInGroupAs(pi, pid)
@@ -1944,9 +1939,8 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(0)))
       ids  <- groupElementsAs(pi, pid, None)
     } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
-  }
 
-  test("[program] insert obs in the middle") {
+  test("[program] insert obs in the middle"):
     for {
       pid  <- createProgramAs(pi)
       o1   <- createObservationInGroupAs(pi, pid)
@@ -1954,9 +1948,8 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid, None, Some(NonNegShort.unsafeFrom(1)))
       ids  <- groupElementsAs(pi, pid, None)
     } yield assertEquals(ids, List(Right(o1), Right(o3), Right(o2)))
-  }
 
-  test("[program] create many obs and then select them (in order)") {
+  test("[program] create many obs and then select them (in order)"):
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)
@@ -1965,9 +1958,8 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid, Some(gid))
       ids  <- groupElementsAs(pi, pid, Some(gid))
     } yield assertEquals(ids, List(Right(o1), Right(o2), Right(o3)))
-  }
 
-  test("[program] insert obs at beginning in a group") {
+  test("[program] insert obs at beginning in a group"):
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)
@@ -1976,9 +1968,8 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(0)))
       ids  <- groupElementsAs(pi, pid, Some(gid))
     } yield assertEquals(ids, List(Right(o3), Right(o1), Right(o2)))
-  }
 
-  test("[program] insert obs in the middle in a group") {
+  test("[program] insert obs in the middle in a group"):
     for {
       pid  <- createProgramAs(pi)
       gid  <- createGroupAs(pi, pid)
@@ -1987,5 +1978,197 @@ class createObservation extends OdbSuite {
       o3   <- createObservationInGroupAs(pi, pid, Some(gid), Some(NonNegShort.unsafeFrom(1)))
       ids  <- groupElementsAs(pi, pid, Some(gid))
     } yield assertEquals(ids, List(Right(o1), Right(o3), Right(o2)))
-  }
+
+  test("[gmos imaging] can create GMOS North imaging observation"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
+              }
+            }
+          """, json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
+              }
+            }
+          """.asRight)
+        }
+      }
+    }
+
+  test("[gmos imaging] can create GMOS South imaging observation"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                observingMode {
+                  gmosSouthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
+              }
+            }
+          """, json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
+              }
+            }
+          """.asRight)
+        }
+      }
+    }
+
+  test("[gmos imaging] GMOS imaging observations have correct observing mode type"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        for {
+          oidN <- createGmosNorthImagingObservationAs(pi, pid, tid)
+          oidS <- createGmosSouthImagingObservationAs(pi, pid, tid)
+          result <- expect(pi, s"""
+            query {
+              observations(WHERE: { id: { IN: ["$oidN", "$oidS"] } }) {
+                matches {
+                  id
+                  observingMode {
+                    mode
+                  }
+                }
+              }
+            }
+          """, json"""
+            {
+              "observations": {
+                "matches": [
+                  {
+                    "id": $oidN,
+                    "observingMode": {
+                      "mode": "GMOS_NORTH_IMAGING"
+                    }
+                  },
+                  {
+                    "id": $oidS,
+                    "observingMode": {
+                      "mode": "GMOS_SOUTH_IMAGING"
+                    }
+                  }
+                ]
+              }
+            }
+          """.asRight)
+        } yield result
+      }
+    }
+
+  test("[gmos imaging] cannot create GMOS North imaging observation with empty filters"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                  }
+                }
+              }
+            }
+          }
+        """, List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+      }
+    }
+
+  test("[gmos imaging] cannot create GMOS South imaging observation with empty filters"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosSouthImaging: {
+                    filters: []
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    filters
+                  }
+                }
+              }
+            }
+          }
+        """, List("Argument 'input.SET.observingMode.gmosSouthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+      }
+    }
 }

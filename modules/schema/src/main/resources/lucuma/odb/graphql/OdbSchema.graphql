@@ -2042,6 +2042,36 @@ input GmosNorthLongSlitInput {
 }
 
 """
+Edit or create GMOS North Imaging advanced configuration
+"""
+input GmosNorthImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosNorthFilter!]
+
+  """
+  The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+}
+
+"""
 GMOS North stage mode
 """
 enum GmosNorthStageMode {
@@ -2434,6 +2464,36 @@ input GmosSouthLongSlitInput {
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
+}
+
+"""
+Edit or create GMOS South Imaging advanced configuration
+"""
+input GmosSouthImagingInput {
+  """
+  The filters field must be specified with at least one filter. It cannot be unset with a null value.
+  """
+  filters: [GmosSouthFilter!]
+
+  """
+  The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
 }
 
 """
@@ -4308,6 +4368,16 @@ input ObservingModeInput {
   The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthLongSlit: GmosSouthLongSlitInput
+
+  """
+  The gmosNorthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosNorthImaging: GmosNorthImagingInput
+
+  """
+  The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosSouthImaging: GmosSouthImagingInput
 
   """
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -6266,6 +6336,16 @@ enum ObservingModeType {
   ObservingModeType Flamingos2LongSlit
   """
   FLAMINGOS_2LONG_SLIT
+
+  """
+  ObservingModeType GmosNorthImaging
+  """
+  GMOS_NORTH_IMAGING
+
+  """
+  ObservingModeType GmosSouthImaging
+  """
+  GMOS_SOUTH_IMAGING
 }
 
 type ConstraintSet {
@@ -8271,6 +8351,82 @@ type GmosNorthLongSlit {
 }
 
 """
+GMOS North Imaging mode
+"""
+type GmosNorthImaging {
+  """
+  GMOS North Filters for imaging mode (multiple filters allowed)
+  """
+  filters: [GmosNorthFilter!]!
+
+  """
+  GMOS Binning, either explicitly specified in explicitBin or else taken
+  from the defaultBin. XBinning == YBinning = Binning
+  """
+  bin: GmosBinning!
+
+  """
+  Default GMOS Binning (ONE).
+  """
+  defaultBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Binning. If set it overrides the
+  default.
+  """
+  explicitBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI.  If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+}
+
+"""
 GMOS Region Of Interest
 """
 enum GmosRoi {
@@ -8755,7 +8911,83 @@ type GmosSouthLongSlit {
 }
 
 """
-GMOS Binning (used for both X and Y axes)
+GMOS South Imaging mode
+"""
+type GmosSouthImaging {
+  """
+  GMOS South Filters for imaging mode (multiple filters allowed)
+  """
+  filters: [GmosSouthFilter!]!
+
+  """
+  GMOS Binning, either explicitly specified in explicitBin or else taken
+  from the defaultBin. XBinning == YBinning = Binning
+  """
+  bin: GmosBinning!
+
+  """
+  Default GMOS Binning (ONE).
+  """
+  defaultBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Binning. If set it overrides the
+  default.
+  """
+  explicitBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it override the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI.  If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+}
+
+"""
+GMOS Binning
 """
 enum GmosBinning {
   """
@@ -11015,6 +11247,16 @@ type ObservingMode {
   GMOS South Long Slit mode
   """
   gmosSouthLongSlit: GmosSouthLongSlit
+
+  """
+  GMOS North Imaging mode
+  """
+  gmosNorthImaging: GmosNorthImaging
+
+  """
+  GMOS South Imaging mode
+  """
+  gmosSouthImaging: GmosSouthImaging
 
   """
   Flamingos 2 Long Slit mode
