@@ -67,6 +67,7 @@ object ProtoStep:
     Eq.by { x => (
       x.value,
       x.stepConfig,
+      x.telescopeConfig,
       x.observeClass,
       x.breakpoint
     )}

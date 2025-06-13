@@ -3,7 +3,11 @@
 
 package lucuma.odb.sequence
 
+import cats.data.NonEmptyList
+import cats.data.State
+import cats.syntax.foldable.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepConfig
@@ -29,6 +33,16 @@ trait TimeEstimateCalculator[S, D]:
    * provided 'past' state.
    */
   def estimateStep(static: S, last: TimeEstimateCalculator.Last[D], next: ProtoStep[D]): StepEstimate
+
+  def estimateOne(static: S, step: ProtoStep[D]): State[TimeEstimateCalculator.Last[D], StepEstimate] =
+    State.apply[TimeEstimateCalculator.Last[D], StepEstimate]: last =>
+      (last.next(step), estimateStep(static, last, step))
+
+  def estimateTotal(static: S, steps: List[ProtoStep[D]]): State[TimeEstimateCalculator.Last[D], TimeSpan] =
+    steps.traverse(estimateOne(static, _)).map(_.foldMap(_.total))
+
+  def estimateTotalNel(static: S, steps: NonEmptyList[ProtoStep[D]]): State[TimeEstimateCalculator.Last[D], TimeSpan] =
+    estimateTotal(static, steps.toList)
 
 object TimeEstimateCalculator:
 
@@ -58,12 +72,9 @@ object TimeEstimateCalculator:
     def empty[D]: Last[D] =
       Last(none, none)
 
-  def estimateTimeSpan[S, D](
-    calc:   TimeEstimateCalculator[S, D],
-    static: S,
-    last:   TimeEstimateCalculator.Last[D],
-    next:   List[ProtoStep[D]]
-  ): TimeSpan =
-    next.foldLeft(TimeSpan.Zero) { (ts, step) =>
-      ts +| calc.estimateStep(static, last, step).total
-    }
+  /**
+   * Execute the state calculation with an empty `Last` value.  In other words,
+   * with no assumption about the current state of the telescope and instrument.
+   */
+  def runEmpty[D, A](s: State[TimeEstimateCalculator.Last[D], A]): A =
+    s.runA(Last.empty[D]).value

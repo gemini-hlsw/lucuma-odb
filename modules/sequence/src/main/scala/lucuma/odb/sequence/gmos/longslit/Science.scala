@@ -565,12 +565,12 @@ object Science:
       // How long do we have left to fill with science?  Adjust lastSteps as
       // though one or more science steps have just happened.
       val lastStepsʹ    = lastSteps.next(block.definition.science)
-      val calTime       = TimeEstimateCalculator.estimateTimeSpan(estimator, static, lastStepsʹ, missingCals)
+      val calTime       = estimator.estimateTotal(static, missingCals).runA(lastStepsʹ).value
       val remainingTime = remainingTimeAt(timestamp) -| calTime
 
       // How long would the first science step take?  It may be different from
       // remaining steps if there is a science fold move to make.
-      val firstStepTime = estimator.estimateStep(static, lastSteps, block.definition.science).total
+      val firstStepTime = estimator.estimateOne(static, block.definition.science).runA(lastSteps).value.total
 
       if remainingTime < firstStepTime then
         // No time left for more science

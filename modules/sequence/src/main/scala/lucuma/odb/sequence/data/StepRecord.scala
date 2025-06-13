@@ -6,9 +6,11 @@ package lucuma.odb.sequence.data
 import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
@@ -52,6 +54,18 @@ case class StepRecord[D](
 
   def isGcal: Boolean =
     stepConfig.stepType === StepType.Gcal
+
+  def isFlat: Boolean =
+    stepConfig match
+      case StepConfig.Gcal(lamp, _, _, _) => lamp.lampType === GcalLampType.Flat
+      case StepConfig.SmartGcal(t)        => t === SmartGcalType.Flat
+      case _                              => false
+
+  def isArc: Boolean =
+    stepConfig match
+      case StepConfig.Gcal(lamp, _, _, _) => lamp.lampType === GcalLampType.Arc
+      case StepConfig.SmartGcal(t)        => t === SmartGcalType.Arc
+      case _                              => false
 
   def isScience: Boolean =
     stepConfig.stepType === StepType.Science
