@@ -64,6 +64,20 @@ class cloneObservation extends OdbSuite {
           fpu
           centralWavelength { nanometers }
         }
+        gmosNorthImaging {
+          filters
+          bin
+          ampReadMode
+          ampGain
+          roi
+        }
+        gmosSouthImaging {
+          filters
+          bin
+          ampReadMode
+          ampGain
+          roi
+        }
         flamingos2LongSlit {
           disperser
           filter
@@ -373,5 +387,149 @@ class cloneObservation extends OdbSuite {
           expected = List(s"Observation '${oref.label}' (id $oid) does not correspond to observation id $oidx.").asLeft
         )
     } yield ()
+  }
+
+  test("clone GMOS North imaging observation preserves filters and configuration") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneObservation": {
+                    "originalObservation": {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "filters": ["G_PRIME", "R_PRIME"],
+                          "bin": "ONE",
+                          "ampReadMode": "SLOW",
+                          "ampGain": "LOW",
+                          "roi": "FULL_FRAME"
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "filters": ["G_PRIME", "R_PRIME"],
+                          "bin": "ONE",
+                          "ampReadMode": "SLOW",
+                          "ampGain": "LOW",
+                          "roi": "FULL_FRAME"
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
+
+  test("clone GMOS South imaging observation preserves filters and configuration") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      gmosSouthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      gmosSouthImaging {
+                        filters
+                        bin
+                        ampReadMode
+                        ampGain
+                        roi
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneObservation": {
+                    "originalObservation": {
+                      "observingMode": {
+                        "gmosSouthImaging": {
+                          "filters": ["G_PRIME", "R_PRIME"],
+                          "bin": "ONE",
+                          "ampReadMode": "SLOW",
+                          "ampGain": "LOW",
+                          "roi": "FULL_FRAME"
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "gmosSouthImaging": {
+                          "filters": ["G_PRIME", "R_PRIME"],
+                          "bin": "ONE",
+                          "ampReadMode": "SLOW",
+                          "ampGain": "LOW",
+                          "roi": "FULL_FRAME"
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
   }
 }
