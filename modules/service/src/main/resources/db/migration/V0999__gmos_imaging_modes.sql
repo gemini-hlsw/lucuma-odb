@@ -12,6 +12,7 @@ CREATE TABLE t_gmos_north_imaging (
 
   PRIMARY KEY (c_observation_id, c_observing_mode_type),
   FOREIGN KEY (c_observation_id, c_instrument, c_observing_mode_type) REFERENCES t_observation(c_observation_id, c_instrument, c_observing_mode_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+  UNIQUE (c_observation_id),
   
   CHECK (c_observing_mode_type = 'gmos_north_imaging'),
   CHECK (c_instrument = 'GmosNorth')
@@ -33,6 +34,7 @@ CREATE TABLE t_gmos_south_imaging (
 
   PRIMARY KEY (c_observation_id, c_observing_mode_type),
   FOREIGN KEY (c_observation_id, c_instrument, c_observing_mode_type) REFERENCES t_observation(c_observation_id, c_instrument, c_observing_mode_type) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+  UNIQUE (c_observation_id),
 
   CHECK (c_observing_mode_type = 'gmos_south_imaging'),
   CHECK (c_instrument = 'GmosSouth')
@@ -47,7 +49,7 @@ CREATE TABLE t_gmos_north_imaging_filter (
   c_observation_id d_observation_id NOT NULL,
   c_filter         d_tag            NOT NULL REFERENCES t_gmos_north_filter(c_tag),
   PRIMARY KEY (c_observation_id, c_filter),
-  FOREIGN KEY (c_observation_id) REFERENCES t_observation(c_observation_id) ON DELETE CASCADE
+  FOREIGN KEY (c_observation_id) REFERENCES t_gmos_north_imaging(c_observation_id) ON DELETE CASCADE
 );
 
 -- GMOS South Imaging Filters - normalized table for array support
@@ -55,7 +57,7 @@ CREATE TABLE t_gmos_south_imaging_filter (
   c_observation_id d_observation_id NOT NULL,
   c_filter         d_tag            NOT NULL REFERENCES t_gmos_south_filter(c_tag),
   PRIMARY KEY (c_observation_id, c_filter),
-  FOREIGN KEY (c_observation_id) REFERENCES t_observation(c_observation_id) ON DELETE CASCADE
+  FOREIGN KEY (c_observation_id) REFERENCES t_gmos_south_imaging(c_observation_id) ON DELETE CASCADE
 );
 
 CREATE VIEW v_gmos_north_imaging_filter AS
