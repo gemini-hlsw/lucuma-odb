@@ -9,15 +9,18 @@ import cats.Eq
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.syntax.flatMap.*
 import cats.syntax.option.*
+import cats.syntax.order.*
 import eu.timepit.refined.*
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.math.syntax.int.*
@@ -28,11 +31,14 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
+import lucuma.core.refined.numeric.NonZeroInt
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.data.VisitRecord
@@ -47,29 +53,63 @@ import java.util.UUID
 object Science:
 
   /**
+   * The name of the ABBA cycle atoms.
+   */
+  val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
+
+  /**
+   * The name of the nighttime cal atoms.
+   */
+  val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
+
+  /**
+   * A visit shouldn't take more than this, since we need to break to do a
+   * telluric.
+   */
+  val MaxVisitLength: TimeSpan =
+    3.hourTimeSpan
+
+  /**
    * Maximum time that may pass between flats.
    */
-  val FlatPeriod: TimeSpan =
-    2.hourTimeSpan
+  val MaxSciencePeriod: TimeSpan =
+    90.minuteTimeSpan
 
-  case class Steps(
-    a:     ProtoStep[F2],
-    b:     ProtoStep[F2],
-    flats: NonEmptyList[ProtoStep[F2]],
-    arcs:  NonEmptyList[ProtoStep[F2]]
+  extension (start: Timestamp)
+    def timeUntil(end: Timestamp): TimeSpan =
+      if start < end then TimeSpan.between(start, end).get else TimeSpan.Zero
+
+  extension [A, B](lst: List[A])
+    def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
+      @annotation.tailrec
+      def loop(rem: List[A], acc: List[A]): List[A] =
+        rem match
+          case Nil    => lst
+          case h :: t => if f(h, b) then acc.reverse ++ t else loop(t, h :: acc)
+
+      loop(lst, Nil)
+
+  case class StepDefinition(
+    a0:   ProtoStep[F2],
+    b0:   ProtoStep[F2],
+    b1:   ProtoStep[F2],
+    a1:   ProtoStep[F2],
+    cals: NonEmptyList[ProtoStep[F2]]
   ):
-    val nominalSequence: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList.of(NonEmptyList.of(a, b, b, a), flats, arcs).flatten
+    /** ABBA science cycle. */
+    def abbaCycle: NonEmptyList[ProtoStep[F2]] =
+      NonEmptyList.of(a0, b0, b1, a1)
 
-  object Steps extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
+  object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
     def compute[F[_]: Monad](
-      oid:      Observation.Id,
-      config:   Config,
-      time:     IntegrationTime,
-      expander: SmartGcalExpander[F, F2]
-    ): EitherT[F, OdbError, Steps] =
-      val (a, b, f, r) = eval:
+      oid:       Observation.Id,
+      config:    Config,
+      time:      IntegrationTime,
+      expander:  SmartGcalExpander[F, F2]
+    ): EitherT[F, OdbError, StepDefinition] =
+
+      val (a0, b0, b1, a1, f, r) = eval:
         for
           _ <- F2.exposure    := time.exposureTime
           _ <- F2.disperser   := config.disperser.some
@@ -84,55 +124,341 @@ object Science:
           b <- scienceStep(0.arcsec, -15.arcsec, ObserveClass.Science)
           f <- flatStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           r <- arcStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-        yield (a, b, f, r)
+        yield (a, b, b, a, f, r)  // for now a0 === a1 and b0 === b1 but this will change
 
-      (for
-        fs <- EitherT(expander.expandStep(f))
-        rs <- EitherT(expander.expandStep(r))
-      yield Steps(a, b, fs, rs)).leftMap: msg =>
+      val steps =
+        for
+          fs <- EitherT(expander.expandStep(f))
+          rs <- EitherT(expander.expandStep(r))
+        yield StepDefinition(a0, b0, b1, a1, fs ::: rs)
+
+      steps.leftMap: msg =>
         OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
-  case class ScienceState(
-    steps:     Steps,
-    builder:   AtomBuilder[F2],
-    calcState: TimeEstimateCalculator.Last[F2],
-    tracker:   IndexTracker,
-    completed: Map[ProtoStep[F2], Int]
-  ) extends SequenceGenerator[F2]:
+  end StepDefinition
 
-    def generate(when: Timestamp): Stream[Pure, Atom[F2]] =
-      val ps = NonEmptyList.fromList(
-        Stream
-          .emits(steps.nominalSequence.toList)
-          .mapAccumulate(completed): (m, s) =>
-            val count = m.getOrElse(s, 0)
-            if count <= 0 then (m, s.some)
-            else (m.updatedWith(s)(_.map(_ - 1)), none)
-          .flatMap: (_, o) =>
-            Stream.emits(o.toList)
-          .compile
-          .toList
-        )
+  private val span: (Option[TimestampInterval], Option[TimestampInterval]) => Option[TimestampInterval] =
+    case (None, None)         => None
+    case (Some(t), None)      => t.some
+    case (None, Some(t))      => t.some
+    case (Some(t0), Some(t1)) => t0.span(t1).some
 
-      ps.fold(Stream.empty): ss =>
-        val f2    = steps.a._1
-        val name  = s"${f2.fpu.builtinFpu.fold("image")(_.shortName)}, ${f2.filter.shortName}, ${f2.disperser.fold("none")(_.shortName)}"
-        val state = builder.build(NonEmptyString.unapply(name), tracker.atomCount, tracker.stepCount, ss)
-        Stream.emit(state.runA(calcState).value)
+  sealed trait StepTracker:
+    def title: NonEmptyString
+    def interval: Option[TimestampInterval] = none
+    def isComplete: Boolean                 = false
+    def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker
+    def remaining(steps: StepDefinition): List[ProtoStep[F2]]
 
-    override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
-      if step.isAcquisitionSequence then this
-      else copy(
-        calcState = calcState.next(step.protoStep),
-        tracker   = tracker.record(step),
-        completed = if step.successfullyCompleted
-                    then completed.updatedWith(step.protoStep)(n => (n.getOrElse(0) + 1).some)
-                    else completed
+  object StepTracker:
+    sealed trait Abba extends StepTracker:
+      def title: NonEmptyString = AbbaCycleTitle
+
+    object Abba:
+      case object A0 extends Abba:
+        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+          if steps.a0.matches(record) && record.successfullyCompleted then B0(record.interval)
+          else this
+
+        override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
+          List(steps.a0, steps.b0, steps.b1, steps.a1)
+
+      case class B0(override val interval: Option[TimestampInterval]) extends Abba:
+        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+          if steps.b0.matches(record) then
+            if record.successfullyCompleted then B1(span(interval, record.interval)) else this
+          else A0.next(steps, record)
+
+        override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
+          List(steps.b0, steps.b1, steps.a1)
+
+      case class B1(override val interval: Option[TimestampInterval]) extends Abba:
+        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+          if steps.b1.matches(record) then
+            if record.successfullyCompleted then A1(span(interval, record.interval)) else this
+          else A0.next(steps, record)
+
+        override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
+          List(steps.b1, steps.a1)
+
+      case class A1(override val interval: Option[TimestampInterval]) extends Abba:
+        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+          if steps.a1.matches(record) then
+            if record.successfullyCompleted then End(span(interval, record.interval)) else this
+          else A0.next(steps, record)
+
+        override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
+          List(steps.a1)
+
+      case class End(override val interval: Option[TimestampInterval]) extends Abba:
+        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker = this
+        override def remaining(steps: StepDefinition): List[ProtoStep[F2]] = Nil
+        override def isComplete: Boolean = true
+
+    end Abba
+
+    case class Calibrations(override val interval: Option[TimestampInterval], expected: List[ProtoStep[F2]]) extends StepTracker:
+      def title: NonEmptyString = NighttimeCalTitle
+
+      override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+        Calibrations(span(interval, record.interval), expected.removeFirstBy(record)(_.matches(_)))
+
+      override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
+        expected
+
+      override val isComplete: Boolean =
+        expected.isEmpty
+
+    end Calibrations
+
+    object Calibrations:
+      def apply(steps: StepDefinition): Calibrations =
+        Calibrations(none, steps.cals.toList)
+
+  end StepTracker
+
+  // Computes the atoms remaining in a 3 hour science block, starting at `when`
+  // assuming the block itself started at `start` and that there are `pending`
+  // science cycles that need calibration.  The result is limited to `maxCycles`
+  // at most.
+  private def remainingAtomsInBlock(
+    steps:         StepDefinition,
+    when:          Timestamp,
+    start:         Option[Timestamp],
+    pending:       Option[TimestampInterval],
+    cycleEstimate: TimeSpan,
+    maxCycles:     NonNegInt
+  ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
+    def cyclesIn(timeSpan: TimeSpan): Int =
+      (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
+
+    // Roughly, how many more cycles can we fit?
+    val startʹ: Timestamp   = start.orElse(pending.map(_.start)).getOrElse(when)
+    val end: Timestamp      = startʹ +| MaxVisitLength
+    def remaining: TimeSpan = when.timeUntil(end)
+    val cycles: Int         = cyclesIn(remaining) min maxCycles.value
+
+    // Remaining science time in this visit.
+    val remainingScience: TimeSpan = cycleEstimate *| cycles
+
+    // Anticipated science time in all, including science we've done already
+    // but for which there haven't been calibrations.
+    val scienceTime: TimeSpan = remainingScience +| pending.map(_.boundedTimeSpan).getOrElse(TimeSpan.Zero)
+
+    // If this is over 1.5 hours we need to insert a flat roughly at:
+    //   science-start + science-time / 2
+    val scienceStart: Timestamp = pending.map(_.start).getOrElse(when)
+    val nominalMidScienceCalTime: Option[Timestamp] =
+      Option.when(scienceTime >= MaxSciencePeriod):
+        scienceStart +| (scienceTime /| NonZeroInt.unsafeFrom(2))
+
+    // How many more full cycles can we do before and after the mid-science cal time
+    val preCalCycles: Int  = nominalMidScienceCalTime.fold(cycles)(t => cyclesIn(when.timeUntil(t)))
+    val postCalCycles: Int = cycles - preCalCycles
+
+    (
+      cycles,
+      List.fill(preCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                   ++
+        Option.when(pending.isDefined || preCalCycles > 0)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList ++
+        List.fill(postCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                ++
+        Option.when(postCalCycles > 0)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList
+    )
+
+  // Calculates the atoms in a 3 hour science block, limited to at most `maxCycles`.
+  def remainingAtomsInEmptyBlock(
+    steps:         StepDefinition,
+    cycleEstimate: TimeSpan,
+    maxCycles:     PosInt
+  ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
+    remainingAtomsInBlock(
+      steps,
+      Timestamp.unsafeFromInstant(java.time.Instant.ofEpochMilli(0)),
+      none,
+      none,
+      cycleEstimate,
+      NonNegInt.unsafeFrom(maxCycles.value)
+    )
+
+  case class SequenceRecord(
+    steps:           StepDefinition,
+    current:         StepTracker               = StepTracker.Abba.A0,
+    block:           Option[TimestampInterval] = none,
+    pending:         Option[TimestampInterval] = none,
+    stop:            Boolean                   = false,
+    completedCycles: Int                       = 0
+  ):
+
+    private def recordCompletion: SequenceRecord =
+      if !current.isComplete then this
+      else current match
+        case abba: StepTracker.Abba =>
+          copy(
+            block           = span(block, abba.interval),
+            pending         = span(pending, abba.interval),
+            completedCycles = completedCycles + 1
+          )
+        case StepTracker.Calibrations(interval, _)   =>
+          copy(
+            block   = span(block, interval),
+            pending = none
+          )
+
+    def next(step: StepRecord[F2]): SequenceRecord =
+      def newAbbaCycle: SequenceRecord =
+        copy(current = StepTracker.Abba.A0).next(step)
+
+      def newGcalSet: SequenceRecord =
+        copy(current = StepTracker.Calibrations(steps)).next(step)
+
+      def continue: SequenceRecord =
+        copy(
+          current = current.next(steps, step),
+          block   = span(block, step.interval)
+        ).recordCompletion
+
+      current match
+        case abba: StepTracker.Abba =>
+          if step.isScience then
+            if current.isComplete then newAbbaCycle else continue
+          else if step.isGcal then newGcalSet else this
+
+        case StepTracker.Calibrations(_, _) =>
+          if step.isGcal then
+            if current.isComplete then newGcalSet else continue
+          else if step.isScience then newAbbaCycle else this
+
+    def endBlockEarly: SequenceRecord =
+      copy(stop = true)
+
+    def resetVisit: SequenceRecord =
+      copy(
+        current = StepTracker.Abba.A0,
+        block   = none,
+        pending = none,
+        stop    = false
       )
 
-    override def recordVisit(visit: VisitRecord): SequenceGenerator[F2] = this
+    // Completes the current ABBA cycle or calibration set, returning the updated
+    // SequenceRecord and the atom comprising the remaining steps.
+    private def completeCurrentAtom(
+      when:      Timestamp,
+      estimate:  NonEmptyList[ProtoStep[F2]] => TimeSpan
+    ): (SequenceRecord, Option[ProtoAtom[ProtoStep[F2]]]) =
+      NonEmptyList
+        .fromList(current.remaining(steps))
+        .fold((this, none[ProtoAtom[ProtoStep[F2]]])): nel =>
+          val time         = estimate(nel)
+          val curAtomTime  = TimestampInterval.between(when, when +| time)
+          val blockTimeʹ   = span(block, curAtomTime.some)
 
-    override def recordSequenceEvent(cmd: SequenceEvent): SequenceGenerator[F2] = this
+          val (pendingʹ, completedCyclesʹ, atom) = current match
+            case abba: StepTracker.Abba         =>
+              val p = span(pending, span(abba.interval, curAtomTime.some))
+              (p, completedCycles + 1, ProtoAtom(AbbaCycleTitle.some, nel))
+
+            case StepTracker.Calibrations(_, _) =>
+              (none, completedCycles, ProtoAtom(NighttimeCalTitle.some, nel))
+
+          copy(
+            block           = blockTimeʹ,
+            pending         = pendingʹ,
+            completedCycles = completedCyclesʹ
+          ) -> atom.some
+
+    // Completes the current science block, returning what will be the total
+    // completed cycle count if the associated atoms are executed.
+    def complete(
+      when:          Timestamp,
+      estimate:      NonEmptyList[ProtoStep[F2]] => TimeSpan,
+      cycleEstimate: TimeSpan,
+      goalCycles:    NonNegInt
+    ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
+      val (stateʹ, curAtom)  = completeCurrentAtom(when, estimate)
+
+      // TODO handle early exit here -- don't need remaining atoms in block if we're to stop early.
+      // Just finish calibrations if there are any pending.
+
+      NonNegInt
+        .from(goalCycles.value - stateʹ.completedCycles)
+        .toOption
+        .fold((stateʹ.completedCycles, curAtom.toList)): allRemainingCycles =>
+          val (c, as) = remainingAtomsInBlock(
+            steps,
+            stateʹ.block.map(_.end).getOrElse(when),
+            stateʹ.block.map(_.start),
+            stateʹ.pending,
+            cycleEstimate,
+            allRemainingCycles
+          )
+          (c + stateʹ.completedCycles, curAtom.fold(as)(_ :: as))
+
+  end SequenceRecord
+
+  case class Generator(
+    steps:         StepDefinition,
+    cycleEstimate: TimeSpan,
+    seqRecord:     SequenceRecord,
+    estimate:      (NonEmptyList[ProtoStep[F2]], TimeEstimateCalculator.Last[F2]) => TimeSpan,
+    calcState:     TimeEstimateCalculator.Last[F2],
+    indices:       IndexTracker,
+    builder:       AtomBuilder[F2],
+    goalCycles:    NonNegInt
+  ) extends SequenceGenerator[F2]:
+
+    override def recordStep(step: StepRecord[F2])(using Eq[F2]): SequenceGenerator[F2] =
+      step.sequenceType match
+        case SequenceType.Acquisition => copy(
+          calcState = calcState.next(step.protoStep),
+        )
+        case SequenceType.Science     => copy(
+          seqRecord = seqRecord.next(step),
+          calcState = calcState.next(step.protoStep),
+          indices   = indices.record(step)
+        )
+
+    override def recordVisit(visit: VisitRecord): SequenceGenerator[F2] =
+      copy(seqRecord = seqRecord.resetVisit)
+
+    override def recordSequenceEvent(event: SequenceEvent): SequenceGenerator[F2] =
+      event.command match
+        case SequenceCommand.Stop => copy(seqRecord = seqRecord.endBlockEarly)
+        case _                    => this
+
+    override def generate(when: Timestamp): Stream[Pure, Atom[F2]] =
+
+      // Complete the current science block.
+      val (completedCount, curBlockAtoms) = seqRecord.complete(
+        when,
+        estimate(_, calcState),
+        cycleEstimate,
+        goalCycles
+      )
+
+      val future =
+        Stream.emits(curBlockAtoms) ++
+        Stream
+          .unfold(completedCount): c =>
+            PosInt.from(goalCycles.value - c).toOption.map: remainingCycles =>
+              val (cycles, atoms) = remainingAtomsInEmptyBlock(steps, cycleEstimate, remainingCycles)
+              (atoms, c + cycles)
+          .flatMap(Stream.emits)
+
+      // Convert the proto atoms into real atoms with ids and estimates.
+      val (aix, six) = indices.toTuple
+      future
+        .mapAccumulate((aix, six, calcState)) { case ((a, s, calcStateʹ), protoAtom) =>
+          val (csʹ, atom) = builder.build(protoAtom.description, a, s, protoAtom.steps).run(calcStateʹ).value
+          ((a + 1, 0, csʹ), atom)
+        }
+        .map(_._2)
+
+  end Generator
+
+  private def zeroExposureTime(oid: Observation.Id): OdbError =
+    OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: Flamingos 2 Long Slit requires a positive exposure time.".some)
+
+  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
+    OdbError.SequenceUnavailable(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.".some)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
@@ -144,28 +470,28 @@ object Science:
     time:          Either[OdbError, IntegrationTime]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
 
-    def usingTime(t: IntegrationTime): EitherT[F, OdbError, SequenceGenerator[F2]] =
-      Steps
-        .compute(observationId, config, t, expander)
-        .map: steps =>
-          ScienceState(
-            steps,
-            AtomBuilder.instantiate(
-              estimator,
-              static,
-              namespace,
-              SequenceType.Science
-            ),
-            TimeEstimateCalculator.Last.empty[F2],
-            IndexTracker.Zero,
-            Map.empty
-          )
-
     val posTime: EitherT[F, OdbError, IntegrationTime] =
       EitherT.fromEither:
-        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some))
+        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId))
 
-    (for
+    def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
+      val estimate = TimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
+      EitherT.fromEither:
+        Either.cond(estimate < MaxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate))
+
+    val gen = for
       t <- posTime
-      g <- usingTime(t)
-    yield g).value
+      s <- StepDefinition.compute(observationId, config, t, expander)
+      e <- cycleEstimate(s)
+    yield Generator(
+      s,
+      e,
+      SequenceRecord(s),
+      (nel, calcState) => estimator.estimateTotalNel(static, nel).runA(calcState).value,
+      TimeEstimateCalculator.Last.empty[F2],
+      IndexTracker.Zero,
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
+      NonNegInt.unsafeFrom((t.exposureCount.value + 3) / 4)  // round up to include a whole ABBA cycle
+    ): SequenceGenerator[F2]
+
+    gen.value
