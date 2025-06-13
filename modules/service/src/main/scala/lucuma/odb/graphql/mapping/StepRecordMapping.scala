@@ -4,21 +4,22 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.apply.*
 import cats.effect.Resource
+import cats.syntax.apply.*
 import grackle.Query.Binding
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import io.circe.syntax.*
 import lucuma.core.model.User
-import lucuma.odb.json.time.query.given
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
-import lucuma.core.util.Timestamp
-import lucuma.core.util.TimestampInterval
+
 import table.AtomRecordTable
 import table.Flamingos2DynamicView
 import table.GmosDynamicTables
