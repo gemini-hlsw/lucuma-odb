@@ -10,7 +10,6 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
-import fs2.text.utf8
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
@@ -21,6 +20,7 @@ import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.ags
 import lucuma.ags.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
@@ -71,11 +71,6 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
-import org.http4s.Header
-import org.http4s.Headers
-import org.http4s.Method
-import org.http4s.Request
-import org.http4s.client.Client
 import skunk.*
 import skunk.data.Arr
 import skunk.implicits.*
@@ -292,7 +287,7 @@ object GuideService {
   }
 
   def instantiate[F[_]: Concurrent: Trace](
-    httpClient:             Client[F],
+    gaiaClient:             GaiaClient[F],
     itcClient:              ItcClient[F],
     commitHash:             CommitHash,
     timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -444,25 +439,13 @@ object GuideService {
       ): F[Result[List[GuideStarCandidate]]] = 
         Trace[F].span("callGaia"):
           val MaxTargets                     = 100
-          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
-          given ci: ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
-          val request                        = Request[F](Method.GET,
-                                  CatalogSearch.gaiaSearchUri(query),
-                                  headers = Headers(("x-requested-with", "XMLHttpRequest"))
-          )
-          httpClient
-            .stream(request)
-            .flatMap(
-              _.body
-                .through(utf8.decode)
-                .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
-                .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
-            )
-            .compile
-            .toList
-            .map(_.success)
+          given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)
+          gaiaClient.query(query)
+          .map:
+            _.collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
+              .success
             // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
-            .handleError(e => gaiaError(e.getMessage()).asFailure)
+          .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
         oid:         Observation.Id,
@@ -497,25 +480,12 @@ object GuideService {
 
       def getGuideStarFromGaia(name: GuideStarName): F[Result[GuideStarCandidate]] =
         ResultT.fromResult(guideStarIdFromName(name)).flatMap { id =>
-          given catalog: CatalogAdapter.Gaia = CatalogAdapter.Gaia3Lite
-          val request = Request[F](Method.GET, CatalogSearch.gaiaSearchUriById(id),
-                                  headers = Headers(("x-requested-with", "XMLHttpRequest"))
-          )
           ResultT(
-            httpClient
-              .stream(request)
-              .flatMap(
-                _.body
-                  .through(utf8.decode)
-                  .through(CatalogSearch.guideStars[F](CatalogAdapter.Gaia3Lite))
-                  .collect { case Right(s) => GuideStarCandidate.siderealTarget.get(s)}
-              )
-              .compile
-              .toList
-              .map(
-                _.headOption
-                .toResult(gaiaError(s"Star with id $id not found on Gaia.").asProblem)
-              )
+            gaiaClient.queryById(id)
+              .map:
+                _.toOption
+                  .map(GuideStarCandidate.siderealTarget.get)
+                  .toResult(gaiaError(s"Star with id $id not found on Gaia.").asProblem)
               // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
               .handleError(e => gaiaError(e.getMessage()).asFailure)
           )

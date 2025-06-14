@@ -5,6 +5,7 @@ package lucuma.odb
 
 import cats.*
 import cats.data.Kleisli
+import cats.data.NonEmptyChain
 import cats.effect.*
 import cats.effect.std.AtomicCell
 import cats.effect.std.Console
@@ -16,6 +17,8 @@ import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
+import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.votable.CatalogAdapter
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.itc.client.ItcClient
@@ -213,7 +216,8 @@ object FMain extends MainParams {
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
       S3FileService.s3PresignerResource(config.aws),
-      config.httpClientResource
+      config.httpClientResource,
+      GaiaClient.DefaultAdapters
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -229,18 +233,20 @@ object FMain extends MainParams {
     domain:               List[String],
     s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
     s3PresignerResource:  Resource[F, S3Presigner],
-    httpClientResource:   Resource[F, Client[F]]
+    httpClientResource:   Resource[F, Client[F]],
+    gaiaAdapters:         NonEmptyChain[CatalogAdapter.Gaia]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
       ssoClient         <- ssoClientResource
       httpClient        <- httpClientResource
+      gaiaClient        =  GaiaClient.build[F](httpClient, adapters = gaiaAdapters)
       userSvc           <- pool.map(UserService.fromSession(_))
       middleware        <- Resource.eval(ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc))
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      graphQLRoutes     <- GraphQLRoutes(itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, emailConfig)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
