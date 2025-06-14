@@ -370,10 +370,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
-                    partnerSplits {
-                      partner
-                      percent
-                    }
                   }
                 }
               }
@@ -387,8 +383,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "type": {
                   "scienceSubtype": "CLASSICAL",
-                  "minPercentTime": 100,
-                  "partnerSplits": []
+                  "minPercentTime": 100
                 }
               }
             }
@@ -563,7 +558,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     fastTurnaround: {
                       toOActivation:  NONE
                       minPercentTime: 50
-                      piAffiliation: US
                     }
                   }
                 }
@@ -576,7 +570,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on FastTurnaround {
                     toOActivation
                     minPercentTime
-                    piAffiliation
                     reviewer {
                       id
                       role
@@ -596,7 +589,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
-                  "piAffiliation": "US",
                   "reviewer": null
                 }
               }
@@ -631,7 +623,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on FastTurnaround {
                     toOActivation
                     minPercentTime
-                    piAffiliation
                   }
                 }
               }
@@ -646,8 +637,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "type": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
-                  "minPercentTime": 100,
-                  "piAffiliation": null
+                  "minPercentTime": 100
                 }
               }
             }
@@ -675,7 +665,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
-                      piAffiliation: US
                       reviewerId: "$puId"
                     }
                   }
@@ -689,7 +678,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on FastTurnaround {
                     toOActivation
                     minPercentTime
-                    piAffiliation
                     reviewer {
                       id
                       role
@@ -709,7 +697,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
-                  "piAffiliation": "US",
                   "reviewer": {
                     "id": ${puId.toString},
                     "role": "COI"
@@ -738,7 +725,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
-                      piAffiliation: US
                       reviewerId: "pu-ffff-ffff-ffff-ffff"
                     }
                   }
@@ -1173,10 +1159,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 type {
                   ... on Queue {
-                    partnerSplits {
-                      partner
-                      percent
-                    }
+                    scienceSubtype
                   }
                 }
               }
@@ -1188,7 +1171,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "type": {
-                  "partnerSplits": []
+                  "scienceSubtype": "QUEUE"
                 }
               }
             }
@@ -1306,7 +1289,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
-                      piAffiliation: US
                     }
                   }
                 }
@@ -1372,7 +1354,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("⨯ queue proposal cannot have reviewerId") {
-    createProgramAs(pi, "ueue Proposal").flatMap { pid =>
+    createProgramAs(pi, "Queue Proposal").flatMap { pid =>
       expect(
         user = pi,
         query = s"""

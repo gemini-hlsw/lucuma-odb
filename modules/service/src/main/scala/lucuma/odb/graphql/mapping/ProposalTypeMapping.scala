@@ -98,7 +98,6 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
-      SqlField("piAffiliation",   ProposalView.FastTurnaround.PiAffiliate),
       SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)),
       SqlObject("mentor",         Join(ProposalView.FastTurnaround.MentorId, ProgramUserTable.ProgramUserId))
     )
