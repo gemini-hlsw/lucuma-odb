@@ -2121,7 +2121,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
-                  piAffiliation: US
                   $additionalFields
                 }
               }
@@ -2135,7 +2134,6 @@ trait DatabaseOperations { this: OdbSuite =>
               ... on FastTurnaround {
                 toOActivation
                 minPercentTime
-                piAffiliation
                 reviewer {
                   id
                   role
@@ -2166,7 +2164,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
-                "piAffiliation": "US",
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
               }
@@ -2193,7 +2190,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
-                  piAffiliation: US
                   reviewerId: "$userId"
                   mentorId: "$userId"
                 }
@@ -2240,7 +2236,6 @@ trait DatabaseOperations { this: OdbSuite =>
                   fastTurnaround: {
                     toOActivation: NONE
                     minPercentTime: 50
-                    piAffiliation: US
                     $additionalFields
                   }
                 }
@@ -2292,7 +2287,6 @@ trait DatabaseOperations { this: OdbSuite =>
               ... on FastTurnaround {
                 toOActivation
                 minPercentTime
-                piAffiliation
                 reviewer {
                   id
                   role
@@ -2322,7 +2316,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
-                "piAffiliation": "US",
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
               }
