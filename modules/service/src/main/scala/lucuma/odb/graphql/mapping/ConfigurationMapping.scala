@@ -14,6 +14,7 @@ import grackle.Result.Failure
 import grackle.Result.Warning
 import grackle.ResultT
 import io.circe.syntax.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -25,14 +26,13 @@ import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
-import org.http4s.client.Client
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
 
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
-  def httpClient: Client[F]
+  def gaiaClient: GaiaClient[F]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
@@ -85,7 +85,7 @@ trait ConfigurationMapping[F[_]]
             Result(None).pure[F]
           case Some(refTime) =>
             services.use { implicit s =>
-              s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+              s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
                 .getObjectTracking(pid, oid)
                 .map:
                   case Failure(problems) => Warning(problems, None) // turn failure into a warning

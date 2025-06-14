@@ -18,6 +18,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -31,7 +32,6 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
-import org.http4s.client.Client
 
 import binding.*
 import table.*
@@ -44,7 +44,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
      with TargetView[F] { this: SkunkMapping[F] & TargetMapping[F] =>
 
   def itcClient: ItcClient[F]
-  def httpClient: Client[F]
+  def gaiaClient: GaiaClient[F]
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
@@ -124,7 +124,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[Option[Coordinates]]] =
       (pid, oid, obsTime) =>
         services.use { implicit s =>
-          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
             .getObjectTracking(pid, oid)
             .map(_.map(_.at(obsTime.toInstant).map(_.value)))
         }
@@ -138,7 +138,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { implicit s =>
-          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironments(pid, oid, obsTime)
         }
 
@@ -151,7 +151,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideService.GuideEnvironment]] =
       (pid, oid, _) =>
         services.use { implicit s =>
-          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideEnvironment(pid, oid)
         }
 
@@ -170,7 +170,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { implicit s =>
-          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideAvailability(pid, oid, period)
         }
 
@@ -183,7 +183,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Option[NonEmptyString]]] =
       (pid, oid, _) =>
         services.use { implicit s =>
-          s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
             .getGuideTargetName(pid, oid)
         }
 
