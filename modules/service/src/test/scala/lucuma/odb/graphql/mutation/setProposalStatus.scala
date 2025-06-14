@@ -24,7 +24,7 @@ import lucuma.odb.data.Tag
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
 
-class setProposalStatus extends OdbSuite 
+class setProposalStatus extends OdbSuite
   with ObservingModeSetupOperations {
 
   val pi       = TestUsers.Standard.pi(1, 101)
@@ -182,35 +182,10 @@ class setProposalStatus extends OdbSuite
     }
   }
 
-  test("⨯ missing piAffiliation (fast turnaround)") {
+  test("✓ fast turnaround submission") {
     createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some, "fastTurnaround: {}".some) *>
-        expect(
-          user = pi,
-          query = s"""
-            mutation {
-              setProposalStatus(
-                input: {
-                  programId: "$pid"
-                  status: SUBMITTED
-                }
-              ) {
-                program { proposal { reference { label } } }
-              }
-            }
-          """,
-          expected =
-            List(s"Submitted proposal $pid of type Fast Turnaround must specify the piAffiliation.").asLeft
-        )
-      }
-    }
-  }
-
-  test("✓  having piAffiliation (fast turnaround)") {
-    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
-      createProgramAs(pi).flatMap { pid =>
-        addProposal(pi, pid, cid.some, "fastTurnaround: { piAffiliation: US }".some) *>
         addCoisAs(pi, pid, List(Partner.US)) *>
         expect(
           user = pi,
