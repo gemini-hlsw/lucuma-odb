@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
@@ -69,6 +70,8 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput).some,
         none,
+        none,
+        none,
         none
       )
 
@@ -87,6 +90,8 @@ object CalibrationConfigSubset:
       ObservingModeInput.Create(
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput).some,
+        none,
+        none,
         none
       )
 
@@ -94,7 +99,16 @@ object CalibrationConfigSubset:
     disperser: Flamingos2Disperser,
     filter:    Flamingos2Filter,
     fpu:       Flamingos2Fpu
-  ) extends CalibrationConfigSubset derives Eq
+  ) extends CalibrationConfigSubset derives Eq:
+
+    def toLongSlitInput: ObservingModeInput.Create =
+      ObservingModeInput.Create(
+        none,
+        none,
+        none,
+        none,
+        Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none).some
+      )
 
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =

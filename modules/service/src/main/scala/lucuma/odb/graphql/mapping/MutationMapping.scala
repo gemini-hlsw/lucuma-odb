@@ -27,6 +27,7 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
@@ -139,6 +140,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   def user: User
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def httpClient: Client[F]
+  def gaiaClient: GaiaClient[F]
   def itcClient: ItcClient[F]
   def emailConfig: Config.Email
   def commitHash: CommitHash
@@ -659,7 +661,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
             case other =>
               other.flatTraverse: checked =>
-                guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+                guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))

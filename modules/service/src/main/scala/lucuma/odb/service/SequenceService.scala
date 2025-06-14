@@ -38,6 +38,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -549,6 +550,12 @@ object SequenceService {
         )
       }
 
+    private val timestamp_interval: Codec[TimestampInterval] =
+      (core_timestamp *: core_timestamp)
+        .imap((first, last) => TimestampInterval.between(first, last))(interval =>
+          (interval.start, interval.end)
+        )
+
     val SelectStepConfigForObs: Query[Observation.Id, (Step.Id, StepConfig)] =
       (sql"""
         SELECT
@@ -561,20 +568,23 @@ object SequenceService {
         WHERE """ ~> sql"""a.c_observation_id = $observation_id"""
       ).query(step_id *: step_config)
 
+
+
     private def step_record[D](dynamic_config: Decoder[D]): Decoder[StepRecord[D]] =
       (
-        step_id              *:
-        atom_id              *:
-        visit_id             *:
-        int4_pos             *:
-        step_config          *:
-        telescope_config     *:
-        instrument           *:
-        dynamic_config       *:
-        core_timestamp       *:
-        sequence_type        *:
-        obs_class            *:
-        step_execution_state *:
+        step_id                *:
+        atom_id                *:
+        visit_id               *:
+        int4_pos               *:
+        step_config            *:
+        telescope_config       *:
+        instrument             *:
+        dynamic_config         *:
+        core_timestamp         *:
+        timestamp_interval.opt *:
+        sequence_type          *:
+        obs_class              *:
+        step_execution_state   *:
         dataset_qa_state.opt
       ).to[StepRecord[D]]
 
@@ -599,6 +609,8 @@ object SequenceService {
           v.c_instrument,
           #${encodeColumns(instAlias.some, instColumns)},
           v.c_created,
+          v.c_first_event_time,
+          v.c_last_event_time,
           a.c_sequence_type,
           v.c_observe_class,
           v.c_execution_state,

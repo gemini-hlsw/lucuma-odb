@@ -17,6 +17,7 @@ import grackle.*
 import grackle.QueryCompiler.SelectElaborator
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -88,6 +89,7 @@ object OdbMapping {
     monitor0:      SkunkMonitor[F],
     user0:         User,
     topics0:       Topics[F],
+    gaiaClient0:   GaiaClient[F],
     itcClient0:    ItcClient[F],
     commitHash0:   CommitHash,
     goaUsers0:     Set[User.Id],
@@ -172,6 +174,7 @@ object OdbMapping {
           with GmosDynamicMapping[F]
           with GmosFpuMapping[F]
           with GmosGratingConfigMapping[F]
+          with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
@@ -285,6 +288,7 @@ object OdbMapping {
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val goaUsers = goaUsers0
+          override val gaiaClient = gaiaClient0
           override val itcClient = itcClient0
           override val user: User = user0
           override val topics: Topics[F] = topics0
@@ -299,6 +303,7 @@ object OdbMapping {
                   monitor0,               // Same args as the outer mapping
                   user0,
                   topics0,
+                  gaiaClient0,
                   itcClient0,
                   commitHash0,
                   goaUsers0,
@@ -382,8 +387,10 @@ object OdbMapping {
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitMapping,
                 Flamingos2StaticMapping,
+                GmosNorthImagingMapping,
                 GmosNorthLongSlitMapping,
                 GmosNorthStaticMapping,
+                GmosSouthImagingMapping,
                 GmosSouthLongSlitMapping,
                 GmosSouthStaticMapping,
                 GoaPropertiesMapping,
@@ -664,6 +671,7 @@ object OdbMapping {
       monitor,
       user,
       null,        // Topics[F]
+      null,        // GaiaClient[F]
       null,        // ItcClient[F]
       commitHash,
       Set.empty,   // GOA users
