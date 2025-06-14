@@ -81,7 +81,7 @@ trait GmosImagingMapping[F[_]]
 
 object GmosImagingMapping:
 
-  private val DefaultBin: GmosBinning = GmosBinning.One
+  private val DefaultBin: GmosBinning = GmosBinning.Two
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
