@@ -2003,7 +2003,7 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosNorthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "bin": "ONE",
+                    "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
                     "roi": "FULL_FRAME"
@@ -2040,7 +2040,7 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosSouthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "bin": "ONE",
+                    "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
                     "roi": "FULL_FRAME"

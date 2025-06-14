@@ -8359,7 +8359,7 @@ type GmosNorthImaging {
   bin: GmosBinning!
 
   """
-  Default GMOS Binning (ONE).
+  Default GMOS Binning (TWO).
   """
   defaultBin: GmosBinning!
 
@@ -8919,7 +8919,7 @@ type GmosSouthImaging {
   bin: GmosBinning!
 
   """
-  Default GMOS Binning (ONE).
+  Default GMOS Binning (TWO).
   """
   defaultBin: GmosBinning!
 
