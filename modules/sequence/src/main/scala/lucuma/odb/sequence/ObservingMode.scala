@@ -8,45 +8,49 @@ import cats.data.NonEmptyList
 import cats.syntax.eq.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
-import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
-import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
+import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
+import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
+import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
 import lucuma.odb.sequence.util.HashBytes
 
 /**
  * All observing mode options.
  */
-type ObservingMode = GmosNorth | GmosSouth | Flamingos2Config
+type ObservingMode = GmosNorthLongSlit | GmosSouthLongSlit | GmosNorthImaging | GmosSouthImaging | Flamingos2Config
 
 given Eq[ObservingMode] =
   Eq.instance:
-    case (a: Flamingos2Config, b: Flamingos2Config) => a === b
-    case (a: GmosNorth,        b: GmosNorth)        => a === b
-    case (a: GmosSouth,        b: GmosSouth)        => a === b
-    case _                                          => false
+    case (a: Flamingos2Config,    b: Flamingos2Config)    => a === b
+    case (a: GmosNorthLongSlit,   b: GmosNorthLongSlit)   => a === b
+    case (a: GmosSouthLongSlit,   b: GmosSouthLongSlit)   => a === b
+    case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
+    case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
+    case _                                                => false
 
 extension (self: ObservingMode)
   def observingModeType: ObservingModeType =
     self match
-      case _: Flamingos2Config  => ObservingModeType.Flamingos2LongSlit
-      case _: GmosNorth         => ObservingModeType.GmosNorthLongSlit
-      case _: GmosSouth         => ObservingModeType.GmosSouthLongSlit
+      case _: Flamingos2Config    => ObservingModeType.Flamingos2LongSlit
+      case _: GmosNorthLongSlit   => ObservingModeType.GmosNorthLongSlit
+      case _: GmosSouthLongSlit   => ObservingModeType.GmosSouthLongSlit
+      case _: GmosNorthImaging    => ObservingModeType.GmosNorthImaging
+      case _: GmosSouthImaging    => ObservingModeType.GmosSouthImaging
 
-object ObservingMode {
+object ObservingMode:
 
   def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] =
     modes.head match
-      case f2: Flamingos2Config  => Flamingos2Config.reconcile(f2, modes.tail)
-      case gn: GmosNorth         => GmosNorth.reconcile(gn, modes.tail)
-      case gs: GmosSouth         => GmosSouth.reconcile(gs, modes.tail)
+      case f2:  Flamingos2Config    => Flamingos2Config.reconcile(f2, modes.tail)
+      case gnl: GmosNorthLongSlit   => GmosNorthLongSlit.reconcile(gnl, modes.tail)
+      case gsl: GmosSouthLongSlit   => GmosSouthLongSlit.reconcile(gsl, modes.tail)
+      case gni: GmosNorthImaging    => GmosNorthImaging.reconcile(gni, modes.tail)
+      case gsi: GmosSouthImaging    => GmosSouthImaging.reconcile(gsi, modes.tail)
 
-  given HashBytes[ObservingMode] with {
-    def hashBytes(a: ObservingMode): Array[Byte] =
-      a match
-        case f2: Flamingos2Config  => f2.hashBytes
-        case gn: GmosNorth         => gn.hashBytes
-        case gs: GmosSouth         => gs.hashBytes
+  given HashBytes[ObservingMode] =
+    case f2:  Flamingos2Config    => f2.hashBytes
+    case gnl: GmosNorthLongSlit   => gnl.hashBytes
+    case gsl: GmosSouthLongSlit   => gsl.hashBytes
+    case gni: GmosNorthImaging    => gni.hashBytes
+    case gsi: GmosSouthImaging    => gsi.hashBytes
 
-  }
-
-
-}
