@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.option.*
 import lucuma.core.enums.Flamingos2Disperser
@@ -11,6 +12,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -22,11 +24,13 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
+import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.gmos.longslit.Config
+import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 
 sealed trait CalibrationConfigSubset derives Eq
 
@@ -95,6 +99,65 @@ object CalibrationConfigSubset:
         none
       )
 
+  sealed trait GmosImaging[F] extends CalibrationConfigSubset:
+    def filters:        NonEmptyList[F]
+    def binning:        GmosBinning
+    def ampReadMode:    GmosAmpReadMode
+    def ampGain:        GmosAmpGain
+    def roi:            GmosRoi
+
+    def toImagingInput: ObservingModeInput.Create
+
+  case class GmosNImagingConfigs(
+    filters:     NonEmptyList[GmosNorthFilter],
+    binning:     GmosBinning,
+    ampReadMode: GmosAmpReadMode,
+    ampGain:     GmosAmpGain,
+    roi:         GmosRoi
+  ) extends GmosImaging[GmosNorthFilter] derives Eq:
+
+    def toImagingInput: ObservingModeInput.Create =
+      ObservingModeInput.Create(
+        none,
+        none,
+        GmosImagingInput.Create.North(
+          filters,
+          GmosImagingInput.Create.Common(
+            binning.some,
+            ampReadMode.some,
+            ampGain.some,
+            roi.some
+          )
+        ).some,
+        none,
+        none
+      )
+
+  case class GmosSImagingConfigs(
+    filters:     NonEmptyList[GmosSouthFilter],
+    binning:     GmosBinning,
+    ampReadMode: GmosAmpReadMode,
+    ampGain:     GmosAmpGain,
+    roi:         GmosRoi
+  ) extends GmosImaging[GmosSouthFilter] derives Eq:
+
+    def toImagingInput: ObservingModeInput.Create =
+      ObservingModeInput.Create(
+        none,
+        none,
+        none,
+        GmosImagingInput.Create.South(
+          filters,
+          GmosImagingInput.Create.Common(
+            binning.some,
+            ampReadMode.some,
+            ampGain.some,
+            roi.some
+          )
+        ).some,
+        none
+      )
+
   case class Flamingos2Configs(
     disperser: Flamingos2Disperser,
     filter:    Flamingos2Filter,
@@ -134,6 +197,22 @@ object CalibrationConfigSubset:
             gs.yBin,
             gs.ampReadMode,
             gs.ampGain
+          )
+        case gni: ImagingConfig.GmosNorth =>
+          GmosNImagingConfigs(
+            gni.filters,
+            gni.bin,
+            gni.ampReadMode,
+            gni.ampGain,
+            gni.roi
+          )
+        case gsi: ImagingConfig.GmosSouth =>
+          GmosSImagingConfigs(
+            gsi.filters,
+            gsi.bin,
+            gsi.ampReadMode,
+            gsi.ampGain,
+            gsi.roi
           )
         case f2: Flamingos2Config =>
           Flamingos2Configs(

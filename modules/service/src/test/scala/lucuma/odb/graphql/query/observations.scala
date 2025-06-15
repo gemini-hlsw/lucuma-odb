@@ -507,7 +507,7 @@ class observations extends OdbSuite {
                             "observingMode": {
                               "gmosNorthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
-                                "bin": "ONE",
+                                "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
                                 "roi": "FULL_FRAME"
@@ -559,7 +559,7 @@ class observations extends OdbSuite {
                             "observingMode": {
                               "gmosSouthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
-                                "bin": "ONE",
+                                "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
                                 "roi": "FULL_FRAME"
@@ -644,7 +644,7 @@ class observations extends OdbSuite {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
                               "filters": ["G_PRIME", "R_PRIME"],
-                              "bin": "ONE",
+                              "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
                               "roi": "FULL_FRAME"
@@ -660,7 +660,7 @@ class observations extends OdbSuite {
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
                               "filters": ["G_PRIME", "R_PRIME"],
-                              "bin": "ONE",
+                              "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
                               "roi": "FULL_FRAME"
