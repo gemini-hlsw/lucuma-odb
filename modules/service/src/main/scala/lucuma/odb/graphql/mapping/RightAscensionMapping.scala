@@ -1,6 +1,9 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package lucuma.odb.graphql
 package mapping
 
@@ -12,8 +15,6 @@ import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
-
-import scala.reflect.ClassTag
 
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ConfigurationRequestView[F]
@@ -44,6 +45,8 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
       rightAscensionMappingAtPath(ConfigurationRequestType / "configuration" / "referenceCoordinates" / "ra", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Ra),
+      rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.SyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
+      rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.SyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
     )
 
 }

@@ -70,6 +70,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
     List(
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[Long](ChronicleIdType),
+      LeafMapping[Tag](ArcTypeType),
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
       LeafMapping[AtomStage](AtomStageType),

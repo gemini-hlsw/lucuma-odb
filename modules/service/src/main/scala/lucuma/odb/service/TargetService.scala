@@ -25,6 +25,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
+import lucuma.odb.graphql.input.OpportunityInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -83,9 +84,10 @@ object TargetService {
 
       override def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] =
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
-          val af = input.tracking match
-            case Left(s)  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
-            case Right(n) => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
+          val af = input.subtypeInfo match
+            case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
+            case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
+            case o: OpportunityInput => ???
           session.prepareR(af.fragment.query(target_id)).use: ps =>
             ps.unique(af.argument).map(Result.success)
 
@@ -329,9 +331,9 @@ object TargetService {
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
-    def trackingUpdates(tracking: Either[SiderealInput.Edit, EphemerisKey]): List[AppliedFragment] =
+    def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput): List[AppliedFragment] =
       tracking match {
-        case Left(sid)   =>
+        case sid: SiderealInput.Edit   =>
           List(
             sid.ra.asUpdate("c_sid_ra", right_ascension),
             sid.dec.asUpdate("c_sid_dec", declination),
@@ -348,7 +350,7 @@ object TargetService {
             void"c_nsid_key_type = null",
             void"c_nsid_key = null",
           )
-        case Right(ek) =>
+        case ek: EphemerisKey =>
           List(
             sql"c_nsid_des = $text".apply(ek.des),
             sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
@@ -367,6 +369,8 @@ object TargetService {
             void"c_sid_catalog_id = null",
             void"c_sid_catalog_object_type = null",
           )
+        case opp: OpportunityInput =>
+          ???
       }
 
     def updates(SET: TargetPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
@@ -375,7 +379,7 @@ object TargetService {
           SET.existence.map(sql"c_existence = $existence"),
           SET.name.map(sql"c_name = $text_nonempty"),
         ).flatten ++
-        SET.tracking.toList.flatMap(trackingUpdates)
+        SET.subtypeInfo.toList.flatMap(subtypeInfoUpdates)
       )
 
     // Contruct an update (or am select in the case of no updates) performing the requested updates on
