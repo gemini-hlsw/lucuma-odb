@@ -10,6 +10,7 @@ BEGIN
     SELECT c_observation_id
     FROM t_observation
     WHERE c_program_id = pid
+      AND c_existence = 'present'
   LOOP
     CALL invalidate_obscalc(obs_id);
   END LOOP;

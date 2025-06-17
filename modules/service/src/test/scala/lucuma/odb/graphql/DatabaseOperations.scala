@@ -164,6 +164,28 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def updateCallForProposalsAs(
+    user: User,
+    id: CallForProposals.Id,
+    set: String
+  ): IO[Unit] =
+    query(user, s"""
+      mutation {
+        updateCallsForProposals(
+          input: {
+            WHERE: {
+              id: { EQ: "$id" }
+            }
+            SET: $set
+          }
+        ) {
+          callsForProposals {
+            id
+          }
+        }
+      }
+    """).void
+
   def createProgramAs(user: User, name: String = null, clientOption: ClientOption = ClientOption.Default): IO[Program.Id] =
     query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }", client = clientOption).flatMap { js =>
       js.hcursor
@@ -381,6 +403,25 @@ trait DatabaseOperations { this: OdbSuite =>
           )
         ).asRight
     )
+
+  def setCallId(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateProposal(
+            input: {
+              programId: "$pid",
+              SET: {
+                callId: "$cid"
+              }
+            }
+          ) {
+            proposal { category }
+          }
+        }
+      """
+    ).void
 
   def getProprietaryMonths(
     user: User,
