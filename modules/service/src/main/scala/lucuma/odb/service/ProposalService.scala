@@ -115,12 +115,7 @@ object ProposalService {
       s"Submitted proposal $pid must have a science subtype.".invalidArg
 
     def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
-      subtype match {
-        case ScienceSubtype.FastTurnaround =>
-          s"Submitted proposal $pid of type ${subtype.title} must specify the piAffiliation.".invalidArg
-        case _ =>
-          s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
-      }
+      s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
 
     def missingPartners(pid: Program.Id, partners: Set[Tag] = Set.empty): OdbError =
       partners.toList.map(_.value.toUpperCase).sorted match
@@ -207,8 +202,7 @@ object ProposalService {
             scienceSubtype.fold(().success) { s =>
               missingOrInvalidSplits(pid, s).asFailure.whenA(
                 splitsSum =!= 100 &&
-                ((s === ScienceSubtype.Classical)      ||
-                 (s === ScienceSubtype.FastTurnaround) ||
+                ((s === ScienceSubtype.Classical) ||
                  (s === ScienceSubtype.Queue))
               )
             },
