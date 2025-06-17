@@ -3836,12 +3836,6 @@ type FastTurnaround implements ProposalType {
   minPercentTime: IntPercent!
 
   """
-  Partner associated with this FT proposal.  This is optional until submission,
-  by which time it must be defined.
-  """
-  piAffiliation: Partner
-
-  """
   Program User that will be selected as a reviewer for this program
   """
   reviewer: ProgramUser
@@ -4027,12 +4021,6 @@ input FastTurnaroundInput {
   If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
-
-  """
-  Partner associated with this FT proposal.  This is optional on creation but
-  must be specified upon submission.
-  """
-  piAffiliation: Partner
 
   """
   The program user ID to be designated as the reviewer for this FT proposal.
