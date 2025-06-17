@@ -6,10 +6,11 @@ package subscription
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.syntax.either.*
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Semester
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.EditType
 import lucuma.odb.service.ObscalcServiceSuiteSupport
@@ -61,10 +62,10 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
     p <- createProgramAs(pi, "foo")
     t <- createTargetWithProfileAs(pi, p)
     o <- createGmosSouthLongSlitObservationAs(pi, p, List(t))
-  yield o
+  yield (p, o)
 
   test("trigger for transition to calculating"):
-    setup.flatMap: oid =>
+    setup.flatMap: (_, oid) =>
       subscriptionExpect(
         user      = pi,
         query     = s"""
@@ -92,6 +93,144 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         )
       )
 
+  test("trigger for CfP assignment"):
+    val s = for {
+      (pid, oid) <- setup
+      cid        <- createCallForProposalsAs(staff)
+      _          <- addProposal(pi, pid)
+    } yield (pid, oid, cid)
+    s.flatMap: (pid, oid, cid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = setCallId(pi, pid, cid).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+
+  test("trigger for CfP assignment change"):
+    val s = for {
+      (pid, oid) <- setup
+      cid1       <- createCallForProposalsAs(staff)
+      _          <- addProposal(pi, pid, cid1.some)
+      cid2       <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025B"))
+    } yield (pid, oid, cid2)
+    s.flatMap: (pid, oid, cid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = setCallId(pi, pid, cid).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+
+  test("trigger for CfP coordinateLimits change"):
+    val set = "{ coordinateLimits: { north: {raStart: {degrees: 17.3}}} }"
+    val s = for {
+      (pid, oid) <- setup
+      cid        <- createCallForProposalsAs(staff)
+      _          <- addProposal(pi, pid, cid.some)
+    } yield (oid, cid)
+    s.flatMap: (oid, cid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = updateCallForProposalsAs(staff, cid, set).asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+    
+  test("trigger for CfP instrument change"):
+    val s = for {
+      (pid, oid) <- setup
+      cid        <- createCallForProposalsAs(staff)
+      _          <- addProposal(pi, pid, cid.some)
+    } yield (oid, cid)
+    s.flatMap: (oid, cid) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = s"""
+          subscription {
+            obscalcUpdate {
+              oldState
+              newState
+              editType
+              value { id }
+            }
+          }
+        """,
+        mutations = updateCallForProposalsAs(staff, cid, "{ instruments: [GMOS_NORTH] }").asRight,
+        expected  = List(
+          Json.obj(
+            "obscalcUpdate" -> Json.obj(
+              "oldState" -> CalculationState.Pending.asJson,
+              "newState" -> CalculationState.Pending.asJson,
+              "editType" -> EditType.Updated.tag.toUpperCase.asJson,
+              "value" -> Json.obj(
+                "id" -> oid.asJson
+              )
+            )
+          )
+        )
+      )
+    
   def deleteCalibrationObservation(oid: Observation.Id): IO[Unit] =
     withServices(pi): services =>
       services.transactionally:
@@ -99,7 +238,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
     .void
 
   test("trigger for hard delete"):
-    setup.flatMap: oid =>
+    setup.flatMap: (_, oid) =>
       subscriptionExpect(
       user      = pi,
       query     = s"""

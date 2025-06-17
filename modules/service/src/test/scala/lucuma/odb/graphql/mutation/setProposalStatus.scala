@@ -15,7 +15,6 @@ import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
-import lucuma.core.model.CallForProposals
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -375,25 +374,6 @@ class setProposalStatus extends OdbSuite
     }
   }
 
-  def setCallId(pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
-    query(
-      pi,
-      s"""
-        mutation {
-          updateProposal(
-            input: {
-              programId: "$pid",
-              SET: {
-                callId: "$cid"
-              }
-            }
-          ) {
-            proposal { category }
-          }
-        }
-      """
-    ).void
-
   test("✓ edit proposal status (pi can set to SUBMITTED and back to NOT_SUBMITTED)") {
 
     def submit(pid: Program.Id): IO[Unit] =
@@ -510,7 +490,7 @@ class setProposalStatus extends OdbSuite
       c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
       p <- createProgramAs(pi)
       _ <- addProposal(pi, p)
-      _ <- setCallId(p, c)
+      _ <- setCallId(pi, p, c)
       _ <- addPartnerSplits(pi, p)
       _ <- addCoisAs(pi, p)
       _ <- submit(p)
@@ -580,7 +560,7 @@ class setProposalStatus extends OdbSuite
       _ <- addProposal(pi, p)
       _ <- addPartnerSplits(pi, p)
       _ <- addCoisAs(pi, p)
-      _ <- setCallId(p, c)
+      _ <- setCallId(pi, p, c)
       _ <- accept(p)
       _ <- recall(p)
     } yield ()
