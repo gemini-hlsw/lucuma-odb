@@ -13,6 +13,9 @@ import grackle.Problem
 import grackle.Result
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ArcType
+import lucuma.core.math.Angular
+import lucuma.core.math.Arc
 import lucuma.core.math.ProperMotion
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.Observation
@@ -26,6 +29,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.OpportunityInput
+import lucuma.odb.graphql.input.RegionInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -38,6 +42,7 @@ import lucuma.odb.service.TargetService.UpdateTargetsResponse.SourceProfileUpdat
 import lucuma.odb.service.TargetService.UpdateTargetsResponse.TrackingSwitchFailed
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
+import skunk.Codec
 import skunk.Encoder
 import skunk.SqlState
 import skunk.Transaction
@@ -87,7 +92,7 @@ object TargetService {
           val af = input.subtypeInfo match
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson)
             case n: EphemerisKey => Statements.insertNonsiderealFragment(pid, input.name, n, input.sourceProfile.asJson)
-            case o: OpportunityInput => ???
+            case o: OpportunityInput.Create => Statements.insertOpportunityFragment(pid, input.name, o.region, input.sourceProfile.asJson)
           session.prepareR(af.fragment.query(target_id)).use: ps =>
             ps.unique(af.argument).map(Result.success)
 
@@ -300,6 +305,55 @@ object TargetService {
       )
     }
 
+    def arc[A: Angular](element: Codec[A]): Codec[Arc[A]] =
+      (arc_type *: element.opt *: element.opt)
+        .eimap[Arc[A]] {
+          case (ArcType.Empty, None, None) => Arc.Empty().asRight
+          case (ArcType.Full, None, None) => Arc.Full().asRight
+          case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).asRight
+          case (t, s, e) => s"Invalid arc: ($t, $s, $e)}".asLeft
+        } {
+          case Arc.Empty() => (ArcType.Empty, None, None)
+          case Arc.Full() => (ArcType.Full, None, None)
+          case Arc.Partial(s, e) => (ArcType.Partial, Some(s), Some(e))
+        }
+
+    def insertOpportunityFragment(
+      pid:           Program.Id,
+      name:          NonEmptyString,
+      region:        RegionInput.Create,
+      sourceProfile: Json
+    ): AppliedFragment = {
+      sql"""
+        insert into t_target (
+          c_program_id,
+          c_name,
+          c_type,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end,
+          c_source_profile
+        )
+        select
+          $program_id,
+          $text_nonempty,
+          'opportunity',
+          ${arc(right_ascension)},
+          ${arc(declination)},
+          $json
+        returning c_target_id
+      """.apply(
+        pid,
+        name,
+        region.raArc,
+        region.decArc,
+        sourceProfile,
+      )
+    }
+
     extension [A](n: Nullable[A]) def asUpdate(column: String, e: Encoder[A]): Option[AppliedFragment] =
       n.foldPresent(_.fold(void"null")(sql"$e")).map(sql"#$column = "(Void) |+| _)
 
@@ -331,7 +385,7 @@ object TargetService {
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
-    def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput): List[AppliedFragment] =
+    def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit): List[AppliedFragment] =
       tracking match {
         case sid: SiderealInput.Edit   =>
           List(
@@ -369,7 +423,7 @@ object TargetService {
             void"c_sid_catalog_id = null",
             void"c_sid_catalog_object_type = null",
           )
-        case opp: OpportunityInput =>
+        case opp: OpportunityInput.Edit =>
           ???
       }
 

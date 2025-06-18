@@ -54,15 +54,17 @@ trait TargetView[F[_]] extends BaseMapping[F] {
         val SyntheticId = col("c_opportunity_id", target_id.embedded)
         object RightAscensionArc {
           val SyntheticId = col("c_opportunity_ra_arc_synthetic_id", target_id.embedded)
-          val Type  = col("c_opp_ra_arc_type", tag.embedded)
-          val Start = col("c_opp_ra_arc_start", right_ascension.opt)
-          val End   = col("c_opp_ra_arc_end", right_ascension.opt)
+          val StartEndSyntheticId = col("c_opportunity_ra_arc_start_end_synthetic_id", target_id.embedded)
+          val Type  = col("c_opp_ra_arc_type", arc_type.embedded)
+          val Start = col("c_opp_ra_arc_start", right_ascension.embedded)
+          val End   = col("c_opp_ra_arc_end", right_ascension.embedded)
         }
         object DeclinationArc {
           val SyntheticId = col("c_opportunity_dec_arc_synthetic_id", target_id.embedded)
-          val Type  = col("c_opp_dec_arc_type", tag.embedded)
-          val Start = col("c_opp_dec_arc_start", declination.opt)
-          val End   = col("c_opp_dec_arc_end", declination.opt)
+          val StartEndSyntheticId = col("c_opportunity_dec_arc_start_end_synthetic_id", target_id.embedded)
+          val Type  = col("c_opp_dec_arc_type", arc_type.embedded)
+          val Start = col("c_opp_dec_arc_start", declination.embedded)
+          val End   = col("c_opp_dec_arc_end", declination.embedded)
         }
       }
     }
