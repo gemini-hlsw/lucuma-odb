@@ -171,6 +171,9 @@ trait Codecs {
       Type("_d_angle_µas", List(Type("d_angle_µas")))
     )
 
+  val arc_type: Codec[ArcType] =
+    enumerated[ArcType](Type("e_arc_type"))
+
   val atom_execution_state: Codec[AtomExecutionState] =
     enumerated[AtomExecutionState](Type.varchar)
 

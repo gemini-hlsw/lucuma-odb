@@ -17,14 +17,14 @@ object TargetPropertiesInput {
 
   final case class Create(
     name: NonEmptyString,
-    subtypeInfo: SiderealInput.Create | EphemerisKey | OpportunityInput,
+    subtypeInfo: SiderealInput.Create | EphemerisKey | OpportunityInput.Create,
     sourceProfile: SourceProfile,
     existence: Existence
   )
 
   final case class Edit(
     name: Option[NonEmptyString],
-    subtypeInfo: Option[SiderealInput.Edit | EphemerisKey | OpportunityInput],
+    subtypeInfo: Option[SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit],
     sourceProfile: Option[SourceProfile => Result[SourceProfile]],
     existence: Option[Existence]
   )
@@ -35,7 +35,7 @@ object TargetPropertiesInput {
         NonEmptyStringBinding.NonNullable("name", rName),
         SiderealInput.EditBinding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
-        OpportunityInput.Binding.Option("opportunity", rOpportunity),
+        OpportunityInput.EditBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.EditBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
       ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
@@ -56,10 +56,10 @@ object TargetPropertiesInput {
         NonEmptyStringBinding.Option("name", rName),
         SiderealInput.CreateBinding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
-        OpportunityInput.Binding.Option("opportunity", rOpportunity),
+        OpportunityInput.CreateBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.CreateBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rSidereal, rOpportunity, rNonsidereal, rSourceProfile, rExistence).parTupled.flatMap {
+      ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
         case (name, sidereal, nonsidereal, opportunity, sourceProfile, existence) =>
           (name, sourceProfile, sidereal, nonsidereal, opportunity) match {
             case (None, _, _, _, _)             => Matcher.validationFailure("Target name is required on creation.")

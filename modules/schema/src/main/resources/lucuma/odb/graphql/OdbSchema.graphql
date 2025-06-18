@@ -4623,16 +4623,16 @@ input RegionInput {
   declinationArc: DeclinationArcInput!
 }
 
-type RightAscensionArcInput {
+input RightAscensionArcInput {
   type: ArcType!
-  start: RightAscensionInput!
-  end: RightAscensionInput!
+  start: RightAscensionInput
+  end: RightAscensionInput
 }
 
-type DeclinationArcInput {
+input DeclinationArcInput {
   type: ArcType!
-  start: DeclinationInput!
-  end: DeclinationInput!
+  start: DeclinationInput
+  end: DeclinationInput
 }
 
 """
