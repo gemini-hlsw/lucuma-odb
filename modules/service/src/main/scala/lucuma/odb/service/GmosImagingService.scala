@@ -3,14 +3,19 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
@@ -19,6 +24,14 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 sealed trait GmosImagingService[F[_]] {
+
+  def selectNorth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]]
+
+  def selectSouth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]]
 
   def insertNorth(
     input: GmosImagingInput.Create.North
@@ -59,6 +72,56 @@ object GmosImagingService {
   def instantiate[F[_]: Concurrent](using Services[F]): GmosImagingService[F] =
     new GmosImagingService[F] {
 
+      private def select[A](
+        which:   List[Observation.Id],
+        f:       NonEmptyList[Observation.Id] => AppliedFragment,
+        decoder: Decoder[A]
+      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(Applicative[F].pure(List.empty)) { oids =>
+            val af = f(oids)
+            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+            }
+          }
+      val common: Decoder[GmosImagingInput.Create.Common] =
+        (gmos_binning.opt       ~
+         gmos_amp_read_mode.opt ~
+         gmos_amp_gain.opt      ~
+         gmos_roi.opt
+        ).map { case (((b, arm), ag), roi) =>
+          GmosImagingInput.Create.Common(b, arm, ag, roi)
+        }
+
+      val north: Decoder[GmosImagingInput.Create.North] =
+        (_gmos_north_filter *:
+         common
+        ).emap { case (f, c) =>
+          NonEmptyList.fromList(f.toList).fold(
+            "Filters list cannot be empty".asLeft
+          )(GmosImagingInput.Create.North(_, c).asRight)
+        }
+
+      val south: Decoder[GmosImagingInput.Create.South] =
+        (_gmos_south_filter *:
+         common
+        ).emap { case (f, c) =>
+          NonEmptyList.fromList(f.toList).fold(
+            "Filters list cannot be empty".asLeft
+          )(GmosImagingInput.Create.South(_, c).asRight)
+        }
+
+      override def selectNorth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]] =
+        select(which, Statements.selectGmosNorthImaging, north)
+          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      override def selectSouth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]] =
+        select(which, Statements.selectGmosSouthImaging, south)
+          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
       override def insertNorth(
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
@@ -117,6 +180,37 @@ object GmosImagingService {
     }
 
   object Statements {
+
+    private def selectGmosImaging(
+      modeTableName:   String,
+      filterTableName: String,
+      observationIds:  NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          img.c_observation_id,
+          ARRAY_AGG(filt.c_filter ORDER BY filt.c_filter),
+          img.c_explicit_bin,
+          img.c_explicit_amp_read_mode,
+          img.c_explicit_amp_gain,
+          img.c_explicit_roi
+        FROM #$modeTableName img
+        LEFT JOIN #$filterTableName filt ON filt.c_observation_id = img.c_observation_id
+        WHERE """.apply(Void) |+| observationIdIn(observationIds) |+| sql"""
+        GROUP BY
+          img.c_observation_id,
+          img.c_explicit_bin,
+          img.c_explicit_amp_read_mode,
+          img.c_explicit_amp_gain,
+          img.c_explicit_roi
+        ORDER BY img.c_observation_id
+      """.apply(Void)
+
+    def selectGmosNorthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
+      selectGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", observationIds)
+
+    def selectGmosSouthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
+      selectGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", observationIds)
 
     private def insertGmosImaging(
       modeTableName:   String,
