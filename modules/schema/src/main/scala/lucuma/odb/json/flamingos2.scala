@@ -20,6 +20,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.MosPreImaging
+import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -99,18 +100,19 @@ trait Flamingos2Codec:
         s <- c.downField("reads").as[Flamingos2Reads]
       yield Flamingos2DynamicConfig(e, d, f, r, l, u, k, m, s)
 
-  given (using Encoder[TimeSpan]): Encoder[Flamingos2DynamicConfig] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Flamingos2DynamicConfig] =
     Encoder.instance[Flamingos2DynamicConfig]: a =>
       Json.obj(
-        "exposure"    -> a.exposure.asJson,
-        "disperser"   -> a.disperser.asJson,
-        "filter"      -> a.filter.asJson,
-        "readMode"    -> a.readMode.asJson,
-        "lyotWheel"   -> a.lyotWheel.asJson,
-        "fpu"         -> a.fpu.asJson,
-        "decker"      -> a.decker.asJson,
-        "readoutMode" -> a.readoutMode.asJson,
-        "reads"       -> a.reads.asJson
+        "exposure"          -> a.exposure.asJson,
+        "disperser"         -> a.disperser.asJson,
+        "filter"            -> a.filter.asJson,
+        "readMode"          -> a.readMode.asJson,
+        "lyotWheel"         -> a.lyotWheel.asJson,
+        "fpu"               -> a.fpu.asJson,
+        "decker"            -> a.decker.asJson,
+        "readoutMode"       -> a.readoutMode.asJson,
+        "reads"             -> a.reads.asJson,
+        "centralWavelength" -> a.centralWavelength.asJson
       )
 
 object flamingos2 extends Flamingos2Codec
