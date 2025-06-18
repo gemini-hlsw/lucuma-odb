@@ -8,6 +8,7 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.ObservationView
@@ -16,6 +17,7 @@ import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
      with ChronConditionsEntryView[F]
+     with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
      with ObservationView[F]
      with SpectroscopyConfigOptionTable[F]:
@@ -60,6 +62,7 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthCoverage", SpectroscopyConfigOptionTable.WavelengthCoverage, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelength", Spectroscopy.Wavelength.Value, Spectroscopy.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyScienceRequirementsType / "wavelengthCoverage", Spectroscopy.WavelengthCoverage.Value, Spectroscopy.WavelengthCoverage.SyntheticId),
+      wavelengthMappingAtPath(StepRecordType / "flamingos2" / "centralWavelength", Flamingos2DynamicView.CentralWavelength, Flamingos2DynamicView.Id),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "centralWavelength", GmosNorthDynamicTable.CentralWavelength.Value, GmosNorthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
