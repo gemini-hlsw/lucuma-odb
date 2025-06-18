@@ -7,27 +7,23 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ArcType
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
-import lucuma.core.math.Arc.Empty
-import lucuma.core.math.Arc.Full
-import lucuma.core.math.Arc.Partial
 
 object arc {
 
-  // Temporary -- this will probably need a public tag type,
-  // depending on how things look in the schema.
-  extension [A](a: Arc[A]) private def tag: String =
+  extension [A](a: Arc[A]) private def tag: ArcType =
     a match
-      case Empty() => "EMPTY"
-      case Full() => "FULL"
-      case Partial(_, _) => "PARTIAL"    
+      case Arc.Empty() => ArcType.Empty
+      case Arc.Full() => ArcType.Full
+      case Arc.Partial(_, _) => ArcType.Partial
 
   given [A: Decoder: Angular]: Decoder[Arc[A]] = hc =>
-    hc.downField("tag").as[String].flatMap:
-      case "EMPTY"   => Right(Arc.Empty())
-      case "FULL"    => Right(Arc.Full())
-      case "PARTIAL" =>
+    hc.downField("tag").as[ArcType].flatMap:
+      case ArcType.Empty   => Right(Arc.Empty())
+      case ArcType.Full    => Right(Arc.Full())
+      case ArcType.Partial =>
         for 
           a <- hc.downField("start").as[A]
           b <- hc.downField("end").as[A]
