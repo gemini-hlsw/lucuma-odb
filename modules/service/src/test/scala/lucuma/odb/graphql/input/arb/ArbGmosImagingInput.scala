@@ -11,6 +11,8 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.math.Offset
+import lucuma.core.math.arb.ArbOffset
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -20,6 +22,7 @@ import org.scalacheck.Arbitrary.arbitrary
 trait ArbGmosImagingInput:
 
   import ArbEnumerated.given
+  import ArbOffset.given
 
   given Arbitrary[GmosImagingInput.Create.Common] =
     Arbitrary {
@@ -28,7 +31,8 @@ trait ArbGmosImagingInput:
         m <- arbitrary[Option[GmosAmpReadMode]]
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
-      } yield GmosImagingInput.Create.Common(b, m, g, r)
+        s <- arbitrary[Option[List[Offset]]]
+      } yield GmosImagingInput.Create.Common(b, m, g, r, s)
     }
 
   given Arbitrary[GmosImagingInput.Create.North] =
@@ -56,7 +60,8 @@ trait ArbGmosImagingInput:
         m <- arbitrary[Nullable[GmosAmpReadMode]]
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
-      } yield GmosImagingInput.Edit.Common(b, m, g, r)
+        s <- arbitrary[Nullable[List[Offset]]]
+      } yield GmosImagingInput.Edit.Common(b, m, g, r, s)
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
     Arbitrary {

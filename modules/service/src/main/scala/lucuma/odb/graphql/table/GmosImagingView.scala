@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import skunk.codec.text.*
 
 trait GmosImagingView[F[_]] extends BaseMapping[F]:
 
@@ -16,6 +17,7 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitAmpReadMode: ColumnRef   = col("c_explicit_amp_read_mode", gmos_amp_read_mode.opt)
     val ExplicitAmpGain: ColumnRef       = col("c_explicit_amp_gain", gmos_amp_gain.opt)
     val ExplicitRoi: ColumnRef           = col("c_explicit_roi", gmos_roi.opt)
+    val ExplicitSpatialOffsets: ColumnRef = col("c_explicit_spatial_offsets", text.opt)
     val Filters: ColumnRef               = col("c_filters", _gmos_north_filter)
 
   object GmosSouthImagingView extends TableDef("v_gmos_south_imaging"):
@@ -25,4 +27,5 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitAmpReadMode: ColumnRef   = col("c_explicit_amp_read_mode", gmos_amp_read_mode.opt)
     val ExplicitAmpGain: ColumnRef       = col("c_explicit_amp_gain", gmos_amp_gain.opt)
     val ExplicitRoi: ColumnRef           = col("c_explicit_roi", gmos_roi.opt)
+    val ExplicitSpatialOffsets: ColumnRef = col("c_explicit_spatial_offsets", text.opt)
     val Filters: ColumnRef               = col("c_filters", _gmos_south_filter)

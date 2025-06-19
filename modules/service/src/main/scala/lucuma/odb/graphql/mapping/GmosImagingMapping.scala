@@ -6,11 +6,16 @@ package mapping
 
 import grackle.Result
 import grackle.skunk.SkunkMapping
+import io.circe.*
+import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
+import lucuma.core.math.Offset
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 
 trait GmosImagingMapping[F[_]]
   extends GmosImagingView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
@@ -32,6 +37,28 @@ trait GmosImagingMapping[F[_]]
     val roi: FieldMapping        = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
     val defaultRoi: FieldMapping = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
 
+    val spatialOffsets: FieldMapping =
+      CursorFieldJson("spatialOffsets",
+        cursor =>
+          cursor
+            .field("spatialOffsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.getOrElse(defaultSpatialOffsetsJson)),
+        List("explicitSpatialOffsets", "defaultSpatialOffsets")
+      )
+
+    val explicitSpatialOffsets: FieldMapping =
+      CursorFieldJson("explicitSpatialOffsets",
+        cursor =>
+          cursor
+            .field("spatialOffsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.fold(defaultSpatialOffsetsJson)(decodeSpatialOffsets))),
+        List("spatialOffsetsString")
+      )
+
+    val defaultSpatialOffsets: FieldMapping =
+      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
 
@@ -52,7 +79,12 @@ trait GmosImagingMapping[F[_]]
 
       CommonImagingFields.roi,
       SqlField("explicitRoi", GmosNorthImagingView.ExplicitRoi),
-      CommonImagingFields.defaultRoi
+      CommonImagingFields.defaultRoi,
+
+      SqlField("spatialOffsetsString", GmosNorthImagingView.ExplicitSpatialOffsets, hidden = true),
+      CommonImagingFields.spatialOffsets,
+      CommonImagingFields.explicitSpatialOffsets,
+      CommonImagingFields.defaultSpatialOffsets,
     )
 
   lazy val GmosSouthImagingMapping: ObjectMapping =
@@ -75,7 +107,12 @@ trait GmosImagingMapping[F[_]]
 
       CommonImagingFields.roi,
       SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
-      CommonImagingFields.defaultRoi
+      CommonImagingFields.defaultRoi,
+
+      SqlField("spatialOffsetsString", GmosSouthImagingView.ExplicitSpatialOffsets, hidden = true),
+      CommonImagingFields.spatialOffsets,
+      CommonImagingFields.explicitSpatialOffsets,
+      CommonImagingFields.defaultSpatialOffsets,
     )
 }
 
@@ -85,4 +122,11 @@ object GmosImagingMapping:
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
+
+  def decodeSpatialOffsets(s: String): Json =
+    if (s.trim.isEmpty) List.empty[Offset].asJson
+    else OffsetsFormat.getOption(s).getOrElse(List.empty[Offset]).asJson
+
+  val defaultSpatialOffsetsJson: Json =
+    List.empty[Offset].asJson
 

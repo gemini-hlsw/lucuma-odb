@@ -126,7 +126,8 @@ object CalibrationConfigSubset:
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some
+            roi.some,
+            none // TODO do we need offsets here?
           )
         ).some,
         none,
@@ -152,7 +153,8 @@ object CalibrationConfigSubset:
             binning.some,
             ampReadMode.some,
             ampGain.some,
-            roi.some
+            roi.some,
+            none // TODO do we need offsets here?
           )
         ).some,
         none
@@ -204,7 +206,7 @@ object CalibrationConfigSubset:
             gni.bin,
             gni.ampReadMode,
             gni.ampGain,
-            gni.roi
+            gni.roi,
           )
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
