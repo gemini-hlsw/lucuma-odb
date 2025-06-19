@@ -85,6 +85,7 @@ object GmosImagingService {
               pq.stream(af.argument, chunkSize = 1024).compile.toList
             }
           }
+
       val common: Decoder[GmosImagingInput.Create.Common] =
         (gmos_binning.opt       ~
          gmos_amp_read_mode.opt ~
@@ -117,11 +118,13 @@ object GmosImagingService {
       ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]] =
         select(which, Statements.selectGmosNorthImaging, north)
           .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+
       override def selectSouth(
         which: List[Observation.Id]
       ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]] =
         select(which, Statements.selectGmosSouthImaging, south)
           .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+
       override def insertNorth(
         input: GmosImagingInput.Create.North
       )(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
@@ -182,35 +185,32 @@ object GmosImagingService {
   object Statements {
 
     private def selectGmosImaging(
-      modeTableName:   String,
-      filterTableName: String,
-      observationIds:  NonEmptyList[Observation.Id]
+      viewName: String,
+      observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
         SELECT
           img.c_observation_id,
-          ARRAY_AGG(filt.c_filter ORDER BY filt.c_filter),
+          ob.c_image_quality,
+          img.c_filters,
           img.c_explicit_bin,
           img.c_explicit_amp_read_mode,
           img.c_explicit_amp_gain,
           img.c_explicit_roi
-        FROM #$modeTableName img
-        LEFT JOIN #$filterTableName filt ON filt.c_observation_id = img.c_observation_id
-        WHERE """.apply(Void) |+| observationIdIn(observationIds) |+| sql"""
-        GROUP BY
-          img.c_observation_id,
-          img.c_explicit_bin,
-          img.c_explicit_amp_read_mode,
-          img.c_explicit_amp_gain,
-          img.c_explicit_roi
-        ORDER BY img.c_observation_id
-      """.apply(Void)
+        FROM #$viewName img
+        INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
+      """(Void) |+|
+      void"""
+        WHERE
+          img.c_observation_id IN (""" |+|
+            observationIds.map(sql"$observation_id").intercalate(void",") |+|
+          void""")"""
 
     def selectGmosNorthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
-      selectGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", observationIds)
+      selectGmosImaging("v_gmos_north_imaging", observationIds)
 
     def selectGmosSouthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
-      selectGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", observationIds)
+      selectGmosImaging("v_gmos_south_imaging", observationIds)
 
     private def insertGmosImaging(
       modeTableName:   String,
