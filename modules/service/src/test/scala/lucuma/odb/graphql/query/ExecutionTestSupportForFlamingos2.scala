@@ -118,6 +118,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
           decker
           readoutMode
           reads
+          centralWavelength { micrometers }
         }
         stepConfig {
           stepType
@@ -213,7 +214,10 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
         },
         "decker": ${f2.decker},
         "readoutMode": ${f2.readoutMode},
-        "reads": ${f2.reads}
+        "reads": ${f2.reads},
+        "centralWavelength": {
+          "micrometers": ${f2.centralWavelength.toMicrometers.value.value.asJson}
+        }
       }
     """
 

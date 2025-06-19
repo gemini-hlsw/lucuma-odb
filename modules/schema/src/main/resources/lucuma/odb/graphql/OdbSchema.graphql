@@ -7212,6 +7212,11 @@ type Flamingos2Dynamic {
   Flamingos 2 reads.
   """
   reads: Flamingos2Reads!
+
+  """
+  Central wavelength, which is taken from the filter wavelength.
+  """
+  centralWavelength: Wavelength!
 }
 
 """
