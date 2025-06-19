@@ -2069,6 +2069,11 @@ input GmosNorthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -2494,6 +2499,11 @@ input GmosSouthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -8417,6 +8427,24 @@ type GmosNorthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
+
+  """
+  Spacial offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the
+  the default.
+  """
+  explicitSpatialOffsets: [Offset!]
+
 }
 
 """
@@ -8977,6 +9005,24 @@ type GmosSouthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
+
+  """
+  Spacial offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the
+  the default.
+  """
+  explicitSpatialOffsets: [Offset!]
+
 }
 
 """

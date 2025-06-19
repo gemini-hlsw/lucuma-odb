@@ -14,11 +14,13 @@ import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.binning.DefaultSampling
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
+import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -90,9 +92,18 @@ object GmosImagingService {
         (gmos_binning.opt       ~
          gmos_amp_read_mode.opt ~
          gmos_amp_gain.opt      ~
-         gmos_roi.opt
-        ).map { case (((b, arm), ag), roi) =>
-          GmosImagingInput.Create.Common(b, arm, ag, roi)
+         gmos_roi.opt           ~
+         text.opt
+        ).emap { case ((((b, arm), ag), roi), spatialOffsets) =>
+          spatialOffsets match {
+            case Some(s) =>
+              OffsetsFormat.getOption(s) match {
+                case Some(offsets) => GmosImagingInput.Create.Common(b, arm, ag, roi, Some(offsets)).asRight
+                case None => s"Could not parse '$s' as a spatial offsets list.".asLeft
+              }
+            case None =>
+              GmosImagingInput.Create.Common(b, arm, ag, roi, None).asRight
+          }
         }
 
       val north: Decoder[GmosImagingInput.Create.North] =
@@ -196,7 +207,8 @@ object GmosImagingService {
           img.c_explicit_bin,
           img.c_explicit_amp_read_mode,
           img.c_explicit_amp_gain,
-          img.c_explicit_roi
+          img.c_explicit_roi,
+          img.c_explicit_spatial_offsets
         FROM #$viewName img
         INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
       """(Void) |+|
@@ -226,13 +238,15 @@ object GmosImagingService {
             ${gmos_binning.opt},
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
-            ${gmos_roi.opt}
+            ${gmos_roi.opt},
+            ${text.opt}
           )"""(
             oid,
             common.explicitBin,
             common.explicitAmpReadMode,
             common.explicitAmpGain,
-            common.explicitRoi
+            common.explicitRoi,
+            common.formattedSpatialOffsets
           )
         }
 
@@ -247,7 +261,8 @@ object GmosImagingService {
               c_explicit_bin,
               c_explicit_amp_read_mode,
               c_explicit_amp_gain,
-              c_explicit_roi
+              c_explicit_roi,
+              c_explicit_spatial_offsets
             ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
           )
@@ -256,7 +271,7 @@ object GmosImagingService {
             c_filter
           ) VALUES """(Void) |+| filterValues
       } else {
-        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi) VALUES "(Void) |+| modeValues
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi, c_explicit_spatial_offsets) VALUES "(Void) |+| modeValues
       }
     }
 
@@ -340,14 +355,16 @@ object GmosImagingService {
           c_explicit_bin,
           c_explicit_amp_read_mode,
           c_explicit_amp_gain,
-          c_explicit_roi
+          c_explicit_roi,
+          c_explicit_spatial_offsets
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
           c_explicit_bin,
           c_explicit_amp_read_mode,
           c_explicit_amp_gain,
-          c_explicit_roi
+          c_explicit_roi,
+          c_explicit_spatial_offsets
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -376,12 +393,14 @@ object GmosImagingService {
       val upAmpReadMode = sql"c_explicit_amp_read_mode = ${gmos_amp_read_mode.opt}"
       val upAmpGain = sql"c_explicit_amp_gain = ${gmos_amp_gain.opt}"
       val upRoi = sql"c_explicit_roi = ${gmos_roi.opt}"
+      val upSpatialOffsets = sql"c_explicit_spatial_offsets = ${text.opt}"
 
       List(
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
-        input.explicitRoi.toOptionOption.map(upRoi)
+        input.explicitRoi.toOptionOption.map(upRoi),
+        input.formattedSpatialOffsets.toOptionOption.map(upSpatialOffsets)
       ).flatten
     }
 
