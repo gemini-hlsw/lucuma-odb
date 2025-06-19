@@ -158,7 +158,8 @@ class createTarget extends OdbSuite {
                   "objectType" : "also arbitrary"
                 }
               },
-              "nonsidereal": null
+              "nonsidereal": null,
+              "opportunity": null
             }
           """
 
@@ -236,6 +237,123 @@ class createTarget extends OdbSuite {
                 "des" : "foo",
                 "keyType" : "COMET",
                 "key" : "Comet_foo"
+              },
+              "opportunity": null
+            }
+          """
+
+          val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
+          assertEquals(data, expected)
+
+          // The create target mutation only creates science targets.
+          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          getCalibrationRoleFromDb(id).map(role => assert(role.isEmpty))
+        }
+    }
+  }
+
+  test("[general] create a target of opportunity") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Crunchy Planet"
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: PARTIAL
+                        start: { degrees: "10.000" }
+                        end: { degrees: "20.000" }
+                      }
+                      declinationArc: {
+                        type: PARTIAL
+                        start: { degrees: "40.000" }
+                        end: { degrees: "50.000" }
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target $FullTargetGraph
+              targetId: target { id }
+            }
+          }
+        """).flatMap { js =>
+          val expected = json"""
+            {
+              "existence" : "PRESENT",
+              "name" : "Crunchy Planet",
+              "program" : {
+                "id" : $pid
+              },
+              "sourceProfile" : {
+                "point" : {
+                  "bandNormalized" : {
+                    "sed" : {
+                      "stellarLibrary" : "B5_III",
+                      "coolStar" : null,
+                      "galaxy" : null,
+                      "planet" : null,
+                      "quasar" : null,
+                      "hiiRegion" : null,
+                      "planetaryNebula" : null,
+                      "powerLaw" : null,
+                      "blackBodyTempK" : null,
+                      "fluxDensities" : null,
+                      "fluxDensitiesAttachment" : null
+                    }
+                  },
+                  "emissionLines" : null
+                }
+              },
+              "sidereal" : null,
+              "nonsidereal" : null,
+              "opportunity" : {
+                "region" : {
+                  "rightAscensionArc" : {
+                    "type" : "PARTIAL",
+                    "start" : {
+                      "hms" : "00:40:00.000000",
+                      "hours" : 0.6666666666666666,
+                      "degrees" : 10.0,
+                      "microarcseconds" : 36000000000
+                    },
+                    "end" : {
+                      "hms" : "01:20:00.000000",
+                      "hours" : 1.3333333333333333,
+                      "degrees" : 20.0,
+                      "microarcseconds" : 72000000000
+                    }
+                  },
+                  "declinationArc" : {
+                    "type" : "PARTIAL",
+                    "start" : {
+                      "dms" : "+40:00:00.000000",
+                      "degrees" : 40.0,
+                      "microarcseconds" : 144000000000
+                    },
+                    "end" : {
+                      "dms" : "+50:00:00.000000",
+                      "degrees" : 50.0,
+                      "microarcseconds" : 180000000000
+                    }
+                  }
+                }
               }
             }
           """
@@ -249,6 +367,101 @@ class createTarget extends OdbSuite {
         }
     }
   }
+
+  test("[general] create a target of opportunity (degenerate cases)") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Crunchy Planet"
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: FULL
+                      }
+                      declinationArc: {
+                        type: EMPTY
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target $FullTargetGraph
+              targetId: target { id }
+            }
+          }
+        """).flatMap { js =>
+          val expected = json"""
+            {
+              "existence" : "PRESENT",
+              "name" : "Crunchy Planet",
+              "program" : {
+                "id" : $pid
+              },
+              "sourceProfile" : {
+                "point" : {
+                  "bandNormalized" : {
+                    "sed" : {
+                      "stellarLibrary" : "B5_III",
+                      "coolStar" : null,
+                      "galaxy" : null,
+                      "planet" : null,
+                      "quasar" : null,
+                      "hiiRegion" : null,
+                      "planetaryNebula" : null,
+                      "powerLaw" : null,
+                      "blackBodyTempK" : null,
+                      "fluxDensities" : null,
+                      "fluxDensitiesAttachment" : null
+                    }
+                  },
+                  "emissionLines" : null
+                }
+              },
+              "sidereal" : null,
+              "nonsidereal" : null,
+              "opportunity" : {
+                "region" : {
+                  "rightAscensionArc" : {
+                    "type" : "FULL",
+                    "start" : null,
+                    "end" : null
+                  },
+                  "declinationArc" : {
+                    "type" : "EMPTY",
+                    "start" : null,
+                    "end" : null
+                  }
+                }
+              }
+            }
+          """
+
+          val data = js.hcursor.downFields("createTarget", "target").as[Json].toOption.get
+          assertEquals(data, expected)
+
+          // The create target mutation only creates science targets.
+          val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
+          getCalibrationRoleFromDb(id).map(role => assert(role.isEmpty))
+        }
+    }
+  }
+
 
   test("[general] can create a target with a proposal reference") {
     createProgramAs(pi).flatMap { pid =>
@@ -467,6 +680,38 @@ object createTarget {
           des
           keyType
           key
+        }
+        opportunity {
+          region {
+            rightAscensionArc {
+              type
+              start {
+                hms
+                hours
+                degrees
+                microarcseconds
+              }
+              end {
+                hms
+                hours
+                degrees
+                microarcseconds
+              }
+            }
+            declinationArc {
+              type
+              start {
+                dms
+                degrees
+                microarcseconds
+              }
+              end {
+                dms
+                degrees
+                microarcseconds
+              }
+            }
+          }
         }
       }
      """

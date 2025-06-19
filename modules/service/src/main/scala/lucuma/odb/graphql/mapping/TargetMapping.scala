@@ -21,7 +21,8 @@ trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
       SqlJson("sourceProfile", TargetView.SourceProfile),
       SqlField("calibrationRole", TargetView.CalibrationRole),
       SqlObject("sidereal"),
-      SqlObject("nonsidereal")
+      SqlObject("nonsidereal"),
+      SqlObject("opportunity"),
     )
 
 }

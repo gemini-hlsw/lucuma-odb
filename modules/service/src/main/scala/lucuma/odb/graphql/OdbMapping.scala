@@ -102,6 +102,7 @@ object OdbMapping {
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
+          with ArcMapping[F]
           with AddAtomEventResultMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
@@ -199,6 +200,7 @@ object OdbMapping {
           with ObservingModeGroupSelectResultMapping[F]
           with ObservingModeMapping[F]
           with OffsetMapping[F]
+          with OpportunityMapping[F]
           with ParallaxMapping[F]
           with PartnerSplitMapping[F]
           with PosAngleConstraintMapping[F]
@@ -224,6 +226,7 @@ object OdbMapping {
           with RecordStepResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
@@ -415,6 +418,7 @@ object OdbMapping {
                 ObservingModeGroupMapping,
                 ObservingModeGroupSelectResultMapping,
                 ObservingModeMapping,
+                OpportunityMapping,
                 ParallaxMapping,
                 PartnerSplitMapping,
                 PoorWeatherMapping,
@@ -513,6 +517,7 @@ object OdbMapping {
                 VisitSelectResultMapping,
               ) ++ List(
                 AngleMappings,
+                ArcMappings,
                 AtomRecordSelectResultMappings,
                 CalculatedObservationWorkflowMappings,
                 CategorizedTimeMappings,
@@ -542,6 +547,7 @@ object OdbMapping {
                 OffsetMappings,
                 OffsetPMappings,
                 OffsetQMappings,
+                RegionMappings,
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
                 TimeSpanMappings,

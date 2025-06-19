@@ -13,8 +13,6 @@ import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 
-import scala.reflect.ClassTag
-
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ConfigurationRequestView[F]
                                      with ObservationView[F]
@@ -44,6 +42,8 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
       rightAscensionMappingAtPath(ConfigurationRequestType / "configuration" / "referenceCoordinates" / "ra", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Ra),
+      rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
+      rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
     )
 
 }
