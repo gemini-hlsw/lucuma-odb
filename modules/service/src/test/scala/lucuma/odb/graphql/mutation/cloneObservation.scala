@@ -70,6 +70,10 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
+          spatialOffsets {
+            p { arcseconds }
+            q { arcseconds }
+          }
         }
         gmosSouthImaging {
           filters
@@ -77,6 +81,10 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
+          spatialOffsets {
+            p { arcseconds }
+            q { arcseconds }
+          }
         }
         flamingos2LongSlit {
           disperser
@@ -433,7 +441,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosNorthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
-                          "bin": "ONE",
+                          "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
                           "roi": "FULL_FRAME"
@@ -444,7 +452,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosNorthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
-                          "bin": "ONE",
+                          "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
                           "roi": "FULL_FRAME"
@@ -505,7 +513,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosSouthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
-                          "bin": "ONE",
+                          "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
                           "roi": "FULL_FRAME"
@@ -516,7 +524,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosSouthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
-                          "bin": "ONE",
+                          "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
                           "roi": "FULL_FRAME"
@@ -532,4 +540,78 @@ class cloneObservation extends OdbSuite {
       }
     }
   }
+
+  test("clone GMOS imaging observation preserves spatial offsets") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        // Create a GMOS North imaging observation with spatial offsets using the simplified helper
+        createGmosNorthImagingObservationAs(pi, pid, Some("""[
+          { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
+          { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
+        ]"""), tid).flatMap { oid =>
+          // Now clone the observation and verify spatial offsets are preserved
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        spatialOffsets {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      gmosNorthImaging {
+                        spatialOffsets {
+                          p { arcseconds }
+                          q { arcseconds }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneObservation": {
+                    "originalObservation": {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "spatialOffsets": [
+                            { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
+                            { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
+                          ]
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "gmosNorthImaging": {
+                          "spatialOffsets": [
+                            { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
+                            { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
 }
+

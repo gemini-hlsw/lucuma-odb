@@ -3280,6 +3280,110 @@ class updateObservations extends OdbSuite
       }
     }
 
+  test("observing mode: set GMOS North imaging in existing observation") {
+    val update = """
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [G_PRIME, R_PRIME, I_PRIME]
+          explicitBin: TWO
+          explicitAmpReadMode: SLOW
+          explicitAmpGain: LOW
+          explicitRoi: FULL_FRAME
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosNorthImaging {
+            filters
+            bin
+            ampReadMode
+            ampGain
+            roi
+          }
+        }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_NORTH",
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "filters": ["G_PRIME", "I_PRIME", "R_PRIME"],
+                  "bin": "TWO",
+                  "ampReadMode": "SLOW",
+                  "ampGain": "LOW",
+                  "roi": "FULL_FRAME"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("observing mode: set GMOS South imaging in existing observation") {
+    val update = """
+      observingMode: {
+        gmosSouthImaging: {
+          filters: [G_PRIME, R_PRIME]
+          explicitBin: FOUR
+          explicitAmpReadMode: FAST
+          explicitAmpGain: HIGH
+          explicitRoi: CCD2
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          gmosSouthImaging {
+            filters
+            bin
+            ampReadMode
+            ampGain
+            roi
+          }
+        }
+      }
+    """
+
+    val expected = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "GMOS_SOUTH",
+              "observingMode": {
+                "gmosSouthImaging": {
+                  "filters": ["G_PRIME", "R_PRIME"],
+                  "bin": "FOUR",
+                  "ampReadMode": "FAST",
+                  "ampGain": "HIGH",
+                  "roi": "CCD2"
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    oneUpdateTest(pi, update, query, expected)
+  }
+
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
