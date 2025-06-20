@@ -7679,6 +7679,23 @@ type Flamingos2LongSlit {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
+  Spacial q offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  """
+  spatialOffsets: [OffsetQ!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified spatial q offsets. If set it overrides the
+  the default.
+  """
+  explicitSpatialOffsets: [OffsetQ!]
+
+  """
   The disperser as it was initially selected.  See the `disperser` field for the
   disperser that will be used in the observation.
   """
@@ -7736,6 +7753,11 @@ input Flamingos2LongSlitInput {
   The readoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetComponentInput!]
 
 }
 

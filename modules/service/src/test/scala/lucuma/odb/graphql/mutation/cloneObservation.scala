@@ -613,5 +613,79 @@ class cloneObservation extends OdbSuite {
       }
     }
   }
+
+  test("clone Flamingos2 long slit observation preserves spatial offsets") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        // Create a Flamingos2 long slit observation with spatial offsets
+        createFlamingos2LongSlitObservationAs(pi, pid, Some("""[
+          { arcseconds: 1.5 },
+          { arcseconds: 0.5 },
+          { arcseconds: 2.25 }
+        ]"""), tid).flatMap { oid =>
+          // Now clone the observation and verify spatial offsets are preserved
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      flamingos2LongSlit {
+                        spatialOffsets {
+                          arcseconds
+                        }
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      flamingos2LongSlit {
+                        spatialOffsets {
+                          arcseconds
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneObservation": {
+                    "originalObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "spatialOffsets": [
+                            { "arcseconds": 1.500000 },
+                            { "arcseconds": 0.500000 },
+                            { "arcseconds": 2.250000 }
+                          ]
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "spatialOffsets": [
+                            { "arcseconds": 1.500000 },
+                            { "arcseconds": 0.500000 },
+                            { "arcseconds": 2.250000 }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
 }
 

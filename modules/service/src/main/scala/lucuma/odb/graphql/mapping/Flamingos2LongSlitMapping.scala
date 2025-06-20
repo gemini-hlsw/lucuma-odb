@@ -4,13 +4,25 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Result
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.math.Offset.Q
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 
 trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+
+  private def decodeSpatialOffsets(s: String): Json =
+    OffsetsQFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Q].asJson)
+
+  private val defaultSpatialOffsetsJson: Json =
+    List.empty[Q].asJson
 
   lazy val Flamingos2LongSlitMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitType)(
@@ -31,6 +43,27 @@ trait Flamingos2LongSlitMapping[F[_]]
       explicitOrElseDefault[Flamingos2ReadoutMode]("readoutMode", "explicitReadoutMode", "defaultReadoutMode"),
       SqlField("defaultReadoutMode",  Flamingos2LongSlitView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2LongSlitView.ReadoutMode),
+
+      SqlField("spatialOffsetsString", Flamingos2LongSlitView.SpatialOffsets, hidden = true),
+
+      CursorFieldJson("spatialOffsets",
+        cursor =>
+          cursor
+            .field("spatialOffsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.getOrElse(defaultSpatialOffsetsJson)),
+        List("explicitSpatialOffsets", "defaultSpatialOffsets")
+      ),
+
+      CursorFieldJson("explicitSpatialOffsets",
+        cursor =>
+          cursor
+            .field("spatialOffsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets).asJson)),
+        List("spatialOffsetsString")
+      ),
+
+      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil),
 
       SqlField("initialDisperser", Flamingos2LongSlitView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2LongSlitView.InitialFilter),
