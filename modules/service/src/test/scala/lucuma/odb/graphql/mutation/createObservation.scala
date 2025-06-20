@@ -1356,6 +1356,85 @@ class createObservation extends OdbSuite {
     }
   }
 
+  private def createObsWithF2SpatialOffsets(pid: Program.Id): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: {
+                disperser: R1200_HK
+                filter: Y
+                fpu: LONG_SLIT_2
+                explicitSpatialOffsets: [
+                  { arcseconds: -10.0 },
+                  { arcseconds:  10.0 },
+                  { arcseconds:   5.5 },
+                  { arcseconds:  -2.5 }
+                ]
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              flamingos2LongSlit {
+                disperser
+                filter
+                fpu
+                spatialOffsets {
+                  arcseconds
+                }
+                explicitSpatialOffsets {
+                  microarcseconds
+                  arcseconds
+                }
+                defaultSpatialOffsets {
+                  arcseconds
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[general] specify f2 long slit spatial offsets at observation creation") {
+    createProgramAs(pi).flatMap { pid =>
+      query(pi, createObsWithF2SpatialOffsets(pid)).flatMap { js =>
+        val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
+        
+        assertIO(
+          (longSlit.downIO[Flamingos2Disperser]("disperser"),
+           longSlit.downIO[Option[Flamingos2Filter]]("filter"),
+           longSlit.downIO[Flamingos2Fpu]("fpu"),
+           longSlit.downIO[List[Json]]("spatialOffsets"),
+           longSlit.downIO[List[Json]]("explicitSpatialOffsets"),
+           longSlit.downIO[List[Json]]("defaultSpatialOffsets")
+          ).tupled,
+          (Flamingos2Disperser.R1200HK,
+           Some(Flamingos2Filter.Y),
+           Flamingos2Fpu.LongSlit2,
+           List(
+             json"""{ "arcseconds": -10.0 }""",
+             json"""{ "arcseconds":  10.0 }""",
+             json"""{ "arcseconds":   5.5 }""",
+             json"""{ "arcseconds":  -2.5 }"""
+           ),
+           List(
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
+             json"""{ "microarcseconds":   5500000, "arcseconds":   5.5 }""",
+             json"""{ "microarcseconds":  -2500000, "arcseconds":  -2.5 }"""
+           ),
+           List() // default spatial offsets should be empty for F2 long slit
+          )
+        )
+      }
+    }
+  }
+
   private def createObsWithObservingModeExplicit(pid: Program.Id, site: Site, grating: String): String =
     s"""
       mutation {

@@ -1898,6 +1898,159 @@ class updateObservations extends OdbSuite
     )
   }
 
+  test("observing mode: update Flamingos2 spatial offsets") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: Y
+          fpu: LONG_SLIT_2
+          explicitSpatialOffsets: [
+            { arcseconds: -5.0 },
+            { arcseconds:  5.0 },
+            { arcseconds:  3.5 },
+            { arcseconds: -2.5 }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            disperser
+            filter
+            fpu
+            spatialOffsets {
+              arcseconds
+            }
+            explicitSpatialOffsets {
+              arcseconds
+            }
+            defaultSpatialOffsets {
+              arcseconds
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [
+                    { "arcseconds": -5.000000 },
+                    { "arcseconds":  5.000000 },
+                    { "arcseconds":  3.500000 },
+                    { "arcseconds": -2.500000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -5.000000 },
+                    { "arcseconds":  5.000000 },
+                    { "arcseconds":  3.500000 },
+                    { "arcseconds": -2.500000 }
+                  ],
+                  "defaultSpatialOffsets": []
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    // Test updating spatial offsets to different values
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          explicitSpatialOffsets: [
+            { arcseconds: -1.5 },
+            { arcseconds:  1.5 }
+          ]
+        }
+      }
+    """
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [
+                    { "arcseconds": -1.500000 },
+                    { "arcseconds":  1.500000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": -1.500000 },
+                    { "arcseconds":  1.500000 }
+                  ],
+                  "defaultSpatialOffsets": []
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    // Test setting spatial offsets to null (unset)
+    val update2 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          explicitSpatialOffsets: null
+        }
+      }
+    """
+
+    val expected2 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [],
+                  "explicitSpatialOffsets": null,
+                  "defaultSpatialOffsets": []
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1),
+        (update2, query, expected2)
+      ),
+      observingMode = Some(ObservingModeType.Flamingos2LongSlit)
+    )
+  }
+
   test("observing mode: update existing, all fields") {
 
     val update0 = """
