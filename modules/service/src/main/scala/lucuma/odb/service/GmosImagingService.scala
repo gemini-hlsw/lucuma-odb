@@ -204,11 +204,11 @@ object GmosImagingService {
           img.c_observation_id,
           ob.c_image_quality,
           img.c_filters,
-          img.c_explicit_bin,
-          img.c_explicit_amp_read_mode,
-          img.c_explicit_amp_gain,
-          img.c_explicit_roi,
-          img.c_explicit_spatial_offsets
+          img.c_bin,
+          img.c_amp_read_mode,
+          img.c_amp_gain,
+          img.c_roi,
+          img.c_spatial_offsets
         FROM #$viewName img
         INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
       """(Void) |+|
@@ -258,11 +258,11 @@ object GmosImagingService {
           WITH mode_inserts AS (
             INSERT INTO #$modeTableName (
               c_observation_id,
-              c_explicit_bin,
-              c_explicit_amp_read_mode,
-              c_explicit_amp_gain,
-              c_explicit_roi,
-              c_explicit_spatial_offsets
+              c_bin,
+              c_amp_read_mode,
+              c_amp_gain,
+              c_roi,
+              c_spatial_offsets
             ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
           )
@@ -271,7 +271,7 @@ object GmosImagingService {
             c_filter
           ) VALUES """(Void) |+| filterValues
       } else {
-        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi, c_explicit_spatial_offsets) VALUES "(Void) |+| modeValues
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_bin, c_amp_read_mode, c_amp_gain, c_roi, c_spatial_offsets) VALUES "(Void) |+| modeValues
       }
     }
 
@@ -352,19 +352,19 @@ object GmosImagingService {
       sql"""
         INSERT INTO #$tableName (
           c_observation_id,
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi,
-          c_explicit_spatial_offsets
+          c_bin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
+          c_spatial_offsets
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi,
-          c_explicit_spatial_offsets
+          c_bin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
+          c_spatial_offsets
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -389,11 +389,11 @@ object GmosImagingService {
     def commonUpdates(
       input: GmosImagingInput.Edit.Common
     ): List[AppliedFragment] = {
-      val upBin = sql"c_explicit_bin = ${gmos_binning.opt}"
-      val upAmpReadMode = sql"c_explicit_amp_read_mode = ${gmos_amp_read_mode.opt}"
-      val upAmpGain = sql"c_explicit_amp_gain = ${gmos_amp_gain.opt}"
-      val upRoi = sql"c_explicit_roi = ${gmos_roi.opt}"
-      val upSpatialOffsets = sql"c_explicit_spatial_offsets = ${text.opt}"
+      val upBin = sql"c_bin = ${gmos_binning.opt}"
+      val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
+      val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
+      val upRoi = sql"c_roi = ${gmos_roi.opt}"
+      val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
 
       List(
         input.explicitBin.toOptionOption.map(upBin),
