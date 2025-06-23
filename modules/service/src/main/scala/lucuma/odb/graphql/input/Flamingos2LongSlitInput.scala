@@ -30,7 +30,7 @@ object Flamingos2LongSlitInput {
     explicitReads: Option[Flamingos2Reads]             = None,
     explicitDecker: Option[Flamingos2Decker]           = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitSpatialOffsets: Option[List[Offset]]            = None
+    explicitSpatialOffsets: Option[List[Offset]]       = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
