@@ -142,6 +142,7 @@ object CalcMain extends MainParams:
         t <- Resource.eval(ObscalcTopic(p, 65536, s))
       yield t
 
+  @scala.annotation.nowarn("msg=unused explicit parameter")
   def runObscalcDaemon[F[_]: Async: Logger](
     connectionsLimit: Int,
     commitHash:       CommitHash,
@@ -193,7 +194,8 @@ object CalcMain extends MainParams:
         .merge(pollStream)
         .evalTap: pc =>
           Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
-        .parEvalMapUnordered(connectionsLimit): pc =>
+        .evalMap: pc =>
+//        .parEvalMapUnordered(connectionsLimit): pc =>
           services.useNonTransactionally:
             requireServiceAccessOrThrow:
               obscalc
