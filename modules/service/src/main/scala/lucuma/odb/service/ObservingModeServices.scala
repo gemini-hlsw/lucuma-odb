@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -68,7 +67,9 @@ object ObservingModeServices {
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
           case (GmosNorthImaging, oids) =>
-            Map.empty[Observation.Id, SourceProfile => ObservingMode].pure[F]
+            gmosImagingService
+              .selectNorth(oids)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
@@ -76,7 +77,9 @@ object ObservingModeServices {
               .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
           case (GmosSouthImaging, oids) =>
-            Map.empty[Observation.Id, SourceProfile => ObservingMode].pure[F]
+            gmosImagingService
+              .selectSouth(oids)
+              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
 
         }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
       }
