@@ -9,6 +9,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
+import lucuma.core.syntax.all.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
 import munit.DisciplineSuite
@@ -58,8 +59,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
 
   test("SpatialOffsetsFormat formattedSpatialOffsets works in Create"):
     val offsets = List(
-      Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("1.5")),
-      Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("2.0"))
+      Offset.Zero.copy(q = 5.arcseconds.q),
+      Offset.Zero.copy(q = 10.arcseconds.q)
     )
 
     val create = Flamingos2LongSlitInput.Create(
@@ -69,12 +70,12 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitSpatialOffsets = Some(offsets)
     )
 
-    assertEquals(create.formattedSpatialOffsets, Some("1.500000,2.000000"))
+    assertEquals(create.formattedSpatialOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
 
   test("SpatialOffsetsFormat formattedSpatialOffsets works in Edit"):
     val offsets = List(
-      Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("-0.5")),
-      Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("3.25"))
+      Offset.Zero.copy(q = 5.arcseconds.q),
+      Offset.Zero.copy(q = 10.arcseconds.q)
     )
 
     val edit = Flamingos2LongSlitInput.Edit(
@@ -88,5 +89,5 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitSpatialOffsets = lucuma.odb.data.Nullable.NonNull(offsets)
     )
 
-    assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("-0.500000,3.250000"))
+    assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))
 

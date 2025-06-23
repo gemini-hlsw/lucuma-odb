@@ -31,7 +31,7 @@ trait ArbFlamingos2LongSlitInput:
         s <- arbitrary[Option[Flamingos2Reads]]
         d <- arbitrary[Option[Flamingos2Decker]]
         o <- arbitrary[Option[Flamingos2ReadoutMode]]
-        so <- arbitrary[Option[List[Offset.Q]]]
+        so <- arbitrary[Option[List[Offset]]]
       } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o, so)
     }
 
@@ -45,8 +45,7 @@ trait ArbFlamingos2LongSlitInput:
         s <- arbitrary[Nullable[Flamingos2Reads]]
         d <- arbitrary[Nullable[Flamingos2Decker]]
         o <- arbitrary[Nullable[Flamingos2ReadoutMode]]
-        so <- arbitrary[Nullable[List[Offset.Q]]]
-      } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o, so)
+        so <- arbitrary[Nullable[List[Offset]]] } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o, so)
     }
 
 

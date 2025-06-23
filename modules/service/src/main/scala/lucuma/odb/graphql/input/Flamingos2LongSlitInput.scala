@@ -14,7 +14,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.math.Offset.Q
+import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
@@ -30,13 +30,13 @@ object Flamingos2LongSlitInput {
     explicitReads: Option[Flamingos2Reads]             = None,
     explicitDecker: Option[Flamingos2Decker]           = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitSpatialOffsets: Option[List[Q]]            = None
+    explicitSpatialOffsets: Option[List[Offset]]            = None
   ) {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
     val formattedSpatialOffsets: Option[String] =
-      explicitSpatialOffsets.map(OffsetsQFormat.reverseGet)
+      explicitSpatialOffsets.map(OffsetsFormat.reverseGet)
 
     /**
       * Creates a F2 long slit observing mode based on input parameters.
@@ -63,7 +63,7 @@ object Flamingos2LongSlitInput {
       Option[Flamingos2Decker],
       Option[Flamingos2ReadoutMode],
       Option[Flamingos2Reads],
-      Option[List[Q]]
+      Option[List[Offset]]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -74,7 +74,7 @@ object Flamingos2LongSlitInput {
           Flamingos2ReadsBinding.Option("explicitReads", rReads),
           Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode),
-          OffsetComponentInput.BindingQ.List.Option("explicitSpatialOffsets", rSpatialOffsets)
+          OffsetInput.Binding.List.Option("explicitSpatialOffsets", rSpatialOffsets)
         ) => (
           rDisperser,
           rFilter,
@@ -121,14 +121,14 @@ object Flamingos2LongSlitInput {
     explicitReads: Nullable[Flamingos2Reads],
     explicitDecker: Nullable[Flamingos2Decker],
     explicitReadoutMode: Nullable[Flamingos2ReadoutMode],
-    explicitSpatialOffsets: Nullable[List[Q]]
+    explicitSpatialOffsets: Nullable[List[Offset]]
   ) {
 
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
     val formattedSpatialOffsets: Nullable[String] =
-      explicitSpatialOffsets.map(OffsetsQFormat.reverseGet)
+      explicitSpatialOffsets.map(OffsetsFormat.reverseGet)
 
     private def required[A](oa: Option[A], itemName: String): Result[A] =
       Result.fromOption(
@@ -163,7 +163,7 @@ object Flamingos2LongSlitInput {
       Nullable[Flamingos2Reads],
       Nullable[Flamingos2Decker],
       Nullable[Flamingos2ReadoutMode],
-      Nullable[List[Q]]
+      Nullable[List[Offset]]
     )] =
       ObjectFieldsBinding.rmap {
         case List(
@@ -174,7 +174,7 @@ object Flamingos2LongSlitInput {
           Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
           Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
-          OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
+          OffsetInput.Binding.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
         ) => (
           rDisperser,
           rFilter,

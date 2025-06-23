@@ -10,7 +10,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2ReadoutMode
-import lucuma.core.math.Offset.Q
+import lucuma.core.math.Offset
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
@@ -20,7 +20,7 @@ trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
 
   private def decodeSpatialOffsets(s: String): Json =
-    OffsetsQFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Q].asJson)
+    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
   private val defaultSpatialOffsetsJson: Json =
     Config.DefaultSpatialOffsets.asJson

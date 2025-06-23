@@ -1368,10 +1368,10 @@ class createObservation extends OdbSuite {
                 filter: Y
                 fpu: LONG_SLIT_2
                 explicitSpatialOffsets: [
-                  { arcseconds: -10.0 },
-                  { arcseconds:  10.0 },
-                  { arcseconds:   5.5 },
-                  { arcseconds:  -2.5 }
+                  { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
+                  { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
+                  { p: { arcseconds: 0.0 }, q: { arcseconds:   5.5 } },
+                  { p: { arcseconds: 0.0 }, q: { arcseconds:  -2.5 } }
                 ]
               }
             }
@@ -1384,14 +1384,34 @@ class createObservation extends OdbSuite {
                 filter
                 fpu
                 spatialOffsets {
-                  arcseconds
+                  p {
+                    microarcseconds
+                    arcseconds
+                  }
+                  q {
+                    microarcseconds
+                    arcseconds
+                  }
                 }
                 explicitSpatialOffsets {
-                  microarcseconds
-                  arcseconds
+                  p {
+                    microarcseconds
+                    arcseconds
+                  }
+                  q {
+                    microarcseconds
+                    arcseconds
+                  }
                 }
                 defaultSpatialOffsets {
-                  arcseconds
+                  p {
+                    microarcseconds
+                    arcseconds
+                  }
+                  q {
+                    microarcseconds
+                    arcseconds
+                  }
                 }
               }
             }
@@ -1417,22 +1437,22 @@ class createObservation extends OdbSuite {
            Some(Flamingos2Filter.Y),
            Flamingos2Fpu.LongSlit2,
            List(
-             json"""{ "arcseconds": -10.0 }""",
-             json"""{ "arcseconds":  10.0 }""",
-             json"""{ "arcseconds":   5.5 }""",
-             json"""{ "arcseconds":  -2.5 }"""
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -10000000, "arcseconds": -10.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  10000000, "arcseconds":  10.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":   5500000, "arcseconds":   5.5 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }"""
            ),
            List(
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.0 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.0 }""",
-             json"""{ "microarcseconds":   5500000, "arcseconds":   5.5 }""",
-             json"""{ "microarcseconds":  -2500000, "arcseconds":  -2.5 }"""
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -10000000, "arcseconds": -10.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  10000000, "arcseconds":  10.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":   5500000, "arcseconds":   5.5 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }"""
            ),
            List(
-             json"""{ "arcseconds": 15.0 }""",
-             json"""{ "arcseconds": -15.0 }""",
-             json"""{ "arcseconds": -15.0 }""",
-             json"""{ "arcseconds": 15.0 }"""
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": 15000000, "arcseconds": 15.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -15000000, "arcseconds": -15.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -15000000, "arcseconds": -15.0 } }""",
+             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": 15000000, "arcseconds": 15.0 } }"""
            )
           )
         )
