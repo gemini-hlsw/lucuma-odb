@@ -35,7 +35,6 @@ object Flamingos2LongSlitInput {
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    // Formatted to store in a text column in the database with a regex constraint
     val formattedSpatialOffsets: Option[String] =
       explicitSpatialOffsets.map(OffsetsQFormat.reverseGet)
 
@@ -128,7 +127,6 @@ object Flamingos2LongSlitInput {
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    // Formatted to store in a text column in the database with a regex constraint
     val formattedSpatialOffsets: Nullable[String] =
       explicitSpatialOffsets.map(OffsetsQFormat.reverseGet)
 

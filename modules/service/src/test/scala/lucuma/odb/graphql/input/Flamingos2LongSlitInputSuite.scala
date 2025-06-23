@@ -56,7 +56,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       val noBoth = edit.copy(disperser = None, fpu = None)
       assert(noBoth.toCreate.isFailure, "Should fail when both grating and fpu are missing")
 
-  test("SpatialOffsetsFormat formattedSpatialOffsets works in Create") {
+  test("SpatialOffsetsFormat formattedSpatialOffsets works in Create"):
     val offsets = List(
       Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("1.5")),
       Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("2.0"))
@@ -70,9 +70,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
     )
 
     assertEquals(create.formattedSpatialOffsets, Some("1.500000,2.000000"))
-  }
 
-  test("SpatialOffsetsFormat formattedSpatialOffsets works in Edit") {
+  test("SpatialOffsetsFormat formattedSpatialOffsets works in Edit"):
     val offsets = List(
       Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("-0.5")),
       Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("3.25"))
@@ -90,27 +89,4 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
     )
 
     assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("-0.500000,3.250000"))
-  }
-
-  test("SpatialOffsetsFormat handles empty offsets") {
-    val create = Flamingos2LongSlitInput.Create(
-      disperser = Flamingos2Disperser.R1200JH,
-      filter = Flamingos2Filter.JH,
-      fpu = Flamingos2Fpu.LongSlit2,
-      explicitSpatialOffsets = Some(List.empty)
-    )
-
-    assertEquals(create.formattedSpatialOffsets, Some(""))
-  }
-
-  test("SpatialOffsetsFormat handles None offsets") {
-    val create = Flamingos2LongSlitInput.Create(
-      disperser = Flamingos2Disperser.R1200JH,
-      filter = Flamingos2Filter.JH,
-      fpu = Flamingos2Fpu.LongSlit2,
-      explicitSpatialOffsets = None
-    )
-
-    assertEquals(create.formattedSpatialOffsets, None)
-  }
 

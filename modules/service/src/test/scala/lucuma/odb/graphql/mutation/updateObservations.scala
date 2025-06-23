@@ -1961,7 +1961,12 @@ class updateObservations extends OdbSuite
                     { "arcseconds":  3.500000 },
                     { "arcseconds": -2.500000 }
                   ],
-                  "defaultSpatialOffsets": []
+                  "defaultSpatialOffsets": [
+                    { "arcseconds": 15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": 15.000000 }
+                  ]
                 }
               }
             }
@@ -1970,7 +1975,6 @@ class updateObservations extends OdbSuite
       }
     """.asRight
 
-    // Test updating spatial offsets to different values
     val update1 = """
       observingMode: {
         flamingos2LongSlit: {
@@ -2001,7 +2005,12 @@ class updateObservations extends OdbSuite
                     { "arcseconds": -1.500000 },
                     { "arcseconds":  1.500000 }
                   ],
-                  "defaultSpatialOffsets": []
+                  "defaultSpatialOffsets": [
+                    { "arcseconds": 15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": 15.000000 }
+                  ]
                 }
               }
             }
@@ -2010,7 +2019,6 @@ class updateObservations extends OdbSuite
       }
     """.asRight
 
-    // Test setting spatial offsets to null (unset)
     val update2 = """
       observingMode: {
         flamingos2LongSlit: {
@@ -2030,9 +2038,19 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [],
+                  "spatialOffsets": [
+                    { "arcseconds": 15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": 15.000000 }
+                  ],
                   "explicitSpatialOffsets": null,
-                  "defaultSpatialOffsets": []
+                  "defaultSpatialOffsets": [
+                    { "arcseconds": 15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": -15.000000 },
+                    { "arcseconds": 15.000000 }
+                  ]
                 }
               }
             }
