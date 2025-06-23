@@ -268,20 +268,26 @@ object ObscalcService:
           itc: Option[ItcService.AsterismResults],
           dig: Option[ExecutionDigest]
         ): F[ObservationWorkflow] =
+          Logger[F].info(s"${pending.observationId}: calculating workflow") *>
           services
             .transactionally:
               observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
             .flatMap: r =>
-              r.toOption.fold(Logger[F].warn(s"Failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
+              r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
+            .flatTap: r =>
+              Logger[F].info(s"${pending.observationId}: finished calculating workflow: $r")
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, ExecutionDigest]] =
-          (for
+          Logger[F].info(s"${pending.observationId}: calculating digest") *>
+          ((for
             p <- params
             d <- EitherT(generator(commitHash, itcClient, calculator).calculateDigest(pending.programId, pending.observationId, itcResult, p))
-          yield d).value
+          yield d).value).flatTap: e =>
+            Logger[F].info(s"${pending.observationId}: finished calculting digest: $e")
 
-        for
+        val result = for
           r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
+          _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
           d <- digest(r)
           w <- workflow(r.toOption, d.toOption)
         yield d.fold(
@@ -292,6 +298,10 @@ object ObscalcService:
               i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig, w)
             )
         )
+
+        Logger[F].info(s"${pending.observationId}: *** start calculating") *>
+        result.flatTap: r =>
+          Logger[F].info(s"${pending.observationId}: *** end caculating: $r")
 
       @annotation.nowarn("msg=unused implicit parameter")
       private def storeResult(
