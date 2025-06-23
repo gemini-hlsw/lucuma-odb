@@ -45,6 +45,7 @@ import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
 import scala.util.NotGiven
+import scala.util.Try
 
 sealed trait MainParams:
   val ServiceName: String =
@@ -90,6 +91,8 @@ object CalcMain extends MainParams:
             |Max Connections: ${config.database.maxObscalcConnections}
             |Poll Period....: ${config.obscalcPoll}
             |PID............: ${ProcessHandle.current.pid}
+            |
+            |JAVA_OPTS......: ${Try(Option(System.getenv("JAVA_OPTS")).getOrElse("<not set>")).getOrElse("<access denied>")}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
