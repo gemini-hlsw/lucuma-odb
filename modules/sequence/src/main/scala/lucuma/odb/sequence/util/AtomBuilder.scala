@@ -36,11 +36,9 @@ trait AtomBuilder[D]:
     six:       Int,
     steps:     List[ProtoStep[D]]
   ): State[TimeEstimateCalculator.Last[D], Option[Atom[D]]] =
-    State(calcState =>
-      NonEmptyList.fromList(steps).fold((calcState, none[Atom[D]])) { nel =>
-        build(desc, aix, six, nel).map(_.some).run(calcState).value
-      }
-    )
+    NonEmptyList.fromList(steps) match
+      case None      => State.pure(None)
+      case Some(nel) => build(desc, aix, six, nel).map(_.some)
 
 object AtomBuilder:
 
