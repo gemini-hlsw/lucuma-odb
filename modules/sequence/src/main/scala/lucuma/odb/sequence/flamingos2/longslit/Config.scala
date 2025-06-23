@@ -13,7 +13,8 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
-import lucuma.core.math.Offset.Q
+import lucuma.core.math.Offset
+import lucuma.core.syntax.all.*
 import lucuma.odb.sequence.ObservingMode
 
 import java.io.ByteArrayOutputStream
@@ -61,12 +62,12 @@ case class Config private[longslit](
 
 object Config:
 
-  val DefaultSpatialOffsets: List[Q] =
+  val DefaultSpatialOffsets: List[Offset] =
     List(
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(15))
+      Offset.Zero.copy(q =  15.arcseconds.q),
+      Offset.Zero.copy(q = -15.arcseconds.q),
+      Offset.Zero.copy(q = -15.arcseconds.q),
+      Offset.Zero.copy(q =  15.arcseconds.q)
     )
 
   def apply(

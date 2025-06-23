@@ -59,7 +59,7 @@ object Flamingos2LongSlitService {
          flamingos_2_readout_mode.opt *:
          text.opt
         ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsetsText) =>
-          spatialOffsetsText.traverse(so => OffsetsQFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")).map(spatialOffsets =>
+          spatialOffsetsText.traverse(so => OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")).map(spatialOffsets =>
             Flamingos2LongSlitInput.Create(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
           )
         }
@@ -179,7 +179,7 @@ object Flamingos2LongSlitService {
       InsertF2LongSlit.apply(
         observationId                ,
         input.disperser              ,
-        input.filter                 , 
+        input.filter                 ,
         input.fpu                    ,
         input.explicitReadMode       ,
         input.explicitReads          ,
