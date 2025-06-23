@@ -1428,7 +1428,12 @@ class createObservation extends OdbSuite {
              json"""{ "microarcseconds":   5500000, "arcseconds":   5.5 }""",
              json"""{ "microarcseconds":  -2500000, "arcseconds":  -2.5 }"""
            ),
-           List() // default spatial offsets should be empty for F2 long slit
+           List(
+             json"""{ "arcseconds": 15.0 }""",
+             json"""{ "arcseconds": -15.0 }""",
+             json"""{ "arcseconds": -15.0 }""",
+             json"""{ "arcseconds": 15.0 }"""
+           )
           )
         )
       }

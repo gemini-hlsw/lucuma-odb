@@ -623,7 +623,6 @@ class cloneObservation extends OdbSuite {
           { arcseconds: 0.5 },
           { arcseconds: 2.25 }
         ]"""), tid).flatMap { oid =>
-          // Now clone the observation and verify spatial offsets are preserved
           expect(
             user = pi,
             query = s"""

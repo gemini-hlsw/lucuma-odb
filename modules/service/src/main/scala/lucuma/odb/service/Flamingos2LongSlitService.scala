@@ -59,17 +59,8 @@ object Flamingos2LongSlitService {
          flamingos_2_readout_mode.opt *:
          text.opt
         ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsetsText) =>
-          for {
-            spatialOffsets <- spatialOffsetsText.traverse(so => OffsetsQFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list."))
-          } yield Flamingos2LongSlitInput.Create(
-            disperser,
-            filter,
-            fpu,
-            readMode,
-            reads,
-            decker,
-            readoutMode,
-            spatialOffsets
+          spatialOffsetsText.traverse(so => OffsetsQFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")).map(spatialOffsets =>
+            Flamingos2LongSlitInput.Create(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
           )
         }
 
@@ -134,7 +125,7 @@ object Flamingos2LongSlitService {
           void")"
 
     val InsertF2LongSlit: Fragment[(
-      Observation.Id       ,
+      Observation.Id               ,
       Flamingos2Disperser          ,
       Flamingos2Filter             ,
       Flamingos2Fpu                ,
@@ -142,7 +133,7 @@ object Flamingos2LongSlitService {
       Option[Flamingos2Reads]      ,
       Option[Flamingos2Decker]     ,
       Option[Flamingos2ReadoutMode],
-      Option[String],
+      Option[String]               ,
       Flamingos2Disperser          ,
       Flamingos2Filter             ,
       Flamingos2Fpu
@@ -186,18 +177,18 @@ object Flamingos2LongSlitService {
       input:         Flamingos2LongSlitInput.Create
     ): AppliedFragment =
       InsertF2LongSlit.apply(
-        observationId            ,
-        input.disperser          ,
-        input.filter             ,
-        input.fpu                ,
-        input.explicitReadMode   ,
-        input.explicitReads      ,
-        input.explicitDecker     ,
-        input.explicitReadoutMode,
+        observationId                ,
+        input.disperser              ,
+        input.filter                 , 
+        input.fpu                    ,
+        input.explicitReadMode       ,
+        input.explicitReads          ,
+        input.explicitDecker         ,
+        input.explicitReadoutMode    ,
         input.formattedSpatialOffsets,
-        input.disperser          ,
-        input.filter             ,
-        input.fpu                ,
+        input.disperser              ,
+        input.filter                 ,
+        input.fpu                    ,
       )
 
     def deleteF2(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -208,13 +199,13 @@ object Flamingos2LongSlitService {
 
     private def f2Updates(input: Flamingos2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upDisperser     = sql"c_disperser       = $flamingos_2_disperser"
-      val upFilter        = sql"c_filter          = $flamingos_2_filter"
-      val upFpu           = sql"c_fpu             = $flamingos_2_fpu"
-      val upReadMode      = sql"c_read_mode       = ${flamingos_2_read_mode.opt}"
-      val upReads         = sql"c_reads           = ${flamingos_2_reads.opt}"
-      val upDecker        = sql"c_decker          = ${flamingos_2_decker.opt}"
-      val upReadoutMode   = sql"c_readout_mode    = ${flamingos_2_readout_mode.opt}"
+      val upDisperser      = sql"c_disperser       = $flamingos_2_disperser"
+      val upFilter         = sql"c_filter          = $flamingos_2_filter"
+      val upFpu            = sql"c_fpu             = $flamingos_2_fpu"
+      val upReadMode       = sql"c_read_mode       = ${flamingos_2_read_mode.opt}"
+      val upReads          = sql"c_reads           = ${flamingos_2_reads.opt}"
+      val upDecker         = sql"c_decker          = ${flamingos_2_decker.opt}"
+      val upReadoutMode    = sql"c_readout_mode    = ${flamingos_2_readout_mode.opt}"
       val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
 
       val ups: List[AppliedFragment] =

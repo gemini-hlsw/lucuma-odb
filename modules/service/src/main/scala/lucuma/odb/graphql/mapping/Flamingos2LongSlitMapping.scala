@@ -14,6 +14,7 @@ import lucuma.core.math.Offset.Q
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
+import lucuma.odb.sequence.flamingos2.longslit.Config
 
 trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
@@ -22,7 +23,7 @@ trait Flamingos2LongSlitMapping[F[_]]
     OffsetsQFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Q].asJson)
 
   private val defaultSpatialOffsetsJson: Json =
-    List.empty[Q].asJson
+    Config.DefaultSpatialOffsets.asJson
 
   lazy val Flamingos2LongSlitMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitType)(
