@@ -487,6 +487,7 @@ class observations extends OdbSuite {
                         observingMode {
                           gmosNorthImaging {
                             filters
+                            initialFilters
                             bin
                             ampReadMode
                             ampGain
@@ -507,6 +508,7 @@ class observations extends OdbSuite {
                             "observingMode": {
                               "gmosNorthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
+                                "initialFilters": ["G_PRIME", "R_PRIME"],
                                 "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
@@ -539,6 +541,7 @@ class observations extends OdbSuite {
                         observingMode {
                           gmosSouthImaging {
                             filters
+                            initialFilters
                             bin
                             ampReadMode
                             ampGain
@@ -559,6 +562,7 @@ class observations extends OdbSuite {
                             "observingMode": {
                               "gmosSouthImaging": {
                                 "filters": ["G_PRIME", "R_PRIME"],
+                                "initialFilters": ["G_PRIME", "R_PRIME"],
                                 "bin": "TWO",
                                 "ampReadMode": "SLOW",
                                 "ampGain": "LOW",
@@ -615,6 +619,7 @@ class observations extends OdbSuite {
                         mode
                         gmosNorthImaging {
                           filters
+                          initialFilters
                           bin
                           ampReadMode
                           ampGain
@@ -622,6 +627,7 @@ class observations extends OdbSuite {
                         }
                         gmosSouthImaging {
                           filters
+                          initialFilters
                           bin
                           ampReadMode
                           ampGain
@@ -644,6 +650,7 @@ class observations extends OdbSuite {
                             "mode": "GMOS_NORTH_IMAGING",
                             "gmosNorthImaging": {
                               "filters": ["G_PRIME", "R_PRIME"],
+                              "initialFilters": ["G_PRIME", "R_PRIME"],
                               "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
@@ -660,6 +667,7 @@ class observations extends OdbSuite {
                             "gmosNorthImaging": null,
                             "gmosSouthImaging": {
                               "filters": ["G_PRIME", "R_PRIME"],
+                              "initialFilters": ["G_PRIME", "R_PRIME"],
                               "bin": "TWO",
                               "ampReadMode": "SLOW",
                               "ampGain": "LOW",
@@ -673,6 +681,88 @@ class observations extends OdbSuite {
                 """
               )
             )
+    } yield ()
+
+  test("initialFilters preserves original values when filters are updated"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _ <- expect(
+        user = pi,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              observingMode {
+                gmosNorthImaging {
+                  filters
+                  initialFilters
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "initialFilters": ["G_PRIME", "R_PRIME"]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+      _ <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid" } }
+              SET: {
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: [I_PRIME, Z_PRIME]
+                  }
+                }
+              }
+            }) {
+              observations {
+                id
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    initialFilters
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = Right(
+          json"""
+            {
+              "updateObservations": {
+                "observations": [
+                  {
+                    "id": $oid,
+                    "observingMode": {
+                      "gmosNorthImaging": {
+                        "filters": ["I_PRIME", "Z_PRIME"],
+                        "initialFilters": ["G_PRIME", "R_PRIME"]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
     } yield ()
 
 }
