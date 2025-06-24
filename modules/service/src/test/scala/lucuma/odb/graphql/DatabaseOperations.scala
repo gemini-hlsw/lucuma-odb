@@ -164,6 +164,28 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def updateCallForProposalsAs(
+    user: User,
+    id: CallForProposals.Id,
+    set: String
+  ): IO[Unit] =
+    query(user, s"""
+      mutation {
+        updateCallsForProposals(
+          input: {
+            WHERE: {
+              id: { EQ: "$id" }
+            }
+            SET: $set
+          }
+        ) {
+          callsForProposals {
+            id
+          }
+        }
+      }
+    """).void
+
   def createProgramAs(user: User, name: String = null, clientOption: ClientOption = ClientOption.Default): IO[Program.Id] =
     query(user, s"mutation { createProgram(input: { SET: { name: ${Option(name).asJson} } }) { program { id } } }", client = clientOption).flatMap { js =>
       js.hcursor
@@ -382,6 +404,25 @@ trait DatabaseOperations { this: OdbSuite =>
         ).asRight
     )
 
+  def setCallId(user: User, pid: Program.Id, cid: CallForProposals.Id): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateProposal(
+            input: {
+              programId: "$pid",
+              SET: {
+                callId: "$cid"
+              }
+            }
+          ) {
+            proposal { category }
+          }
+        }
+      """
+    ).void
+
   def getProprietaryMonths(
     user: User,
     pid:  Program.Id
@@ -516,10 +557,40 @@ trait DatabaseOperations { this: OdbSuite =>
     createObservationAs(user, pid, None, tids*)
 
   def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationAs(user, pid, Some(ObservingModeType.GmosNorthImaging), tids*)
+    createGmosNorthImagingObservationAs(user, pid, None, tids*)
+
+  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, spatialOffsets, tids*)
 
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationAs(user, pid, Some(ObservingModeType.GmosSouthImaging), tids*)
+    createGmosSouthImagingObservationAs(user, pid, None, tids*)
+
+  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, spatialOffsets, tids*)
+
+  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, spatialOffsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+    query(
+      user = user,
+      query =
+        s"""
+          mutation {
+            createObservation(input: {
+            programId: ${pid.asJson},
+              SET: {
+                targetEnvironment: {
+                  asterism: ${tids.asJson}
+                }
+                scienceRequirements: ${scienceRequirementsObject(observingMode)}
+                observingMode: ${gmosImagingWithSpatialOffsets(observingMode, spatialOffsets)}
+              }
+            }) {
+              observation {
+                id
+              }
+            }
+          }
+        """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
   def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
     query(
@@ -711,6 +782,26 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+
+  private def gmosImagingWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
+    observingMode match
+      case ObservingModeType.GmosNorthImaging =>
+        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        s"""{
+          gmosNorthImaging: {
+            filters: [R_PRIME, G_PRIME]
+            $offsetsField
+          }
+        }"""
+      case ObservingModeType.GmosSouthImaging =>
+        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        s"""{
+          gmosSouthImaging: {
+            filters: [R_PRIME, G_PRIME]
+            $offsetsField
+          }
+        }"""
+      case _ => ""
 
   def createObservationAs(user: User, pid: Program.Id, observingMode: Option[ObservingModeType] = None, tids: Target.Id*): IO[Observation.Id] =
     query(
@@ -2068,7 +2159,7 @@ trait DatabaseOperations { this: OdbSuite =>
     val reviewerField = reviewerId.foldMap(id => s"""reviewerId: "$id"""")
     val mentorField = mentorId.foldMap(id => s"""mentorId: "$id"""")
     val additionalFields = List(reviewerField, mentorField).filter(_.nonEmpty).mkString("\n")
-    
+
     val query = s"""
       mutation {
         createProposal(
@@ -2080,7 +2171,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
-                  piAffiliation: US
                   $additionalFields
                 }
               }
@@ -2094,7 +2184,6 @@ trait DatabaseOperations { this: OdbSuite =>
               ... on FastTurnaround {
                 toOActivation
                 minPercentTime
-                piAffiliation
                 reviewer {
                   id
                   role
@@ -2112,7 +2201,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
     val expectedReviewer: Json = reviewerId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
     val expectedMentor: Json = mentorId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
-    
+
     expect(
       user = user,
       query = query,
@@ -2125,7 +2214,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
-                "piAffiliation": "US",
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
               }
@@ -2152,7 +2240,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
-                  piAffiliation: US
                   reviewerId: "$userId"
                   mentorId: "$userId"
                 }
@@ -2185,7 +2272,7 @@ trait DatabaseOperations { this: OdbSuite =>
     val reviewerField = reviewerId.foldMap(id => s"""reviewerId: "$id"""")
     val mentorField = mentorId.foldMap(id => s"""mentorId: "$id"""")
     val additionalFields = List(reviewerField, mentorField).filter(_.nonEmpty).mkString("\n")
-    
+
     query(
       user = user,
       query = s"""
@@ -2199,7 +2286,6 @@ trait DatabaseOperations { this: OdbSuite =>
                   fastTurnaround: {
                     toOActivation: NONE
                     minPercentTime: 50
-                    piAffiliation: US
                     $additionalFields
                   }
                 }
@@ -2229,7 +2315,7 @@ trait DatabaseOperations { this: OdbSuite =>
       case Some(id) => s"""mentorId: "$id""""
       case None => "mentorId: null"
     }
-    
+
     val query = s"""
       mutation {
         updateProposal(
@@ -2251,7 +2337,6 @@ trait DatabaseOperations { this: OdbSuite =>
               ... on FastTurnaround {
                 toOActivation
                 minPercentTime
-                piAffiliation
                 reviewer {
                   id
                   role
@@ -2269,7 +2354,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
     val expectedReviewer: Json = reviewerId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
     val expectedMentor: Json = mentorId.map(id => json"""{"id": $id, "role": "COI"}""").getOrElse(Json.Null)
-    
+
     expect(
       user = user,
       query = query,
@@ -2281,7 +2366,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
-                "piAffiliation": "US",
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
               }

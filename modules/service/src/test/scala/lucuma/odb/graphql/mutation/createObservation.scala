@@ -2003,7 +2003,7 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosNorthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "bin": "ONE",
+                    "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
                     "roi": "FULL_FRAME"
@@ -2040,7 +2040,7 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosSouthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "bin": "ONE",
+                    "bin": "TWO",
                     "ampReadMode": "SLOW",
                     "ampGain": "LOW",
                     "roi": "FULL_FRAME"
@@ -2169,6 +2169,219 @@ class createObservation extends OdbSuite {
             }
           }
         """, List("Argument 'input.SET.observingMode.gmosSouthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft)
+      }
+    }
+
+  test("[gmos imaging] can create GMOS North imaging observation with spatial offsets"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: [G_PRIME, R_PRIME]
+                    explicitSpatialOffsets: [
+                      { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
+                      { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "spatialOffsets": [
+                      { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
+                      { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
+                      { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
+                    ],
+                    "defaultSpatialOffsets": []
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+      }
+    }
+
+  test("[gmos imaging] can create GMOS South imaging observation with spatial offsets"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosSouthImaging: {
+                    filters: [G_PRIME, R_PRIME]
+                    explicitSpatialOffsets: [
+                      { p: { arcseconds: "2.5" }, q: { arcseconds: "-1.5" } }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosSouthImaging {
+                    filters
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "spatialOffsets": [
+                      { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
+                    ],
+                    "defaultSpatialOffsets": []
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+      }
+    }
+
+  test("[gmos imaging] GMOS imaging observation defaults to empty spatial offsets"):
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  imaging: {
+                    minimumFov: { arcseconds: 100 }
+                    narrowFilters: false
+                    broadFilters: false
+                    combinedFilters: true
+                  }
+                }
+                observingMode: {
+                  gmosNorthImaging: {
+                    filters: [G_PRIME, R_PRIME]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gmosNorthImaging {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """, json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "spatialOffsets": [],
+                    "explicitSpatialOffsets": [],
+                    "defaultSpatialOffsets": []
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
       }
     }
 }

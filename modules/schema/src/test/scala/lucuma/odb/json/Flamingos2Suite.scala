@@ -17,6 +17,7 @@ class Flamingos2Suite extends DisciplineSuite with ArbitraryInstances:
   import ArbFlamingos2StaticConfig.given
   import flamingos2.given
   import time.query.given
+  import wavelength.query.given
 
   checkAll("Flamingos2Codec DynamicConfig", CodecTests[Flamingos2DynamicConfig].codec)
   checkAll("Flamingos2Codec StaticConfig",  CodecTests[Flamingos2StaticConfig].codec)

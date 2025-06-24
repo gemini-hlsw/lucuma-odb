@@ -23,7 +23,6 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
-import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
@@ -31,6 +30,7 @@ import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.gmos.longslit.Config
 
@@ -48,15 +48,7 @@ object GmosLongSlitInput {
       _.map(_.toNanometers.value.bigDecimal.toPlainString).intercalate(",")
     )
 
-  val SpatialOffsetsFormat: Format[String, List[Q]] =
-    Format(
-      s => Try(
-        s.split(",").toList.map { q =>
-          Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
-        }
-      ).toOption,
-      _.map(q => Angle.signedDecimalArcseconds.get(q.toAngle).bigDecimal.toPlainString).intercalate(",")
-    )
+  val SpatialOffsetsFormat: Format[String, List[Q]] = OffsetsQFormat
 
   sealed trait Create[G, F, U] {
     def grating: G

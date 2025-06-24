@@ -154,15 +154,13 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerBinding.Option("piAffiliation", rPartner),
           ProgramUserIdBinding.Option("reviewerId", rReviewerId),
           ProgramUserIdBinding.Option("mentorId", rMentorId)
-        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewer, mentor) =>
+        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN { (too, min, reviewer, mentor) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for {
               _ <- tooActivation  := too
               _ <- minPercentTime := min
-              _ <- partnerSplits  := partner.map(p => Map(p -> HundredPercent))
               _ <- reviewerId     := reviewer
               _ <- mentorId       := mentor
             } yield ()
@@ -286,11 +284,10 @@ object ProposalTypeInput {
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerBinding.Nullable("piAffiliation", rPartner),
           ProgramUserIdBinding.Nullable("reviewerId", rReviewerId),
           ProgramUserIdBinding.Nullable("mentorId", rMentorId)
-        ) => (rToo, rMin, rPartner, rReviewerId, rMentorId).parMapN { (too, min, partner, reviewerId, mentorId) =>
-          Edit(ScienceSubtype.FastTurnaround, too, min, partnerSplits = partner.map(p => Map(p -> HundredPercent)), reviewerId = reviewerId, mentorId = mentorId)
+        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN { (too, min, reviewerId, mentorId) =>
+          Edit(ScienceSubtype.FastTurnaround, tooActivation = too, minPercentTime = min, reviewerId = reviewerId, mentorId = mentorId)
         }
       }
 
