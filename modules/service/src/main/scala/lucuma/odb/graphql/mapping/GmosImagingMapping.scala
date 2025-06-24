@@ -64,6 +64,7 @@ trait GmosImagingMapping[F[_]]
 
       SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosNorthImagingView.Filters),
+      SqlField("initialFilters", GmosNorthImagingView.InitialFilters),
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
@@ -92,6 +93,7 @@ trait GmosImagingMapping[F[_]]
 
       SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosSouthImagingView.Filters),
+      SqlField("initialFilters", GmosSouthImagingView.InitialFilters),
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
