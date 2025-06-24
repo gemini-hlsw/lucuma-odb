@@ -149,12 +149,12 @@ object GmosImagingService {
       override def deleteNorth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        Statements.deleteGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", which)
+        Statements.deleteGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", "t_gmos_north_imaging_initial_filter", which)
 
       override def deleteSouth(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        Statements.deleteGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", which)
+        Statements.deleteGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", "t_gmos_south_imaging_initial_filter", which)
 
       override def updateNorth(
         SET: GmosImagingInput.Edit.North
@@ -184,13 +184,13 @@ object GmosImagingService {
         observationId: Observation.Id,
         newObservationId: Observation.Id
       )(using Transaction[F]): F[Unit] =
-        Statements.cloneGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", observationId, newObservationId)
+        Statements.cloneGmosImaging("t_gmos_north_imaging", "t_gmos_north_imaging_filter", "t_gmos_north_imaging_initial_filter", observationId, newObservationId)
 
       override def cloneSouth(
         observationId: Observation.Id,
         newObservationId: Observation.Id
       )(using Transaction[F]): F[Unit] =
-        Statements.cloneGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", observationId, newObservationId)
+        Statements.cloneGmosImaging("t_gmos_south_imaging", "t_gmos_south_imaging_filter", "t_gmos_south_imaging_initial_filter", observationId, newObservationId)
     }
 
   object Statements {
@@ -225,11 +225,12 @@ object GmosImagingService {
       selectGmosImaging("v_gmos_south_imaging", observationIds)
 
     private def insertGmosImaging(
-      modeTableName:   String,
-      filterTableName: String,
-      oids:            List[Observation.Id],
-      common:          GmosImagingInput.Create.Common,
-      filterEntries:   List[AppliedFragment]
+      modeTableName:          String,
+      filterTableName:        String,
+      initialFilterTableName: String,
+      oids:                   List[Observation.Id],
+      common:                 GmosImagingInput.Create.Common,
+      filterEntries:          List[AppliedFragment]
     ): AppliedFragment = {
       val modeEntries =
         oids.map { oid =>
@@ -265,8 +266,15 @@ object GmosImagingService {
               c_spatial_offsets
             ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
+          ),
+          filter_inserts AS (
+            INSERT INTO #$filterTableName (
+              c_observation_id,
+              c_filter
+            ) VALUES """(Void) |+| filterValues |+| sql"""
+            RETURNING c_observation_id
           )
-          INSERT INTO #$filterTableName (
+          INSERT INTO #$initialFilterTableName (
             c_observation_id,
             c_filter
           ) VALUES """(Void) |+| filterValues
@@ -275,7 +283,6 @@ object GmosImagingService {
       }
     }
 
-    // inserts both mode and filters in a single call
     def insertGmosNorthImaging(
       oids: List[Observation.Id],
       input: GmosImagingInput.Create.North
@@ -288,6 +295,7 @@ object GmosImagingService {
       insertGmosImaging(
         "t_gmos_north_imaging",
         "t_gmos_north_imaging_filter",
+        "t_gmos_north_imaging_initial_filter",
         oids,
         input.common,
         filterEntries
@@ -305,6 +313,7 @@ object GmosImagingService {
       insertGmosImaging(
         "t_gmos_south_imaging",
         "t_gmos_south_imaging_filter",
+        "t_gmos_south_imaging_initial_filter",
         oids,
         input.common,
         filterEntries
@@ -315,11 +324,13 @@ object GmosImagingService {
     def deleteGmosImaging[F[_]: MonadCancelThrow](
       modeTableName: String,
       filterTableName: String,
+      initialFilterTableName: String,
       which: List[Observation.Id]
     )(using Services[F]): F[Unit] =
       which.traverse_ { oid =>
         session.exec(Statements.deleteGmosImagingMode(modeTableName, oid)) *>
-        session.exec(Statements.deleteGmosImagingFilters(filterTableName, oid))
+        session.exec(Statements.deleteGmosImagingFilters(filterTableName, oid)) *>
+        session.exec(Statements.deleteGmosImagingFilters(initialFilterTableName, oid))
       }
 
     private def deleteGmosImagingMode(tableName: String, oid: Observation.Id): AppliedFragment =
@@ -338,11 +349,13 @@ object GmosImagingService {
     def cloneGmosImaging[F[_]: MonadCancelThrow](
       modeTableName: String,
       filterTableName: String,
+      initialFilterTableName: String,
       observationId: Observation.Id,
       newObservationId: Observation.Id
     )(using Services[F]): F[Unit] =
       session.exec(Statements.cloneGmosImagingMode(modeTableName, observationId, newObservationId)) *>
-        session.exec(Statements.cloneGmosImagingFilters(filterTableName, observationId, newObservationId))
+        session.exec(Statements.cloneGmosImagingFilters(filterTableName, observationId, newObservationId)) *>
+        session.exec(Statements.cloneGmosImagingFilters(initialFilterTableName, observationId, newObservationId))
 
     private def cloneGmosImagingMode(
       tableName: String,
@@ -383,7 +396,6 @@ object GmosImagingService {
           c_filter
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
-
 
     // Update statements following the GmosLongSlitService pattern
     def commonUpdates(
