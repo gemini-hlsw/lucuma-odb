@@ -8,17 +8,53 @@ create type e_arc_type as enum('empty', 'full', 'partial');
 
 -- Add columns for region, which cannot be null for TOOs
 alter table t_target
+
   -- RA arc
   add c_opp_ra_arc_type  e_arc_type  null check (c_type = 'opportunity'        or c_opp_ra_arc_type  is null),
   add c_opp_ra_arc_start d_angle_µas null check (c_opp_ra_arc_type = 'partial' or c_opp_ra_arc_start is null),
   add c_opp_ra_arc_end   d_angle_µas null check (c_opp_ra_arc_type = 'partial' or c_opp_ra_arc_end   is null),
+
   -- Dec arc
   add c_opp_dec_arc_type  e_arc_type  null check (c_type = 'opportunity'         or c_opp_dec_arc_type  is null),
   add c_opp_dec_arc_start d_angle_µas null check (c_opp_dec_arc_type = 'partial' or c_opp_dec_arc_start is null),
   add c_opp_dec_arc_end   d_angle_µas null check (c_opp_dec_arc_type = 'partial' or c_opp_dec_arc_end   is null),
 
-  drop constraint nonsidereal_all_non_null, -- TODO
-  drop constraint ra_dec_epoch_all_defined; -- TODO 
+  -- update this constraint
+  drop constraint nonsidereal_all_non_null, 
+  add constraint nonsidereal_all_non_null
+  check (
+    c_type = 'sidereal' or c_type = 'opportunity' or
+    num_nulls(c_nsid_des, c_nsid_key_type, c_nsid_key) = 0
+  ),
+
+  -- and this one too
+  drop constraint ra_dec_epoch_all_defined,
+  add constraint ra_dec_epoch_all_defined
+  check (
+    c_type = 'nonsidereal' or c_type = 'opportunity' or
+    num_nulls(c_sid_ra, c_sid_dec, c_sid_epoch) = 0
+  ),
+
+  -- and make one for opportunity targets
+  add constraint opportunity_fields
+  check (
+    c_type = 'sidereal' or c_type = 'nonsidereal' or
+    num_nulls(c_opp_ra_arc_type, c_opp_dec_arc_type) = 0
+  ),
+
+  -- and for arcs (ra)
+  add constraint opportunity_ra
+  check (
+    c_opp_ra_arc_type = 'full' or c_opp_ra_arc_type = 'empty' or
+    num_nulls(c_opp_ra_arc_start, c_opp_ra_arc_end) = 0
+  ),
+
+  -- and for arcs (dec)
+  add constraint opportunity_dec
+  check (
+    c_opp_dec_arc_type = 'full' or c_opp_dec_arc_type = 'empty' or
+    num_nulls(c_opp_dec_arc_start, c_opp_dec_arc_end) = 0
+  );
 
 -- Update target view 
 drop view if exists v_target;
