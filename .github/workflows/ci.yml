@@ -58,6 +58,12 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
+      - name: Validate Migrations
+        if: github.event_name == 'pull_request'  && matrix.shard == '1'
+        uses: gemini-hlsw/migration-validator-action@main
+        with:
+          path: modules/service/src/main/resources/db/migration/
+
       - name: Validate GraphQL schema changes
         if: github.event_name == 'pull_request' && matrix.shard == '1'
         uses: kamilkisiela/graphql-inspector@master
