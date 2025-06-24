@@ -1420,11 +1420,11 @@ class createObservation extends OdbSuite {
       }
     """
 
-  test("[general] specify f2 long slit spatial offsets at observation creation") {
+  test("[general] specify f2 long slit spatial offsets at observation creation"):
     createProgramAs(pi).flatMap { pid =>
       query(pi, createObsWithF2SpatialOffsets(pid)).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
-        
+
         assertIO(
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
@@ -1458,7 +1458,35 @@ class createObservation extends OdbSuite {
         )
       }
     }
-  }
+
+  test("createObservation: rejects 3 spatial offsets"):
+    createProgramAs(pi).flatMap { pid =>
+      interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 0 or 4 offsets, but 3 were provided.") {
+        query(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                observingMode: {
+                  flamingos2LongSlit: {
+                    disperser: R1200_HK
+                    filter: Y
+                    fpu: LONG_SLIT_2
+                    explicitSpatialOffsets: [
+                      { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
+                      { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
+                      { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation { id }
+            }
+          }
+        """)
+      }
+    }
 
   private def createObsWithObservingModeExplicit(pid: Program.Id, site: Site, grating: String): String =
     s"""

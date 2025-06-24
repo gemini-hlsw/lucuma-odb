@@ -621,7 +621,8 @@ class cloneObservation extends OdbSuite {
         createFlamingos2LongSlitObservationAs(pi, pid, Some("""[
           { p: { arcseconds: 0.0 }, q: { arcseconds: 1.5 } },
           { p: { arcseconds: 0.0 }, q: { arcseconds: 0.5 } },
-          { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } }
+          { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -1.0 } }
         ]"""), tid).flatMap { oid =>
           expect(
             user = pi,
@@ -671,7 +672,8 @@ class cloneObservation extends OdbSuite {
                           "spatialOffsets": [
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } }
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
                           ]
                         }
                       }
@@ -682,7 +684,8 @@ class cloneObservation extends OdbSuite {
                           "spatialOffsets": [
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } }
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
                           ]
                         }
                       }
