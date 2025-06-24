@@ -4612,6 +4612,27 @@ input SiderealInput {
   catalogInfo: CatalogInfoInput
 }
 
+input OpportunityInput {
+  region: RegionInput!
+}
+
+input RegionInput {
+  rightAscensionArc: RightAscensionArcInput!
+  declinationArc: DeclinationArcInput!
+}
+
+input RightAscensionArcInput {
+  type: ArcType!
+  start: RightAscensionInput
+  end: RightAscensionInput
+}
+
+input DeclinationArcInput {
+  type: ArcType!
+  start: DeclinationInput
+  end: DeclinationInput
+}
+
 """
 Signal-to-noise mode parameters
 """
@@ -5152,6 +5173,7 @@ input TargetPropertiesInput {
   name: NonEmptyString
   sidereal: SiderealInput
   nonsidereal: NonsiderealInput
+  opportunity: OpportunityInput
   sourceProfile: SourceProfileInput
   existence: Existence
 }
@@ -13138,6 +13160,37 @@ type Target {
   Nonsidereal tracking information, if this is a nonsidereal target
   """
   nonsidereal: Nonsidereal
+
+  """
+  Target of opportunity range information, if this a TOO target
+  """
+  opportunity: Opportunity
+
+}
+
+type Opportunity {
+  region: Region!
+}
+
+enum ArcType {
+  EMPTY, FULL, PARTIAL
+}
+
+type RightAscensionArc {
+  type: ArcType!
+  start: RightAscension
+  end: RightAscension
+}
+
+type DeclinationArc {
+  type: ArcType!
+  start: Declination
+  end: Declination
+}
+
+type Region {
+  rightAscensionArc: RightAscensionArc!
+  declinationArc: DeclinationArc!
 }
 
 type TargetEnvironment {

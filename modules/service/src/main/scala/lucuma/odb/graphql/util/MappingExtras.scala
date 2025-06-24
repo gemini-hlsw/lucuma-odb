@@ -11,6 +11,7 @@ import grackle.Mapping
 import grackle.Path
 import grackle.circe.CirceMappingLike
 import io.circe.Encoder
+import org.tpolecat.typename.TypeName
 
 import scala.reflect.ClassTag
 
@@ -27,7 +28,7 @@ trait MappingExtras[F[_]] extends CirceMappingLike[F] {
       new Partial[A](underlyingField)
 
     class Partial[A](underlyingField: String) {
-      def as[B: Encoder](field: String, f: A => B)(implicit ev: ClassTag[A]): CursorField[B] =
+      def as[B: Encoder](field: String, f: A => B)(using ClassTag[A], TypeName[A]): CursorField[B] =
         CursorField(field, _.field(underlyingField, None).flatMap(_.as[A].map(f)), List(underlyingField))
     }
   }
