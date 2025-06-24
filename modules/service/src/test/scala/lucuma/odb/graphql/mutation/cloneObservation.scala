@@ -613,5 +613,91 @@ class cloneObservation extends OdbSuite {
       }
     }
   }
+
+  test("clone Flamingos2 long slit observation preserves spatial offsets") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        // Create a Flamingos2 long slit observation with spatial offsets
+        createFlamingos2LongSlitObservationAs(pi, pid, Some("""[
+          { p: { arcseconds: 0.0 }, q: { arcseconds: 1.5 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: 0.5 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } },
+          { p: { arcseconds: 0.0 }, q: { arcseconds: -1.0 } }
+        ]"""), tid).flatMap { oid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneObservation(input: {
+                  observationId: "$oid"
+                }) {
+                  originalObservation {
+                    observingMode {
+                      flamingos2LongSlit {
+                        spatialOffsets {
+                          p {
+                            arcseconds
+                          }
+                          q {
+                            arcseconds
+                          }
+                        }
+                      }
+                    }
+                  }
+                  newObservation {
+                    observingMode {
+                      flamingos2LongSlit {
+                        spatialOffsets {
+                          p {
+                            arcseconds
+                          }
+                          q {
+                            arcseconds
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneObservation": {
+                    "originalObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "spatialOffsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                          ]
+                        }
+                      }
+                    },
+                    "newObservation": {
+                      "observingMode": {
+                        "flamingos2LongSlit": {
+                          "spatialOffsets": [
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
+                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.000000 } }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        }
+      }
+    }
+  }
 }
 

@@ -568,6 +568,12 @@ trait DatabaseOperations { this: OdbSuite =>
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, spatialOffsets, tids*)
 
+  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createFlamingos2LongSlitObservationAs(user, pid, None, tids*)
+
+  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, spatialOffsets, tids*)
+
   private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, spatialOffsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
@@ -581,7 +587,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   asterism: ${tids.asJson}
                 }
                 scienceRequirements: ${scienceRequirementsObject(observingMode)}
-                observingMode: ${gmosImagingWithSpatialOffsets(observingMode, spatialOffsets)}
+                observingMode: ${observingModeWithSpatialOffsets(observingMode, spatialOffsets)}
               }
             }) {
               observation {
@@ -783,7 +789,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
 
-  private def gmosImagingWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
+  private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
     observingMode match
       case ObservingModeType.GmosNorthImaging =>
         val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
@@ -798,6 +804,16 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""{
           gmosSouthImaging: {
             filters: [R_PRIME, G_PRIME]
+            $offsetsField
+          }
+        }"""
+      case ObservingModeType.Flamingos2LongSlit =>
+        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        s"""{
+          flamingos2LongSlit: {
+            disperser: R1200_HK
+            filter: Y
+            fpu: LONG_SLIT_2
             $offsetsField
           }
         }"""

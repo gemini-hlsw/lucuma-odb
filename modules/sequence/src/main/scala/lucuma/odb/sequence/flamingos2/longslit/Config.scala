@@ -13,6 +13,8 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.math.Offset
+import lucuma.core.syntax.all.*
 import lucuma.odb.sequence.ObservingMode
 
 import java.io.ByteArrayOutputStream
@@ -59,6 +61,14 @@ case class Config private[longslit](
 }
 
 object Config:
+
+  val DefaultSpatialOffsets: List[Offset] =
+    List(
+      Offset.Zero.copy(q =  15.arcseconds.q),
+      Offset.Zero.copy(q = -15.arcseconds.q),
+      Offset.Zero.copy(q = -15.arcseconds.q),
+      Offset.Zero.copy(q =  15.arcseconds.q)
+    )
 
   def apply(
     disperser: Flamingos2Disperser,

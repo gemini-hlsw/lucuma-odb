@@ -1898,6 +1898,198 @@ class updateObservations extends OdbSuite
     )
   }
 
+  test("observing mode: update Flamingos2 spatial offsets") {
+
+    val update0 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          disperser: R1200_JH
+          filter: Y
+          fpu: LONG_SLIT_2
+          explicitSpatialOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        instrument
+        observingMode {
+          flamingos2LongSlit {
+            disperser
+            filter
+            fpu
+            spatialOffsets {
+              p {
+                arcseconds
+              }
+              q {
+                arcseconds
+              }
+            }
+            explicitSpatialOffsets {
+              p {
+                arcseconds
+              }
+              q {
+                arcseconds
+              }
+            }
+            defaultSpatialOffsets {
+              p {
+                arcseconds
+              }
+              q {
+                arcseconds
+              }
+            }
+          }
+        }
+      }
+    """
+
+    val expected0 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
+                  ],
+                  "defaultSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          explicitSpatialOffsets: [
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  2.5 } }
+          ]
+        }
+      }
+    """
+
+    val expected1 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
+                  ],
+                  "defaultSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update2 = """
+      observingMode: {
+        flamingos2LongSlit: {
+          explicitSpatialOffsets: null
+        }
+      }
+    """
+
+    val expected2 = json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "instrument": "FLAMINGOS2",
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "disperser": "R1200_JH",
+                  "filter": "Y",
+                  "fpu": "LONG_SLIT_2",
+                  "spatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ],
+                  "explicitSpatialOffsets": null,
+                  "defaultSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected0),
+        (update1, query, expected1),
+        (update2, query, expected2)
+      ),
+      observingMode = Some(ObservingModeType.Flamingos2LongSlit)
+    )
+  }
+
   test("observing mode: update existing, all fields") {
 
     val update0 = """
@@ -3384,6 +3576,106 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
+  test("updateObservations: flamingos2 rejects 2 spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 0 or 4 offsets, but 2 were provided.") {
+        query(pi, s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  flamingos2LongSlit: {
+                    disperser: R1200_HK
+                    filter: Y
+                    fpu: LONG_SLIT_2
+                    explicitSpatialOffsets: [
+                      { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+                      { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
+                    ]
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              observations {
+                observingMode {
+                  flamingos2LongSlit {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """)
+      }
+    } yield ()
+
+  test("updateObservations: flamingos2 accepts clearing spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      // First, set some offsets
+      _   <- query(pi, s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  disperser: R1200_HK
+                  filter: Y
+                  fpu: LONG_SLIT_2
+                  explicitSpatialOffsets: [
+                    { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:  -5.0 } }
+                  ]
+                }
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """)
+      _   <- query(pi, s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  explicitSpatialOffsets: null
+                }
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations {
+              observingMode {
+                flamingos2LongSlit {
+                  spatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """)
+    } yield ()
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

@@ -8,6 +8,8 @@ import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Offset
+import lucuma.core.syntax.all.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
 import munit.DisciplineSuite
@@ -55,3 +57,36 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       val noBoth = edit.copy(disperser = None, fpu = None)
       assert(noBoth.toCreate.isFailure, "Should fail when both grating and fpu are missing")
 
+  test("SpatialOffsetsFormat formattedSpatialOffsets works in Create"):
+    val offsets = List(
+      Offset.Zero.copy(q = 5.arcseconds.q),
+      Offset.Zero.copy(q = 10.arcseconds.q)
+    )
+
+    val create = Flamingos2LongSlitInput.Create(
+      disperser = Flamingos2Disperser.R1200JH,
+      filter = Flamingos2Filter.JH,
+      fpu = Flamingos2Fpu.LongSlit2,
+      explicitSpatialOffsets = Some(offsets)
+    )
+
+    assertEquals(create.formattedSpatialOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
+
+  test("SpatialOffsetsFormat formattedSpatialOffsets works in Edit"):
+    val offsets = List(
+      Offset.Zero.copy(q = 5.arcseconds.q),
+      Offset.Zero.copy(q = 10.arcseconds.q)
+    )
+
+    val edit = Flamingos2LongSlitInput.Edit(
+      disperser = None,
+      filter = None,
+      fpu = None,
+      explicitReadMode = lucuma.odb.data.Nullable.Null,
+      explicitReads = lucuma.odb.data.Nullable.Null,
+      explicitDecker = lucuma.odb.data.Nullable.Null,
+      explicitReadoutMode = lucuma.odb.data.Nullable.Null,
+      explicitSpatialOffsets = lucuma.odb.data.Nullable.NonNull(offsets)
+    )
+
+    assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))

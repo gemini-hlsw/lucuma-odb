@@ -7,6 +7,7 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.circe.codec.json.*
+import skunk.codec.all.*
 
 trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
 
@@ -27,6 +28,8 @@ trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
 
     val ReadoutMode: ColumnRef        = col("c_readout_mode", flamingos_2_readout_mode.opt)
     val ReadoutModeDefault: ColumnRef = col("c_readout_mode_default", flamingos_2_readout_mode)
+
+    val SpatialOffsets: ColumnRef     = col("c_spatial_offsets", text.opt)
 
     val ImageQuality: ColumnRef       = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef      = col("c_source_profile", jsonb.opt)
