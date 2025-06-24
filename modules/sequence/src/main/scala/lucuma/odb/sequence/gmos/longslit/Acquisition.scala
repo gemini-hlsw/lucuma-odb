@@ -16,8 +16,6 @@ import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
-import lucuma.core.data.Zipper
-import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
@@ -45,13 +43,11 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
-import lucuma.itc.TargetIntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.IndexTracker
-import lucuma.refined.*
 
 import java.util.UUID
 
@@ -59,15 +55,6 @@ object Acquisition:
   val AcquisitionSN: SignalToNoise =
     SignalToNoise.FromBigDecimalExact.getOption(10).get
 
-  val DefaultIntegrationTime: TargetIntegrationTime =
-    TargetIntegrationTime(
-      Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 1.refined)),
-      Band.R.asLeft, // Band is meaningless here, but we need to provide one
-      None // Imaging doesn't return signal-to-noise at
-    )
-
-  val MinExposureTime    =   1.secondTimeSpan
-  val MaxExposureTime    = 180.secondTimeSpan
   val MaxExpTimeLastStep = 360.secondTimeSpan
 
   def filter[L](acqFilters: NonEmptyList[L], λ: Wavelength, wavelength: L => Wavelength): L =

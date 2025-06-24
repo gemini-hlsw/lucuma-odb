@@ -34,6 +34,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
+import lucuma.core.enums.Band
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -44,19 +45,21 @@ import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.SingleSN
+import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TotalSN
 import lucuma.itc.client.ClientCalculationResult
+import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.gmos.longslit.Acquisition
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.circe.codec.json.*
@@ -336,21 +339,38 @@ object ItcService {
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
       private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
-        client
-          .imaging(targets.imagingInput, useCache = false)
-          .map:
-            _.targetTimes.modifyValue:
-              _.map:
-                _.modifyValue:
-                  case Left(lucuma.itc.Error.SourceTooBright(_)) =>
-                    Acquisition.DefaultIntegrationTime.asRight
-                  case Right(r) if r.times.focus.exposureTime > Acquisition.MaxExposureTime =>
-                    r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MaxExposureTime))).asRight
-                  case Right(r) if r.times.focus.exposureTime < Acquisition.MinExposureTime =>
-                    r.copy(times = r.times.map(_.copy(exposureTime = Acquisition.MinExposureTime))).asRight
-                  case other => other
-            .partitionErrors
-            .leftMap(convertErrors(targets))
+        def go(min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
+          client
+            .imaging(targets.imagingInput, useCache = false)
+            .map:
+              _.targetTimes.modifyValue:
+                _.map:
+                  _.modifyValue:
+                    case Left(lucuma.itc.Error.SourceTooBright(_))    =>
+                      TargetIntegrationTime(
+                        Zipper.one(IntegrationTime(min, 1.refined)),
+                        Band.R.asLeft, // Band is meaningless here, but we need to provide one
+                        None // Imaging doesn't return signal-to-noise at
+                      ).asRight
+                    case Right(r) if r.times.focus.exposureTime > max =>
+                      r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
+                    case Right(r) if r.times.focus.exposureTime < min =>
+                      r.copy(times = r.times.map(_.copy(exposureTime = min))).asRight
+                    case other => other
+              .partitionErrors
+              .leftMap(convertErrors(targets))
+
+        targets.imaging.mode match
+          case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
+               InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
+               InstrumentMode.GmosNorthImaging(_, _)                  |
+               InstrumentMode.GmosSouthImaging(_, _)                    =>
+            go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
+          case InstrumentMode.Flamingos2Spectroscopy(_, _, _)         |
+               InstrumentMode.Flamingos2Imaging(_)                      =>
+            go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
+               lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
 
       @annotation.nowarn("msg=unused implicit parameter")
       private def callRemoteItc(
