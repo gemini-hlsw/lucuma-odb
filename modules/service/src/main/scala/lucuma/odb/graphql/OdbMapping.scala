@@ -97,8 +97,9 @@ object OdbMapping {
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:   Client[F],
     emailConfig0:  Config.Email,
-    allowSub:      Boolean = true,       // Are submappings (recursive calls) allowed?
-    schema0:       Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
+    schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
+    shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
@@ -320,9 +321,13 @@ object OdbMapping {
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
 
+          def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =
+            if shouldValidate then TypeMappings(ms)
+            else TypeMappings.unchecked(ms)
+
           // Our combined type mappings
           override val typeMappings: TypeMappings =
-            TypeMappings(
+            mkTypeMappings(
               List[TypeMapping](
                 AddAtomEventResultMapping,
                 AddConditionsEntryResultMapping,
@@ -657,30 +662,36 @@ object OdbMapping {
    * subscriptions.
    */
   def forObscalc[F[_]: Async: Parallel: Trace: Logger: SecureRandom](
-    database:   Resource[F, Session[F]],
-    monitor:    SkunkMonitor[F],
-    user:       User,
-    commitHash: CommitHash,
-    enums:      Enums,
-    httpClient: Client[F],
-    schema:     Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    database:    Resource[F, Session[F]],
+    monitor:     SkunkMonitor[F],
+    user:        User,
+    goaUsers:    Set[User.Id],
+    gaiaClient:  GaiaClient[F],
+    itcClient:   ItcClient[F],
+    commitHash:  CommitHash,
+    enums:       Enums,
+    tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:  Client[F],
+    emailConfig: Config.Email,
+    schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
   ): Mapping[F] =
 
     apply(
       database,
       monitor,
       user,
-      null,        // Topics[F]
-      null,        // GaiaClient[F]
-      null,        // ItcClient[F]
+      null,    // Topics[F]
+      gaiaClient,
+      itcClient,
       commitHash,
-      Set.empty,   // GOA users
+      goaUsers,
       enums,
-      null,        // TimeEstimateCalculatorImplementation.ForInstrumentMode
+      tec,
       httpClient,
-      null,        // Config.Email
+      emailConfig,
       allowSub = false,
-      schema
+      schema,
+      shouldValidate = false, // seems to cause overflow from time to time
     )
 
 }

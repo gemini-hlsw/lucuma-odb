@@ -700,20 +700,27 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     val res =
       for
         http <- JdkHttpClient.simple[IO]
-        sess <- Resource.eval(IO(sessionFixture()))
-      yield (http, sess)
+        db   <- FMain.databasePoolResource[IO](databaseConfig)
+        enm  <- db.evalMap(Enums.load)
+        ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+      yield (http, db, enm, ptc)
 
-    res.use: (http, s) =>
-      Enums.load(s).flatMap: e =>
-        val mapping = OdbMapping.forObscalc(
-          Resource.pure(s),
-          SkunkMonitor.noopMonitor[IO],
-          u,
-          CommitHash.Zero,
-          e,
-          http
-        )
-        given services: Services[IO] = Services.forUser(u, e, mapping.some)(s)
+    res.use: (http, db, enm, ptc) =>
+      val mapping = OdbMapping.forObscalc(
+        db,
+        SkunkMonitor.noopMonitor[IO],
+        u,
+        goaUsers,
+        GaiaClient.build[IO](http, adapters = gaiaAdapters),
+        itcClient,
+        CommitHash.Zero,
+        enm,
+        ptc,
+        http,
+        emailConfig
+      )
+      db.use: s =>
+        given services: Services[IO] = Services.forUser(u, enm, mapping.some)(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
