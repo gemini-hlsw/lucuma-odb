@@ -3,7 +3,10 @@ ALTER TABLE t_flamingos_2_long_slit
 ADD COLUMN c_spatial_offsets text NULL;
 
 ALTER TABLE t_flamingos_2_long_slit
-ADD CONSTRAINT flamingos2_spatial_offsets_format CHECK (c_spatial_offsets IS NULL OR c_spatial_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$');
+ADD CONSTRAINT flamingos2_spatial_offsets_format CHECK (
+  c_spatial_offsets IS NULL OR 
+  c_spatial_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){7}$'
+);
 
 DROP VIEW IF EXISTS v_flamingos_2_long_slit;
 CREATE OR REPLACE VIEW v_flamingos_2_long_slit AS

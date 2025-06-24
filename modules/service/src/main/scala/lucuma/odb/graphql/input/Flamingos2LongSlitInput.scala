@@ -16,11 +16,18 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.flamingos2.longslit.Config
 
 object Flamingos2LongSlitInput {
+
+  private def validateSpatialOffsets[A](offsets: List[Offset]): Result[List[Offset]] =
+    if (offsets.nonEmpty && offsets.length != 4)
+      Result.failure(s"Flamingos2 must have exactly 0 or 4 offsets, but ${offsets.length} were provided.")
+    else
+      Result(offsets)
 
   case class Create(
     disperser: Flamingos2Disperser,
@@ -99,16 +106,32 @@ object Flamingos2LongSlitInput {
           explicitReads,
           explicitSpatialOffsets
       ) =>
-        Result(Create(
-          disperser,
-          filter,
-          fpu,
-          explicitReadMode,
-          explicitReads,
-          explicitDecker,
-          explicitReadoutMode,
-          explicitSpatialOffsets
-        ))
+        explicitSpatialOffsets match {
+          case Some(offsets) =>
+            validateSpatialOffsets(offsets).map(_ =>
+              Create(
+                disperser,
+                filter,
+                fpu,
+                explicitReadMode,
+                explicitReads,
+                explicitDecker,
+                explicitReadoutMode,
+                explicitSpatialOffsets
+              )
+            )
+          case None =>
+            Result(Create(
+              disperser,
+              filter,
+              fpu,
+              explicitReadMode,
+              explicitReads,
+              explicitDecker,
+              explicitReadoutMode,
+              explicitSpatialOffsets
+            ))
+        }
       }
 
   }
@@ -199,16 +222,32 @@ object Flamingos2LongSlitInput {
           explicitReadoutMode,
           explicitSpatialOffsets
           ) =>
-          Result(Edit(
-            grating,
-            filter,
-            fpu,
-            explicitReadMode,
-            explicitReads,
-            explicitDecker,
-            explicitReadoutMode,
-            explicitSpatialOffsets
-          ))
+          explicitSpatialOffsets match {
+            case NonNull(offsets) =>
+              validateSpatialOffsets(offsets).map(_ =>
+                Edit(
+                  grating,
+                  filter,
+                  fpu,
+                  explicitReadMode,
+                  explicitReads,
+                  explicitDecker,
+                  explicitReadoutMode,
+                  explicitSpatialOffsets
+                )
+              )
+            case _ =>
+              Result(Edit(
+                grating,
+                filter,
+                fpu,
+                explicitReadMode,
+                explicitReads,
+                explicitDecker,
+                explicitReadoutMode,
+                explicitSpatialOffsets
+              ))
+          }
       }
 
   }

@@ -90,4 +90,3 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
     )
 
     assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))
-

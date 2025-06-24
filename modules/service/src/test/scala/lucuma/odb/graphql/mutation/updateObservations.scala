@@ -1995,7 +1995,9 @@ class updateObservations extends OdbSuite
         flamingos2LongSlit: {
           explicitSpatialOffsets: [
             { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } }
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } },
+            { p: { arcseconds: 0.0 }, q: { arcseconds:  2.5 } }
           ]
         }
       }
@@ -2014,11 +2016,15 @@ class updateObservations extends OdbSuite
                   "fpu": "LONG_SLIT_2",
                   "spatialOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } }
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
                   "explicitSpatialOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } }
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
                   "defaultSpatialOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
@@ -3570,6 +3576,106 @@ class updateObservations extends OdbSuite
     oneUpdateTest(pi, update, query, expected)
   }
 
+  test("updateObservations: flamingos2 rejects 2 spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 0 or 4 offsets, but 2 were provided.") {
+        query(pi, s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  flamingos2LongSlit: {
+                    disperser: R1200_HK
+                    filter: Y
+                    fpu: LONG_SLIT_2
+                    explicitSpatialOffsets: [
+                      { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
+                      { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
+                    ]
+                  }
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
+              }
+            }) {
+              observations {
+                observingMode {
+                  flamingos2LongSlit {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """)
+      }
+    } yield ()
+
+  test("updateObservations: flamingos2 accepts clearing spatial offsets"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      // First, set some offsets
+      _   <- query(pi, s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  disperser: R1200_HK
+                  filter: Y
+                  fpu: LONG_SLIT_2
+                  explicitSpatialOffsets: [
+                    { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } },
+                    { p: { arcseconds: 0.0 }, q: { arcseconds:  -5.0 } }
+                  ]
+                }
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """)
+      _   <- query(pi, s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  explicitSpatialOffsets: null
+                }
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations {
+              observingMode {
+                flamingos2LongSlit {
+                  spatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """)
+    } yield ()
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
