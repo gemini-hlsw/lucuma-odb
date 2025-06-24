@@ -18,6 +18,7 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Mapping
 import grackle.skunk.SkunkMonitor
+import lucuma.catalog.clients.GaiaClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.CalculationState
@@ -234,12 +235,14 @@ object CalcMain extends MainParams:
       enums <- Resource.eval(pool.use(Enums.load))
 
       http  <- c.httpClientResource
+      gaiaClient =  GaiaClient.build[F](http, adapters = GaiaClient.DefaultAdapters)
+
       itc   <- c.itcClient
       ptc   <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      mapping = OdbMapping.forObscalc(pool, SkunkMonitor.noopMonitor[F], user, c.commitHash, enums, http)
+      mapping = OdbMapping.forObscalc(pool, SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
       o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, mapping)))
     yield o
 
