@@ -17,14 +17,14 @@ object TargetPropertiesInput {
 
   final case class Create(
     name: NonEmptyString,
-    tracking: Either[SiderealInput.Create, EphemerisKey],
+    subtypeInfo: SiderealInput.Create | EphemerisKey | OpportunityInput.Create,
     sourceProfile: SourceProfile,
     existence: Existence
   )
 
   final case class Edit(
     name: Option[NonEmptyString],
-    tracking: Option[Either[SiderealInput.Edit, EphemerisKey]],
+    subtypeInfo: Option[SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit],
     sourceProfile: Option[SourceProfile => Result[SourceProfile]],
     existence: Option[Existence]
   )
@@ -35,13 +35,17 @@ object TargetPropertiesInput {
         NonEmptyStringBinding.NonNullable("name", rName),
         SiderealInput.EditBinding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
+        OpportunityInput.EditBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.EditBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rSidereal, rNonsidereal, rSourceProfile, rExistence).parTupled.flatMap {
-        case (name, sidereal, nonsidereal, sourceProfile, existence) =>
-          (sidereal, nonsidereal) match {
-            case (Some(_), Some(_))  => Matcher.validationFailure("Found both sidereal and nonsidereal tracking; at most one may be provided.")
-            case (a, b)              => Result(a.map(_.asLeft) orElse b.map(_.asRight))
+      ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
+        case (name, sidereal, nonsidereal, opportunity, sourceProfile, existence) =>
+          (sidereal, nonsidereal, opportunity) match {
+            case (Some(s), None, None) => Result(Some(s))
+            case (None, Some(n), None) => Result(Some(n))
+            case (None, None, Some(o)) => Result(Some(o))
+            case (None, None, None)    => Result(None)
+            case _ => Matcher.validationFailure("At most one of sidereal, nonsidereal, or opportunity may be specified (found multiple).")
           } map  { Edit(name, _, sourceProfile, existence) }
       } 
     }
@@ -52,17 +56,18 @@ object TargetPropertiesInput {
         NonEmptyStringBinding.Option("name", rName),
         SiderealInput.CreateBinding.Option("sidereal", rSidereal),
         NonsiderealInput.Binding.Option("nonsidereal", rNonsidereal),
+        OpportunityInput.CreateBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.CreateBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rSidereal, rNonsidereal, rSourceProfile, rExistence).parTupled.flatMap {
-        case (name, sidereal, nonsidereal, sourceProfile, existence) =>
-          (name, sourceProfile, sidereal, nonsidereal) match {
-            case (None, _, _, _)             => Matcher.validationFailure("Target name is required on creation.")
-            case (_, None, _, _)             => Matcher.validationFailure("Source Profile is required on creation.")
-            case (Some(t), Some(p), Some(s), None) => Result(Create(t, Left(s), p, existence.getOrElse(Existence.Default)))
-            case (Some(t), Some(p), None, Some(n)) => Result(Create(t, Right(n), p, existence.getOrElse(Existence.Default)))
-            case (_, _, Some(_), Some(_))    => Matcher.validationFailure("Found both sidereal and nonsidereal tracking; only one may be provided.")
-            case (_, _, None, None)          => Matcher.validationFailure("Found neither sidereal noe nonsidereal tracking; exactly one must be provided.")
+      ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
+        case (name, sidereal, nonsidereal, opportunity, sourceProfile, existence) =>
+          (name, sourceProfile, sidereal, nonsidereal, opportunity) match {
+            case (None, _, _, _, _)             => Matcher.validationFailure("Target name is required on creation.")
+            case (_, None, _, _, _)             => Matcher.validationFailure("Source Profile is required on creation.")
+            case (Some(t), Some(p), Some(s), None, None) => Result(Create(t, s, p, existence.getOrElse(Existence.Default)))
+            case (Some(t), Some(p), None, Some(n), None) => Result(Create(t, n, p, existence.getOrElse(Existence.Default)))
+            case (Some(t), Some(p), None, None, Some(o)) => Result(Create(t, o, p, existence.getOrElse(Existence.Default)))
+            case _ => Matcher.validationFailure("Exactly one of sidereal, nonsidereal, or opportunity must be specified.")
           }
       }
     }
