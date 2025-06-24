@@ -19,6 +19,7 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitRoi: ColumnRef           = col("c_roi", gmos_roi.opt)
     val ExplicitSpatialOffsets: ColumnRef = col("c_spatial_offsets", text.opt)
     val Filters: ColumnRef               = col("c_filters", _gmos_north_filter)
+    val InitialFilters: ColumnRef        = col("c_initial_filters", _gmos_north_filter.opt)
 
   object GmosSouthImagingView extends TableDef("v_gmos_south_imaging"):
 
@@ -29,3 +30,4 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitRoi: ColumnRef           = col("c_roi", gmos_roi.opt)
     val ExplicitSpatialOffsets: ColumnRef = col("c_spatial_offsets", text.opt)
     val Filters: ColumnRef               = col("c_filters", _gmos_south_filter)
+    val InitialFilters: ColumnRef        = col("c_initial_filters", _gmos_south_filter.opt)

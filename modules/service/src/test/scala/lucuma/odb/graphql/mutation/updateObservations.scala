@@ -3067,6 +3067,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthImaging {
             filters
+            initialFilters
             bin
             ampReadMode
             ampGain
@@ -3074,6 +3075,7 @@ class updateObservations extends OdbSuite
           }
           gmosSouthImaging {
             filters
+            initialFilters
             bin
             ampReadMode
             ampGain
@@ -3093,6 +3095,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
+                  "initialFilters": ["G_PRIME", "R_PRIME"],
                   "bin": "TWO",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3447,6 +3450,7 @@ class updateObservations extends OdbSuite
                   observingMode {
                     gmosNorthImaging {
                       filters
+                      initialFilters
                       bin
                       ampGain
                     }
@@ -3460,6 +3464,7 @@ class updateObservations extends OdbSuite
                   "observingMode": {
                     "gmosNorthImaging": {
                       "filters": ["G_PRIME", "R_PRIME"],
+                      "initialFilters": ["G_PRIME", "R_PRIME"],
                       "bin": "TWO",
                       "ampGain": "LOW"
                     }

@@ -8407,6 +8407,11 @@ type GmosNorthImaging {
   filters: [GmosNorthFilter!]!
 
   """
+  Initial GMOS North Filters that were used when creating the imaging mode
+  """
+  initialFilters: [GmosNorthFilter!]
+
+  """
   GMOS Binning, either explicitly specified in explicitBin or else taken
   from the defaultBin. XBinning == YBinning = Binning
   """
@@ -8983,6 +8988,11 @@ type GmosSouthImaging {
   GMOS South Filters for imaging mode (multiple filters allowed)
   """
   filters: [GmosSouthFilter!]!
+
+  """
+  Initial GMOS South Filters that were used when creating the imaging mode
+  """
+  initialFilters: [GmosSouthFilter!]
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
