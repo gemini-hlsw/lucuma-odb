@@ -314,6 +314,7 @@ object OdbMapping {
                   emailConfig0,
                   false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                   Some(schema),           // don't re-parse the schema
+                  shouldValidate = false  // already validated
                 ))
               )(session)
 
