@@ -41,9 +41,9 @@ CREATE VIEW v_gmos_north_imaging AS
     fs.c_initial_filters
   FROM
     t_gmos_north_imaging i
-  LEFT JOIN v_gmos_north_imaging_filter f
+  INNER JOIN v_gmos_north_imaging_filter f
     ON i.c_observation_id = f.c_observation_id
-  LEFT JOIN v_gmos_north_imaging_initial_filter fs
+  INNER JOIN v_gmos_north_imaging_initial_filter fs
     ON i.c_observation_id = fs.c_observation_id;
 
 DROP VIEW v_gmos_south_imaging;
@@ -55,7 +55,7 @@ CREATE VIEW v_gmos_south_imaging AS
     fs.c_initial_filters
   FROM
     t_gmos_south_imaging i
-  LEFT JOIN v_gmos_south_imaging_filter f
+  INNER JOIN v_gmos_south_imaging_filter f
     ON i.c_observation_id = f.c_observation_id
-  LEFT JOIN v_gmos_south_imaging_initial_filter fs
+  INNER JOIN v_gmos_south_imaging_initial_filter fs
     ON i.c_observation_id = fs.c_observation_id;
