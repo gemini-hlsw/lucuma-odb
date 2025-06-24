@@ -66,6 +66,7 @@ class cloneObservation extends OdbSuite {
         }
         gmosNorthImaging {
           filters
+          initialFilters
           bin
           ampReadMode
           ampGain
@@ -77,6 +78,7 @@ class cloneObservation extends OdbSuite {
         }
         gmosSouthImaging {
           filters
+          initialFilters
           bin
           ampReadMode
           ampGain
@@ -412,6 +414,7 @@ class cloneObservation extends OdbSuite {
                     observingMode {
                       gmosNorthImaging {
                         filters
+                        initialFilters
                         bin
                         ampReadMode
                         ampGain
@@ -423,6 +426,7 @@ class cloneObservation extends OdbSuite {
                     observingMode {
                       gmosNorthImaging {
                         filters
+                        initialFilters
                         bin
                         ampReadMode
                         ampGain
@@ -441,6 +445,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosNorthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
+                          "initialFilters": ["G_PRIME", "R_PRIME"],
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
@@ -452,6 +457,7 @@ class cloneObservation extends OdbSuite {
                       "observingMode": {
                         "gmosNorthImaging": {
                           "filters": ["G_PRIME", "R_PRIME"],
+                          "initialFilters": ["G_PRIME", "R_PRIME"],
                           "bin": "TWO",
                           "ampReadMode": "SLOW",
                           "ampGain": "LOW",
