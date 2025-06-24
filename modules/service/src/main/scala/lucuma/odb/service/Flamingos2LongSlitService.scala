@@ -15,11 +15,13 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
+import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -54,8 +56,13 @@ object Flamingos2LongSlitService {
          flamingos_2_read_mode.opt    *:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
-         flamingos_2_readout_mode.opt
-        ).to[Flamingos2LongSlitInput.Create]
+         flamingos_2_readout_mode.opt *:
+         text.opt
+        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsetsText) =>
+          spatialOffsetsText.traverse(so => OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")).map(spatialOffsets =>
+            Flamingos2LongSlitInput.Create(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
+          )
+        }
 
       private def select[A](
         which:   List[Observation.Id],
@@ -105,7 +112,8 @@ object Flamingos2LongSlitService {
           ls.c_read_mode,
           ls.c_reads,
           ls.c_decker,
-          ls.c_readout_mode
+          ls.c_readout_mode,
+          ls.c_spatial_offsets
         FROM
           t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
@@ -117,7 +125,7 @@ object Flamingos2LongSlitService {
           void")"
 
     val InsertF2LongSlit: Fragment[(
-      Observation.Id       ,
+      Observation.Id               ,
       Flamingos2Disperser          ,
       Flamingos2Filter             ,
       Flamingos2Fpu                ,
@@ -125,6 +133,7 @@ object Flamingos2LongSlitService {
       Option[Flamingos2Reads]      ,
       Option[Flamingos2Decker]     ,
       Option[Flamingos2ReadoutMode],
+      Option[String]               ,
       Flamingos2Disperser          ,
       Flamingos2Filter             ,
       Flamingos2Fpu
@@ -140,6 +149,7 @@ object Flamingos2LongSlitService {
           C_reads,
           c_decker,
           c_readout_mode,
+          c_spatial_offsets,
           c_initial_disperser,
           c_initial_filter,
           c_initial_fpu
@@ -154,29 +164,31 @@ object Flamingos2LongSlitService {
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
           ${flamingos_2_readout_mode.opt},
+          ${text.opt},
           $flamingos_2_disperser,
           $flamingos_2_filter,
           $flamingos_2_fpu
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, u, r, e, m, a, id, ii, iu) => (o, d, f, u, r, e, m, a, id, ii, iu, o)}
+       """.contramap { (o, d, f, u, r, e, m, a, s, id, ii, iu) => (o, d, f, u, r, e, m, a, s, id, ii, iu, o)}
 
     def insertF2LongSlit(
       observationId: Observation.Id,
       input:         Flamingos2LongSlitInput.Create
     ): AppliedFragment =
       InsertF2LongSlit.apply(
-        observationId            ,
-        input.disperser          ,
-        input.filter             ,
-        input.fpu                ,
-        input.explicitReadMode   ,
-        input.explicitReads      ,
-        input.explicitDecker     ,
-        input.explicitReadoutMode,
-        input.disperser          ,
-        input.filter             ,
-        input.fpu                ,
+        observationId                ,
+        input.disperser              ,
+        input.filter                 ,
+        input.fpu                    ,
+        input.explicitReadMode       ,
+        input.explicitReads          ,
+        input.explicitDecker         ,
+        input.explicitReadoutMode    ,
+        input.formattedSpatialOffsets,
+        input.disperser              ,
+        input.filter                 ,
+        input.fpu                    ,
       )
 
     def deleteF2(which: List[Observation.Id]): Option[AppliedFragment] =
@@ -187,13 +199,14 @@ object Flamingos2LongSlitService {
 
     private def f2Updates(input: Flamingos2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upDisperser   = sql"c_disperser    = $flamingos_2_disperser"
-      val upFilter      = sql"c_filter       = $flamingos_2_filter"
-      val upFpu         = sql"c_fpu          = $flamingos_2_fpu"
-      val upReadMode    = sql"c_read_mode    = ${flamingos_2_read_mode.opt}"
-      val upReads       = sql"c_reads        = ${flamingos_2_reads.opt}"
-      val upDecker      = sql"c_decker       = ${flamingos_2_decker.opt}"
-      val upReadoutMode = sql"c_readout_mode = ${flamingos_2_readout_mode.opt}"
+      val upDisperser      = sql"c_disperser       = $flamingos_2_disperser"
+      val upFilter         = sql"c_filter          = $flamingos_2_filter"
+      val upFpu            = sql"c_fpu             = $flamingos_2_fpu"
+      val upReadMode       = sql"c_read_mode       = ${flamingos_2_read_mode.opt}"
+      val upReads          = sql"c_reads           = ${flamingos_2_reads.opt}"
+      val upDecker         = sql"c_decker          = ${flamingos_2_decker.opt}"
+      val upReadoutMode    = sql"c_readout_mode    = ${flamingos_2_readout_mode.opt}"
+      val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -203,7 +216,8 @@ object Flamingos2LongSlitService {
           input.explicitReadMode.toOptionOption.map(upReadMode),
           input.explicitReads.toOptionOption.map(upReads),
           input.explicitDecker.toOptionOption.map(upDecker),
-          input.explicitReadoutMode.toOptionOption.map(upReadoutMode)
+          input.explicitReadoutMode.toOptionOption.map(upReadoutMode),
+          input.formattedSpatialOffsets.toOptionOption.map(upSpatialOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)
@@ -236,6 +250,7 @@ object Flamingos2LongSlitService {
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
+        c_spatial_offsets,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu
@@ -253,6 +268,7 @@ object Flamingos2LongSlitService {
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
+        c_spatial_offsets,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu

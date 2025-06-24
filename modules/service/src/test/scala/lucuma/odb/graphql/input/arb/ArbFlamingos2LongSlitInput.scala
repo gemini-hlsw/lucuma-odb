@@ -11,6 +11,8 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.math.Offset
+import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -29,7 +31,8 @@ trait ArbFlamingos2LongSlitInput:
         s <- arbitrary[Option[Flamingos2Reads]]
         d <- arbitrary[Option[Flamingos2Decker]]
         o <- arbitrary[Option[Flamingos2ReadoutMode]]
-      } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o)
+        so <- arbitrary[Option[List[Offset]]]
+      } yield Flamingos2LongSlitInput.Create(g, f, u, r, s, d, o, so)
     }
 
   given Arbitrary[Flamingos2LongSlitInput.Edit] =
@@ -42,7 +45,7 @@ trait ArbFlamingos2LongSlitInput:
         s <- arbitrary[Nullable[Flamingos2Reads]]
         d <- arbitrary[Nullable[Flamingos2Decker]]
         o <- arbitrary[Nullable[Flamingos2ReadoutMode]]
-      } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o)
+        so <- arbitrary[Nullable[List[Offset]]] } yield Flamingos2LongSlitInput.Edit(g, f, u, r, s, d, o, so)
     }
 
 
