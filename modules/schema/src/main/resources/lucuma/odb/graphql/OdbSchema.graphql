@@ -2069,6 +2069,11 @@ input GmosNorthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -2494,6 +2499,11 @@ input GmosSouthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
+
+  """
+  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -3836,12 +3846,6 @@ type FastTurnaround implements ProposalType {
   minPercentTime: IntPercent!
 
   """
-  Partner associated with this FT proposal.  This is optional until submission,
-  by which time it must be defined.
-  """
-  piAffiliation: Partner
-
-  """
   Program User that will be selected as a reviewer for this program
   """
   reviewer: ProgramUser
@@ -4027,12 +4031,6 @@ input FastTurnaroundInput {
   If not set, 100% is assumed.
   """
   minPercentTime: IntPercent
-
-  """
-  Partner associated with this FT proposal.  This is optional on creation but
-  must be specified upon submission.
-  """
-  piAffiliation: Partner
 
   """
   The program user ID to be designated as the reviewer for this FT proposal.
@@ -7246,6 +7244,11 @@ type Flamingos2Dynamic {
   Flamingos 2 reads.
   """
   reads: Flamingos2Reads!
+
+  """
+  Central wavelength, which is taken from the filter wavelength.
+  """
+  centralWavelength: Wavelength!
 }
 
 """
@@ -8388,7 +8391,7 @@ type GmosNorthImaging {
   bin: GmosBinning!
 
   """
-  Default GMOS Binning (ONE).
+  Default GMOS Binning (TWO).
   """
   defaultBin: GmosBinning!
 
@@ -8446,6 +8449,24 @@ type GmosNorthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
+
+  """
+  Spacial offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the
+  the default.
+  """
+  explicitSpatialOffsets: [Offset!]
+
 }
 
 """
@@ -8948,7 +8969,7 @@ type GmosSouthImaging {
   bin: GmosBinning!
 
   """
-  Default GMOS Binning (ONE).
+  Default GMOS Binning (TWO).
   """
   defaultBin: GmosBinning!
 
@@ -9006,6 +9027,24 @@ type GmosSouthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
+
+  """
+  Spacial offsets, either explicitly specified in explicitSpatialOffsets
+  or else taken from defaultSpatialOffsets
+  """
+  spatialOffsets: [Offset!]!
+
+  """
+  Default spatial offsets.
+  """
+  defaultSpatialOffsets: [Offset!]!
+
+  """
+  Optional explicitly specified spatial offsets. If set it overrides the
+  the default.
+  """
+  explicitSpatialOffsets: [Offset!]
+
 }
 
 """

@@ -19,5 +19,6 @@ trait Flamingos2DynamicMapping[F[_]] extends Flamingos2DynamicView[F]:
       SqlObject("fpu"),
       SqlField("decker",      Flamingos2DynamicView.Decker),
       SqlField("readoutMode", Flamingos2DynamicView.ReadoutMode),
-      SqlField("reads",       Flamingos2DynamicView.Reads)
+      SqlField("reads",       Flamingos2DynamicView.Reads),
+      SqlObject("centralWavelength")
     )

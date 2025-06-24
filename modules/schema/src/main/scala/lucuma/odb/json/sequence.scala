@@ -191,7 +191,7 @@ trait SequenceCodec {
   ): Encoder[R] =
     Encoder.instance { (a: R) => root(a).asJson }
 
-  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Flamingos2] =
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Flamingos2] =
     rootEncoder(_.executionConfig)
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.GmosNorth] =

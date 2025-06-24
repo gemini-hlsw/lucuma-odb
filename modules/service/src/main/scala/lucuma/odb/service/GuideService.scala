@@ -272,6 +272,12 @@ object GuideService {
         (Site.GN, AgsParams.GmosAgsParams(mode.fpu.asLeft.some, PortDisposition.Side), mode.centralWavelength)
       case mode: gmos.longslit.Config.GmosSouth =>
         (Site.GS, AgsParams.GmosAgsParams(mode.fpu.asRight.some, PortDisposition.Side), mode.centralWavelength)
+      case mode: gmos.imaging.Config.GmosNorth =>
+        // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
+        (Site.GN, AgsParams.GmosAgsParams(none, PortDisposition.Side), Wavelength.fromIntNanometers(500).get)
+      case mode: gmos.imaging.Config.GmosSouth =>
+        // GMOS imaging doesn't use an FPU or central wavelength; use a default wavelength for AGS
+        (Site.GS, AgsParams.GmosAgsParams(none, PortDisposition.Side), Wavelength.fromIntNanometers(500).get)
       case mode: flamingos2.longslit.Config     =>
         (Site.GS, AgsParams.Flamingos2AgsParams(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(mode.fpu), PortDisposition.Side), mode.filter.wavelength)
 

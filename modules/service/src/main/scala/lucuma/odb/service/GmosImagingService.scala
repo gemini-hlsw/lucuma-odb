@@ -3,22 +3,37 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.sequence.gmos.binning.DefaultSampling
+import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
+import lucuma.odb.sequence.gmos.imaging.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*
+import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
 
 sealed trait GmosImagingService[F[_]] {
+
+  def selectNorth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]]
+
+  def selectSouth(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]]
 
   def insertNorth(
     input: GmosImagingInput.Create.North
@@ -58,6 +73,68 @@ object GmosImagingService {
 
   def instantiate[F[_]: Concurrent](using Services[F]): GmosImagingService[F] =
     new GmosImagingService[F] {
+
+      private def select[A](
+        which:   List[Observation.Id],
+        f:       NonEmptyList[Observation.Id] => AppliedFragment,
+        decoder: Decoder[A]
+      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(Applicative[F].pure(List.empty)) { oids =>
+            val af = f(oids)
+            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+            }
+          }
+
+      val common: Decoder[GmosImagingInput.Create.Common] =
+        (gmos_binning.opt       ~
+         gmos_amp_read_mode.opt ~
+         gmos_amp_gain.opt      ~
+         gmos_roi.opt           ~
+         text.opt
+        ).emap { case ((((b, arm), ag), roi), spatialOffsets) =>
+          spatialOffsets match {
+            case Some(s) =>
+              OffsetsFormat.getOption(s) match {
+                case Some(offsets) => GmosImagingInput.Create.Common(b, arm, ag, roi, Some(offsets)).asRight
+                case None => s"Could not parse '$s' as a spatial offsets list.".asLeft
+              }
+            case None =>
+              GmosImagingInput.Create.Common(b, arm, ag, roi, None).asRight
+          }
+        }
+
+      val north: Decoder[GmosImagingInput.Create.North] =
+        (_gmos_north_filter *:
+         common
+        ).emap { case (f, c) =>
+          NonEmptyList.fromList(f.toList).fold(
+            "Filters list cannot be empty".asLeft
+          )(GmosImagingInput.Create.North(_, c).asRight)
+        }
+
+      val south: Decoder[GmosImagingInput.Create.South] =
+        (_gmos_south_filter *:
+         common
+        ).emap { case (f, c) =>
+          NonEmptyList.fromList(f.toList).fold(
+            "Filters list cannot be empty".asLeft
+          )(GmosImagingInput.Create.South(_, c).asRight)
+        }
+
+      override def selectNorth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]] =
+        select(which, Statements.selectGmosNorthImaging, north)
+          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+
+      override def selectSouth(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]] =
+        select(which, Statements.selectGmosSouthImaging, south)
+          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
 
       override def insertNorth(
         input: GmosImagingInput.Create.North
@@ -118,6 +195,35 @@ object GmosImagingService {
 
   object Statements {
 
+    private def selectGmosImaging(
+      viewName: String,
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          img.c_observation_id,
+          ob.c_image_quality,
+          img.c_filters,
+          img.c_bin,
+          img.c_amp_read_mode,
+          img.c_amp_gain,
+          img.c_roi,
+          img.c_spatial_offsets
+        FROM #$viewName img
+        INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
+      """(Void) |+|
+      void"""
+        WHERE
+          img.c_observation_id IN (""" |+|
+            observationIds.map(sql"$observation_id").intercalate(void",") |+|
+          void""")"""
+
+    def selectGmosNorthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
+      selectGmosImaging("v_gmos_north_imaging", observationIds)
+
+    def selectGmosSouthImaging(observationIds: NonEmptyList[Observation.Id]): AppliedFragment =
+      selectGmosImaging("v_gmos_south_imaging", observationIds)
+
     private def insertGmosImaging(
       modeTableName:   String,
       filterTableName: String,
@@ -132,13 +238,15 @@ object GmosImagingService {
             ${gmos_binning.opt},
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
-            ${gmos_roi.opt}
+            ${gmos_roi.opt},
+            ${text.opt}
           )"""(
             oid,
             common.explicitBin,
             common.explicitAmpReadMode,
             common.explicitAmpGain,
-            common.explicitRoi
+            common.explicitRoi,
+            common.formattedSpatialOffsets
           )
         }
 
@@ -150,10 +258,11 @@ object GmosImagingService {
           WITH mode_inserts AS (
             INSERT INTO #$modeTableName (
               c_observation_id,
-              c_explicit_bin,
-              c_explicit_amp_read_mode,
-              c_explicit_amp_gain,
-              c_explicit_roi
+              c_bin,
+              c_amp_read_mode,
+              c_amp_gain,
+              c_roi,
+              c_spatial_offsets
             ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
           )
@@ -162,7 +271,7 @@ object GmosImagingService {
             c_filter
           ) VALUES """(Void) |+| filterValues
       } else {
-        sql"INSERT INTO #$modeTableName (c_observation_id, c_explicit_bin, c_explicit_amp_read_mode, c_explicit_amp_gain, c_explicit_roi) VALUES "(Void) |+| modeValues
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_bin, c_amp_read_mode, c_amp_gain, c_roi, c_spatial_offsets) VALUES "(Void) |+| modeValues
       }
     }
 
@@ -243,17 +352,19 @@ object GmosImagingService {
       sql"""
         INSERT INTO #$tableName (
           c_observation_id,
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi
+          c_bin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
+          c_spatial_offsets
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
-          c_explicit_bin,
-          c_explicit_amp_read_mode,
-          c_explicit_amp_gain,
-          c_explicit_roi
+          c_bin,
+          c_amp_read_mode,
+          c_amp_gain,
+          c_roi,
+          c_spatial_offsets
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -278,16 +389,18 @@ object GmosImagingService {
     def commonUpdates(
       input: GmosImagingInput.Edit.Common
     ): List[AppliedFragment] = {
-      val upBin = sql"c_explicit_bin = ${gmos_binning.opt}"
-      val upAmpReadMode = sql"c_explicit_amp_read_mode = ${gmos_amp_read_mode.opt}"
-      val upAmpGain = sql"c_explicit_amp_gain = ${gmos_amp_gain.opt}"
-      val upRoi = sql"c_explicit_roi = ${gmos_roi.opt}"
+      val upBin = sql"c_bin = ${gmos_binning.opt}"
+      val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
+      val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
+      val upRoi = sql"c_roi = ${gmos_roi.opt}"
+      val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
 
       List(
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
-        input.explicitRoi.toOptionOption.map(upRoi)
+        input.explicitRoi.toOptionOption.map(upRoi),
+        input.formattedSpatialOffsets.toOptionOption.map(upSpatialOffsets)
       ).flatten
     }
 

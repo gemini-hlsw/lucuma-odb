@@ -411,6 +411,12 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
             gmosSouthLongSlit(ctx, config, role, when).flatMap: (p, e) =>
               EitherT.fromEither[F](executionDigest(ctx.oid, p, e, calculator.gmosSouth.estimateSetup))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
         )
 
       override def generate(
@@ -442,6 +448,12 @@ object Generator {
           case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, _, _) =>
             gmosSouthLongSlit(ctx, config, role, when).map: (p, _) =>
               InstrumentExecutionConfig.GmosSouth(executionConfig(p, lim))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            EitherT.leftT[F, InstrumentExecutionConfig](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging execution config generation is not yet implemented".some))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            EitherT.leftT[F, InstrumentExecutionConfig](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging execution config generation is not yet implemented".some))
 
       private def executionDigest[S, D](
         oid:       Observation.Id,
