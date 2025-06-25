@@ -26,41 +26,43 @@ class cloneTarget extends OdbSuite {
 
   test("simple clone") {
     createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid, "My Target").flatMap { tid =>
-        query(
-          user = pi,
-          query = s"""
-            mutation {
-              cloneTarget(input: {
-                targetId: "$tid"
-              }) {
-                originalTarget $FullTargetGraph
-                newTarget $FullTargetGraph
+      createAllTargetTypesAs(pi, pid).flatMap { tids =>
+        tids.traverse { tid =>
+          query(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneTarget(input: {
+                  targetId: "$tid"
+                }) {
+                  originalTarget $FullTargetGraph
+                  newTarget $FullTargetGraph
 
-                originalTargetId: originalTarget { id }
-                newTargetId: newTarget { id }
+                  originalTargetId: originalTarget { id }
+                  newTargetId: newTarget { id }
+                }
               }
-            }
-          """
-        ).flatMap { json =>
+            """
+          ).flatMap { json =>
 
-          // The data fields (i.e., everything but ID) should be the same
-          assertEquals(
-            json.hcursor.downFields("cloneTarget", "originalTarget").as[Json],
-            json.hcursor.downFields("cloneTarget", "newTarget").as[Json]
-          )
+            // The data fields (i.e., everything but ID) should be the same
+            assertEquals(
+              json.hcursor.downFields("cloneTarget", "originalTarget").as[Json],
+              json.hcursor.downFields("cloneTarget", "newTarget").as[Json]
+            )
 
-          // The ids should exist, so we'll just 'get' them
-          val origId = json.hcursor.downFields("cloneTarget", "originalTargetId", "id").as[Target.Id].toOption.get
-          val newId =  json.hcursor.downFields("cloneTarget", "newTargetId", "id").as[Target.Id].toOption.get
+            // The ids should exist, so we'll just 'get' them
+            val origId = json.hcursor.downFields("cloneTarget", "originalTargetId", "id").as[Target.Id].toOption.get
+            val newId =  json.hcursor.downFields("cloneTarget", "newTargetId", "id").as[Target.Id].toOption.get
 
-          // The ids should be different
-          assertNotEquals(origId, newId)
+            // The ids should be different
+            assertNotEquals(origId, newId)
 
-          // The target roles should match
-          (getCalibrationRoleFromDb(origId), getCalibrationRoleFromDb(newId)).parMapN((oldCalib, newCalib) =>
-            assertEquals(oldCalib, newCalib)
-          )
+            // The target roles should match
+            (getCalibrationRoleFromDb(origId), getCalibrationRoleFromDb(newId)).parMapN((oldCalib, newCalib) =>
+              assertEquals(oldCalib, newCalib)
+            )
+          }
         }
       }
     }
@@ -68,41 +70,43 @@ class cloneTarget extends OdbSuite {
 
   test("clone with rename") {
     createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid, "My Target").flatMap { tid =>
-        expect(
-          user = pi,
-          query = s"""
-            mutation {
-              cloneTarget(input: {
-                targetId: "$tid"
-                SET: {
-                  name: "New Name"
-                }
-              }) {
-                originalTarget {
-                  name
-                }
-                newTarget {
-                  name
-                }
-              }
-            }
-          """,
-          expected = Right(
-            json"""
-              {
-                "cloneTarget" : {
-                  "originalTarget" : {
-                    "name" : "My Target"
-                  },
-                  "newTarget" : {
-                    "name" : "New Name"
+      createAllTargetTypesAs(pi, pid).flatMap { tids =>
+        tids.traverse { tid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneTarget(input: {
+                  targetId: "$tid"
+                  SET: {
+                    name: "New Name"
+                  }
+                }) {
+                  originalTarget {
+                    name
+                  }
+                  newTarget {
+                    name
                   }
                 }
               }
-            """
+            """,
+            expected = Right(
+              json"""
+                {
+                  "cloneTarget" : {
+                    "originalTarget" : {
+                      "name" : "No Name"
+                    },
+                    "newTarget" : {
+                      "name" : "New Name"
+                    }
+                  }
+                }
+              """
+            )
           )
-        )
+        }
       }
     }
   }
@@ -127,50 +131,54 @@ class cloneTarget extends OdbSuite {
 
   test("clone with bogus update") {
     createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid, "My Target").flatMap { tid =>
-        expect(
-          user = pi,
-          query = s"""
-            mutation {
-              cloneTarget(input: {
-                targetId: "$tid"
-                SET: {
-                  sourceProfile: {
-                    gaussian: {
+      createAllTargetTypesAs(pi, pid).flatMap { tids =>
+        tids.traverse { tid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                cloneTarget(input: {
+                  targetId: "$tid"
+                  SET: {
+                    sourceProfile: {
+                      gaussian: {
+                      }
                     }
                   }
-                }
-              }) {
-                newTarget {
-                  id
+                }) {
+                  newTarget {
+                    id
+                  }
                 }
               }
-            }
-          """,
-          expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
-        )
+            """,
+            expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
+          )
+        }
       }
     }
   }
 
   test("clone someone else's target") {
     createProgramAs(pi).flatMap { pid =>
-      createTargetAs(pi, pid, "My Target").flatMap { tid =>
-        expect(
-          user = pi2, // different user!
-          query = s"""
-            mutation {
-              cloneTarget(input: {
-                targetId: "$tid"
-              }) {
-                newTarget {
-                  id
+      createAllTargetTypesAs(pi, pid).flatMap { tids =>
+        tids.traverse { tid =>
+          expect(
+            user = pi2, // different user!
+            query = s"""
+              mutation {
+                cloneTarget(input: {
+                  targetId: "$tid"
+                }) {
+                  newTarget {
+                    id
+                  }
                 }
               }
-            }
-          """,
-          expected = Left(List(s"Target $tid does not exist, is not visible, or is ineligible for the requested operation."))
-        )
+            """,
+            expected = Left(List(s"Target $tid does not exist, is not visible, or is ineligible for the requested operation."))
+          )
+        }
       }
     }
   }

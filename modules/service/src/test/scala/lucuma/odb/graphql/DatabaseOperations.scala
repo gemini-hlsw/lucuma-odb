@@ -886,29 +886,49 @@ trait DatabaseOperations { this: OdbSuite =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
     }
 
+  private val DefaultSourceProfile: String =
+    """
+      sourceProfile: {
+        point: {
+          bandNormalized: {
+            sed: {
+              stellarLibrary: B5_III
+            }
+            brightnesses: [
+              {
+                band: R
+                value: 15.0
+                units: VEGA_MAGNITUDE
+              }
+            ]
+          }
+        }
+      }
+    """
+
+  def createAllTargetTypesAs(
+    user: User,
+    pid:  Program.Id,
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[List[Target.Id]] =
+    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
+     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
+     createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile)
+    ).mapN(List(_, _, _))
+
   def createTargetAs(
     user: User,
     pid:  Program.Id,
     name: String = "No Name",
-    sourceProfile: String =
-      """
-        sourceProfile: {
-          point: {
-            bandNormalized: {
-              sed: {
-                stellarLibrary: B5_III
-              }
-              brightnesses: [
-                {
-                  band: R
-                  value: 15.0
-                  units: VEGA_MAGNITUDE
-                }
-              ]
-            }
-          }
-        }
-      """
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    createSiderealTargetAs(user, pid, name, sourceProfile)
+
+  def createSiderealTargetAs(
+    user: User,
+    pid:  Program.Id,
+    name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
   ): IO[Target.Id] =
     query(
       user,
@@ -926,6 +946,86 @@ trait DatabaseOperations { this: OdbSuite =>
                   radialVelocity: {
                     kilometersPerSecond: 0.0
                   }
+                }
+                $sourceProfile
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("createTarget")
+        .downField("target")
+        .downField("id")
+        .as[Target.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def createOpportunityTargetAs(
+    user: User,
+    pid:  Program.Id,
+    name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                opportunity: {
+                  region: {
+                    rightAscensionArc: { type: FULL }
+                    declinationArc: {
+                      type: PARTIAL 
+                      start: { degrees: 10 }
+                      end: { degrees: 70 }
+                    }
+                  }
+                }
+                $sourceProfile
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor
+        .downField("createTarget")
+        .downField("target")
+        .downField("id")
+        .as[Target.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
+  def createNonsiderealTargetAs(
+    user: User,
+    pid:  Program.Id,
+    name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                nonsidereal: {
+                  keyType: COMET
+                  des: "foo"
                 }
                 $sourceProfile
               }
