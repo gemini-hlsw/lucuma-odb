@@ -16,6 +16,9 @@ import io.circe.syntax.*
 import lucuma.core.enums.ArcType
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
+import lucuma.core.math.Arc.Empty
+import lucuma.core.math.Arc.Full
+import lucuma.core.math.Arc.Partial
 import lucuma.core.math.ProperMotion
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.Observation
@@ -52,9 +55,6 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
-import lucuma.core.math.Arc.Empty
-import lucuma.core.math.Arc.Full
-import lucuma.core.math.Arc.Partial
 
 trait TargetService[F[_]] {
   def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] 
