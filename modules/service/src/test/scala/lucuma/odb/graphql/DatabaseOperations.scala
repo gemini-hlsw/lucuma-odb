@@ -983,7 +983,11 @@ trait DatabaseOperations { this: OdbSuite =>
                 opportunity: {
                   region: {
                     rightAscensionArc: { type: FULL }
-                    declinationArc: { type: FULL }
+                    declinationArc: {
+                      type: PARTIAL 
+                      start: { degrees: 10 }
+                      end: { degrees: 70 }
+                    }
                   }
                 }
                 $sourceProfile
@@ -1008,25 +1012,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user: User,
     pid:  Program.Id,
     name: String = "No Name",
-    sourceProfile: String =
-      """
-        sourceProfile: {
-          point: {
-            bandNormalized: {
-              sed: {
-                stellarLibrary: B5_III
-              }
-              brightnesses: [
-                {
-                  band: R
-                  value: 15.0
-                  units: VEGA_MAGNITUDE
-                }
-              ]
-            }
-          }
-        }
-      """
+    sourceProfile: String = DefaultSourceProfile
   ): IO[Target.Id] =
     query(
       user,

@@ -487,33 +487,458 @@ class updateTargets extends OdbSuite {
     }
   }
 
-  test("update tracking (sidereal -> opportunity)".ignore) {
-    fail("not implemented")
+  test("update tracking (sidereal, nonsidereal -> opportunity)") {
+    createProgramAs(pi).flatMap { pid =>
+      createSiderealTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: FULL
+                      }
+                      declinationArc: {
+                        type: PARTIAL
+                        start: {
+                          degrees: 10
+                        }
+                        end: {
+                          degrees: 50
+                        }
+                      }
+                    }                      
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update tracking (nonsidereal -> opportunity)".ignore) {
-    fail("not implemented")
+  test("update tracking (nonsidereal -> opportunity)") {
+    createProgramAs(pi).flatMap { pid =>
+      createNonsiderealTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: FULL
+                      }
+                      declinationArc: {
+                        type: PARTIAL
+                        start: {
+                          degrees: 10
+                        }
+                        end: {
+                          degrees: 50
+                        }
+                      }
+                    }                      
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update tracking (opportunity -> sidereal)".ignore) {
-    fail("not implemented")
+  test("update tracking (opportunity -> sidereal)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  sidereal: {
+                    ra: { hours: "0.0" }
+                    dec: { degrees: "0.0" }
+                    epoch: "J2000.000"
+                    radialVelocity: {
+                      kilometersPerSecond: 0.0
+                    }
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                  sidereal {
+                    ra { degrees }
+                    dec { degrees }
+                    epoch
+                    radialVelocity { kilometersPerSecond }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid,
+                      "sidereal" : {
+                        "ra" : {
+                          "degrees" : 0.0
+                        },
+                        "dec" : {
+                          "degrees" : 0.0
+                        },
+                        "epoch" : "J2000.000",
+                        "radialVelocity" : {
+                          "kilometersPerSecond" : 0.0000
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update tracking (opportunity -> nonsidereal)".ignore) {
-    fail("not implemented")
+  test("update tracking (opportunity -> nonsidereal)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  nonsidereal: {
+                    keyType: COMET
+                    des: "foo"
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                  nonsidereal {
+                    keyType
+                    des
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid,
+                      "nonsidereal" : {
+                        "keyType" : "COMET",
+                        "des" : "foo"
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update opportunity region (empty arcs)".ignore) {
-    fail("not implemented")
+  test("update opportunity region (empty arcs)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: EMPTY
+                      }
+                      declinationArc: {
+                        type: EMPTY
+                      }
+                    }                      
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                  opportunity {
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                      declinationArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                    }                      
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid,
+                      "opportunity" : {
+                        "region" : {
+                          "rightAscensionArc" : {
+                            "type" : "EMPTY",
+                            "start" : null,
+                            "end" : null
+                          },
+                          "declinationArc" : {
+                            "type" : "EMPTY",
+                            "start" : null,
+                            "end" : null
+                          }
+                        }
+                      }                      
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update opportunity region (full arcs)".ignore) {
-    fail("not implemented")
+  test("update opportunity region (full arcs)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: FULL
+                      }
+                      declinationArc: {
+                        type: FULL
+                      }
+                    }                      
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                  opportunity {
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                      declinationArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                    }                      
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid,
+                      "opportunity" : {
+                        "region" : {
+                          "rightAscensionArc" : {
+                            "type" : "FULL",
+                            "start" : null,
+                            "end" : null
+                          },
+                          "declinationArc" : {
+                            "type" : "FULL",
+                            "start" : null,
+                            "end" : null
+                          }
+                        }
+                      }                      
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }
   }
 
-  test("update opportunity region (partial arcs)".ignore) {
-    fail("not implemented")
-  }
+  test("update opportunity region (partial arcs)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      rightAscensionArc: {
+                        type: PARTIAL
+                        start: { degrees: 110 }
+                        end: { degrees: 120 }
+                      }
+                      declinationArc: {
+                        type: PARTIAL
+                        start: { degrees: 10 }
+                        end: { degrees: 20 }
+                      }
+                    }                      
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                  opportunity {
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                      declinationArc {
+                        type
+                        start { degrees }
+                        end { degrees }
+                      }
+                    }                      
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "id" : $tid,
+                      "opportunity" : {
+                        "region" : {
+                          "rightAscensionArc" : {
+                            "type" : "PARTIAL",
+                            "start" : { "degrees": 110.0 },
+                            "end" : { "degrees": 120.0 }
+                          },
+                          "declinationArc" : {
+                            "type" : "PARTIAL",
+                            "start" : { "degrees": 10.0 },
+                            "end" : { "degrees": 20.0 }
+                          }
+                        }
+                      }                      
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }  }
 
   test("update source profile (point/bandNormalized/sed)") {
     createProgramAs(pi).flatMap { pid =>
