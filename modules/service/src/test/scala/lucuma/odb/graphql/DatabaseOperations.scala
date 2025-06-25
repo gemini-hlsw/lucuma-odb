@@ -968,7 +968,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def createOpportunityTargetAs(
     user: User,
     pid:  Program.Id,
-    name: String = "TOO",
+    name: String = "No Name",
     sourceProfile: String = DefaultSourceProfile
   ): IO[Target.Id] =
     query(
@@ -1007,7 +1007,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def createNonsiderealTargetAs(
     user: User,
     pid:  Program.Id,
-    name: String = "TOO",
+    name: String = "No Name",
     sourceProfile: String =
       """
         sourceProfile: {

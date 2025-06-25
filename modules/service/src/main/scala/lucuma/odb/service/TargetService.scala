@@ -474,7 +474,13 @@ object TargetService {
           c_nsid_key_type,
           c_nsid_key,
           c_source_profile,
-          c_calibration_role
+          c_calibration_role,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end
         )
         SELECT
           $program_id,
@@ -494,7 +500,13 @@ object TargetService {
           c_nsid_key_type,
           c_nsid_key,
           c_source_profile,
-          c_calibration_role
+          c_calibration_role,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end
         FROM t_target
         WHERE c_target_id = $target_id
         RETURNING c_target_id
