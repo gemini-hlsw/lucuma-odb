@@ -52,6 +52,9 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import Services.Syntax.*
+import lucuma.core.math.Arc.Empty
+import lucuma.core.math.Arc.Full
+import lucuma.core.math.Arc.Partial
 
 trait TargetService[F[_]] {
   def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] 
@@ -382,12 +385,53 @@ object TargetService {
         )
       }
 
+    extension [A](a: Arc[A]) def tpe: ArcType =
+      a match
+        case Empty() => ArcType.Empty
+        case Full() => ArcType.Full
+        case Partial(_, _) => ArcType.Partial
+      
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
     def subtypeInfoUpdates(tracking: SiderealInput.Edit | EphemerisKey | OpportunityInput.Edit): List[AppliedFragment] =
+
+      val NullOutNonsiderealFields =
+        List(
+          void"c_nsid_des = null",
+          void"c_nsid_key_type = null",
+          void"c_nsid_key = null",
+        )
+
+      val NullOutSiderealFields =
+        List(
+          void"c_sid_ra = null",
+          void"c_sid_dec = null",
+          void"c_sid_epoch = null",
+          void"c_sid_pm_ra = null",
+          void"c_sid_pm_dec = null",
+          void"c_sid_rv = null",
+          void"c_sid_parallax = null",
+          void"c_sid_catalog_name = null",
+          void"c_sid_catalog_id = null",
+          void"c_sid_catalog_object_type = null",
+        )
+
+      val NullOutOpportunityFields =
+        List(
+          void"c_opp_ra_arc_type = null",
+          void"c_opp_ra_arc_start = null",
+          void"c_opp_ra_arc_end = null",
+          void"c_opp_dec_arc_type = null",
+          void"c_opp_dec_arc_start = null",
+          void"c_opp_dec_arc_end = null",
+          
+        )
+
       tracking match {
+
         case sid: SiderealInput.Edit   =>
+          void"c_type = 'sidereal'" ::
           List(
             sid.ra.asUpdate("c_sid_ra", right_ascension),
             sid.dec.asUpdate("c_sid_dec", declination),
@@ -397,34 +441,32 @@ object TargetService {
           ).flatten ++
           properMotionUpdates(sid.properMotion) ++
           catalogInfoUpdates(sid.catalogInfo) ++
-          List(
-            // set the type, and set inapplicable tracking fields to null
-            void"c_type = 'sidereal'",
-            void"c_nsid_des = null",
-            void"c_nsid_key_type = null",
-            void"c_nsid_key = null",
-          )
+          NullOutNonsiderealFields ++ 
+          NullOutOpportunityFields
+        
         case ek: EphemerisKey =>
+          void"c_type = 'nonsidereal'" ::
           List(
             sql"c_nsid_des = $text".apply(ek.des),
             sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
             sql"c_nsid_key = $text".apply(EphemerisKey.fromString.reverseGet(ek)),
-          ) ++ List(
-            // set the type, and set inapplicable tracking fields to null
-            void"c_type = 'nonsidereal'",
-            void"c_sid_ra = null",
-            void"c_sid_dec = null",
-            void"c_sid_epoch = null",
-            void"c_sid_pm_ra = null",
-            void"c_sid_pm_dec = null",
-            void"c_sid_rv = null",
-            void"c_sid_parallax = null",
-            void"c_sid_catalog_name = null",
-            void"c_sid_catalog_id = null",
-            void"c_sid_catalog_object_type = null",
-          )
+          ) ++ 
+          NullOutSiderealFields ++ 
+          NullOutOpportunityFields
+        
         case opp: OpportunityInput.Edit =>
-          ???
+          void"c_type = 'opportunity'" ::
+          List(
+            opp.region.raArc.map(_.tpe).asUpdate("c_opp_ra_arc_type", arc_type),
+            opp.region.raArc.map(Arc.start.getOption).asUpdate("c_opp_ra_arc_start", right_ascension.opt),
+            opp.region.raArc.map(Arc.end.getOption).asUpdate("c_opp_ra_arc_end", right_ascension.opt),
+            opp.region.decArc.map(_.tpe).asUpdate("c_opp_dec_arc_type", arc_type),
+            opp.region.decArc.map(Arc.start.getOption).asUpdate("c_opp_dec_arc_start", declination.opt),
+            opp.region.decArc.map(Arc.end.getOption).asUpdate("c_opp_dec_arc_end", declination.opt),
+          ) ++ 
+          NullOutSiderealFields ++
+          NullOutNonsiderealFields
+      
       }
 
     def updates(SET: TargetPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
