@@ -706,8 +706,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       yield (http, db, enm, ptc)
 
     res.use: (http, db, enm, ptc) =>
-      val mapping = OdbMapping.forObscalc(
-        db,
+      val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
+        Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
         u,
         goaUsers,
