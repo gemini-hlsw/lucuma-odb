@@ -227,7 +227,7 @@ object Services:
    * Construct a `Services` for the given `User` and `Session`. Service instances are constructed
    * lazily.
    */
-  def forUser[F[_]](u: User, e: Enums, m: Option[Mapping[F]])(s: Session[F])(
+  def forUser[F[_]](u: User, e: Enums, m: Option[Session[F] => Mapping[F]])(s: Session[F])(
     using tf: Trace[F], uf: UUIDGen[F], cf: Concurrent[F], par: Parallel[F], log: Logger[F]
   ): Services[F[_]] =
     new Services[F]:
@@ -241,7 +241,7 @@ object Services:
       private val graphQlService: Result[GraphQLService[F]] =
         m match
           case None => Result.internalError("No GraphQL Mapping available for this Services instance.")
-          case Some(value) => Result(GraphQLService(value))
+          case Some(f) => Result(GraphQLService(f(session)))
 
       def runGraphQLQueryImpl(query: String, op: Option[String], vars: Option[JsonObject]): ResultT[F, Json] =
         for
