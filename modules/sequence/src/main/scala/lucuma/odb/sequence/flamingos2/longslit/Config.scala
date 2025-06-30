@@ -35,7 +35,6 @@ case class Config private[longslit](
   explicitDecker: Option[Flamingos2Decker],
   defaultReadoutMode: Flamingos2ReadoutMode,
   explicitReadoutMode: Option[Flamingos2ReadoutMode],
-  defaultSpatialOffsets: List[Offset],
   explicitSpatialOffsets: Option[List[Offset]]
 ) derives Eq {
 
@@ -46,7 +45,7 @@ case class Config private[longslit](
     explicitReadoutMode.getOrElse(defaultReadoutMode)
 
   def spatialOffsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
+    explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
 
   def hashBytes: Array[Byte] = {
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
@@ -98,7 +97,6 @@ object Config:
       explicitDecker,
       DefaultFlamingos2ReadoutMode,
       explicitReadoutMode,
-      DefaultSpatialOffsets,
       explicitSpatialOffsets
     )
 
