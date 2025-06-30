@@ -340,6 +340,7 @@ object ItcService {
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
       private def safeAcquisitionCall(targets: ItcInput): F[Either[OdbError, AsterismIntegrationTimes]] =
         def go(min: TimeSpan, max: TimeSpan): F[Either[OdbError, AsterismIntegrationTimes]] =
+          assert(targets.imagingInput.modes.length == 1, "Cannot do acquistion with more than one filter")
           client
             .imaging(targets.imagingInput, useCache = false)
             .map:
@@ -377,7 +378,7 @@ object ItcService {
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
         // verify only one mode is passed
-        assert (targets.spectroscopy.modes.length == 1)
+        assert (targets.spectroscopy.modes.length == 1, "spectroscopy only supports a single mode")
 
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
           case (imgResult, ClientAllResults(_, results)) =>
