@@ -16,6 +16,7 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.math.Offset
 import lucuma.core.syntax.all.*
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -33,7 +34,8 @@ case class Config private[longslit](
   defaultDecker: Flamingos2Decker,
   explicitDecker: Option[Flamingos2Decker],
   defaultReadoutMode: Flamingos2ReadoutMode,
-  explicitReadoutMode: Option[Flamingos2ReadoutMode]
+  explicitReadoutMode: Option[Flamingos2ReadoutMode],
+  explicitSpatialOffsets: Option[List[Offset]]
 ) derives Eq {
 
   def decker: Flamingos2Decker =
@@ -53,6 +55,8 @@ case class Config private[longslit](
     out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.tag)
+    val off: Array[Byte] = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
+    out.write(off, 0, off.length)
 
     out.close()
     bao.toByteArray
@@ -78,6 +82,7 @@ object Config:
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
+    explicitSpatialOffsets: Option[List[Offset]] = None
   ): Config =
     new Config(
       disperser,
@@ -88,7 +93,8 @@ object Config:
       Flamingos2Decker.LongSlit,
       explicitDecker,
       DefaultFlamingos2ReadoutMode,
-      explicitReadoutMode
+      explicitReadoutMode,
+      explicitSpatialOffsets
     )
 
   def reconcile(a: Config, modes: List[ObservingMode]): Option[Config] =

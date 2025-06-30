@@ -56,7 +56,8 @@ object Flamingos2LongSlitInput {
         explicitReadMode,
         explicitReads,
         explicitDecker,
-        explicitReadoutMode
+        explicitReadoutMode,
+        explicitSpatialOffsets
       )
 
   }
