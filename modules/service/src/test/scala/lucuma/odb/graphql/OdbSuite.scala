@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import cats.data.Ior
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.effect.IO
 import cats.effect.Resource
@@ -59,6 +60,7 @@ import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.TotalSN
+import lucuma.itc.client.ClientAllResults
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
@@ -233,23 +235,28 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
-      override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
-        ClientCalculationResult(
+
+      override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientAllResults] =
+        ClientAllResults(
           FakeItcVersions,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None).asRight
+          NonEmptyList.one(ClientCalculationResult(
+            AsterismIntegrationTimeOutcomes(
+              NonEmptyChain.fromSeq(
+                List.fill(input.asterism.length)(
+                  TargetIntegrationTimeOutcome(
+                    TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None).asRight
+                  )
                 )
-              )
-            ).get
-          )
+              ).get
+            )
+          ))
         ).pure[IO]
 
-      override def spectroscopy(input: SpectroscopyInput, useCache: Boolean): IO[ClientCalculationResult] = {
+      override def spectroscopy(input: SpectroscopyInput, useCache: Boolean): IO[ClientAllResults] = {
         val signal = lucuma.core.math.Wavelength.fromIntNanometers(666).get
-        val wavelength = input.mode match
+        // assume we only ever pass a single mode
+        assert (input.modes.length == 1)
+        val wavelength = input.modes.head match
           case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(d, _, _)         => d.wavelength
           case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(w, _, _, _, _, _) => w
           case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(w, _, _, _, _, _) => w
@@ -264,17 +271,19 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
                 IntegrationTime(t, c)
 
-          ClientCalculationResult(
+          ClientAllResults(
             FakeItcVersions,
-            AsterismIntegrationTimeOutcomes(
-              NonEmptyChain.fromSeq(
-                List.fill(input.asterism.length)(
-                  TargetIntegrationTimeOutcome(
-                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some).asRight
+            NonEmptyList.one(ClientCalculationResult(
+              AsterismIntegrationTimeOutcomes(
+                NonEmptyChain.fromSeq(
+                  List.fill(input.asterism.length)(
+                    TargetIntegrationTimeOutcome(
+                      TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some).asRight
+                    )
                   )
-                )
-              ).get
-            )
+                ).get
+              )
+            ))
           ).pure[IO]
         }
       }
@@ -387,7 +396,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map  = OdbMapping(db, mon, usr, top, gaia, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
-  protected def trace: Resource[IO, Trace[IO]] =    
+  protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
   protected def server: Resource[IO, Server] =

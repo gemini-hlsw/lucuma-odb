@@ -47,7 +47,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TotalSN
-import lucuma.itc.client.ClientCalculationResult
+import lucuma.itc.client.ClientAllResults
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Md5Hash
@@ -343,24 +343,24 @@ object ItcService {
           client
             .imaging(targets.imagingInput, useCache = false)
             .map:
-              _.targetTimes.modifyValue:
-                _.map:
-                  _.modifyValue:
-                    case Left(lucuma.itc.Error.SourceTooBright(_))    =>
-                      TargetIntegrationTime(
-                        Zipper.one(IntegrationTime(min, 1.refined)),
-                        Band.R.asLeft, // Band is meaningless here, but we need to provide one
-                        None // Imaging doesn't return signal-to-noise at
-                      ).asRight
-                    case Right(r) if r.times.focus.exposureTime > max =>
-                      r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
-                    case Right(r) if r.times.focus.exposureTime < min =>
-                      r.copy(times = r.times.map(_.copy(exposureTime = min))).asRight
-                    case other => other
-              .partitionErrors
-              .leftMap(convertErrors(targets))
+              _.all.head.targetTimes.modifyValue:
+                  _.map:
+                    _.modifyValue:
+                      case Left(lucuma.itc.Error.SourceTooBright(_))    =>
+                        TargetIntegrationTime(
+                          Zipper.one(IntegrationTime(min, 1.refined)),
+                          Band.R.asLeft, // Band is meaningless here, but we need to provide one
+                          None // Imaging doesn't return signal-to-noise at
+                        ).asRight
+                      case Right(r) if r.times.focus.exposureTime > max =>
+                        r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
+                      case Right(r) if r.times.focus.exposureTime < min =>
+                        r.copy(times = r.times.map(_.copy(exposureTime = min))).asRight
+                      case other => other
+                .partitionErrors
+                .leftMap(convertErrors(targets))
 
-        targets.imaging.mode match
+        targets.imaging.modes.head match
           case InstrumentMode.GmosNorthSpectroscopy(_, _, _, _, _, _) |
                InstrumentMode.GmosSouthSpectroscopy(_, _, _, _, _, _) |
                InstrumentMode.GmosNorthImaging(_, _)                  |
@@ -376,9 +376,12 @@ object ItcService {
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
+        // verify only one mode is passed
+        assert (targets.spectroscopy.modes.length == 1)
+
         (safeAcquisitionCall(targets), client.spectroscopy(targets.spectroscopyInput, useCache = false)).parMapN {
-          case (imgResult, ClientCalculationResult(_, specOutcomes)) =>
-            val specResult = specOutcomes.partitionErrors.leftMap(convertErrors(targets))
+          case (imgResult, ClientAllResults(_, results)) =>
+            val specResult = results.head.targetTimes.partitionErrors.leftMap(convertErrors(targets))
 
             for
               img    <- imgResult

@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.issue.shortcut
 
 import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -18,6 +19,7 @@ import lucuma.itc.Error
 import lucuma.itc.ItcVersions
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
+import lucuma.itc.client.ClientAllResults
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
@@ -28,36 +30,40 @@ class ShortCut_5912 extends ExecutionTestSupportForFlamingos2:
 
   override protected def itcClient: ItcClient[IO] =
     new ItcClient[IO]:
-      override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
-        ClientCalculationResult(
+      override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientAllResults] =
+        ClientAllResults(
           FakeItcVersions,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  // Simulate a "source too bright result"
-                  Error.SourceTooBright(BigDecimal(1.0)).asLeft
+          NonEmptyList.one(ClientCalculationResult(
+            AsterismIntegrationTimeOutcomes(
+              NonEmptyChain.fromSeq(
+                List.fill(input.asterism.length)(
+                  TargetIntegrationTimeOutcome(
+                    // Simulate a "source too bright result"
+                    Error.SourceTooBright(BigDecimal(1.0)).asLeft
+                  )
                 )
-              )
-            ).get
-          )
+              ).get
+            )
+          ))
         ).pure[IO]
 
       override def spectroscopy(
         input: SpectroscopyInput,
         useCache: Boolean
-      ): IO[ClientCalculationResult] =
-        ClientCalculationResult(
+      ): IO[ClientAllResults] =
+        ClientAllResults(
           FakeItcVersions,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine, fakeSignalToNoiseAt(Flamingos2Filter.JH.wavelength).some).asRight
+          NonEmptyList.one(ClientCalculationResult(
+            AsterismIntegrationTimeOutcomes(
+              NonEmptyChain.fromSeq(
+                List.fill(input.asterism.length)(
+                  TargetIntegrationTimeOutcome(
+                    TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine, fakeSignalToNoiseAt(Flamingos2Filter.JH.wavelength).some).asRight
+                  )
                 )
-              )
-            ).get
-          )
+              ).get
+            )
+          ))
         ).pure[IO]
 
       def spectroscopyGraphs(

@@ -23,6 +23,7 @@ import lucuma.itc.SingleSN
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.TotalSN
+import lucuma.itc.client.ClientAllResults
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ItcClient
@@ -59,7 +60,7 @@ object TestItcClient {
       override def spectroscopy(
         input:    SpectroscopyInput,
         useCache: Boolean
-      ): F[ClientCalculationResult] =
+      ): F[ClientAllResults] =
         val resultʹ =
           input.exposureTimeMode match
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
@@ -77,33 +78,42 @@ object TestItcClient {
           case _                                        =>
             none[SignalToNoiseAt]
 
-        ClientCalculationResult(
+        ClientAllResults(
           Version,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine, snAt).asRight
-                )
+          NonEmptyList.one(
+            ClientCalculationResult(
+              AsterismIntegrationTimeOutcomes(
+                NonEmptyChain.fromSeq(
+                  List.fill(input.asterism.length)(
+                    TargetIntegrationTimeOutcome(
+                      TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine, snAt).asRight
+                    )
+                  )
+                ).get
               )
-            ).get
+            )
           )
         ).pure[F]
 
       override def imaging(
         input:    ImagingInput,
         useCache: Boolean
-      ): F[ClientCalculationResult] =
-        ClientCalculationResult(
+      ): F[ClientAllResults] =
+        ClientAllResults(
           Version,
-          AsterismIntegrationTimeOutcomes(
-            NonEmptyChain.fromSeq(
-              List.fill(input.asterism.length)(
-                TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine, None).asRight
-                )
+          NonEmptyList.one(
+            ClientCalculationResult(
+              // Version,
+              AsterismIntegrationTimeOutcomes(
+                NonEmptyChain.fromSeq(
+                  List.fill(input.asterism.length)(
+                    TargetIntegrationTimeOutcome(
+                      TargetIntegrationTime(Zipper.of(result, result), bandOrLine, None).asRight
+                    )
+                  )
+                ).get
               )
-            ).get
+            )
           )
         ).pure[F]
 

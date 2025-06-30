@@ -256,7 +256,7 @@ object GeneratorParamsService {
               gn.ccdMode.some,
               gn.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(obsParams, NonEmptyList.one(mode)), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
@@ -267,25 +267,23 @@ object GeneratorParamsService {
               gs.ccdMode.some,
               gs.roi.some
             )
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(obsParams, NonEmptyList.one(mode)), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, _, _, _, _, _, _) =>
             val mode = InstrumentMode.Flamingos2Spectroscopy(disperser, filter, fpu)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            GeneratorParams(itcObsParams(obsParams, NonEmptyList.one(mode)), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gn @ gmos.imaging.Config.GmosNorth(filters = filters) =>
-            // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosNorthImaging(filters.head, gn.ccdMode.some)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            val modes = filters.map(InstrumentMode.GmosNorthImaging(_, gn.ccdMode.some))
+            GeneratorParams(itcObsParams(obsParams, modes), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
           case gs @ gmos.imaging.Config.GmosSouth(filters = filters) =>
-            // FIXME: This is not right we have n filters
-            val mode = InstrumentMode.GmosSouthImaging(filters.head, gs.ccdMode.some)
-            GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
+            val modes = filters.map(InstrumentMode.GmosSouthImaging(_, gs.ccdMode.some))
+            GeneratorParams(itcObsParams(obsParams, modes), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
       private def itcObsParams(
         obsParams:  ObsParams,
-        mode:       InstrumentMode,
+        modes:       NonEmptyList[InstrumentMode],
       ): Either[MissingParamSet, ItcInput] =
         (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
          obsParams.targets.traverse(itcTargetParams)
@@ -294,12 +292,12 @@ object GeneratorParamsService {
             ImagingParameters(
               ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
               obsParams.constraints,
-              mode.asImaging(exposureTimeMode.at)
+              modes.map(_.asImaging(exposureTimeMode.at))
             ),
             SpectroscopyParameters(
               exposureTimeMode,
               obsParams.constraints,
-              mode
+              modes
             ),
             targets
           )
