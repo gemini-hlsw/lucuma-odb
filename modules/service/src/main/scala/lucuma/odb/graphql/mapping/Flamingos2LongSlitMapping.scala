@@ -23,7 +23,7 @@ trait Flamingos2LongSlitMapping[F[_]]
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
   private val defaultSpatialOffsetsJson: Json =
-    Config.DefaultSpatialOffsets.asJson
+    Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
   lazy val Flamingos2LongSlitMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitType)(

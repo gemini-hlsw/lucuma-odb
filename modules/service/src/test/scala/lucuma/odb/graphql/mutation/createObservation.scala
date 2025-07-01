@@ -2516,4 +2516,67 @@ class createObservation extends OdbSuite {
         """.asRight)
       }
     }
+
+  test("[flamingos2] F2 observation defaults to 4 spatial offsets"):
+    createProgramAs(pi).flatMap { pid =>
+      expect(pi, s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  disperser: R1200_HK
+                  filter: Y
+                  fpu: LONG_SLIT_2
+                }
+              }
+            }
+          }) {
+            observation {
+              observingMode {
+                flamingos2LongSlit {
+                  spatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                  explicitSpatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                  defaultSpatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """, json"""
+        {
+          "createObservation": {
+            "observation": {
+              "observingMode": {
+                "flamingos2LongSlit": {
+                  "spatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ],
+                  "explicitSpatialOffsets": null,
+                  "defaultSpatialOffsets": [
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      """.asRight)
+    }
 }

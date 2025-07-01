@@ -3681,6 +3681,88 @@ class updateObservations extends OdbSuite
         }
       """)
     } yield ()
+
+  test("[flamingos2] updateObservations with custom explicitSpatialOffsets"):
+    for {
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(pi, s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                flamingos2LongSlit: {
+                  disperser: R1200_HK
+                  filter: Y
+                  fpu: LONG_SLIT_2
+                  explicitSpatialOffsets: [
+                    { p: { arcseconds: 1.0 }, q: { arcseconds: -3.0 } },
+                    { p: { arcseconds: 2.0 }, q: { arcseconds:  4.0 } },
+                    { p: { arcseconds: -1.5 }, q: { arcseconds: 2.5 } },
+                    { p: { arcseconds: 0.5 }, q: { arcseconds: -1.0 } }
+                  ]
+                }
+              }
+            }
+            WHERE: {
+              id: { EQ: ${oid.asJson} }
+            }
+          }) {
+            observations {
+              observingMode {
+                flamingos2LongSlit {
+                  disperser
+                  spatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                  explicitSpatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                  defaultSpatialOffsets {
+                    p { arcseconds }
+                    q { arcseconds }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """, json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "flamingos2LongSlit": {
+                    "disperser": "R1200_HK",
+                    "spatialOffsets": [
+                      { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
+                      { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
+                      { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
+                      { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
+                      { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
+                      { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
+                      { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
+                    ],
+                    "defaultSpatialOffsets": [
+                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
+                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
+                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight)
+    } yield ()
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
