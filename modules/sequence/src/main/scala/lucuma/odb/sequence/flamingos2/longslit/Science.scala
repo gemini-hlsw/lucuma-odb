@@ -75,6 +75,9 @@ object Science:
   val MaxSciencePeriod: TimeSpan =
     90.minuteTimeSpan
 
+  val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
+  val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
+
   extension (start: Timestamp)
     def timeUntil(end: Timestamp): TimeSpan =
       if start < end then TimeSpan.between(start, end).get else TimeSpan.Zero
@@ -126,11 +129,16 @@ object Science:
           r <- arcStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
         yield (a, b, b, a, f, r)  // for now a0 === a1 and b0 === b1 but this will change
 
+      // Flamingos2 needs read mode and reads to be consistent with exposure time
+      def adjustReadMode(f2: ProtoStep[F2]): ProtoStep[F2] =
+        val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
+        f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
+
       val steps =
         for
           fs <- EitherT(expander.expandStep(f))
           rs <- EitherT(expander.expandStep(r))
-        yield StepDefinition(a0, b0, b1, a1, fs ::: rs)
+        yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ::: rs.map(adjustReadMode))
 
       steps.leftMap: msg =>
         OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
@@ -229,6 +237,7 @@ object Science:
     cycleEstimate: TimeSpan,
     maxCycles:     NonNegInt
   ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
+
     def cyclesIn(timeSpan: TimeSpan): Int =
       (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
 
@@ -249,11 +258,19 @@ object Science:
     //   science-start + science-time / 2
     val scienceStart: Timestamp = pending.map(_.start).getOrElse(when)
     val nominalMidScienceCalTime: Option[Timestamp] =
-      Option.when(scienceTime >= MaxSciencePeriod):
-        scienceStart +| (scienceTime /| NonZeroInt.unsafeFrom(2))
+      Option.when(scienceTime >= MaxSciencePeriod)(scienceStart +| (scienceTime /| Two))
 
-    // How many more full cycles can we do before and after the mid-science cal time
-    val preCalCycles: Int  = nominalMidScienceCalTime.fold(cycles)(t => cyclesIn(when.timeUntil(t)))
+    // How many more full cycles can we do before the mid-science cal time
+    val timeUntilMidScienceCals: TimeSpan = nominalMidScienceCalTime.fold(TimeSpan.Zero)(when.timeUntil)
+    val fullPreCalCycles: Int             = cyclesIn(timeUntilMidScienceCals)
+    val leftOverPreCalTime: TimeSpan      = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
+
+    // If the nominal cal time falls in the middle of an ABBA cycle, make it so
+    // the break to do calibrations falls closest to an ABBA cycle boundary.
+    val extraPreCalCycle: Int =
+      if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
+
+    val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
     val postCalCycles: Int = cycles - preCalCycles
 
     (
@@ -373,24 +390,20 @@ object Science:
       cycleEstimate: TimeSpan,
       goalCycles:    NonNegInt
     ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
-      val (stateʹ, curAtom)  = completeCurrentAtom(when, estimate)
+      val (stateʹ, curAtom) = completeCurrentAtom(when, estimate)
+      val remainingCycles   =
+        if stop then Zero
+        else NonNegInt.from(goalCycles.value - stateʹ.completedCycles).toOption.getOrElse(Zero)
 
-      // TODO handle early exit here -- don't need remaining atoms in block if we're to stop early.
-      // Just finish calibrations if there are any pending.
-
-      NonNegInt
-        .from(goalCycles.value - stateʹ.completedCycles)
-        .toOption
-        .fold((stateʹ.completedCycles, curAtom.toList)): allRemainingCycles =>
-          val (c, as) = remainingAtomsInBlock(
-            steps,
-            stateʹ.block.map(_.end).getOrElse(when),
-            stateʹ.block.map(_.start),
-            stateʹ.pending,
-            cycleEstimate,
-            allRemainingCycles
-          )
-          (c + stateʹ.completedCycles, curAtom.fold(as)(_ :: as))
+      val (c, as) = remainingAtomsInBlock(
+        steps,
+        stateʹ.block.map(_.end).getOrElse(when),
+        stateʹ.block.map(_.start),
+        stateʹ.pending,
+        cycleEstimate,
+        remainingCycles
+      )
+      (c + stateʹ.completedCycles, curAtom.fold(as)(_ :: as))
 
   end SequenceRecord
 
