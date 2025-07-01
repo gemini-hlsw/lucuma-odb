@@ -9,6 +9,8 @@ import cats.Eq
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
+import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -23,10 +25,12 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
-import lucuma.core.math.syntax.int.*
+import lucuma.core.enums.StepGuideState.Enabled
+import lucuma.core.math.Offset
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -105,6 +109,35 @@ object Science:
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
+    // PreDef is a StepDefinition before SmartGcal expansion.
+    case class PreDef(
+      a0:   ProtoStep[F2],
+      b0:   ProtoStep[F2],
+      b1:   ProtoStep[F2],
+      a1:   ProtoStep[F2],
+      flat: ProtoStep[F2],  // Unexpanded SmartGcal Flat
+      arc:  ProtoStep[F2]   // Unexpanded SmartGcal Arc
+    ):
+      def expand[F[_]: Monad](
+        expander: SmartGcalExpander[F, F2]
+      ): EitherT[F, String, StepDefinition] =
+
+        // Flamingos2 needs read mode and reads to be consistent with exposure time
+        def adjustReadMode(f2: ProtoStep[F2]): ProtoStep[F2] =
+          val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
+          f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
+
+        for
+          fs <- EitherT(expander.expandStep(flat))
+          rs <- EitherT(expander.expandStep(arc))
+        yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ::: rs.map(adjustReadMode))
+
+    def f2ScienceStep(o: Offset): State[F2, ProtoStep[F2]] =
+      // This may need to be more sophisticated but as a first approximation ...
+      // If p is not-zero we're off slit.
+      val guideState = if o.p.toAngle.toMicroarcseconds === 0 then Enabled else Disabled
+      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
+
     def compute[F[_]: Monad](
       oid:       Observation.Id,
       config:    Config,
@@ -112,35 +145,41 @@ object Science:
       expander:  SmartGcalExpander[F, F2]
     ): EitherT[F, OdbError, StepDefinition] =
 
-      val (a0, b0, b1, a1, f, r) = eval:
+      def evalWithOffsets(
+        a0Offset: Offset,
+        b0Offset: Offset,
+        b1Offset: Offset,
+        a1Offset: Offset
+      ): PreDef =
+        eval:
+          for
+            _  <- F2.exposure    := time.exposureTime
+            _  <- F2.disperser   := config.disperser.some
+            _  <- F2.filter      := config.filter
+            _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(time.exposureTime)
+            _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
+            _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.fpu)
+            _  <- F2.decker      := config.decker
+            _  <- F2.readoutMode := config.readoutMode
+            _  <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
+            a0 <- f2ScienceStep(a0Offset)
+            b0 <- f2ScienceStep(b0Offset)
+            b1 <- f2ScienceStep(b1Offset)
+            a1 <- f2ScienceStep(a1Offset)
+            f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+            r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+          yield PreDef(a0, b0, b1, a1, f, r)
+
+      val stepDef =
         for
-          _ <- F2.exposure    := time.exposureTime
-          _ <- F2.disperser   := config.disperser.some
-          _ <- F2.filter      := config.filter
-          _ <- F2.readMode    := Flamingos2ReadMode.forExposureTime(time.exposureTime)
-          _ <- F2.lyotWheel   := Flamingos2LyotWheel.F16
-          _ <- F2.fpu         := Flamingos2FpuMask.builtin(config.fpu)
-          _ <- F2.decker      := config.decker
-          _ <- F2.readoutMode := config.readoutMode
-          _ <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
-          a <- scienceStep(0.arcsec,  15.arcsec, ObserveClass.Science)
-          b <- scienceStep(0.arcsec, -15.arcsec, ObserveClass.Science)
-          f <- flatStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-          r <- arcStep(a.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-        yield (a, b, b, a, f, r)  // for now a0 === a1 and b0 === b1 but this will change
+          p <- EitherT.fromEither:
+                 config.spatialOffsets match
+                   case List(a0, b0, b1, a1) => evalWithOffsets(a0, b0, b1, a1).asRight
+                   case _                    => s"Flamingos 2 Long Slit requires 4 offset positions.".asLeft
+          d <- p.expand(expander)
+        yield d
 
-      // Flamingos2 needs read mode and reads to be consistent with exposure time
-      def adjustReadMode(f2: ProtoStep[F2]): ProtoStep[F2] =
-        val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
-        f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
-
-      val steps =
-        for
-          fs <- EitherT(expander.expandStep(f))
-          rs <- EitherT(expander.expandStep(r))
-        yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ::: rs.map(adjustReadMode))
-
-      steps.leftMap: msg =>
+      stepDef.leftMap: msg =>
         OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
   end StepDefinition
