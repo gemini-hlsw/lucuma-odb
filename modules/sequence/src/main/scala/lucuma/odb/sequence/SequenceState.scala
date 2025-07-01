@@ -49,6 +49,9 @@ trait SequenceState[D] {
   def scienceStep(t: TelescopeConfig, c: ObserveClass): State[D, ProtoStep[D]] =
     step(ProtoStep(_, StepConfig.Science, t, c))
 
+  def scienceStep(o: Offset, c: ObserveClass): State[D, ProtoStep[D]] =
+    scienceStep(TelescopeConfig(o, Enabled), c)
+
   /**
    * Produces a "science" step based upon the current instrument configuration
    * state and the given offset.
