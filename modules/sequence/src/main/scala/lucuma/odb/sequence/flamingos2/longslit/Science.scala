@@ -26,6 +26,7 @@ import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.Observation
@@ -79,8 +80,18 @@ object Science:
   val MaxSciencePeriod: TimeSpan =
     90.minuteTimeSpan
 
-  val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
-  val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
+  /**
+   * Slit length.  Offsets larger than +/- 54 arcsec are off slit and unguided.
+   */
+  val SlitLength: Angle =
+    Angle.fromBigDecimalArcseconds(108.0)
+
+  private def isOnSlit(o: Offset): Boolean =
+    (o.p.toAngle.toMicroarcseconds === 0) &&
+    (Angle.signedDecimalArcseconds.get(o.q.toAngle).abs <= (Angle.signedDecimalArcseconds.get(SlitLength) / 2))
+
+  private val Zero: NonNegInt = NonNegInt.unsafeFrom(0)
+  private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
   extension (start: Timestamp)
     def timeUntil(end: Timestamp): TimeSpan =
@@ -107,7 +118,21 @@ object Science:
     def abbaCycle: NonEmptyList[ProtoStep[F2]] =
       NonEmptyList.of(a0, b0, b1, a1)
 
+    def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
+      val requiredExposures = t.exposureCount.value
+      val exposuresPerCycle = abbaCycle.toList.count(s => isOnSlit(s.telescopeConfig.offset))
+      Either.cond(
+        exposuresPerCycle > 0,
+        // Round up to a whole cycle event if it produces extra data.
+        NonNegInt.unsafeFrom((requiredExposures + (exposuresPerCycle - 1)) / exposuresPerCycle),
+        "At least one exposure must be taken on slit."
+      )
+
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
+
+    def f2ScienceStep(o: Offset): State[F2, ProtoStep[F2]] =
+      val guideState = if isOnSlit(o) then Enabled else Disabled
+      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
@@ -132,24 +157,15 @@ object Science:
           rs <- EitherT(expander.expandStep(arc))
         yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ::: rs.map(adjustReadMode))
 
-    def f2ScienceStep(o: Offset): State[F2, ProtoStep[F2]] =
-      // This may need to be more sophisticated but as a first approximation ...
-      // If p is not-zero we're off slit.
-      val guideState = if o.p.toAngle.toMicroarcseconds === 0 then Enabled else Disabled
-      scienceStep(TelescopeConfig(o, guideState), ObserveClass.Science)
+    object PreDef:
 
-    def compute[F[_]: Monad](
-      oid:       Observation.Id,
-      config:    Config,
-      time:      IntegrationTime,
-      expander:  SmartGcalExpander[F, F2]
-    ): EitherT[F, OdbError, StepDefinition] =
-
-      def evalWithOffsets(
-        a0Offset: Offset,
-        b0Offset: Offset,
-        b1Offset: Offset,
-        a1Offset: Offset
+      def apply(
+         config: Config,
+         time:   IntegrationTime,
+         a0Off:  Offset,
+         b0Off:  Offset,
+         b1Off:  Offset,
+         a1Off:  Offset
       ): PreDef =
         eval:
           for
@@ -162,25 +178,26 @@ object Science:
             _  <- F2.decker      := config.decker
             _  <- F2.readoutMode := config.readoutMode
             _  <- F2.reads       := config.explicitReads.getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime).readCount)
-            a0 <- f2ScienceStep(a0Offset)
-            b0 <- f2ScienceStep(b0Offset)
-            b1 <- f2ScienceStep(b1Offset)
-            a1 <- f2ScienceStep(a1Offset)
+            a0 <- f2ScienceStep(a0Off)
+            b0 <- f2ScienceStep(b0Off)
+            b1 <- f2ScienceStep(b1Off)
+            a1 <- f2ScienceStep(a1Off)
             f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
             r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           yield PreDef(a0, b0, b1, a1, f, r)
 
-      val stepDef =
-        for
-          p <- EitherT.fromEither:
-                 config.spatialOffsets match
-                   case List(a0, b0, b1, a1) => evalWithOffsets(a0, b0, b1, a1).asRight
-                   case _                    => s"Flamingos 2 Long Slit requires 4 offset positions.".asLeft
-          d <- p.expand(expander)
-        yield d
-
-      stepDef.leftMap: msg =>
-        OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
+    def compute[F[_]: Monad](
+      config:    Config,
+      time:      IntegrationTime,
+      expander:  SmartGcalExpander[F, F2]
+    ): EitherT[F, String, StepDefinition] =
+      for
+        p <- EitherT.fromEither:
+               config.spatialOffsets match
+                 case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1).asRight
+                 case _                    => s"Flamingos 2 Long Slit requires 4 offset positions.".asLeft
+        d <- p.expand(expander)
+      yield d
 
   end StepDefinition
 
@@ -506,11 +523,14 @@ object Science:
 
   end Generator
 
+  private def definitionError(oid: Observation.Id, msg: String): OdbError =
+     OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
+
   private def zeroExposureTime(oid: Observation.Id): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: Flamingos 2 Long Slit requires a positive exposure time.".some)
+    definitionError(oid, "Flamingos 2 Long Slit requires a positive exposure time.")
 
   private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.".some)
+    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
@@ -533,8 +553,9 @@ object Science:
 
     val gen = for
       t <- posTime
-      s <- StepDefinition.compute(observationId, config, t, expander)
+      s <- StepDefinition.compute(config, t, expander).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
+      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       e,
@@ -543,7 +564,7 @@ object Science:
       TimeEstimateCalculator.Last.empty[F2],
       IndexTracker.Zero,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-      NonNegInt.unsafeFrom((t.exposureCount.value + 3) / 4)  // round up to include a whole ABBA cycle
+      c
     ): SequenceGenerator[F2]
 
     gen.value
