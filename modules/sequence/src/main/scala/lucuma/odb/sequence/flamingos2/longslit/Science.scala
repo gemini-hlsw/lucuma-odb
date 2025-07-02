@@ -329,10 +329,13 @@ object Science:
     val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
     val postCalCycles: Int = cycles - preCalCycles
 
+    val addMidScienceCal: Boolean =
+        (preCalCycles > 0) || (pending.isDefined && postCalCycles === 0)
+
     (
       cycles,
       List.fill(preCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                   ++
-        Option.when(pending.isDefined || preCalCycles > 0)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList ++
+        Option.when(addMidScienceCal)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList ++
         List.fill(postCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                ++
         Option.when(postCalCycles > 0)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList
     )

@@ -13,6 +13,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
@@ -21,12 +22,14 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 
 // Match an example in the F2 Long Slit requirements spreadsheet
-class executionSciFlamingos2_20Steps5MinExposures extends ExecutionTestSupportForFlamingos2:
+class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(20))
+
+  val abba = flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled))
 
   test("simple generation"):
     val setup: IO[Observation.Id] =
@@ -54,13 +57,13 @@ class executionSciFlamingos2_20Steps5MinExposures extends ExecutionTestSupportFo
                 "config" -> Json.obj(
                   "flamingos2" -> Json.obj(
                     "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
+                      "nextAtom" -> abba,
                       "possibleFuture" -> List(
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
+                        abba,
+                        abba,
                         flamingos2ExpectedGcals((0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
+                        abba,
+                        abba,
                         flamingos2ExpectedGcals((0, 15))
                       ).asJson,
                       "hasMore" -> false.asJson
@@ -103,7 +106,7 @@ class executionSciFlamingos2_20Steps5MinExposures extends ExecutionTestSupportFo
                 "config" -> Json.obj(
                   "flamingos2" -> Json.obj(
                     "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15), (0, -15), (0, 15)),
+                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
                       "possibleFuture" -> List(
                         // Gcals to finish up the "stopped" block
                         flamingos2ExpectedGcals((0, 15)),
@@ -111,10 +114,10 @@ class executionSciFlamingos2_20Steps5MinExposures extends ExecutionTestSupportFo
                         // New block.  In theory the operator or scheduler will
                         // stop after the gcals.  At any rate, only 80 minutes
                         // remaining so no mid-period calibration
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
-                        flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
+                        abba,
+                        abba,
+                        abba,
+                        abba,
                         flamingos2ExpectedGcals((0, 15))
                       ).asJson,
                       "hasMore" -> false.asJson
