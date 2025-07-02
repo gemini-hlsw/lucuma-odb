@@ -298,3 +298,58 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             )
           ).asRight
       )
+
+  test("not on slit"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <-
+          createObservationWithModeAs(
+            pi,
+            p,
+            List(t),
+            s"""
+              flamingos2LongSlit: {
+                disperser: R1200_JH
+                filter: JH
+                fpu: LONG_SLIT_1
+                explicitSpatialOffsets: [
+                  {
+                    p: { arcseconds:  60 }
+                    q: { arcseconds:   0 }
+                  },
+                  {
+                    p: { arcseconds:   0 }
+                    q: { arcseconds: 100 }
+                  },
+                  {
+                    p: { arcseconds:   0 }
+                    q: { arcseconds: 100 }
+                  },
+                  {
+                    p: { arcseconds: 60 }
+                    q: { arcseconds:  0 }
+                  }
+                ]
+              }
+            """
+          )
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user  = pi,
+        query =
+          s"""
+             query {
+               observation(observationId: "$oid") {
+                 ${flamingos2ScienceQuery(none)}
+               }
+             }
+           """,
+        expected =
+          List(
+            s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
+          ).asLeft
+      )

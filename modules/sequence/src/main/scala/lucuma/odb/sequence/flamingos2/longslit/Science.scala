@@ -195,7 +195,7 @@ object Science:
         p <- EitherT.fromEither:
                config.spatialOffsets match
                  case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1).asRight
-                 case _                    => s"Flamingos 2 Long Slit requires 4 offset positions.".asLeft
+                 case _                    => s"v".asLeft
         d <- p.expand(expander)
       yield d
 
