@@ -17,6 +17,7 @@ trait FetchLimit[F[_]: Async](maxBytes: Long) extends SkunkMapping[F]:
 
   case class FetchLimitError(maxBytes: Long) extends Exception(s"Fetch limit ($maxBytes bytes) exceeded.")
 
+  // Given a decoder, return an equivalent decoder that also yields the total length of the underly row data
   def countingDecoder[A](dec: Decoder[A]): Decoder[(A, Long)] =
     new Decoder[(A, Long)]:
       override def types = dec.types
@@ -30,9 +31,9 @@ trait FetchLimit[F[_]: Async](maxBytes: Long) extends SkunkMapping[F]:
           ps.stream(fragment.argument, 1024)
             .evalMapAccumulate(0L): 
               case (prev, (arr, size)) =>
-              val next = prev + size
-              Async[F].raiseWhen(next > maxBytes)(FetchLimitError(maxBytes)) >>
-              (next, arr).pure[F]
+                val next = prev + size
+                Async[F].raiseWhen(next > maxBytes)(FetchLimitError(maxBytes)) >>
+                (next, arr).pure[F]
             .compile
             .toVector
             .map: vec =>
