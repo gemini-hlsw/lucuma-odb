@@ -123,7 +123,7 @@ object Science:
       val exposuresPerCycle = abbaCycle.toList.count(s => isOnSlit(s.telescopeConfig.offset))
       Either.cond(
         exposuresPerCycle > 0,
-        // Round up to a whole cycle event if it produces extra data.
+        // Round up to a whole cycle even if it produces extra data.
         NonNegInt.unsafeFrom((requiredExposures + (exposuresPerCycle - 1)) / exposuresPerCycle),
         "At least one exposure must be taken on slit."
       )
@@ -195,32 +195,40 @@ object Science:
         p <- EitherT.fromEither:
                config.spatialOffsets match
                  case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1).asRight
-                 case _                    => s"v".asLeft
+                 // This case should be caught when validating arguments to the mode
+                 // construction / update.  Nevertheless, we'll guarantee it here.
+                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.spatialOffsets.size} provided).".asLeft
         d <- p.expand(expander)
       yield d
 
   end StepDefinition
 
+  // Combine two Option[TimestampInterval] into one that incorporates both.
   private val span: (Option[TimestampInterval], Option[TimestampInterval]) => Option[TimestampInterval] =
     case (None, None)         => None
     case (Some(t), None)      => t.some
     case (None, Some(t))      => t.some
     case (Some(t0), Some(t1)) => t0.span(t1).some
 
-  sealed trait StepTracker:
+  // There are two kinds of atoms in F2 Long Slit.  The ABBA science cycle and
+  // gcal calibrations.  There is an AtomTracker for each type.  They are state
+  // machines which keep up with which part of these atoms has been seen,
+  // whether it is complete and what would be remaining in order to complete it
+  // from the current state.
+  sealed trait AtomTracker:
     def title: NonEmptyString
     def interval: Option[TimestampInterval] = none
     def isComplete: Boolean                 = false
-    def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker
+    def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker
     def remaining(steps: StepDefinition): List[ProtoStep[F2]]
 
-  object StepTracker:
-    sealed trait Abba extends StepTracker:
+  object AtomTracker:
+    sealed trait Abba extends AtomTracker:
       def title: NonEmptyString = AbbaCycleTitle
 
     object Abba:
       case object A0 extends Abba:
-        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+        override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker =
           if steps.a0.matches(record) && record.successfullyCompleted then B0(record.interval)
           else this
 
@@ -228,7 +236,7 @@ object Science:
           List(steps.a0, steps.b0, steps.b1, steps.a1)
 
       case class B0(override val interval: Option[TimestampInterval]) extends Abba:
-        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+        override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker =
           if steps.b0.matches(record) then
             if record.successfullyCompleted then B1(span(interval, record.interval)) else this
           else A0.next(steps, record)
@@ -237,7 +245,7 @@ object Science:
           List(steps.b0, steps.b1, steps.a1)
 
       case class B1(override val interval: Option[TimestampInterval]) extends Abba:
-        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+        override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker =
           if steps.b1.matches(record) then
             if record.successfullyCompleted then A1(span(interval, record.interval)) else this
           else A0.next(steps, record)
@@ -246,7 +254,7 @@ object Science:
           List(steps.b1, steps.a1)
 
       case class A1(override val interval: Option[TimestampInterval]) extends Abba:
-        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+        override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker =
           if steps.a1.matches(record) then
             if record.successfullyCompleted then End(span(interval, record.interval)) else this
           else A0.next(steps, record)
@@ -255,16 +263,16 @@ object Science:
           List(steps.a1)
 
       case class End(override val interval: Option[TimestampInterval]) extends Abba:
-        override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker = this
+        override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker = this
         override def remaining(steps: StepDefinition): List[ProtoStep[F2]] = Nil
         override def isComplete: Boolean = true
 
     end Abba
 
-    case class Calibrations(override val interval: Option[TimestampInterval], expected: List[ProtoStep[F2]]) extends StepTracker:
+    case class Calibrations(override val interval: Option[TimestampInterval], expected: List[ProtoStep[F2]]) extends AtomTracker:
       def title: NonEmptyString = NighttimeCalTitle
 
-      override def next(steps: StepDefinition, record: StepRecord[F2]): StepTracker =
+      override def next(steps: StepDefinition, record: StepRecord[F2]): AtomTracker =
         Calibrations(span(interval, record.interval), expected.removeFirstBy(record)(_.matches(_)))
 
       override def remaining(steps: StepDefinition): List[ProtoStep[F2]] =
@@ -279,7 +287,7 @@ object Science:
       def apply(steps: StepDefinition): Calibrations =
         Calibrations(none, steps.cals.toList)
 
-  end StepTracker
+  end AtomTracker
 
   // Computes the atoms remaining in a 3 hour science block, starting at `when`
   // assuming the block itself started at `start` and that there are `pending`
@@ -288,19 +296,25 @@ object Science:
   private def remainingAtomsInBlock(
     steps:         StepDefinition,
     when:          Timestamp,
-    start:         Option[Timestamp],
-    pending:       Option[TimestampInterval],
+    start:         Option[Timestamp],          // block start time
+    pending:       Option[TimestampInterval],  // ABBA science time pending calibration
     cycleEstimate: TimeSpan,
     maxCycles:     NonNegInt
   ): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
 
+    // Adjust the requested reference time to ensure that it does not come
+    // before the recorded times for this block.
+    val whenʹ = start.fold(when)(_ max when)
+    val now   = pending.map(_.end).fold(whenʹ)(_ max whenʹ)
+
+    // How many full ABBA cycles would fit in the given time span?
     def cyclesIn(timeSpan: TimeSpan): Int =
       (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
 
-    // Roughly, how many more cycles can we fit?
-    val startʹ: Timestamp   = start.orElse(pending.map(_.start)).getOrElse(when)
+    // Roughly, how many more cycles can we fit in the remaining time?
+    val startʹ: Timestamp   = start.orElse(pending.map(_.start)).getOrElse(now)
     val end: Timestamp      = startʹ +| MaxVisitLength
-    def remaining: TimeSpan = when.timeUntil(end)
+    def remaining: TimeSpan = now.timeUntil(end)
     val cycles: Int         = cyclesIn(remaining) min maxCycles.value
 
     // Remaining science time in this visit.
@@ -312,33 +326,36 @@ object Science:
 
     // If this is over 1.5 hours we need to insert a flat roughly at:
     //   science-start + science-time / 2
-    val scienceStart: Timestamp = pending.map(_.start).getOrElse(when)
-    val nominalMidScienceCalTime: Option[Timestamp] =
-      Option.when(scienceTime >= MaxSciencePeriod)(scienceStart +| (scienceTime /| Two))
+    val scienceStart: Timestamp = pending.map(_.start).getOrElse(now)
 
-    // How many more full cycles can we do before the mid-science cal time
-    val timeUntilMidScienceCals: TimeSpan = nominalMidScienceCalTime.fold(TimeSpan.Zero)(when.timeUntil)
-    val fullPreCalCycles: Int             = cyclesIn(timeUntilMidScienceCals)
-    val leftOverPreCalTime: TimeSpan      = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
+    val abbaAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle)
+    val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
 
-    // If the nominal cal time falls in the middle of an ABBA cycle, make it so
-    // the break to do calibrations falls closest to an ABBA cycle boundary.
-    val extraPreCalCycle: Int =
-      if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
+    cycles ->
+      Option
+        .when(scienceTime >= MaxSciencePeriod)(scienceStart +| (scienceTime /| Two))
+        .fold(
+          // The science time is not long enough to warrant a mid-science cal in this block.
+          List.fill(cycles)(abbaAtom) ++ Option.when(cycles > 0 || pending.isDefined)(gcalAtom).toList
+        ): nominalMidScienceCalTime =>
 
-    val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
-    val postCalCycles: Int = cycles - preCalCycles
+          // How many more full cycles can we do before the mid-science cal time?
+          val timeUntilMidScienceCals: TimeSpan = now.timeUntil(nominalMidScienceCalTime)
+          val fullPreCalCycles: Int             = cyclesIn(timeUntilMidScienceCals)
+          val leftOverPreCalTime: TimeSpan      = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
 
-    val addMidScienceCal: Boolean =
-        (preCalCycles > 0) || (pending.isDefined && postCalCycles === 0)
+          // If the nominal cal time falls in the middle of an ABBA cycle, make it so
+          // the break to do calibrations falls closest to an ABBA cycle boundary.
+          val extraPreCalCycle: Int =
+            if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
 
-    (
-      cycles,
-      List.fill(preCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                   ++
-        Option.when(addMidScienceCal)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList ++
-        List.fill(postCalCycles)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))                                ++
-        Option.when(postCalCycles > 0)(ProtoAtom(NighttimeCalTitle.some, steps.cals)).toList
-    )
+          // How many new ABBA cycles before and after the mid-science cals
+          val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
+          val postCalCycles: Int = cycles - preCalCycles
+
+          List.fill(preCalCycles)(abbaAtom).appended(gcalAtom) ++
+          List.fill(postCalCycles)(abbaAtom)                   ++
+          Option.when(postCalCycles > 0)(gcalAtom).toList
 
   // Calculates the atoms in a 3 hour science block, limited to at most `maxCycles`.
   def remainingAtomsInEmptyBlock(
@@ -357,7 +374,7 @@ object Science:
 
   case class SequenceRecord(
     steps:           StepDefinition,
-    current:         StepTracker               = StepTracker.Abba.A0,
+    current:         AtomTracker               = AtomTracker.Abba.A0,
     block:           Option[TimestampInterval] = none,
     pending:         Option[TimestampInterval] = none,
     stop:            Boolean                   = false,
@@ -367,13 +384,13 @@ object Science:
     private def recordCompletion: SequenceRecord =
       if !current.isComplete then this
       else current match
-        case abba: StepTracker.Abba =>
+        case abba: AtomTracker.Abba =>
           copy(
             block           = span(block, abba.interval),
             pending         = span(pending, abba.interval),
             completedCycles = completedCycles + 1
           )
-        case StepTracker.Calibrations(interval, _)   =>
+        case AtomTracker.Calibrations(interval, _)   =>
           copy(
             block   = span(block, interval),
             pending = none
@@ -381,10 +398,10 @@ object Science:
 
     def next(step: StepRecord[F2]): SequenceRecord =
       def newAbbaCycle: SequenceRecord =
-        copy(current = StepTracker.Abba.A0).next(step)
+        copy(current = AtomTracker.Abba.A0).next(step)
 
       def newGcalSet: SequenceRecord =
-        copy(current = StepTracker.Calibrations(steps)).next(step)
+        copy(current = AtomTracker.Calibrations(steps)).next(step)
 
       def continue: SequenceRecord =
         copy(
@@ -393,12 +410,12 @@ object Science:
         ).recordCompletion
 
       current match
-        case abba: StepTracker.Abba =>
+        case abba: AtomTracker.Abba =>
           if step.isScience then
             if current.isComplete then newAbbaCycle else continue
           else if step.isGcal then newGcalSet else this
 
-        case StepTracker.Calibrations(_, _) =>
+        case AtomTracker.Calibrations(_, _) =>
           if step.isGcal then
             if current.isComplete then newGcalSet else continue
           else if step.isScience then newAbbaCycle else this
@@ -408,7 +425,7 @@ object Science:
 
     def resetVisit: SequenceRecord =
       copy(
-        current = StepTracker.Abba.A0,
+        current = AtomTracker.Abba.A0,
         block   = none,
         pending = none,
         stop    = false
@@ -428,11 +445,11 @@ object Science:
           val blockTimeʹ   = span(block, curAtomTime.some)
 
           val (pendingʹ, completedCyclesʹ, atom) = current match
-            case abba: StepTracker.Abba         =>
+            case abba: AtomTracker.Abba         =>
               val p = span(pending, span(abba.interval, curAtomTime.some))
               (p, completedCycles + 1, ProtoAtom(AbbaCycleTitle.some, nel))
 
-            case StepTracker.Calibrations(_, _) =>
+            case AtomTracker.Calibrations(_, _) =>
               (none, completedCycles, ProtoAtom(NighttimeCalTitle.some, nel))
 
           copy(
@@ -506,12 +523,17 @@ object Science:
         goalCycles
       )
 
+      // Add future blocks until we've completed all the cycles.
       val future =
         Stream.emits(curBlockAtoms) ++
         Stream
           .unfold(completedCount): c =>
             PosInt.from(goalCycles.value - c).toOption.map: remainingCycles =>
               val (cycles, atoms) = remainingAtomsInEmptyBlock(steps, cycleEstimate, remainingCycles)
+
+              // Sanity check....
+              assert(cycles > 0, "No progress made generating future F2 Long Slit sequence!")
+
               (atoms, c + cycles)
           .flatMap(Stream.emits)
 

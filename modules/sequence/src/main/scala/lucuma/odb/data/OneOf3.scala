@@ -8,6 +8,10 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
 
+/**
+ * Like an Either, but with three different cases and no error / success
+ * connotation or right bias.
+ */
 sealed trait OneOf3[+A, +B, +C]:
 
   def fold[R](
