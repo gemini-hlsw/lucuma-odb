@@ -142,7 +142,7 @@ object Acquisition:
 
   end StepComputer
 
-  private sealed trait AcquisitionState[D] extends SequenceGenerator[D]:
+  private sealed trait AcquisitionState[D] extends SequenceGenerator.Base[D]:
 
     def builder: AtomBuilder[D]
     def steps: Steps[D]
@@ -201,7 +201,7 @@ object Acquisition:
         a1 <- fineAdjustments(builder, slit, track.atomCount+1)
       } yield Stream(a0, a1)).runA(calcState).value
 
-    case class Init[D](lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends SequenceGenerator[D]:
+    case class Init[D](lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[D], steps: Steps[D]) extends SequenceGenerator.Base[D]:
 
       override def generate(ignore: Timestamp): Stream[Pure, Atom[D]] =
         gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[D], tracker)
