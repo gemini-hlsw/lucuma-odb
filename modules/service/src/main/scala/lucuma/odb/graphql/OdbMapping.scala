@@ -102,7 +102,7 @@ object OdbMapping {
     shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
-          // with FetchLimit[F](1000000)
+          // with FetchLimit[F](10000)
           with BaseMapping[F]
           with ArcMapping[F]
           with AddAtomEventResultMapping[F]
