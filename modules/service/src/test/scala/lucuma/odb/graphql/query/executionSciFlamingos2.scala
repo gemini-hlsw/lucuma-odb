@@ -13,6 +13,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.syntax.timespan.*
@@ -52,7 +53,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                 "config" -> Json.obj(
                   "flamingos2" -> Json.obj(
                     "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 15), (0, -15), (0, -15), (0, 15)),
+                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
                       "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
                       "hasMore" -> false.asJson
                     )
@@ -93,7 +94,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                 "config" -> Json.obj(
                   "flamingos2" -> Json.obj(
                     "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15), (0, -15), (0, 15)),
+                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
                       "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
                       "hasMore" -> false.asJson
                     )
@@ -287,7 +288,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                 "config" -> Json.obj(
                   "flamingos2" -> Json.obj(
                     "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15), (0, -15), (0, 15)),
+                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
                       "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
                       "hasMore" -> false.asJson
                     )

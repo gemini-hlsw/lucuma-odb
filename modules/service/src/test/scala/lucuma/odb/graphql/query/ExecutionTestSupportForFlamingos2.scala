@@ -259,12 +259,12 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
 
     """
 
-  protected def flamingos2ExpectedScience(exposureTime: TimeSpan, p: Int, q: Int): Json =
+  protected def flamingos2ExpectedScience(exposureTime: TimeSpan, p: Int, q: Int, g: StepGuideState): Json =
     json"""
       {
         "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(flamingos2Science(exposureTime))},
         "stepConfig": { "stepType": "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, g)},
         "observeClass": "SCIENCE",
         "breakpoint": "DISABLED"
       }
@@ -272,9 +272,9 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
 
   protected def flamingos2ExpectedScienceAtom(
     exposureTime: TimeSpan,
-    offset: (Int, Int)*
+    offset: (Int, Int, StepGuideState)*
   ): Json =
-    val sciSteps  = offset.toList.map((p, q) => flamingos2ExpectedScience(exposureTime, p, q))
+    val sciSteps  = offset.toList.map((p, q, g) => flamingos2ExpectedScience(exposureTime, p, q, g))
 
     Json.obj(
       "description" -> s"ABBA Cycle".asJson,
