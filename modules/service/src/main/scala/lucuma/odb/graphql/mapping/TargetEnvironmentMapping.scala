@@ -124,9 +124,10 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[Option[Coordinates]]] =
       (pid, oid, obsTime) =>
         services.use { implicit s =>
-          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-            .getObjectTracking(pid, oid)
-            .map(_.map(_.at(obsTime.toInstant).map(_.value)))
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getObjectTracking(pid, oid)
+              .map(_.map(_.at(obsTime.toInstant).map(_.value)))
         }
 
     effectHandler(readEnv, calculate)
@@ -138,8 +139,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Timestamp) => F[Result[List[GuideService.GuideEnvironment]]] =
       (pid, oid, obsTime) =>
         services.use { implicit s =>
-          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-            .getGuideEnvironments(pid, oid, obsTime)
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getGuideEnvironments(pid, oid, obsTime)
         }
 
     effectHandler(readEnv, calculate)
@@ -151,8 +153,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideService.GuideEnvironment]] =
       (pid, oid, _) =>
         services.use { implicit s =>
-          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-            .getGuideEnvironment(pid, oid)
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getGuideEnvironment(pid, oid)
         }
 
     effectHandler(readEnv, calculate)
@@ -170,8 +173,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { implicit s =>
-          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-            .getGuideAvailability(pid, oid, period)
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getGuideAvailability(pid, oid, period)
         }
 
     effectHandler(readEnv, calculate)
@@ -183,8 +187,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Option[NonEmptyString]]] =
       (pid, oid, _) =>
         services.use { implicit s =>
-          s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-            .getGuideTargetName(pid, oid)
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getGuideTargetName(pid, oid)
         }
 
     effectHandler(readEnv, calculate)

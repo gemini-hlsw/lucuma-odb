@@ -17,6 +17,7 @@ import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.NewType
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -289,7 +290,7 @@ object AttachmentFileService {
           .map(_.fold(().asRight)(_ => InvalidRequest(duplicateTypeMsg(attachmentType)).asLeft))
       else ().asRight.pure
 
-    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString): NonEmptyString =
+    def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =
       s3FileSvc.filePath(programId, remoteId, fileName)
 
     new AttachmentFileService[F] {
@@ -302,7 +303,7 @@ object AttachmentFileService {
           path <- services.transactionallyEitherT {
                       getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
                   }
-          res  <- s3FileSvc.verifyAndGet(path).right
+          res  <- Services.asSuperUser(s3FileSvc.verifyAndGet(path)).right
         } yield res).value
           .recoverWith { case e: AttachmentException =>
             e.asLeft.pure
@@ -327,7 +328,7 @@ object AttachmentFileService {
                             checkForDuplicateName(programId, fn, none).asEitherT
                         }
               uuid   <- UUIDGen[F].randomUUID.right
-              path    = filePath(programId, uuid, fn.value)
+              path    = Services.asSuperUser(filePath(programId, uuid, fn.value))
             } yield (fn, path)
           ).value
           .flatTap {
@@ -341,7 +342,7 @@ object AttachmentFileService {
           }.asEitherT
           .flatMap((fn, path) =>
             for {
-              size   <- s3FileSvc.upload(path, data).right
+              size   <- Services.asSuperUser(s3FileSvc.upload(path, data)).right
               _      <- checkForEmptyFile(size).liftF
               result <- insertAttachmentInDB(programId,
                                              attachmentType,
@@ -372,7 +373,7 @@ object AttachmentFileService {
                 } yield (pid, oldPath)
               }
             uuid           <- UUIDGen[F].randomUUID.right
-            newPath         = filePath(pid, uuid, fn.value)
+            newPath         = Services.asSuperUser(filePath(pid, uuid, fn.value))
           } yield (fn, pid, oldPath, newPath)
         ).value
         .flatTap {
@@ -382,7 +383,7 @@ object AttachmentFileService {
         }.asEitherT
         .flatMap((fn, pid, oldPath, newPath) =>
           for {
-            size    <- s3FileSvc.upload(newPath, data).right
+            size    <- Services.asSuperUser(s3FileSvc.upload(newPath, data)).right
             _       <- checkForEmptyFile(size).liftF
             _       <- updateAttachmentInDB(pid,
                                             attachmentId,
@@ -391,7 +392,7 @@ object AttachmentFileService {
                                             size,
                                             newPath
                         ).asEitherT
-            _       <- s3FileSvc.delete(oldPath).right
+            _       <- Services.asSuperUser(s3FileSvc.delete(oldPath)).right
           } yield ()
         )
         .value
@@ -410,7 +411,7 @@ object AttachmentFileService {
           res  <-
             // We'll trap errors from the remote delete because, although not ideal, we don't
             // care so much if an orphan file is left on S3. The error will have been put in the trace.
-            s3FileSvc.delete(path).handleError { case _ => () }.right
+            Services.asSuperUser(s3FileSvc.delete(path)).handleError { case _ => () }.right
         } yield res).value
 
       def getPresignedUrl(user: User, attachmentId: Attachment.Id)(using
@@ -420,7 +421,7 @@ object AttachmentFileService {
           path <- services.transactionallyEitherT {
                       getAttachmentInfoAndCheckAccess(user, attachmentId).map(_._2)
                   }
-          res  <- s3FileSvc.presignedUrl(path).right
+          res  <- Services.asSuperUser(s3FileSvc.presignedUrl(path)).right
         } yield res).value
 
     }

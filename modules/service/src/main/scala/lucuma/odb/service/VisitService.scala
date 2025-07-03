@@ -38,11 +38,11 @@ trait VisitService[F[_]]:
 
   def select(
     visitId: Visit.Id
-  ): F[Option[VisitRecord]]
+  )(using Services.ServiceAccess): F[Option[VisitRecord]]
 
   def selectAll(
     observationId: Observation.Id
-  ): Stream[F, VisitRecord]
+  )(using Services.ServiceAccess): Stream[F, VisitRecord]
 
   def lookupOrInsert(
     observationId: Observation.Id
@@ -89,12 +89,12 @@ object VisitService:
 
       override def select(
         visitId: Visit.Id
-      ): F[Option[VisitRecord]] =
+      )(using Services.ServiceAccess): F[Option[VisitRecord]] =
         session.option(Statements.SelectVisit)(visitId)
 
       override def selectAll(
         observationId: Observation.Id
-      ): Stream[F, VisitRecord] =
+      )(using Services.ServiceAccess): Stream[F, VisitRecord] =
         session.stream(VisitService.Statements.SelectAllVisit)(observationId, 1024)
 
       private def obsDescription(

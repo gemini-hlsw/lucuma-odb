@@ -16,6 +16,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*
@@ -35,7 +36,7 @@ trait EmailService[F[_]] {
     subject: NonEmptyString,
     textMessage: NonEmptyString,
     htmlMessage: Option[NonEmptyString]
-  )(using Transaction[F]): F[Result[EmailId]]
+  )(using Transaction[F], SuperUserAccess): F[Result[EmailId]]
 }
 
 object EmailService {
@@ -57,7 +58,7 @@ object EmailService {
         subject: NonEmptyString,
         textMessage: NonEmptyString,
         htmlMessage: Option[NonEmptyString]
-      )(using Transaction[F]): F[Result[EmailId]] = {
+      )(using Transaction[F], SuperUserAccess): F[Result[EmailId]] = {
 
         def insertEmail(emailId: EmailId): F[Result[Unit]] = {
           val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)

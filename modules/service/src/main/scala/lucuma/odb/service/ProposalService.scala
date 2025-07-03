@@ -296,7 +296,8 @@ object ProposalService {
 
         val insertSplits: ResultT[F, Unit] =
           ResultT.liftF(
-            partnerSplitsService.insertSplits(input.SET.typeʹ.partnerSplits, input.programId)
+            Services.asSuperUser:
+              partnerSplitsService.insertSplits(input.SET.typeʹ.partnerSplits, input.programId)
           )
 
         (for {
@@ -354,7 +355,8 @@ object ProposalService {
 
         def updateSplits(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
           ResultT.liftF(Nullable.orAbsent(set.typeʹ).flatMap(_.partnerSplits).foldPresent( splits =>
-            partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
+            Services.asSuperUser:
+              partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
           ).sequence.void)
 
         (for {

@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
 import lucuma.core.model.Program
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.syntax.all.*
@@ -17,9 +18,9 @@ import Services.Syntax.*
 
 private[service] trait PartnerSplitsService[F[_]] {
 
-    def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
+    def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
-    def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit]
+    def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
 }
 
@@ -32,12 +33,12 @@ object PartnerSplitsService {
   def instantiate[F[_]: Concurrent](using Services[F]): PartnerSplitsService[F] =
     new PartnerSplitsService[F] {
 
-      def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def insertSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
         NonEmptyList.fromList(splits.toList).traverse_ { lst =>
           session.prepareR(Statements.insertSplits(lst)).use(_.execute(pid, lst)).void
         }
 
-      def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
         for {
           _ <- deleteSplits(pid)
           _ <- insertSplits(splits, pid)

@@ -100,7 +100,8 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
-          services.smartGcalService.insertFlamingos2(i, r)
+          Services.asSuperUser:
+            services.smartGcalService.insertFlamingos2(i, r)
   }
 
   val Flamingos2AtomQuery: String =

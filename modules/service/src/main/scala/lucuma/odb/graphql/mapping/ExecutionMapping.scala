@@ -186,7 +186,8 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) => {
         services.useTransactionally {
-          timeAccountingService.selectObservation(oid).map(_.asJson.success)
+          Services.asSuperUser:
+            timeAccountingService.selectObservation(oid).map(_.asJson.success)
         }
       }
 

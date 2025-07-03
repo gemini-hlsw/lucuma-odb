@@ -8,6 +8,7 @@ import cats.syntax.functor.*
 import lucuma.core.enums.Site
 import lucuma.core.model.ObservingNight
 import lucuma.core.util.Timestamp
+import lucuma.odb.service.Services.GuestAccess
 import skunk.*
 import skunk.codec.temporal.timestamptz
 import skunk.implicits.*
@@ -22,22 +23,22 @@ trait TimeService[F[_]]:
   /**
    * The database time associated with the current transaction.
    */
-  def transactionTime(using Transaction[F]): F[Timestamp]
+  def transactionTime(using Transaction[F], GuestAccess): F[Timestamp]
 
   /**
    * The observing night associated with the site and transaction time.
    */
-  def currentObservingNight(site: Site)(using Transaction[F]): F[ObservingNight]
+  def currentObservingNight(site: Site)(using Transaction[F], GuestAccess): F[ObservingNight]
 
 object TimeService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): TimeService[F] =
     new TimeService[F]:
 
-      override def transactionTime(using Transaction[F]): F[Timestamp] =
+      override def transactionTime(using Transaction[F], GuestAccess): F[Timestamp] =
         session.unique(Statements.TransactionTime)
 
-      override def currentObservingNight(site: Site)(using Transaction[F]): F[ObservingNight] =
+      override def currentObservingNight(site: Site)(using Transaction[F], GuestAccess): F[ObservingNight] =
         transactionTime.map(t => ObservingNight.fromSiteAndInstant(site, t.toInstant))
 
   object Statements:

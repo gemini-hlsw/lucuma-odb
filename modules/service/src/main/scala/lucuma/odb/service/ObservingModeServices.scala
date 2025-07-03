@@ -13,6 +13,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
 import Services.Syntax.*
@@ -21,27 +22,27 @@ sealed trait ObservingModeServices[F[_]] {
 
   def selectObservingMode(
     which: List[(Observation.Id, ObservingModeType)]
-  )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => ObservingMode]]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SourceProfile => ObservingMode]]
 
   def createFunction(
     input: ObservingModeInput.Create
-  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
+  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
 
   def deleteFunction(
     mode: ObservingModeType
-  )(using Transaction[F]): List[Observation.Id] => F[Unit]
+  )(using Transaction[F], SuperUserAccess): List[Observation.Id] => F[Unit]
 
   def updateFunction(
     input: ObservingModeInput.Edit
-  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
+  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
 
   def createViaUpdateFunction(
     input: ObservingModeInput.Edit
-  )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]]
+  )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]]
 
   def cloneFunction(
     mode: ObservingModeType
-  )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit]
+  )(using Transaction[F], SuperUserAccess): (Observation.Id, Observation.Id) => F[Unit]
 
 }
 
@@ -52,7 +53,7 @@ object ObservingModeServices {
 
       override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
-      )(using Transaction[F]): F[Map[Observation.Id, SourceProfile => ObservingMode]] = {
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SourceProfile => ObservingMode]] = {
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
@@ -86,7 +87,7 @@ object ObservingModeServices {
 
       override def createFunction(
         input: ObservingModeInput.Create
-      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
+      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.gmosNorthLongSlit.map(gmosLongSlitService.insertNorth),
           input.gmosSouthLongSlit.map(gmosLongSlitService.insertSouth),
@@ -100,7 +101,7 @@ object ObservingModeServices {
 
       override def deleteFunction(
         mode: ObservingModeType
-      )(using Transaction[F]): List[Observation.Id] => F[Unit] =
+      )(using Transaction[F], SuperUserAccess): List[Observation.Id] => F[Unit] =
         mode match
           case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth
@@ -110,7 +111,7 @@ object ObservingModeServices {
 
       override def updateFunction(
         input: ObservingModeInput.Edit
-      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
+      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.flamingos2LongSlit.map(flamingos2LongSlitService.update),
           input.gmosNorthLongSlit.map(gmosLongSlitService.updateNorth),
@@ -124,7 +125,7 @@ object ObservingModeServices {
 
       override def createViaUpdateFunction(
         input: ObservingModeInput.Edit
-      )(using Transaction[F]): Result[List[Observation.Id] => F[Unit]] =
+      )(using Transaction[F], SuperUserAccess): Result[List[Observation.Id] => F[Unit]] =
         List(
           input.flamingos2LongSlit.map(m => m.toCreate.map(flamingos2LongSlitService.insert)),
           input.gmosNorthLongSlit.map(m => m.toCreate.map(gmosLongSlitService.insertNorth)),
@@ -138,7 +139,7 @@ object ObservingModeServices {
 
       override def cloneFunction(
         mode: ObservingModeType
-      )(using Transaction[F]): (Observation.Id, Observation.Id) => F[Unit] =
+      )(using Transaction[F], SuperUserAccess): (Observation.Id, Observation.Id) => F[Unit] =
         mode match
           case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone
           case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth

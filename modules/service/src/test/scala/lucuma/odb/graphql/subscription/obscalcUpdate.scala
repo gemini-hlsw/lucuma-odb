@@ -14,6 +14,7 @@ import lucuma.core.model.Semester
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.EditType
 import lucuma.odb.service.ObscalcServiceSuiteSupport
+import lucuma.odb.service.Services
 
 import scala.concurrent.duration.*
 
@@ -233,8 +234,10 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
     
   def deleteCalibrationObservation(oid: Observation.Id): IO[Unit] =
     withServices(pi): services =>
-      services.transactionally:
-        services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))
+      services.transactionally {
+        Services.asSuperUser:
+          services.observationService.deleteCalibrationObservations(NonEmptyList.one(oid))
+      }
     .void
 
   test("trigger for hard delete"):

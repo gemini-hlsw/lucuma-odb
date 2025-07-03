@@ -241,7 +241,8 @@ trait ProgramMapping[F[_]]
   private val timeChargeHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, List[BandedTime]]("id") { pid =>
       services.useTransactionally {
-        timeAccountingService.selectProgram(pid)
+        Services.asSuperUser:
+          timeAccountingService.selectProgram(pid)
       }
     }
 
