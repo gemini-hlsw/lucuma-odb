@@ -44,7 +44,7 @@ object TimingWindowService:
         originalId: Observation.Id,
         newId: Observation.Id,
       )(using Transaction[F], SuperUserAccess): F[Unit] =
-        exec(Statements.clone(originalId, newId))
+        session.exec(Statements.clone(originalId, newId))
     }
 
 object Statements {

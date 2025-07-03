@@ -256,11 +256,12 @@ object ObservationWorkflowService {
                 .toMap
 
         def addAsterisms(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          asterismService
-            .getAsterisms(input.keys.toList)
-            .map: results =>
-              input.map: (oid, info) =>
-                oid -> info.copy(asterism = results.get(oid).foldMap(_.map(_._2)))
+          Services.asSuperUser:
+            asterismService
+              .getAsterisms(input.keys.toList)
+              .map: results =>
+                input.map: (oid, info) =>
+                  oid -> info.copy(asterism = results.get(oid).foldMap(_.map(_._2)))
 
         def addGeneratorParams(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
           generatorParamsService

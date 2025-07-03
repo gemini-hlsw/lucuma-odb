@@ -86,7 +86,7 @@ trait ConfigurationMapping[F[_]]
           case Some(refTime) =>
             services.use { implicit s =>
               Services.asSuperUser:
-                s.guideService(httpClient, itcClient, commitHash, timeEstimateCalculator)
+                s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
                   .getObjectTracking(pid, oid)
                   .map:
                     case Failure(problems) => Warning(problems, None) // turn failure into a warning

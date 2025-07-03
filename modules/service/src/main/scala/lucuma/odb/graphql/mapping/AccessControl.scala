@@ -224,6 +224,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
               .map(Result.success)
 
   /** Verify that `oid` is writable. */
+  @annotation.nowarn("msg=unused implicit parameter")
   private def verifyWritable(
     oid: Observation.Id
   )(using Services[F], NoTransaction[F]): F[Result[Unit]] =
@@ -740,6 +741,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
 
+  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:

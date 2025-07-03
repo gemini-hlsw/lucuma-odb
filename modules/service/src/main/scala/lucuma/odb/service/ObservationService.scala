@@ -310,6 +310,7 @@ object ObservationService {
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def selectObservingModes(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
