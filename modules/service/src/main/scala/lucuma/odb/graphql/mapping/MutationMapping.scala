@@ -10,7 +10,6 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import grackle.Context
 import grackle.Env
 import grackle.Path
 import grackle.Predicate
@@ -64,7 +63,6 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
-import skunk.AppliedFragment
 import skunk.SqlState
 import skunk.Transaction
 
@@ -727,48 +725,33 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               .map(_.flatMap(callForProposalsResultSubquery(_, input.LIMIT, child)))
 
   private lazy val UpdateConfigurationRequests: MutationField =
-    MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))) { (input, child) =>
-      services.useTransactionally {
-
-        // Our predicate for selecting requests to update
-        val filterPredicate = and(List(
-          Predicates.configurationRequest.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
-
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("requests"), List("requests"), List(ConfigurationRequestType))).flatMap(_.fragment)
-
-        idSelect.flatTraverse { which =>
+    MutationField("updateConfigurationRequests", UpdateConfigurationRequestsInput.binding(Path.from(ConfigurationRequestType))): (input, child) =>
+      services.useTransactionally:
+        idSelectFromPredicate(
+          ConfigurationRequestType,
+            and(List(
+            Predicates.configurationRequest.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
+        ).flatTraverse: which =>
           configurationService
             .updateRequests(input.SET, which)
             .map(_.flatMap(configurationRequestResultSubquery(_, input.LIMIT, child)))
-        }
-
-      }
-    }
 
   private lazy val UpdateDatasets: MutationField =
-    MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))) { (input, child) =>
-      services.useTransactionally {
-        requireStaffAccess {
-          // Our predicate for selecting datasets to update
-          val filterPredicate = and(List(
-            Predicates.dataset.observation.program.isWritableBy(user),
-            input.WHERE.getOrElse(True)
-          ))
-
-          val idSelect: Result[AppliedFragment] =
-            MappedQuery(Filter(filterPredicate, Select("id", Empty)), Context(QueryType, List("datasets"), List("datasets"), List(DatasetType))).flatMap(_.fragment)
-
-          idSelect.flatTraverse { which =>
+    MutationField("updateDatasets", UpdateDatasetsInput.binding(Path.from(DatasetType))): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          idSelectFromPredicate(
+            DatasetType,
+            and(List(
+              Predicates.dataset.observation.program.isWritableBy(user),
+              input.WHERE.getOrElse(True)
+            ))
+          ).flatTraverse: which =>
             datasetService
               .updateDatasets(input.SET, which)
               .map(datasetResultSubquery(_, input.LIMIT, child))
-          }
-        }
-      }
-    }
 
   private lazy val UpdateAttachments =
     MutationField("updateAttachments", UpdateAttachmentsInput.binding(Path.from(AttachmentType))): (input, child) =>
@@ -850,18 +833,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField("updateProgramUsers", UpdateProgramUsersInput.binding(Path.from(ProgramUserType))): (input, child) =>
       services.useTransactionally:
         requirePiAccess:
-          val filterPredicate = and(List(
-            Predicates.programUser.program.isWritableBy(user),
-            input.WHERE.getOrElse(True)
-          ))
-
-          val selection: Result[AppliedFragment] =
-            MappedQuery(
-              Filter(filterPredicate, Query.Group(List(Select("id", None, Empty)))),
-              Context(QueryType, List("programUsers"), List("programUsers"), List(ProgramUserType))
-            ).flatMap(_.fragment)
-
-          selection.flatTraverse: which =>
+          idSelectFromPredicate(
+            ProgramUserType,
+            and(List(
+              Predicates.programUser.program.isWritableBy(user),
+              input.WHERE.getOrElse(True)
+            ))
+          ).flatTraverse: which =>
             programUserService
               .updateProperties(input.SET, which)
               .map(
@@ -915,29 +893,21 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     )
 
   private lazy val UpdateGroups =
-    MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))) { (input, child) =>
-      services.useTransactionally {
-
-        // Our predicate for selecting groups to update
-        val filterPredicate = and(List(
-          // TODO: Predicates.group.program.isWritableBy(user),
-          input.WHERE.getOrElse(True)
-        ))
-
-        // An applied fragment that selects all group ids that satisfy `filterPredicate`
-        val idSelect: Result[AppliedFragment] =
-          MappedQuery(Filter(filterPredicate, Select("id", None, Empty)), Context(QueryType, List("groups"), List("groups"), List(GroupType))).flatMap(_.fragment)
-
-        // Update the specified groups and then return a query for the affected groups (or an error)
-        idSelect.flatTraverse: which =>
-          groupService.updateGroups(input.SET, which).map: r =>
-            r.flatMap: selected =>
-              groupResultSubquery(selected, input.LIMIT, child)
-
-      } .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
-        case SqlState.RaiseException(ex) =>
-          OdbError.InconsistentGroupError(Some(ex.message)).asFailure
-
-    }
+    MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))): (input, child) =>
+      services
+        .useTransactionally:
+          idSelectFromPredicate(
+            GroupType,
+            and(List(
+              // TODO: Predicates.group.program.isWritableBy(user),
+              input.WHERE.getOrElse(True)
+            ))
+          ).flatTraverse: which =>
+            groupService.updateGroups(input.SET, which).map: r =>
+              r.flatMap: selected =>
+                groupResultSubquery(selected, input.LIMIT, child)
+        .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
+          case SqlState.RaiseException(ex) =>
+            OdbError.InconsistentGroupError(Some(ex.message)).asFailure
 
 }
