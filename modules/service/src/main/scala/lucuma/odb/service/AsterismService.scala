@@ -123,6 +123,7 @@ object AsterismService {
         }
       }
 
+      @annotation.nowarn("msg=unused implicit parameter")
       def deleteAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]

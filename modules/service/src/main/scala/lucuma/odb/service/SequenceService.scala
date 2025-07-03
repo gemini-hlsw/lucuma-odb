@@ -15,6 +15,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.Instrument
