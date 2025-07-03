@@ -220,7 +220,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
             pq.stream(af.argument, 1024)
               .compile
               .toList
-              .map(Result.success)
+              .map: ids =>
+                Result.success(ids)
 
   /** Verify that `oid` is writable. */
   @annotation.nowarn("msg=unused implicit parameter")
