@@ -7,6 +7,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.math.Offset
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
@@ -91,6 +92,24 @@ object HashBytes {
   given HashBytes[TimeSpan] with {
     def hashBytes(a: TimeSpan): Array[Byte] =
       HashBytes[Long].hashBytes(a.toMicroseconds)
+  }
+
+  given HashBytes[Offset.P] with {
+    def hashBytes(a: Offset.P): Array[Byte] =
+      HashBytes[Long].hashBytes(a.toAngle.toMicroarcseconds)
+  }
+
+  given HashBytes[Offset.Q] with {
+    def hashBytes(a: Offset.Q): Array[Byte] =
+      HashBytes[Long].hashBytes(a.toAngle.toMicroarcseconds)
+  }
+
+  given HashBytes[Offset] with {
+    def hashBytes(a: Offset): Array[Byte] =
+      Array.concat(
+        HashBytes[Offset.P].hashBytes(a.p),
+        HashBytes[Offset.Q].hashBytes(a.q)
+      )
   }
 
   given [A](using HashBytes[A]): HashBytes[Option[A]] with {

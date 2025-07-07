@@ -302,23 +302,24 @@ object OdbMapping {
               Services.forUser(
                 user,
                 enums,
-                Option.when(allowSub)(apply(
-                  Resource.pure(session), // Always use this session
-                  monitor0,               // Same args as the outer mapping
-                  user0,
-                  topics0,
-                  gaiaClient0,
-                  itcClient0,
-                  commitHash0,
-                  goaUsers0,
-                  enums,
-                  tec,
-                  httpClient0,
-                  emailConfig0,
-                  false,                  // don't allow further sub-mappings; only one level of recursion is allowed
-                  Some(schema),           // don't re-parse the schema
-                  shouldValidate = false  // already validated
-                ))
+                Option.when(allowSub): (s: Session[F]) => 
+                  apply(
+                    Resource.pure(s),     // Always use the provided session
+                    monitor0,             // Same args as the outer mapping
+                    user0,
+                    topics0,
+                    gaiaClient0,
+                    itcClient0,
+                    commitHash0,
+                    goaUsers0,
+                    enums,
+                    tec,
+                    httpClient0,
+                    emailConfig0,
+                    false,                  // don't allow further sub-mappings; only one level of recursion is allowed
+                    Some(schema),           // don't re-parse the schema
+                    shouldValidate = false  // already validated
+                  )
               )(session)
 
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
