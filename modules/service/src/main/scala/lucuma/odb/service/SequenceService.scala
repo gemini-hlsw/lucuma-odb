@@ -62,9 +62,9 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id
   ): Stream[F, StepRecord[GmosNorth]]
 
-  def selectGmosSouthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[GmosSouth]]
+  // def selectGmosSouthStepRecords(
+  //   observationId: Observation.Id
+  // ): Stream[F, StepRecord[GmosSouth]]
 
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
@@ -84,7 +84,7 @@ trait SequenceService[F[_]] {
     stepId: Step.Id,
     stage:  StepStage,
     time:   Timestamp
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def abandonOngoingStepsExcept(
     observationId: Observation.Id,
@@ -175,11 +175,6 @@ object SequenceService {
       ): Stream[F, StepRecord[GmosNorth]] =
         gmosSequenceService.selectGmosNorthStepRecords(observationId)
 
-      override def selectGmosSouthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[GmosSouth]] =
-        gmosSequenceService.selectGmosSouthStepRecords(observationId)
-
       /**
        * We'll need to estimate the cost of executing the next step.  For that
        * we have to find the static config, the last gcal step (if any), the
@@ -268,7 +263,7 @@ object SequenceService {
         stepId: Step.Id,
         stage:  StepStage,
         time:   Timestamp
-      )(using Transaction[F]): F[Unit] = {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
         val state = stage match {
           case StepStage.EndStep => StepExecutionState.Completed
           case StepStage.Abort   => StepExecutionState.Aborted

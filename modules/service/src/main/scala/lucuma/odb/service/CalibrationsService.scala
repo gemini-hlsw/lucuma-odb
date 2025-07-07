@@ -300,7 +300,7 @@ object CalibrationsService extends CalibrationObservations {
       private def removeUnnecessaryCalibrations(
         scienceConfigs: List[CalibrationConfigSubset],
         calibrations:   List[(Observation.Id, CalibrationConfigSubset)]
-      )(using Transaction[F]): F[List[Observation.Id]] = {
+      )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val oids = NonEmptyList.fromList(
           calibrations
             .collect { case (oid, c) if !scienceConfigs.exists(_ === c) => oid }
@@ -404,7 +404,8 @@ object CalibrationsService extends CalibrationObservations {
           o    <- session.execute(Statements.selectCalibrationTimeAndConf)(oid).map(_.headOption)
           // Find the original target
           otgs <- o.map(_._1).map { oid =>
-                    asterismService.getAsterism(pid, oid).map(_.map(_._1))
+                    Services.asSuperUser:
+                      asterismService.getAsterism(pid, oid).map(_.map(_._1))
                   }.getOrElse(List.empty.pure[F])
           // Select a new target
           tgts <- o match {
