@@ -41,7 +41,6 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
-import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
