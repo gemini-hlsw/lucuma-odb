@@ -13,13 +13,13 @@ class ShortCut_6006 extends OdbSuite:
   val admin = TestUsers.Standard.admin(nextId, nextId)
   val validUsers = List(bob, andy, admin)
 
-  test("foo"):
+  test("Secondary support user should be able to clone an observation."):
     for 
       _   <- createUsers(andy)
       pid <- createProgramAs(bob)
       mid <- addProgramUserAs(admin, pid, ProgramUserRole.SupportSecondary)
       _   <- linkUserAs(admin, mid, andy.id)
       oid <- createObservationAs(bob, pid)
-      _   <- cloneObservationAs(andy, oid)
+      _   <- cloneObservationAs(andy, oid) // was failing, should work now
     yield ()
 
