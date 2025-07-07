@@ -216,10 +216,10 @@ object CalcMain extends MainParams:
   def services[F[_]: Concurrent: Parallel: UUIDGen: Trace: Logger](
     user:    User,
     enums:   Enums,
-    mapping: Mapping[F]
-  )(pool: Session[F]): F[Services[F]] =
-    Services.forUser(user, enums, mapping.some)(pool).pure[F].flatTap: _ =>
-      val us = UserService.fromSession(pool)
+    mapping: Session[F] => Mapping[F]
+  )(session: Session[F]): F[Services[F]] =
+    Services.forUser(user, enums, mapping.some)(session).pure[F].flatTap: _ =>
+      val us = UserService.fromSession(session)
       Services.asSuperUser(us.canonicalizeUser(user))
 
   /**
@@ -242,7 +242,7 @@ object CalcMain extends MainParams:
 
       t     <- topic(pool)
       user  <- Resource.eval(serviceUser[F](c))
-      mapping = OdbMapping.forObscalc(pool, SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
+      mapping = (s: Session[F]) => OdbMapping.forObscalc(Resource.pure(s), SkunkMonitor.noopMonitor[F], user, c.goaUsers, gaiaClient, itc, c.commitHash, enums, ptc, http, c.email)
       o     <- runObscalcDaemon(c.database.maxObscalcConnections, c.commitHash, c.obscalcPoll, itc, ptc, t, pool.evalMap(services(user, enums, mapping)))
     yield o
 
