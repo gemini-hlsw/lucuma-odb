@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.issue.shortcut
 
+import lucuma.core.enums.ProgramUserRole
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
-import lucuma.core.enums.ProgramUserRole
 
 class ShortCut_6006 extends OdbSuite:
 
