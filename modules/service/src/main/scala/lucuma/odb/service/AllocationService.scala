@@ -15,6 +15,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
@@ -27,7 +28,7 @@ trait AllocationService[F[_]] {
    * Selects the science bands for which time has been allocated, if any, for
    * the given program.
    */
-  def selectScienceBands(pid: Program.Id): F[Set[ScienceBand]]
+  def selectScienceBands(pid: Program.Id)(using SuperUserAccess): F[Set[ScienceBand]]
 
   def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Unit]]
 
@@ -35,7 +36,7 @@ trait AllocationService[F[_]] {
    * Validates that the given `band` may be assigned to observations in the
    * programs referenced by `pids`.
    */
-  def validateBand(band: ScienceBand, pids: List[Program.Id]): F[Result[Unit]]
+  def validateBand(band: ScienceBand, pids: List[Program.Id])(using SuperUserAccess): F[Result[Unit]]
 }
 
 object AllocationService {
@@ -43,10 +44,10 @@ object AllocationService {
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): AllocationService[F] =
     new AllocationService[F] {
 
-      def selectScienceBands(pid: Program.Id): F[Set[ScienceBand]] =
+      def selectScienceBands(pid: Program.Id)(using SuperUserAccess): F[Set[ScienceBand]] =
         session.execute(Statements.SelectScienceBands)(pid).map(_.toSet)
 
-      def validateBand(band: ScienceBand, pids: List[Program.Id]): F[Result[Unit]] =
+      def validateBand(band: ScienceBand, pids: List[Program.Id])(using SuperUserAccess): F[Result[Unit]] =
         NonEmptyList.fromList(pids).fold(Result.unit.pure[F]) { nelPids =>
           session.execute(Statements.validPidsForBand(nelPids))((band, nelPids)).map { validPids =>
             (pids.toSet &~ validPids.toSet).toList match {

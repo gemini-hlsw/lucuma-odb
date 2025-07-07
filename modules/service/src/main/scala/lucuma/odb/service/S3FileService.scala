@@ -17,6 +17,7 @@ import io.laserdisc.pure.s3.tagless.Interpreter
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.core.model.Program
 import lucuma.odb.Config
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.refined.*
 import natchez.Trace
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -43,10 +44,10 @@ import java.util.UUID
 trait S3FileService[F[_]] {
 
   /** Get the file as a stream */
-  def get(filePath: NonEmptyString): Stream[F, Byte]
+  def get(filePath: NonEmptyString)(using SuperUserAccess): Stream[F, Byte]
 
   /** Get metatada about the S3 file */
-  def getMetadata(filePath: NonEmptyString): F[HeadObjectResponse]
+  def getMetadata(filePath: NonEmptyString)(using SuperUserAccess): F[HeadObjectResponse]
 
   /**
     * A convenience method for verifying eistence of and access to the file.
@@ -54,20 +55,20 @@ trait S3FileService[F[_]] {
     * terminates without a response code. This allows the request to at least finish
     * with Internal Server Error most of the time.
     */
-  def verifyFileAcess(filePath: NonEmptyString): F[Unit]
+  def verifyFileAcess(filePath: NonEmptyString)(using SuperUserAccess): F[Unit]
 
   /** A meta-convenience method combining verify and get */
-  def verifyAndGet(filePath: NonEmptyString): F[Stream[F, Byte]]
+  def verifyAndGet(filePath: NonEmptyString)(using SuperUserAccess): F[Stream[F, Byte]]
 
   /** Uploads a stream to S3 */
-  def upload(filePath: NonEmptyString, data: Stream[F, Byte]): F[Long]
+  def upload(filePath: NonEmptyString, data: Stream[F, Byte])(using SuperUserAccess): F[Long]
 
   /** Deletes a file from S3 */
-  def delete(filePath: NonEmptyString): F[Unit]
+  def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit]
 
-  def presignedUrl(filePath: NonEmptyString): F[String]
+  def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String]
 
-  def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString): NonEmptyString
+  def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString
 }
 
 object S3FileService {
@@ -87,10 +88,10 @@ object S3FileService {
 
     new S3FileService[F] {
 
-      def get(filePath: NonEmptyString): Stream[F, Byte] =
+      def get(filePath: NonEmptyString)(using SuperUserAccess): Stream[F, Byte] =
         s3.readFileMultipart(awsConfig.bucketName, filePath.toKey, partSize)
 
-      def getMetadata(filePath: NonEmptyString): F[HeadObjectResponse] =
+      def getMetadata(filePath: NonEmptyString)(using SuperUserAccess): F[HeadObjectResponse] =
         Trace[F].span(s"get remote file metadata for file key: ${filePath.toKey}") {
           s3Ops
             .headObject(
@@ -103,13 +104,13 @@ object S3FileService {
             .onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
 
-      def verifyFileAcess(filePath: NonEmptyString): F[Unit] =
+      def verifyFileAcess(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
         getMetadata(filePath).void
 
-      def verifyAndGet(filePath: NonEmptyString): F[Stream[F, Byte]] =
+      def verifyAndGet(filePath: NonEmptyString)(using SuperUserAccess): F[Stream[F, Byte]] =
         verifyFileAcess(filePath).map(_ => get(filePath))
 
-      def upload(filePath: NonEmptyString, data: Stream[F, Byte]): F[Long] =
+      def upload(filePath: NonEmptyString, data: Stream[F, Byte])(using SuperUserAccess): F[Long] =
         Trace[F].span(s"uploading remote file with file key: ${filePath.toKey}") {
           val f = for {
             ref  <- Ref.of(0L)
@@ -120,13 +121,13 @@ object S3FileService {
           f.onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
 
-      def delete(filePath: NonEmptyString): F[Unit] =
+      def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
         Trace[F].span(s"deleting remote file with file key: ${filePath.toKey}") {
           s3.delete(awsConfig.bucketName, filePath.toKey)
             .onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
 
-      def presignedUrl(filePath: NonEmptyString): F[String] =
+      def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String] =
         Trace[F].span(s"getting presigned URL for file key: ${filePath.toKey}") {
           val objectRequest = GetObjectRequest
             .builder()
@@ -144,7 +145,7 @@ object S3FileService {
             .onError { case e => Trace[F].attachError(e, ("error", true)) }
         }
 
-      def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString): NonEmptyString =
+      def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =
         awsConfig.filePath(programId, uuid, fileName)
     }
   }

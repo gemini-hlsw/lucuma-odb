@@ -65,6 +65,8 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import natchez.Trace
 import skunk.*
@@ -82,15 +84,11 @@ sealed trait ObservationService[F[_]] {
   def resolveOid(
     oid: Option[Observation.Id],
     ref: Option[ObservationReference]
-  ): F[Result[Observation.Id]]
+  )(using SuperUserAccess): F[Result[Observation.Id]]
 
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
-
-  def selectObservingModes(
-    which: List[Observation.Id]
-  )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]]
 
   def updateObservations(
     update: AccessControl.Checked[ObservationPropertiesInput.Edit]
@@ -106,7 +104,7 @@ sealed trait ObservationService[F[_]] {
 
   def deleteCalibrationObservations(
     oids: NonEmptyList[Observation.Id]
-  )(using Transaction[F]): F[Result[Unit]]
+  )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
   def resetAcquisition(
     input: AccessControl.CheckedWithId[Unit, Observation.Id]
@@ -209,13 +207,13 @@ object ObservationService {
       override def resolveOid(
         oid: Option[Observation.Id],
         ref: Option[ObservationReference]
-      ): F[Result[Observation.Id]] =
+      )(using SuperUserAccess): F[Result[Observation.Id]] =
         resolver.resolve(oid, ref)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
         timingWindows: Option[List[TimingWindowInput]],
-      )(using Transaction[F]): F[Result[Unit]] =
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         timingWindows
           .traverse(timingWindowService.createFunction)
           .traverse { optF =>
@@ -226,7 +224,7 @@ object ObservationService {
       private def createObservationImpl(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create
-      )(using Transaction[F]): F[Result[Observation.Id]] =
+      )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
         Trace[F].span("createObservation") {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
@@ -244,7 +242,7 @@ object ObservationService {
 
                 }
               }.flatTap { rOid =>
-                rOid.flatTraverse { oid => setTimingWindows(List(oid), SET.timingWindows) }
+                rOid.flatTraverse { oid => Services.asSuperUser(setTimingWindows(List(oid), SET.timingWindows)) }
               }.flatMap { rOid =>
                 SET.attachments.fold(rOid.pure[F]) { aids =>
                   rOid.flatTraverse { oid =>
@@ -264,7 +262,7 @@ object ObservationService {
       // It assumes the imple case where the observation has no extra timing windows or attachments
       def deleteCalibrationObservations(
         oids: NonEmptyList[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] = {
+      )(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
         val existenceOff = ObservationPropertiesInput.Edit.Empty.copy(
           existence = Existence.Deleted.some,
           group     = Nullable.Null
@@ -299,18 +297,21 @@ object ObservationService {
         input.foldWithId(
           OdbError.InvalidArgument().asFailureF // typically handled by caller
         ): (SET, pid) =>
-          ResultT(createObservationImpl(pid, SET))
+          ResultT(Services.asSuperUser(createObservationImpl(pid, SET)))
             .flatMap: oid =>
               SET
                 .asterism
                 .traverse: a =>
-                  ResultT(asterismService.insertAsterism(pid, NonEmptyList.one(oid), a))
+                  ResultT:
+                    Services.asSuperUser:
+                      asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
             .value
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
 
-      override def selectObservingModes(
+      @annotation.nowarn("msg=unused implicit parameter")
+      def selectObservingModes(
         which: List[Observation.Id]
       )(using Transaction[F]): F[Map[Option[ObservingModeType], List[Observation.Id]]] =
         NonEmptyList
@@ -337,7 +338,7 @@ object ObservationService {
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
-      )(using Transaction[F]): F[Result[Unit]] =
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
@@ -393,7 +394,10 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-              SET.scienceBand.toOption.fold(ResultT.unit)(band => ResultT(allocationService.validateBand(band, pids)))
+              SET.scienceBand.toOption.fold(ResultT.unit): band => 
+                ResultT:
+                  Services.asSuperUser:
+                    allocationService.validateBand(band, pids)
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
@@ -405,8 +409,8 @@ object ObservationService {
                 g  = r.groupMap(_._1)(_._2)                                        // grouped:   Map[Program.Id, List[Observation.Id]]
                 u  = g.values.reduceOption(_ ++ _).flatMap(NonEmptyList.fromList)  // ungrouped: NonEmptyList[Observation.Id]
                 _ <- validateBand(g.keys.toList)
-                _ <- ResultT(u.map(u => updateObservingModes(SET.observingMode, u)).getOrElse(Result.unit.pure[F]))
-                _ <- ResultT(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty)))
+                _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u))).getOrElse(Result.unit.pure[F]))
+                _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.timingWindows.foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
@@ -474,10 +478,11 @@ object ObservationService {
               case Some(oid2) =>
 
                 val cloneRelatedItems =
-                  asterismService.cloneAsterism(observationId, oid2) >>
-                  observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
-                  timingWindowService.cloneTimingWindows(observationId, oid2) >>
-                  obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
+                  Services.asSuperUser:
+                    asterismService.cloneAsterism(observationId, oid2) >>
+                    observingMode.traverse(observingModeServices.cloneFunction(_)(observationId, oid2)) >>
+                    timingWindowService.cloneTimingWindows(observationId, oid2) >>
+                    obsAttachmentAssignmentService.cloneAssignments(observationId, oid2)
 
                 val doUpdate =
                   SET match
@@ -506,9 +511,10 @@ object ObservationService {
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
           cloneObservationImpl(origOid, oSET).flatMap: res =>
             res.flatTraverse: (pid, newOid) =>
-              asterismService
-                .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
-                .map(_.as(CloneIds(origOid, newOid)))
+              Services.asSuperUser:
+                asterismService
+                  .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
+                  .map(_.as(CloneIds(origOid, newOid)))
 
       override def resetAcquisition(
         input: AccessControl.CheckedWithId[Unit, Observation.Id]

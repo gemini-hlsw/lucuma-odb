@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.input.TimingWindowInput
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -19,12 +20,12 @@ import Services.Syntax.*
 trait TimingWindowService[F[_]] {
   def createFunction(
     timingWindows: List[TimingWindowInput]
-  ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
+  )(using SuperUserAccess): Result[(List[Observation.Id], Transaction[F]) => F[Unit]]
 
   def cloneTimingWindows(
     originalId: Observation.Id,
     newId: Observation.Id,
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], SuperUserAccess): F[Unit]
 }
 
 object TimingWindowService:
@@ -33,7 +34,7 @@ object TimingWindowService:
 
       override def createFunction(
         timingWindows: List[TimingWindowInput]
-      ): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
+      )(using SuperUserAccess): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         Result( (obsIds, _) =>
           session.exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
             Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(session.exec)
@@ -42,7 +43,7 @@ object TimingWindowService:
       def cloneTimingWindows(
         originalId: Observation.Id,
         newId: Observation.Id,
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], SuperUserAccess): F[Unit] =
         session.exec(Statements.clone(originalId, newId))
     }
 

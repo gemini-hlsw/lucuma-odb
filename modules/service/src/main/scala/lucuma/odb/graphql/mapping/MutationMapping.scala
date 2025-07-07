@@ -60,6 +60,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
@@ -669,7 +670,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val SetObservationWorkflowState =
     MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
       services.useNonTransactionally:
-        observationWorkflowService.setWorkflowState(input.observationId, input.state, commitHash, itcClient, timeEstimateCalculator)
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            observationWorkflowService.setWorkflowState(checked, commitHash, itcClient, timeEstimateCalculator)
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>
@@ -801,7 +804,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               }
             }
 
-      def setAsterisms(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F]): ResultT[F, Unit] =
+      def setAsterisms(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F], SuperUserAccess): ResultT[F, Unit] =
         ResultT:
           // The "obvious" implementation with `traverse` doesn't work here because
           // ResultT isn't a Monad and thus doesn't short-circuit. Doing an explicit
@@ -821,8 +824,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                 updateObservations(edit)
                   .flatMap: 
                     case (map, query) =>
-                      setAsterisms(map)
-                        .as(query)
+                      Services.asSuperUser:
+                        setAsterisms(map)
+                          .as(query)
                   .value
                   .flatTap: q =>
                     transaction.rollback.unlessA(q.hasValue)

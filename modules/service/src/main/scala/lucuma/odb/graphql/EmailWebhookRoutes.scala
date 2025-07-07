@@ -13,6 +13,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.service.EmailWebhookService
+import lucuma.odb.service.Services
 import org.http4s.*
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.dsl.Http4sDsl
@@ -95,7 +96,8 @@ object EmailWebhookRoutes {
     import dsl.*
 
     def updateStatus(data: EventData): F[Unit] =
-      webhookService.updateStatus(data.messageId, data.emailStatus, data.timestamp)
+      Services.asSuperUser:
+        webhookService.updateStatus(data.messageId, data.emailStatus, data.timestamp)
 
     def validateSignature(event: WebhookEvent): F[Unit] =
       if (event.signature.isValid(emailConfig.webhookSigningKey)) Async[F].unit
