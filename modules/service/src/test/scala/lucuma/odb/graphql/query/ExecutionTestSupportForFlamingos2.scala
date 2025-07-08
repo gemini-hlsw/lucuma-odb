@@ -32,7 +32,6 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.string.*
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
@@ -160,33 +159,19 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   val Flamingos2Flat: Flamingos2DynamicConfig =
     flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2Acq0: Flamingos2DynamicConfig =
+  val Flamingos2AcqImage: Flamingos2DynamicConfig =
     Flamingos2Science.copy(
-      exposure  = fakeItcImagingResult.exposureTime,
       disperser = none,
       filter    = Flamingos2Filter.J,
       fpu       = Flamingos2FpuMask.Imaging,
       decker    = Flamingos2Decker.Imaging
     )
 
-  val Flamingos2Acq1: Flamingos2DynamicConfig =
-    Flamingos2Acq0.copy(
-      exposure  = 10.secondTimeSpan,
+  val Flamingos2AcqSlit: Flamingos2DynamicConfig =
+    Flamingos2AcqImage.copy(
       fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       decker    = Flamingos2Decker.LongSlit
     )
-
-  val Flamingos2Acq2: Flamingos2DynamicConfig =
-    Flamingos2Acq1.copy(
-      exposure = fakeItcImagingResult.exposureTime
-    )
-
-  def flamingos2Acq(step: Int): Flamingos2DynamicConfig =
-    step match
-      case 0 => Flamingos2Acq0
-      case 1 => Flamingos2Acq1
-      case 2 => Flamingos2Acq2
-      case _ => sys.error("Only 3 steps in a Flamingos 2 Acq")
 
   val Flamingos2FlatStep: StepConfig.Gcal =
     f2_flat_JH1.gcalConfig
@@ -217,12 +202,12 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       }
     """
 
-  protected def flamingos2ExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
+  protected def flamingos2ExpectedAcq(f2: Flamingos2DynamicConfig, exposureTime: TimeSpan, p: Int, q: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
     json"""
       {
-        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(flamingos2Acq(step))},
+        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(f2.copy(exposure = exposureTime))},
         "stepConfig" : { "stepType":  "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION",
         "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }

@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
@@ -18,9 +19,17 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.json.all.transport.given
 
-class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
+class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportForFlamingos2:
+
+  val ExposureTime: TimeSpan = 2.secTimeSpan
+
+  override def fakeItcImagingResult: IntegrationTime =
+    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(1))
 
   val InitialAcquisition: Json =
     json"""
@@ -34,9 +43,9 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                     "description": "Initial Acquisition",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${flamingos2ExpectedAcq(0,  0)},
-                      ${flamingos2ExpectedAcq(1, 10)},
-                      ${flamingos2ExpectedAcq(2,  0, Breakpoint.Enabled)}
+                      ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0,  0)},
+                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                     ]
                   },
                   "possibleFuture": [
@@ -44,7 +53,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${flamingos2ExpectedAcq(2, 0)}
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
                       ]
                     }
                   ],
@@ -69,7 +78,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                     "description": "Fine Adjustments",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${flamingos2ExpectedAcq(2, 0, Breakpoint.Disabled)}
+                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
                     ]
                   },
                   "possibleFuture": [
@@ -77,7 +86,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                       "description": "Fine Adjustments",
                       "observeClass": "ACQUISITION",
                       "steps": [
-                        ${flamingos2ExpectedAcq(2, 0, Breakpoint.Disabled)}
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
                       ]
                     }
                   ],
@@ -122,7 +131,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
         _  <- resetAcquisitionAs(serviceUser, o)
       yield o
@@ -151,11 +160,11 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // Record the first atom with 3 steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Now the last acquisition step should be generated as the nextAtom
@@ -185,7 +194,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // Record the first atom and one of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
       yield o
 
@@ -212,8 +221,8 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                           "description": "Initial Acquisition",
                           "observeClass": "ACQUISITION",
                           "steps": [
-                            ${flamingos2ExpectedAcq(1, 10)},
-                            ${flamingos2ExpectedAcq(2,  0, Breakpoint.Enabled)}
+                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -221,7 +230,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${flamingos2ExpectedAcq(2, 0, Breakpoint.Disabled)}
+                              ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime, 0,  0)}
                             ]
                           }
                         ],
@@ -245,16 +254,16 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
 
         // Second atom with just the last acq step
         a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Now we should expect to generate (again) the last acq step
@@ -284,14 +293,14 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // Acquisition Sequence
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
-        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s2 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s2)
         a1 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, flamingos2Acq(2), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s3 <- recordStepAs(serviceUser, a1, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s3)
 
         // Reset acquisition to take it from the top.
@@ -322,9 +331,9 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // Record the first atom and two of its steps
         a  <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
-        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
         // Fail the second step
@@ -357,8 +366,8 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                           "description": "Initial Acquisition",
                           "observeClass": "ACQUISITION",
                           "steps": [
-                            ${flamingos2ExpectedAcq(1, 10)},
-                            ${flamingos2ExpectedAcq(2,  0, Breakpoint.Enabled)}
+                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
                           ]
                         },
                         "possibleFuture": [
@@ -366,7 +375,7 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
                             "description": "Fine Adjustments",
                             "observeClass": "ACQUISITION",
                             "steps": [
-                              ${flamingos2ExpectedAcq(2, 0)}
+                              ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0)}
                             ]
                           }
                         ],
@@ -396,12 +405,12 @@ class executionAcqFlamingos2 extends ExecutionTestSupportForFlamingos2:
 
         // First atom with 3 steps.
         a0 <- recordAtomAs(serviceUser, Instrument.Flamingos2, v, SequenceType.Acquisition)
-        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
+        s0 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqImage.copy(exposure = ExposureTime), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
 
         x1 <- nextAtomStepIds(p, o)
 
-        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, flamingos2Acq(1), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
+        s1 <- recordStepAs(serviceUser, a0, Instrument.Flamingos2, Flamingos2AcqSlit.copy(exposure = 10.secTimeSpan), StepConfig.Science, acqTelescopeConfig(10), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s1)
 
         x2 <- nextAtomStepIds(p, o)
