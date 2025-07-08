@@ -486,32 +486,33 @@ object ProgramUserService:
       """(targetId) |+|
       accessCheck.map(ac => void" AND " |+| ac).getOrElse(AppliedFragment.empty)
 
-    def existsUserAs(
+    def existsProgramUserInRole(
       programId: Program.Id,
       userId: User.Id,
-      role: ProgramUserRole
+      acceptableRoles: List[ProgramUserRole]
     ): AppliedFragment =
+      val roles: Encoder[acceptableRoles.type] = program_user_role.list(acceptableRoles)
       sql"""
-        EXISTS (select c_role from t_program_user where c_program_id = $program_id and c_user_id = $user_id and c_role = $program_user_role)
-      """.apply(programId, userId, role)
+        EXISTS (select c_role from t_program_user where c_program_id = $program_id and c_user_id = $user_id and c_role IN ($roles))
+      """.apply(programId, userId, acceptableRoles)
 
     def existsUserAsPi(
       programId: Program.Id,
       userId: User.Id,
     ): AppliedFragment =
-      existsUserAs(programId, userId, ProgramUserRole.Pi)
+      existsProgramUserInRole(programId, userId, List(ProgramUserRole.Pi))
 
     def existsUserAsCoi(
       programId: Program.Id,
       userId: User.Id,
     ): AppliedFragment =
-      existsUserAs(programId, userId, ProgramUserRole.Coi)
+      existsProgramUserInRole(programId, userId, List(ProgramUserRole.Coi))
 
     def existsUserAsCoiRO(
       programId: Program.Id,
       userId: User.Id,
     ): AppliedFragment =
-      existsUserAs(programId, userId, ProgramUserRole.CoiRO)
+      existsProgramUserInRole(programId, userId, List(ProgramUserRole.CoiRO))
 
     def existsAllocationForPartner(
       programId: Program.Id,
@@ -527,7 +528,7 @@ object ProgramUserService:
     ): Option[AppliedFragment] =
       user.role match
         case GuestRole                    => existsUserAsPi(programId, user.id).some
-        case StandardRole.Pi(_)           => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void" OR " |+| existsUserAsCoiRO(programId, user.id) |+|void")").some
+        case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
         case StandardRole.Ngo(_, partner) => existsAllocationForPartner(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
@@ -539,7 +540,7 @@ object ProgramUserService:
     ): Option[AppliedFragment] =
       user.role match
         case GuestRole                    => existsUserAsPi(programId, user.id).some
-        case StandardRole.Pi(_)           => (void"(" |+| existsUserAsPi(programId, user.id) |+| void" OR " |+| existsUserAsCoi(programId, user.id) |+| void")").some
+        case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
         case StandardRole.Ngo(_, partner) => existsAllocationForPartner(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |

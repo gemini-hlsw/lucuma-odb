@@ -7,12 +7,14 @@ import cats.Functor
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Context
+import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
 import grackle.ResultT
+import grackle.Type
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -166,19 +168,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean
-  ): Result[AppliedFragment] = {
-    val whereObservation: Predicate =
+  ): Result[AppliedFragment] =
+    idSelectFromPredicate(
+      ObservationType,
       and(List(
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
         if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
         WHERE.getOrElse(True)
       ))
-    MappedQuery(
-      Filter(whereObservation, Select("id", None, Query.Empty)),
-      Context(QueryType, List("observations"), List("observations"), List(ObservationType))
-    ).flatMap(_.fragment)
-  }
+    )
 
 
   /**
@@ -221,7 +220,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
             pq.stream(af.argument, 1024)
               .compile
               .toList
-              .map(Result.success)
+              .map: ids =>
+                Result.success(ids)
 
   /** Verify that `oid` is writable. */
   @annotation.nowarn("msg=unused implicit parameter")
@@ -239,6 +239,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
         case _           => Result.internalError("Unpossible: selectForObservationCloneImpl returned multiple ids, or the wrong id")
 
   /**
+   * Construct a `SELECT` statement that returns the `"id"` fields of all objects
+   * of type `Type` that match the given `Predicate`. Note that the query generated
+   * here is not subject to elaboration; the predicate passed here must express
+   * exactly what is needed.
+   */
+  protected def idSelectFromPredicate(tpe: Type, pred: Predicate): Result[Fragment] =
+    Context(Path.from(tpe)).flatMap: ctx =>
+      val q = Filter(pred, Select("id", None, Query.Empty))
+      MappedQuery(q, ctx).flatMap(_.fragment)
+
+  /**
    * Select and return the ids of programs that are editable by the current user and meet
    * all the specified filters.
    */
@@ -246,29 +257,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
   private def selectForProgramUpdateImpl(
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
-  )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =  {
-
-    val programIdWhereClause: Result[AppliedFragment] = {
-      val whereProgram: Predicate =
-        and(List(
-          Predicates.program.isWritableBy(user),
-          Predicates.program.existence.includeDeleted(includeDeleted.getOrElse(false)),
-          WHERE.getOrElse(True)
-        ))
-      MappedQuery(
-        Filter(whereProgram, Select("id", None, Query.Empty)),
-        Context(QueryType, List("programs"), List("programs"), List(ProgramType))
-      ).flatMap(_.fragment)
-    }
-
-    programIdWhereClause.flatTraverse: frag =>
+  )(using Services[F], NoTransaction[F]): F[Result[List[Program.Id]]] =
+    idSelectFromPredicate(
+      ProgramType,
+      and(List(
+        Predicates.program.isWritableBy(user),
+        Predicates.program.existence.includeDeleted(includeDeleted.getOrElse(false)),
+        WHERE.getOrElse(True)
+      ))
+    ).flatTraverse: frag =>
       session.prepareR(frag.fragment.query(program_id)).use: pq =>
         pq.stream(frag.argument, 1024)
           .compile
           .toList
           .map(Result.success)
-
-  }
 
   /**
    * Compute the subset of `pids` that identify programs which are editable by the current user.
@@ -292,22 +294,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     allowedStates:       Set[ObservationWorkflowState]
-  )(using Services[F], NoTransaction[F]): F[Result[List[Target.Id]]] =  {
-
-    val rWhichTargets: Result[AppliedFragment] =
-      val whereTarget: Predicate =
+  )(using Services[F], NoTransaction[F]): F[Result[List[Target.Id]]] =
+    Services.asSuperUser:
+      idSelectFromPredicate(
+        TargetType,
         and(List(
           Predicates.target.program.isWritableBy(user),
           Predicates.target.existence.includeDeleted(includeDeleted.getOrElse(false)),
           WHERE.getOrElse(True)
         ))
-      MappedQuery(
-        Filter(whereTarget, Select("id", None, Query.Empty)),
-        Context(QueryType, List("targets"), List("targets"), List(TargetType))
-      ).flatMap(_.fragment)
-
-    Services.asSuperUser:
-      rWhichTargets.flatTraverse: which =>
+      ).flatTraverse: which =>
         observationWorkflowService.filterTargets(
           which,
           allowedStates,
@@ -315,8 +311,6 @@ trait AccessControl[F[_]] extends Predicates[F] {
           itcClient,
           timeEstimateCalculator
         )
-      
-  }
 
   /**
    * Given an operation that defines a set of targets and a proposed edit, select and filter this
@@ -589,13 +583,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: UpdateProgramsInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.Checked[ProgramPropertiesInput.Edit]]] =
-    MappedQuery(Filter(and(List(
-      Predicates.program.isWritableBy(user),
-      Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-      input.WHERE.getOrElse(True)
-    )), Select("id", None, Empty)), Context(QueryType, List("programs"), List("programs"), List(ProgramType)))
-      .flatMap(_.fragment)
-      .map: frag =>
+    idSelectFromPredicate(
+      ProgramType,
+      and(List(
+        Predicates.program.isWritableBy(user),
+        Predicates.program.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+        input.WHERE.getOrElse(True)
+      ))
+    ) .map: frag =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, frag)
       .pure[F]
@@ -617,16 +612,15 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: UpdateAttachmentsInput
   )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =
-    MappedQuery(
-      Filter(and(List(
+    idSelectFromPredicate(
+      AttachmentType,
+      and(List(
         Predicates.attachment.program.isWritableBy(user),
         input.WHERE.getOrElse(True)
-      )), Select("id", Empty)),
-      Context(QueryType, List("attachments"), List("attachments"), List(AttachmentType))
-    ) .flatMap(_.fragment)
-      .traverse: af =>
-        Services.asSuperUser:
-          AccessControl.unchecked(input.SET, af).pure[F]
+      ))
+    ).traverse: af =>
+      Services.asSuperUser:
+        AccessControl.unchecked(input.SET, af).pure[F]
 
   def selectForUpdate(
     input: CreateCallForProposalsInput
@@ -639,44 +633,34 @@ trait AccessControl[F[_]] extends Predicates[F] {
     input: UpdateCallsForProposalsInput
   )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Edit]]] =
     requireStaffAccess: // this is the only check
-      MappedQuery(
-        Filter(
-          and(List(
-            Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
-            input.WHERE.getOrElse(True)
-          )), 
-          Select("id", None, Empty)
-        ),
-        Context(QueryType, List("callsForProposals"), List("callsForProposals"), List(CallForProposalsType))
-      ) .flatMap(_.fragment)
-        .flatTraverse: which =>
-          Services.asSuperUser:
-            Result(AccessControl.unchecked(input.SET, which)).pure[F]
+      idSelectFromPredicate(
+        CallForProposalsType,
+        and(List(
+          Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
+          input.WHERE.getOrElse(True)
+        ))
+      ).flatTraverse: which =>
+        Services.asSuperUser:
+          Result(AccessControl.unchecked(input.SET, which)).pure[F]
 
   @annotation.nowarn("msg=unused implicit parameter")
   private def selectForProgramNoteUpdateImpl(
     includeDeleted: Option[Boolean],
     WHERE:          Option[Predicate]
   )(using Services[F], NoTransaction[F]): F[Result[List[ProgramNote.Id]]] =
-    val whereNote: Predicate =
+    idSelectFromPredicate(
+      ProgramNoteType,
       and(List(
         Predicates.programNote.isWritableBy(user),
         Predicates.programNote.existence.includeDeleted(includeDeleted.getOrElse(false)),
         WHERE.getOrElse(True)
       ))
-
-    MappedQuery(
-      Filter(whereNote, Select("id", None, Query.Empty)),
-      Context(QueryType, List("programNotes"), List("programNotes"), List(ProgramNoteType))
-    )
-      .flatMap(_.fragment)
-      .flatTraverse: af =>
-        session.prepareR(af.fragment.query(program_note_id)).use: pq =>
-          pq.stream(af.argument, 1024)
-            .compile
-            .toList
-            .map(Result.success)
-
+    ).flatTraverse: af =>
+      session.prepareR(af.fragment.query(program_note_id)).use: pq =>
+        pq.stream(af.argument, 1024)
+          .compile
+          .toList
+          .map(Result.success)
 
   def selectForUpdate(
     input: UpdateProgramNotesInput
