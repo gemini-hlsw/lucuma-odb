@@ -90,7 +90,7 @@ object Acquisition:
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Steps(s0, s1, s2)
 
-  private sealed trait AcquisitionState extends SequenceGenerator[F2]:
+  private sealed trait AcquisitionState extends SequenceGenerator.Base[F2]:
 
     def builder: AtomBuilder[F2]
     def steps: Steps
@@ -136,7 +136,7 @@ object Acquisition:
         a1 <- fineAdjustments(builder, slit, track.atomCount+1)
       yield Stream(a0, a1)).runA(calcState).value
 
-    case class Init(lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[F2], steps: Steps) extends SequenceGenerator[F2]:
+    case class Init(lastReset: Option[Timestamp], tracker: IndexTracker, builder: AtomBuilder[F2], steps: Steps) extends SequenceGenerator.Base[F2]:
       override def generate(ignore: Timestamp): Stream[Pure, Atom[F2]] =
         gen(builder, steps.initialAtom.some, steps.slit, TimeEstimateCalculator.Last.empty[F2], tracker)
 

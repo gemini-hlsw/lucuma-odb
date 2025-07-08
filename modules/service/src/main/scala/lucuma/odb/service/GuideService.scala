@@ -532,12 +532,12 @@ object GuideService {
         pid: Program.Id,
         oid: Observation.Id
       ): F[Result[GeneratorInfo]] =
-        generator(commitHash, itcClient, timeEstimateCalculator)
-          .digestWithParamsAndHash(pid, oid)
-          .map {
-            case Right((d, p, h)) => GeneratorInfo(d, p, h).success
-            case Left(ge)         => generatorError(ge).asFailure
-          }
+        Services.asSuperUser:
+          generator(commitHash, itcClient, timeEstimateCalculator)
+            .digestWithParamsAndHash(pid, oid)
+            .map:
+              case Right((d, p, h)) => GeneratorInfo(d, p, h).success
+              case Left(ge)         => generatorError(ge).asFailure
 
       def getPositions(
         angles:             NonEmptyList[Angle],
