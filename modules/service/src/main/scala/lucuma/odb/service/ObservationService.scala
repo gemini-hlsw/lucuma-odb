@@ -41,7 +41,6 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
-import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
@@ -442,7 +441,8 @@ object ObservationService {
                 .map: list =>
                   list.groupMap(_._1)(_._2)
 
-      private def cloneObservationImpl(
+      /** Clone the observation. We assume access has been checked already. */
+      private def cloneObservationUnconditionally(
         observationId: Observation.Id,
         SET:           Option[ObservationPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
@@ -458,7 +458,7 @@ object ObservationService {
 
             // Ok the obs exists, so let's clone its main row in t_observation. If this returns
             // None then it means the user doesn't have permission to see the obs.
-            val cObsStmt = Statements.cloneObservation(pid, observationId, user, destGroupIndex)
+            val cObsStmt = Statements.cloneObservation(observationId, destGroupIndex)
             val cloneObs = session.prepareR(cObsStmt.fragment.query(observation_id)).use(_.option(cObsStmt.argument))
 
             // Action to open a hole in the destination program/group after the observation we're cloning
@@ -509,7 +509,7 @@ object ObservationService {
         input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-          cloneObservationImpl(origOid, oSET).flatMap: res =>
+          cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
             res.flatTraverse: (pid, newOid) =>
               Services.asSuperUser:
                 asterismService
@@ -1027,7 +1027,7 @@ object ObservationService {
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
      * doesn't exist or isn't accessible.
      */
-    def cloneObservation(pid: Program.Id, oid: Observation.Id, user: User, gix: NonNegShort): AppliedFragment =
+    def cloneObservation(oid: Observation.Id, gix: NonNegShort): AppliedFragment =
       sql"""
         INSERT INTO t_observation (
           c_program_id,
@@ -1112,11 +1112,8 @@ object ObservationService {
           c_img_combined_filters
       FROM t_observation
       WHERE c_observation_id = $observation_id
-      """.apply(gix, oid) |+|
-      ProgramUserService.Statements.existsUserWriteAccess(user, pid).foldMap(void"AND " |+| _) |+|
-      void"""
-        RETURNING c_observation_id
-      """
+      RETURNING c_observation_id
+      """.apply(gix, oid)
 
     def moveObservations(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment): AppliedFragment =
       sql"""
