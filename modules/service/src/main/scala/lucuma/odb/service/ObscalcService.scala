@@ -146,7 +146,7 @@ sealed trait ObscalcService[F[_]]:
    */
   def calculateOnly(
     pending: Obscalc.PendingCalc
-  )(using NoTransaction[F]): F[Obscalc.Result]
+  )(using ServiceAccess, NoTransaction[F]): F[Obscalc.Result]
 
 object ObscalcService:
 
@@ -252,7 +252,7 @@ object ObscalcService:
 
       override def calculateOnly(
         pending: Obscalc.PendingCalc
-      )(using NoTransaction[F]): F[Obscalc.Result] =
+      )(using ServiceAccess, NoTransaction[F]): F[Obscalc.Result] =
 
         def sequenceUnavailable(msg: String): OdbError =
           OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: $msg".some)
