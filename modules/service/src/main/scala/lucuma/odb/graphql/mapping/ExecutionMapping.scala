@@ -129,9 +129,10 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
       (pid, oid, futureLimit) =>
         services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .generate(pid, oid, futureLimit)
-           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
+          Services.asSuperUser:
+            s.generator(commitHash, itcClient, timeEstimateCalculator)
+             .generate(pid, oid, futureLimit)
+             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
     // merges them with the top-level query environment.  This is done in order
@@ -148,9 +149,10 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) => {
         services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .executionState(pid, oid)
-           .map(_.asJson.success)
+          Services.asSuperUser:
+            s.generator(commitHash, itcClient, timeEstimateCalculator)
+             .executionState(pid, oid)
+             .map(_.asJson.success)
       }
 
     effectHandler(_ => ().success, calculate)
@@ -159,9 +161,10 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) =>
         services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .digest(pid, oid)
-           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
+          Services.asSuperUser:
+            s.generator(commitHash, itcClient, timeEstimateCalculator)
+             .digest(pid, oid)
+             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     effectHandler(_ => ().success, calculate)
 

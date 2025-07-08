@@ -351,7 +351,7 @@ object ObservationWorkflowService {
         commitHash: CommitHash,
         itcClient:  ItcClient[F],
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F]): F[Map[Observation.Id, ExecutionState]] =
+      )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
         generator(commitHash, itcClient, ptc)
           .executionStates:
             infos
