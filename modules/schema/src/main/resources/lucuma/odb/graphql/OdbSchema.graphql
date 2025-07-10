@@ -156,6 +156,45 @@ input AngleInput {
   hms: String
 }
 
+type AtomDigest {
+
+  """
+  Atom id
+  """
+  id: AtomId!
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """
+  Expected execution time for this atom.
+  """
+  timeEstimate: CategorizedTime!
+
+  """
+  Whether this atom has an arc Gcal calibration step.
+  """
+  hasArc: Boolean!
+
+  """
+  Whether this atom has a flat Gcal calibration step.
+  """
+  hasFlat: Boolean!
+
+}
+
+type CalculatedAtomDigests {
+
+  "The current state of the background calculation."
+  state: CalculationState!
+
+  value: [AtomDigest!]!
+
+}
+
 """
 Atom-level events.  The execution of a single atom will generate multiple events.
 """
@@ -6832,6 +6871,12 @@ type Execution {
   along with warning messages.
   """
   calculatedDigest: CalculatedExecutionDigest
+
+  """
+  A summary of pending atoms in this observation's sequence.  This is intended
+  for the scheduler, but is available generally.
+  """
+  atomDigests: CalculatedAtomDigests!
 
   """
   Full execution config, including acquisition and science sequences.  If a

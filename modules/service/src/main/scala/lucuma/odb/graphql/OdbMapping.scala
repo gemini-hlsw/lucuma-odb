@@ -117,8 +117,10 @@ object OdbMapping {
           with AngleMapping[F]
           with AsterismGroupMapping[F]
           with AsterismGroupSelectResultMapping[F]
+          with AtomDigestMapping[F]
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
+          with CalculatedAtomDigestsMapping[F]
           with CalculatedObservationWorkflowMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
@@ -570,8 +572,8 @@ object OdbMapping {
               List(
                 AsterismGroupElaborator,
                 AtomRecordElaborator,
+                CalculatedAtomDigestsElaborator,
                 CallForProposalsElaborator,
-                ProposalTypeElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
                 ExecutionElaborator,
@@ -581,6 +583,7 @@ object OdbMapping {
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
                 ProgramUserElaborator,
+                ProposalTypeElaborator,
                 StepRecordElaborator,
                 SubscriptionElaborator,
                 TargetEnvironmentElaborator,

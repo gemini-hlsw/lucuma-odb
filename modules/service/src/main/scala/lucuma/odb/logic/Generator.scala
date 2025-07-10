@@ -24,7 +24,6 @@ import lucuma.core.enums.ExecutionState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
@@ -475,17 +474,7 @@ object Generator {
           def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[OdbError, SequenceDigest] =
             s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
               eDigest.flatMap: digest =>
-                digest
-                  .incrementAtomCount
-                  .filter(_.atomCount.value <= SequenceAtomLimit)
-                  .toRight(Error.sequenceTooLong(oid))
-                  .map: incDigest =>
-                    atom.steps.foldLeft(incDigest) { case (d, s) =>
-                      d.add(s.observeClass)
-                       .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
-                       .add(s.telescopeConfig.offset)
-                       .copy(executionState = execState)
-                    }
+                Either.cond(digest.atomCount.value < SequenceAtomLimit, digest.add(atom), Error.sequenceTooLong(oid))
             }.toList.head
 
           // Compute the SequenceDigests.
