@@ -137,7 +137,7 @@ class ShortCut_5912 extends ExecutionTestSupportForFlamingos2:
                             {
                               "instrumentConfig" : {
                                 "exposure" : {
-                                  "seconds" : 10.000000
+                                  "seconds" : 2.000000
                                 }
                               }
                             }
