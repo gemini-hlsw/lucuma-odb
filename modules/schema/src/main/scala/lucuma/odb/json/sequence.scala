@@ -21,6 +21,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
@@ -96,6 +97,26 @@ trait SequenceCodec {
         "observeClass" -> a.observeClass.asJson
       )
     }
+
+  given Decoder[AtomDigest] =
+    Decoder.instance: c =>
+      for
+        i <- c.downField("id").as[Atom.Id]
+        o <- c.downField("observeClass").as[ObserveClass]
+        t <- c.downField("timeEstimate").as[CategorizedTime]
+        a <- c.downField("hasArc").as[Boolean]
+        f <- c.downField("hasFlat").as[Boolean]
+      yield AtomDigest(i, o, t, a, f)
+
+  given (using Encoder[TimeSpan]): Encoder[AtomDigest] =
+    Encoder.instance: (a: AtomDigest) =>
+      Json.obj(
+        "id"           -> a.id.asJson,
+        "observeClass" -> a.observeClass.asJson,
+        "timeEstimate" -> a.timeEstimate.asJson,
+        "hasArc"       -> a.hasArc.asJson,
+        "hasFlat"      -> a.hasFlat.asJson
+      )
 
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
