@@ -18,8 +18,8 @@ trait CalculatedAtomDigestsMapping[F[_]] extends ObscalcTable[F]
 
   lazy val CalculatedAtomDigestsMapping: ObjectMapping =
     ObjectMapping(CalculatedAtomDigestsType)(
-      SqlField("synthetic_id",  ObscalcTable.ObservationId, key = true),
-      SqlField("state",         ObscalcTable.Workflow.State),
+      SqlField("synthetic_id",  ObscalcTable.ObservationId, key = true, hidden = true),
+      SqlField("state",         ObscalcTable.CalculationState),
       SqlObject("value",        Join(ObscalcTable.ObservationId, AtomDigestTable.ObservationId))
     )
 
