@@ -17,6 +17,8 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import fs2.Pure
+import fs2.Stream
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
@@ -25,6 +27,7 @@ import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -38,7 +41,6 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation.ForInstrumentMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.util.CommitHash
@@ -253,6 +255,11 @@ object ObscalcService:
       override def calculateOnly(
         pending: Obscalc.PendingCalc
       )(using ServiceAccess, NoTransaction[F]): F[Obscalc.Result] =
+        calculateWithAtomDigests(pending).map(_._1)
+
+      private def calculateWithAtomDigests(
+        pending: Obscalc.PendingCalc
+      )(using ServiceAccess): F[(Obscalc.Result, Stream[Pure, AtomDigest])] =
 
         def sequenceUnavailable(msg: String): OdbError =
           OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: $msg".some)
@@ -277,26 +284,31 @@ object ObscalcService:
             .flatTap: r =>
               Logger[F].info(s"${pending.observationId}: finished calculating workflow: $r")
 
-        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, ExecutionDigest]] =
+        val gen = generator(commitHash, itcClient, calculator)
+
+        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
           ((for
             p <- params
-            d <- EitherT(generator(commitHash, itcClient, calculator).calculateDigest(pending.programId, pending.observationId, itcResult, p))
-          yield d).value).flatTap: e =>
-            Logger[F].info(s"${pending.observationId}: finished calculting digest: $e")
+            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
+            a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
+          yield (d, a)).value).flatTap: da =>
+            Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
         val result = for
           r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
           _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
           d <- digest(r)
-          w <- workflow(r.toOption, d.toOption)
+          w <- workflow(r.toOption, d.toOption.map(_._1))
         yield d.fold(
-          err => Obscalc.Result.Error(err, w),
-          dig =>
+          err => (Obscalc.Result.Error(err, w), Stream.empty),
+          dig => (
             r.fold(
-              _ => Obscalc.Result.WithoutTarget(dig, w),
-              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig, w)
-            )
+              _ => Obscalc.Result.WithoutTarget(dig._1, w),
+              i => Obscalc.Result.WithTarget(Obscalc.ItcResult(i.acquisitionResult.focus, i.scienceResult.focus), dig._1, w)
+            ),
+            dig._2
+          )
         )
 
         Logger[F].info(s"${pending.observationId}: *** start calculating") *>
@@ -319,12 +331,13 @@ object ObscalcService:
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
       )(using ServiceAccess, NoTransaction[F]): F[Option[Obscalc.Meta]] =
-        calculateOnly(pending)
-          .flatMap: result =>
+        calculateWithAtomDigests(pending)
+          .flatMap: (result, atomDigests) =>
             services.transactionally:
-              result.odbError match
+              sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
+              (result.odbError match
                 case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, CalculationState.Retry)
-                case _                                        => storeResult(pending, result, CalculationState.Ready)
+                case _                                        => storeResult(pending, result, CalculationState.Ready))
           .handleErrorWith: e =>
             val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
             services.transactionally:

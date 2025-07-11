@@ -26,6 +26,7 @@ import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -48,23 +49,13 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
+import skunk.codec.numeric.int2
 import skunk.implicits.*
 
 import Services.Syntax.*
 
 trait SequenceService[F[_]] {
-
-  def selectFlamingos2StepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[Flamingos2DynamicConfig]]
-
-  def selectGmosNorthStepRecords(
-    observationId: Observation.Id
-  ): Stream[F, StepRecord[GmosNorth]]
-
-  // def selectGmosSouthStepRecords(
-  //   observationId: Observation.Id
-  // ): Stream[F, StepRecord[GmosSouth]]
 
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
@@ -129,6 +120,10 @@ trait SequenceService[F[_]] {
     timeCalculator: TimeEstimateCalculator[GmosSouthStatic, GmosSouth]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Step.Id]]
 
+  def insertAtomDigests(
+    observationId: Observation.Id,
+    digests:       Stream[F, AtomDigest]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
 }
 
 object SequenceService {
@@ -164,16 +159,6 @@ object SequenceService {
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
     new SequenceService[F] {
-
-      override def selectFlamingos2StepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[Flamingos2DynamicConfig]] =
-        flamingos2SequenceService.selectStepRecords(observationId)
-
-      override def selectGmosNorthStepRecords(
-        observationId: Observation.Id
-      ): Stream[F, StepRecord[GmosNorth]] =
-        gmosSequenceService.selectGmosNorthStepRecords(observationId)
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
@@ -297,6 +282,25 @@ object SequenceService {
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
           _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId))
         } yield InsertAtomResponse.Success(aid)).merge
+
+      def insertAtomDigests(
+        observationId: Observation.Id,
+        digests:       Stream[F, AtomDigest]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val insert =
+          digests
+            .zipWithIndex
+            .map: (d, i) =>
+              (observationId, i.toShort, d)
+            .chunkN(256)
+            .evalTap: c =>
+              val lst = c.toList
+              session.execute(Statements.insertAtomDigest(lst))(lst)
+
+        for
+          _ <- session.execute(Statements.DeleteAtomDigests)(observationId)
+          _ <- insert.compile.drain
+        yield ()
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
@@ -730,6 +734,48 @@ object SequenceService {
         ORDER BY s.c_created DESC
         LIMIT 1
       """.query(step_id *: step_config *: telescope_config *: obs_class)
+
+    val DeleteAtomDigests: Command[Observation.Id] =
+      sql"""
+        DELETE FROM t_atom_digest WHERE c_observation_id = $observation_id
+      """.command
+
+    def insertAtomDigest(ds: List[(Observation.Id, Short, AtomDigest)]): Command[ds.type] =
+      val digest_row = (
+        atom_id        *:
+        int2           *:
+        observation_id *:
+        obs_class      *:
+        time_span      *:
+        time_span      *:
+        bool           *:
+        bool
+      ).contramap[(Observation.Id, Short, AtomDigest)]: (o, i, d) =>
+        (
+          d.id,
+          i,
+          o,
+          d.observeClass,
+          d.timeEstimate.nonCharged,
+          d.timeEstimate.programTime,
+          d.hasArc,
+          d.hasFlat
+        )
+
+      val enc = digest_row.values.list(ds)
+
+      sql"""
+        INSERT INTO t_atom_digest (
+          c_atom_id,
+          c_atom_index,
+          c_observation_id,
+          c_observe_class,
+          c_non_charged_time_estimate,
+          c_program_time_estimate,
+          c_has_arc,
+          c_has_flat
+        ) VALUES $enc
+      """.command
 
   }
 }

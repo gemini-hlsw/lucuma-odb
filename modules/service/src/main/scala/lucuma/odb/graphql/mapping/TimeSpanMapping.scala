@@ -41,8 +41,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
   lazy val TimeSpanMappings: List[TypeMapping] =
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
-      timeSpanMappingAtPath(AtomDigestType / "nonCharged", AtomDigestTable.NonChargedEstimate)(AtomDigestTable.AtomId),
-      timeSpanMappingAtPath(AtomDigestType / "program",    AtomDigestTable.ProgramEstimate)(AtomDigestTable.AtomId),
+      timeSpanMappingAtPath(AtomDigestType / "timeEstimate" / "nonCharged", AtomDigestTable.NonChargedEstimate)(AtomDigestTable.AtomId),
+      timeSpanMappingAtPath(AtomDigestType / "timeEstimate" / "program",    AtomDigestTable.ProgramEstimate)(AtomDigestTable.AtomId),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
