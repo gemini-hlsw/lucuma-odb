@@ -506,6 +506,8 @@ object Generator {
         setupTime: SetupTime
       ): Either[OdbError, ExecutionDigest] =
 
+        println(s"executionDigest: execState = $execState")
+
         if execState === ExecutionState.DeclaredComplete then
           ExecutionDigest(
             SetupTime.Zero,
@@ -517,7 +519,7 @@ object Generator {
           def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[OdbError, SequenceDigest] =
             s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
               eDigest.flatMap: digest =>
-                Either.cond(digest.atomCount.value < SequenceAtomLimit, digest.add(atom), Error.sequenceTooLong(oid))
+                Either.cond(digest.atomCount.value < SequenceAtomLimit, digest.add(atom).copy(executionState = execState), Error.sequenceTooLong(oid))
             }.toList.head
 
           // Compute the SequenceDigests.
