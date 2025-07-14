@@ -47,8 +47,8 @@ class atomDigests extends ExecutionTestSupportForGmos:
                 program { seconds }
                 nonCharged { seconds }
               }
-              hasArc
-              hasFlat
+              stepTypes
+              lampTypes
             }
           }
         }
@@ -64,8 +64,8 @@ class atomDigests extends ExecutionTestSupportForGmos:
           "program": { "seconds": 3892.500000 },
           "nonCharged": { "seconds": 0.000000 }
         },
-        "hasArc": true,
-        "hasFlat": true
+        "stepTypes": [ "GCAL", "SCIENCE" ],
+        "lampTypes": [ "ARC", "FLAT" ]
       }
     """
 
@@ -77,8 +77,8 @@ class atomDigests extends ExecutionTestSupportForGmos:
           "program": { "seconds": 1390.300000 },
           "nonCharged": { "seconds": 0.000000 }
         },
-        "hasArc": true,
-        "hasFlat": true
+        "stepTypes": [ "GCAL", "SCIENCE" ],
+        "lampTypes": [ "ARC", "FLAT" ]
       }
     """
 
@@ -150,8 +150,8 @@ class atomDigests extends ExecutionTestSupportForGmos:
                            "program": { "seconds": 2502.200000 },
                            "nonCharged": { "seconds": 0.000000 }
                          },
-                         "hasArc": false,
-                         "hasFlat": false
+                         "stepTypes": [ "SCIENCE" ],
+                         "lampTypes": []
                       },
                       $fullAtom,
                       $fullAtom,

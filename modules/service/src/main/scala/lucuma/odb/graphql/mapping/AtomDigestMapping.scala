@@ -16,6 +16,6 @@ trait AtomDigestMapping[F[_]] extends AtomDigestTable[F]:
 
       SqlField("observeClass",  AtomDigestTable.ObserveClass),
       SqlObject("timeEstimate"),
-      SqlField("hasArc",        AtomDigestTable.HasArc),
-      SqlField("hasFlat",       AtomDigestTable.HasFlat)
+      SqlField("stepTypes",     AtomDigestTable.StepTypes),
+      SqlField("lampTypes",     AtomDigestTable.LampTypes)
     )

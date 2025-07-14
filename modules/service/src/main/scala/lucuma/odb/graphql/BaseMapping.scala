@@ -151,6 +151,7 @@ trait BaseMapping[F[_]]
   lazy val GcalContinuumType                       = schema.ref("GcalContinuum")
   lazy val GcalDiffuserType                        = schema.ref("GcalDiffuser")
   lazy val GcalFilterType                          = schema.ref("GcalFilter")
+  lazy val GcalLampTypeType                        = schema.ref("GcalLampType")
   lazy val GcalShutterType                         = schema.ref("GcalShutter")
   lazy val GcalType                                = schema.ref("Gcal")
   lazy val GmosAmpCountType                        = schema.ref("GmosAmpCount")

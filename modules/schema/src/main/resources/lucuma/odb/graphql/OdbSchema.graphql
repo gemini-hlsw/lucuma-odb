@@ -156,6 +156,14 @@ input AngleInput {
   hms: String
 }
 
+enum GcalLampType {
+
+  ARC
+
+  FLAT
+
+}
+
 type AtomDigest {
 
   """
@@ -175,14 +183,14 @@ type AtomDigest {
   timeEstimate: CategorizedTime!
 
   """
-  Whether this atom has an arc Gcal calibration step.
+  Step types contained in this atom.
   """
-  hasArc: Boolean!
+  stepTypes: [StepType!]!
 
   """
-  Whether this atom has a flat Gcal calibration step.
+  Gcal lamp types used in this atom, if any.
   """
-  hasFlat: Boolean!
+  lampTypes: [GcalLampType!]!
 
 }
 

@@ -8,6 +8,7 @@ import cats.data.EitherT
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.Order.catsKernelOrderingForOrder
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -49,7 +50,6 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StepRecord
 import lucuma.odb.util.Codecs.*
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
 import skunk.implicits.*
 
@@ -748,8 +748,8 @@ object SequenceService {
         obs_class      *:
         time_span      *:
         time_span      *:
-        bool           *:
-        bool
+        _step_type     *:
+        _gcal_lamp_type
       ).contramap[(Observation.Id, Short, AtomDigest)]: (o, i, d) =>
         (
           d.id,
@@ -758,8 +758,8 @@ object SequenceService {
           d.observeClass,
           d.timeEstimate.nonCharged,
           d.timeEstimate.programTime,
-          d.hasArc,
-          d.hasFlat
+          d.stepTypes.toList.sorted,
+          d.lampTypes.toList.sorted
         )
 
       val enc = digest_row.values.list(ds)
@@ -772,8 +772,8 @@ object SequenceService {
           c_observe_class,
           c_non_charged_time_estimate,
           c_program_time_estimate,
-          c_has_arc,
-          c_has_flat
+          c_step_types,
+          c_lamp_types
         ) VALUES $enc
       """.command
 
