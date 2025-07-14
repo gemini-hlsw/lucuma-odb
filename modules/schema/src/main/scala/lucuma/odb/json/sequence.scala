@@ -16,8 +16,10 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.StepType
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
@@ -104,9 +106,9 @@ trait SequenceCodec {
         i <- c.downField("id").as[Atom.Id]
         o <- c.downField("observeClass").as[ObserveClass]
         t <- c.downField("timeEstimate").as[CategorizedTime]
-        a <- c.downField("hasArc").as[Boolean]
-        f <- c.downField("hasFlat").as[Boolean]
-      yield AtomDigest(i, o, t, a, f)
+        s <- c.downField("stepTypes").as[Set[StepType]]
+        l <- c.downField("lampTypes").as[Set[GcalLampType]]
+      yield AtomDigest(i, o, t, s, l)
 
   given (using Encoder[TimeSpan]): Encoder[AtomDigest] =
     Encoder.instance: (a: AtomDigest) =>
@@ -114,8 +116,8 @@ trait SequenceCodec {
         "id"           -> a.id.asJson,
         "observeClass" -> a.observeClass.asJson,
         "timeEstimate" -> a.timeEstimate.asJson,
-        "hasArc"       -> a.hasArc.asJson,
-        "hasFlat"      -> a.hasFlat.asJson
+        "stepTypes"    -> a.stepTypes.toList.sorted.asJson,
+        "lampTypes"    -> a.lampTypes.toList.sorted.asJson
       )
 
   given Decoder[SequenceDigest] =
