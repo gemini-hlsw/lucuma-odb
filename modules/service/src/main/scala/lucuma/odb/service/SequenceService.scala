@@ -4,11 +4,11 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.Order.catsKernelOrderingForOrder
 import cats.data.EitherT
 import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
-import cats.Order.catsKernelOrderingForOrder
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
