@@ -66,8 +66,8 @@ object ObservingModeInput {
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit.map(_.observingModeType)
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
-        .orElse(gmosNorthImaging.flatMap(_.toCreate.toOption).map(_.observingModeType))
-        .orElse(gmosSouthImaging.flatMap(_.toCreate.toOption).map(_.observingModeType))
+        .orElse(gmosNorthImaging.map(_.observingModeType))
+        .orElse(gmosSouthImaging.map(_.observingModeType))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
 
   }
