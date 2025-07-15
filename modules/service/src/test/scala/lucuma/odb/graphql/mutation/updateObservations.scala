@@ -3356,7 +3356,47 @@ class updateObservations extends OdbSuite
       )
     )
 
-  test("observing mode: (fail to) create GMOS imaging without filters"):
+  test("observing mode: update GMOS imaging binning without filters"):
+
+    val update = """
+      observingMode: {
+        gmosSouthImaging: {
+          explicitBin: FOUR
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosSouthImaging {
+            filters
+            explicitBin
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "explicitBin": "FOUR"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    oneUpdateTest(pi, update, query, expected, ObservingModeType.GmosSouthImaging.some)
+
+  test("observing mode: (fail to) update GMOS imaging with empty filters"):
 
     val update = """
       observingMode: {
@@ -3376,7 +3416,7 @@ class updateObservations extends OdbSuite
       }
     """
 
-    val expected = "At least one filter must be specified for GMOS imaging observations.".asLeft
+    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
     oneUpdateTest(pi, update, query, expected)
 
   test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
@@ -3439,7 +3479,7 @@ class updateObservations extends OdbSuite
           _ <- expect(
             user = pi,
             query = updateObservationsMutation(oid, failingUpdate, query),
-            expected = List("At least one filter must be specified for GMOS imaging observations.").asLeft
+            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
           )
           // Verify that ALL values remain unchanged (transaction rollback)
           _ <- expect(
