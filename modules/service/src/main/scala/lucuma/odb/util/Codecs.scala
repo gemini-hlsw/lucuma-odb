@@ -296,6 +296,12 @@ trait Codecs {
   val gcal_filter: Codec[GcalFilter] =
     enumerated[GcalFilter](Type.varchar)
 
+  val gcal_lamp_type: Codec[GcalLampType] =
+    enumerated(Type("e_gcal_lamp_type"))
+
+  val _gcal_lamp_type: Codec[List[GcalLampType]] =
+    _enumerated[GcalLampType](Type("_e_gcal_lamp_type", List(Type("e_gcal_lamp_type"))))
+
   val gcal_shutter: Codec[GcalShutter] =
     enumerated[GcalShutter](Type.varchar)
 
@@ -520,6 +526,9 @@ trait Codecs {
 
   val step_stage: Codec[StepStage] =
     enumerated(Type("e_step_stage"))
+
+  val _step_type: Codec[List[StepType]] =
+    _enumerated[StepType](Type("_e_step_type", List(Type("e_step_type"))))
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))

@@ -24,7 +24,7 @@ import lucuma.core.enums.ExecutionState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
@@ -114,6 +114,14 @@ sealed trait Generator[F[_]] {
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]]
+
+  def calculateScienceAtomDigests(
+    programId:      Program.Id,
+    observationId:  Observation.Id,
+    asterismResult: Either[OdbError, ItcService.AsterismResults],
+    params:         GeneratorParams,
+    when:           Option[Timestamp] = None
+  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -421,6 +429,40 @@ object Generator {
             EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
         )
 
+      override def calculateScienceAtomDigests(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        ast:    Either[OdbError, ItcService.AsterismResults],
+        params: GeneratorParams,
+        when:   Option[Timestamp] = None
+      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]] =
+        scienceAtomDigestsFromContext(Context(pid, oid, ast, params), when).value
+
+      @annotation.nowarn("msg=unused implicit parameter")
+      private def scienceAtomDigestsFromContext(
+        ctx:  Context,
+        when: Option[Timestamp]
+      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, Stream[Pure, AtomDigest]] =
+        EitherT
+          .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
+          .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
+        (ctx.params match
+          case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, declaredComplete, _) =>
+            flamingos2LongSlit(ctx, config, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosNorth, role, declaredComplete, _) =>
+            gmosNorthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.longslit.Config.GmosSouth, role, declaredComplete, _) =>
+            gmosSouthLongSlit(ctx, config, role, when).map((p, _) => p.science.map(AtomDigest.fromAtom))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosNorth, _, _, _) =>
+            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS North imaging sequence generation is not yet implemented".some))
+
+          case GeneratorParams(_, _, config: gmos.imaging.Config.GmosSouth, _, _, _) =>
+            EitherT.leftT[F, Stream[Pure, AtomDigest]](OdbError.SequenceUnavailable(ctx.oid, "GMOS South imaging sequence generation is not yet implemented".some))
+        )
+
       override def generate(
         pid:  Program.Id,
         oid:  Observation.Id,
@@ -464,6 +506,8 @@ object Generator {
         setupTime: SetupTime
       ): Either[OdbError, ExecutionDigest] =
 
+        println(s"executionDigest: execState = $execState")
+
         if execState === ExecutionState.DeclaredComplete then
           ExecutionDigest(
             SetupTime.Zero,
@@ -475,17 +519,7 @@ object Generator {
           def sequenceDigest(s: Stream[Pure, Atom[D]]): Either[OdbError, SequenceDigest] =
             s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
               eDigest.flatMap: digest =>
-                digest
-                  .incrementAtomCount
-                  .filter(_.atomCount.value <= SequenceAtomLimit)
-                  .toRight(Error.sequenceTooLong(oid))
-                  .map: incDigest =>
-                    atom.steps.foldLeft(incDigest) { case (d, s) =>
-                      d.add(s.observeClass)
-                       .add(CategorizedTime.fromStep(s.observeClass, s.estimate))
-                       .add(s.telescopeConfig.offset)
-                       .copy(executionState = execState)
-                    }
+                Either.cond(digest.atomCount.value < SequenceAtomLimit, digest.add(atom).copy(executionState = execState), Error.sequenceTooLong(oid))
             }.toList.head
 
           // Compute the SequenceDigests.
