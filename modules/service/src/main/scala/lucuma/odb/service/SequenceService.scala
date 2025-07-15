@@ -19,6 +19,7 @@ import cats.syntax.traverse.*
 import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.AtomStage
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -28,6 +29,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
@@ -55,7 +57,7 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait SequenceService[F[_]] {
+trait SequenceService[F[_]]:
 
   def abandonAtomsAndStepsForObservation(
     observationId: Observation.Id
@@ -124,14 +126,16 @@ trait SequenceService[F[_]] {
     observationId: Observation.Id,
     digests:       Stream[F, AtomDigest]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
-}
 
-object SequenceService {
+  def selectAtomDigests(
+    which: List[Observation.Id]
+  )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
+
+object SequenceService:
 
   sealed trait InsertAtomResponse extends Product with Serializable
 
-  object InsertAtomResponse {
-
+  object InsertAtomResponse:
     case class VisitNotFound(
       vid:        Visit.Id,
       instrument: Instrument
@@ -141,12 +145,9 @@ object SequenceService {
       aid: Atom.Id
     ) extends InsertAtomResponse
 
-  }
-
   sealed trait InsertStepResponse extends Product with Serializable
 
-  object InsertStepResponse {
-
+  object InsertStepResponse:
     case class AtomNotFound(
       aid:        Atom.Id,
       instrument: Instrument
@@ -155,10 +156,10 @@ object SequenceService {
     case class Success(
       sid: Step.Id
     ) extends InsertStepResponse
-  }
+
 
   def instantiate[F[_]: Concurrent: UUIDGen](using Services[F]): SequenceService[F] =
-    new SequenceService[F] {
+    new SequenceService[F]:
 
       /**
        * We'll need to estimate the cost of executing the next step.  For that
@@ -219,55 +220,51 @@ object SequenceService {
       override def abandonAtomsAndStepsForObservation(
         observationId: Observation.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        for {
+        for
           _ <- session.execute(Statements.AbandonAllNonTerminalAtomsForObservation)(observationId)
           _ <- session.execute(Statements.AbandonAllNonTerminalStepsForObservation)(observationId)
-        } yield ()
+        yield ()
 
       override def setAtomExecutionState(
         atomId: Atom.Id,
         stage:  AtomStage
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
-        val state = stage match {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val state = stage match
           case AtomStage.StartAtom => AtomExecutionState.Ongoing
           case AtomStage.EndAtom   => AtomExecutionState.Completed
-        }
         session.execute(Statements.SetAtomExecutionState)(state, atomId).void
-      }
 
       override def abandonOngoingAtomsExcept(
         observationId: Observation.Id,
         atomId:        Atom.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        for {
+        for
           _ <- session.execute(Statements.AbandonOngoingAtomsWithoutAtomId)(observationId, atomId)
           _ <- session.execute(Statements.AbandonOngoingStepsWithoutAtomId)(observationId, atomId)
-        } yield ()
+        yield ()
 
       override def setStepExecutionState(
         stepId: Step.Id,
         stage:  StepStage,
         time:   Timestamp
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] = {
-        val state = stage match {
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val state = stage match
           case StepStage.EndStep => StepExecutionState.Completed
           case StepStage.Abort   => StepExecutionState.Aborted
           case StepStage.Stop    => StepExecutionState.Stopped
           case _                 => StepExecutionState.Ongoing
-        }
         val completedTime = Option.when(stage === StepStage.EndStep)(time)
         session.execute(Statements.SetStepExecutionState)(state, completedTime, stepId).void
-      }
 
       override def abandonOngoingStepsExcept(
         observationId: Observation.Id,
         atomId:        Atom.Id,
         stepId:        Step.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        for {
+        for
           _ <- session.execute(Statements.AbandonOngoingAtomsWithoutAtomId)(observationId, atomId)
           _ <- session.execute(Statements.AbandonOngoingStepsWithoutStepId)(observationId, stepId)
-        } yield ()
+        yield ()
 
       @annotation.nowarn("msg=unused implicit parameter")
       def insertAtomRecordImpl(
@@ -277,30 +274,11 @@ object SequenceService {
         generatedId:  Option[Atom.Id]
       )(using Transaction[F], Services.ServiceAccess): F[InsertAtomResponse] =
         val v = visitService.select(visitId).map(_.filter(_.instrument === instrument))
-        (for {
+        (for
           inv <- EitherT.fromOptionF(v, InsertAtomResponse.VisitNotFound(visitId, instrument))
           aid <- EitherT.right[InsertAtomResponse](UUIDGen[F].randomUUID.map(Atom.Id.fromUuid))
           _   <- EitherT.right[InsertAtomResponse](session.execute(Statements.InsertAtom)(aid, inv.observationId, visitId, instrument, sequenceType, generatedId))
-        } yield InsertAtomResponse.Success(aid)).merge
-
-      def insertAtomDigests(
-        observationId: Observation.Id,
-        digests:       Stream[F, AtomDigest]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val insert =
-          digests
-            .zipWithIndex
-            .map: (d, i) =>
-              (observationId, i.toShort, d)
-            .chunkN(256)
-            .evalTap: c =>
-              val lst = c.toList
-              session.execute(Statements.insertAtomDigest(lst))(lst)
-
-        for
-          _ <- session.execute(Statements.DeleteAtomDigests)(observationId)
-          _ <- insert.compile.drain
-        yield ()
+        yield InsertAtomResponse.Success(aid)).merge
 
       override def insertAtomRecord(
         visitId:      Visit.Id,
@@ -412,9 +390,33 @@ object SequenceService {
           selectGmosSouthEstimatorState,
           sid => gmosSequenceService.insertGmosSouthDynamic(sid, dynamicConfig)
         )
-    }
 
-  object Statements {
+      override def insertAtomDigests(
+        observationId: Observation.Id,
+        digests:       Stream[F, AtomDigest]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        val insert =
+          digests
+            .zipWithIndex
+            .map: (d, i) =>
+              (observationId, i.toShort, d)
+            .chunkN(256)
+            .evalTap: c =>
+              val lst = c.toList
+              session.execute(Statements.insertAtomDigest(lst))(lst)
+
+        for
+          _ <- session.execute(Statements.DeleteAtomDigests)(observationId)
+          _ <- insert.compile.drain
+        yield ()
+
+      override def selectAtomDigests(
+        which: List[Observation.Id]
+      )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)] =
+        if which.isEmpty then Stream.empty
+        else session.stream(Statements.selectAtomDigests(which))(which, 1024)
+
+  object Statements:
 
     val SelectObservationId: Query[(Atom.Id, Instrument), Observation.Id] =
       sql"""
@@ -740,42 +742,60 @@ object SequenceService {
         DELETE FROM t_atom_digest WHERE c_observation_id = $observation_id
       """.command
 
-    def insertAtomDigest(ds: List[(Observation.Id, Short, AtomDigest)]): Command[ds.type] =
-      val digest_row = (
-        atom_id        *:
-        int2           *:
-        observation_id *:
-        obs_class      *:
-        time_span      *:
-        time_span      *:
-        _step_type     *:
-        _gcal_lamp_type
-      ).contramap[(Observation.Id, Short, AtomDigest)]: (o, i, d) =>
-        (
-          d.id,
-          i,
-          o,
-          d.observeClass,
-          d.timeEstimate.nonCharged,
-          d.timeEstimate.programTime,
-          d.stepTypes.toList.sorted,
-          d.lampTypes.toList.sorted
-        )
+    val atom_digest: Codec[AtomDigest] = (
+      atom_id        *:
+      obs_class      *:
+      time_span      *:
+      time_span      *:
+      _step_type     *:
+      _gcal_lamp_type
+    ).imap { case (a, c, n, p, ss, ls) =>
+      AtomDigest(
+        a,
+        c,
+        CategorizedTime(ChargeClass.NonCharged -> n, ChargeClass.Program -> p),
+        ss.toSet,
+        ls.toSet
+      )
+    } { (a: AtomDigest) => (
+      a.id,
+      a.observeClass,
+      a.timeEstimate.nonCharged,
+      a.timeEstimate.programTime,
+      a.stepTypes.toList.sorted,
+      a.lampTypes.toList.sorted
+    )}
 
-      val enc = digest_row.values.list(ds)
+    val atom_digest_row: Codec[(Observation.Id, Short, AtomDigest)] =
+      observation_id *: int2 *: atom_digest
 
-      sql"""
-        INSERT INTO t_atom_digest (
-          c_atom_id,
-          c_atom_index,
+    val AtomDigestRowColumns: String =
+      """
           c_observation_id,
+          c_atom_index,
+          c_atom_id,
           c_observe_class,
           c_non_charged_time_estimate,
           c_program_time_estimate,
           c_step_types,
           c_lamp_types
+      """
+
+    def insertAtomDigest(ds: List[(Observation.Id, Short, AtomDigest)]): Command[ds.type] =
+      val enc = atom_digest_row.values.list(ds)
+      sql"""
+        INSERT INTO t_atom_digest (
+          #$AtomDigestRowColumns
         ) VALUES $enc
       """.command
 
-  }
-}
+    def selectAtomDigests(which: List[Observation.Id]): Query[which.type, (Observation.Id, Short, AtomDigest)] =
+      sql"""
+        SELECT
+          #$AtomDigestRowColumns
+        FROM
+          t_atom_digest
+        WHERE
+          c_observation_id IN ${observation_id.list(which).values}
+        ORDER BY c_observation_id, c_atom_index
+      """.query(atom_digest_row)
