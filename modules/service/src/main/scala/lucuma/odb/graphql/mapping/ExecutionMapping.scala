@@ -68,6 +68,7 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
+      SqlObject("atomDigests", Join(ObservationView.Id, ObscalcTable.ObservationId)),
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
