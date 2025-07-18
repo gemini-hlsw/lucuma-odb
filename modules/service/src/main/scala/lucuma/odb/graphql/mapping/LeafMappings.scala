@@ -147,6 +147,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
+      LeafMapping[MultipleFiltersMode](MultipleFiltersModeType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),

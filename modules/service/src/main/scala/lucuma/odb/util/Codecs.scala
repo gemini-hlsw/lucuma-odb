@@ -345,6 +345,9 @@ trait Codecs {
       b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
     )(_.toBoolean)
 
+  val multiple_filters_mode: Codec[MultipleFiltersMode] =
+    enumerated(Type("e_multiple_filters_mode"))
+
   val odb_error: Codec[OdbError] =
     jsonb.eimap(
       json => if json.isNull then s"Could not decode OdbError: unexpected NULL value.".asLeft

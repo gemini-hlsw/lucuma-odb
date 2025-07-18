@@ -89,20 +89,22 @@ object GmosImagingService {
           }
 
       val common: Decoder[GmosImagingInput.Create.Common] =
-        (gmos_binning.opt       ~
-         gmos_amp_read_mode.opt ~
-         gmos_amp_gain.opt      ~
-         gmos_roi.opt           ~
-         text.opt
-        ).emap { case ((((b, arm), ag), roi), spatialOffsets) =>
+        (
+          multiple_filters_mode.opt ~
+          gmos_binning.opt       ~
+          gmos_amp_read_mode.opt ~
+          gmos_amp_gain.opt      ~
+          gmos_roi.opt           ~
+          text.opt
+        ).emap { case (((((mf, b), arm), ag), roi), spatialOffsets) =>
           spatialOffsets match {
             case Some(s) =>
               OffsetsFormat.getOption(s) match {
-                case Some(offsets) => GmosImagingInput.Create.Common(b, arm, ag, roi, Some(offsets)).asRight
+                case Some(offsets) => GmosImagingInput.Create.Common(mf, b, arm, ag, roi, Some(offsets)).asRight
                 case None => s"Could not parse '$s' as a spatial offsets list.".asLeft
               }
             case None =>
-              GmosImagingInput.Create.Common(b, arm, ag, roi, None).asRight
+              GmosImagingInput.Create.Common(mf, b, arm, ag, roi, None).asRight
           }
         }
 
@@ -204,6 +206,7 @@ object GmosImagingService {
           img.c_observation_id,
           ob.c_image_quality,
           img.c_filters,
+          img.c_multiple_filters_mode,
           img.c_bin,
           img.c_amp_read_mode,
           img.c_amp_gain,
@@ -236,6 +239,7 @@ object GmosImagingService {
         oids.map { oid =>
           sql"""(
             $observation_id,
+            ${multiple_filters_mode.opt},
             ${gmos_binning.opt},
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
@@ -243,6 +247,7 @@ object GmosImagingService {
             ${text.opt}
           )"""(
             oid,
+            common.explicitMultipleFiltersMode,
             common.explicitBin,
             common.explicitAmpReadMode,
             common.explicitAmpGain,
@@ -259,6 +264,7 @@ object GmosImagingService {
           WITH mode_inserts AS (
             INSERT INTO #$modeTableName (
               c_observation_id,
+              c_multiple_filters_mode,
               c_bin,
               c_amp_read_mode,
               c_amp_gain,
@@ -365,6 +371,7 @@ object GmosImagingService {
       sql"""
         INSERT INTO #$tableName (
           c_observation_id,
+          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
@@ -373,6 +380,7 @@ object GmosImagingService {
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
+          c_multiple_filters_mode,
           c_bin,
           c_amp_read_mode,
           c_amp_gain,
@@ -401,6 +409,7 @@ object GmosImagingService {
     def commonUpdates(
       input: GmosImagingInput.Edit.Common
     ): List[AppliedFragment] = {
+      val upMultipleFiltersMode = sql"c_multiple_filters_mode = ${multiple_filters_mode.opt}"
       val upBin = sql"c_bin = ${gmos_binning.opt}"
       val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
       val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
@@ -408,6 +417,7 @@ object GmosImagingService {
       val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
 
       List(
+        input.explicitMultipleFiltersMode.toOptionOption.map(upMultipleFiltersMode),
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),

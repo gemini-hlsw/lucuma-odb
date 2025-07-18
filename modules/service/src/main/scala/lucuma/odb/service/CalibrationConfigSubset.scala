@@ -123,6 +123,7 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create.North(
           filters,
           GmosImagingInput.Create.Common(
+            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
@@ -150,6 +151,7 @@ object CalibrationConfigSubset:
         GmosImagingInput.Create.South(
           filters,
           GmosImagingInput.Create.Common(
+            none, // Do we need multipleFiltersMode here?
             binning.some,
             ampReadMode.some,
             ampGain.some,
