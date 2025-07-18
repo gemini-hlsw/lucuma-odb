@@ -3053,6 +3053,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [G_PRIME, R_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3068,6 +3069,7 @@ class updateObservations extends OdbSuite
           gmosNorthImaging {
             filters
             initialFilters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3076,6 +3078,7 @@ class updateObservations extends OdbSuite
           gmosSouthImaging {
             filters
             initialFilters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3096,6 +3099,7 @@ class updateObservations extends OdbSuite
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
                   "initialFilters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3131,6 +3135,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3150,6 +3155,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "GROUPED",
                   "bin": "ONE",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -3166,6 +3172,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [I_PRIME, Z_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3184,6 +3191,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["I_PRIME", "Z_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3522,6 +3530,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [G_PRIME, R_PRIME, I_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -3536,6 +3545,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3554,6 +3564,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "I_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -3574,6 +3585,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosSouthImaging: {
           filters: [G_PRIME, R_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3588,6 +3600,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosSouthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3606,6 +3619,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosSouthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
