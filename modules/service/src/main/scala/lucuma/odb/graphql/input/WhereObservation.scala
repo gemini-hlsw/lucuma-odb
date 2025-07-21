@@ -60,7 +60,7 @@ object WhereObservation {
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
     val InstrumentBinding = WhereOptionEq.binding(path / "instrument", enumeratedBinding[Instrument])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
-    val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "calculatedWorkflow")
+    val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "workflow")
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
