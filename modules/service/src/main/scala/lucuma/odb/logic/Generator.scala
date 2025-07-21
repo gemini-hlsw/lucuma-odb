@@ -506,8 +506,6 @@ object Generator {
         setupTime: SetupTime
       ): Either[OdbError, ExecutionDigest] =
 
-        println(s"executionDigest: execState = $execState")
-
         if execState === ExecutionState.DeclaredComplete then
           ExecutionDigest(
             SetupTime.Zero,
