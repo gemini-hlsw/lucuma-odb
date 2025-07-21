@@ -25,7 +25,6 @@ object RecordAtomInput {
         VisitIdBinding("visitId", rVisitId),
         InstrumentBinding("instrument", rInstrument),
         SequenceTypeBinding("sequenceType", rSequenceType),
-        NonNegShortBinding.Option("stepCount", rIgnore),
         AtomIdBinding.Option("generatedId", rGenerated)
       ) => (rVisitId, rInstrument, rSequenceType, rGenerated).parMapN {
         (visitId, instrument, sequenceType, generated) =>

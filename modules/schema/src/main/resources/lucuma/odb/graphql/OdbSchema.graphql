@@ -3633,10 +3633,6 @@ type ProgramEdit { #implements Event {
   Edited object
   """
   value: Program!
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -4234,13 +4230,11 @@ input RadialVelocityInput {
 
 """
 Input parameters for creating a new atom record.
-(stepCount is deprecated and will be ignored)
 """
 input RecordAtomInput {
   visitId: VisitId!
   instrument: Instrument!
   sequenceType: SequenceType!
-  stepCount: NonNegShort
   generatedId: AtomId
 }
 
@@ -4373,7 +4367,6 @@ type ResetAcquisitionResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
@@ -5208,10 +5201,6 @@ type GroupEdit {
   Edited group, or null if it's the top-level group.
   """
   value: Group
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -11417,11 +11406,6 @@ type RightAscension {
   degrees: BigDecimal!
 
   """
-  Right Ascension (RA) in µas
-  """
-  microarcseconds: Long! @deprecated
-
-  """
   Right Ascension (RA) in µs
   """
   microseconds: Long!
@@ -13560,9 +13544,6 @@ interface TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13577,9 +13558,6 @@ time is not charged.
 type TimeChargeDaylightDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!
@@ -13600,9 +13578,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13619,9 +13594,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13634,9 +13606,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
 type TimeChargeQaDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!
