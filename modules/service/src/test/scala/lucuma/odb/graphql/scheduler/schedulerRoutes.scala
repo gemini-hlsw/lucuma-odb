@@ -80,7 +80,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
     setup.flatMap: oid =>
       atomsRequest(serviceUser, oid.toString).flatMap: request =>
-        withRoutes(serviceUser, request).assertAtoms(Status.Ok, List(oid -> List(a0, a0, a0, a3)))
+        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid -> List(a0, a0, a0, a3)))
 
   test("two observations"):
     val setup: IO[(Observation.Id, Observation.Id)] =
@@ -95,4 +95,17 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
 
     setup.flatMap: (oid0, oid1) =>
       atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
-        withRoutes(serviceUser, request).assertAtoms(Status.Ok, List(oid0 -> List(a0, a0, a0, a3), oid1 -> List(a0, a0, a0, a3)))
+        withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a0, a0, a3), oid1 -> List(a0, a0, a0, a3)))
+
+  test("gzip"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    setup.flatMap: oid =>
+      gzipAtomsRequest(serviceUser, gzip = true, oid.toString).flatMap: request =>
+        withRoutes(serviceUser, request).assertCompressedAtoms(Status.Ok, List(oid -> List(a0, a0, a0, a3)))
