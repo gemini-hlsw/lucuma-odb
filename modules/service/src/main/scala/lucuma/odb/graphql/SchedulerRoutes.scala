@@ -9,6 +9,7 @@ import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
+import fs2.compression.Compression
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
@@ -25,6 +26,8 @@ import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`Accept-Encoding`
+import org.typelevel.ci.*
 import org.typelevel.log4cats.Logger
 import skunk.Session
 
@@ -62,7 +65,7 @@ object SchedulerRoutes:
       row._3.lampTypes.map(_.tag.toScreamingSnakeCase).mkString("[", ", ", "]")
     ).intercalate("\t")
 
-  def apply[F[_]: Concurrent](
+  def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
     ssoClient: SsoClient[F, User]
   ): HttpRoutes[F] =
@@ -93,13 +96,28 @@ object SchedulerRoutes:
                 services(user): s =>
                   Services.asSuperUser:
                     s.transactionally:
-                      val stream =
+
+                      val rawStream =
                         sequenceService
                           .selectAtomDigests(validIds)
                           .map(tsv)
                           .intersperse("\n")
                           .through(fs2.text.utf8.encode)
-                      Ok(stream)
+
+                      val gzip: Boolean =
+                        req
+                          .headers
+                          .get[`Accept-Encoding`]
+                          .exists(_.values.exists(_ === ContentCoding.gzip))
+
+                      if gzip then
+                        val compressedStream =
+                          rawStream
+                            .through(Compression.forSync[F].gzip(deflateLevel = 9.some))
+                        Ok(compressedStream).map: resp =>
+                          resp.putHeaders(Header.Raw(ci"Content-Encoding", "gzip"))
+                      else
+                        Ok(rawStream)
               }.handleErrorWith:
                  case _: AccessControlException => Forbidden()
                  case other                     => other.raiseError[F, Response[F]]
