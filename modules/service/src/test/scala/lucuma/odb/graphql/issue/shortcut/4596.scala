@@ -53,13 +53,15 @@ class ShortCut_4596 extends OdbSuite
         query {
           observation(observationId: "$oid") {
             workflow {
-              state
+              value {
+                state
+              }
             }
           }
         }
         """
     ).map: json =>
-      json.hcursor.downFields("observation", "workflow", "state").require[ObservationWorkflowState]
+      json.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState]
 
   def createExecutedObservationWithTarget(p: Program.Id, state: ObservationWorkflowState): IO[(Observation.Id, Target.Id)] =
     for
@@ -75,6 +77,7 @@ class ShortCut_4596 extends OdbSuite
       _  <- addEndStepEvent(s2)
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
       _  <- computeItcResultAs(pi,o)
+      _  <- runObscalcUpdateAs(serviceUser, p, o)
       _  <- assertIO(queryObservationWorkflowState(o), state)
     yield (o, t)
 
