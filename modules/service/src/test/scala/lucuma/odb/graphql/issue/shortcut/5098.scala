@@ -59,7 +59,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                    }
                  }
                  execution {
-                   calculatedDigest {
+                   digest {
                      value {
                        science {
                          timeEstimate {
@@ -89,7 +89,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                   }
                 },
                 "execution": {
-                  "calculatedDigest": {
+                  "digest": {
                     "value": null
                   }
                 }
