@@ -780,6 +780,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
             }
           """
         )
+        _ <- runObscalcUpdate(p, o)
       } yield o
 
     def telescopeConfig(arcsec: Int): Json =
@@ -831,9 +832,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
                observation(observationId: "$oid") {
                  execution {
                    digest {
-                     science {
-                       offsets {
-                         q { arcseconds }
+                     value {
+                       science {
+                         offsets {
+                           q { arcseconds }
+                         }
                        }
                      }
                    }
@@ -879,18 +882,20 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
               "observation": {
                 "execution": {
                   "digest": {
-                    "science": {
-                      "offsets": [
-                        {
-                          "q": { "arcseconds": -20.000000 }
-                        },
-                        {
-                          "q": { "arcseconds": 0.000000 }
-                        },
-                        {
-                          "q": { "arcseconds": 20.000000 }
-                        }
-                      ]
+                    "value": {
+                      "science": {
+                        "offsets": [
+                          {
+                            "q": { "arcseconds": -20.000000 }
+                          },
+                          {
+                            "q": { "arcseconds": 0.000000 }
+                          },
+                          {
+                            "q": { "arcseconds": 20.000000 }
+                          }
+                        ]
+                      }
                     }
                   },
                   "config": {

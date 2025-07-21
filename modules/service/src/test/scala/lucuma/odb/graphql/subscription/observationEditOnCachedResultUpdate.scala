@@ -73,8 +73,10 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
             observation(observationId: "$oid") {
               execution {
                 digest {
-                  science {
-                    atomCount
+                  value {
+                    science {
+                      atomCount
+                    }
                   }
                 }
               }
