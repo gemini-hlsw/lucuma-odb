@@ -2098,6 +2098,12 @@ input GmosNorthImagingInput {
   filters: [GmosNorthFilter!]
 
   """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitBin: GmosBinning
@@ -2526,6 +2532,12 @@ input GmosSouthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosSouthFilter!]
+
+  """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -8465,6 +8477,23 @@ type GmosNorthImaging {
   initialFilters: [GmosNorthFilter!]!
 
   """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
   GMOS Binning, either explicitly specified in explicitBin or else taken
   from the defaultBin. XBinning == YBinning = Binning
   """
@@ -9046,6 +9075,23 @@ type GmosSouthImaging {
   Initial GMOS South Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosSouthFilter!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -10251,6 +10297,17 @@ type ConfigurationRequestSelectResult {
   `true` when there were additional matches that were not returned.
   """
   hasMore: Boolean!
+}
+
+"""
+How sequences are generated when multiple filters are specified.
+"""
+enum MultipleFiltersMode {
+  "Grouped filters"
+  GROUPED
+
+  "Interleaved filters"
+  INTERLEAVED
 }
 
 """

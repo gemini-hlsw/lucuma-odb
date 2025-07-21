@@ -79,6 +79,7 @@ class ConfigSuite extends FunSuite:
       sampling = sampling,
       filters = filters,
       explicitBin = Some(GmosBinning.Two),
+      explicitMultipleFiltersMode = None,
       explicitAmpReadMode = None,
       explicitAmpGain = None,
       explicitRoi = None
@@ -95,6 +96,7 @@ class ConfigSuite extends FunSuite:
       sampling = sampling,
       filters = filters,
       explicitBin = Some(GmosBinning.One),
+      explicitMultipleFiltersMode = None,
       explicitAmpReadMode = None,
       explicitAmpGain = None,
       explicitRoi = None
@@ -105,6 +107,7 @@ class ConfigSuite extends FunSuite:
       sampling = sampling,
       filters = filters,
       explicitBin = Some(GmosBinning.Two),
+      explicitMultipleFiltersMode = None,
       explicitAmpReadMode = None,
       explicitAmpGain = None,
       explicitRoi = None

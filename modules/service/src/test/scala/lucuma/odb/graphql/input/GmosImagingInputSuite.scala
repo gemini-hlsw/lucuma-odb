@@ -8,6 +8,7 @@ import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
 import lucuma.odb.format.spatialOffsets.*
@@ -27,6 +28,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
   test("GmosImagingInput.Create.Common stores explicit values correctly") {
     val common = GmosImagingInput.Create.Common(
+      explicitMultipleFiltersMode = Some(MultipleFiltersMode.Interleaved),
       explicitBin = Some(GmosBinning.Two),
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
       explicitAmpGain = Some(GmosAmpGain.Low),
@@ -34,6 +36,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
       explicitSpatialOffsets = None
     )
 
+    assertEquals(common.explicitMultipleFiltersMode, Some(MultipleFiltersMode.Interleaved))
     assertEquals(common.explicitBin, Some(GmosBinning.Two))
     assertEquals(common.explicitAmpReadMode, Some(GmosAmpReadMode.Slow))
     assertEquals(common.explicitAmpGain, Some(GmosAmpGain.Low))
@@ -44,6 +47,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     import lucuma.odb.data.Nullable
 
     val editCommon = GmosImagingInput.Edit.Common(
+      explicitMultipleFiltersMode = Nullable.NonNull(MultipleFiltersMode.Interleaved),
       explicitBin = Nullable.NonNull(GmosBinning.Two),
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
       explicitAmpGain = Nullable.Null,
@@ -53,6 +57,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
 
     val createCommon = editCommon.toCreate
 
+    assertEquals(createCommon.explicitMultipleFiltersMode, Some(MultipleFiltersMode.Interleaved))
     assertEquals(createCommon.explicitBin, Some(GmosBinning.Two))
     assertEquals(createCommon.explicitAmpReadMode, Some(GmosAmpReadMode.Slow))
     assertEquals(createCommon.explicitAmpGain, None)
@@ -86,6 +91,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
     )
 
     val common = GmosImagingInput.Create.Common(
+      explicitMultipleFiltersMode = None,
       explicitBin = None,
       explicitAmpReadMode = None,
       explicitAmpGain = None,
