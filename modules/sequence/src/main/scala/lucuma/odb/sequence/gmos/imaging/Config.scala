@@ -18,6 +18,7 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.SourceProfile
@@ -37,6 +38,11 @@ import java.io.DataOutputStream
 sealed trait Config[L: Enumerated]:
 
   def filters: NonEmptyList[L]
+
+  def multipleFiltersMode: MultipleFiltersMode =
+    explicitMultipleFiltersMode.getOrElse(Config.DefaultMultipleFiltersMode)
+
+  def explicitMultipleFiltersMode: Option[MultipleFiltersMode]
 
   def bin: GmosBinning =
     explicitBin.getOrElse(defaultBin)
@@ -97,39 +103,43 @@ sealed trait Config[L: Enumerated]:
 
 object Config:
 
-  private val DefaultAmpReadMode = GmosAmpReadMode.Slow
-  private val DefaultAmpGain     = GmosAmpGain.Low
-  private val DefaultRoi         = GmosRoi.FullFrame
-  private val DefaultAmpCount    = GmosAmpCount.Twelve
+  private val DefaultMultipleFiltersMode = MultipleFiltersMode.Grouped
+  private val DefaultAmpReadMode         = GmosAmpReadMode.Slow
+  private val DefaultAmpGain             = GmosAmpGain.Low
+  private val DefaultRoi                 = GmosRoi.FullFrame
+  private val DefaultAmpCount            = GmosAmpCount.Twelve
 
   val DefaultSpatialOffsets: List[Offset] = Nil
 
   case class GmosNorth private[imaging] (
-    filters:                NonEmptyList[GmosNorthFilter],
-    defaultBin:             GmosBinning,
-    explicitBin:            Option[GmosBinning],
-    explicitAmpReadMode:    Option[GmosAmpReadMode],
-    explicitAmpGain:        Option[GmosAmpGain],
-    explicitRoi:            Option[GmosRoi],
-    explicitSpatialOffsets: Option[List[Offset]]
+    filters:                     NonEmptyList[GmosNorthFilter],
+    explicitMultipleFiltersMode: Option[MultipleFiltersMode],
+    defaultBin:                  GmosBinning,
+    explicitBin:                 Option[GmosBinning],
+    explicitAmpReadMode:         Option[GmosAmpReadMode],
+    explicitAmpGain:             Option[GmosAmpGain],
+    explicitRoi:                 Option[GmosRoi],
+    explicitSpatialOffsets:      Option[List[Offset]]
   ) extends Config[GmosNorthFilter]
 
   object GmosNorth {
 
     def apply(
-      sourceProfile:          SourceProfile,
-      imageQuality:           ImageQuality.Preset,
-      sampling:               PosDouble,
-      filters:                NonEmptyList[GmosNorthFilter],
-      explicitBin:            Option[GmosBinning]     = None,
-      explicitAmpReadMode:    Option[GmosAmpReadMode] = None,
-      explicitAmpGain:        Option[GmosAmpGain]     = None,
-      explicitRoi:            Option[GmosRoi]         = None,
-      explicitSpatialOffsets: Option[List[Offset]]    = None
+      sourceProfile:               SourceProfile,
+      imageQuality:                ImageQuality.Preset,
+      sampling:                    PosDouble,
+      filters:                     NonEmptyList[GmosNorthFilter],
+      explicitMultipleFiltersMode: Option[MultipleFiltersMode] = None,
+      explicitBin:                 Option[GmosBinning]         = None,
+      explicitAmpReadMode:         Option[GmosAmpReadMode]     = None,
+      explicitAmpGain:             Option[GmosAmpGain]         = None,
+      explicitRoi:                 Option[GmosRoi]             = None,
+      explicitSpatialOffsets:      Option[List[Offset]]        = None
     ): GmosNorth =
       val (x, _) = northBinning(sourceProfile, imageQuality.toImageQuality, sampling = sampling)
       GmosNorth(
         filters,
+        explicitMultipleFiltersMode,
         x.value,
         explicitBin,
         explicitAmpReadMode,
@@ -156,6 +166,7 @@ object Config:
     given Eq[GmosNorth] =
       Eq.by { a => (
         a.filters,
+        a.explicitMultipleFiltersMode,
         a.explicitBin,
         a.explicitAmpReadMode,
         a.explicitAmpGain,
@@ -168,31 +179,34 @@ object Config:
   }
 
   case class GmosSouth(
-    filters:                NonEmptyList[GmosSouthFilter],
-    defaultBin:             GmosBinning,
-    explicitBin:            Option[GmosBinning],
-    explicitAmpReadMode:    Option[GmosAmpReadMode],
-    explicitAmpGain:        Option[GmosAmpGain],
-    explicitRoi:            Option[GmosRoi],
+    filters:                     NonEmptyList[GmosSouthFilter],
+    explicitMultipleFiltersMode: Option[MultipleFiltersMode],
+    defaultBin:                  GmosBinning,
+    explicitBin:                 Option[GmosBinning],
+    explicitAmpReadMode:         Option[GmosAmpReadMode],
+    explicitAmpGain:             Option[GmosAmpGain],
+    explicitRoi:                 Option[GmosRoi],
     explicitSpatialOffsets: Option[List[Offset]]
   ) extends Config[GmosSouthFilter]
 
   object GmosSouth {
 
     def apply(
-      sourceProfile:          SourceProfile,
-      imageQuality:           ImageQuality.Preset,
-      sampling:               PosDouble,
-      filters:                NonEmptyList[GmosSouthFilter],
-      explicitBin:            Option[GmosBinning]     = None,
-      explicitAmpReadMode:    Option[GmosAmpReadMode] = None,
-      explicitAmpGain:        Option[GmosAmpGain]     = None,
-      explicitRoi:            Option[GmosRoi]         = None,
-      explicitSpatialOffsets: Option[List[Offset]]    = None
+      sourceProfile:               SourceProfile,
+      imageQuality:                ImageQuality.Preset,
+      sampling:                    PosDouble,
+      filters:                     NonEmptyList[GmosSouthFilter],
+      explicitMultipleFiltersMode: Option[MultipleFiltersMode] = None,
+      explicitBin:                 Option[GmosBinning]         = None,
+      explicitAmpReadMode:         Option[GmosAmpReadMode]     = None,
+      explicitAmpGain:             Option[GmosAmpGain]         = None,
+      explicitRoi:                 Option[GmosRoi]             = None,
+      explicitSpatialOffsets:      Option[List[Offset]]        = None
     ): GmosSouth =
       val (x, _) = southBinning(sourceProfile, imageQuality.toImageQuality, sampling = sampling)
       GmosSouth(
         filters,
+        explicitMultipleFiltersMode,
         x.value,
         explicitBin,
         explicitAmpReadMode,
@@ -219,6 +233,7 @@ object Config:
     given Eq[GmosSouth] =
       Eq.by { a => (
         a.filters,
+        a.explicitMultipleFiltersMode,
         a.explicitBin,
         a.explicitAmpReadMode,
         a.explicitAmpGain,
