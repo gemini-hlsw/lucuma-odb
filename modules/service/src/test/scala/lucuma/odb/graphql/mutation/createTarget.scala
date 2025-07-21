@@ -173,6 +173,109 @@ class createTarget extends OdbSuite {
     }
   }
 
+  test("[general] create a sidereal target with defaults for pm/rv/parallax") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(pi,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Target with Defaults"
+                  sidereal: {
+                    ra: {
+                      degrees: "10.0"
+                    }
+                    dec: {
+                      degrees: "20.0"
+                    }
+                    epoch: "J2000.000"
+                  }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target {
+                existence
+                name
+                program {
+                  id
+                }
+                sidereal {
+                  ra {
+                    degrees
+                  }
+                  dec {
+                    degrees
+                  }
+                  epoch
+                  properMotion {
+                    ra {
+                      milliarcsecondsPerYear
+                    }
+                    dec {
+                      milliarcsecondsPerYear
+                    }
+                  }
+                  radialVelocity {
+                    metersPerSecond
+                  }
+                  parallax {
+                    microarcseconds
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json""" {
+          "createTarget": {
+            "target": {
+              "existence": "PRESENT",
+              "name": "Target with Defaults",
+              "program": {
+                "id": $pid
+              },
+              "sidereal": {
+                "ra": {
+                  "degrees": 10.0
+                },
+                "dec": {
+                  "degrees": 20.0
+                },
+                "epoch": "J2000.000",
+                "properMotion": {
+                  "ra": {
+                    "milliarcsecondsPerYear": 0.000
+                  },
+                  "dec": {
+                    "milliarcsecondsPerYear": 0.000
+                  }
+                },
+                "radialVelocity": {
+                  "metersPerSecond": 0.000
+                },
+                "parallax": {
+                  "microarcseconds": 0
+                }
+              }
+            }
+          }
+        }
+      """.asRight)
+    }
+  }
+
   test("[general] create a nonsidereal target") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
