@@ -32,8 +32,10 @@ import lucuma.core.model
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.OrcidId
+import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.StandardUser
@@ -60,6 +62,12 @@ import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 import lucuma.odb.instances.given
+import lucuma.odb.json.offset.query.given
+import lucuma.odb.json.sequence.given
+import lucuma.odb.json.time.query.given
+import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.logic.Generator
+import lucuma.odb.logic.Generator.FutureLimit
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
@@ -68,6 +76,10 @@ import skunk.Transaction
 
 trait QueryMapping[F[_]] extends Predicates[F] {
   this: SkunkMapping[F] =>
+
+  private val ObservationIdParam  = "observationId"
+  private val ObservationRefParam = "observationReference"
+  private val FutureLimitParam    = "futureLimit"
 
   // Resources defined in the final cake.
   def user: model.User
@@ -87,6 +99,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("dataset"),
       SqlObject("datasets"),
       SqlObject("events"),
+      RootEffect.computeJson("executionConfig")(executionConfig),
       SqlObject("filterTypeMeta"),
       RootEffect.computeJson("goaDataDownloadAccess")(goaDataDownloadAccess),
       SqlObject("group"),
@@ -117,15 +130,16 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       Dataset,
       Datasets,
       Events,
+      ExecutionConfig,
       FilterTypeMeta,
       GoaDataDownloadAccess,
       Group,
       ImagingConfigOptions,
-      Observation,
+      Observation_,
       Observations,
       ObservationsByWorkflowState,
       ObservingModeGroup,
-      Program,
+      Program_,
       Programs,
       ProgramNote,
       ProgramNotes,
@@ -138,6 +152,37 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     ).combineAll
 
   import Services.Syntax.*
+
+  val executionConfig: (Path, Env) => F[Result[Json]] = (_, env) =>
+    def checkAccess(pid: Program.Id)(using Services[F], Transaction[F]): ResultT[F, Unit] =
+      ResultT:
+        programUserService.userHasReadAccess(pid).map: ok =>
+          if ok then ().success
+          else OdbError.NotAuthorized(user.id, s"User not authorized to view program $pid".some).asFailure
+
+    def gatherArgs: F[Result[(Program.Id, Observation.Id, FutureLimit)]] =
+      services.useTransactionally:
+        Services.asSuperUser:
+          (for
+            oidParam   <- ResultT.fromResult(env.getR[Option[Observation.Id]](ObservationIdParam))
+            refParam   <- ResultT.fromResult(env.getR[Option[ObservationReference]](ObservationRefParam))
+            limitParam <- ResultT.fromResult(env.getR[Option[FutureLimit]](FutureLimitParam))
+            oid        <- ResultT(observationService.resolveOid(oidParam, refParam))
+            pid        <- ResultT(observationService.selectProgram(oid))
+            _          <- checkAccess(pid)
+          yield (pid, oid, limitParam.getOrElse(FutureLimit.Default))).value
+
+    def generate(pid: Program.Id, oid: Observation.Id, limit: FutureLimit): F[Result[Json]] =
+      services.useNonTransactionally:
+        Services.asSuperUser:
+          generator(commitHash, itcClient, timeEstimateCalculator)
+            .generate(pid, oid, limit)
+            .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
+
+    (for
+      (p, o, l) <- ResultT(gatherArgs)
+      r         <- ResultT(generate(p, o, l))
+    yield r).value
 
   // We can't directly filter for computed values like workflow state, so our strategy here
   // is to first fetch the oids of the observations that match the WhereObservation, then
@@ -468,6 +513,20 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
   }
 
+  private lazy val ExecutionConfig: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+    case (QueryType, "executionConfig", List(
+      ObservationIdBinding.Option(ObservationIdParam, rOid),
+      ObservationReferenceBinding.Option(ObservationRefParam, rRef),
+      Generator.FutureLimit.Binding.Option(FutureLimitParam, rFutureLimit)
+    )) =>
+      Elab.liftR((rOid, rRef, rFutureLimit).parTupled).flatMap: (oid, ref, limit) =>
+        Elab.env(
+          ObservationIdParam  -> oid,
+          ObservationRefParam -> ref,
+          FutureLimitParam    -> limit
+        )
+  }
+
   private lazy val FilterTypeMeta: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "filterTypeMeta", Nil) =>
       Elab.transformChild { child =>
@@ -513,7 +572,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
     }
 
-  private lazy val Observation: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+  private lazy val Observation_ : PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "observation", List(
       ObservationIdBinding.Option("observationId", rOid),
       ObservationReferenceBinding.Option("observationReference", rRef)
@@ -660,7 +719,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
     }
 
-  private lazy val Program: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+  private lazy val Program_ : PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "program", List(
       ProgramIdBinding.Option("programId", rPid),
       ProposalReferenceBinding.Option("proposalReference", rProp),

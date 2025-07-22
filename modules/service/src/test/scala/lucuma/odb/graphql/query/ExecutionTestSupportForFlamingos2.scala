@@ -27,6 +27,7 @@ import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.StepGuideState
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -131,11 +132,11 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       }
     """
 
-  def flamingos2AcquisitionQuery(futureLimit: Option[Int]): String =
-    excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, futureLimit)
+  def flamingos2AcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "flamingos2", "acquisition", Flamingos2AtomQuery, futureLimit)
 
-  def flamingos2ScienceQuery(futureLimit: Option[Int]): String =
-    excutionConfigQuery("flamingos2", "science", Flamingos2AtomQuery, futureLimit)
+  def flamingos2ScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "flamingos2", "science", Flamingos2AtomQuery, futureLimit)
 
   def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
     Flamingos2DynamicConfig(

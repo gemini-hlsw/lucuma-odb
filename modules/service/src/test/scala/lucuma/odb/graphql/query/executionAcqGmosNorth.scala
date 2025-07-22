@@ -21,37 +21,33 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.odb.json.all.transport.given
 
-class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
+class executionAcqGmosNorth extends ExecutionTestSupportForGmos:
 
   val InitialAcquisition: Json =
     json"""
       {
-        "observation": {
-          "execution": {
-            "config": {
-              "gmosNorth": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${gmosNorthExpectedAcq(0,  0)},
-                      ${gmosNorthExpectedAcq(1, 10)},
-                      ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${gmosNorthExpectedAcq(2, 0)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
+        "executionConfig": {
+          "gmosNorth": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${gmosNorthExpectedAcq(0,  0)},
+                  ${gmosNorthExpectedAcq(1, 10)},
+                  ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                ]
+              },
+              "possibleFuture": [
+                {
+                  "description": "Fine Adjustments",
+                  "observeClass": "ACQUISITION",
+                  "steps": [
+                    ${gmosNorthExpectedAcq(2, 0)}
+                  ]
                 }
-              }
+              ],
+              "hasMore": false
             }
           }
         }
@@ -61,59 +57,46 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
   val FineAdjustments: Json =
     json"""
       {
-        "observation": {
-          "execution": {
-            "config": {
-              "gmosNorth": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Fine Adjustments",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
+        "executionConfig": {
+          "gmosNorth": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Fine Adjustments",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                ]
+              },
+              "possibleFuture": [
+                {
+                  "description": "Fine Adjustments",
+                  "observeClass": "ACQUISITION",
+                  "steps": [
+                    ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                  ]
                 }
-              }
+              ],
+              "hasMore": false
             }
           }
         }
       }
     """
 
-  test("initial generation") {
+  test("initial generation"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
-    }
-  }
 
   test("execute first step only, reset"):
     val setup: IO[Observation.Id] =
@@ -132,21 +115,14 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
 
-  test("execute first atom - repeat of last acq step") {
+  test("execute first atom - repeat of last acq step"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -162,27 +138,18 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s2)
 
         // Now the last acquisition step should be generated as the nextAtom
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = FineAdjustments.asRight
       )
-    }
-  }
 
-  test("execute first step only") {
+  test("execute first step only"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -192,60 +159,46 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Acquisition)
         s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthAcq(0), StepConfig.Science, acqTelescopeConfig(0), ObserveClass.Acquisition)
         _  <- addEndStepEvent(s0)
+      yield o
 
-      } yield o
-
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "acquisition": {
-                        "nextAtom": {
-                          "description": "Initial Acquisition",
-                          "observeClass": "ACQUISITION",
-                          "steps": [
-                            ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
-                          ]
-                        },
-                        "possibleFuture": [
-                          {
-                            "description": "Fine Adjustments",
-                            "observeClass": "ACQUISITION",
-                            "steps": [
-                              ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
-                            ]
-                          }
-                        ],
-                        "hasMore": false
+              "executionConfig": {
+                "gmosNorth": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "observeClass": "ACQUISITION",
+                      "steps": [
+                        ${gmosNorthExpectedAcq(1, 10)},
+                        ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "description": "Fine Adjustments",
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          ${gmosNorthExpectedAcq(2, 0, Breakpoint.Disabled)}
+                        ]
                       }
-                    }
+                    ],
+                    "hasMore": false
                   }
                 }
               }
             }
           """.asRight
       )
-    }
-  }
 
-  test("execute first and second atoms - 2nd repeat of last acq step") {
+  test("execute first and second atoms - 2nd repeat of last acq step"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -266,27 +219,18 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s3)
 
         // Now we should expect to generate (again) the last acq step
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = FineAdjustments.asRight
       )
-    }
-  }
 
-  test("execute acquisition, switch to science, back to acquisition") {
+  test("execute acquisition, switch to science, back to acquisition"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -311,27 +255,18 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
 
         // Reset acquisition to take it from the top.
         _  <- resetAcquisitionAs(serviceUser, o)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
-    }
-  }
 
-  test("execute acquisition, make a new visit, back to acquisition") {
+  test("execute acquisition, make a new visit, back to acquisition"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -354,27 +289,18 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
 
         // Reset acquisition
         _  <- resetAcquisitionAs(serviceUser, o)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
-    }
-  }
 
-  test("execute first step, second step, fail second step only") {
+  test("execute first step, second step, fail second step only"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -392,55 +318,42 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
         _  <- setQaState(d, DatasetQaState.Usable)
 
         // We'll have to repeat the second step (index 1)
-      } yield o
+      yield o
 
-    setup.flatMap { oid =>
+    setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthAcquisitionQuery(oid),
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "acquisition": {
-                        "nextAtom": {
-                          "description": "Initial Acquisition",
-                          "observeClass": "ACQUISITION",
-                          "steps": [
-                            ${gmosNorthExpectedAcq(1, 10)},
-                            ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
-                          ]
-                        },
-                        "possibleFuture": [
-                          {
-                            "description": "Fine Adjustments",
-                            "observeClass": "ACQUISITION",
-                            "steps": [
-                              ${gmosNorthExpectedAcq(2, 0)}
-                            ]
-                          }
-                        ],
-                        "hasMore": false
+              "executionConfig": {
+                "gmosNorth": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "observeClass": "ACQUISITION",
+                      "steps": [
+                        ${gmosNorthExpectedAcq(1, 10)},
+                        ${gmosNorthExpectedAcq(2,  0, Breakpoint.Enabled)}
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "description": "Fine Adjustments",
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          ${gmosNorthExpectedAcq(2, 0)}
+                        ]
                       }
-                    }
+                    ],
+                    "hasMore": false
                   }
                 }
               }
             }
           """.asRight
       )
-    }
-  }
 
   def firstScienceStepId(p: Program.Id, o: Observation.Id): IO[Step.Id] =
     import lucuma.odb.testsyntax.execution.*
@@ -535,5 +448,3 @@ class executionAcqGmosNorth extends ExecutionTestSupportForGmos {
         ).asLeft
       )
     yield ()
-
-}
