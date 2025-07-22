@@ -6872,14 +6872,7 @@ type Execution {
   If a sequence cannot be generated for this observation, `null` is returned
   along with warning messages.
   """
-  digest: ExecutionDigest @deprecated(reason: "will be updated with a CalculatedExecutionDigest result, use calculatedDigest for now")
-
-  """
-  Calculations dependent on the sequence, such as planned time and offsets.
-  If a sequence cannot be generated for this observation, `null` is returned
-  along with warning messages.
-  """
-  calculatedDigest: CalculatedExecutionDigest
+  digest: CalculatedExecutionDigest
 
   """
   A summary of pending atoms in this observation's sequence.  This is intended

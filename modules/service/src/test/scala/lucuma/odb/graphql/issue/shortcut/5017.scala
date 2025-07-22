@@ -96,7 +96,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
       query {
         observation(observationId: "$o") {
           execution {
-            calculatedDigest {
+            digest {
               value {
                 science {
                   timeEstimate {
@@ -121,7 +121,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         val c = json.hcursor.downField("observation")
         (for
           s <- c.downFields("calculatedWorkflow", "value", "state").as[ObservationWorkflowState]
-          t <- c.downFields("execution", "calculatedDigest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
+          t <- c.downFields("execution", "digest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
         yield (s, t)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
     val result =
