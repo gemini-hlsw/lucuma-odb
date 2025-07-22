@@ -46,6 +46,7 @@ import lucuma.itc.client.InstrumentMode.GmosNorthImaging
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthImaging
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
+import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.data.ExposureTimeModeType
@@ -215,7 +216,7 @@ object GeneratorParamsService {
         NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
           .fold(params.pure)(attIds =>
             Services.asSuperUser(attachmentMetadataService.getUpdatedAt(attIds)).map(map =>
-              params.map(p =>  
+              params.map(p =>
                 val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
                 aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
               )
@@ -290,15 +291,16 @@ object GeneratorParamsService {
         (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (exposureTimeMode, targets) =>
+          val ici = obsParams.constraints.toInput
           ItcInput(
             ImagingParameters(
               ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
-              obsParams.constraints,
+              ici,
               mode.asImaging(exposureTimeMode.at)
             ),
             SpectroscopyParameters(
               exposureTimeMode,
-              obsParams.constraints,
+              ici,
               mode
             ),
             targets
