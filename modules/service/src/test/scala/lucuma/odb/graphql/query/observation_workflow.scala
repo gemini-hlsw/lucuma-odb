@@ -36,7 +36,7 @@ import lucuma.odb.json.all.transport.given
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationWorkflowService
 
-class observation_workflow 
+class observation_workflow
   extends ExecutionTestSupportForGmos
      with UpdateConstraintSetOps {
 
@@ -53,7 +53,7 @@ class observation_workflow
   val Limits = (RaStart, RaEnd, DecStart, DecEnd)
   val WrappedLimits = (RaStartWrap, RaEndWrap, DecStart, DecEnd)
 
-  def workflowQuery(oids: Observation.Id*) = 
+  def workflowQuery(oids: Observation.Id*) =
     s"""
       query {
         observations(
@@ -110,14 +110,14 @@ class observation_workflow
             "validationErrors": ${wf.validationErrors}
           }
         }
-      """ 
+      """
     json"""
       {
         "observations": {
           "matches": $embed
         }
       }
-    """ 
+    """
 
   def calculatedWorkflowQueryResult(wfs: CalculatedValue[ObservationWorkflow]*): Json =
     val embed = wfs.map: wf =>
@@ -146,7 +146,7 @@ class observation_workflow
     instruments: List[Instrument] = List.empty,
     limits: Option[(Int, Int, Int, Int)] = none
   ): IO[CallForProposals.Id] =
-    val inStr = 
+    val inStr =
       if (instruments.isEmpty) ""
       else s"instruments: [${instruments.map(_.tag.toScreamingSnakeCase).mkString(",")}]\n"
     val limitStr = limits.fold("") { (raStart, raEnd, decStart, decEnd) =>
@@ -301,7 +301,7 @@ class observation_workflow
           ObservationWorkflow(
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
-            List(ObservationValidation.configuration("Missing brightness measure, radial velocity"))
+            List(ObservationValidation.configuration("Missing brightness measure"))
           )
         ).asRight
       )
@@ -346,7 +346,7 @@ class observation_workflow
         ps.execute(req).void
 
   def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction.Preset): IO[Unit] =
-    updateObservation(user, oid, 
+    updateObservation(user, oid,
       update = s"""
         constraintSet: {
           cloudExtinction: ${cloudExtinction.tag.toUpperCase()}
@@ -395,7 +395,7 @@ class observation_workflow
       )
     }
   }
-    
+
   test("missing target info, invalid instrument") {
     val setup: IO[(Target.Id, Observation.Id)] =
       for {
@@ -414,7 +414,7 @@ class observation_workflow
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
             List(
-              ObservationValidation.configuration("Missing brightness measure, radial velocity"),
+              ObservationValidation.configuration("Missing brightness measure"),
               ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
             )
           )
@@ -482,7 +482,7 @@ class observation_workflow
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))     
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
          _   <- computeItcResultAs(pi, oid)
       } yield oid
     setup.flatMap { oid =>
@@ -493,7 +493,7 @@ class observation_workflow
             pi,
             workflowQuery(oid),
             expected = workflowQueryResult(
-              ObservationWorkflow(          
+              ObservationWorkflow(
                 ObservationWorkflowState.Defined,
                 List(ObservationWorkflowState.Inactive),
                 Nil
@@ -522,7 +522,7 @@ class observation_workflow
             pi,
             workflowQuery(oid),
             expected = workflowQueryResult(
-              ObservationWorkflow(          
+              ObservationWorkflow(
                 ObservationWorkflowState.Defined,
                 List(ObservationWorkflowState.Inactive),
                 Nil
@@ -549,7 +549,7 @@ class observation_workflow
             pi,
             workflowQuery(oid),
             expected = workflowQueryResult(
-              ObservationWorkflow(          
+              ObservationWorkflow(
                 ObservationWorkflowState.Undefined,
                 List(ObservationWorkflowState.Inactive),
                 List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
@@ -576,7 +576,7 @@ class observation_workflow
             pi,
             workflowQuery(oid),
             expected = workflowQueryResult(
-              ObservationWorkflow(          
+              ObservationWorkflow(
                 ObservationWorkflowState.Undefined,
                 List(ObservationWorkflowState.Inactive),
                 List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
@@ -604,7 +604,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive),
             Nil
@@ -629,7 +629,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
@@ -654,7 +654,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
             List(
@@ -691,7 +691,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
             List(
@@ -720,7 +720,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive),
             Nil
@@ -748,7 +748,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Unapproved,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.configurationRequestNotRequested)
@@ -777,7 +777,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Unapproved,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.configurationRequestPending)
@@ -806,7 +806,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Unapproved,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.configurationRequestDenied)
@@ -835,7 +835,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
             Nil
@@ -857,7 +857,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Ready,
             Nil,
             Nil
@@ -879,7 +879,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
             Nil
@@ -889,7 +889,7 @@ class observation_workflow
     }
   }
 
-  test("approved configuration request AND asterism outside limits") {      
+  test("approved configuration request AND asterism outside limits") {
 
     val oid1: IO[Observation.Id]  =
       for {
@@ -920,12 +920,12 @@ class observation_workflow
         pi,
         workflowQuery(oid1, oid2),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
             Nil
           ),
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Undefined,
             List(ObservationWorkflowState.Inactive),
             List(
@@ -965,7 +965,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Defined,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),  // intially approved
             Nil
@@ -978,7 +978,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Unapproved,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.configurationRequestNotRequested)
@@ -1012,7 +1012,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Ready,
             List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Defined),  // intially approved
             Nil
@@ -1025,7 +1025,7 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-          ObservationWorkflow(          
+          ObservationWorkflow(
             ObservationWorkflowState.Unapproved,
             List(ObservationWorkflowState.Inactive),
             List(ObservationValidation.configurationRequestNotRequested)
@@ -1112,7 +1112,7 @@ class observation_workflow
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
-                ObservationValidation.configuration("Missing brightness measure, radial velocity"),
+                ObservationValidation.configuration("Missing brightness measure"),
                 ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
               )
             )
