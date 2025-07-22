@@ -44,7 +44,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              query {
                observation(observationId: "$oid") {
                  execution {
-                   calculatedDigest {
+                   digest {
                      value {
                        science {
                          observeClass
@@ -78,7 +78,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
              query {
                observation(observationId: "$oid") {
                  execution {
-                   calculatedDigest {
+                   digest {
                      value {
                        science {
                          observeClass
@@ -94,7 +94,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
             {
               "observation": {
                 "execution": {
-                  "calculatedDigest": {
+                  "digest": {
                     "value": {
                       "science" : {
                         "observeClass" : "SCIENCE"

@@ -64,10 +64,10 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
-      EffectField("calculatedDigest", calculatedDigestHandler, List("id", "programId")),
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
+      SqlObject("atomDigests", Join(ObservationView.Id, ObscalcTable.ObservationId)),
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
@@ -129,9 +129,10 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Generator.FutureLimit) => F[Result[Json]] =
       (pid, oid, futureLimit) =>
         services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .generate(pid, oid, futureLimit)
-           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
+          Services.asSuperUser:
+            s.generator(commitHash, itcClient, timeEstimateCalculator)
+             .generate(pid, oid, futureLimit)
+             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
 
     // Scans the top-level query and its descendents for environment entries,
     // merges them with the top-level query environment.  This is done in order
@@ -148,24 +149,15 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (pid, oid, _) => {
         services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .executionState(pid, oid)
-           .map(_.asJson.success)
+          Services.asSuperUser:
+            s.generator(commitHash, itcClient, timeEstimateCalculator)
+             .executionState(pid, oid)
+             .map(_.asJson.success)
       }
 
     effectHandler(_ => ().success, calculate)
 
   private lazy val digestHandler: EffectHandler[F] =
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) =>
-        services.use: s =>
-          s.generator(commitHash, itcClient, timeEstimateCalculator)
-           .digest(pid, oid)
-           .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
-
-    effectHandler(_ => ().success, calculate)
-
-  private lazy val calculatedDigestHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) =>
         services.useTransactionally:
@@ -186,7 +178,8 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) => {
         services.useTransactionally {
-          timeAccountingService.selectObservation(oid).map(_.asJson.success)
+          Services.asSuperUser:
+            timeAccountingService.selectObservation(oid).map(_.asJson.success)
         }
       }
 

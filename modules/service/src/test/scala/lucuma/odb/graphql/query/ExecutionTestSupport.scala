@@ -257,7 +257,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
         tec    <- TimeEstimateCalculatorImplementation.fromSession(session, enums)
         srv     = Services.forUser(serviceUser, enums, None)(session)
         gen     = srv.generator(CommitHash.Zero, itcClient, tec)
-        res    <- gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when)
+        res    <- Services.asSuperUser(gen.generate(pid, oid, future.getOrElse(Generator.FutureLimit.Default), when))
       yield res
 
   /**

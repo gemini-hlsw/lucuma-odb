@@ -19,13 +19,13 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
-import lucuma.core.model.User
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.circe.codec.all.*
@@ -46,15 +46,7 @@ trait AsterismService[F[_]] {
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      NonEmptyList[Target.Id]
-  )(using Transaction[F]): F[Result[Unit]]
-
-  /**
-   * Deletes the asterisms associated with the given observation ids.
-   */
-  def deleteAsterism(
-    programId:      Program.Id,
-    observationIds: NonEmptyList[Observation.Id]
-  )(using Transaction[F]): F[Result[Unit]]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 
   /**
    * Replaces the existing asterisms associated with the given observation ids
@@ -65,7 +57,7 @@ trait AsterismService[F[_]] {
     programId:      Program.Id,
     observationIds: NonEmptyList[Observation.Id],
     targetIds:      Nullable[NonEmptyList[Target.Id]]
-  )(using Transaction[F]): F[Result[Unit]]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 
   /**
    * Updates the asterisms associated with each observation id, adding and
@@ -78,16 +70,16 @@ trait AsterismService[F[_]] {
   def cloneAsterism(
     originalId: Observation.Id,
     newId: Observation.Id,
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F], SuperUserAccess): F[Unit]
 
   def getAsterism(
     programId: Program.Id,
     observationId: Observation.Id
-  ): F[List[(Target.Id, Target)]]
+  )(using SuperUserAccess): F[List[(Target.Id, Target)]]
 
   def getAsterisms(
     oids: List[Observation.Id]
-  ): F[Map[Observation.Id, List[(Target.Id, Target)]]]
+  )(using SuperUserAccess): F[Map[Observation.Id, List[(Target.Id, Target)]]]
 }
 
 object AsterismService {
@@ -118,8 +110,8 @@ object AsterismService {
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      NonEmptyList[Target.Id]
-      )(using Transaction[F]): F[Result[Unit]] = {
-        val af = Statements.insertLinksAs(user, programId, observationIds, targetIds)
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] = {
+        val af = Statements.insertLinks(programId, observationIds, targetIds)
         session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument)
             .as(Result.unit)
@@ -130,11 +122,12 @@ object AsterismService {
         }
       }
 
-      override def deleteAsterism(
+      @annotation.nowarn("msg=unused implicit parameter")
+      def deleteAsterism(
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] =
-        val af = Statements.deleteAllLinksAs(user, programId, observationIds)
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
+        val af = Statements.deleteAllLinks(programId, observationIds)
         session.prepareR(af.fragment.command).use { p =>
           p.execute(af.argument).as(Result.unit)
         }
@@ -143,7 +136,7 @@ object AsterismService {
         programId:      Program.Id,
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      Nullable[NonEmptyList[Target.Id]]
-      )(using Transaction[F]): F[Result[Unit]] =
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         targetIds match {
           case Nullable.Null          =>
             deleteAsterism(programId, observationIds)
@@ -163,9 +156,9 @@ object AsterismService {
           val ADD = set.ADD.flatMap(NonEmptyList.fromList)
           val DELETE = set.DELETE.flatMap(NonEmptyList.fromList)
           ResultT(selectProgramId(observationIds)).flatMap { pid =>
-            ResultT(ADD.fold(Result.unit.pure[F])(insertAsterism(pid, observationIds, _))) *>
+            ResultT(ADD.fold(Result.unit.pure[F])(Services.asSuperUser(insertAsterism(pid, observationIds, _)))) *>
               ResultT(DELETE.fold(Result.unit.pure[F]) { tids =>
-                val af = Statements.deleteLinksAs(user, pid, observationIds, tids)
+                val af = Statements.deleteLinks(pid, observationIds, tids)
                 session.prepareR(af.fragment.command).use { p =>
                   p.execute(af.argument).as(Result.unit)
                 }
@@ -175,7 +168,7 @@ object AsterismService {
       override def cloneAsterism(
         originalId: Observation.Id,
         newId: Observation.Id,
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F], SuperUserAccess): F[Unit] =
         val clone = Statements.clone(originalId, newId)
         session.prepareR(clone.fragment.command).use { ps =>
           ps.execute(clone.argument).void
@@ -184,15 +177,15 @@ object AsterismService {
       override def getAsterism(
         programId: Program.Id,
         observationId: Observation.Id
-      ): F[List[(Target.Id, Target)]] =
-        val af = Statements.getAsterism(user, programId, observationId)
+      )(using SuperUserAccess): F[List[(Target.Id, Target)]] =
+        val af = Statements.getAsterism(programId, observationId)
         session.prepareR(af.fragment.query(Decoders.targetDecoder)).use { ps =>
           ps.stream(af.argument, chunkSize = 1024).compile.toList
         }
 
       override def getAsterisms(
         oids: List[Observation.Id]
-      ): F[Map[Observation.Id, List[(Target.Id, Target)]]] =
+      )(using SuperUserAccess): F[Map[Observation.Id, List[(Target.Id, Target)]]] =
         NonEmptyList.fromList(oids) match
           case None      => Map.empty.pure[F]
           case Some(nel) =>
@@ -207,8 +200,6 @@ object AsterismService {
 
   object Statements {
 
-    import ProgramUserService.Statements.{andWhereUserReadAccess, andWhereUserWriteAccess, whereUserWriteAccess}
-
     def selectProgramId(
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
@@ -217,8 +208,7 @@ object AsterismService {
         FROM t_observation
         WHERE """ |+| observationIdIn(observationIds)
 
-    def insertLinksAs(
-      user:           User,
+    def insertLinks(
       programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id],
       targetIds:      NonEmptyList[Target.Id]
@@ -246,7 +236,7 @@ object AsterismService {
       val as: AppliedFragment =
         void""") AS t (c_program_id, c_observation_id, c_target_id) """
 
-      insert |+| values |+| as |+| whereUserWriteAccess(user, programId) |+|
+      insert |+| values |+| as |+|
         void""" ON CONFLICT DO NOTHING"""  // the key consists of all the columns anyway
     }
 
@@ -262,8 +252,7 @@ object AsterismService {
         targetIds.map(sql"$target_id").intercalate(void", ") |+|
       void")"
 
-    def deleteLinksAs(
-      user:           User,
+    def deleteLinks(
       programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id],
       targetIds:      NonEmptyList[Target.Id]
@@ -271,18 +260,15 @@ object AsterismService {
        void"DELETE FROM ONLY t_asterism_target "        |+|
          void"WHERE " |+| programIdEqual(programId)     |+|
          void" AND " |+| observationIdIn(observationIds) |+|
-         void" AND " |+| targetIdIn(targetIds)           |+|
-         andWhereUserWriteAccess(user, programId)
+         void" AND " |+| targetIdIn(targetIds)
 
-    def deleteAllLinksAs(
-      user:           User,
+    def deleteAllLinks(
       programId:      Program.Id,
       observationIds: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       void"DELETE FROM ONLY t_asterism_target "         |+|
         void"WHERE " |+| programIdEqual(programId)      |+|
-        void" AND "  |+| observationIdIn(observationIds) |+|
-        andWhereUserWriteAccess(user, programId)
+        void" AND "  |+| observationIdIn(observationIds)
 
     // programs that aren't visible.
     def clone(originalOid: Observation.Id, newOid: Observation.Id): AppliedFragment =
@@ -302,7 +288,7 @@ object AsterismService {
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
 
-    def getAsterism(user: User, pid: Program.Id, oid: Observation.Id): AppliedFragment =
+    def getAsterism(pid: Program.Id, oid: Observation.Id): AppliedFragment =
       sql"""
         select
           t.c_target_id,
@@ -326,7 +312,7 @@ object AsterismService {
           and a.c_program_id = $program_id
           and a.c_observation_id = $observation_id
         where t.c_existence = 'present'
-      """.apply(pid, oid) |+| andWhereUserReadAccess(user, pid)
+      """.apply(pid, oid)
 
     def getAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, (Target.Id, Target))] =
       sql"""

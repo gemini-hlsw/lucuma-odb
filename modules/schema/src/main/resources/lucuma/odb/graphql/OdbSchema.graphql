@@ -156,6 +156,53 @@ input AngleInput {
   hms: String
 }
 
+enum GcalLampType {
+
+  ARC
+
+  FLAT
+
+}
+
+type AtomDigest {
+
+  """
+  Atom id
+  """
+  id: AtomId!
+
+  """
+  Observe class for this atom as a whole (combined observe class for each of
+  its steps).
+  """
+  observeClass: ObserveClass!
+
+  """
+  Expected execution time for this atom.
+  """
+  timeEstimate: CategorizedTime!
+
+  """
+  Step types contained in this atom.
+  """
+  stepTypes: [StepType!]!
+
+  """
+  Gcal lamp types used in this atom, if any.
+  """
+  lampTypes: [GcalLampType!]!
+
+}
+
+type CalculatedAtomDigests {
+
+  "The current state of the background calculation."
+  state: CalculationState!
+
+  value: [AtomDigest!]!
+
+}
+
 """
 Atom-level events.  The execution of a single atom will generate multiple events.
 """
@@ -2051,6 +2098,12 @@ input GmosNorthImagingInput {
   filters: [GmosNorthFilter!]
 
   """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitBin: GmosBinning
@@ -2479,6 +2532,12 @@ input GmosSouthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosSouthFilter!]
+
+  """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -3574,10 +3633,6 @@ type ProgramEdit { #implements Event {
   Edited object
   """
   value: Program!
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -4175,13 +4230,11 @@ input RadialVelocityInput {
 
 """
 Input parameters for creating a new atom record.
-(stepCount is deprecated and will be ignored)
 """
 input RecordAtomInput {
   visitId: VisitId!
   instrument: Instrument!
   sequenceType: SequenceType!
-  stepCount: NonNegShort
   generatedId: AtomId
 }
 
@@ -4314,7 +4367,6 @@ type ResetAcquisitionResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
@@ -5149,10 +5201,6 @@ type GroupEdit {
   Edited group, or null if it's the top-level group.
   """
   value: Group
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -6824,14 +6872,13 @@ type Execution {
   If a sequence cannot be generated for this observation, `null` is returned
   along with warning messages.
   """
-  digest: ExecutionDigest @deprecated(reason: "will be updated with a CalculatedExecutionDigest result, use calculatedDigest for now")
+  digest: CalculatedExecutionDigest
 
   """
-  Calculations dependent on the sequence, such as planned time and offsets.
-  If a sequence cannot be generated for this observation, `null` is returned
-  along with warning messages.
+  A summary of pending atoms in this observation's sequence.  This is intended
+  for the scheduler, but is available generally.
   """
-  calculatedDigest: CalculatedExecutionDigest
+  atomDigests: CalculatedAtomDigests!
 
   """
   Full execution config, including acquisition and science sequences.  If a
@@ -8412,6 +8459,23 @@ type GmosNorthImaging {
   initialFilters: [GmosNorthFilter!]!
 
   """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
+
+  """
   GMOS Binning, either explicitly specified in explicitBin or else taken
   from the defaultBin. XBinning == YBinning = Binning
   """
@@ -8993,6 +9057,23 @@ type GmosSouthImaging {
   Initial GMOS South Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosSouthFilter!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -10201,6 +10282,17 @@ type ConfigurationRequestSelectResult {
 }
 
 """
+How sequences are generated when multiple filters are specified.
+"""
+enum MultipleFiltersMode {
+  "Grouped filters"
+  GROUPED
+
+  "Interleaved filters"
+  INTERLEAVED
+}
+
+"""
 Observation reference type, broken into its constituient parts and including
 a formatted label.
 """
@@ -11305,11 +11397,6 @@ type RightAscension {
   Right Ascension (RA) in degrees
   """
   degrees: BigDecimal!
-
-  """
-  Right Ascension (RA) in µas
-  """
-  microarcseconds: Long! @deprecated
 
   """
   Right Ascension (RA) in µs
@@ -13450,9 +13537,6 @@ interface TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13467,9 +13551,6 @@ time is not charged.
 type TimeChargeDaylightDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!
@@ -13490,9 +13571,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13509,9 +13587,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13524,9 +13599,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
 type TimeChargeQaDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!

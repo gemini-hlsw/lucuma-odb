@@ -94,7 +94,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       query {
         observation(observationId: "$oid") {
           execution {
-            calculatedDigest {
+            digest {
               state
               value {
                 setup {
@@ -126,7 +126,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "calculatedDigest": {
+            "digest": {
               "state": "READY",
               "value": {
                 "setup" : {
@@ -270,7 +270,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          state
                          value {
                            setup {
@@ -295,7 +295,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       {
                         "id": $oid,
                         "execution": {
-                          "calculatedDigest": {
+                          "digest": {
                             "state": "READY",
                             "value": null
                           }
@@ -330,7 +330,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          state
                          value {
                            setup {
@@ -354,7 +354,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "state": "READY",
                           "value": null
                         }
@@ -391,7 +391,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          value {
                            setup {
                              full { seconds }
@@ -414,7 +414,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -428,7 +428,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": null
                         }
                       }
@@ -464,7 +464,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          value {
                            setup {
                              full { seconds }
@@ -487,7 +487,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": null
                         }
                       }
@@ -495,7 +495,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -545,7 +545,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
     s"""
       query {
         observation(observationId: "$oid") {
-          execution { calculatedDigest { value { science { executionState } } } }
+          execution { digest { value { science { executionState } } } }
         }
       }
     """
@@ -555,7 +555,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "calculatedDigest": {
+            "digest": {
               "value": {
                 "science" : {
                   "executionState": ${e.tag.toScreamingSnakeCase}
@@ -660,7 +660,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
             {
               "observation": {
                 "execution": {
-                  "calculatedDigest": {
+                  "digest": {
                     "state": "READY",
                     "value": {
                       "setup" : {

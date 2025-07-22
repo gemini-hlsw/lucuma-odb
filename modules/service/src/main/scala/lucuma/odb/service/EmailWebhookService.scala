@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import lucuma.core.enums.EmailStatus
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.EmailId
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
 import skunk.Session
@@ -15,13 +16,13 @@ import skunk.implicits.*
 
 trait EmailWebhookService[F[Unit]] {
   
-  def updateStatus(emailId: EmailId, status: EmailStatus, timestamp: Timestamp): F[Unit]
+  def updateStatus(emailId: EmailId, status: EmailStatus, timestamp: Timestamp)(using SuperUserAccess): F[Unit]
 }
 
 object EmailWebhookService:
   def fromSession[F[_]: MonadCancelThrow](session: Session[F]): EmailWebhookService[F] = 
     new EmailWebhookService[F]:
-      override def updateStatus(emailId: EmailId, status: EmailStatus, timestamp: Timestamp): F[Unit] =
+      override def updateStatus(emailId: EmailId, status: EmailStatus, timestamp: Timestamp)(using SuperUserAccess): F[Unit] =
         val af = Statements.updateStatus(emailId, status, timestamp)
     
         session.prepareR(af.fragment.command)

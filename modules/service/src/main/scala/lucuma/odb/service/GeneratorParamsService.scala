@@ -46,6 +46,7 @@ import lucuma.itc.client.InstrumentMode.GmosNorthImaging
 import lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy
 import lucuma.itc.client.InstrumentMode.GmosSouthImaging
 import lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy
+import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.data.ExposureTimeModeType
@@ -171,7 +172,7 @@ object GeneratorParamsService {
         for
           paramsRows <- params
           oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _) => (oid, om) }.distinct
-          m          <- observingModeServices.selectObservingMode(oms)
+          m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
             ObsParams.fromParamsRows(paramsRowsNel).map: (obsId, obsParams) =>
@@ -214,7 +215,7 @@ object GeneratorParamsService {
       private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
         NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
           .fold(params.pure)(attIds =>
-            attachmentMetadataService.getUpdatedAt(attIds).map(map =>
+            Services.asSuperUser(attachmentMetadataService.getUpdatedAt(attIds)).map(map =>
               params.map(p =>
                 val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
                 aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
@@ -290,15 +291,16 @@ object GeneratorParamsService {
         (obsParams.exposureTimeMode.toValidNel(MissingParam.forObservation("exposure time mode")),
          obsParams.targets.traverse(itcTargetParams)
         ).mapN { case (exposureTimeMode, targets) =>
+          val ici = obsParams.constraints.toInput
           ItcInput(
             ImagingParameters(
               ExposureTimeMode.SignalToNoiseMode(Acquisition.AcquisitionSN, exposureTimeMode.at),
-              obsParams.constraints,
+              ici,
               mode.asImaging(exposureTimeMode.at)
             ),
             SpectroscopyParameters(
               exposureTimeMode,
-              obsParams.constraints,
+              ici,
               mode
             ),
             targets

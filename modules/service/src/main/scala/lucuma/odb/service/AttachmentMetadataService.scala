@@ -12,6 +12,7 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
@@ -25,7 +26,7 @@ trait AttachmentMetadataService [F[_]] {
     input: AccessControl.Checked[AttachmentPropertiesInput.Edit]
   )(using Transaction[F]): F[Result[List[Attachment.Id]]]
 
-  def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F]): F[Map[Attachment.Id, Timestamp]]
+  def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F], SuperUserAccess): F[Map[Attachment.Id, Timestamp]]
 }
 
 object AttachmentMetadataService {
@@ -44,7 +45,7 @@ object AttachmentMetadataService {
           }.map(Result.success)
 
       // Called by other services, no access validation is performed.
-      def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F]): F[Map[Attachment.Id, Timestamp]] =
+      def getUpdatedAt(aids: NonEmptyList[Attachment.Id])(using NoTransaction[F], SuperUserAccess): F[Map[Attachment.Id, Timestamp]] =
         val uniqueIds = aids.distinct
         session.execute(Statements.getUpdatedAt(uniqueIds))(uniqueIds.toList).map(_.toMap)
     }

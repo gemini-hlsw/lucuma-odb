@@ -3053,6 +3053,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [G_PRIME, R_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3068,6 +3069,7 @@ class updateObservations extends OdbSuite
           gmosNorthImaging {
             filters
             initialFilters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3076,6 +3078,7 @@ class updateObservations extends OdbSuite
           gmosSouthImaging {
             filters
             initialFilters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3096,6 +3099,7 @@ class updateObservations extends OdbSuite
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
                   "initialFilters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3131,6 +3135,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3150,6 +3155,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "GROUPED",
                   "bin": "ONE",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -3166,6 +3172,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [I_PRIME, Z_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3184,6 +3191,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["I_PRIME", "Z_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",
@@ -3356,7 +3364,47 @@ class updateObservations extends OdbSuite
       )
     )
 
-  test("observing mode: (fail to) create GMOS imaging without filters"):
+  test("observing mode: update GMOS imaging binning without filters"):
+
+    val update = """
+      observingMode: {
+        gmosSouthImaging: {
+          explicitBin: FOUR
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosSouthImaging {
+            filters
+            explicitBin
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "gmosSouthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "explicitBin": "FOUR"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    oneUpdateTest(pi, update, query, expected, ObservingModeType.GmosSouthImaging.some)
+
+  test("observing mode: (fail to) update GMOS imaging with empty filters"):
 
     val update = """
       observingMode: {
@@ -3376,7 +3424,7 @@ class updateObservations extends OdbSuite
       }
     """
 
-    val expected = "At least one filter must be specified for GMOS imaging observations.".asLeft
+    val expected = "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.".asLeft
     oneUpdateTest(pi, update, query, expected)
 
   test("observing mode: (fail to) update existing GMOS imaging with empty filters - rollback other changes"):
@@ -3439,7 +3487,7 @@ class updateObservations extends OdbSuite
           _ <- expect(
             user = pi,
             query = updateObservationsMutation(oid, failingUpdate, query),
-            expected = List("At least one filter must be specified for GMOS imaging observations.").asLeft
+            expected = List("Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations.").asLeft
           )
           // Verify that ALL values remain unchanged (transaction rollback)
           _ <- expect(
@@ -3482,6 +3530,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosNorthImaging: {
           filters: [G_PRIME, R_PRIME, I_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: TWO
           explicitAmpReadMode: SLOW
           explicitAmpGain: LOW
@@ -3496,6 +3545,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosNorthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3514,6 +3564,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosNorthImaging": {
                   "filters": ["G_PRIME", "I_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "TWO",
                   "ampReadMode": "SLOW",
                   "ampGain": "LOW",
@@ -3534,6 +3585,7 @@ class updateObservations extends OdbSuite
       observingMode: {
         gmosSouthImaging: {
           filters: [G_PRIME, R_PRIME]
+          explicitMultipleFiltersMode: INTERLEAVED
           explicitBin: FOUR
           explicitAmpReadMode: FAST
           explicitAmpGain: HIGH
@@ -3548,6 +3600,7 @@ class updateObservations extends OdbSuite
         observingMode {
           gmosSouthImaging {
             filters
+            multipleFiltersMode
             bin
             ampReadMode
             ampGain
@@ -3566,6 +3619,7 @@ class updateObservations extends OdbSuite
               "observingMode": {
                 "gmosSouthImaging": {
                   "filters": ["G_PRIME", "R_PRIME"],
+                  "multipleFiltersMode": "INTERLEAVED",
                   "bin": "FOUR",
                   "ampReadMode": "FAST",
                   "ampGain": "HIGH",

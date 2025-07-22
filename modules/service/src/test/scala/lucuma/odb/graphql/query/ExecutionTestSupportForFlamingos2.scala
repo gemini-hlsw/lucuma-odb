@@ -6,7 +6,6 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -33,9 +32,7 @@ import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.string.*
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
@@ -45,12 +42,6 @@ import natchez.Trace.Implicits.noop
 import skunk.Session
 
 trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
-
-  override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(
-      20.secondTimeSpan,
-      NonNegInt.unsafeFrom(4)
-    )
 
   val f2_key_JH1: Flamingos2.TableKey =
     Flamingos2.TableKey(
@@ -100,7 +91,8 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       val services = Services.forUser(pi /* doesn't matter*/, e, None)(s)
       services.transactionally:
         rows.zipWithIndex.traverse_ : (r, i) =>
-          services.smartGcalService.insertFlamingos2(i, r)
+          Services.asSuperUser:
+            services.smartGcalService.insertFlamingos2(i, r)
   }
 
   val Flamingos2AtomQuery: String =
@@ -145,52 +137,41 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   def flamingos2ScienceQuery(futureLimit: Option[Int]): String =
     excutionConfigQuery("flamingos2", "science", Flamingos2AtomQuery, futureLimit)
 
-  val Flamingos2Science: Flamingos2DynamicConfig =
+  def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
     Flamingos2DynamicConfig(
-      fakeItcSpectroscopyResult.exposureTime,
+      exposureTime,
       Flamingos2Disperser.R1200JH.some,
       Flamingos2Filter.JH,
-      Flamingos2ReadMode.Bright,
+      Flamingos2ReadMode.forExposureTime(exposureTime),
       Flamingos2LyotWheel.F16,
       Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       Flamingos2Decker.LongSlit,
       Flamingos2ReadoutMode.Science,
-      Flamingos2ReadMode.Bright.readCount
+      Flamingos2ReadMode.forExposureTime(exposureTime).readCount
     )
 
+  val Flamingos2Science: Flamingos2DynamicConfig =
+    flamingos2Science(fakeItcSpectroscopyResult.exposureTime)
+
   val Flamingos2Arc: Flamingos2DynamicConfig =
-    Flamingos2Science.copy(exposure = f2_arc_JH1.instrumentConfig.exposureTime)
+    flamingos2Science(f2_arc_JH1.instrumentConfig.exposureTime)
 
   val Flamingos2Flat: Flamingos2DynamicConfig =
-    Flamingos2Science.copy(exposure = f2_flat_JH1.instrumentConfig.exposureTime)
+    flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2Acq0: Flamingos2DynamicConfig =
+  val Flamingos2AcqImage: Flamingos2DynamicConfig =
     Flamingos2Science.copy(
-      exposure  = fakeItcImagingResult.exposureTime,
       disperser = none,
       filter    = Flamingos2Filter.J,
       fpu       = Flamingos2FpuMask.Imaging,
       decker    = Flamingos2Decker.Imaging
     )
 
-  val Flamingos2Acq1: Flamingos2DynamicConfig =
-    Flamingos2Acq0.copy(
-      exposure  = 10.secondTimeSpan,
+  val Flamingos2AcqSlit: Flamingos2DynamicConfig =
+    Flamingos2AcqImage.copy(
       fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       decker    = Flamingos2Decker.LongSlit
     )
-
-  val Flamingos2Acq2: Flamingos2DynamicConfig =
-    Flamingos2Acq1.copy(
-      exposure = fakeItcImagingResult.exposureTime
-    )
-
-  def flamingos2Acq(step: Int): Flamingos2DynamicConfig =
-    step match
-      case 0 => Flamingos2Acq0
-      case 1 => Flamingos2Acq1
-      case 2 => Flamingos2Acq2
-      case _ => sys.error("Only 3 steps in a Flamingos 2 Acq")
 
   val Flamingos2FlatStep: StepConfig.Gcal =
     f2_flat_JH1.gcalConfig
@@ -221,12 +202,12 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       }
     """
 
-  protected def flamingos2ExpectedAcq(step: Int, p: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
+  protected def flamingos2ExpectedAcq(f2: Flamingos2DynamicConfig, exposureTime: TimeSpan, p: Int, q: Int, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
     json"""
       {
-        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(flamingos2Acq(step))},
+        "instrumentConfig" : ${flamingos2ExpectedInstrumentConfig(f2.copy(exposure = exposureTime))},
         "stepConfig" : { "stepType":  "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, 0, StepGuideState.Enabled)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION",
         "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
@@ -263,23 +244,36 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
 
     """
 
-  protected def flamingos2ExpectedScience(p: Int, q: Int): Json =
+  protected def flamingos2ExpectedScience(exposureTime: TimeSpan, p: Int, q: Int, g: StepGuideState): Json =
     json"""
       {
-        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(Flamingos2Science)},
+        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(flamingos2Science(exposureTime))},
         "stepConfig": { "stepType": "SCIENCE" },
-        "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, g)},
         "observeClass": "SCIENCE",
         "breakpoint": "DISABLED"
       }
     """
 
-  protected def flamingos2ExpectedScienceAtom(a: (Int, Int), b: (Int, Int)): Json =
-    val sciSteps  = List(a, b, b, a).map((p, q) => flamingos2ExpectedScience(p, q))
-    val gcalSteps = List(flamingos2ExpectedFlat(a._1, a._2), flamingos2ExpectedArc(a._1, a._2))
+  protected def flamingos2ExpectedScienceAtom(
+    exposureTime: TimeSpan,
+    offset: (Int, Int, StepGuideState)*
+  ): Json =
+    val sciSteps  = offset.toList.map((p, q, g) => flamingos2ExpectedScience(exposureTime, p, q, g))
 
     Json.obj(
-      "description" -> s"Long Slit 1px, JH, R1200JH".asJson,
+      "description" -> s"ABBA Cycle".asJson,
       "observeClass" -> "SCIENCE".asJson,
-      "steps" -> (sciSteps ++ gcalSteps).asJson
+      "steps" -> sciSteps.asJson
+    )
+
+  protected def flamingos2ExpectedGcals(
+    offset: (Int, Int)
+  ): Json =
+    val gcalSteps = List(flamingos2ExpectedFlat(offset._1, offset._2), flamingos2ExpectedArc(offset._1, offset._2))
+
+    Json.obj(
+      "description" -> s"Nighttime Calibrations".asJson,
+      "observeClass" -> "NIGHT_CAL".asJson,
+      "steps" -> gcalSteps.asJson
     )

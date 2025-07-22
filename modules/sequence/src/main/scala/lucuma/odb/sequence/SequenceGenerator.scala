@@ -6,9 +6,11 @@ package lucuma.odb.sequence
 import cats.Eq
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.StepRecord
+import lucuma.odb.sequence.data.VisitRecord
 
 /**
  * A sequence generator.  Record past steps and vists in order until all have
@@ -34,15 +36,25 @@ trait SequenceGenerator[D]:
    */
   def recordStep(step: StepRecord[D])(using Eq[D]): SequenceGenerator[D]
 
+  def recordVisit(visit: VisitRecord): SequenceGenerator[D]
+
+  def recordSequenceEvent(cmd: SequenceEvent): SequenceGenerator[D]
+
 
 object SequenceGenerator:
 
+  abstract class Base[D] extends SequenceGenerator[D]:
+    override def recordStep(step:  StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
+      this
+
+    override def recordVisit(visit: VisitRecord): SequenceGenerator[D] =
+      this
+
+    override def recordSequenceEvent(cmd: SequenceEvent): SequenceGenerator[D] =
+      this
+
   /** A degenerate implementation that produces no atoms. */
   def empty[D]: SequenceGenerator[D] =
-    new SequenceGenerator[D]:
-
+    new Base[D]:
       override def generate(when:  Timestamp): Stream[Pure, Atom[D]] =
         Stream.empty
-
-      override def recordStep(step:  StepRecord[D])(using Eq[D]): SequenceGenerator[D] =
-        this
