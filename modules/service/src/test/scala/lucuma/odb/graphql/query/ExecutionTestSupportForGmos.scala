@@ -32,6 +32,7 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -181,11 +182,11 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       }
     """
 
-  def gmosNorthAcquisitionQuery(futureLimit: Option[Int]): String =
-    excutionConfigQuery("gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
+  def gmosNorthAcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "gmosNorth", "acquisition", GmosAtomQuery, futureLimit)
 
-  def gmosNorthScienceQuery(futureLimit: Option[Int]): String =
-    excutionConfigQuery("gmosNorth", "science", GmosAtomQuery, futureLimit)
+  def gmosNorthScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "gmosNorth", "science", GmosAtomQuery, futureLimit)
 
   def gmosNorthScience(ditherNm: Int): GmosNorth =
     GmosNorth(
