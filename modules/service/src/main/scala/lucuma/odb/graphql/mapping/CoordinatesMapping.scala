@@ -26,7 +26,7 @@ trait CoordinatesMapping[F[_]] extends ObservationView[F] with ConfigurationRequ
     )
 
   private lazy val ConfigurationRequestCoordinatesMapping =
-    ObjectMapping(ConfigurationRequestType / "configuration" / "referenceCoordinates")(
+    ObjectMapping(ConfigurationRequestType / "configuration" / "target" / "coordinates")(
       SqlField("synthetic-id", ConfigurationRequestView.Id, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec")

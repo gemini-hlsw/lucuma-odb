@@ -18,8 +18,16 @@ trait RegionMapping[F[_]] extends TargetView[F] {
       SqlObject("declinationArc"),    
     )
 
+  private lazy val ConfigurationTargetRegionMapping =
+    ObjectMapping(ConfigurationTargetType / "region")(
+      SqlField("synthetic_id", TargetView.Opportunity.Region.SyntheticId, key = true, hidden = true),
+      SqlObject("rightAscensionArc"),
+      SqlObject("declinationArc"),    
+    )
+
   lazy val RegionMappings = List(
-    OpportunityRegionMapping
+    OpportunityRegionMapping,
+    ConfigurationTargetRegionMapping
   )
 
 }

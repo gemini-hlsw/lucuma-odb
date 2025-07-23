@@ -10155,9 +10155,15 @@ enum ExecutionState {
   DECLARED_COMPLETE
 }
 
+"A configuration target will define either coordinates or a region."
+type ConfigurationTarget {
+  coordinates: Coordinates
+  region: Region
+}
+
 type Configuration {
   conditions: ConfigurationConditions!
-  referenceCoordinates: Coordinates # may not be available
+  target: ConfigurationTarget # may not be available
   observingMode: ConfigurationObservingMode
 }
 

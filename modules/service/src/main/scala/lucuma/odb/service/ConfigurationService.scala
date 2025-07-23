@@ -36,6 +36,7 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import lucuma.core.math.Region
 
 trait ConfigurationService[F[_]] {
 
@@ -292,12 +293,14 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
-                    }
-                    dec { 
-                      dms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
                   }
                   observingMode {
@@ -330,12 +333,14 @@ object ConfigurationService {
                         skyBackground
                         waterVapor
                       }
-                      referenceCoordinates {
-                        ra { 
-                          hms 
-                        }
-                        dec { 
-                          dms 
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
                         }
                       }
                       observingMode {
@@ -401,12 +406,14 @@ object ConfigurationService {
                   skyBackground
                   waterVapor
                 }
-                referenceCoordinates {
-                  ra { 
-                    hms 
-                  }
-                  dec { 
-                    dms 
+                target {
+                  coordinates {
+                    ra { 
+                      hms 
+                    }
+                    dec { 
+                      dms 
+                    }
                   }
                 }
                 observingMode {
@@ -441,12 +448,14 @@ object ConfigurationService {
                       skyBackground
                       waterVapor
                     }
-                    referenceCoordinates {
-                      ra { 
-                        hms 
-                      }
-                      dec { 
-                        dms 
+                    target {
+                      coordinates: {
+                        ra { 
+                          hms 
+                        }
+                        dec { 
+                          dms 
+                        }
                       }
                     }
                     observingMode {
@@ -509,12 +518,14 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
-                    }
-                    dec { 
-                      dms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
                   }
                   observingMode {
@@ -539,12 +550,14 @@ object ConfigurationService {
                           skyBackground
                           waterVapor
                         }
-                        referenceCoordinates {
-                          ra { 
-                            hms 
-                          }
-                          dec { 
-                            dms 
+                        target {
+                          coordinates {
+                            ra { 
+                              hms 
+                            }
+                            dec { 
+                              dms 
+                            }
                           }
                         }
                         observingMode {
@@ -581,12 +594,14 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
-                    }
-                    dec { 
-                      dms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
                   }
                   observingMode {
@@ -633,25 +648,25 @@ object ConfigurationService {
           c_image_quality = $image_quality_preset AND
           c_sky_background = $sky_background AND
           c_water_vapor = $water_vapor AND
-          c_reference_ra = $right_ascension AND
-          c_reference_dec = $declination AND
+          c_reference_ra is not distinct from ${right_ascension.opt} AND
+          c_reference_dec is not distinct from ${declination.opt} AND
           c_observing_mode_type = $observing_mode_type AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt}
         ) 
       """.query(
         (
-          configuration_request_id *:
+          configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt        *:
-          cloud_extinction_preset         *:
-          image_quality_preset            *:
-          sky_background           *:
-          water_vapor              *:
-          right_ascension          *:
-          declination              *:
-          observing_mode_type      *:
-          gmos_north_grating.opt   *:
+          text_nonempty.opt            *:
+          cloud_extinction_preset      *:
+          image_quality_preset         *:
+          sky_background               *:
+          water_vapor                  *:
+          right_ascension.opt          *:
+          declination.opt              *:
+          observing_mode_type          *:
+          gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
           { case 
@@ -680,36 +695,39 @@ object ConfigurationService {
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
-              mode.map: m =>
-                ConfigurationRequest(
-                  id, 
-                  status,
-                  justification,
-                  Configuration(
-                    Conditions(
-                      cloudExtinction,
-                      imageQuality,
-                      skyBackground,
-                      waterVapor
-                    ),
-                    Coordinates(
-                      rightAscension,
-                      declination
-                    ),
-                    m
+              val target: Either[String, Either[Coordinates, Region]] =
+                (rightAscension, declination) match
+                  case (Some(ra), Some(dec)) => Right(Left(Coordinates(ra, dec)))
+                  case _ => Left(s"Unsupported or malformed configuration target type.")
+
+              mode.flatMap: m =>
+                target.map: t =>
+                  ConfigurationRequest(
+                    id, 
+                    status,
+                    justification,
+                    Configuration(
+                      Conditions(
+                        cloudExtinction,
+                        imageQuality,
+                        skyBackground,
+                        waterVapor
+                      ),
+                      t,
+                      m
+                    )
                   )
-                )
 
           }
       ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
-        oid                                                         *:
-        cfg.conditions.cloudExtinction                              *:
-        cfg.conditions.imageQuality                                 *:
-        cfg.conditions.skyBackground                                *:
-        cfg.conditions.waterVapor                                   *:
-        cfg.refererenceCoordinates.ra                               *:
-        cfg.refererenceCoordinates.dec                              *:
-        cfg.observingMode.tpe                                       *:
+        oid                                                *:
+        cfg.conditions.cloudExtinction                     *:
+        cfg.conditions.imageQuality                        *:
+        cfg.conditions.skyBackground                       *:
+        cfg.conditions.waterVapor                          *:
+        cfg.target.left.toOption.map(_.ra)                 *:
+        cfg.target.left.toOption.map(_.dec)                *:
+        cfg.observingMode.tpe                              *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
         EmptyTuple
@@ -737,8 +755,8 @@ object ConfigurationService {
           $image_quality_preset,
           $sky_background,
           $water_vapor,
-          $right_ascension,
-          $declination,
+          ${right_ascension.opt},
+          ${declination.opt},
           $observing_mode_type,
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt}
@@ -759,17 +777,17 @@ object ConfigurationService {
           c_gmos_south_longslit_grating
       """.query(
         (
-          configuration_request_id *:
+          configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt        *:
-          cloud_extinction_preset         *:
-          image_quality_preset            *:
-          sky_background           *:
-          water_vapor              *:
-          right_ascension          *:
-          declination              *:
-          observing_mode_type      *:
-          gmos_north_grating.opt                  *:
+          text_nonempty.opt            *:
+          cloud_extinction_preset      *:
+          image_quality_preset         *:
+          sky_background               *:
+          water_vapor                  *:
+          right_ascension.opt          *:
+          declination.opt              *:
+          observing_mode_type          *:
+          gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
           { case 
@@ -798,37 +816,40 @@ object ConfigurationService {
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
-              mode.map: m =>
-                ConfigurationRequest(
-                  id, 
-                  status,
-                  justification,
-                  Configuration(
-                    Conditions(
-                      cloudExtinction,
-                      imageQuality,
-                      skyBackground,
-                      waterVapor
-                    ),
-                    Coordinates(
-                      rightAscension,
-                      declination
-                    ),
-                    m
+              val target: Either[String, Either[Coordinates, Region]] =
+                (rightAscension, declination) match
+                  case (Some(ra), Some(dec)) => Right(Left(Coordinates(ra, dec)))
+                  case _ => Left(s"Unsupported or malformed configuration target type.")
+
+              mode.flatMap: m =>
+                target.map: t =>
+                  ConfigurationRequest(
+                    id, 
+                    status,
+                    justification,
+                    Configuration(
+                      Conditions(
+                        cloudExtinction,
+                        imageQuality,
+                        skyBackground,
+                        waterVapor
+                      ),
+                      t,
+                      m
+                    )
                   )
-                )
 
           }
       ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) => 
-        input.oid                                                   *:
-        input.SET.justification                                     *:
-        cfg.conditions.cloudExtinction                              *:
-        cfg.conditions.imageQuality                                 *:
-        cfg.conditions.skyBackground                                *:
-        cfg.conditions.waterVapor                                   *:
-        cfg.refererenceCoordinates.ra                               *:
-        cfg.refererenceCoordinates.dec                              *:
-        cfg.observingMode.tpe                                       *:
+        input.oid                                          *:
+        input.SET.justification                            *:
+        cfg.conditions.cloudExtinction                     *:
+        cfg.conditions.imageQuality                        *:
+        cfg.conditions.skyBackground                       *:
+        cfg.conditions.waterVapor                          *:
+        cfg.target.left.toOption.map(_.ra)                 *:
+        cfg.target.left.toOption.map(_.dec)                *:
+        cfg.observingMode.tpe                              *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
         EmptyTuple
