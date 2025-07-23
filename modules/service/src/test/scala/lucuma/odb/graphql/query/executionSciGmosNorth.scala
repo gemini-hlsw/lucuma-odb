@@ -689,7 +689,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
           """
         )
         _ <- runObscalcUpdate(p, o)
-      } yield o
+      yield o
 
     def telescopeConfig(arcsec: Int): Json =
       json"""
