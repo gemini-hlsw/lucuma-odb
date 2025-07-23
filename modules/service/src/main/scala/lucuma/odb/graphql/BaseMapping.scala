@@ -29,7 +29,6 @@ trait BaseMapping[F[_]]
   lazy val AsterismGroupType                       = schema.ref("AsterismGroup")
   lazy val AsterismGroupSelectResultType           = schema.ref("AsterismGroupSelectResult")
   lazy val AngleType                               = schema.ref("Angle")
-  lazy val AtomDigestType                          = schema.ref("AtomDigest")
   lazy val AtomExecutionStateType                  = schema.ref("AtomExecutionState")
   lazy val AtomEventType                           = schema.ref("AtomEvent")
   lazy val AtomIdType                              = schema.ref("AtomId")
