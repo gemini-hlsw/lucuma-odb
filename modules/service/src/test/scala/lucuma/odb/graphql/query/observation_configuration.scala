@@ -41,6 +41,18 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             dms 
                           }
                         }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
                       }
                       observingMode {
                         instrument
