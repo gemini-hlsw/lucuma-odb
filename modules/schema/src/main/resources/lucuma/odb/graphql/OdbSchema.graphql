@@ -6875,12 +6875,6 @@ type Execution {
   digest: CalculatedExecutionDigest
 
   """
-  A summary of pending atoms in this observation's sequence.  This is intended
-  for the scheduler, but is available generally.
-  """
-  atomDigests: CalculatedAtomDigests!
-
-  """
   Full execution config, including acquisition and science sequences.  If a
   sequence cannot be generated for this observation, `null` is returned along
   with warning messages.
