@@ -156,53 +156,6 @@ input AngleInput {
   hms: String
 }
 
-enum GcalLampType {
-
-  ARC
-
-  FLAT
-
-}
-
-type AtomDigest {
-
-  """
-  Atom id
-  """
-  id: AtomId!
-
-  """
-  Observe class for this atom as a whole (combined observe class for each of
-  its steps).
-  """
-  observeClass: ObserveClass!
-
-  """
-  Expected execution time for this atom.
-  """
-  timeEstimate: CategorizedTime!
-
-  """
-  Step types contained in this atom.
-  """
-  stepTypes: [StepType!]!
-
-  """
-  Gcal lamp types used in this atom, if any.
-  """
-  lampTypes: [GcalLampType!]!
-
-}
-
-type CalculatedAtomDigests {
-
-  "The current state of the background calculation."
-  state: CalculationState!
-
-  value: [AtomDigest!]!
-
-}
-
 """
 Atom-level events.  The execution of a single atom will generate multiple events.
 """
