@@ -26,6 +26,8 @@ import lucuma.core.model.Configuration.ObservingMode.GmosSouthLongSlit
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
 import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.json.region.query.given
+import lucuma.core.math.Region
 
 object configurationrequest:
 
@@ -69,11 +71,27 @@ object configurationrequest:
           case GmosSouthLongSlit(grating) => "gmosSouthLongSlit" -> Json.obj("grating" -> grating.asJson)
       )
 
+    given Encoder[Either[Coordinates, Region]] = e =>
+      Json.obj(
+        "coordinates" -> e.left.toOption.asJson,
+        "region" -> e.toOption.asJson,
+      )
+
+    given Decoder[Option[Either[Coordinates, Region]]] = hc =>
+      (
+        hc.downField("coordinates").as[Option[Coordinates]],
+        hc.downField("region").as[Option[Region]]
+      ).tupled.flatMap:
+        case (Some(c), None)    => Left(c).some.asRight
+        case (None, Some(r))    => Right(r).some.asRight
+        case (None, None)       => None.asRight
+        case (Some(_), Some(_)) => Left(DecodingFailure("Cannot decode target; both coords and region are defined.", Nil))
+
     /** A decoder based on the GraphQL schema, used for recursive service queries. */
     given Decoder[Configuration] = hc =>
       (
         hc.downField("conditions").as[Conditions],
-        hc.downField("referenceCoordinates").as[Option[Coordinates]],
+        hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
         hc.downField("observingMode").as[Option[ObservingMode]]
       ).tupled.flatMap:
         case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
@@ -83,7 +101,7 @@ object configurationrequest:
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
-        "referenceCoordinates" -> c.refererenceCoordinates.asJson,
+        "target" -> c.target.asJson,
         "observingMode" -> c.observingMode.asJson
       )
 

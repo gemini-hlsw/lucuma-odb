@@ -14,7 +14,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
 
   val validUsers = List(pi, admin).toList
 
-  test("select configuration for fully-configured observation") {
+  test("select configuration for fully-configured observation with sidereal target") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
@@ -32,12 +32,14 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         skyBackground
                         waterVapor
                       }
-                      referenceCoordinates {
-                        ra { 
-                          hms 
-                        }
-                        dec { 
-                          dms 
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
                         }
                       }
                       observingMode {
@@ -64,12 +66,14 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "skyBackground" : "DARKEST",
                         "waterVapor" : "WET"
                       },
-                      "referenceCoordinates" : {
-                        "ra" : {
-                          "hms" : "05:46:13.138550"
-                        },
-                        "dec" : {
-                          "dms" : "-00:06:04.916777"
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
                         }
                       },
                       "observingMode" : {
@@ -91,7 +95,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
     }
   }
 
-  test("select configuration for non-fully-configured observation (no proposal)") {
+  test("select configuration for non-fully-configured observation with sidereal target (no proposal)") {
     createCallForProposalsAs(admin).flatMap { _ =>
       createProgramAs(pi).flatMap { pid =>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -108,12 +112,14 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         skyBackground
                         waterVapor
                       }
-                      referenceCoordinates {
-                        ra { 
-                          hms 
-                        }
-                        dec { 
-                          dms 
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
                         }
                       }
                       observingMode {
@@ -140,7 +146,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "skyBackground" : "DARKEST",
                         "waterVapor" : "WET"
                       },
-                      "referenceCoordinates" : null,
+                      "target" : {
+                        "coordinates" : null
+                      },
                       "observingMode" : {
                         "instrument" : "GMOS_NORTH",
                         "mode" : "GMOS_NORTH_LONG_SLIT",
