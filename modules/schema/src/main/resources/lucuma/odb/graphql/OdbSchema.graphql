@@ -6842,7 +6842,7 @@ type Execution {
     projected atom count is available in the execution digest.
     """
     futureLimit: NonNegInt = 25
-  ): ExecutionConfig
+  ): ExecutionConfig @deprecated(reason: "moved to Query -> executionConfig")
 
   """
   Determines the execution state as a whole of this observation.
@@ -10982,6 +10982,29 @@ type Query {
     """
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  """
+  Full execution config, including static values and acquisition and science
+  sequences.  If a sequence cannot be generated for this observation, `null`
+  is returned along with warning messages.
+  """
+  executionConfig(
+    "Specify to lookup the observation by its ID."
+    observationId: ObservationId
+
+    "Specify to lookup the observation by its reference."
+    observationReference: ObservationReferenceLabel
+
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has a `hasMore` field that can be used to determine whether there
+    additional atoms beyond those returned in `possibleFuture`.  The total
+    projected atom count is available in the execution digest.
+    """
+    futureLimit: NonNegInt = 25
+  ): ExecutionConfig
 
   """
   Metadata for `enum FilterType`

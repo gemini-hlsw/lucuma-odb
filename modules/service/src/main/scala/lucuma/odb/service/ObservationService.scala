@@ -85,6 +85,10 @@ sealed trait ObservationService[F[_]] {
     ref: Option[ObservationReference]
   )(using SuperUserAccess): F[Result[Observation.Id]]
 
+  def selectProgram(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Result[Program.Id]]
+
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
@@ -208,6 +212,12 @@ object ObservationService {
         ref: Option[ObservationReference]
       )(using SuperUserAccess): F[Result[Observation.Id]] =
         resolver.resolve(oid, ref)
+
+      override def selectProgram(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Result[Program.Id]] =
+        session.option(Statements.selectPid)(oid).map: p =>
+          p.fold(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some).asFailure)(_.success)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -546,6 +556,13 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
+
+    val selectPid: Query[Observation.Id, Program.Id] =
+      sql"""
+        SELECT c_program_id
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(program_id)
 
     def insertObservation(
       programId: Program.Id,

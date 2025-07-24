@@ -112,10 +112,10 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations {
   def twilightTargets: IO[List[Target.Id]] =
     calibrationTargets(CalibrationRole.Twilight)
 
-  def excutionConfigQuery(inst: String, sequenceType: String, atomQuery: String, futureLimit: Option[Int]): String =
+  def executionConfigQuery(oid: Observation.Id, inst: String, sequenceType: String, atomQuery: String, futureLimit: Option[Int]): String =
     s"""
-      execution {
-        config${futureLimit.fold("")(lim => s"(futureLimit: $lim)")} {
+      query {
+        executionConfig(observationId: "$oid"${futureLimit.fold("")(lim => s", futureLimit: $lim")}) {
           $inst {
             $sequenceType {
               nextAtom {
