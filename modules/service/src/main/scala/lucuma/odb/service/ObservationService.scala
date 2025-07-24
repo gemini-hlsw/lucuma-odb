@@ -697,7 +697,7 @@ object ObservationService {
       Option[Wavelength]               ,
       Option[SignalToNoise]            ,
       Option[TimeSpan]                 ,
-      Option[NonNegInt]                ,
+      Option[PosInt]                   ,
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
@@ -774,7 +774,7 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${signal_to_noise.opt},
           ${time_span.opt},
-          ${int4_nonneg.opt},
+          ${int4_pos.opt},
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
@@ -906,7 +906,7 @@ object ObservationService {
       val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
       val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
       val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_pos.opt}"
 
       val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
       val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))
