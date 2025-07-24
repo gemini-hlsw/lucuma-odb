@@ -86,7 +86,8 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                           "dec" : {
                             "dms" : "-00:06:04.916777"
                           }
-                        }
+                        },
+                        "region" : null
                       },
                       "observingMode" : {
                         "instrument" : "GMOS_NORTH",
@@ -133,6 +134,18 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                             dms 
                           }
                         }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
                       }
                       observingMode {
                         instrument
@@ -159,7 +172,8 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "waterVapor" : "WET"
                       },
                       "target" : {
-                        "coordinates" : null
+                        "coordinates" : null,
+                        "region" : null
                       },
                       "observingMode" : {
                         "instrument" : "GMOS_NORTH",
@@ -179,5 +193,108 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
       }
     }
   }
+
+  test("select configuration for fully-configured observation with opportunity target") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createOpportunityTargetAs(pi, pid).flatMap { tid =>
+          createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_ONE",
+                        "cloudExtinction" : "POINT_ONE",
+                        "skyBackground" : "DARKEST",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : null,
+                        "region" : {
+                          "rightAscensionArc" : {
+                            "type" : "FULL",
+                            "start" : null,
+                            "end" : null
+                          },
+                          "declinationArc" : {
+                            "type" : "PARTIAL",
+                            "start" : {
+                              "degrees" : 10.0
+                            },
+                            "end" : {
+                              "degrees" : 70.0
+                            }
+                          }
+                        }
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_NORTH",
+                        "mode" : "GMOS_NORTH_LONG_SLIT",
+                        "gmosNorthLongSlit" : {
+                          "grating" : "R831_G5302"
+                        },
+                        "gmosSouthLongSlit" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
 
 }
