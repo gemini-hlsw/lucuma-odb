@@ -8,7 +8,6 @@ import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
-import eu.timepit.refined.types.numeric.PosDouble
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -26,13 +25,10 @@ import lucuma.core.enums.Site
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.ImageQuality
-import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.gmos.longslit.Config
 
 import scala.util.Try
 
@@ -84,37 +80,9 @@ object GmosLongSlitInput {
       filter:  Option[GmosNorthFilter],
       fpu:     GmosNorthFpu,
       common:  Common
-    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
-
+    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
-
-      /**
-       * Creates a GMOS long slit observing mode based on input parameters.
-       */
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): Config.GmosNorth =
-        Config.GmosNorth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          grating,
-          filter,
-          fpu,
-          common.centralWavelength,
-          common.explicitXBin,
-          common.explicitYBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.explicitλDithers,
-          common.explicitSpatialOffsets
-        )
-
-    }
 
     object North {
 
@@ -159,37 +127,9 @@ object GmosLongSlitInput {
       filter:  Option[GmosSouthFilter],
       fpu:     GmosSouthFpu,
       common:  Common
-    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
-
+    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
-
-      /**
-       * Creates a GMOS long slit observing mode based on input parameters.
-       */
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): Config.GmosSouth =
-        Config.GmosSouth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          grating,
-          filter,
-          fpu,
-          common.centralWavelength,
-          common.explicitXBin,
-          common.explicitYBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.explicitλDithers,
-          common.explicitSpatialOffsets
-        )
-
-    }
 
     object South {
 

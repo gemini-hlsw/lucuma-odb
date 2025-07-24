@@ -248,9 +248,9 @@ object GeneratorParamsService {
         config:    Option[SourceProfile => ObservingMode]
       ): Either[Error, GeneratorParams] =
         observingMode(obsParams.targets, config).map:
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
+          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c) =>
             val mode = InstrumentMode.GmosNorthSpectroscopy(
-              cw,
+              c.centralWavelength,
               g,
               f,
               GmosFpu.North.builtin(u),
@@ -259,9 +259,9 @@ object GeneratorParamsService {
             )
             GeneratorParams(itcObsParams(obsParams, mode), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredComplete, obsParams.acqResetTime)
 
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, cw, _, _, _, _, _, _, _, _, _) =>
+          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c) =>
             val mode = InstrumentMode.GmosSouthSpectroscopy(
-              cw,
+              c.centralWavelength,
               g,
               f,
               GmosFpu.South.builtin(u),
