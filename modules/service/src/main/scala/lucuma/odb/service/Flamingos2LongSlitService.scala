@@ -14,7 +14,6 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.Observation
-import lucuma.core.model.SourceProfile
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
@@ -26,30 +25,30 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 
-trait Flamingos2LongSlitService[F[_]] {
-
+trait Flamingos2LongSlitService[F[_]]:
   def select(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => Config]]
+  ): F[Map[Observation.Id, Config]]
 
   def insert(input: Flamingos2LongSlitInput.Create)(
-    which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
 
   def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit]
 
   def update(SET: Flamingos2LongSlitInput.Edit)(
-    which: List[Observation.Id])(using Transaction[F]): F[Unit]
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Unit]
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
-}
 
-object Flamingos2LongSlitService {
+object Flamingos2LongSlitService:
 
   def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2LongSlitService[F] =
 
     new Flamingos2LongSlitService[F] {
 
-      val f2LS: Decoder[Flamingos2LongSlitInput.Create] =
+      val f2LS: Decoder[Config] =
         (flamingos_2_disperser        *:
          flamingos_2_filter           *:
          flamingos_2_fpu              *:
@@ -59,30 +58,23 @@ object Flamingos2LongSlitService {
          flamingos_2_readout_mode.opt *:
          text.opt
         ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsetsText) =>
-          spatialOffsetsText.traverse(so => OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")).map(spatialOffsets =>
-            Flamingos2LongSlitInput.Create(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
-          )
+          spatialOffsetsText
+            .traverse: so =>
+              OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")
+            .map: spatialOffsets =>
+              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
         }
-
-      private def select[A](
-        which:   List[Observation.Id],
-        f:       NonEmptyList[Observation.Id] => AppliedFragment,
-        decoder: Decoder[A]
-      ): F[List[(Observation.Id, A)]] =
-        NonEmptyList
-          .fromList(which)
-          .fold(List.empty.pure[F]) { oids =>
-            val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id *: decoder)).use { pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList
-            }
-          }
 
       override def select(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => Config]] =
-        select(which, Statements.selectFlamingos2LongSlit, f2LS)
-          .map(_.map { case (oid, f2) => (oid, (_: SourceProfile) => f2.toObservingMode) }.toMap)
+      ): F[Map[Observation.Id, Config]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(List.empty.pure[F]): oids =>
+            val af = Statements.selectFlamingos2LongSlit(oids)
+            session.prepareR(af.fragment.query(observation_id *: f2LS)).use: pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+          .map(_.toMap)
 
       override def insert(
         input: Flamingos2LongSlitInput.Create,
@@ -276,4 +268,3 @@ object Flamingos2LongSlitService {
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
   }
-}

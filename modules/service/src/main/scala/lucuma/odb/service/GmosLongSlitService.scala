@@ -19,11 +19,9 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.Wavelength
-import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.gmos.longslit.Config.Common
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
 import lucuma.odb.util.Codecs.*
@@ -38,11 +36,11 @@ trait GmosLongSlitService[F[_]] {
 
   def selectNorth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => GmosNorth]]
+  ): F[Map[Observation.Id, GmosNorth]]
 
   def selectSouth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => GmosSouth]]
+  ): F[Map[Observation.Id, GmosSouth]]
 
   def insertNorth(
     input: GmosLongSlitInput.Create.North
@@ -82,61 +80,69 @@ object GmosLongSlitService {
 
     new GmosLongSlitService[F] {
 
-      val common: Decoder[GmosLongSlitInput.Create.Common] =
-        (wavelength_pm          ~
-         gmos_binning.opt     ~
-         gmos_binning.opt     ~
-         gmos_amp_read_mode.opt ~
-         gmos_amp_gain.opt      ~
-         gmos_roi.opt           ~
-         text.opt               ~
-         text.opt
-        ).emap { case (((((((w, x), y), arm), ag), roi), owd), osd) =>
-          for {
+      val common: Decoder[Common] =
+        (wavelength_pm          *:   // centralWavelength
+         gmos_binning           *:   // defaultXBin
+         gmos_binning.opt       *:   // explicitXBin
+         gmos_binning           *:   // defaultYBin
+         gmos_binning.opt       *:   // explicitYBin
+         gmos_amp_read_mode.opt *:   // explicitAmpReadMode
+         gmos_amp_gain.opt      *:   // explicitAmpGain
+         gmos_roi.opt           *:   // explicitRoi
+         text.opt               *:   // explicitWavelengthDithers
+         text.opt                    // explicitSpatialOffsets
+        ).emap: (w, defaultX, x, defaultY, y, arm, ag, roi, owd, osd) =>
+          for
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
             spatialDithers    <- osd.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as a spatial offsets list."))
-          } yield GmosLongSlitInput.Create.Common(w, x.map(GmosXBinning(_)), y.map(GmosYBinning(_)), arm, ag, roi, wavelengthDithers, spatialDithers)
-        }
+          yield Common(
+            w,
+            GmosXBinning(defaultX),
+            x.map(GmosXBinning(_)),
+            GmosYBinning(defaultY),
+            y.map(GmosYBinning(_)),
+            arm,
+            ag,
+            roi,
+            wavelengthDithers,
+            spatialDithers
+          )
 
-      val north: Decoder[GmosLongSlitInput.Create.North] =
+      val north: Decoder[GmosNorth] =
         (gmos_north_grating     *:
          gmos_north_filter.opt  *:
          gmos_north_fpu         *:
          common
-        ).to[GmosLongSlitInput.Create.North]
+        ).to[GmosNorth]
 
-      val south: Decoder[GmosLongSlitInput.Create.South] =
+      val south: Decoder[GmosSouth] =
         (gmos_south_grating     *:
          gmos_south_filter.opt  *:
          gmos_south_fpu         *:
          common
-        ).to[GmosLongSlitInput.Create.South]
+        ).to[GmosSouth]
 
       private def select[A](
         which:   List[Observation.Id],
         f:       NonEmptyList[Observation.Id] => AppliedFragment,
         decoder: Decoder[A]
-      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
+      ): F[List[(Observation.Id, A)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Applicative[F].pure(List.empty)) { oids =>
+          .fold(Applicative[F].pure(List.empty)): oids =>
             val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList
-            }
-          }
 
       override def selectNorth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => GmosNorth]] =
-        select(which, Statements.selectGmosNorthLongSlit, north)
-          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      ): F[Map[Observation.Id, GmosNorth]] =
+        select(which, Statements.selectGmosNorthLongSlit, north).map(_.toMap)
 
       override def selectSouth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => GmosSouth]] =
-        select(which, Statements.selectGmosSouthLongSlit, south)
-          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      ): F[Map[Observation.Id, GmosSouth]] =
+        select(which, Statements.selectGmosSouthLongSlit, south).map(_.toMap)
 
       override def insertNorth(
         input: GmosLongSlitInput.Create.North,
@@ -187,12 +193,13 @@ object GmosLongSlitService {
       sql"""
         SELECT
           ls.c_observation_id,
-          ob.c_image_quality,
           ls.c_grating,
           ls.c_filter,
           ls.c_fpu,
           ls.c_central_wavelength,
+          ls.c_xbin_default,
           ls.c_xbin,
+          ls.c_ybin_default,
           ls.c_ybin,
           ls.c_amp_read_mode,
           ls.c_amp_gain,
@@ -201,7 +208,6 @@ object GmosLongSlitService {
           ls.c_spatial_offsets
         FROM
           #$table ls
-        INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
       """(Void) |+|
       void"""
         WHERE
