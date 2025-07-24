@@ -15,7 +15,6 @@ import grackle.Env
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.QueryInterpreter
@@ -27,7 +26,6 @@ import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
@@ -70,7 +68,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Generator.FutureLimit
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
-import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import skunk.Transaction
 
@@ -105,7 +102,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("group"),
       SqlObject("observation"),
       SqlObject("observations"),
-      RootEffect.computeChild("observationsByWorkflowState")(observationsByWorkflowState),
       SqlObject("observingModeGroup"),
       SqlObject("program"),
       SqlObject("programs"),
@@ -137,7 +133,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ImagingConfigOptions,
       Observation_,
       Observations,
-      ObservationsByWorkflowState,
       ObservingModeGroup,
       Program_,
       Programs,
@@ -183,75 +178,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       (p, o, l) <- ResultT(gatherArgs)
       r         <- ResultT(generate(p, o, l))
     yield r).value
-
-  // We can't directly filter for computed values like workflow state, so our strategy here
-  // is to first fetch the oids of the observations that match the WhereObservation, then
-  // fetch the workflow states for just those oids, then find the ones with the states we're
-  // interested in and build a new query that's the same as the original but with a swapped
-  // out predicate that explicitly matches the set of oids we have computed.
-  @annotation.nowarn("msg=unused explicit parameter")
-  def observationsByWorkflowState(query: Query, p: Path, e: Env): F[Result[Query]] =
-    query match {
-      case Environment(env, Filter(pred, child)) =>
-
-        // observation query result to list of oids
-        def decode(json: Json): Result[List[model.Observation.Id]] =
-          Result.fromEither:
-            json
-              .hcursor.downFields("observations", "matches").as[List[Json]].flatMap: jsons =>
-                jsons.traverse(_.hcursor.downField("id").as[model.Observation.Id])
-              .leftMap(_.toString)
-
-        // given an observation predicate, find ids of matching observations
-        def oids(pred: Predicate): ResultT[F, List[model.Observation.Id]] =
-          val idQuery    = Select("observations", Select("matches", Filter(pred, Select("id"))))
-          val rootCursor = RootCursor(Context(QueryType), None, env)
-          for
-            pjson <- ResultT(interpreter.runOneShot(idQuery, QueryType, rootCursor))
-            json  <- ResultT(QueryInterpreter.complete[F](pjson))
-            oids  <- ResultT.fromResult(decode(json))
-          yield oids
-
-        // given a list of oids, find their workflows
-        @annotation.nowarn("msg=unused implicit parameter")
-        def stateMap(oids: List[model.Observation.Id])(using Services[F], NoTransaction[F]) : F[Result[Map[model.Observation.Id, ObservationWorkflowState]]] =
-          Services.asSuperUser:
-            observationWorkflowService.getWorkflows(oids, commitHash, itcClient, timeEstimateCalculator).map: r =>
-              r.map: m =>
-                m.view.mapValues(_.state).toMap
-
-        // a new query with a predicate over the specified oids, with ordering by oid
-        def newQuery(oids: List[model.Observation.Id], child: Query): Query =
-          FilterOrderByOffsetLimit(
-            pred = Some(In(ObservationType / "id", oids)),
-            oss = Some(List(
-              OrderSelection[model.Observation.Id](ObservationType / "id")
-            )),
-            offset = None,
-            limit = None,
-            child
-          )
-
-        // Ok here we go. Figure out which observations we're talking about, filter based on state, and return a
-        // query that will just fetch the matches.
-        @annotation.nowarn("msg=unused implicit parameter")
-        def go(using Services[F], NoTransaction[F]): ResultT[F, Query] =
-          for
-            states   <- ResultT.fromResult(env.getR[List[ObservationWorkflowState]]("states"))
-            oids     <- oids(pred)
-            stateMap <- ResultT(stateMap(oids))
-            filtered  = oids.filter(stateMap.get(_).exists(states.contains))
-          yield Environment(env, newQuery(filtered, child))
-
-        // I can't believe this works.
-        services.useNonTransactionally:
-          requireStaffAccess: // N.B. this is only for staff or better, at least for now
-            go.value
-
-      case other =>
-        Result.internalError(s"observationsByWorkflowState: expected Environment(env, Filter(pred, child)) got $other").pure[F]
-
-    }
 
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (_, e) =>
     val notAuthorized = OdbError.NotAuthorized(user.id, "Only the GOA user may access this field.".some).asFailure
@@ -613,32 +539,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 child = q
               )
             }
-          }
-        }
-      }
-  }
-
-  private lazy val ObservationsByWorkflowState: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
-    val StateBinding = enumeratedBinding[ObservationWorkflowState]
-    {
-      case (QueryType, "observationsByWorkflowState", List(
-        WhereObservationBinding.Option("WHERE", rWHERE),
-        StateBinding.List.Option("states", rStates)
-      )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rStates).parMapN { (WHERE, states) =>
-            Environment(
-              Env("states" -> states.orEmpty),
-              Filter(
-                and(List(
-                  Predicates.observation.existence.includeDeleted(false),
-                  Predicates.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                )),
-                child
-              )
-            )
           }
         }
       }
