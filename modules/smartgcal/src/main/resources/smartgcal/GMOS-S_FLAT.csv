@@ -1,4 +1,4 @@
-488,2023/02/28 04:39:16 HST
+520,2025/05/20 07:47:32 HST
 # GMOS_FLAT,,,,,,,,,,,,,,,,,,
 # V 487, GG 2023Feb28,,,,,,,,,,,,,,,,,
 # updated R150 2x1 0.5 (2 sec from 3) and added B480,,,,,,,,,,,,,,,,,,
@@ -18,6 +18,7 @@
 # update for  R400 0.25arcsec 2x2 (GG 20190628),,,,,,,,,,,,,,,,,,
 # update for  R831 IFU-2+z+CaT 8sec->5sec, and  2sec -> 1sec for R400, 785 2"" slit 1x2 (GG 20210720)",,,,,,,,,,,,,,,,,,
 # update for  R150  720nm  1"" slit 4x2 (GG 20220126) ND = ND4.0",,,,,,,,,,,,,,,,,,
+# Updated exposure time for R400 flats 700nm 1x1 and 2x2 - GG 20250520,,,,,,,,,,,,,,,,,,
 # this is a copy of GMOS-N flat version 240, starting point for Hamamatsu CCDs,,,,,,,,,,,,,,,,,
 # Site dependent instrument specifications removed.,,,,,,,,,,,,,,,,,,
 #,,,,,,,,,,,,,,,,,,
@@ -212,7 +213,7 @@ $R150.*,$GG455.*,$IFU.* 2 Slits,4,1,300 - 1200,1,Low,,,,1,GMOS balance,Visible,Q
 #,,,,,,,,,,,,,,,,,1,Night
 $R400.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,400 - 590,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,10,1,Night
 $R400.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,590 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
-$R400.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,650 - 1000,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$R400.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,650 - 1000,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $R400.*,$.*one|.*G.*,$.* 1.00 arcsec,2,1,400 - 590,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,5,1,Night
 $R400.*,$.*one|.*G.*,$.* 1.00 arcsec,1,2,400 - 590,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,5,1,Night
 $R400.*,$.*one|.*G.*,$.* 1.00 arcsec,2,1,590 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
@@ -258,9 +259,9 @@ $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,1,2,650 - 1000,1,Low,,,,1,GMOS balance,Visi
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,400 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
+$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
+$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
+$R400.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,650 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,400 - 700,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,400 - 700,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $R400.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,700 - 1000,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
