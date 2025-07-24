@@ -33,7 +33,7 @@ object ExposureTimeModeInput:
       ObjectFieldsBinding.rmap:
         case List(
           TimeSpanInput.Binding("time", rTime),
-          NonNegIntBinding("count", rCount),
+          PosIntBinding("count", rCount),
           WavelengthInput.Binding("at", rAt)
         ) =>
           for
