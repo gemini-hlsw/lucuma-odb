@@ -4,11 +4,40 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.effect.Resource
+import cats.syntax.all.*
+import grackle.Cursor
+import grackle.Query
+import grackle.Query.EffectHandler
+import grackle.Result
+import grackle.Result.Failure
+import grackle.Result.Warning
+import grackle.ResultT
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.catalog.clients.GaiaClient
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Region
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.util.Timestamp
+import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.json.region.query.given
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.Services
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
+
+  def services: Resource[F, Services[F]]
+  def itcClient: ItcClient[F]
+  def gaiaClient: GaiaClient[F]
+  def commitHash: CommitHash
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val ConfigurationMappings =
     List(
@@ -28,9 +57,78 @@ trait ConfigurationMapping[F[_]]
     ObjectMapping(ObservationType / "configuration")(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
-      SqlObject("target"),
+
+      // N.B. the reference time here has no zone information, so it's interpreted as UTC. This will
+      // almost certainly never matter, but if it does matter at some point then we can change it
+      // to use the timezone of the site associated with the instrument. In any case this value is
+      // a computed column in the view and is the midpoint of the active period for the observation's
+      // associated CFP (if any). The reference time is used when computing coordintes for approved
+      // configurations; it is not related to visualization time.
+      SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
+      EffectField("target", targetQueryHandler, List("id", "programId", "referenceTime")),
       SqlObject("conditions"),
       SqlObject("observingMode"),
     )
+
+  // Use GuideService.getObjectTrackikng to compute thet location of this observation's asterism at the middle
+  // of the CFP's active period (if we can).
+  def targetQueryHandler: EffectHandler[F] =
+
+    // N.B. we can't use ObservationEffectHandler here because it doesn't gather all the infomation we need from
+    // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
+    new EffectHandler[F] {
+
+      def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
+        services.use { implicit s =>
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getObjectTrackingOrRegion(pid, oid)
+              .map:
+                case Failure(problems) => Warning(problems, None) // turn failure into a warning                
+                case other => 
+                  other.map:
+                    case Right(r) => Some(Right(r))
+                    case Left(cs) =>
+                      oRefTime.flatMap: refTime =>                        
+                        cs.at(refTime.toInstant).map: aliased =>
+                          Left(aliased.value)
+        }
+
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
+        queries.parTraverse: (_, cursor) =>
+          (
+            cursor.fieldAs[Program.Id]("programId"),
+            cursor.fieldAs[Observation.Id]("id"),
+            cursor.fieldAs[Option[Timestamp]]("referenceTime")
+          ).parTupled
+
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (for {
+          ctx <- ResultT(queryContext(queries).pure[F])
+          obs <- ctx.distinct.traverse { case (pid, oid, ldt) =>
+                   ResultT(calculate(pid, oid, ldt)).map((oid, _))
+                 }
+          res <- ResultT(ctx
+                   .flatMap { case (pid, oid, ldt) => obs.find(r => r._1 === oid).map(_._2).toList }
+                   .zip(queries)
+                   .traverse { case (result, (query, parentCursor)) =>
+                     Query.childContext(parentCursor.context, query).map { childContext =>
+                       CirceCursor(
+                        childContext,
+                        Json.obj(
+                          "coordinates" -> result.flatMap(_.left.toOption).asJson,
+                          "region"      -> result.flatMap(_.toOption).asJson,
+                        ), 
+                        Some(parentCursor), 
+                        parentCursor.fullEnv
+                      )
+                     }
+                   }.pure[F]
+                 )
+          } yield res
+        ).value
+
+    }
+
 
 }

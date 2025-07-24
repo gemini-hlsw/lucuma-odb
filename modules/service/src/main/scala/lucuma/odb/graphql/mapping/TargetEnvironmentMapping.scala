@@ -127,7 +127,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
           Services.asSuperUser:
             s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
               .getObjectTracking(pid, oid)
-              .map(_.map(_.at(obsTime.toInstant).map(_.value)))
+              .map(_.map(_.flatMap(_.at(obsTime.toInstant)).map(_.value)))
         }
 
     effectHandler(readEnv, calculate)

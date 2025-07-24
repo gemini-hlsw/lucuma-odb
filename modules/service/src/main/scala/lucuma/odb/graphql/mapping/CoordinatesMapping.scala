@@ -19,7 +19,7 @@ trait CoordinatesMapping[F[_]] extends ObservationView[F] with ConfigurationRequ
     )
 
   private lazy val CoordinatesMapping =
-    ObjectMapping(CoordinatesType)(
+    ObjectMapping(TargetEnvironmentType / "explicitBase")(
       SqlField("synthetic_id", ObservationView.TargetEnvironment.Coordinates.SyntheticId, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec")

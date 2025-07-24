@@ -163,7 +163,7 @@ case class ObservationValidationInfo(
       for
         ast <- NonEmptyList.fromList(asterism)
         tracking  = ObjectTracking.fromAsterism(ast)
-        coordsAt <- tracking.at(when)
+        coordsAt <- tracking.flatMap(_.at(when))
       yield coordsAt.value
 
 }

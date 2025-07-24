@@ -16,6 +16,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Region
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
@@ -36,7 +37,6 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import lucuma.core.math.Region
 
 trait ConfigurationService[F[_]] {
 
