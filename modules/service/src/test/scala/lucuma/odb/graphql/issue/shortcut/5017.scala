@@ -106,7 +106,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
               }
             }
           }
-          calculatedWorkflow { value { state } }
+          workflow { value { state } }
         }
       }
     """
@@ -120,7 +120,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
       ).flatMap: json =>
         val c = json.hcursor.downField("observation")
         (for
-          s <- c.downFields("calculatedWorkflow", "value", "state").as[ObservationWorkflowState]
+          s <- c.downFields("workflow", "value", "state").as[ObservationWorkflowState]
           t <- c.downFields("execution", "digest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
         yield (s, t)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
