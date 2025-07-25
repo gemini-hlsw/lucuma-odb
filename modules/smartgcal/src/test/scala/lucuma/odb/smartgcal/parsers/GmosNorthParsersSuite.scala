@@ -38,7 +38,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
         u <- fpus
       } yield TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu](
         GratingConfigKey(
-          GmosNorthGrating.R400_G5305,
+          GmosNorthGrating.R400_G5310,
           GmosGratingOrder.One,
           BoundedInterval.unsafeOpenUpper(
             Wavelength.fromIntNanometers(675).get,
@@ -103,7 +103,7 @@ final class GmosNorthParsersSuite extends munit.FunSuite {
         """$.*FooBar.*,$.*one|.*G.*,$.* 0.50 arcsec,4,1,675 - 1200,1,Low
            |           ^
            |expectation:
-           |* context: GMOS North grating, must fail: Pattern '.*FooBar.*' matched nothing, must match one of the strings: {'Mirror', 'B1200_G5301', 'R831_G5302', 'R600_G5304', 'B480_G5309', 'R400_G5305', 'R150_G5308'}""".stripMargin
+           |* context: GMOS North grating, must fail: Pattern '.*FooBar.*' matched nothing, must match one of the strings: {'Mirror', 'B1200_G5301', 'R831_G5302', 'R600_G5304', 'B480_G5309', 'R400_G5310', 'R150_G5308'}""".stripMargin
       )
     )
 
