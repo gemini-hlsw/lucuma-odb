@@ -1215,7 +1215,7 @@ input TimeAndCountExposureTimeModeInput {
   time: TimeSpanInput!
 
   "Exposure count, which much be greater than zero."
-  count: NonNegInt!
+  count: PosInt!
 
   "S/N at wavelength."
   at: WavelengthInput!
