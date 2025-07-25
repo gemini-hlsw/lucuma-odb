@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
 import eu.timepit.refined.api.Refined.value
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
