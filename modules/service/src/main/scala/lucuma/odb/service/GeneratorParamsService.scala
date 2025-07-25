@@ -410,7 +410,7 @@ object GeneratorParamsService {
         wavelength_pm.opt            *:
         signal_to_noise.opt          *:
         time_span.opt                *:
-        int4_nonneg.opt
+        int4_pos.opt
       ).emap: (tpe, at, s2n, time, count) =>
         tpe.fold(none[ExposureTimeMode].asRight[String]) {
           case ExposureTimeModeType.SignalToNoiseMode =>
