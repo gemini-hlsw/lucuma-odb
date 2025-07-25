@@ -361,7 +361,7 @@ object Config:
            GmosNorthGrating.R831_G5302  |
            GmosNorthGrating.R600_G5304  |
            GmosNorthGrating.B480_G5309  => 5
-      case GmosNorthGrating.R400_G5305  => 8
+      case GmosNorthGrating.R400_G5310  => 8
       case GmosNorthGrating.R150_G5308  => 20
     )
 
