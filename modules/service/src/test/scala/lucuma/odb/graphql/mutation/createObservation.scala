@@ -463,34 +463,27 @@ class createObservation extends OdbSuite {
       }
   }
 
-  test("[general] new observation without definition should be UNDEFINED") {
-    createProgramAs(pi).flatMap { pid =>
-      query(pi,
-        s"""
-          mutation {
-            createObservation(input: {
-              programId: ${pid.asJson}
-            }) {
-              observation {
-                workflow {
-                  state
-                }
+  test("[general] new observation without definition should be UNDEFINED"):
+    createProgramAs(pi).flatMap: pid =>
+      createObservationAs(pi, pid).flatMap: oid =>
+        runObscalcUpdateAs(service, pid, oid) >>
+        query(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                workflow { value { state } }
               }
             }
-          }
-          """).flatMap { js =>
-        val get = js.hcursor
-          .downField("createObservation")
-          .downField("observation")
-          .downField("workflow")
-          .downField("state")
-          .as[ObservationWorkflowState]
-          .leftMap(f => new RuntimeException(f.message))
-          .liftTo[IO]
-        assertIO(get, ObservationWorkflowState.Undefined)
-      }
-    }
-  }
+          """
+        ).flatMap: js =>
+          val get = js.hcursor
+            .downField("observation")
+            .downField("workflow")
+            .downField("value")
+            .downField("state")
+            .as[ObservationWorkflowState]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+          assertIO(get, ObservationWorkflowState.Undefined)
 
   test("[general] created observation has no explicit base by default") {
     createProgramAs(pi).flatMap { pid =>
