@@ -8,7 +8,6 @@ import cats.Eq
 import cats.syntax.option.*
 import cats.syntax.order.*
 import coulomb.*
-import eu.timepit.refined.types.numeric.PosDouble
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -30,8 +29,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
-import lucuma.core.model.ImageQuality
-import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
@@ -47,7 +44,7 @@ import java.io.DataOutputStream
  * @tparam L filter type
  * @tparam U FPU type
  */
-sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable {
+sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable:
   def grating: G
 
   def coverage: WavelengthDelta
@@ -127,7 +124,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       ampReadMode
     )
 
-  def hashBytes: Array[Byte] = {
+  def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
@@ -140,25 +137,17 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     out.writeChars(ampGain.tag)
     out.writeChars(ampReadMode.tag)
     out.writeChars(roi.tag)
-    wavelengthDithers.foreach { d =>
+    wavelengthDithers.foreach: d =>
       out.writeInt(d.toPicometers.value)
-    }
-    spatialOffsets.foreach { o =>
+    spatialOffsets.foreach: o =>
       out.writeLong(o.toAngle.toMicroarcseconds)
-    }
 
     out.close()
     bao.toByteArray
-  }
 
-}
+object Config:
 
-object Config {
-
-  final case class GmosNorth private[longslit] (
-    grating:                   GmosNorthGrating,
-    filter:                    Option[GmosNorthFilter],
-    fpu:                       GmosNorthFpu,
+  final case class Common(
     centralWavelength:         Wavelength,
     defaultXBin:               GmosXBinning,
     explicitXBin:              Option[GmosXBinning],
@@ -169,203 +158,175 @@ object Config {
     explicitRoi:               Option[GmosRoi],
     explicitWavelengthDithers: Option[List[WavelengthDither]],
     explicitSpatialOffsets:    Option[List[Q]]
-  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
+  )
+
+  object Common:
+
+    given Eq[Common] =
+      Eq.by: a =>
+        (
+          a.centralWavelength,
+          a.defaultXBin,
+          a.explicitXBin,
+          a.defaultYBin,
+          a.explicitYBin,
+          a.explicitAmpReadMode,
+          a.explicitAmpGain,
+          a.explicitRoi,
+          a.explicitWavelengthDithers,
+          a.explicitSpatialOffsets
+        )
+
+  final case class GmosNorth(
+    grating: GmosNorthGrating,
+    filter:  Option[GmosNorthFilter],
+    fpu:     GmosNorthFpu,
+    common:  Common
+  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
+
+    override def centralWavelength: Wavelength =
+      common.centralWavelength
+
+    override def defaultXBin: GmosXBinning =
+      common.defaultXBin
+
+    override def explicitXBin: Option[GmosXBinning] =
+      common.explicitXBin
+
+    override def defaultYBin: GmosYBinning =
+      common.defaultYBin
+
+    override def explicitYBin: Option[GmosYBinning] =
+      common.explicitYBin
+
+    override def explicitAmpReadMode: Option[GmosAmpReadMode] =
+      common.explicitAmpReadMode
+
+    override def explicitAmpGain: Option[GmosAmpGain] =
+      common.explicitAmpGain
+
+    override def explicitRoi: Option[GmosRoi] =
+      common.explicitRoi
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
 
-  }
+    override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
+      common.explicitWavelengthDithers
 
-  object GmosNorth {
+    override def explicitSpatialOffsets: Option[List[Q]] =
+      common.explicitSpatialOffsets
 
-    def apply(
-      sourceProfile:             SourceProfile,
-      imageQuality:              ImageQuality.Preset,
-      sampling:                  PosDouble,
-      grating:                   GmosNorthGrating,
-      filter:                    Option[GmosNorthFilter],
-      fpu:                       GmosNorthFpu,
-      centralWavelength:         Wavelength,
-      explicitXBin:              Option[GmosXBinning]           = None,
-      explicitYBin:              Option[GmosYBinning]           = None,
-      explicitAmpReadMode:       Option[GmosAmpReadMode]        = None,
-      explicitAmpGain:           Option[GmosAmpGain]            = None,
-      explicitRoi:               Option[GmosRoi]                = None,
-      explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
-      explicitSpatialOffsets:    Option[List[Q]]                = None
-    ): GmosNorth = {
-      val (x, y) = northBinning(fpu, sourceProfile, imageQuality.toImageQuality, grating, sampling = sampling)
-
-      GmosNorth(
-        grating,
-        filter,
-        fpu,
-        centralWavelength,
-        x,
-        explicitXBin,
-        y,
-        explicitYBin,
-        explicitAmpReadMode,
-        explicitAmpGain,
-        explicitRoi,
-        explicitWavelengthDithers,
-        explicitSpatialOffsets
-      )
-    }
+  object GmosNorth:
 
     def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
-      modes.headOption match {
-        case None                                                  =>
-          a.some
+      modes.headOption match
+        case None => a.some
 
         case Some(b: GmosNorth) =>
-          if (a === b)
+          if a === b then
             reconcile(a, modes.tail)
-          else {
+          else
             val x  = a.xBin min b.xBin
             val y  = a.yBin min b.yBin
-            val aʹ = a.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
-            val bʹ = b.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
-            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
-          }
+            val aʹ = a.copy(common = a.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
+            val bʹ = b.copy(common = b.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
+            if aʹ === bʹ then reconcile(aʹ, modes.tail) else none
 
-        case _                                                     =>
-          none
-      }
-
+        case _  => none
 
     given Eq[GmosNorth] =
-      Eq.by { a => (
-        a.grating,
-        a.filter,
-        a.fpu,
-        a.centralWavelength,
-        a.defaultXBin,
-        a.explicitXBin,
-        a.defaultYBin,
-        a.explicitYBin,
-        a.explicitAmpReadMode,
-        a.explicitAmpGain,
-        a.explicitRoi,
-        a.explicitWavelengthDithers,
-        a.explicitSpatialOffsets
-      )}
+      Eq.by: a =>
+        (
+          a.grating,
+          a.filter,
+          a.fpu,
+          a.common
+        )
 
-  }
-
-  final case class GmosSouth private[longslit] (
-    grating:                   GmosSouthGrating,
-    filter:                    Option[GmosSouthFilter],
-    fpu:                       GmosSouthFpu,
-    centralWavelength:         Wavelength,
-    defaultXBin:               GmosXBinning,
-    explicitXBin:              Option[GmosXBinning],
-    defaultYBin:               GmosYBinning,
-    explicitYBin:              Option[GmosYBinning],
-    explicitAmpReadMode:       Option[GmosAmpReadMode],
-    explicitAmpGain:           Option[GmosAmpGain],
-    explicitRoi:               Option[GmosRoi],
-    explicitWavelengthDithers: Option[List[WavelengthDither]],
-    explicitSpatialOffsets:    Option[List[Q]]
-  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
+  final case class GmosSouth(
+    grating: GmosSouthGrating,
+    filter:  Option[GmosSouthFilter],
+    fpu:     GmosSouthFpu,
+    common:  Common
+  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
 
+    override def centralWavelength: Wavelength =
+      common.centralWavelength
+
+    override def defaultXBin: GmosXBinning =
+      common.defaultXBin
+
+    override def explicitXBin: Option[GmosXBinning] =
+      common.explicitXBin
+
+    override def defaultYBin: GmosYBinning =
+      common.defaultYBin
+
+    override def explicitYBin: Option[GmosYBinning] =
+      common.explicitYBin
+
+    override def explicitAmpReadMode: Option[GmosAmpReadMode] =
+      common.explicitAmpReadMode
+
+    override def explicitAmpGain: Option[GmosAmpGain] =
+      common.explicitAmpGain
+
+    override def explicitRoi: Option[GmosRoi] =
+      common.explicitRoi
+
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
 
-  }
+    override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
+      common.explicitWavelengthDithers
 
-  object GmosSouth {
+    override def explicitSpatialOffsets: Option[List[Q]] =
+      common.explicitSpatialOffsets
 
-    def apply(
-      sourceProfile:             SourceProfile,
-      imageQuality:              ImageQuality.Preset,
-      sampling:                  PosDouble,
-      grating:                   GmosSouthGrating,
-      filter:                    Option[GmosSouthFilter],
-      fpu:                       GmosSouthFpu,
-      centralWavelength:         Wavelength,
-      explicitXBin:              Option[GmosXBinning]           = None,
-      explicitYBin:              Option[GmosYBinning]           = None,
-      explicitAmpReadMode:       Option[GmosAmpReadMode]        = None,
-      explicitAmpGain:           Option[GmosAmpGain]            = None,
-      explicitRoi:               Option[GmosRoi]                = None,
-      explicitWavelengthDithers: Option[List[WavelengthDither]] = None,
-      explicitSpatialOffsets:    Option[List[Q]]                = None
-    ): GmosSouth = {
-      val (x, y) = southBinning(fpu, sourceProfile, imageQuality.toImageQuality, grating, sampling = sampling)
-
-      GmosSouth(
-        grating,
-        filter,
-        fpu,
-        centralWavelength,
-        x,
-        explicitXBin,
-        y,
-        explicitYBin,
-        explicitAmpReadMode,
-        explicitAmpGain,
-        explicitRoi,
-        explicitWavelengthDithers,
-        explicitSpatialOffsets
-      )
-    }
+  object GmosSouth:
 
     def reconcile(a: GmosSouth, modes: List[ObservingMode]): Option[GmosSouth] =
-      modes.headOption match {
-        case None                                                  =>
-          a.some
+      modes.headOption match
+        case None => a.some
 
         case Some(b: GmosSouth) =>
-          if (a === b)
+          if a === b then
             reconcile(a, modes.tail)
-          else {
+          else
             val x  = a.xBin min b.xBin
             val y  = a.yBin min b.yBin
-            val aʹ = a.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
-            val bʹ = b.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y)
-            if (aʹ === bʹ) reconcile(aʹ, modes.tail) else none
-          }
+            val aʹ = a.copy(common = a.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
+            val bʹ = b.copy(common = b.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
+            if aʹ === bʹ then reconcile(aʹ, modes.tail) else none
 
-        case _                                                     =>
-          none
-      }
+        case _ => none
 
     given Eq[GmosSouth] =
-      Eq.by { a => (
-        a.grating,
-        a.filter,
-        a.fpu,
-        a.centralWavelength,
-        a.defaultXBin,
-        a.explicitXBin,
-        a.defaultYBin,
-        a.explicitYBin,
-        a.explicitAmpReadMode,
-        a.explicitAmpGain,
-        a.explicitRoi,
-        a.explicitWavelengthDithers,
-        a.explicitSpatialOffsets
-      )}
-
-  }
+      Eq.by: a =>
+        (
+          a.grating,
+          a.filter,
+          a.fpu,
+          a.common
+        )
 
   def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =
     Lens[Config[G, L, U], Option[List[WavelengthDither]]](_.explicitWavelengthDithers) { dithers => {
-      case gn: GmosNorth => gn.copy(explicitWavelengthDithers = dithers)
-      case gs: GmosSouth => gs.copy(explicitWavelengthDithers = dithers)
+      case gn: GmosNorth => gn.copy(common = gn.common.copy(explicitWavelengthDithers = dithers))
+      case gs: GmosSouth => gs.copy(common = gs.common.copy(explicitWavelengthDithers = dithers))
     }}
 
   def explicitSpatialOffsets[G, L, U]: Lens[Config[G, L, U], Option[List[Q]]] =
     Lens[Config[G, L, U], Option[List[Q]]](_.explicitSpatialOffsets) { qs => {
-      case gn: GmosNorth => gn.copy(explicitSpatialOffsets = qs)
-      case gs: GmosSouth => gs.copy(explicitSpatialOffsets = qs)
+      case gn: GmosNorth => gn.copy(common = gn.common.copy(explicitSpatialOffsets = qs))
+      case gs: GmosSouth => gs.copy(common = gs.common.copy(explicitSpatialOffsets = qs))
     }}
 
   val IfuSlitWidth: Angle =
@@ -415,5 +376,3 @@ object Config {
       case GmosSouthGrating.R400_G5325  => 8
       case GmosSouthGrating.R150_G5326  => 20
     )
-
-}

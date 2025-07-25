@@ -27,76 +27,53 @@ import lucuma.core.util.arb.ArbEnumerated
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
-object ArbGmosLongSlitConfig {
+object ArbGmosLongSlitConfig:
 
   import ArbEnumerated.given
   import ArbOffset.given
   import ArbWavelength.given
   import ArbWavelengthDither.given
+
+  given Arbitrary[Config.Common] =
+    Arbitrary:
+      for
+        w <- arbitrary[Wavelength]
+        dx <- arbitrary[GmosXBinning]
+        x <- arbitrary[Option[GmosXBinning]]
+        dy <- arbitrary[GmosYBinning]
+        y <- arbitrary[Option[GmosYBinning]]
+        m <- arbitrary[Option[GmosAmpReadMode]]
+        n <- arbitrary[Option[GmosAmpGain]]
+        r <- arbitrary[Option[GmosRoi]]
+        d <- arbitrary[Option[List[WavelengthDither]]]
+        s <- arbitrary[Option[List[Q]]]
+      yield Config.Common(
+        w,
+        dx,
+        x,
+        dy,
+        y,
+        m,
+        n,
+        r,
+        d,
+        s
+      )
+
   given Arbitrary[Config.GmosNorth] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         g <- arbitrary[GmosNorthGrating]
         f <- arbitrary[Option[GmosNorthFilter]]
         u <- arbitrary[GmosNorthFpu]
-        w <- arbitrary[Wavelength]
-        dx <- arbitrary[GmosXBinning]
-        x <- arbitrary[Option[GmosXBinning]]
-        dy <- arbitrary[GmosYBinning]
-        y <- arbitrary[Option[GmosYBinning]]
-        m <- arbitrary[Option[GmosAmpReadMode]]
-        n <- arbitrary[Option[GmosAmpGain]]
-        r <- arbitrary[Option[GmosRoi]]
-        d <- arbitrary[Option[List[WavelengthDither]]]
-        s <- arbitrary[Option[List[Q]]]
-      } yield Config.GmosNorth(
-        g,
-        f,
-        u,
-        w,
-        dx,
-        x,
-        dy,
-        y,
-        m,
-        n,
-        r,
-        d,
-        s
-      )
-    }
+        c <- arbitrary[Config.Common]
+      yield Config.GmosNorth(g, f, u, c)
 
   given Arbitrary[Config.GmosSouth] =
-    Arbitrary {
-      for {
+    Arbitrary:
+      for
         g <- arbitrary[GmosSouthGrating]
         f <- arbitrary[Option[GmosSouthFilter]]
         u <- arbitrary[GmosSouthFpu]
-        w <- arbitrary[Wavelength]
-        dx <- arbitrary[GmosXBinning]
-        x <- arbitrary[Option[GmosXBinning]]
-        dy <- arbitrary[GmosYBinning]
-        y <- arbitrary[Option[GmosYBinning]]
-        m <- arbitrary[Option[GmosAmpReadMode]]
-        n <- arbitrary[Option[GmosAmpGain]]
-        r <- arbitrary[Option[GmosRoi]]
-        d <- arbitrary[Option[List[WavelengthDither]]]
-        s <- arbitrary[Option[List[Q]]]
-      } yield Config.GmosSouth(
-        g,
-        f,
-        u,
-        w,
-        dx,
-        x,
-        dy,
-        y,
-        m,
-        n,
-        r,
-        d,
-        s
-      )
-    }
-
-}
+        c <- arbitrary[Config.Common]
+      yield Config.GmosSouth(g, f, u, c)
