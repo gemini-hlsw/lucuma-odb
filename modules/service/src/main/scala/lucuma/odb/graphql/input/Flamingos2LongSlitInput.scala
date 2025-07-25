@@ -19,7 +19,6 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.flamingos2.longslit.Config
 
 object Flamingos2LongSlitInput {
 
@@ -44,22 +43,6 @@ object Flamingos2LongSlitInput {
 
     val formattedSpatialOffsets: Option[String] =
       explicitSpatialOffsets.map(OffsetsFormat.reverseGet)
-
-    /**
-      * Creates a F2 long slit observing mode based on input parameters.
-      */
-    def toObservingMode: Config =
-      Config(
-        disperser,
-        filter,
-        fpu,
-        explicitReadMode,
-        explicitReads,
-        explicitDecker,
-        explicitReadoutMode,
-        explicitSpatialOffsets
-      )
-
   }
 
   object Create {

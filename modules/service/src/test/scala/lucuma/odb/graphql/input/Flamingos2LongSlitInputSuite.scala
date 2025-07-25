@@ -21,17 +21,6 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
     forAll: (c: Flamingos2LongSlitInput.Create) =>
       assertEquals(c.observingModeType, ObservingModeType.Flamingos2LongSlit)
 
-  test("Flamingos2LongSlitInput.Create toObservingMode should preserve values"):
-    forAll: (c: Flamingos2LongSlitInput.Create) =>
-      val om = c.toObservingMode
-      assertEquals(om.disperser, c.disperser)
-      assertEquals(om.filter, c.filter)
-      assertEquals(om.fpu, c.fpu)
-      assertEquals(om.explicitReadMode, c.explicitReadMode)
-      assertEquals(om.explicitDecker, c.explicitDecker)
-      assertEquals(om.explicitReadoutMode, c.explicitReadoutMode)
-      assertEquals(om.explicitReads, c.explicitReads)
-
   test("Flamingos2LongSlitInput.Edit should have correct observingModeType"):
     forAll: (e: Flamingos2LongSlitInput.Edit) =>
       assertEquals(e.observingModeType, ObservingModeType.Flamingos2LongSlit)
