@@ -28,7 +28,7 @@ val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.8"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.7"
-val pprintVersion              = "0.9.0"
+val pprintVersion              = "0.9.3"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
