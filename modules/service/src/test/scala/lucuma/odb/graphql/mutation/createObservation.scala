@@ -631,7 +631,7 @@ class createObservation extends OdbSuite {
           .as[CloudExtinction.Preset]
           .leftMap(f => new RuntimeException(f.message))
           .liftTo[IO]
-        assertIO(get, CloudExtinction.Preset.OnePointFive)
+        assertIO(get, CloudExtinction.Preset.OnePointZero)
       }
     }
   }
