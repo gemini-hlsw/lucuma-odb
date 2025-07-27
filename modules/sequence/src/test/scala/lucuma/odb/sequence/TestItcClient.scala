@@ -9,12 +9,10 @@ import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.*
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcVersions
@@ -37,19 +35,6 @@ object TestItcClient {
   def Version: ItcVersions =
     new ItcVersions("foo", "bar".some)
 
-  def withSuccessResult[F[_]: Applicative](
-    exposureTime:  TimeSpan,
-    exposureCount: Int,
-    bandOrLine:    Either[Band, Wavelength],
-  ): ItcClient[F] =
-    withResult[F](
-      IntegrationTime(
-        exposureTime,
-        NonNegInt.unsafeFrom(exposureCount),
-      ),
-      bandOrLine
-    )
-
   def withResult[F[_]: Applicative](
     result:      IntegrationTime,
     bandOrLine:  Either[Band, Wavelength]
@@ -65,7 +50,7 @@ object TestItcClient {
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
             case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-              IntegrationTime(t, NonNegInt.unsafeFrom(c.value))
+              IntegrationTime(t, c)
 
         val snAt = input.exposureTimeMode match
           case ExposureTimeMode.SignalToNoiseMode(sn, at) =>

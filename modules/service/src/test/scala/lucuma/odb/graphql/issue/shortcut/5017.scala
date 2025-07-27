@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.effect.IO
 import cats.effect.std.AtomicCell
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -32,7 +32,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   test("Digest updates after dataset QA"):
