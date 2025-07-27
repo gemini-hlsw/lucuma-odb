@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
@@ -29,7 +29,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
   val ExposureTime: TimeSpan = 2.secTimeSpan
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(1))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
 
   val InitialAcquisition: Json =
     json"""

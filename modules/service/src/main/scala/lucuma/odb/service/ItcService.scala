@@ -24,7 +24,7 @@ import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -170,7 +170,7 @@ object ItcService {
         for {
           targetId        <- c.downField("targetId").as[Target.Id]
           exposureTime    <- c.downField("exposureTime").as[TimeSpan]
-          exposureCount   <- c.downField("exposureCount").as[NonNegInt]
+          exposureCount   <- c.downField("exposureCount").as[PosInt]
           signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
         } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
       }

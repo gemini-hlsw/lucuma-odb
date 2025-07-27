@@ -6,7 +6,7 @@ package scheduler
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass
@@ -33,7 +33,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   def withRoutes[A](user: User, request: Request[IO]): IO[Response[IO]] =

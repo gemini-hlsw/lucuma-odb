@@ -8,7 +8,7 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -38,7 +38,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
+      PosInt.unsafeFrom(10),
     )
 
   // * Arc:
