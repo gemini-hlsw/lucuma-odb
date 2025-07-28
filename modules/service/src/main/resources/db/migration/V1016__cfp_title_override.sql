@@ -1,6 +1,6 @@
 -- Add a nullable title override column.
 ALTER TABLE t_cfp
-  ADD COLUMN c_title_override text NULL DEFAULT NULL;
+  ADD COLUMN c_title_override text NULL DEFAULT NULL CHECK (c_title_override IS NULL OR length(c_title_override) > 0);
 
 -- Drop the v_cfp view which calls the title formatting function.
 DROP VIEW v_cfp;
@@ -8,9 +8,9 @@ DROP VIEW v_cfp;
 -- Update the title formatting function to consider the title override.
 DROP FUNCTION format_cfp_title;
 CREATE FUNCTION format_cfp_title(
-  titleOverride text,
   cfpType       e_cfp_type,
   semester      d_semester,
+  titleOverride text,
   startDate     date,
   endDate       date,
   instruments   d_tag[]
@@ -76,7 +76,7 @@ CREATE VIEW v_cfp AS
       c.*,
       cte_instrument.c_instruments,
       cte_partner.c_is_open,
-      format_cfp_title(c.c_title_override, c.c_type, c.c_semester, c.c_active_start, c.c_active_end, cte_instrument.c_instrument_names) AS c_title,
+      format_cfp_title(c.c_type, c.c_semester, c.c_title_override, c.c_active_start, c.c_active_end, cte_instrument.c_instrument_names) AS c_title,
       cte_partner.c_non_partner = 1 AS c_allows_non_partner,
       (CASE WHEN cte_partner.c_non_partner = 1 THEN cte_partner.c_us_deadline ELSE NULL END) AS c_non_partner_deadline
     FROM
