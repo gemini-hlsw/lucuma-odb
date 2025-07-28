@@ -756,12 +756,12 @@ object Science:
         case Some(CalibrationRole.SpectroPhotometric) =>
           val configʹ = calibrationObservationConfig(config)
           extractTime
-            .map(_.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length)))
+            .map(_.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))))
             .tupleLeft(configʹ)
 
         case Some(CalibrationRole.Twilight)           =>
           val configʹ = calibrationObservationConfig(config)
-          val timeʹ   = IntegrationTime(TwilightExposureTime, PosInt.unsafeFrom(configʹ.wavelengthDithers.length))
+          val timeʹ   = IntegrationTime(TwilightExposureTime, PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1)))
           (configʹ, timeʹ).asRight[OdbError]
 
         case Some(c)                                  =>
