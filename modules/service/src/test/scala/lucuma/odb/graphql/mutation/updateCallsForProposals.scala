@@ -964,4 +964,81 @@ class updateCallsForProposals extends OdbSuite {
       )
   }
 
+  test("titleOverride"):
+    createCall.flatMap: id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                titleOverride: "Foo"
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                title
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "title": "Foo"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  test("unset titleOverride"):
+    createCall.flatMap: id =>
+      query(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: { titleOverride: "Foo" },
+              WHERE: { id: { EQ: "$id" } }
+            }) {
+              callsForProposals { title }
+            }
+          }
+        """
+      ) >> expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                titleOverride: null
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                title
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "title": "2025A Regular Semester"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
 }
