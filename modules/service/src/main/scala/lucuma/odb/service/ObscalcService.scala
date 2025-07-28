@@ -358,7 +358,7 @@ object ObscalcService:
     ).to[Obscalc.Meta]
 
     val integration_time: Codec[IntegrationTime] =
-      (time_span *: int4_nonneg).to[IntegrationTime]
+      (time_span *: int4_pos).to[IntegrationTime]
 
     val signal_to_noise_at: Codec[SignalToNoiseAt] =
       (wavelength_pm *: signal_to_noise *: signal_to_noise)
@@ -646,7 +646,7 @@ object ObscalcService:
         // Imaging ITC Results
         sql"c_img_target_id        = ${target_id.opt}"(r.itcResult.map(_.imaging.targetId)),
         sql"c_img_exposure_time    = ${time_span.opt}"(r.itcResult.map(_.imaging.value.exposureTime)),
-        sql"c_img_exposure_count   = ${int4_nonneg.opt}"(r.itcResult.map(_.imaging.value.exposureCount)),
+        sql"c_img_exposure_count   = ${int4_pos.opt}"(r.itcResult.map(_.imaging.value.exposureCount)),
         sql"c_img_wavelength       = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.wavelength)),
         sql"c_img_single_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.single.value)),
         sql"c_img_total_sn         = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.imaging.signalToNoise).map(_.total.value)),
@@ -654,7 +654,7 @@ object ObscalcService:
         // Spectroscopy ITC Results
         sql"c_spec_target_id       = ${target_id.opt}"(r.itcResult.map(_.spectroscopy.targetId)),
         sql"c_spec_exposure_time   = ${time_span.opt}"(r.itcResult.map(_.spectroscopy.value.exposureTime)),
-        sql"c_spec_exposure_count  = ${int4_nonneg.opt}"(r.itcResult.map(_.spectroscopy.value.exposureCount)),
+        sql"c_spec_exposure_count  = ${int4_pos.opt}"(r.itcResult.map(_.spectroscopy.value.exposureCount)),
         sql"c_spec_wavelength      = ${wavelength_pm.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.wavelength)),
         sql"c_spec_single_sn       = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.single.value)),
         sql"c_spec_total_sn        = ${signal_to_noise.opt}"(r.itcResult.flatMap(_.spectroscopy.signalToNoise).map(_.total.value)),

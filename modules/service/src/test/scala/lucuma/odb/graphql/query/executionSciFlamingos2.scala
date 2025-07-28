@@ -6,7 +6,7 @@ package lucuma.odb.graphql.query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetQaState
@@ -25,7 +25,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
   val ExposureTime: TimeSpan = 20.secondTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(4))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
 
   test("simple generation - limited future"):
     val setup: IO[Observation.Id] =

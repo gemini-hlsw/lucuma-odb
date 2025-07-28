@@ -9,7 +9,6 @@ import cats.data.State
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -68,7 +67,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(3)
+      PosInt.unsafeFrom(3)
     )
 
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>

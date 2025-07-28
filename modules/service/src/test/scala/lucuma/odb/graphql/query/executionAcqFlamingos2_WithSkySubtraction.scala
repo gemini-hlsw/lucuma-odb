@@ -5,7 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
@@ -19,7 +19,7 @@ class executionAcqFlamingos2_WithSkySubtraction extends ExecutionTestSupportForF
   val ExposureTime: TimeSpan = 3.secTimeSpan
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(1))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
 
   val InitialAcquisition: Json =
     json"""

@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.effect.IO
 import cats.effect.Ref
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
@@ -24,7 +24,7 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       1.hrTimeSpan,
-      NonNegInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1)
+      PosInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1)
     )
 
   test("forever sequence") {
