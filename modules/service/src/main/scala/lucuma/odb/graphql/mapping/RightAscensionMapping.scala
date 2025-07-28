@@ -41,7 +41,7 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
-      rightAscensionMappingAtPath(ConfigurationRequestType / "configuration" / "target" / "coordinates" / "ra", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Ra),
+      rightAscensionMappingAtPath(ConfigurationRequestType / "configuration" / "target" / "coordinates" / "ra", ConfigurationRequestView.Id, ConfigurationRequestView.Target.ReferenceCoordinates.Ra),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
     )

@@ -41,7 +41,7 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
-      declinationMappingAtPath(ConfigurationRequestType / "configuration" / "target" / "coordinates" / "dec", ConfigurationRequestView.Id, ConfigurationRequestView.ReferenceCoordinates.Dec),
+      declinationMappingAtPath(ConfigurationRequestType / "configuration" / "target" / "coordinates" / "dec", ConfigurationRequestView.Id, ConfigurationRequestView.Target.ReferenceCoordinates.Dec),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "start", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.Start),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "end", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.End),
     )

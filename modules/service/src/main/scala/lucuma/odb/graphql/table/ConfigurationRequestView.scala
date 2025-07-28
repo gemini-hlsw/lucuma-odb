@@ -22,9 +22,27 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val SkyBackground = col("c_sky_background", sky_background)
       val WaterVapor = col("c_water_vapor", water_vapor)
 
-    object ReferenceCoordinates:
-      val Ra = col("c_reference_ra", right_ascension)
-      val Dec = col("c_reference_dec", declination)
+    object Target:
+      val Id = col("c_configuration_request_id", configuration_request_id.embedded)
+      object ReferenceCoordinates:
+        val SyntheticId = col("c_reference_id", configuration_request_id.embedded)
+        val Ra = col("c_reference_ra", right_ascension.embedded)
+        val Dec = col("c_reference_dec", declination.embedded)
+
+      object Region:
+        val SyntheticId = col("c_region_id", configuration_request_id.embedded)
+        // object RightAscensionArc:
+        //   val SyntheticId = col("c_opportunity_ra_arc_synthetic_id", target_id.embedded)
+        //   val StartEndSyntheticId = col("c_opportunity_ra_arc_start_end_synthetic_id", target_id.embedded)
+        //   val Type  = col("c_opp_ra_arc_type", arc_type.embedded)
+        //   val Start = col("c_opp_ra_arc_start", right_ascension.embedded)
+        //   val End   = col("c_opp_ra_arc_end", right_ascension.embedded)
+        // object DeclinationArc:
+        //   val SyntheticId = col("c_opportunity_dec_arc_synthetic_id", target_id.embedded)
+        //   val StartEndSyntheticId = col("c_opportunity_dec_arc_start_end_synthetic_id", target_id.embedded)
+        //   val Type  = col("c_opp_dec_arc_type", arc_type.embedded)
+        //   val Start = col("c_opp_dec_arc_start", declination.embedded)
+        //   val End   = col("c_opp_dec_arc_end", declination.embedded)
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
 
