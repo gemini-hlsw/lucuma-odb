@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -89,7 +90,8 @@ class callForProposals extends OdbSuite {
   }
 
   private def getTitle(
-    cfpType: CallForProposalsType
+    cfpType:       CallForProposalsType,
+    titleOverride: Option[String] = None
   ): IO[String] =
     query(
       user = staff,
@@ -100,6 +102,7 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        ${cfpType.tag.toScreamingSnakeCase}
                 semester:    "2025A"
+                ${titleOverride.fold("")(title => s"titleOverride: \"$title\"")}
                 activeStart: "2025-02-01"
                 activeEnd:   "2025-07-31"
               }
@@ -122,6 +125,9 @@ class callForProposals extends OdbSuite {
   test("demo science") {
     assertIO(getTitle(CallForProposalsType.DemoScience), "2025A Demo Science")
   }
+
+  test("title override"):
+    assertIO(getTitle(CallForProposalsType.DemoScience, "Foo".some), "Foo")
 
   test("director's time") {
     assertIO(getTitle(CallForProposalsType.DirectorsTime), "2025A Director's Time")
