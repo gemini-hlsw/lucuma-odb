@@ -25,7 +25,7 @@ import clue.websocket.WebSocketClient
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.text.utf8
 import grackle.Mapping
@@ -213,7 +213,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      NonNegInt.unsafeFrom(6),
+      PosInt.unsafeFrom(6),
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
@@ -262,7 +262,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResult
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-                IntegrationTime(t, NonNegInt.unsafeFrom(c.value))
+                IntegrationTime(t, PosInt.unsafeFrom(c.value))
 
           ClientCalculationResult(
             FakeItcVersions,
@@ -387,7 +387,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map  = OdbMapping(db, mon, usr, top, gaia, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, emailConfig)
     } yield map
 
-  protected def trace: Resource[IO, Trace[IO]] =    
+  protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
   protected def server: Resource[IO, Server] =
