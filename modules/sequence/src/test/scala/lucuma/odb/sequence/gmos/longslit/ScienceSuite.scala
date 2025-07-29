@@ -8,6 +8,7 @@ package longslit
 import cats.data.NonEmptyList
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
 import lucuma.core.syntax.timespan.*
@@ -19,7 +20,7 @@ import munit.ScalaCheckSuite
 class ScienceSuite extends ScalaCheckSuite {
 
   private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
-    IntegrationTime(time, NonNegInt.unsafeFrom(exposures))
+    IntegrationTime(time, PosInt.unsafeFrom(exposures))
 
   import Science.Adjustment
   import Science.Goal
