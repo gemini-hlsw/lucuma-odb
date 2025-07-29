@@ -8,6 +8,7 @@ import cats.Traverse
 import cats.data.Ior
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.CallForProposalsType
@@ -29,6 +30,7 @@ object CallForProposalsPropertiesInput {
   case class Create(
     cfpType:     CallForProposalsType,
     semester:    Semester,
+    title:       Option[NonEmptyString],
     gnRaLimit:   (RightAscension, RightAscension),
     gnDecLimit:  (Declination, Declination),
     gsRaLimit:   (RightAscension, RightAscension),
@@ -48,6 +50,7 @@ object CallForProposalsPropertiesInput {
         case List(
           CallForProposalsTypeBinding("type", rType),
           SemesterBinding("semester", rSemester),
+          NonEmptyStringBinding.Option("title", rTitle),
           SiteCoordinateLimitsInput.Create.Binding.Option("coordinateLimits", rLimits),
           DateBinding("activeStart", rActiveStart),
           DateBinding("activeEnd",   rActiveEnd),
@@ -63,6 +66,7 @@ object CallForProposalsPropertiesInput {
           (
             rType,
             rSemester,
+            rTitle,
             rLimits,
             rActive,
             rDeadline,
@@ -70,11 +74,12 @@ object CallForProposalsPropertiesInput {
             rInstrumentsʹ,
             rProprietary,
             rExistence.map(_.getOrElse(Existence.Present))
-          ).parMapN { (cfpType, semester, limits, active, deadline, partners, instruments, proprietary, exist) =>
+          ).parMapN { (cfpType, semester, title, limits, active, deadline, partners, instruments, proprietary, exist) =>
             val coords = limits.fold(SiteCoordinateLimitsInput.Create.default(active))(f => f(active))
             Create(
               cfpType,
               semester,
+              title,
               (coords.north.raStart, coords.north.raEnd),
               (coords.north.decStart, coords.north.decEnd),
               (coords.south.raStart, coords.south.raEnd),
@@ -95,6 +100,7 @@ object CallForProposalsPropertiesInput {
   case class Edit(
     cfpType:     Option[CallForProposalsType],
     semester:    Option[Semester],
+    title:       Nullable[NonEmptyString],
     gnRaLimit:   (Option[RightAscension], Option[RightAscension]),
     gnDecLimit:  (Option[Declination], Option[Declination]),
     gsRaLimit:   (Option[RightAscension], Option[RightAscension]),
@@ -114,6 +120,7 @@ object CallForProposalsPropertiesInput {
         case List(
           CallForProposalsTypeBinding.NonNullable("type", rType),
           SemesterBinding.NonNullable("semester", rSemester),
+          NonEmptyStringBinding.Nullable("title", rTitle),
           SiteCoordinateLimitsInput.Edit.Binding.Option("coordinateLimits", rLimits),
           DateBinding.NonNullable("activeStart", rActiveStart),
           DateBinding.NonNullable("activeEnd",   rActiveEnd),
@@ -132,6 +139,7 @@ object CallForProposalsPropertiesInput {
           (
             rType,
             rSemester,
+            rTitle,
             rLimNorth.map(lim => (lim.flatMap(_.raStart), lim.flatMap(_.raEnd))),
             rLimNorth.map(lim => (lim.flatMap(_.decStart), lim.flatMap(_.decEnd))),
             rLimSouth.map(lim => (lim.flatMap(_.raStart), lim.flatMap(_.raEnd))),
