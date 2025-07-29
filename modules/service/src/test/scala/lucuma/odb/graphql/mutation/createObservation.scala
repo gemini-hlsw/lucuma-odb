@@ -611,7 +611,7 @@ class createObservation extends OdbSuite {
               programId: ${pid.asJson}
               SET: {
                 constraintSet: {
-                  cloudExtinction: ONE_POINT_FIVE
+                  cloudExtinction: ONE_POINT_ZERO
                 }
               }
             }) {
