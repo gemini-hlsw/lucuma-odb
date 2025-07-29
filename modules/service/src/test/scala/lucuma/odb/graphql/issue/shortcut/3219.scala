@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.effect.IO
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.model.sequence.Atom
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
@@ -20,7 +20,7 @@ class ShortCut_3219 extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       30.minTimeSpan,
-      NonNegInt.unsafeFrom(40)
+      PosInt.unsafeFrom(40)
     )
 
   test("no duplicated atom ids") {
