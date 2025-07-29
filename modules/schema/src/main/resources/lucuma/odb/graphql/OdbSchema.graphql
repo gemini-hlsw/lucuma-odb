@@ -6312,6 +6312,11 @@ Cloud extinction
 """
 enum CloudExtinctionPreset {
   """
+  CloudExtinctionPreset Zero
+  """
+  ZERO
+
+  """
   CloudExtinctionPreset PointOne
   """
   POINT_ONE
@@ -6330,11 +6335,6 @@ enum CloudExtinctionPreset {
   CloudExtinctionPreset OnePointZero
   """
   ONE_POINT_ZERO
-
-  """
-  CloudExtinctionPreset OnePointFive
-  """
-  ONE_POINT_FIVE
 
   """
   CloudExtinctionPreset TwoPointZero
