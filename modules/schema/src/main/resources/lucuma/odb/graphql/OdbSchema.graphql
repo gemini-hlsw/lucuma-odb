@@ -470,11 +470,11 @@ input CallForProposalsPropertiesInput {
   semester: Semester
 
   """
-  An explicit title.  If not set then a title will be determined from the CfP
+  The CfP title.  If not set then a title will be determined from the CfP
   properties.  This property is not required on create and may be assigned
   a null value to return to the default.
   """
-  titleOverride: NonEmptyString
+  title: NonEmptyString
 
   """
   Coordinate limits.  If not specified, they will default according to the

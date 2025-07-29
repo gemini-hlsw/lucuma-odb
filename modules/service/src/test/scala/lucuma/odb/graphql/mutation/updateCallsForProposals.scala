@@ -964,7 +964,7 @@ class updateCallsForProposals extends OdbSuite {
       )
   }
 
-  test("titleOverride"):
+  test("title"):
     createCall.flatMap: id =>
       expect(
         staff,
@@ -972,7 +972,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                titleOverride: "Foo"
+                title: "Foo"
               },
               WHERE: {
                 id: { EQ: "$id" }
@@ -997,14 +997,14 @@ class updateCallsForProposals extends OdbSuite {
         """.asRight
       )
 
-  test("unset titleOverride"):
+  test("unset title"):
     createCall.flatMap: id =>
       query(
         staff,
         s"""
           mutation {
             updateCallsForProposals(input: {
-              SET: { titleOverride: "Foo" },
+              SET: { title: "Foo" },
               WHERE: { id: { EQ: "$id" } }
             }) {
               callsForProposals { title }
@@ -1017,7 +1017,7 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                titleOverride: null
+                title: null
               },
               WHERE: {
                 id: { EQ: "$id" }
