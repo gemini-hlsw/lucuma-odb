@@ -90,8 +90,8 @@ class callForProposals extends OdbSuite {
   }
 
   private def getTitle(
-    cfpType:       CallForProposalsType,
-    titleOverride: Option[String] = None
+    cfpType: CallForProposalsType,
+    title:   Option[String] = None
   ): IO[String] =
     query(
       user = staff,
@@ -102,7 +102,7 @@ class callForProposals extends OdbSuite {
               SET: {
                 type:        ${cfpType.tag.toScreamingSnakeCase}
                 semester:    "2025A"
-                ${titleOverride.fold("")(title => s"titleOverride: \"$title\"")}
+                ${title.fold("")(title => s"title: \"$title\"")}
                 activeStart: "2025-02-01"
                 activeEnd:   "2025-07-31"
               }

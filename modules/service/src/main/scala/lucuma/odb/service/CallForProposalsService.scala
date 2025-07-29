@@ -244,7 +244,7 @@ object CallForProposalsService {
       """.query(cfp_id).contramap { input => (
         input.cfpType,
         input.semester,
-        input.titleOverride,
+        input.title,
         input.gnRaLimit._1,
         input.gnRaLimit._2,
         input.gnDecLimit._1,
@@ -344,7 +344,7 @@ object CallForProposalsService {
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
         NonEmptyList.fromList(List(
-          SET.titleOverride.foldPresent(sql"c_title_override = ${text_nonempty.opt}"),
+          SET.title.foldPresent(sql"c_title_override = ${text_nonempty.opt}"),
           SET.gnRaLimit._1.map(gnRaStart),
           SET.gnRaLimit._2.map(gnRaEnd),
           SET.gnDecLimit._1.map(gnDecStart),
