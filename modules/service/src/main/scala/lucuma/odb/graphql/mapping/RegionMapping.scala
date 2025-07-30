@@ -19,16 +19,16 @@ trait RegionMapping[F[_]] extends TargetView[F] with ConfigurationRequestView[F]
       SqlObject("declinationArc"),    
     )
 
-  private lazy val ConfigurationRequestTargetRegionMapping =
-    ObjectMapping(ConfigurationRequestType / "configuration" / "target" / "region")(
-      SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
+  private lazy val ConfigurationTargetRegionMapping =
+    ObjectMapping(ConfigurationTargetType / "region")(
+      SqlField("synthetic_id", ConfigurationRequestView.Target.Region.SyntheticId, key = true, hidden = true),
       SqlObject("rightAscensionArc"),
       SqlObject("declinationArc"),    
     )
 
   lazy val RegionMappings = List(
     OpportunityRegionMapping,
-    ConfigurationRequestTargetRegionMapping
+    ConfigurationTargetRegionMapping
   )
 
 }

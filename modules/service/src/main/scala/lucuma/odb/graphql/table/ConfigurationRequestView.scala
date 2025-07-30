@@ -31,18 +31,16 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
       object Region:
         val SyntheticId = col("c_region_id", configuration_request_id.embedded)
-        // object RightAscensionArc:
-        //   val SyntheticId = col("c_opportunity_ra_arc_synthetic_id", target_id.embedded)
-        //   val StartEndSyntheticId = col("c_opportunity_ra_arc_start_end_synthetic_id", target_id.embedded)
-        //   val Type  = col("c_opp_ra_arc_type", arc_type.embedded)
-        //   val Start = col("c_opp_ra_arc_start", right_ascension.embedded)
-        //   val End   = col("c_opp_ra_arc_end", right_ascension.embedded)
-        // object DeclinationArc:
-        //   val SyntheticId = col("c_opportunity_dec_arc_synthetic_id", target_id.embedded)
-        //   val StartEndSyntheticId = col("c_opportunity_dec_arc_start_end_synthetic_id", target_id.embedded)
-        //   val Type  = col("c_opp_dec_arc_type", arc_type.embedded)
-        //   val Start = col("c_opp_dec_arc_start", declination.embedded)
-        //   val End   = col("c_opp_dec_arc_end", declination.embedded)
+        object RightAscensionArc:
+          val PartialSyntheticId = col("c_partial_ra_region_id", configuration_request_id.embedded)
+          val Type  = col("c_region_ra_arc_type", arc_type.embedded)
+          val Start = col("c_region_ra_arc_start", right_ascension.embedded)
+          val End   = col("c_region_ra_arc_end", right_ascension.embedded)
+        object DeclinationArc:
+          val PartialSyntheticId = col("c_partial_dec_region_id", configuration_request_id.embedded)
+          val Type  = col("c_region_dec_arc_type", arc_type.embedded)
+          val Start = col("c_region_dec_arc_start", declination.embedded)
+          val End   = col("c_region_dec_arc_end", declination.embedded)
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
 

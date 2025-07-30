@@ -13,7 +13,7 @@ import lucuma.core.math.Arc
 
 object arc {
 
-  extension [A](a: Arc[A]) private def tag: ArcType =
+  extension [A](a: Arc[A]) def tag: ArcType =
     a match
       case Arc.Empty() => ArcType.Empty
       case Arc.Full() => ArcType.Full

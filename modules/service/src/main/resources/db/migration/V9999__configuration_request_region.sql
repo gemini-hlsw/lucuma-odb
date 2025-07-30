@@ -23,5 +23,7 @@ CREATE VIEW v_configuration_request AS
     CASE WHEN c_reference_ra IS NOT NULL THEN c_configuration_request_id END AS c_reference_id,
     CASE WHEN c_region_ra_arc_type IS NOT NULL THEN c_configuration_request_id END AS c_region_id,
     CASE WHEN c_observing_mode_type = 'gmos_north_long_slit' THEN c_configuration_request_id END AS c_gmos_north_longslit_id,
-    CASE WHEN c_observing_mode_type = 'gmos_south_long_slit' THEN c_configuration_request_id END AS c_gmos_south_longslit_id
+    CASE WHEN c_observing_mode_type = 'gmos_south_long_slit' THEN c_configuration_request_id END AS c_gmos_south_longslit_id,
+    CASE WHEN c_region_ra_arc_type = 'partial' THEN c_configuration_request_id END AS c_partial_ra_region_id,
+    CASE WHEN c_region_dec_arc_type = 'partial' THEN c_configuration_request_id END AS c_partial_dec_region_id
   FROM t_configuration_request;

@@ -41,7 +41,9 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
-      declinationMappingAtPath(ConfigurationRequestType / "configuration" / "target" / "coordinates" / "dec", ConfigurationRequestView.Id, ConfigurationRequestView.Target.ReferenceCoordinates.Dec),
+      declinationMappingAtPath(ConfigurationTargetType / "coordinates" / "dec", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, ConfigurationRequestView.Target.ReferenceCoordinates.Dec),
+      declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "start", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.Start),
+      declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "end", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.End),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "start", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.Start),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "end", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.End),
     )

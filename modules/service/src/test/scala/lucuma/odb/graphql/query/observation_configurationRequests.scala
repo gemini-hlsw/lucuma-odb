@@ -94,84 +94,88 @@ class observation_configurationRequests
     )
 
   // set up cfp, program, and fullt configured observation
-  private def setup: IO[Observation.Id] =
+  private def setup(too: Boolean): IO[Observation.Id] =
     for
       cfpid <- createCallForProposalsAs(admin)
       pid   <- createProgramAs(pi, "Foo")
       _     <- addProposal(pi, pid, Some(cfpid), None)
-      tid   <- createTargetWithProfileAs(pi, pid)
+      tid   <- if !too then createTargetWithProfileAs(pi, pid) else createOpportunityTargetAs(pi, pid)
       oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
     yield oid
 
-  test("create and select some configuration requests, expect deduplication"):
-    for
-      oid   <- setup
-      ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
-      _     <- expectRequests(pi, oid, ids.distinct)
-    yield ()
+  List(false, true).foreach { too =>
 
-  test("request should apply to identical obs"):
-    for
-      oid   <- setup
-      oid2  <- cloneObservationAs(pi, oid)
-      mid   <- createConfigurationRequestAs(pi, oid)
-      _     <- expectRequests(pi, oid2, List(mid))
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] create and select some configuration requests, expect deduplication"):
+      for
+        oid   <- setup(too)
+        ids   <- createConfigurationRequestAs(pi, oid).replicateA(2)
+        _     <- expectRequests(pi, oid, ids.distinct)
+      yield ()
 
-  test("request should apply for nearby base position"):
-    for
-      oid  <- setup
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
-      _    <- expectRequests(pi, oid, List(mid))
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should apply to identical obs"):
+      for
+        oid   <- setup(too)
+        oid2  <- cloneObservationAs(pi, oid)
+        mid   <- createConfigurationRequestAs(pi, oid)
+        _     <- expectRequests(pi, oid2, List(mid))
+      yield ()
 
-  test("request should not apply for faraway base position"):
-    for
-      oid  <- setup
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
-      _    <- expectRequests(pi, oid, Nil)
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should apply for nearby base position"):
+      for
+        oid  <- setup(too)
+        _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- setExplicitBaseAs(pi, oid, "1:00:00.01", "2:00:00.01")
+        _    <- expectRequests(pi, oid, List(mid))
+      yield ()
 
-  test("request should apply when base position is moved back"):
-    for
-      oid  <- setup
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
-      _    <- expectRequests(pi, oid, Nil) // sanity check
-      _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
-      _    <- expectRequests(pi, oid, List(mid))
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should not apply for faraway base position"):
+      for
+        oid  <- setup(too)
+        _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
+        _    <- expectRequests(pi, oid, Nil)
+      yield ()
 
-  test("request should not apply for different observing mode"):
-    for
-      oid  <- setup
-      _    <- updateGratingAs(pi, oid, GmosNorthGrating.B480_G5309)
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5308)
-      _    <- expectRequests(pi, oid, Nil)
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should apply when base position is moved back"):
+      for
+        oid  <- setup(too)
+        _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- setExplicitBaseAs(pi, oid, "3:00:00", "4:00:00")
+        _    <- expectRequests(pi, oid, Nil) // sanity check
+        _    <- setExplicitBaseAs(pi, oid, "1:00:00", "2:00:00")
+        _    <- expectRequests(pi, oid, List(mid))
+      yield ()
 
-  test("request should not apply for narrower conditions"):
-    for
-      oid  <- setup
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive)
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // can't ask for better conditions
-      _    <- expectRequests(pi, oid, Nil)
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should not apply for different observing mode"):
+      for
+        oid  <- setup(too)
+        _    <- updateGratingAs(pi, oid, GmosNorthGrating.B480_G5309)
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- updateGratingAs(pi, oid, GmosNorthGrating.R150_G5308)
+        _    <- expectRequests(pi, oid, Nil)
+      yield ()
 
-  test("request should apply for wider conditions"):
-    for
-      oid  <- setup
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
-      mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive) // ok to ask for worse conditions
-      _    <- expectRequests(pi, oid, List(mid))
-    yield ()
+    test(s"[${if too then "opportunity" else "sidereal"}] request should not apply for narrower conditions"):
+      for
+        oid  <- setup(too)
+        _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive)
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // can't ask for better conditions
+        _    <- expectRequests(pi, oid, Nil)
+      yield ()
+
+    test(s"[${if too then "opportunity" else "sidereal"}] request should apply for wider conditions"):
+      for
+        oid  <- setup(too)
+        _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
+        mid  <- createConfigurationRequestAs(pi, oid)
+        _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive) // ok to ask for worse conditions
+        _    <- expectRequests(pi, oid, List(mid))
+      yield ()
+
+  }
 
 }
