@@ -152,6 +152,8 @@ object OdbMapping {
           with CreateProposalResultMapping[F]
           with CreateTargetResultMapping[F]
           with CreateUserInvitationResultMapping[F]
+          with DatasetChronicleEntryMapping[F]
+          with DatasetChronicleEntrySelectResultMapping[F]
           with DatasetEditMapping[F]
           with DatasetMapping[F]
           with DatasetReferenceMapping[F]
@@ -378,6 +380,8 @@ object OdbMapping {
                 CreateProposalResultMapping,
                 CreateTargetResultMapping,
                 CreateUserInvitationResultMapping,
+                DatasetChronicleEntryMapping,
+                DatasetChronicleEntrySelectResultMapping,
                 DatasetEditMapping,
                 DatasetEventMapping,
                 DatasetMapping,
