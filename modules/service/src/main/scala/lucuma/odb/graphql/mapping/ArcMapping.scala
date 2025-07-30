@@ -8,11 +8,12 @@ package mapping
 import grackle.skunk.SkunkMapping
 
 import table.TargetView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 
-trait ArcMapping[F[_]] extends TargetView[F] {
+trait ArcMapping[F[_]] extends TargetView[F] with ConfigurationRequestView[F] {
 
   private lazy val OpportunityRegionRightAscensionArc =
-    ObjectMapping(RightAscensionArcType)(
+    ObjectMapping(OpportunityType / "region" / "rightAscensionArc")(
       SqlField("synthetic_id", TargetView.Opportunity.Region.RightAscensionArc.SyntheticId, key = true, hidden = true),
       SqlField("type", TargetView.Opportunity.Region.RightAscensionArc.Type),
       SqlObject("start"),
@@ -20,9 +21,25 @@ trait ArcMapping[F[_]] extends TargetView[F] {
     )
 
   private lazy val OpportunityRegionDeclinationArc =
-    ObjectMapping(DeclinationArcType)(
+    ObjectMapping(OpportunityType / "region" / "declinationArc")(
       SqlField("synthetic_id", TargetView.Opportunity.Region.DeclinationArc.SyntheticId, key = true, hidden = true),
       SqlField("type", TargetView.Opportunity.Region.DeclinationArc.Type),
+      SqlObject("start"),
+      SqlObject("end"),
+    )
+
+  private lazy val ConfigurationRequestRegionDeclinationArc =
+    ObjectMapping(ConfigurationTargetType / "region" / "declinationArc")(
+      SqlField("synthetic_id", ConfigurationRequestView.Target.Region.SyntheticId, key = true, hidden = true),
+      SqlField("type", ConfigurationRequestView.Target.Region.DeclinationArc.Type),
+      SqlObject("start"),
+      SqlObject("end"),
+    )
+
+  private lazy val ConfigurationRequestRegionRightAscensionArc =
+    ObjectMapping(ConfigurationTargetType / "region" / "rightAscensionArc")(
+      SqlField("synthetic_id", ConfigurationRequestView.Target.Region.SyntheticId, key = true, hidden = true),
+      SqlField("type", ConfigurationRequestView.Target.Region.RightAscensionArc.Type),
       SqlObject("start"),
       SqlObject("end"),
     )
@@ -30,6 +47,8 @@ trait ArcMapping[F[_]] extends TargetView[F] {
   lazy val ArcMappings = List(
     OpportunityRegionRightAscensionArc,
     OpportunityRegionDeclinationArc,
+    ConfigurationRequestRegionDeclinationArc,
+    ConfigurationRequestRegionRightAscensionArc,
   )
 
 }
