@@ -207,6 +207,7 @@ object CallForProposalsService {
         INSERT INTO t_cfp (
           c_type,
           c_semester,
+          c_title_override,
           c_north_ra_start,
           c_north_ra_end,
           c_north_dec_start,
@@ -224,6 +225,7 @@ object CallForProposalsService {
         SELECT
           $cfp_type,
           $semester,
+          ${text_nonempty.opt},
           ${right_ascension},
           ${right_ascension},
           ${declination},
@@ -242,6 +244,7 @@ object CallForProposalsService {
       """.query(cfp_id).contramap { input => (
         input.cfpType,
         input.semester,
+        input.title,
         input.gnRaLimit._1,
         input.gnRaLimit._2,
         input.gnDecLimit._1,
@@ -341,6 +344,7 @@ object CallForProposalsService {
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
         NonEmptyList.fromList(List(
+          SET.title.foldPresent(sql"c_title_override = ${text_nonempty.opt}"),
           SET.gnRaLimit._1.map(gnRaStart),
           SET.gnRaLimit._2.map(gnRaEnd),
           SET.gnDecLimit._1.map(gnDecStart),

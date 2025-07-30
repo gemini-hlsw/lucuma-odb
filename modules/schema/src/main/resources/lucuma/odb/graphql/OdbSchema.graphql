@@ -462,11 +462,19 @@ scalar CallForProposalsId
 The properties of a Call for Proposal in an input for creation and editing.
 """
 input CallForProposalsPropertiesInput {
+
   "Type of the call. Required on create."
   type: CallForProposalsType
 
   "Semester associated with the call. Required on create."
   semester: Semester
+
+  """
+  The CfP title.  If not set then a title will be determined from the CfP
+  properties.  This property is not required on create and may be assigned
+  a null value to return to the default.
+  """
+  title: NonEmptyString
 
   """
   Coordinate limits.  If not specified, they will default according to the
@@ -6304,6 +6312,11 @@ Cloud extinction
 """
 enum CloudExtinctionPreset {
   """
+  CloudExtinctionPreset Zero
+  """
+  ZERO
+
+  """
   CloudExtinctionPreset PointOne
   """
   POINT_ONE
@@ -6322,11 +6335,6 @@ enum CloudExtinctionPreset {
   CloudExtinctionPreset OnePointZero
   """
   ONE_POINT_ZERO
-
-  """
-  CloudExtinctionPreset OnePointFive
-  """
-  ONE_POINT_FIVE
 
   """
   CloudExtinctionPreset TwoPointZero
