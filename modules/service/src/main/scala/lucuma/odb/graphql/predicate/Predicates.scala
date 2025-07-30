@@ -28,6 +28,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val constraintSetGroup            = ConstraintSetGroupPredicates(Path.from(ConstraintSetGroupType))
     val createProposalResult          = CreateProposalResultPredicates(Path.from(CreateProposalResultType))
     val dataset                       = DatasetPredicates(Path.from(DatasetType))
+    val datasetChronicleEntry         = DatasetChronicleEntryPredicates(Path.from(DatasetChronicleEntryType))
     val datasetEdit                   = DatasetEditPredicates(Path.from(DatasetEditType))
     val datasetEvent                  = ExecutionEventPredicates(Path.from(DatasetEventType))
     val executionEvent                = ExecutionEventPredicates(Path.from(ExecutionEventType))

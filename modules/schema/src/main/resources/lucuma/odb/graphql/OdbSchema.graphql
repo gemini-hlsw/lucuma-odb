@@ -6589,6 +6589,73 @@ type Dataset {
 }
 
 """
+Database operations that provoke Chronicle table updates.
+"""
+enum DatabaseOperation {
+  INSERT
+  UPDATE
+  DELETE
+  TRUNCATE
+}
+
+"""
+The Chronicle entry for dataset updates.
+"""
+type DatasetChronicleEntry { # implements ChronicleEntry
+  id: ChronicleId!
+  transactionId: TransactionId!
+
+  "The user who performed the insertion or update."
+  user: User
+
+  "When the update happened."
+  timestamp: Timestamp!
+
+  "The database operation that was performed."
+  operation: DatabaseOperation!
+
+  "The dataset that was inserted or updated."
+  dataset: Dataset!
+
+  modDatasetId: Boolean!
+  modStepId: Boolean!
+  modObservationId: Boolean!
+  modVisitId: Boolean!
+
+  modReference: Boolean!
+  modFilename: Boolean!
+  modQaState: Boolean!
+  modInterval: Boolean!
+  modComment: Boolean!
+
+  newDatasetId: DatasetId
+  newStepId: StepId
+  newObservationId: ObservationId
+  newVisitId: VisitId
+
+  newReference: DatasetReferenceLabel
+  newFilename: DatasetFilename
+  newQaState: DatasetQaState
+  newInterval: TimestampInterval
+  newComment: NonEmptyString
+
+}
+
+type DatasetChronicleEntrySelectResult {
+
+  """
+  Matching entries up to the return size limit of 1000
+  """
+  matches: [DatasetChronicleEntry!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+
+}
+
+"""
 Dataset-level events.  A single dataset will be associated with multiple events
 as it makes its way through observe, readout and write stages.
 """
@@ -10966,6 +11033,23 @@ type Query {
     """
     LIMIT: NonNegInt
   ): DatasetSelectResult!
+
+  """
+  Select all dataset chronicle entries.  This will contain detailed information
+  about dataset creation and updates.
+  """
+  datasetChronicleEntries(
+
+    """
+    Starts the result set at (or after if not existent) the given id.
+    """
+    OFFSET: ChronicleId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT:  NonNegInt
+  ): DatasetChronicleEntrySelectResult!
 
   """
   Selects the first `LIMIT` matching execution events based on the provided `WHERE` parameter, if any.

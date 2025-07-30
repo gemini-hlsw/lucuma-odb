@@ -48,6 +48,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -557,6 +558,9 @@ trait Codecs {
 
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
+
+  val tg_op: Codec[DatabaseOperation] =
+    enumerated(Type("e_tg_op"))
 
   val time_accounting_category: Codec[TimeAccountingCategory] =
     enumerated(Type.varchar)
