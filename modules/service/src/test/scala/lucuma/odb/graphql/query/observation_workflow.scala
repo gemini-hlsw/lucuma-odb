@@ -933,7 +933,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointFive)  // ask for poor conditions
+        _   <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
@@ -984,7 +984,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointFive)  // ask for poor conditions
+        _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResultAs(pi, oid)
         _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)

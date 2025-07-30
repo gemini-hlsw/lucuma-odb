@@ -159,7 +159,7 @@ class observation_configurationRequests
   test("request should not apply for narrower conditions"):
     for
       oid  <- setup
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive)
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointZero)
       mid  <- createConfigurationRequestAs(pi, oid)
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // can't ask for better conditions
       _    <- expectRequests(pi, oid, Nil)
@@ -170,7 +170,7 @@ class observation_configurationRequests
       oid  <- setup
       _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
       mid  <- createConfigurationRequestAs(pi, oid)
-      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive) // ok to ask for worse conditions
+      _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointZero) // ok to ask for worse conditions
       _    <- expectRequests(pi, oid, List(mid))
     yield ()
 
