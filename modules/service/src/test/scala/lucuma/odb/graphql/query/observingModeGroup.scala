@@ -110,7 +110,7 @@ class observingModeGroup extends OdbSuite:
           ).replicateA(2)
 
         (create2(ImageQuality.Preset.OnePointFive, GmosNorthGrating.B1200_G5301),
-         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R400_G5305),
+         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R400_G5310),
          create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R831_G5302)
         ).parTupled.flatMap: (g1, g2, g3) =>
           expect(
@@ -152,7 +152,7 @@ class observingModeGroup extends OdbSuite:
                       {
                         "observingMode" : {
                           "gmosNorthLongSlit": {
-                            "grating" : "R400_G5305"
+                            "grating" : "R400_G5310"
                           }
                         },
                         "observations" : {
@@ -289,7 +289,7 @@ class observingModeGroup extends OdbSuite:
 
         for {
           o1 <- createObs(GmosNorthGrating.B1200_G5301)
-          o2 <- createObs(GmosNorthGrating.R400_G5305)
+          o2 <- createObs(GmosNorthGrating.R400_G5310)
           _  <- query(
             user  = pi,
             query = s"""
