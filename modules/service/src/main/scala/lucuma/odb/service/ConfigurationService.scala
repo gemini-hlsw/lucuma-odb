@@ -13,10 +13,15 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Angular
+import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
 import lucuma.core.math.Region
+import lucuma.core.math.RightAscension
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
@@ -27,6 +32,7 @@ import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
 import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
 import lucuma.odb.graphql.input.CreateConfigurationRequestInput
+import lucuma.odb.json.arc.tag
 import lucuma.odb.json.configurationrequest.query.DecodingFailures
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
@@ -36,14 +42,7 @@ import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
-import lucuma.odb.json.arc.tag
-
 import Services.Syntax.*
-import lucuma.core.enums.ArcType
-import lucuma.core.math.Arc
-import lucuma.core.math.RightAscension
-import lucuma.core.math.Declination
-import lucuma.core.math.Angular
 
 trait ConfigurationService[F[_]] {
 
