@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.Gender
 import lucuma.core.model.PartnerLink
@@ -20,6 +21,7 @@ case class ProgramUserPropertiesInput(
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
+  affiliation:       Nullable[NonEmptyString],
   hasDataAccess:     Option[Boolean]
 )
 
@@ -28,6 +30,7 @@ object ProgramUserPropertiesInput:
   val Empty: ProgramUserPropertiesInput =
     ProgramUserPropertiesInput(
       none,
+      Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
       Nullable.Absent,
@@ -46,5 +49,6 @@ object ProgramUserPropertiesInput:
         EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
         BooleanBinding.Nullable("thesis", rThesis),
         GenderBinding.Nullable("gender", rGender),
+        NonEmptyStringBinding.Nullable("affiliation", rAffiliation),
         BooleanBinding.Option("hasDataAccess", rDataAccess)
-      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)
+      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)

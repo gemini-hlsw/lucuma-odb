@@ -39,6 +39,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("educationalStatus", ProgramUserTable.EducationalStatus),
       SqlField("thesis", ProgramUserTable.Thesis),
       SqlField("gender", ProgramUserTable.Gender),
+      SqlField("affiliation", ProgramUserTable.Affiliation),
       SqlField("hasDataAccess", ProgramUserTable.HasDataAccess),
       CursorFieldJson("partnerLink", c =>
         for {
@@ -63,4 +64,3 @@ trait ProgramUserMapping[F[_]]
   }
 
 }
-

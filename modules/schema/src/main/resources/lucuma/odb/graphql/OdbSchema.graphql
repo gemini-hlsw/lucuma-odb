@@ -3684,6 +3684,9 @@ input ProgramUserPropertiesInput {
   "The user's reported gender."
   gender: Gender
 
+  "Investigator affiliation."
+  affiliation: NonEmptyString
+
   """
   Whether the user has data access.  This property may be changed only by the
   PI (or staff).  If a COI attempts to change the data access flag, the entire
@@ -3750,6 +3753,9 @@ type ProgramUser {
 
   "User invitations, if any, associated with this program user."
   invitations: [UserInvitation!]!
+
+  "Investigator affiliation."
+  affiliation: NonEmptyString
 
   "Has access to data."
   hasDataAccess: Boolean!
