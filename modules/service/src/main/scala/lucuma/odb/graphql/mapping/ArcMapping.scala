@@ -6,9 +6,9 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ConfigurationRequestView
 
 import table.TargetView
-import lucuma.odb.graphql.table.ConfigurationRequestView
 
 trait ArcMapping[F[_]] extends TargetView[F] with ConfigurationRequestView[F] {
 

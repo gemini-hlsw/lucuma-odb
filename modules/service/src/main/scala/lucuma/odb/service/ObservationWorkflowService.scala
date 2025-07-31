@@ -166,6 +166,11 @@ case class ObservationValidationInfo(
         coordsAt <- tracking.flatMap(_.at(when))
       yield coordsAt.value
 
+  def isOpportunity: Boolean =
+    asterism.exists:
+      case t: Target.Opportunity => true
+      case _ => false
+
 }
 
 case class CfpInfo(
@@ -422,7 +427,7 @@ object ObservationWorkflowService {
               case Inactive   => List(executionState.getOrElse(validationStatus))
               case Undefined  => List(Inactive)
               case Unapproved => List(Inactive)
-              case Defined    => List(Inactive) ++ Option.when(isAccepted || info.tpe =!= ProgramType.Science)(Ready)
+              case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (isAccepted || info.tpe =!= ProgramType.Science))(Ready)
               case Ready      => List(Inactive, validationStatus)
               case Ongoing    => List(Inactive, Completed)
               case Completed  => if info.declaredComplete then List(Ongoing) else Nil
