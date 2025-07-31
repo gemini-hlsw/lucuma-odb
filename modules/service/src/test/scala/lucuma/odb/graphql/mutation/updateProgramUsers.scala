@@ -186,6 +186,33 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
+  def updateUserAffiliation(p: Program.Id, u: User, affiliation: Option[String]): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              affiliation: ${quotedOption(affiliation)}
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            affiliation
+          }
+        }
+      }
+    """
+
   def quotedOption(o: Option[String]): String =
     o.fold("null")(s => s"\"$s\"")
 
@@ -302,6 +329,19 @@ class updateProgramUsers extends OdbSuite:
             "program" -> Json.obj("id" -> pid.asJson),
             "user"    -> Json.obj("id" -> user.id.asJson),
             "thesis"  -> th.asJson
+          )
+        }.asJson
+      )
+    )
+
+  def expectedAffiliation(ts: (Program.Id, User, Option[String])*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, affiliation) =>
+          Json.obj(
+            "program"     -> Json.obj("id" -> pid.asJson),
+            "user"        -> Json.obj("id" -> user.id.asJson),
+            "affiliation" -> affiliation.asJson
           )
         }.asJson
       )
@@ -434,6 +474,26 @@ class updateProgramUsers extends OdbSuite:
           user     = pi,
           query    = updateUserThesisFlag(pid, pi3, true),
           expected = expectedThesis((pid, pi3, true)).asRight
+        )
+
+  test("update coi affiliation"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserAffiliation(pid, pi3, Some("UTFSM")),
+          expected = expectedAffiliation((pid, pi3, Some("UTFSM"))).asRight
+        )
+
+  test("update coi affiliation to null"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserAffiliation(pid, pi3, None),
+          expected = expectedAffiliation((pid, pi3, None)).asRight
         )
 
   test("update coi hasDataAccess flag"):
