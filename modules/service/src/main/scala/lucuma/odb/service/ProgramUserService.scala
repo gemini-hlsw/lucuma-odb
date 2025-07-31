@@ -46,6 +46,7 @@ import lucuma.odb.util.Codecs.program_user_id
 import lucuma.odb.util.Codecs.program_user_role
 import lucuma.odb.util.Codecs.user_id
 import lucuma.odb.util.Codecs.user_type
+import lucuma.odb.util.Codecs.varchar_nonempty
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.text.varchar
@@ -636,7 +637,7 @@ object ProgramUserService:
       val upEducationalStatus = sql"c_educational_status   = ${educational_status.opt}"
       val upThesis            = sql"c_thesis               = ${bool.opt}"
       val upGender            = sql"c_gender               = ${gender.opt}"
-      val upAffiliation       = sql"c_affiliation          = ${varchar.opt}"
+      val upAffiliation       = sql"c_affiliation          = ${varchar_nonempty.opt}"
       val upDataAccess        = sql"c_has_data_access      = $bool"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(

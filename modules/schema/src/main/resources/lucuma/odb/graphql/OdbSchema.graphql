@@ -3685,7 +3685,7 @@ input ProgramUserPropertiesInput {
   gender: Gender
 
   "Investigator affiliation."
-  affiliation: String
+  affiliation: NonEmptyString
 
   """
   Whether the user has data access.  This property may be changed only by the
@@ -3755,7 +3755,7 @@ type ProgramUser {
   invitations: [UserInvitation!]!
 
   "Investigator affiliation."
-  affiliation: String
+  affiliation: NonEmptyString
 
   "Has access to data."
   hasDataAccess: Boolean!

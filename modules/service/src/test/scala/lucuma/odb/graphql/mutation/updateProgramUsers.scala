@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -20,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.core.model.UserProfile
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
+import lucuma.refined.*
 
 class updateProgramUsers extends OdbSuite:
 
@@ -186,13 +188,13 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
-  def updateUserAffiliation(p: Program.Id, u: User, affiliation: Option[String]): String =
+  def updateUserAffiliation(p: Program.Id, u: User, affiliation: Option[NonEmptyString]): String =
     s"""
       mutation {
         updateProgramUsers(
           input: {
             SET: {
-              affiliation: ${quotedOption(affiliation)}
+              affiliation: ${quotedOption(affiliation.map(_.value))}
             }
             WHERE: {
               user: {
@@ -334,14 +336,14 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
-  def expectedAffiliation(ts: (Program.Id, User, Option[String])*): Json =
+  def expectedAffiliation(ts: (Program.Id, User, Option[NonEmptyString])*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
         "programUsers" -> ts.toList.map { case (pid, user, affiliation) =>
           Json.obj(
             "program"     -> Json.obj("id" -> pid.asJson),
             "user"        -> Json.obj("id" -> user.id.asJson),
-            "affiliation" -> affiliation.asJson
+            "affiliation" -> affiliation.map(_.value).asJson
           )
         }.asJson
       )
@@ -482,8 +484,8 @@ class updateProgramUsers extends OdbSuite:
         linkUserAs(pi, mid, pi3.id) >>
         expect(
           user     = pi,
-          query    = updateUserAffiliation(pid, pi3, Some("UTFSM")),
-          expected = expectedAffiliation((pid, pi3, Some("UTFSM"))).asRight
+          query    = updateUserAffiliation(pid, pi3, Some("UTFSM".refined)),
+          expected = expectedAffiliation((pid, pi3, Some("UTFSM".refined))).asRight
         )
 
   test("update coi affiliation to null"):
