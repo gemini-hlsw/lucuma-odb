@@ -6647,6 +6647,10 @@ type DatasetChronicleEntry { # implements ChronicleEntry
 
 }
 
+"""
+Allows filtering of DatasetChronicleEntry (see Query -> datasetChronicleEntries)
+based on a number of criteria.
+"""
 input WhereDatasetChronicleEntry {
 
   AND: [WhereDatasetChronicleEntry!]
@@ -6655,25 +6659,75 @@ input WhereDatasetChronicleEntry {
 
   NOT: WhereDatasetChronicleEntry
 
+  """
+  Limits the results to those matching a chronicle id.
+  """
   id: WhereOrderChronicleId
 
+  """
+  Limits the results to a particular user or users.
+  """
   user: WhereUser
 
+  """
+  Limits the results to particular database operations.
+  """
   operation: WhereEqDatabaseOperation
 
+  """
+  Limits the results based on timestamp of the change.
+  """
   timestamp: WhereOrderTimestamp
 
+  """
+  Limits the results to specified datasets.
+  """
   dataset: WhereOrderDatasetId
 
+  """
+  Add this item to match only when a dataset id is or isn't updated.
+  """
   modDatasetId: WhereBoolean
+
+  """
+  Add this item to match only when a step id is or isn't updated.
+  """
   modStepId: WhereBoolean
+
+  """
+  Add this item to match only when an observation id is or isn't updated.
+  """
   modObservationId: WhereBoolean
+
+  """
+  Add this item to match only when a visit id is or isn't updated.
+  """
   modVisitId: WhereBoolean
 
+  """
+  Add this item to match only when a dataset reference is or isn't updated.
+  """
   modReference: WhereBoolean
+
+  """
+  Add this item to match only when a dataset filename is or isn't updated.
+  """
   modFilename: WhereBoolean
+
+  """
+  Add this item to match only when a dataset QA state is or isn't updated.
+  """
   modQaState: WhereBoolean
+
+  """
+  Add this item to match only when a dataset time interval (the range of time
+  during which it was collected) is or isn't updated.
+  """
   modInterval: WhereBoolean
+
+  """
+  Add this item to match only when a dataset comment is or isn't updated.
+  """
   modComment: WhereBoolean
 
 }
