@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.show.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -18,6 +19,7 @@ import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_id
+import skunk.codec.temporal.timestamptz
 import skunk.syntax.all.*
 
 
@@ -188,7 +190,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
         staff,
         s"""
           query {
-            datasetChronicleEntries(OFFSET: 14) {
+            datasetChronicleEntries(WHERE: { dataset: { EQ: "$did" } } ) {
               hasMore
               matches {
                 operation
@@ -248,3 +250,240 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
         """.asRight
       )
     yield ()
+
+  def comment(
+    comment: String,
+    dids:    List[Dataset.Id]
+  ): IO[Unit] =
+    val q = s"""
+      mutation {
+        updateDatasets(input: {
+          SET: {
+            comment: "${comment}"
+          },
+          WHERE: {
+            id: { IN: [ ${dids.map(_.show).mkString("\"", "\",\"", "\"")} ] }
+          }
+        }) {
+          datasets {
+            id
+          }
+        }
+      }
+    """
+    query(user = staff, query = q).void
+
+  def setup(index: Int): IO[Dataset.Id] =
+    for
+      cfp <- createCallForProposalsAs(staff)
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- addQueueProposal(pi, pid, cfp)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- runObscalcUpdate(pid, oid)
+      _   <- submitProposal(pi, pid)
+      _   <- acceptProposal(staff, pid)
+      ref <- fetchProgramReference(pi, pid)
+
+      vid <- recordVisitAs(serviceUser, mode.instrument, oid)
+      aid <- recordAtomAs(serviceUser, mode.instrument, vid)
+      sid <- recordStepAs(serviceUser, mode.instrument, aid)
+      did <- recordDatasetAs(serviceUser, sid, f"N18630703S$index%04d.fits")
+      t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
+      t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
+      _   <- setInterval(did, TimestampInterval.between(t0, t1))
+      _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
+      _   <- comment("foo", List(did))
+    yield did
+
+  test("WHERE user"):
+    setup(3).flatMap: did =>
+      expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              user: { id: { EQ: "${staff.id}" } }
+              dataset: { EQ: "$did" }
+            }) {
+              hasMore
+              matches {
+                dataset { id }
+                modQaState
+                modComment
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "dataset":   { "id": $did },
+                  "modQaState": true,
+                  "modComment": false
+                },
+                {
+                  "dataset":   { "id": $did },
+                  "modQaState": false,
+                  "modComment": true
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  test("WHERE operation"):
+    setup(4).flatMap: did =>
+      expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              operation: { EQ: INSERT }
+              dataset: { EQ: "$did" }
+            }) {
+              hasMore
+              matches {
+                operation
+                dataset { id }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "operation": "INSERT",
+                  "dataset":   { "id": $did }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  val currentTimestamp: IO[Timestamp] =
+    withSession: s =>
+      s.unique:
+        sql"""SELECT CURRENT_TIMESTAMP(6)"""
+          .query(timestamptz(6))
+          .map(t => Timestamp.unsafeFromInstantTruncated(t.toInstant))
+
+  test("WHERE timestamp"):
+    currentTimestamp.flatMap: t =>
+      setup(5).flatMap: _ => // we will filter only on timestamp (not dataset id), previous entries ignored
+        expect(
+          staff,
+          s"""
+            query {
+              datasetChronicleEntries(WHERE: {
+                timestamp: { GT: "${Timestamp.FromString.reverseGet(t)}" }
+              }) {
+                hasMore
+                matches {
+                  operation
+                }
+              }
+            }
+          """,
+          json"""
+            {
+              "datasetChronicleEntries": {
+                "hasMore": false,
+                "matches": [
+                  {
+                    "operation": "INSERT"
+                  },
+                  {
+                    "operation": "UPDATE"
+                  },
+                  {
+                    "operation": "UPDATE"
+                  },
+                  {
+                    "operation": "UPDATE"
+                  }
+                ]
+              }
+            }
+          """.asRight
+        )
+
+  test("WHERE modQa"):
+    setup(6).flatMap: did =>
+      expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              dataset: { EQ: "$did" }
+              modQaState: { EQ: true }
+            }) {
+              hasMore
+              matches {
+                operation
+                modQaState
+                newQaState
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "operation": "UPDATE",
+                  "modQaState": true,
+                  "newQaState": "PASS"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  test("WHERE modComment"):
+    setup(7).flatMap: did =>
+      expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              dataset: { EQ: "$did" }
+              modComment: { EQ: true }
+            }) {
+              hasMore
+              matches {
+                operation
+                modComment
+                newComment
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "operation": "UPDATE",
+                  "modComment": true,
+                  "newComment": "foo"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )

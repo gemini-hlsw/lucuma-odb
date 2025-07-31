@@ -6647,6 +6647,37 @@ type DatasetChronicleEntry { # implements ChronicleEntry
 
 }
 
+input WhereDatasetChronicleEntry {
+
+  AND: [WhereDatasetChronicleEntry!]
+
+  OR: [WhereDatasetChronicleEntry!]
+
+  NOT: WhereDatasetChronicleEntry
+
+  id: WhereOrderChronicleId
+
+  user: WhereUser
+
+  operation: WhereEqDatabaseOperation
+
+  timestamp: WhereOrderTimestamp
+
+  dataset: WhereOrderDatasetId
+
+  modDatasetId: WhereBoolean
+  modStepId: WhereBoolean
+  modObservationId: WhereBoolean
+  modVisitId: WhereBoolean
+
+  modReference: WhereBoolean
+  modFilename: WhereBoolean
+  modQaState: WhereBoolean
+  modInterval: WhereBoolean
+  modComment: WhereBoolean
+
+}
+
 type DatasetChronicleEntrySelectResult {
 
   """
@@ -11047,6 +11078,11 @@ type Query {
   datasetChronicleEntries(
 
     """
+    Filters the selection of chronicle entries.
+    """
+    WHERE: WhereDatasetChronicleEntry
+
+    """
     Starts the result set at (or after if not existent) the given id.
     """
     OFFSET: ChronicleId
@@ -14323,6 +14359,33 @@ input WhereEqCallForProposalsType {
 }
 
 """
+Filters on equality (or not) of the database operation.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereEqDatabaseOperation {
+
+  """
+  Matches if the database operation is exactly the supplied value.
+  """
+  EQ: DatabaseOperation
+
+  """
+  Matches if the database operation is not the supplied value.
+  """
+  NEQ: DatabaseOperation
+
+  """
+  Matches if the database operation is any of the supplied options.
+  """
+  IN: [DatabaseOperation!]
+
+  """
+  Matches if the database operation is none of the supplied values.
+  """
+  NIN: [DatabaseOperation!]
+}
+
+"""
 Filters on equality (or not) of the user educational status and the supplied
 criteria. All supplied criteria must match, but usually only one is selected.
 """
@@ -15326,6 +15389,52 @@ input WhereOrderCallForProposalsId {
   Matches if the id is ordered before or equal (<=) the supplied value.
   """
   LTE: CallForProposalsId
+}
+
+"""
+Filters on equality or order comparisons of the chronicle id.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderChronicleId {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ChronicleId
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ChronicleId
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ChronicleId!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ChronicleId!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: ChronicleId
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: ChronicleId
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ChronicleId
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ChronicleId
 }
 
 """
