@@ -47,6 +47,7 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
+import lucuma.odb.graphql.input.WhereDatasetChronicleEntry
 import lucuma.odb.graphql.input.WhereExecutionEvent
 import lucuma.odb.graphql.input.WhereImagingConfigOption
 import lucuma.odb.graphql.input.WhereObservation
@@ -374,8 +375,10 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val DatasetChronicleEntries: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereDatasetChronicleEntryBinding = WhereDatasetChronicleEntry.binding(Path.from(DatasetChronicleEntryType))
     {
       case (QueryType, "datasetChronicleEntries", List(
+        WhereDatasetChronicleEntryBinding.Option("WHERE", rWHERE),
         LongBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
@@ -385,8 +388,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
             case StandardUser(id, r, rs, _) => if goaUsers.contains(id) then Predicate.True else Predicate.False
             case _                          => Predicate.False
 
-        Elab.transformChild { child =>
-          (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+        Elab.transformChild: child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
@@ -395,7 +398,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                   Predicate.Or(
                     GoaPredicate,
                     Predicates.datasetChronicleEntry.observation.program.isVisibleTo(user)
-                  )
+                  ),
+                  WHERE.getOrElse(True)
                 ))),
                 oss = Some(List(
                   OrderSelection[Long](DatasetChronicleEntryType / "id")
@@ -406,7 +410,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
               )
             }
           }
-        }
     }
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
