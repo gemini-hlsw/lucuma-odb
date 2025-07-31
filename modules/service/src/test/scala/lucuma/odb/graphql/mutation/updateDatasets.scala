@@ -276,6 +276,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
               "c_mod_file_site"             : false,
               "c_mod_file_date"             : false,
               "c_mod_file_index"            : false,
+              "c_mod_filename"              : false,
               "c_mod_qa_state"              : true,
               "c_mod_start_time"            : false,
               "c_mod_end_time"              : false,
@@ -284,12 +285,14 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
               "c_mod_observation_reference" : false,
               "c_mod_step_index"            : false,
               "c_mod_exposure_index"        : false,
+              "c_mod_dataset_reference"     : false,
               "c_mod_comment"               : false,
               "c_new_dataset_id"            : null,
               "c_new_step_id"               : null,
               "c_new_file_site"             : null,
               "c_new_file_date"             : null,
               "c_new_file_index"            : null,
+              "c_new_filename"              : null,
               "c_new_qa_state"              : "Pass",
               "c_new_start_time"            : null,
               "c_new_end_time"              : null,
@@ -298,6 +301,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
               "c_new_observation_reference" : null,
               "c_new_step_index"            : null,
               "c_new_exposure_index"        : null,
+              "c_new_dataset_reference"     : null,
               "c_new_comment"               : null
             }
           """

@@ -95,6 +95,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("constraintSetGroup"),
       SqlObject("dataset"),
       SqlObject("datasets"),
+      SqlObject("datasetChronicleEntries"),
       SqlObject("events"),
       RootEffect.computeJson("executionConfig")(executionConfig),
       SqlObject("filterTypeMeta"),
@@ -125,6 +126,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ConstraintSetGroup,
       Dataset,
       Datasets,
+      DatasetChronicleEntries,
       Events,
       ExecutionConfig,
       FilterTypeMeta,
@@ -361,6 +363,42 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 ))),
                 oss = Some(List(
                   OrderSelection[lucuma.core.model.sequence.Dataset.Id](DatasetType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+            }
+          }
+        }
+    }
+
+  private lazy val DatasetChronicleEntries: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    {
+      case (QueryType, "datasetChronicleEntries", List(
+        LongBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        // The GOA user can perform this query.
+        val GoaPredicate: Predicate =
+          user match
+            case StandardUser(id, r, rs, _) => if goaUsers.contains(id) then Predicate.True else Predicate.False
+            case _                          => Predicate.False
+
+        Elab.transformChild { child =>
+          (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit) { q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.map(Predicates.datasetChronicleEntry.id.gtEql).getOrElse(True),
+                  Predicate.Or(
+                    GoaPredicate,
+                    Predicates.datasetChronicleEntry.observation.program.isVisibleTo(user)
+                  )
+                ))),
+                oss = Some(List(
+                  OrderSelection[Long](DatasetChronicleEntryType / "id")
                 )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.

@@ -249,6 +249,7 @@ class recordDataset extends OdbSuite {
               "c_mod_file_site"             : true,
               "c_mod_file_date"             : true,
               "c_mod_file_index"            : true,
+              "c_mod_filename"              : true,
               "c_mod_qa_state"              : false,
               "c_mod_start_time"            : false,
               "c_mod_end_time"              : false,
@@ -257,12 +258,14 @@ class recordDataset extends OdbSuite {
               "c_mod_observation_reference" : false,
               "c_mod_step_index"            : true,
               "c_mod_exposure_index"        : true,
+              "c_mod_dataset_reference"     : false,
               "c_mod_comment"               : false,
               "c_new_dataset_id"            : $did,
               "c_new_step_id"               : $sid,
               "c_new_file_site"             : "gn",
               "c_new_file_date"             : "1863-01-01",
               "c_new_file_index"            : 4,
+              "c_new_filename"              : "N18630101S0004.fits",
               "c_new_qa_state"              : null,
               "c_new_start_time"            : null,
               "c_new_end_time"              : null,
@@ -271,6 +274,7 @@ class recordDataset extends OdbSuite {
               "c_new_observation_reference" : null,
               "c_new_step_index"            : 1,
               "c_new_exposure_index"        : 1,
+              "c_new_dataset_reference"     : null,
               "c_new_comment"               : null
             }
           """
