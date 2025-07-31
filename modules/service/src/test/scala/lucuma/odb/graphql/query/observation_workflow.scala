@@ -24,7 +24,6 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
-import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
@@ -36,7 +35,6 @@ import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.ObservationWorkflowService
-import munit.TestOptions
 
 class observation_workflow 
   extends ExecutionTestSupportForGmos
@@ -266,24 +264,6 @@ class observation_workflow
           )
         ).asRight
       )
-
-  enum TargetType:
-    case Sidereal, Nonsidereal, Opportunity
-
-  /** Create multiple tests that take an injected Target constructor. */
-  def testWithTargetTypes(
-    name: String | TestOptions,
-    ctors: Map[TargetType, (User, Program.Id) => IO[Target.Id]] =
-      Map(
-        TargetType.Sidereal    -> ((u, p) => createTargetWithProfileAs(u, p)),
-        TargetType.Opportunity -> ((u, p) => createOpportunityTargetAs(u, p)),
-      )
-  )(body: (TargetType, (User, Program.Id) => IO[Target.Id]) => Any) =
-    ctors.foreach: (tt, fun) =>
-      val ops = name match
-        case s: String => TestOptions(s"[$tt] $name")
-        case o: TestOptions => o.withName(s"[$tt] ${o.name}")          
-      test(ops)(body(tt, fun))
 
   testWithTargetTypes("no observing mode") { (_, mkTarget) =>
     val setup: IO[Observation.Id] =
