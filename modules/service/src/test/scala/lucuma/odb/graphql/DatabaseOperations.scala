@@ -35,6 +35,7 @@ import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
@@ -1524,15 +1525,15 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addSequenceEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
-      } yield SequenceEvent(i, r, o, vid, cmd)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      yield SequenceEvent(i, r, o, vid, n, cmd)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
   }
 
   def addSlewEventAs(
@@ -1561,7 +1562,8 @@ trait DatabaseOperations { this: OdbSuite =>
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield SlewEvent(i, r, oid, v, stg)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      } yield SlewEvent(i, r, oid, v, n, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1718,45 +1720,46 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        n <- c.downField("clientId").as[Option[Client.Id]]
         a <- c.downFields("atom", "id").as[Atom.Id]
-      } yield StepEvent(i, r, o, v, a, sid, stage)
+      } yield StepEvent(i, r, o, v, n, a, sid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
 
   def addAtomEventAs(
-    user:  User,
-    aid:   Atom.Id,
-    stage: AtomStage
-  ): IO[AtomEvent] = {
+    user:     User,
+    aid:      Atom.Id,
+    stage:    AtomStage,
+    clientId: Option[Client.Id] = None
+  ): IO[AtomEvent] =
     val q = s"""
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
+          ${clientId.fold("")(cid => s"clientId: \"$cid\"")}
         }) {
           event {
             id
             received
             observation { id }
             visit { id }
+            clientId
           }
         }
       }
     """
-
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addAtomEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield AtomEvent(i, r, o, v, aid, stage)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      yield AtomEvent(i, r, o, v, n, aid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
-  }
-
 
   def recordDatasetAs(
     user:     User,
@@ -1811,9 +1814,10 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        n <- c.downFields("clientId").as[Option[Client.Id]]
         a <- c.downFields("atom", "id").as[Atom.Id]
         s <- c.downFields("step", "id").as[Step.Id]
-      } yield DatasetEvent(i, r, o, v, a, s, did, stage)
+      } yield DatasetEvent(i, r, o, v, n, a, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
