@@ -9,7 +9,9 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
@@ -62,6 +64,8 @@ class goaAccessQuery extends OdbSuite:
     for
       cid <- createCallForProposalsAs(staff, semester = sem2025B)
       pid <- createProgramAs(pi)
+      mid <- piProgramUserIdAs(pi, pid)
+      _   <- updateProgramUserAs(pi, mid, PartnerLink.HasPartner(Partner.US))
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)

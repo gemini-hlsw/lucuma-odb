@@ -10,7 +10,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.Partner
 import lucuma.core.model.Observation
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
@@ -193,6 +195,8 @@ class asterismGroup extends OdbSuite {
       for {
         cid  <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramAs(user)
+        mid  <- piProgramUserIdAs(pi, pid)
+        _    <- updateProgramUserAs(pi, mid, PartnerLink.HasPartner(Partner.US))
         _    <- addDemoScienceProposal(user, pid, cid)
         _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(5)
