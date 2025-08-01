@@ -8981,11 +8981,6 @@ enum GmosSouthGrating {
   R831_G5322
 
   """
-  GmosSouthGrating B600_G5323
-  """
-  B600_G5323
-
-  """
   GmosSouthGrating R600_G5324
   """
   R600_G5324
