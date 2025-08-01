@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.atom_id
 import lucuma.odb.util.Codecs.atom_stage
+import lucuma.odb.util.Codecs.client_id
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.dataset_id
 import lucuma.odb.util.Codecs.dataset_stage
@@ -18,9 +19,9 @@ import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Codecs.step_stage
 import lucuma.odb.util.Codecs.visit_id
 
-trait ExecutionEventTable[F[_]] extends BaseMapping[F] {
+trait ExecutionEventTable[F[_]] extends BaseMapping[F]:
 
-  object ExecutionEventTable extends TableDef("t_execution_event") {
+  object ExecutionEventTable extends TableDef("t_execution_event"):
     val Id: ColumnRef              = col("c_execution_event_id", execution_event_id)
     val EventType: ColumnRef       = col("c_event_type",         execution_event_type)
     val Received: ColumnRef        = col("c_received",           core_timestamp)
@@ -36,6 +37,5 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F] {
     val AtomStage: ColumnRef       = col("c_atom_stage",         atom_stage)
     val StepStage: ColumnRef       = col("c_step_stage",         step_stage)
     val DatasetStage: ColumnRef    = col("c_dataset_stage",      dataset_stage)
-  }
 
-}
+    val ClientId: ColumnRef        = col("c_client_id",         client_id.opt)

@@ -6,25 +6,24 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.StepStage
+import lucuma.core.model.Client
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.*
 
 case class AddStepEventInput(
-  stepId:       Step.Id,
-  stepStage:    StepStage
+  stepId:    Step.Id,
+  stepStage: StepStage,
+  clientId:  Option[Client.Id]
 )
 
-object AddStepEventInput {
+object AddStepEventInput:
 
   val Binding: Matcher[AddStepEventInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         StepIdBinding("stepId", rStepId),
-        StepStageBinding("stepStage", rStepStage)
+        StepStageBinding("stepStage", rStepStage),
+        ClientIdBinding.Option("clientId", rCid)
       ) =>
-        (rStepId, rStepStage).parMapN { (sid, stage) =>
-          AddStepEventInput(sid, stage)
-        }
-    }
-
-}
+        (rStepId, rStepStage, rCid).parMapN: (sid, stage, cid) =>
+          AddStepEventInput(sid, stage, cid)

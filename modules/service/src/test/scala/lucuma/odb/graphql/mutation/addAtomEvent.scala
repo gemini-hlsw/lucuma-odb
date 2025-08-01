@@ -10,6 +10,7 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.model.Client
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
@@ -19,7 +20,7 @@ import lucuma.core.syntax.string.*
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.StepExecutionState
 
-class addAtomEvent extends OdbSuite with ExecutionState {
+class addAtomEvent extends OdbSuite with ExecutionState:
 
   val service: User = TestUsers.service(nextId)
 
@@ -166,4 +167,44 @@ class addAtomEvent extends OdbSuite with ExecutionState {
     }
   }
 
-}
+  test("addAtomEvent - client id"):
+    val user = service
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+
+    for
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid, mode.some)
+      vid <- recordVisitAs(user, mode.instrument, oid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+      sid <- recordStepAs(user, mode.instrument, aid)
+      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, cid)
+    yield assertEquals(evt.clientId, cid)
+
+  test("addAtomEvent - duplicate client id"):
+    val user = service
+    val mode = ObservingModeType.GmosNorthLongSlit
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    for
+      pid <- createProgramAs(user)
+      oid <- createObservationAs(user, pid, mode.some)
+      vid <- recordVisitAs(user, mode.instrument, oid)
+      aid <- recordAtomAs(user, mode.instrument, vid)
+      sid <- recordStepAs(user, mode.instrument, aid)
+      evt <- addAtomEventAs(user, aid, AtomStage.StartAtom, cid)
+      _   <- expect(user,
+        s"""
+          mutation {
+            addAtomEvent(input: {
+              atomId: "$aid"
+              atomStage: START_ATOM
+              clientId: "${cid.get}"
+            }) {
+              event { id }
+            }
+          }
+        """,
+        List(s"An event with client id '${cid.get}' has already been added.").asLeft
+      )
+    yield ()

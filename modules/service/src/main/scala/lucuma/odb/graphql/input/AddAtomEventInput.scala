@@ -5,25 +5,24 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.AtomStage
+import lucuma.core.model.Client
 import lucuma.core.model.sequence.Atom
 import lucuma.odb.graphql.binding.*
 
 case class AddAtomEventInput(
   atomId:    Atom.Id,
-  atomStage: AtomStage
+  atomStage: AtomStage,
+  clientId:  Option[Client.Id]
 )
 
-object AddAtomEventInput {
+object AddAtomEventInput:
 
   val Binding: Matcher[AddAtomEventInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         AtomIdBinding("atomId", rAtomId),
-        AtomStageBinding("atomStage", rAtomStage)
+        AtomStageBinding("atomStage", rAtomStage),
+        ClientIdBinding.Option("clientId", rCid)
       ) =>
-        (rAtomId, rAtomStage).parMapN { (aid, stage) =>
-          AddAtomEventInput(aid, stage)
-        }
-    }
-
-}
+        (rAtomId, rAtomStage, rCid).parMapN: (aid, stage, cid) =>
+          AddAtomEventInput(aid, stage, cid)

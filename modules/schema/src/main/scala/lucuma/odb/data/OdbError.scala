@@ -15,6 +15,7 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
@@ -63,6 +64,7 @@ enum OdbError:
   case InvalidConfiguration(detail: Option[String] = None)
   case InvalidWorkflowTransition(currentState: ObservationWorkflowState, requestedState: ObservationWorkflowState, detail: Option[String] = None)
   case RemoteServiceCallError(detail: Option[String] = None)
+  case DuplicatedEvent(clientId: Client.Id, detail: Option[String] = None)
 
 object OdbError:
 
@@ -95,6 +97,7 @@ object OdbError:
     case InvalidConfiguration      extends Tag("invalid_configuration")
     case InvalidWorkflowTransition extends Tag("invalid_workflow_transition")
     case RemoteServiceCallError    extends Tag("remote_service_call_error")
+    case DuplicatedEvent           extends Tag("duplicated_event")
 
   private[data]  object Tag:
 
@@ -131,6 +134,7 @@ object OdbError:
       case InvalidConfiguration(_)            => Tag.InvalidConfiguration
       case InvalidWorkflowTransition(_, _, _) => Tag.InvalidWorkflowTransition
       case RemoteServiceCallError(_)          => Tag.RemoteServiceCallError
+      case DuplicatedEvent(_, _)              => Tag.DuplicatedEvent
 
   def defaultMessage(e: OdbError): String =
     e match
@@ -159,6 +163,7 @@ object OdbError:
       case InvalidConfiguration(_)       => "Observation configuration is incomplete."
       case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be chanegd from $a to $b."
       case RemoteServiceCallError(_)     => "Error attempting to call a remote service."
+      case DuplicatedEvent(c, _)         => s"An event with client id '$c' has already been recorded."
 
   private def data(e: OdbError): JsonObject =
     e match
@@ -187,6 +192,7 @@ object OdbError:
       case InvalidConfiguration(_)            => JsonObject()
       case InvalidWorkflowTransition(a, b, _) => JsonObject("currentState" -> a.asJson, "requestedState" -> b.asJson)
       case RemoteServiceCallError(_)          => JsonObject()
+      case DuplicatedEvent(c, _)              => JsonObject("clientId" -> c.asJson)
     
   private def decode(d: Tag, detail: Option[String], c: ACursor): Decoder.Result[OdbError] =
     d match
@@ -215,6 +221,7 @@ object OdbError:
       case Tag.InvalidConfiguration      => InvalidConfiguration(detail).asRight
       case Tag.InvalidWorkflowTransition => (c.downField("currentState").as[ObservationWorkflowState], c.downField("requestedState").as[ObservationWorkflowState]).mapN(InvalidWorkflowTransition(_, _, detail))
       case Tag.RemoteServiceCallError    => RemoteServiceCallError(detail).asRight
+      case Tag.DuplicatedEvent           => c.downField("clientId").as[Client.Id].map(DuplicatedEvent(_, detail))
     
   private object Field:
     private val Prefix = "odb_error"

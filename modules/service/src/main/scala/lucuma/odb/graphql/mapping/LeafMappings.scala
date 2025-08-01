@@ -20,6 +20,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Client
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
@@ -69,19 +70,20 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
-      LeafMapping[BigDecimal](BigDecimalType),
-      LeafMapping[Long](ChronicleIdType),
       LeafMapping[ArcType](ArcTypeType),
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
       LeafMapping[AtomStage](AtomStageType),
       LeafMapping[Attachment.Id](AttachmentIdType),
       LeafMapping[AttachmentType](AttachmentTypeType),
+      LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
+      LeafMapping[Long](ChronicleIdType),
+      LeafMapping[Client.Id](ClientIdType),
       LeafMapping[CloudExtinction.Preset](CloudExtinctionPresetType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
       LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),

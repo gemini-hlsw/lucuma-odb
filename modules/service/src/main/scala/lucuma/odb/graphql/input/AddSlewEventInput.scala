@@ -5,12 +5,14 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.SlewStage
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.*
 
 case class AddSlewEventInput(
   observationId: Observation.Id,
-  slewStage:     SlewStage
+  slewStage:     SlewStage,
+  clientId:      Option[Client.Id]
 )
 
 object AddSlewEventInput:
@@ -19,7 +21,8 @@ object AddSlewEventInput:
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding("observationId", rObsId),
-        SlewStageBinding("slewStage", rStage)
+        SlewStageBinding("slewStage", rStage),
+        ClientIdBinding.Option("clientId", rCid)
       ) =>
-        (rObsId, rStage).parMapN: (oid, stg) =>
-          AddSlewEventInput(oid, stg)
+        (rObsId, rStage, rCid).parMapN: (oid, stg, cid) =>
+          AddSlewEventInput(oid, stg, cid)

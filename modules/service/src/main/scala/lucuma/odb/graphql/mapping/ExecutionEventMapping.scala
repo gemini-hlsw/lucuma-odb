@@ -33,6 +33,7 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       SqlObject("observation", Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
       SqlField("received",     ExecutionEventTable.Received),
       SqlField("eventType",    ExecutionEventTable.EventType, discriminator = true),
+      SqlField("clientId",     ExecutionEventTable.ClientId),
 
       // Hidden fields used in the WhereExecutionEvent predicate.  There
       // appears to be no good way to create a predicate that matches on a

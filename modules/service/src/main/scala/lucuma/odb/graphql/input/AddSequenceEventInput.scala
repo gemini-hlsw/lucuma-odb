@@ -6,25 +6,24 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.model.Client
 import lucuma.core.model.Visit
 import lucuma.odb.graphql.binding.*
 
 case class AddSequenceEventInput(
-  visitId: Visit.Id,
-  command: SequenceCommand
+  visitId:  Visit.Id,
+  command:  SequenceCommand,
+  clientId: Option[Client.Id]
 )
 
-object AddSequenceEventInput {
+object AddSequenceEventInput:
 
   val Binding: Matcher[AddSequenceEventInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         VisitIdBinding("visitId", rVisitId),
-        SequenceCommandBinding("command", rCommand)
+        SequenceCommandBinding("command", rCommand),
+        ClientIdBinding.Option("clientId", rCid)
       ) =>
-        (rVisitId, rCommand).parMapN { (vid, cmd) =>
-          AddSequenceEventInput(vid, cmd)
-        }
-    }
-
-}
+        (rVisitId, rCommand, rCid).parMapN: (vid, cmd, cid) =>
+          AddSequenceEventInput(vid, cmd, cid)

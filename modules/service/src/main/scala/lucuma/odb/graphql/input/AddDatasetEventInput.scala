@@ -6,26 +6,24 @@ package input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.DatasetStage
+import lucuma.core.model.Client
 import lucuma.core.model.sequence.Dataset
 import lucuma.odb.graphql.binding.*
 
 case class AddDatasetEventInput(
   datasetId:    Dataset.Id,
-  datasetStage: DatasetStage
+  datasetStage: DatasetStage,
+  clientId:     Option[Client.Id]
 )
 
-object AddDatasetEventInput {
+object AddDatasetEventInput:
 
   val Binding: Matcher[AddDatasetEventInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         DatasetIdBinding("datasetId", rDatasetId),
-        DatasetStageBinding("datasetStage", rDatasetStage)
+        DatasetStageBinding("datasetStage", rDatasetStage),
+        ClientIdBinding.Option("clientId", rCid)
       ) =>
-        (rDatasetId, rDatasetStage).parMapN { (did, stage) =>
-          AddDatasetEventInput(did, stage)
-        }
-    }
-
-}
-
+        (rDatasetId, rDatasetStage, rCid).parMapN: (did, stage, cid) =>
+          AddDatasetEventInput(did, stage, cid)
