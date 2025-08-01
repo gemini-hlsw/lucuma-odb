@@ -26,6 +26,7 @@ scalar EmailAddress
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
+  clientId: ClientId
 }
 
 "The result of adding a atom event."
@@ -41,6 +42,8 @@ input AddDatasetEventInput {
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
+
+  clientId: ClientId
 }
 
 "The result of adding a dataset event."
@@ -63,6 +66,7 @@ type AddProgramUserResult {
 input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
+  clientId: ClientId
 }
 
 "The result of adding a sequence event."
@@ -75,6 +79,7 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
+  clientId: ClientId
 }
 
 "The result of adding a slew event."
@@ -87,6 +92,7 @@ type AddSlewEventResult {
 input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
+  clientId: ClientId
 }
 
 "The result of adding a step event."
@@ -180,6 +186,9 @@ type AtomEvent implements ExecutionEvent {
 
   "Atom execution stage."
   atomStage: AtomStage!
+
+  "Client id, if any."
+  clientId: ClientId
 }
 
 enum AtomExecutionState {
@@ -684,6 +693,8 @@ Result of the program user role update, which is the updated program user itself
 type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
+
+scalar ClientId
 
 """
 Describes an observation clone operation, making any edits in the `SET`
@@ -6777,6 +6788,10 @@ type DatasetEvent implements ExecutionEvent {
 
   "The associated dataset."
   dataset: Dataset!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "Dataset filename in standard format."
@@ -7102,6 +7117,9 @@ interface ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
+
+  "Client id, if any."
+  clientId: ClientId
 }
 
 """
@@ -11843,6 +11861,10 @@ type SequenceEvent implements ExecutionEvent {
 
   "Sequence event data."
   command: SequenceCommand!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 """
@@ -11982,6 +12004,10 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "Slew stage"
@@ -12915,6 +12941,10 @@ type StepEvent implements ExecutionEvent {
 
   "Step execution stage."
   stepStage: StepStage!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
