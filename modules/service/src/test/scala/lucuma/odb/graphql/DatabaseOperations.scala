@@ -136,27 +136,41 @@ trait DatabaseOperations { this: OdbSuite =>
      semester:    Semester             = Semester.unsafeFromString("2025A"),
      activeStart: LocalDate            = LocalDate.parse("2025-02-01"),
      activeEnd:   LocalDate            = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]    = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
      other:       Option[String]       = None
   ): IO[CallForProposals.Id] =
+    val deadlineStr = deadline.foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
+    val partnerList =
+      partners.map((p, d) =>
+        s"""
+          {
+            partner: ${p.tag.toScreamingSnakeCase}
+            ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
+          }
+        """
+      ).mkString("[", ", ", "]")
     query(user, s"""
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        ${callType.tag.toScreamingSnakeCase}
-                semester:    "${semester.format}"
-                activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
-                activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
-                ${other.getOrElse("")}
-              }
-            }
-          ) {
-            callForProposals {
-              id
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              type:        ${callType.tag.toScreamingSnakeCase}
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              $deadlineStr
+              partners: $partnerList
+              ${other.getOrElse("")}
             }
           }
+        ) {
+          callForProposals {
+            id
+          }
         }
-      """
+      }
+    """
     ).flatMap { js =>
       js.hcursor
         .downFields("createCallForProposals", "callForProposals", "id")
@@ -195,6 +209,25 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createProgramWithPiAffiliation(
+    pi: User,
+    piPartnerLink: PartnerLink
+  ): IO[Program.Id] =
+    for
+      pid    <- createProgramAs(pi)
+      piPuid <- piProgramUserIdAs(pi, pid)
+      _      <- updateProgramUserAs(pi, piPuid, piPartnerLink)
+    yield pid
+
+  def createProgramWithNonPartnerPi(pi: User): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner)
+
+  def createProgramWithUsPi(pi: User): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US))
+
+  def createProgramWithCaPi(pi: User): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA))
 
   def createProgramNoteAs(
     user:      User,
@@ -468,8 +501,17 @@ trait DatabaseOperations { this: OdbSuite =>
   def addPartnerSplits(
     user: User,
     pid: Program.Id,
-    proposalType: String = "queue"
+    proposalType: String = "queue",
+    partnerSplits: List[(Partner, Int)] = List((Partner.US, 70), (Partner.CA, 30))
   ): IO[Unit] =
+    val splitsList = partnerSplits.map((p, v) =>
+      s"""
+        {
+          partner: ${p.tag.toScreamingSnakeCase}
+          percent: $v
+        }
+      """
+    ).mkString("[", ",", "]")
     query(user, s"""
       mutation {
         updateProposal(
@@ -478,16 +520,7 @@ trait DatabaseOperations { this: OdbSuite =>
             SET: {
               type: {
                 $proposalType: {
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 70
-                    },
-                    {
-                      partner: CA
-                      percent: 30
-                    }
-                  ]
+                  partnerSplits: $splitsList
                 }
               }
             }
@@ -1973,6 +2006,37 @@ trait DatabaseOperations { this: OdbSuite =>
         """
     ).map: j =>
       j.hcursor.downFields("addProgramUser", "programUser", "id").require[ProgramUser.Id]
+
+  def updateProgramUserAs(
+    user:       User,
+    puid:       ProgramUser.Id,
+    partnerLink: PartnerLink
+  ): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateProgramUsers(input: {
+            WHERE: {
+              id: {
+                EQ: "$puid"
+              }
+            }
+            SET: {
+              partnerLink: {
+                ${
+                  partnerLink match
+                    case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
+                    case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                }
+              }
+            }
+          }) {
+            programUsers { id }
+          }
+        }
+      """
+    ).void
 
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>

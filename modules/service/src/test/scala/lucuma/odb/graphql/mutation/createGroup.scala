@@ -195,7 +195,7 @@ class createGroup extends OdbSuite {
 
     for {
       cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
-      pid <- createProgramAs(pi)
+      pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       _   <- submitProposal(pi, pid)
       _   <- createWithReference
