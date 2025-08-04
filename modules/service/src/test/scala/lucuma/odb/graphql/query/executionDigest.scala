@@ -534,7 +534,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
           services.session.transaction.use: xa =>
             for
               _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
 
