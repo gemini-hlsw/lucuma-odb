@@ -133,7 +133,7 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
   val setup: IO[(Program.Id, Observation.Id)] =
     for     
       cid <- createCallForProposalsAs(admin)
-      pid <- createProgramAs(pi, "Foo")
+      pid <- createProgramWithUsPi(pi)
       _   <- addProposal(pi, pid, Some(cid), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
