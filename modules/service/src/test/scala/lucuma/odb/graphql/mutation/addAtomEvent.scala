@@ -10,9 +10,9 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.AtomStage
-import lucuma.core.model.Client
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
