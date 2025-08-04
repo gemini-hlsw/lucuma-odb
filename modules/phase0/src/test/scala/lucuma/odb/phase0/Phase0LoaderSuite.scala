@@ -41,7 +41,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .compile
       .toList
       .map: rows =>
-        assertEquals(rows.length, 210)
+        assertEquals(rows.length, 182)
 
   test("loadAll flamingos2 spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
