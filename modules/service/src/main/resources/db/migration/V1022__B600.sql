@@ -21,7 +21,7 @@ UPDATE t_gmos_south_long_slit
 
 UPDATE t_gmos_south_long_slit
    SET c_initial_grating = 'B480_G5327'
- WHERE c_initial_grating = 'R600_G5323';
+ WHERE c_initial_grating = 'B600_G5323';
 
 -- Delete the old G5323 disperser.
 DELETE FROM t_gmos_south_disperser WHERE c_tag = 'B600_G5323';

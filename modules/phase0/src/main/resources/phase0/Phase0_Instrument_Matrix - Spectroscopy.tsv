@@ -344,10 +344,6 @@ GMOS-S	R150 1.0" CaT	singleslit,multislit	1.0"	1.000	330	R150	CaT	0.78	0.933	0.8
 GMOS-S	R150 1.5" CaT	singleslit,multislit	1.5"	1.500	330	R150	CaT	0.78	0.933	0.86	0.153	210	no		s
 GMOS-S	R150 2.0" CaT	singleslit,multislit	2.0"	2.000	330	R150	CaT	0.78	0.933	0.86	0.153	158	no		s
 GMOS-S	R150 5.0" CaT	singleslit,multislit	5.0"	5.000	330	R150	CaT	0.78	0.933	0.86	0.153	63	no		s
-GMOS-S	B600 IFU1	ifu	IFU-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no		s
-GMOS-S	B600 IFU2	ifu	IFU-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no		s
-GMOS-S	B600 IFU1 NS	ifu	IFU-NS-R	3	5	B600	none	0.36	1.03	0.461	0.307	2723	no	Nod&Shuffle	s
-GMOS-S	B600 IFU2 NS	ifu	IFU-NS-2	5	7	B600	g	0.398	0.552	0.461	0.154	2723	no	Nod&Shuffle	s
 GMOS-S	R150 NS1.0 GG455	singleslit,multislit	NS1.0"	1.000	330	R150	GG455	0.46	1.03	0.717	0.57	316	no	Nod&Shuffle	s
 GMOS-S	R150 NS1.0 OG515	singleslit,multislit	NS1.0"	1.000	330	R150	OG515	0.52	1.03	0.717	0.51	316	no	Nod&Shuffle	s
 GMOS-S	R831 NS1.0 CaT	singleslit,multislit	NS1.0"	1.000	330	R831	CaT	0.78	0.933	0.757	0.23	2198	no	Nod&Shuffle	s
