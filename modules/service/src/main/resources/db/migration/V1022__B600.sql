@@ -1,4 +1,4 @@
--- Update the instrument matrix to use the new entry instead of the old one.
+-- Update the instrument matrix to remove the obsolete grating.
 DELETE FROM t_spectroscopy_config_option_gmos_south WHERE c_grating = 'B600_G5323';
 
 -- Update the Smart Gcal table.
