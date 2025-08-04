@@ -102,6 +102,7 @@ object OdbMapping {
     shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
+          // with FetchLimit[F](10000)
           with BaseMapping[F]
           with ArcMapping[F]
           with AddAtomEventResultMapping[F]
@@ -601,7 +602,7 @@ object OdbMapping {
             super.defaultRootCursor(query, tpe, parentCursor)
 
           // Override `fetch` to log the SQL query. This is optional.
-          override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
+          override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Result[Vector[Array[Any]]]] = {
             Logger[F].debug {
               val formatted = SqlFormatter.format(fragment.fragment.sql)
               val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
@@ -610,7 +611,7 @@ object OdbMapping {
             } *>
             super.fetch(fragment, codecs)
           }
-
+            
           // HACK: If the codec is a DomainCodec then use the domain name when generating `null::<type>` in Grackle queries
           override implicit def Fragments: SqlFragment[AppliedFragment] =
             val delegate = super.Fragments
