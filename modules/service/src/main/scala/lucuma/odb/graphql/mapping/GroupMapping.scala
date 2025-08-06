@@ -23,6 +23,7 @@ import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
@@ -34,6 +35,7 @@ import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
+import org.http4s.client.Client
 
 import Services.Syntax.*
 
@@ -45,6 +47,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
   def services: Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+  def emailConfig: Config.Email
+  def httpClient: Client[F]
 
   lazy val GroupMapping =
     ObjectMapping(GroupType)(
@@ -85,12 +89,12 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
   private lazy val estimateRangeHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
           .estimateGroupRange(gid)
 
   private lazy val estimateBandedHandler: EffectHandler[F] =
     keyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
       services.useTransactionally:
-        timeEstimateService(commitHash, itcClient, timeEstimateCalculator)
+        timeEstimateService(commitHash, itcClient, timeEstimateCalculator, emailConfig, httpClient)
           .estimateGroupBanded(gid)
           .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))

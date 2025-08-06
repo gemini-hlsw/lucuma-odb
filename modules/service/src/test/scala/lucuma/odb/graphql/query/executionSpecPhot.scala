@@ -31,7 +31,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o
@@ -237,7 +237,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
              )
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o
@@ -358,7 +358,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
              )
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o

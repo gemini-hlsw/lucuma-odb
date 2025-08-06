@@ -240,7 +240,7 @@ class executionFailures extends ExecutionTestSupportForGmos {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.Photometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.Photometric.some)(using xa)
                }
              }
       } yield o

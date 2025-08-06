@@ -310,7 +310,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       Resource.eval(IO.pure(Response(body = Stream.eval(sio).through(utf8.encode))))
     }
 
-  private def httpClient: Client[IO] = Client.apply(httpRequestHandler)
+  protected def httpClient: Client[IO] = Client.apply(httpRequestHandler)
 
   protected def databaseConfig: Config.Database =
     Config.Database(
