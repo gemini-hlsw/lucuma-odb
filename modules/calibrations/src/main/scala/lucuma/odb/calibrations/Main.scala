@@ -30,6 +30,7 @@ import natchez.EntryPoint
 import natchez.Trace
 import natchez.honeycomb.Honeycomb
 import org.http4s.Credentials
+import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
@@ -137,7 +138,11 @@ object CMain extends MainParams {
     } yield (top, ctt)
 
   def runCalibrationsDaemon[F[_]: Async: Logger](
-    obsTopic: Topic[F, ObservationTopic.Element], calibTopic: Topic[F, CalibTimeTopic.Element], services: Resource[F, Services[F]]
+    emailConfig: Config.Email,
+    httpClient: Client[F],
+    obsTopic: Topic[F, ObservationTopic.Element],
+    calibTopic: Topic[F, CalibTimeTopic.Element],
+    services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
@@ -146,7 +151,7 @@ object CMain extends MainParams {
                 requireServiceAccess:
                   for {
                     t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                    _ <- calibrationsService
+                    _ <- calibrationsService(emailConfig, httpClient)
                           .recalculateCalibrations(
                             elem.programId,
                             LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
@@ -158,7 +163,7 @@ object CMain extends MainParams {
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally {
                 requireServiceAccess:
-                  calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                  calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
               }
             }.compile.drain.start.void)
@@ -195,7 +200,8 @@ object CMain extends MainParams {
       enums       <- Resource.eval(pool.use(Enums.load))
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
-      _           <- runCalibrationsDaemon(obsT, ctT, pool.evalMap(services(user, enums)))
+      httpClient  <- c.httpClientResource
+      _           <- runCalibrationsDaemon(c.email, httpClient, obsT, ctT, pool.evalMap(services(user, enums)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */

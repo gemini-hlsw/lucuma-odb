@@ -26,6 +26,7 @@ import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
@@ -68,6 +69,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.observationWorkflowState.*
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import skunk.AppliedFragment
 import skunk.Encoder
 import skunk.Transaction
@@ -154,6 +156,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
   def commitHash: CommitHash
+  def httpClient: Client[F]
+  def emailConfig: Config.Email
 
   // We do this a lot
   extension [F[_]: Functor, G[_]: Functor, A](fga: F[G[A]])
@@ -458,7 +462,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     prop: Option[ProposalReference],
     prog: Option[ProgramReference]
   )(using Services[F]): F[Result[Option[Program.Id]]] =
-    programService
+    programService(emailConfig, httpClient)
       .resolvePid(pid, prop, prog)
       .flatMap: r =>
         r.flatTraverse: pid =>
@@ -571,7 +575,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: SetProgramReferenceInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]]] =
-    programService
+    programService(emailConfig, httpClient)
       .resolvePid(input.programId, input.proposalReference, input.programReference)
       .flatMap: r =>
         r.flatTraverse: pid =>
