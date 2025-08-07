@@ -8,6 +8,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -43,12 +44,15 @@ class setProposalStatus extends OdbSuite
   val oneDay: TimeSpan     = TimeSpan.fromHours(24).get
   val yesterday: Timestamp = Timestamp.unsafeFromInstantTruncated(Instant.now) -| oneDay
 
+  override val httpRequestHandler = invitationEmailRequestHandler
+
   test("✓ valid submission") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramWithNonPartnerPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
         addCoisAs(pi, pid) *>
+        ensureNoEmailsForAddress(defaultPiEmail) *>
         expect(
           user = pi,
           query = s"""
@@ -75,7 +79,8 @@ class setProposalStatus extends OdbSuite
                 }
               }
             """.asRight
-        )
+        ) *>
+        ensureSomeQueuedEmailsForAddress(defaultPiEmail, 1)
       }
     }
   }
@@ -879,4 +884,66 @@ class setProposalStatus extends OdbSuite
           expected =
             List(error.pastDeadline(pid).message).asLeft
         )
+
+  test("Cannot submit without a PI email address"):
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      mid <- piProgramUserIdAs(pi, pid)
+      _   <- updateProgramUserAs(pi, mid, PartnerLink.HasNonPartner, email = none)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <-
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.missingPiEmailAddress(pid).message).asLeft
+        )
+    yield ()
+
+  test("Cannot submit with an invalid PI email address"):
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      mid <- piProgramUserIdAs(pi, pid)
+      em   = NonEmptyString.unsafeFrom("invalid")
+      _   <- updateProgramUserAs(pi, mid, PartnerLink.HasNonPartner, email = em.some)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <-
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.invalidPiEmailAddress(em.value, pid).message).asLeft
+        )
+    yield ()
+
 }

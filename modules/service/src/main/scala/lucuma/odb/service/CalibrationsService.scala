@@ -31,6 +31,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
+import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
@@ -49,6 +50,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
+import org.http4s.client.Client
 import skunk.AppliedFragment
 import skunk.Command
 import skunk.Query
@@ -128,7 +130,7 @@ object CalibrationsService extends CalibrationObservations {
       case (tid, name, role, Some(st)) => (tid, name, role, st)
     }
 
-  def instantiate[F[_]: MonadCancelThrow](using Services[F]): CalibrationsService[F] =
+  def instantiate[F[_]: MonadCancelThrow](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] =
     new CalibrationsService[F] {
 
       override def setCalibrationRole(
@@ -139,7 +141,7 @@ object CalibrationsService extends CalibrationObservations {
 
       private def calibrationsGroup(pid: Program.Id, size: Int)(using Transaction[F]): F[Option[Group.Id]] =
         if (size > 0) {
-          groupService.selectGroups(pid).flatMap {
+          groupService(emailConfig, httpClient).selectGroups(pid).flatMap {
             case GroupTree.Root(_, c) =>
               val existing = c.collectFirst {
                 case GroupTree.Branch(gid, _, _, _, Some(CalibrationsGroupName), _, _, _, true) => gid
@@ -148,7 +150,7 @@ object CalibrationsService extends CalibrationObservations {
               existing match {
                 case Some(gid) => gid.some.pure[F]
                 case None      =>
-                  groupService.createGroup(
+                  groupService(emailConfig, httpClient).createGroup(
                       input = CreateGroupInput(
                         programId = pid.some,
                         proposalReference = none,

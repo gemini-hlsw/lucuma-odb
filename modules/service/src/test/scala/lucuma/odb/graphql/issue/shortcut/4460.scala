@@ -30,7 +30,7 @@ class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
       for {
         _ <- createUsers(pi, staffCoiRo, staff)
         c <- createCallForProposalsAs(staff, RegularSemester)
-        p <- createProgramAs(pi, "ShortCut 4460")
+        p <- createProgramWithNonPartnerPi(pi, "ShortCut 4460")
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)
         _ <- setObservationWorkflowState(pi, o, ObservationWorkflowState.Inactive) // avoid submission check

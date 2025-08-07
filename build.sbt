@@ -32,7 +32,7 @@ val pprintVersion              = "0.9.3"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.26"
+ThisBuild / tlBaseVersion      := "0.27"
 ThisBuild / scalaVersion       := "3.7.1"
 ThisBuild / crossScalaVersions := Seq("3.7.1")
 

@@ -250,7 +250,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       oid <- createObservationAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -271,7 +271,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       gr  <- groupElementsAs(pi, pid, None)
       _   <- withServices(service) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                }
              }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -298,7 +298,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -371,7 +371,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -400,7 +400,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -430,7 +430,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -463,7 +463,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -487,7 +487,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
 
   def calibrationTargets(role: CalibrationRole, referenceInstant: Instant) =
     withServices(pi) { services =>
-      services.calibrationsService.calibrationTargets(List(role), referenceInstant)
+      services.calibrationsService(emailConfig, httpClient).calibrationTargets(List(role), referenceInstant)
     }
 
   test("calculate best target for specphoto") {
@@ -539,7 +539,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       tpid <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                      s.programService
+                      s.programService(emailConfig, httpClient)
                         .insertCalibrationProgram(
                           ProgramPropertiesInput.Create.Default.some,
                           CalibrationRole.SpectroPhotometric,
@@ -558,7 +558,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
               }
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryObservations(pid)
@@ -581,8 +581,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa) *>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -614,8 +614,8 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> scienceRequirements(pi, oid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa) *>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa) *>
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -645,7 +645,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryObservations(pid)
@@ -693,7 +693,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryObservations(pid)
@@ -740,7 +740,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryObservations(pid)
@@ -769,7 +769,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       // In reality this is done listening to events but we can explicitly call the function here
       _     <- withServices(service) { services =>
                  services.session.transaction.use { xa =>
-                   services.calibrationsService.recalculateCalibrationTarget(pid, cid1)(using xa)
+                   services.calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(pid, cid1)(using xa)
                  }
                }
       ob2   <- queryObservations(pid)
@@ -791,7 +791,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       ob   <- queryObservations(pid)
@@ -829,13 +829,13 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- prepareObservation(pi, oid1, tid1) *> prepareObservation(pi, oid2, tid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       _    <- deleteObservation(pi, oid2)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)
@@ -878,7 +878,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
   def recalculateCalibrations(pid: Program.Id): IO[(List[Observation.Id], List[Observation.Id])] =
     withServices(service) { services =>
       services.session.transaction.use { xa =>
-        services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+        services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
       }
     }
 
@@ -1037,7 +1037,7 @@ class calibrations extends OdbSuite with SubscriptionUtils {
       _    <- setObservationWorkflowState(pi, oid1, ObservationWorkflowState.Inactive)
       _    <- withServices(service) { services =>
                 services.session.transaction.use { xa =>
-                  services.calibrationsService.recalculateCalibrations(pid, when)(using xa)
+                  services.calibrationsService(emailConfig, httpClient).recalculateCalibrations(pid, when)(using xa)
                 }
               }
       gr1  <- groupElementsAs(pi, pid, None)

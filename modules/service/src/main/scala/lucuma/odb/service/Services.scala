@@ -101,7 +101,7 @@ trait Services[F[_]]:
   def attachmentMetadataService: AttachmentMetadataService[F]
 
   /** The `CalibrationsService`. */
-  def calibrationsService: CalibrationsService[F]
+  def calibrationsService(emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F]
 
   /** The `CallForProposalsService`. */
   def callForProposalsService: CallForProposalsService[F]
@@ -140,7 +140,7 @@ trait Services[F[_]]:
   def gmosSequenceService: GmosSequenceService[F]
 
   /** The `GroupService`. */
-  def groupService: GroupService[F]
+  def groupService(emailConfig: Config.Email, httpClient: Client[F]): GroupService[F]
 
   /** The `ObsAttachmentAssignmentService`. */
   def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
@@ -161,13 +161,13 @@ trait Services[F[_]]:
   def programNoteService: ProgramNoteService[F]
 
   /** The `ProgramService`. */
-  def programService: ProgramService[F]
+  def programService(emailConfig: Config.Email, httpClient: Client[F]): ProgramService[F]
 
   /** The `ProgramUserService`. */
   def programUserService: ProgramUserService[F]
 
   /** The `ProposalService`. */
-  def proposalService: ProposalService[F]
+  def proposalService(emailConfig: Config.Email, httpClient: Client[F]): ProposalService[F]
 
   /** The `SmartGcalService`. */
   def smartGcalService: SmartGcalService[F]
@@ -199,7 +199,7 @@ trait Services[F[_]]:
   def timeAccountingService: TimeAccountingService[F]
 
   /** Construct a `TimeEstimateService`, given a `CommitHash` and an `ItcClient`.*/
-    def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): TimeEstimateService[F]
+  def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode, emailConfig: Config.Email, httpClient: Client[F]): TimeEstimateService[F]
 
   /** Construct a `guideService`, given an http4s `Client`, an `ItcClient`, a `CommitHash` and a `TimeEstimateCalculator`. */
   def guideService(gaiaClient: GaiaClient[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode): GuideService[F]
@@ -279,7 +279,6 @@ object Services:
       lazy val asterismService = AsterismService.instantiate
       lazy val attachmentMetadataService = AttachmentMetadataService.instantiate
       lazy val callForProposalsService = CallForProposalsService.instantiate
-      lazy val calibrationsService = CalibrationsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
       lazy val configurationService = ConfigurationService.instantiate
       lazy val datasetService = DatasetService.instantiate
@@ -291,16 +290,13 @@ object Services:
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
-      lazy val groupService = GroupService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programNoteService = ProgramNoteService.instantiate
-      lazy val programService = ProgramService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
-      lazy val proposalService = ProposalService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val sequenceService = SequenceService.instantiate
       lazy val targetService = TargetService.instantiate
@@ -316,9 +312,13 @@ object Services:
       def itcService(itcClient: ItcClient[F]) = ItcService.instantiate(itcClient)
       def generator(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = Generator.instantiate(commitHash, itcClient, ptc)
       def obscalcService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Logger[F]) = ObscalcService.instantiate(commitHash, itcClient, ptc)
-      def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = TimeEstimateService.instantiate(commitHash, itcClient, ptc)
+      def timeEstimateService(commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode, emailConfig: Config.Email, httpClient: Client[F]) = TimeEstimateService.instantiate(commitHash, itcClient, ptc, emailConfig, httpClient)
       def guideService(gaiaClient: GaiaClient[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode) = GuideService.instantiate(gaiaClient, itcClient, commitHash, ptc)
+      def calibrationsService(emailConfig: Config.Email, httpClient: Client[F]) = CalibrationsService.instantiate(emailConfig, httpClient)
       def emailService(emailConfig: Config.Email, httpClient: Client[F]) = EmailService.fromConfigAndClient(emailConfig, httpClient)
+      def groupService(emailConfig: Config.Email, httpClient: Client[F]) = GroupService.instantiate(emailConfig, httpClient)
+      def programService(emailConfig: Config.Email, httpClient: Client[F]) = ProgramService.instantiate(emailConfig, httpClient)
+      def proposalService(emailConfig: Config.Email, httpClient: Client[F]) = ProposalService.instantiate(emailConfig, httpClient)
       def userInvitationService(emailConfig: Config.Email, httpClient: Client[F]) = UserInvitationService.instantiate(emailConfig, httpClient)
 
 
@@ -335,7 +335,7 @@ object Services:
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
     def attachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): AttachmentFileService[F] = summon[Services[F]].attachmentFileService(s3)
     def attachmentMetadataService[F[_]](using Services[F]): AttachmentMetadataService[F] = summon[Services[F]].attachmentMetadataService
-    def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
+    def calibrationsService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService(emailConfig, httpClient)
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService
@@ -348,16 +348,16 @@ object Services:
     def flamingos2LongSlitService[F[_]](using Services[F]): Flamingos2LongSlitService[F] = summon[Services[F]].flamingos2LongSlitService
     def flamingos2SequenceService[F[_]](using Services[F]): Flamingos2SequenceService[F] = summon[Services[F]].flamingos2SequenceService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
-    def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
+    def groupService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): GroupService[F] = summon[Services[F]].groupService(emailConfig, httpClient)
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
-    def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
+    def programService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): ProgramService[F] = summon[Services[F]].programService(emailConfig, httpClient)
     def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
-    def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
+    def proposalService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): ProposalService[F] = summon[Services[F]].proposalService(emailConfig, httpClient)
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
@@ -368,7 +368,7 @@ object Services:
     def itcService[F[_]](client: ItcClient[F])(using Services[F]): ItcService[F] = summon[Services[F]].itcService(client)
     def generator[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): Generator[F] = summon[Services[F]].generator(commitHash, itcClient, ptc)
     def obscalcService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F], Logger[F]): ObscalcService[F] = summon[Services[F]].obscalcService(commitHash, itcClient, ptc)
-    def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc)
+    def timeEstimateService[F[_]](commitHash: CommitHash, itcClient: ItcClient[F], ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode, emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService(commitHash, itcClient, ptc, emailConfig, httpClient)
     def guideService[F[_]](gaiaClient: GaiaClient[F], itcClient: ItcClient[F], commitHash: CommitHash, ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode)(using Services[F]): GuideService[F] = summon[Services[F]].guideService(gaiaClient, itcClient, commitHash, ptc)
     def userInvitationService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService(emailConfig, httpClient)
     def emailService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]) = summon[Services[F]].emailService(emailConfig, httpClient)

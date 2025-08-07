@@ -30,7 +30,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
     for
       _ <- createUsers(pi, coiRo, staff)
       c <- createCallForProposalsAs(staff, RegularSemester)
-      p <- createProgramAs(pi, "ShortCut 4457")
+      p <- createProgramWithNonPartnerPi(pi, "ShortCut 4457")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _ <- computeItcResultAs(pi, o)

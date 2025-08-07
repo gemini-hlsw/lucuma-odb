@@ -212,22 +212,23 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def createProgramWithPiAffiliation(
     pi: User,
-    piPartnerLink: PartnerLink
+    piPartnerLink: PartnerLink,
+    programName: String = null
   ): IO[Program.Id] =
     for
-      pid    <- createProgramAs(pi)
+      pid    <- createProgramAs(pi, programName)
       piPuid <- piProgramUserIdAs(pi, pid)
       _      <- updateProgramUserAs(pi, piPuid, piPartnerLink)
     yield pid
 
-  def createProgramWithNonPartnerPi(pi: User): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner)
+  def createProgramWithNonPartnerPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner, programName)
 
-  def createProgramWithUsPi(pi: User): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US))
+  def createProgramWithUsPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US), programName)
 
-  def createProgramWithCaPi(pi: User): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA))
+  def createProgramWithCaPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA), programName)
 
   def createProgramNoteAs(
     user:      User,
@@ -2007,11 +2008,21 @@ trait DatabaseOperations { this: OdbSuite =>
     ).map: j =>
       j.hcursor.downFields("addProgramUser", "programUser", "id").require[ProgramUser.Id]
 
+  val defaultPiEmail: NonEmptyString = "pi@someprestigiousplace.com".refined
+
   def updateProgramUserAs(
     user:       User,
     puid:       ProgramUser.Id,
-    partnerLink: PartnerLink
+    partnerLink: PartnerLink, 
+    email: Option[NonEmptyString] = defaultPiEmail.some
   ): IO[Unit] =
+    val fallback = email.foldMap(e =>
+      s"""
+        fallbackProfile: {
+          email: "$e"
+        }
+      """
+    )
     query(
       user = user,
       query = s"""
@@ -2030,6 +2041,7 @@ trait DatabaseOperations { this: OdbSuite =>
                     case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
+              $fallback
             }
           }) {
             programUsers { id }
@@ -2166,6 +2178,25 @@ trait DatabaseOperations { this: OdbSuite =>
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(id)))
   }
+
+  def getEmailStatusesByAddress(address: NonEmptyString): IO[List[EmailStatus]] = {
+    val query = sql"select c_status from t_email where c_recipient_email = $text_nonempty".query(email_status)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream(address, chunkSize = 1024).compile.toList))
+  }
+
+  def ensureNoEmailsForAddress(address: NonEmptyString): IO[Unit] = 
+    getEmailStatusesByAddress(address).flatMap: es =>
+      es match
+        case Nil => IO.unit
+        case _   => IO.raiseError(new Exception(s"Emails found for address $address"))
+
+  def ensureSomeQueuedEmailsForAddress(address: NonEmptyString, count: Int): IO[Unit] = 
+    getEmailStatusesByAddress(address).flatMap: es =>
+      val queued = es.count(_ == EmailStatus.Queued)
+      if queued =!= count then
+        IO.raiseError(new Exception(s"Expected $count queued emails for address $address, found $queued"))
+      else IO.unit
 
   def updateEmailStatus(id: EmailId, status: EmailStatus): IO[Unit] = {
     val command = sql"update t_email set c_status = $email_status where c_email_id = $email_id".command

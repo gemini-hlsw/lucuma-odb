@@ -82,7 +82,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       _ <- withServices(serviceUser) { services =>
         services.session.transaction.use: xa =>
           services
-            .calibrationsService
+            .calibrationsService(emailConfig, httpClient)
             .recalculateCalibrations(p, when)(using xa)
             .map(_._1)
       }
