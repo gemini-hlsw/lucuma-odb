@@ -827,7 +827,7 @@ trait DatabaseOperations { this: OdbSuite =>
   private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
     observingMode match
       case ObservingModeType.GmosNorthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = spatialOffsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -835,7 +835,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = spatialOffsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -946,8 +946,8 @@ trait DatabaseOperations { this: OdbSuite =>
     pid:  Program.Id,
     sourceProfile: String = DefaultSourceProfile
   ): IO[List[Target.Id]] =
-    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
-     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
+    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile),
+     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile),
      createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile)
     ).mapN(List(_, _, _))
 
@@ -1019,7 +1019,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   region: {
                     rightAscensionArc: { type: FULL }
                     declinationArc: {
-                      type: PARTIAL 
+                      type: PARTIAL
                       start: { degrees: 10 }
                       end: { degrees: 70 }
                     }

@@ -95,16 +95,15 @@ object GmosImagingService {
           gmos_amp_read_mode.opt ~
           gmos_amp_gain.opt      ~
           gmos_roi.opt           ~
-          text.opt
-        ).emap { case (((((mf, b), arm), ag), roi), spatialOffsets) =>
-          spatialOffsets match {
-            case Some(s) =>
-              OffsetsFormat.getOption(s) match {
-                case Some(offsets) => GmosImagingInput.Create.Common(mf, b, arm, ag, roi, Some(offsets)).asRight
-                case None => s"Could not parse '$s' as a spatial offsets list.".asLeft
-              }
-            case None =>
-              GmosImagingInput.Create.Common(mf, b, arm, ag, roi, None).asRight
+          text
+        ).emap { case (((((mf, b), arm), ag), roi), offsets) =>
+          if (offsets.isEmpty) {
+            GmosImagingInput.Create.Common(mf, b, arm, ag, roi, Nil).asRight
+          } else {
+            OffsetsFormat.getOption(offsets) match {
+              case Some(offs) => GmosImagingInput.Create.Common(mf, b, arm, ag, roi, offs).asRight
+              case None => s"Could not parse '$offsets' as a spatial offsets list.".asLeft
+            }
           }
         }
 
@@ -211,7 +210,7 @@ object GmosImagingService {
           img.c_amp_read_mode,
           img.c_amp_gain,
           img.c_roi,
-          img.c_spatial_offsets
+          img.c_offsets
         FROM #$viewName img
         INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
       """(Void) |+|
@@ -244,7 +243,7 @@ object GmosImagingService {
             ${gmos_amp_read_mode.opt},
             ${gmos_amp_gain.opt},
             ${gmos_roi.opt},
-            ${text.opt}
+            ${text}
           )"""(
             oid,
             common.explicitMultipleFiltersMode,
@@ -252,7 +251,7 @@ object GmosImagingService {
             common.explicitAmpReadMode,
             common.explicitAmpGain,
             common.explicitRoi,
-            common.formattedSpatialOffsets
+            common.formattedOffsets
           )
         }
 
@@ -269,7 +268,7 @@ object GmosImagingService {
               c_amp_read_mode,
               c_amp_gain,
               c_roi,
-              c_spatial_offsets
+              c_offsets
             ) VALUES """(Void) |+| modeValues |+| sql"""
             RETURNING c_observation_id
           ),
@@ -285,7 +284,7 @@ object GmosImagingService {
             c_filter
           ) VALUES """(Void) |+| filterValues
       } else {
-        sql"INSERT INTO #$modeTableName (c_observation_id, c_bin, c_amp_read_mode, c_amp_gain, c_roi, c_spatial_offsets) VALUES "(Void) |+| modeValues
+        sql"INSERT INTO #$modeTableName (c_observation_id, c_bin, c_amp_read_mode, c_amp_gain, c_roi, c_offsets) VALUES "(Void) |+| modeValues
       }
     }
 
@@ -376,7 +375,7 @@ object GmosImagingService {
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_spatial_offsets
+          c_offsets
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
@@ -385,7 +384,7 @@ object GmosImagingService {
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_spatial_offsets
+          c_offsets
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 
@@ -414,15 +413,14 @@ object GmosImagingService {
       val upAmpReadMode = sql"c_amp_read_mode = ${gmos_amp_read_mode.opt}"
       val upAmpGain = sql"c_amp_gain = ${gmos_amp_gain.opt}"
       val upRoi = sql"c_roi = ${gmos_roi.opt}"
-      val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
-
+      val upOffsets = sql"c_offsets = ${text}"
       List(
         input.explicitMultipleFiltersMode.toOptionOption.map(upMultipleFiltersMode),
         input.explicitBin.toOptionOption.map(upBin),
         input.explicitAmpReadMode.toOptionOption.map(upAmpReadMode),
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi),
-        input.formattedSpatialOffsets.toOptionOption.map(upSpatialOffsets)
+        upOffsets(input.formattedOffsets).some
       ).flatten
     }
 
