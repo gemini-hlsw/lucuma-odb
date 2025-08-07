@@ -703,7 +703,7 @@ class reference extends OdbSuite {
   test("setProposalReference SCI, yes proposal") {
     for {
       cid <- createCallForProposalsAs(staff, semester = sem2025B)
-      pid <- createProgramAs(pi)
+      pid <- createProgramWithNonPartnerPi(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)

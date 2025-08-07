@@ -109,7 +109,7 @@ class programs extends OdbSuite {
       pid  <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                    s.programService
+                    s.programService(emailConfig, httpClient)
                       .insertCalibrationProgram(
                         ProgramPropertiesInput.Create.Default.some,
                         CalibrationRole.Telluric,
