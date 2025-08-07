@@ -33,7 +33,7 @@ trait ArbGmosImagingInput:
         m <- arbitrary[Option[GmosAmpReadMode]]
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
-        s <- arbitrary[Option[List[Offset]]]
+        s <- arbitrary[List[Offset]]
       } yield GmosImagingInput.Create.Common(f, b, m, g, r, s)
     }
 
@@ -63,7 +63,7 @@ trait ArbGmosImagingInput:
         m <- arbitrary[Nullable[GmosAmpReadMode]]
         g <- arbitrary[Nullable[GmosAmpGain]]
         r <- arbitrary[Nullable[GmosRoi]]
-        s <- arbitrary[Nullable[List[Offset]]]
+        s <- arbitrary[List[Offset]]
       } yield GmosImagingInput.Edit.Common(f, b, m, g, r, s)
 
   given arbEditCommonN: Arbitrary[GmosImagingInput.Edit.North] =
