@@ -66,13 +66,7 @@ sealed trait Config[L: Enumerated]:
 
   def explicitRoi: Option[GmosRoi]
 
-  def spatialOffsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
-
-  def defaultSpatialOffsets: List[Offset] =
-    Config.DefaultSpatialOffsets
-
-  def explicitSpatialOffsets: Option[List[Offset]]
+  def offsets: List[Offset]
 
   def ccdMode: GmosCcdMode =
     GmosCcdMode(
@@ -92,7 +86,7 @@ sealed trait Config[L: Enumerated]:
     out.writeChars(ampGain.tag)
     out.writeChars(ampReadMode.tag)
     out.writeChars(roi.tag)
-    spatialOffsets.foreach { o =>
+    offsets.foreach { o =>
       out.writeLong(o.p.toAngle.toMicroarcseconds)
       out.writeLong(o.q.toAngle.toMicroarcseconds)
     }
@@ -109,7 +103,7 @@ object Config:
   private val DefaultRoi                 = GmosRoi.FullFrame
   private val DefaultAmpCount            = GmosAmpCount.Twelve
 
-  val DefaultSpatialOffsets: List[Offset] = Nil
+  val DefaultOffsets: List[Offset] = Nil
 
   case class GmosNorth private[imaging] (
     filters:                     NonEmptyList[GmosNorthFilter],
@@ -119,7 +113,7 @@ object Config:
     explicitAmpReadMode:         Option[GmosAmpReadMode],
     explicitAmpGain:             Option[GmosAmpGain],
     explicitRoi:                 Option[GmosRoi],
-    explicitSpatialOffsets:      Option[List[Offset]]
+    offsets:                     List[Offset]
   ) extends Config[GmosNorthFilter]
 
   object GmosNorth {
@@ -134,7 +128,7 @@ object Config:
       explicitAmpReadMode:         Option[GmosAmpReadMode]     = None,
       explicitAmpGain:             Option[GmosAmpGain]         = None,
       explicitRoi:                 Option[GmosRoi]             = None,
-      explicitSpatialOffsets:      Option[List[Offset]]        = None
+      offsets:                     List[Offset]                = Nil
     ): GmosNorth =
       val (x, _) = northBinning(sourceProfile, imageQuality.toImageQuality, sampling = sampling)
       GmosNorth(
@@ -145,7 +139,7 @@ object Config:
         explicitAmpReadMode,
         explicitAmpGain,
         explicitRoi,
-        explicitSpatialOffsets
+        offsets
       )
 
     def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
@@ -171,7 +165,7 @@ object Config:
         a.explicitAmpReadMode,
         a.explicitAmpGain,
         a.explicitRoi,
-        a.explicitSpatialOffsets
+        a.offsets
       )}
 
     given HashBytes[GmosNorth] = _.hashBytes
@@ -186,7 +180,7 @@ object Config:
     explicitAmpReadMode:         Option[GmosAmpReadMode],
     explicitAmpGain:             Option[GmosAmpGain],
     explicitRoi:                 Option[GmosRoi],
-    explicitSpatialOffsets: Option[List[Offset]]
+    offsets:                     List[Offset]
   ) extends Config[GmosSouthFilter]
 
   object GmosSouth {
@@ -201,7 +195,7 @@ object Config:
       explicitAmpReadMode:         Option[GmosAmpReadMode]     = None,
       explicitAmpGain:             Option[GmosAmpGain]         = None,
       explicitRoi:                 Option[GmosRoi]             = None,
-      explicitSpatialOffsets:      Option[List[Offset]]        = None
+      offsets:                     List[Offset]                = Nil
     ): GmosSouth =
       val (x, _) = southBinning(sourceProfile, imageQuality.toImageQuality, sampling = sampling)
       GmosSouth(
@@ -212,7 +206,7 @@ object Config:
         explicitAmpReadMode,
         explicitAmpGain,
         explicitRoi,
-        explicitSpatialOffsets
+        offsets
       )
 
     def reconcile(a: GmosSouth, modes: List[ObservingMode]): Option[GmosSouth] =
@@ -238,10 +232,9 @@ object Config:
         a.explicitAmpReadMode,
         a.explicitAmpGain,
         a.explicitRoi,
-        a.explicitSpatialOffsets
+        a.offsets
       )}
 
     given HashBytes[GmosSouth] = _.hashBytes
 
   }
-
