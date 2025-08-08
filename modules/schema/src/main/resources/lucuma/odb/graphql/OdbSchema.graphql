@@ -2070,6 +2070,11 @@ input GmosNorthImagingInput {
   filters: [GmosNorthFilter!]
 
   """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
+
+  """
   How sequences are generated when multiple filters are specified.
   Defaults to GROUPED.
   """
@@ -2094,11 +2099,6 @@ input GmosNorthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -2506,6 +2506,11 @@ input GmosSouthImagingInput {
   filters: [GmosSouthFilter!]
 
   """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
+
+  """
   How sequences are generated when multiple filters are specified.
   Defaults to GROUPED.
   """
@@ -2530,11 +2535,6 @@ input GmosSouthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -8600,6 +8600,11 @@ type GmosNorthImaging {
   initialFilters: [GmosNorthFilter!]!
 
   """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
+
+  """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
   from the defaultMultipleFiltersMode.
   """
@@ -8681,23 +8686,6 @@ type GmosNorthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -9195,6 +9183,11 @@ type GmosSouthImaging {
   initialFilters: [GmosSouthFilter!]!
 
   """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
+
+  """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
   from the defaultMultipleFiltersMode.
   """
@@ -9276,23 +9269,6 @@ type GmosSouthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
