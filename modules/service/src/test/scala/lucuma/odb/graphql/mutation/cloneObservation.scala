@@ -72,7 +72,7 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
-          offsets {
+          spatialOffsets {
             p { arcseconds }
             q { arcseconds }
           }
@@ -85,7 +85,7 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
-          offsets {
+          spatialOffsets {
             p { arcseconds }
             q { arcseconds }
           }
@@ -576,7 +576,7 @@ class cloneObservation extends OdbSuite {
                   originalObservation {
                     observingMode {
                       gmosNorthImaging {
-                        offsets {
+                        spatialOffsets {
                           p { arcseconds }
                           q { arcseconds }
                         }
@@ -586,7 +586,7 @@ class cloneObservation extends OdbSuite {
                   newObservation {
                     observingMode {
                       gmosNorthImaging {
-                        offsets {
+                        spatialOffsets {
                           p { arcseconds }
                           q { arcseconds }
                         }
@@ -603,7 +603,7 @@ class cloneObservation extends OdbSuite {
                     "originalObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "offsets": [
+                          "spatialOffsets": [
                             { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                             { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
                           ]
@@ -613,7 +613,7 @@ class cloneObservation extends OdbSuite {
                     "newObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "offsets": [
+                          "spatialOffsets": [
                             { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                             { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
                           ]
@@ -716,3 +716,4 @@ class cloneObservation extends OdbSuite {
     }
   }
 }
+
