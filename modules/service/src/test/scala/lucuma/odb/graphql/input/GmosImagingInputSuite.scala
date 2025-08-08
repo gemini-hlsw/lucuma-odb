@@ -33,7 +33,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
       explicitAmpReadMode = Some(GmosAmpReadMode.Slow),
       explicitAmpGain = Some(GmosAmpGain.Low),
       explicitRoi = Some(GmosRoi.FullFrame),
-      offsets = Nil
+      explicitSpatialOffsets = None
     )
 
     assertEquals(common.explicitMultipleFiltersMode, Some(MultipleFiltersMode.Interleaved))
@@ -52,7 +52,7 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
       explicitAmpReadMode = Nullable.NonNull(GmosAmpReadMode.Slow),
       explicitAmpGain = Nullable.Null,
       explicitRoi = Nullable.Absent,
-      offsets = List.empty
+      explicitSpatialOffsets = Nullable.Absent
     )
 
     val createCommon = editCommon.toCreate
@@ -96,8 +96,9 @@ class GmosImagingInputSuite extends DisciplineSuite with ArbitraryInstances :
       explicitAmpReadMode = None,
       explicitAmpGain = None,
       explicitRoi = None,
-      offsets = offsets
+      explicitSpatialOffsets = Some(offsets)
     )
 
-    assertEquals(common.formattedOffsets, "1.500000,2.000000")
+    assertEquals(common.formattedSpatialOffsets, Some("1.500000,2.000000"))
   }
+
