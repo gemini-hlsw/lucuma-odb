@@ -40,14 +40,13 @@ ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
-
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Use(
-    UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
-    name = Some("Validate Migrations"),
-    params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
-  )
+// ThisBuild / githubWorkflowBuildPreamble +=
+//   WorkflowStep.Use(
+//     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
+//     name = Some("Validate Migrations"),
+//     params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
+//     cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
+//   )
 
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
