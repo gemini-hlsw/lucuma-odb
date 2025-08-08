@@ -2319,7 +2319,7 @@ class createObservation extends OdbSuite {
                 observingMode: {
                   gmosNorthImaging: {
                     filters: [G_PRIME, R_PRIME]
-                    offsets: [
+                    explicitSpatialOffsets: [
                       { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
                       { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
                     ]
@@ -2331,7 +2331,15 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosNorthImaging {
                     filters
-                    offsets {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2347,10 +2355,15 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosNorthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "offsets": [
+                    "spatialOffsets": [
                       { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                       { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                    ]
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
+                      { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
+                    ],
+                    "defaultSpatialOffsets": []
                   }
                 }
               }
@@ -2382,7 +2395,7 @@ class createObservation extends OdbSuite {
                 observingMode: {
                   gmosSouthImaging: {
                     filters: [G_PRIME, R_PRIME]
-                    offsets: [
+                    explicitSpatialOffsets: [
                       { p: { arcseconds: "2.5" }, q: { arcseconds: "-1.5" } }
                     ]
                   }
@@ -2393,7 +2406,15 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosSouthImaging {
                     filters
-                    offsets {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2409,9 +2430,13 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosSouthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "offsets": [
+                    "spatialOffsets": [
                       { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
-                    ]
+                    ],
+                    "explicitSpatialOffsets": [
+                      { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
+                    ],
+                    "defaultSpatialOffsets": []
                   }
                 }
               }
@@ -2450,7 +2475,15 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    offsets {
+                    spatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    explicitSpatialOffsets {
+                      p { arcseconds }
+                      q { arcseconds }
+                    }
+                    defaultSpatialOffsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2465,7 +2498,9 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "offsets": []
+                    "spatialOffsets": [],
+                    "explicitSpatialOffsets": [],
+                    "defaultSpatialOffsets": []
                   }
                 }
               }
