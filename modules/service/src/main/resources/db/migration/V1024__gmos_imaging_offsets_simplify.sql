@@ -2,16 +2,16 @@
 ALTER TABLE t_gmos_north_imaging RENAME COLUMN c_spatial_offsets TO c_offsets;
 ALTER TABLE t_gmos_south_imaging RENAME COLUMN c_spatial_offsets TO c_offsets;
 
+ALTER TABLE t_gmos_north_imaging DROP CONSTRAINT north_imaging_spatial_offsets_format;
+ALTER TABLE t_gmos_south_imaging DROP CONSTRAINT south_imaging_spatial_offsets_format;
+
 UPDATE t_gmos_north_imaging SET c_offsets = '' WHERE c_offsets IS NULL;
 UPDATE t_gmos_south_imaging SET c_offsets = '' WHERE c_offsets IS NULL;
 
 ALTER TABLE t_gmos_north_imaging ALTER COLUMN c_offsets SET NOT NULL;
 ALTER TABLE t_gmos_south_imaging ALTER COLUMN c_offsets SET NOT NULL;
 
-ALTER TABLE t_gmos_north_imaging DROP CONSTRAINT north_imaging_spatial_offsets_format;
 ALTER TABLE t_gmos_north_imaging ADD CONSTRAINT north_imaging_offsets_format CHECK (c_offsets = '' OR c_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$');
-
-ALTER TABLE t_gmos_south_imaging DROP CONSTRAINT south_imaging_spatial_offsets_format;
 ALTER TABLE t_gmos_south_imaging ADD CONSTRAINT south_imaging_offsets_format CHECK (c_offsets = '' OR c_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$');
 
 -- crecreate the views
