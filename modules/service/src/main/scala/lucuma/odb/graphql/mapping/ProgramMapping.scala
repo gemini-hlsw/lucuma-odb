@@ -48,7 +48,7 @@ trait ProgramMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
      with ProgramNoteTable[F]
-     with ProgramUserTable[F]
+     with ProgramUserView[F]
      with ProposalView[F]
      with ObservationView[F]
      with AttachmentTable[F]
@@ -81,8 +81,8 @@ trait ProgramMapping[F[_]]
       SqlObject("reference",  Join(ProgramTable.Id, ProgramReferenceView.Id)),
 
       SqlField("proposalStatus", ProgramTable.ProposalStatus),
-      SqlObject("pi", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
-      SqlObject("users", Join(ProgramTable.Id, ProgramUserTable.ProgramId)),
+      SqlObject("pi", Join(ProgramTable.Id, ProgramUserView.ProgramId)),
+      SqlObject("users", Join(ProgramTable.Id, ProgramUserView.ProgramId)),
       SqlObject("observations"),
       SqlObject("configurationRequests"),
       SqlObject("proposal", Join(ProgramTable.Id, ProposalView.ProgramId)),

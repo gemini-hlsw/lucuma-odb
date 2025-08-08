@@ -1968,7 +1968,7 @@ trait DatabaseOperations { this: OdbSuite =>
     pid:         Program.Id,
     role:        ProgramUserRole   = ProgramUserRole.Coi,
     partnerLink: PartnerLink       = PartnerLink.HasPartner(Partner.US),
-    fallback:    UserProfile       = UserProfile.Empty,
+    preferred:   UserProfile       = UserProfile.Empty,
     education:   EducationalStatus = EducationalStatus.PhD,
     thesis:      Boolean           = false,
     gender:      Gender            = Gender.NotSpecified
@@ -1991,11 +1991,11 @@ trait DatabaseOperations { this: OdbSuite =>
                       case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                   }
                 }
-                fallbackProfile: {
-                  givenName: ${fallback.givenName.strOrNull}
-                  familyName: ${fallback.familyName.strOrNull}
-                  creditName: ${fallback.creditName.strOrNull}
-                  email: ${fallback.email.strOrNull}
+                preferredProfile: {
+                  givenName: ${preferred.givenName.strOrNull}
+                  familyName: ${preferred.familyName.strOrNull}
+                  creditName: ${preferred.creditName.strOrNull}
+                  email: ${preferred.email.strOrNull}
                 }
                 educationalStatus: ${education.tag.toScreamingSnakeCase}
                 thesis: $thesis
@@ -2016,9 +2016,9 @@ trait DatabaseOperations { this: OdbSuite =>
     partnerLink: PartnerLink, 
     email: Option[NonEmptyString] = defaultPiEmail.some
   ): IO[Unit] =
-    val fallback = email.foldMap(e =>
+    val preferred = email.foldMap(e =>
       s"""
-        fallbackProfile: {
+        preferredProfile: {
           email: "$e"
         }
       """
@@ -2041,7 +2041,7 @@ trait DatabaseOperations { this: OdbSuite =>
                     case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
-              $fallback
+              $preferred
             }
           }) {
             programUsers { id }
