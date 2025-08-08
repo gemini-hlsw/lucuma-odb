@@ -24,13 +24,13 @@ import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.PartnerSplitTable
-import lucuma.odb.graphql.table.ProgramUserTable
+import lucuma.odb.graphql.table.ProgramUserView
 import lucuma.odb.graphql.table.ProposalView
 
 trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
                                    with Predicates[F]
                                    with PartnerSplitTable[F]
-                                   with ProgramUserTable[F]
+                                   with ProgramUserView[F]
                                    with ProposalView[F] {
 
   lazy val ProposalTypeMapping: ObjectMapping =
@@ -98,8 +98,8 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
       SqlField("toOActivation",   ProposalView.TooActivation),
       SqlField("minPercentTime",  ProposalView.MinPercent),
-      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserTable.ProgramUserId)),
-      SqlObject("mentor",         Join(ProposalView.FastTurnaround.MentorId, ProgramUserTable.ProgramUserId))
+      SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserView.ProgramUserId)),
+      SqlObject("mentor",         Join(ProposalView.FastTurnaround.MentorId, ProgramUserView.ProgramUserId))
     )
 
   lazy val LargeProgramMapping: ObjectMapping =
