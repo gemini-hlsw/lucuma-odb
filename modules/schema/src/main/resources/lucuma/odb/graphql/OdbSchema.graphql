@@ -3681,10 +3681,9 @@ input ProgramUserPropertiesInput {
   partnerLink: PartnerLinkInput
 
   """
-  The fallback profile may used when the ORCiD user profile is not set or not
-  shared publicly.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfileInput
+  preferredProfile: UserProfileInput
 
   "The user's educational status."
   educationalStatus: EducationalStatus
@@ -3748,10 +3747,9 @@ type ProgramUser {
   partnerLink: PartnerLink!
 
   """
-  Profile information reported when the corresponding ORCiD profile is not set
-  or is not public.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfile!
+  preferredProfile: UserProfile!
 
   "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
@@ -3770,6 +3768,18 @@ type ProgramUser {
 
   "Has access to data."
   hasDataAccess: Boolean!
+
+  """
+  Name created preferentially from the fields of the preferred profile, falling back
+  to the Orcid profile if the preferred fields are not set.
+  """
+  displayName: String
+
+  """
+  The user's email address from the preferred profile, falling back to the Orcid profile
+  if the preferred email is not set.
+  """
+  email: String
 }
 
 """
@@ -16778,9 +16788,9 @@ input WhereProgramUser {
   partnerLink: WherePartnerLink
 
   """
-  Matches the fallback profile.
+  Matches the preferred profile.
   """
-  fallbackProfile: WhereUserProfile
+  preferredProfile: WhereUserProfile
 
   """
   Matches the educational status.

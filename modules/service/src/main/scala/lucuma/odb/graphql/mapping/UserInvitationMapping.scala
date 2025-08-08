@@ -10,7 +10,7 @@ import table.*
 
 trait UserInvitationMapping[F[_]]
   extends ProgramTable[F]
-  with ProgramUserTable[F]
+  with ProgramUserView[F]
   with UserTable[F]
   with UserInvitationTable[F]
   with EmailTable[F]:
@@ -21,6 +21,6 @@ trait UserInvitationMapping[F[_]]
       SqlField("status", UserInvitationTable.Status),
       SqlObject("issuer", Join(UserInvitationTable.IssuerId, UserTable.UserId)),
       SqlField("recipientEmail", UserInvitationTable.RecipientEmail),
-      SqlObject("programUser", Join(UserInvitationTable.ProgramUserId, ProgramUserTable.ProgramUserId)),
+      SqlObject("programUser", Join(UserInvitationTable.ProgramUserId, ProgramUserView.ProgramUserId)),
       SqlObject("email", Join(UserInvitationTable.EmailId, EmailTable.EmailId))
     )

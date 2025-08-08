@@ -17,7 +17,7 @@ import monocle.Lens
 
 case class ProgramUserPropertiesInput(
   partnerLink:       Option[PartnerLink],
-  fallbackProfile:   Nullable[UserProfileInput],
+  preferredProfile:   Nullable[UserProfileInput],
   educationalStatus: Nullable[EducationalStatus],
   thesis:            Nullable[Boolean],
   gender:            Nullable[Gender],
@@ -45,10 +45,10 @@ object ProgramUserPropertiesInput:
     ObjectFieldsBinding.rmap:
       case List(
         PartnerLinkInput.Binding.Option("partnerLink", rPartnerLink),
-        UserProfileInput.Binding.Nullable("fallbackProfile", rFallbackProfile),
+        UserProfileInput.Binding.Nullable("preferredProfile", rPreferredProfile),
         EducationalStatusBinding.Nullable("educationalStatus", rEducationalStatus),
         BooleanBinding.Nullable("thesis", rThesis),
         GenderBinding.Nullable("gender", rGender),
         NonEmptyStringBinding.Nullable("affiliation", rAffiliation),
         BooleanBinding.Option("hasDataAccess", rDataAccess)
-      ) => (rPartnerLink, rFallbackProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)
+      ) => (rPartnerLink, rPreferredProfile, rEducationalStatus, rThesis, rGender, rAffiliation, rDataAccess).parMapN(ProgramUserPropertiesInput.apply)

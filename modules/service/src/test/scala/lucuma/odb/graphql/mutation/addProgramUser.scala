@@ -49,7 +49,7 @@ class addProgramUser extends OdbSuite:
                 role: COI
                 SET: {
                   partnerLink: { partner: CA }
-                  fallbackProfile: {
+                  preferredProfile: {
                     givenName: "Gavrilo"
                     familyName: "Princip"
                     creditName: "Гаврило Принцип"
@@ -69,7 +69,7 @@ class addProgramUser extends OdbSuite:
                     partner
                   }
                 }
-                fallbackProfile {
+                preferredProfile {
                   givenName
                   familyName
                   creditName
@@ -92,7 +92,7 @@ class addProgramUser extends OdbSuite:
                   "linkType": "HAS_PARTNER",
                   "partner": "CA"
                 },
-                "fallbackProfile": {
+                "preferredProfile": {
                   "givenName": "Gavrilo",
                   "familyName": "Princip",
                   "creditName": "Гаврило Принцип",

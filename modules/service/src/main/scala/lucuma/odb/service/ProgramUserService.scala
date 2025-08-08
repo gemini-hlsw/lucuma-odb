@@ -75,7 +75,7 @@ trait ProgramUserService[F[_]]:
   )(using Transaction[F]): F[Result[ProgramUser.Id]]
 
   /**
-   * Updates program user properties such as fallback profile, thesis and
+   * Updates program user properties such as preferred profile, thesis and
    * gender.
    *
    * @param SET property edits to apply
@@ -629,10 +629,10 @@ object ProgramUserService:
 
       val alias = "o"
 
-      val upGivenName         = sql"c_fallback_given_name  = ${varchar.opt}"
-      val upFamilyName        = sql"c_fallback_family_name = ${varchar.opt}"
-      val upCreditName        = sql"c_fallback_credit_name = ${varchar.opt}"
-      val upEmail             = sql"c_fallback_email       = ${varchar.opt}"
+      val upGivenName         = sql"c_preferred_given_name  = ${varchar.opt}"
+      val upFamilyName        = sql"c_preferred_family_name = ${varchar.opt}"
+      val upCreditName        = sql"c_preferred_credit_name = ${varchar.opt}"
+      val upEmail             = sql"c_preferred_email       = ${varchar.opt}"
 
       val upEducationalStatus = sql"c_educational_status   = ${educational_status.opt}"
       val upThesis            = sql"c_thesis               = ${bool.opt}"
@@ -642,10 +642,10 @@ object ProgramUserService:
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
-          SET.fallbackProfile.flatMap(_.givenName).foldPresent(upGivenName),
-          SET.fallbackProfile.flatMap(_.familyName).foldPresent(upFamilyName),
-          SET.fallbackProfile.flatMap(_.creditName).foldPresent(upCreditName),
-          SET.fallbackProfile.flatMap(_.email).foldPresent(upEmail),
+          SET.preferredProfile.flatMap(_.givenName).foldPresent(upGivenName),
+          SET.preferredProfile.flatMap(_.familyName).foldPresent(upFamilyName),
+          SET.preferredProfile.flatMap(_.creditName).foldPresent(upCreditName),
+          SET.preferredProfile.flatMap(_.email).foldPresent(upEmail),
           SET.educationalStatus.foldPresent(upEducationalStatus),
           SET.thesis.foldPresent(upThesis),
           SET.gender.foldPresent(upGender),
