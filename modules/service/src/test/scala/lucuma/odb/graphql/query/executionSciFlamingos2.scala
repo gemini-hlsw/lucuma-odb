@@ -248,7 +248,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   {
                     p: { arcseconds:  60 }
                     q: { arcseconds:   0 }

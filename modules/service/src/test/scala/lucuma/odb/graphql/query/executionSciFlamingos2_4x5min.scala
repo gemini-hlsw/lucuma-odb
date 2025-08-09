@@ -38,7 +38,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   {
                     p: { arcseconds: 60 }
                     q: { arcseconds:  0 }
@@ -99,7 +99,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   {
                     p: { arcseconds: 300 }
                     q: { arcseconds:  55 }

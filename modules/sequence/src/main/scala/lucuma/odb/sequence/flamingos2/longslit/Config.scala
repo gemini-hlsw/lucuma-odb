@@ -44,7 +44,7 @@ case class Config private[longslit](
   def readoutMode: Flamingos2ReadoutMode =
     explicitReadoutMode.getOrElse(defaultReadoutMode)
 
-  def spatialOffsets: List[Offset] =
+  def offsets: List[Offset] =
     explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
 
   def hashBytes: Array[Byte] = {

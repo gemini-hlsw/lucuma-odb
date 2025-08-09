@@ -594,22 +594,22 @@ trait DatabaseOperations { this: OdbSuite =>
   def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createGmosNorthImagingObservationAs(user, pid, None, tids*)
 
-  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, spatialOffsets, tids*)
+  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, offsets, tids*)
 
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createGmosSouthImagingObservationAs(user, pid, None, tids*)
 
-  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, spatialOffsets, tids*)
+  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, offsets, tids*)
 
   def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createFlamingos2LongSlitObservationAs(user, pid, None, tids*)
 
-  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, spatialOffsets, tids*)
+  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, offsets, tids*)
 
-  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, spatialOffsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -622,7 +622,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   asterism: ${tids.asJson}
                 }
                 scienceRequirements: ${scienceRequirementsObject(observingMode)}
-                observingMode: ${observingModeWithSpatialOffsets(observingMode, spatialOffsets)}
+                observingMode: ${observingModeWithSpatialOffsets(observingMode, offsets)}
               }
             }) {
               observation {
@@ -824,10 +824,10 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
 
-  private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
+  private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
       case ObservingModeType.GmosNorthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", offsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -835,7 +835,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", offsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -843,7 +843,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
         s"""{
           flamingos2LongSlit: {
             disperser: R1200_HK
@@ -2013,7 +2013,7 @@ trait DatabaseOperations { this: OdbSuite =>
   def updateProgramUserAs(
     user:       User,
     puid:       ProgramUser.Id,
-    partnerLink: PartnerLink, 
+    partnerLink: PartnerLink,
     email: Option[NonEmptyString] = defaultPiEmail.some
   ): IO[Unit] =
     val preferred = email.foldMap(e =>
@@ -2185,13 +2185,13 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(query).use(_.stream(address, chunkSize = 1024).compile.toList))
   }
 
-  def ensureNoEmailsForAddress(address: NonEmptyString): IO[Unit] = 
+  def ensureNoEmailsForAddress(address: NonEmptyString): IO[Unit] =
     getEmailStatusesByAddress(address).flatMap: es =>
       es match
         case Nil => IO.unit
         case _   => IO.raiseError(new Exception(s"Emails found for address $address"))
 
-  def ensureSomeQueuedEmailsForAddress(address: NonEmptyString, count: Int): IO[Unit] = 
+  def ensureSomeQueuedEmailsForAddress(address: NonEmptyString, count: Int): IO[Unit] =
     getEmailStatusesByAddress(address).flatMap: es =>
       val queued = es.count(_ == EmailStatus.Queued)
       if queued =!= count then

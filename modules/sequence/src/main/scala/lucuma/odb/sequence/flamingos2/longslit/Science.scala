@@ -193,11 +193,11 @@ object Science:
     ): EitherT[F, String, StepDefinition] =
       for
         p <- EitherT.fromEither:
-               config.spatialOffsets match
+               config.offsets match
                  case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1).asRight
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
-                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.spatialOffsets.size} provided).".asLeft
+                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.offsets.size} provided).".asLeft
         d <- p.expand(expander)
       yield d
 

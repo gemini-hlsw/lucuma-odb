@@ -1906,7 +1906,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          explicitSpatialOffsets: [
+          explicitOffsets: [
             { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
@@ -1924,7 +1924,7 @@ class updateObservations extends OdbSuite
             disperser
             filter
             fpu
-            spatialOffsets {
+            offsets {
               p {
                 arcseconds
               }
@@ -1932,7 +1932,7 @@ class updateObservations extends OdbSuite
                 arcseconds
               }
             }
-            explicitSpatialOffsets {
+            explicitOffsets {
               p {
                 arcseconds
               }
@@ -1940,7 +1940,7 @@ class updateObservations extends OdbSuite
                 arcseconds
               }
             }
-            defaultSpatialOffsets {
+            defaultOffsets {
               p {
                 arcseconds
               }
@@ -1964,19 +1964,19 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
                   ],
-                  "explicitSpatialOffsets": [
+                  "explicitOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
                   ],
-                  "defaultSpatialOffsets": [
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -1993,7 +1993,7 @@ class updateObservations extends OdbSuite
     val update1 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitSpatialOffsets: [
+          explicitOffsets: [
             { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } },
@@ -2014,19 +2014,19 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
-                  "explicitSpatialOffsets": [
+                  "explicitOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
-                  "defaultSpatialOffsets": [
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -2043,7 +2043,7 @@ class updateObservations extends OdbSuite
     val update2 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitSpatialOffsets: null
+          explicitOffsets: null
         }
       }
     """
@@ -2059,14 +2059,14 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
                   ],
-                  "explicitSpatialOffsets": null,
-                  "defaultSpatialOffsets": [
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -3649,7 +3649,7 @@ class updateObservations extends OdbSuite
                     disperser: R1200_HK
                     filter: Y
                     fpu: LONG_SLIT_2
-                    explicitSpatialOffsets: [
+                    explicitOffsets: [
                       { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
                       { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
                     ]
@@ -3663,7 +3663,7 @@ class updateObservations extends OdbSuite
               observations {
                 observingMode {
                   flamingos2LongSlit {
-                    spatialOffsets {
+                    offsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -3690,7 +3690,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  explicitSpatialOffsets: [
+                  explicitOffsets: [
                     { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
                     { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
                     { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } },
@@ -3713,7 +3713,7 @@ class updateObservations extends OdbSuite
             SET: {
               observingMode: {
                 flamingos2LongSlit: {
-                  explicitSpatialOffsets: null
+                  explicitOffsets: null
                 }
               }
             }
@@ -3724,7 +3724,7 @@ class updateObservations extends OdbSuite
             observations {
               observingMode {
                 flamingos2LongSlit {
-                  spatialOffsets {
+                  offsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
@@ -3736,7 +3736,7 @@ class updateObservations extends OdbSuite
       """)
     } yield ()
 
-  test("[flamingos2] updateObservations with custom explicitSpatialOffsets"):
+  test("[flamingos2] updateObservations with custom explicitOffsets"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -3749,7 +3749,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  explicitSpatialOffsets: [
+                  explicitOffsets: [
                     { p: { arcseconds: 1.0 }, q: { arcseconds: -3.0 } },
                     { p: { arcseconds: 2.0 }, q: { arcseconds:  4.0 } },
                     { p: { arcseconds: -1.5 }, q: { arcseconds: 2.5 } },
@@ -3766,15 +3766,15 @@ class updateObservations extends OdbSuite
               observingMode {
                 flamingos2LongSlit {
                   disperser
-                  spatialOffsets {
+                  offsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  explicitSpatialOffsets {
+                  explicitOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  defaultSpatialOffsets {
+                  defaultOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
@@ -3791,19 +3791,19 @@ class updateObservations extends OdbSuite
                 "observingMode": {
                   "flamingos2LongSlit": {
                     "disperser": "R1200_HK",
-                    "spatialOffsets": [
+                    "offsets": [
                       { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
                       { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
                       { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
                       { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
                     ],
-                    "explicitSpatialOffsets": [
+                    "explicitOffsets": [
                       { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
                       { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
                       { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
                       { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
                     ],
-                    "defaultSpatialOffsets": [
+                    "defaultOffsets": [
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
