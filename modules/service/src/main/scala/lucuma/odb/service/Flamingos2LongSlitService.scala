@@ -57,12 +57,12 @@ object Flamingos2LongSlitService:
          flamingos_2_decker.opt       *:
          flamingos_2_readout_mode.opt *:
          text.opt
-        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsetsText) =>
-          spatialOffsetsText
+        ).emap { case (disperser, filter, fpu, readMode, reads, decker, readoutMode, offsetsText) =>
+          offsetsText
             .traverse: so =>
-              OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as a spatial offsets list.")
-            .map: spatialOffsets =>
-              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, spatialOffsets)
+              OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as an offsets list.")
+            .map: offsets =>
+              Config(disperser, filter, fpu, readMode, reads, decker, readoutMode, offsets)
         }
 
       override def select(
@@ -105,7 +105,7 @@ object Flamingos2LongSlitService:
           ls.c_reads,
           ls.c_decker,
           ls.c_readout_mode,
-          ls.c_spatial_offsets
+          ls.c_offsets
         FROM
           t_flamingos_2_long_slit ls
         INNER JOIN t_observation ob ON ls.c_observation_id = ob.c_observation_id
@@ -141,7 +141,7 @@ object Flamingos2LongSlitService:
           C_reads,
           c_decker,
           c_readout_mode,
-          c_spatial_offsets,
+          c_offsets,
           c_initial_disperser,
           c_initial_filter,
           c_initial_fpu
@@ -177,7 +177,7 @@ object Flamingos2LongSlitService:
         input.explicitReads          ,
         input.explicitDecker         ,
         input.explicitReadoutMode    ,
-        input.formattedSpatialOffsets,
+        input.formattedOffsets,
         input.disperser              ,
         input.filter                 ,
         input.fpu                    ,
@@ -198,7 +198,7 @@ object Flamingos2LongSlitService:
       val upReads          = sql"c_reads           = ${flamingos_2_reads.opt}"
       val upDecker         = sql"c_decker          = ${flamingos_2_decker.opt}"
       val upReadoutMode    = sql"c_readout_mode    = ${flamingos_2_readout_mode.opt}"
-      val upSpatialOffsets = sql"c_spatial_offsets = ${text.opt}"
+      val upOffsets        = sql"c_offsets = ${text.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -209,7 +209,7 @@ object Flamingos2LongSlitService:
           input.explicitReads.toOptionOption.map(upReads),
           input.explicitDecker.toOptionOption.map(upDecker),
           input.explicitReadoutMode.toOptionOption.map(upReadoutMode),
-          input.formattedSpatialOffsets.toOptionOption.map(upSpatialOffsets)
+          input.formattedOffsets.toOptionOption.map(upOffsets)
         ).flatten
 
       NonEmptyList.fromList(ups)
@@ -242,7 +242,7 @@ object Flamingos2LongSlitService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_spatial_offsets,
+        c_offsets,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu
@@ -260,7 +260,7 @@ object Flamingos2LongSlitService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_spatial_offsets,
+        c_offsets,
         c_initial_disperser,
         c_initial_filter,
         c_initial_fpu
