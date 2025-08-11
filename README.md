@@ -47,16 +47,16 @@ supply optional arguments to simplify development though:
 
 * `--reset` - Drops then creates the database for you. Do this after cycling
 `docker-compose` `down`, `up` to give flyway a chance to run the migration and
-update its schema table. 
-* `--skip-migration` - Skips the database migration.  This assumes that the 
+update its schema table.
+* `--skip-migration` - Skips the database migration.  This assumes that the
 database has been initialized already.  Usually this won't be necessary since
-flyway already skips migrations that have previously run. 
+flyway already skips migrations that have previously run.
 
 ## S3/Cloudcube
-We are using the Cloudcube heroku addon for accessing S3. In Heroku, the addon sets 
+We are using the Cloudcube heroku addon for accessing S3. In Heroku, the addon sets
 the environment variables for us. However, when running locally these are what needs
-to be set. If you want to actually upload/download attachments, you can get the 
-real values from the staging app in Heroku. Otherwise, you can use these as 
+to be set. If you want to actually upload/download attachments, you can get the
+real values from the staging app in Heroku. Otherwise, you can use these as
 dummy values
 
 - CLOUDCUBE_ACCESS_KEY_ID = <Any string>
@@ -112,17 +112,16 @@ then
 
 6. Use `psql` to restore the database.
 ```
-psql -h localhost -U jimmy -d lucuma-odb -f ~/dump.sql 
+psql -h localhost -U jimmy -d lucuma-odb -f ~/dump.sql
 ```
 At this point the database is running locally with the data as it exists in main and any new
 migrations are ready to run when the application starts.
 
 7. Start the application in `sbt`.  This will cause the new migration to run and any errors
-will be revealed. 
+will be revealed.
 ```
 service/reStart
 ```
-
 
 ## Mailgun
 
@@ -133,7 +132,7 @@ If you need to install Mailgun in a new app, you can do so via:
 `heroku addons:create mailgun:Starter --app <APP NAME>`
 
 The addon manages the mailgun users so that anyone with access to the app on heroku can go to
-the mailgun dashboard by clicking on `Mailgun` in the app resources. It also sets some of the 
+the mailgun dashboard by clicking on `Mailgun` in the app resources. It also sets some of the
 required config variables. However, some will need to be added/updated as described below.
 
 The setup a custom domain in mailgun, go to the mailgun dashboard and navigate to `Sending > Domains`,
@@ -165,3 +164,12 @@ loading the configuration. Here is the complete list with some example values.
 - EXPLORE_URL=https://explore-dev.lucuma.xyz
 
 Mailgun sets other variables in the Heroku app, but they are for things we are not using.
+
+## SOPS Setup for Nix Users
+
+If using Nix flake for development, secrets are managed via SOPS:
+
+1. **Get team key**: Obtain `odb-keys.txt` from team lead (see `KEY_DISTRIBUTION.md`)
+2. **run direnv**: Run `direnv allow`
+3. **Git hook** (recommended): Run `cp .githooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit` to prevent accidental key commits
+
