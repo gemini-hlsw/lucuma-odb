@@ -1543,6 +1543,16 @@ class createObservation extends OdbSuite {
                 defaultWavelengthDithers {
                   nanometers
                 }
+                offsets {
+                  arcseconds
+                }
+                explicitOffsets {
+                  microarcseconds
+                  arcseconds
+                }
+                defaultOffsets {
+                  arcseconds
+                }
                 spatialOffsets {
                   arcseconds
                 }
@@ -1583,10 +1593,7 @@ class createObservation extends OdbSuite {
            longSlit.downIO[GmosRoi]("defaultRoi"),
            IO(longSlit.downField("wavelengthDithers").values.toList.flatMap(_.toList)),
            IO(longSlit.downField("explicitWavelengthDithers").values.map(_.toList)),
-           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
-           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList))
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
@@ -1619,6 +1626,33 @@ class createObservation extends OdbSuite {
              json"""{ "nanometers": 0.000 }""",
              json"""{ "nanometers": 5.000 }""",
              json"""{ "nanometers": -5.000 }"""
+           ),
+          )
+        ) *>
+        assertIO(
+          (IO(longSlit.downField("offsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+          ).tupled,
+          (List(
+             json"""{ "arcseconds": -10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds": -10.000000}"""
+           ),
+           Some(List(
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }"""
+           )),
+           List(
+             json"""{ "arcseconds":  0.000000}""",
+             json"""{ "arcseconds": 15.000000}""",
+             json"""{ "arcseconds": -15.000000}"""
            ),
            List(
              json"""{ "arcseconds": -10.000000}""",

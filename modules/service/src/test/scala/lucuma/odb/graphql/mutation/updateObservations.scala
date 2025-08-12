@@ -2141,7 +2141,16 @@ class updateObservations extends OdbSuite
             explicitWavelengthDithers {
               picometers
             }
+            explicitOffsets {
+              arcseconds
+            }
             explicitSpatialOffsets {
+              arcseconds
+            }
+            offsets {
+              arcseconds
+            }
+            spatialOffsets {
               arcseconds
             }
           }
@@ -2175,7 +2184,25 @@ class updateObservations extends OdbSuite
                     { "picometers":  7100 },
                     { "picometers": -7500 }
                   ],
+                  "explicitOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
                   "explicitSpatialOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
+                  "spatialOffsets": [
                     { "arcseconds": -10.000000 },
                     { "arcseconds":  10.000000 },
                     { "arcseconds":  10.000000 },
@@ -2241,7 +2268,25 @@ class updateObservations extends OdbSuite
                     { "picometers": -10000 },
                     { "picometers":  10000 }
                   ],
+                  "explicitOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
                   "explicitSpatialOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
+                  "spatialOffsets": [
                     { "arcseconds": -2.000000 },
                     { "arcseconds":  2.000000 },
                     { "arcseconds":  2.000000 },
@@ -3817,6 +3862,81 @@ class updateObservations extends OdbSuite
         }
       """.asRight)
     } yield ()
+
+  test("field precedence: new offset fields take priority over deprecated ones"):
+
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 500
+          }
+          explicitSpatialOffsets: [
+            { arcseconds: 100.0 },
+            { arcseconds: 200.0 }
+          ]
+          explicitOffsets: [
+            { arcseconds: 1.0 },
+            { arcseconds: 2.0 },
+            { arcseconds: 3.0 }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            explicitOffsets { arcseconds }
+            explicitSpatialOffsets { arcseconds }
+            offsets { arcseconds }
+            spatialOffsets { arcseconds }
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "explicitOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "spatialOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    oneUpdateTest(pi, update, query, expected, Some(ObservingModeType.GmosNorthLongSlit))
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

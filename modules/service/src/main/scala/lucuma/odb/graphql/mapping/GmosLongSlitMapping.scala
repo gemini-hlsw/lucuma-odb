@@ -67,14 +67,41 @@ trait GmosLongSlitMapping[F[_]]
         List("wavelengthDithersString")
       )
 
+    val offsetsString: FieldMapping =
+      SqlField("offsetsString", cc.Offsets, hidden = true)
+
+    val offsets: FieldMapping =
+      CursorFieldJson("offsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.getOrElse(defaultSpatialOffsetsJson)),
+        List("explicitOffsets", "defaultOffsets")
+      )
+
+    val explicitOffsets: FieldMapping =
+      CursorFieldJson("explicitOffsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.asJson),
+        List("offsetsString")
+      )
+
+    val defaultOffsets: FieldMapping =
+      CursorFieldJson("defaultOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+
+    // Deprecated spatial offsets fields - these map to the same data as the new offsets fields
     val spatialOffsetsString: FieldMapping =
-      SqlField("spatialOffsetsString", cc.SpatialOffsets, hidden = true)
+      SqlField("spatialOffsetsString", cc.Offsets, hidden = true)
 
     val spatialOffsets: FieldMapping =
       CursorFieldJson("spatialOffsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
+            .field("offsetsString", None)
             .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
             .map(_.getOrElse(defaultSpatialOffsetsJson)),
         List("explicitSpatialOffsets", "defaultSpatialOffsets")
@@ -84,9 +111,10 @@ trait GmosLongSlitMapping[F[_]]
       CursorFieldJson("explicitSpatialOffsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets).asJson)),
-        List("spatialOffsetsString")
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.asJson),
+        List("offsetsString")
       )
 
     val defaultSpatialOffsets: FieldMapping =
@@ -168,7 +196,15 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // spatialOffsets
+      // offsets
+      // ---------------------
+      common.offsetsString,
+      common.offsets,
+      common.explicitOffsets,
+      common.defaultOffsets,
+
+      // ---------------------
+      // spatialOffsets (deprecated)
       // ---------------------
       common.spatialOffsetsString,
       common.spatialOffsets,
@@ -263,7 +299,15 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // spatialOffsets
+      // offsets
+      // ---------------------
+      common.offsetsString,
+      common.offsets,
+      common.explicitOffsets,
+      common.defaultOffsets,
+
+      // ---------------------
+      // spatialOffsets (deprecated)
       // ---------------------
       common.spatialOffsetsString,
       common.spatialOffsets,
