@@ -20,7 +20,6 @@
         # SOPS secrets
         secretValues = {
           DATABASE_URL = "postgres://user:SOPS_ENCRYPTED_PASSWORD@localhost:5432/lucuma-odb";
-          ODB_HONEYCOMB_WRITE_KEY = "SOPS_ENCRYPTED_HONEYCOMB_KEY";
           ODB_SERVICE_JWT = "SOPS_ENCRYPTED_JWT_TOKEN";
           CLOUDCUBE_ACCESS_KEY_ID = "SOPS_ENCRYPTED_CLOUDCUBE_ACCESS_KEY_ID";
           CLOUDCUBE_SECRET_ACCESS_KEY = "SOPS_ENCRYPTED_CLOUDCUBE_SECRET";
@@ -117,7 +116,11 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
             }
             {
               name = "ODB_HONEYCOMB_WRITE_KEY";
-              value = secretValues.ODB_HONEYCOMB_WRITE_KEY;
+              value = "";
+            }
+            {
+              name = "ODB_HONEYCOMB_DATASET";
+              value = "";
             }
             {
               name = "ODB_SERVICE_JWT";
