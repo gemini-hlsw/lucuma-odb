@@ -6,7 +6,9 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.order.*
 import cats.syntax.show.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -487,3 +489,32 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
           }
         """.asRight
       )
+
+  test("can read timestamp"):
+    currentTimestamp.flatMap: t =>
+      setup(8).flatMap: did =>
+        val timestamps = query(
+          staff,
+          s"""
+            query {
+              datasetChronicleEntries(WHERE: {
+                dataset: { EQ: "$did" }
+                modQaState: { EQ: true }
+              }) {
+                matches { timestamp }
+              }
+            }
+          """
+        ).flatMap: js =>
+          js.hcursor
+            .downFields("datasetChronicleEntries", "matches")
+            .values
+            .toList
+            .flatten
+            .traverse: js =>
+               js.hcursor.downField("timestamp").as[Timestamp]
+            .leftMap(f => new RuntimeException(f.message))
+            .liftTo[IO]
+            .map(_.map(_ > t)) // don't know the precise timestamp, but it should be readable and > than t
+
+        assertIO(timestamps, List(true))
