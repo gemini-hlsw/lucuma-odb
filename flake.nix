@@ -108,7 +108,7 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
             }
             {
               name = "MAILGUN_DOMAIN";
-              value = "lucuma.xyz";
+              value = "odb-dev.lucuma.xyz";
             }
             {
               name = "DATABASE_URL";
