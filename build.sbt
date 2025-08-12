@@ -164,6 +164,7 @@ lazy val service = project
       "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
+      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,
