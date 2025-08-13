@@ -34,9 +34,8 @@ import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
-import natchez.EntryPoint
+import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import org.http4s.Credentials
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
@@ -91,6 +90,7 @@ object CalcMain extends MainParams:
             |Max Connections: ${config.database.maxObscalcConnections}
             |Poll Period....: ${config.obscalcPoll}
             |PID............: ${ProcessHandle.current.pid}
+            |Tracing........: ${LucumaEntryPoint.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
@@ -112,13 +112,6 @@ object CalcMain extends MainParams:
       // debug    = true,
     )
 
-  /** A resource that yields a Natchez tracing entry point. */
-  def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
-    Honeycomb.entryPoint(ServiceName): cb =>
-      Sync[F].delay:
-        cb.setWriteKey(config.honeycomb.writeKey)
-        cb.setDataset(config.honeycomb.dataset)
-        cb.build()
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[User] =
     c.ssoClient
@@ -230,7 +223,7 @@ object CalcMain extends MainParams:
     for
       c     <- Resource.eval(Config.fromCiris.load[F])
       _     <- Resource.eval(banner[F](c))
-      ep    <- entryPointResource(c)
+      ep    <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       pool  <- databasePoolResource[F](c.database)
       enums <- Resource.eval(pool.use(Enums.load))
 
