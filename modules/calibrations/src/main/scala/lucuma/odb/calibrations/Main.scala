@@ -26,9 +26,8 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
-import natchez.EntryPoint
+import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import org.http4s.Credentials
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -83,17 +82,17 @@ object CalibrationsMain extends CommandIOApp(
 object CMain extends MainParams {
 
   /** A startup action that prints a banner. */
-  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
+  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
     val banner =
         s"""|
             |$Header
             |
             |CommitHash. : ${config.commitHash.format}
             |PID         : ${ProcessHandle.current.pid}
+            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
-  }
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Network: Console](
@@ -113,16 +112,6 @@ object CMain extends MainParams {
     )
   }
 
-
-  /** A resource that yields a Natchez tracing entry point. */
-  def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
-    Honeycomb.entryPoint(ServiceName) { cb =>
-      Sync[F].delay {
-        cb.setWriteKey(config.honeycomb.writeKey)
-        cb.setDataset(config.honeycomb.dataset)
-        cb.build()
-      }
-    }
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
@@ -195,7 +184,7 @@ object CMain extends MainParams {
     for {
       c           <- Resource.eval(Config.fromCiris.load[F])
       _           <- Resource.eval(banner[F](c))
-      ep          <- entryPointResource(c)
+      ep          <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       pool        <- databasePoolResource[F](c.database)
       enums       <- Resource.eval(pool.use(Enums.load))
       (obsT, ctT) <- topics(pool)
@@ -209,4 +198,3 @@ object CMain extends MainParams {
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }
-
