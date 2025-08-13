@@ -38,20 +38,20 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
-  port:          Port,             // Our port, nothing fancy.
-  itc:           Config.Itc,       // ITC config
-  sso:           Config.Sso,       // SSO config
-  serviceJwt:    String,           // Only service users can exchange API keys, so we need a service user JWT.
-  honeycomb:     Config.Honeycomb, // Honeycomb config
-  database:      Config.Database,  // Database config
-  aws:           Config.Aws,       // AWS config
-  email:         Config.Email,     // Mailgun config
-  corsOverHttps: Boolean,          // Whether to require CORS over HTTPS
-  domain:        List[String],     // Domains, for CORS headers
-  commitHash:    CommitHash,       // From Heroku Dyno Metadata
-  goaUsers:      Set[User.Id],     // Gemini Observatory Archive user id(s)
-  obscalcPoll:   FiniteDuration,   // Obscalc poll period
-  httpClient:    Config.HttpClient // Configuration for HTTP requests made by the ODB
+  port:          Port,                      // Our port, nothing fancy.
+  itc:           Config.Itc,                // ITC config
+  sso:           Config.Sso,                // SSO config
+  serviceJwt:    String,                    // Only service users can exchange API keys, so we need a service user JWT.
+  honeycomb:     Option[Config.Honeycomb],  // Honeycomb config
+  database:      Config.Database,           // Database config
+  aws:           Config.Aws,                // AWS config
+  email:         Config.Email,              // Mailgun config
+  corsOverHttps: Boolean,                   // Whether to require CORS over HTTPS
+  domain:        List[String],              // Domains, for CORS headers
+  commitHash:    CommitHash,                // From Heroku Dyno Metadata
+  goaUsers:      Set[User.Id],              // Gemini Observatory Archive user id(s)
+  obscalcPoll:   FiniteDuration,            // Obscalc poll period
+  httpClient:    Config.HttpClient          // Configuration for HTTP requests made by the ODB
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -113,10 +113,20 @@ object Config:
   )
 
   object Honeycomb:
-    lazy val fromCiris: ConfigValue[Effect, Honeycomb] = (
-      envOrProp("ODB_HONEYCOMB_WRITE_KEY"),
-      envOrProp("ODB_HONEYCOMB_DATASET")
-    ).parMapN(Honeycomb.apply)
+    private val inHeroku: ConfigValue[Effect, Boolean] =
+      envOrProp("HEROKU_SLUG_COMMIT").option.map(_.isDefined)
+
+    lazy val fromCiris: ConfigValue[Effect, Option[Honeycomb]] =
+      inHeroku.flatMap: inHeroku =>
+        if (inHeroku)
+          (envOrProp("ODB_HONEYCOMB_WRITE_KEY"), envOrProp("ODB_HONEYCOMB_DATASET")).parMapN: (writeKey, dataset) =>
+            Honeycomb(writeKey, dataset).some
+        else
+          (envOrProp("ODB_HONEYCOMB_WRITE_KEY").option, envOrProp("ODB_HONEYCOMB_DATASET").option).parTupled.map:
+            case (Some(writeKey), Some(dataset)) if writeKey.trim.nonEmpty && dataset.trim.nonEmpty =>
+              Honeycomb(writeKey, dataset).some
+            case _ =>
+              None
 
   case class Database(
     maxConnections: Int,
