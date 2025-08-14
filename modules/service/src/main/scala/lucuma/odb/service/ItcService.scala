@@ -411,7 +411,7 @@ object ItcService {
           .void
           .recoverWith {
             case SqlState.ForeignKeyViolation(ex) =>
-              Logger[F].info(ex)("Failed to insert or update ITC result. Probably due to a deleted calibration observation.")
+              Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
           }
     }
 
