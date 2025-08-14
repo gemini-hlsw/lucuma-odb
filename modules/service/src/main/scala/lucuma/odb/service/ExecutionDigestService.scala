@@ -148,7 +148,7 @@ object ExecutionDigestService {
         .void
         .recoverWith:
           case SqlState.ForeignKeyViolation(ex) =>
-            Logger[F].info(ex)("Failed to insert or update execution digest. Probably due to a deleted calibration observation.")
+            Logger[F].info(ex)(s"Failed to insert or update execution digest for program $pid, observation $oid. Probably due to a deleted calibration observation.")
 
     }
 
