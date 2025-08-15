@@ -57,12 +57,24 @@ class cloneObservation extends OdbSuite {
           filter
           fpu
           centralWavelength { nanometers }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
+          spatialOffsets { arcseconds }
+          explicitSpatialOffsets { arcseconds }
+          defaultSpatialOffsets { arcseconds }
         }
         gmosSouthLongSlit {
           grating
           filter
           fpu
           centralWavelength { nanometers }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
+          spatialOffsets { arcseconds }
+          explicitSpatialOffsets { arcseconds }
+          defaultSpatialOffsets { arcseconds }
         }
         gmosNorthImaging {
           filters

@@ -2055,7 +2055,13 @@ input GmosNorthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -2491,7 +2497,13 @@ input GmosSouthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -8544,19 +8556,39 @@ type GmosNorthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 
@@ -9127,19 +9159,39 @@ type GmosSouthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 

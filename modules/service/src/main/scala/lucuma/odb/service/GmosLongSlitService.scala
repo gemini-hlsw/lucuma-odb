@@ -90,11 +90,11 @@ object GmosLongSlitService {
          gmos_amp_gain.opt      *:   // explicitAmpGain
          gmos_roi.opt           *:   // explicitRoi
          text.opt               *:   // explicitWavelengthDithers
-         text.opt                    // explicitSpatialOffsets
-        ).emap: (w, defaultX, x, defaultY, y, arm, ag, roi, owd, osd) =>
+         text.opt                    // explicitOffsets
+        ).emap: (w, defaultX, x, defaultY, y, arm, ag, roi, owd, oso) =>
           for
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
-            spatialDithers    <- osd.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as a spatial offsets list."))
+            offsets           <- oso.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as as offsets list."))
           yield Common(
             w,
             GmosXBinning(defaultX),
@@ -105,7 +105,7 @@ object GmosLongSlitService {
             ag,
             roi,
             wavelengthDithers,
-            spatialDithers
+            offsets
           )
 
       val north: Decoder[GmosNorth] =
@@ -205,7 +205,7 @@ object GmosLongSlitService {
           ls.c_amp_gain,
           ls.c_roi,
           ls.c_wavelength_dithers,
-          ls.c_spatial_offsets
+          ls.c_offsets
         FROM
           #$table ls
       """(Void) |+|
@@ -257,7 +257,7 @@ object GmosLongSlitService {
           c_amp_gain,
           c_roi,
           c_wavelength_dithers,
-          c_spatial_offsets,
+          c_offsets,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -303,7 +303,7 @@ object GmosLongSlitService {
           input.common.explicitAmpGain         ,
           input.common.explicitRoi             ,
           input.common.formattedλDithers       ,
-          input.common.formattedSpatialOffsets ,
+          input.common.formattedOffsets        ,
           input.grating                        ,
           input.filter                         ,
           input.fpu                            ,
@@ -342,7 +342,7 @@ object GmosLongSlitService {
           c_amp_gain,
           c_roi,
           c_wavelength_dithers,
-          c_spatial_offsets,
+          c_offsets,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -388,7 +388,7 @@ object GmosLongSlitService {
           input.common.explicitAmpGain         ,
           input.common.explicitRoi             ,
           input.common.formattedλDithers       ,
-          input.common.formattedSpatialOffsets ,
+          input.common.formattedOffsets ,
           input.grating                        ,
           input.filter                         ,
           input.fpu                            ,
@@ -421,7 +421,7 @@ object GmosLongSlitService {
       val upAmpGain     = sql"c_amp_gain           = ${gmos_amp_gain.opt}"
       val upRoi         = sql"c_roi                = ${gmos_roi.opt}"
       val upλDithers    = sql"c_wavelength_dithers = ${text.opt}"
-      val upOffsets     = sql"c_spatial_offsets    = ${text.opt}"
+      val upOffsets     = sql"c_offsets            = ${text.opt}"
 
       List(
         input.centralWavelength.map(upCentralλ),
@@ -431,7 +431,7 @@ object GmosLongSlitService {
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi),
         input.formattedλDithers.toOptionOption.map(upλDithers),
-        input.formattedSpatialOffsets.toOptionOption.map(upOffsets)
+        input.formattedOffsets.toOptionOption.map(upOffsets)
       ).flatten
     }
 
@@ -517,7 +517,7 @@ object GmosLongSlitService {
         c_amp_gain,
         c_roi,
         c_wavelength_dithers,
-        c_spatial_offsets,
+        c_offsets,
         c_initial_grating,
         c_initial_filter,
         c_initial_fpu,
@@ -537,7 +537,7 @@ object GmosLongSlitService {
         c_amp_gain,
         c_roi,
         c_wavelength_dithers,
-        c_spatial_offsets,
+        c_offsets,
         c_initial_grating,
         c_initial_filter,
         c_initial_fpu,
