@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 
 trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
@@ -44,6 +45,10 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
 
+    object Flamingos2LongSlit:
+      val Id = col("c_flamingos2_longslit_id", configuration_request_id.embedded)
+      val Disperser = col("c_flamingos2_longslit_disperser", flamingos_2_disperser.embedded)
+
     object GmosNorthLongSlit:
       val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
       val Grating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)
@@ -52,3 +57,10 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Id = col("c_gmos_south_longslit_id", configuration_request_id.embedded)
       val Grating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
 
+    object GmosNorthImaging:
+      val Id = col("c_gmos_north_imaging_id", configuration_request_id.embedded)
+      val Filters = col("c_gmos_north_imaging_filters", _gmos_north_filter.embedded)
+
+    object GmosSouthImaging:
+      val Id = col("c_gmos_south_imaging_id", configuration_request_id.embedded)
+      val Filters = col("c_gmos_south_imaging_filters", _gmos_south_filter.embedded)
