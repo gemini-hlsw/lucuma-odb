@@ -10179,6 +10179,9 @@ type ConfigurationObservingMode {
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+  gmosNorthImaging: ConfigurationGmosNorthImaging
+  gmosSouthImaging: ConfigurationGmosSouthImaging
+  flamingos2LongSlit: ConfigurationFlamingos2LongSlit
 }
 
 type ConfigurationGmosNorthLongSlit {
@@ -10187,6 +10190,18 @@ type ConfigurationGmosNorthLongSlit {
 
 type ConfigurationGmosSouthLongSlit {
   grating: GmosSouthGrating!
+}
+
+type ConfigurationGmosNorthImaging {
+  filters: [GmosNorthFilter!]!
+}
+
+type ConfigurationGmosSouthImaging {
+  filters: [GmosSouthFilter!]!
+}
+
+type ConfigurationFlamingos2LongSlit {
+  disperser: Flamingos2Disperser!
 }
 
 scalar ConfigurationRequestId

@@ -135,6 +135,7 @@ object OdbMapping {
           with ConditionsIntuitionMapping[F]
           with ConditionsMeasurementMapping[F]
           with ConfigurationConditionsMapping[F]
+          with ConfigurationGmosImagingMappings[F]
           with ConfigurationGmosLongSlitMappings[F]
           with ConfigurationMapping[F]
           with ConfigurationRequestMapping[F]
@@ -168,6 +169,7 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
+          with ConfigurationFlamingos2LongSlitMappings[F]
           with Flamingos2CustomMaskMapping[F]
           with Flamingos2DynamicMapping[F]
           with Flamingos2FpuMaskMapping[F]
@@ -535,6 +537,9 @@ object OdbMapping {
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
+                ConfigurationFlamingos2LongSlitMappings,
+                ConfigurationGmosNorthImagingMappings,
+                ConfigurationGmosSouthImagingMappings,
                 ConfigurationGmosNorthLongSlitMappings,
                 ConfigurationGmosSouthLongSlitMappings,
                 ConfigurationObservingModeMappings,
@@ -545,9 +550,9 @@ object OdbMapping {
                 DateIntervalMappings,
                 DeclinationMapping,
                 ExecutionEventSelectResultMapping,
-                GmosCcdModeMappings,
                 Flamingos2CustomMaskMappings,
                 Flamingos2FpuMaskMappings,
+                GmosCcdModeMappings,
                 GmosCustomMaskMappings,
                 GmosNorthDynamicMappings,
                 GmosNorthFpuMappings,
