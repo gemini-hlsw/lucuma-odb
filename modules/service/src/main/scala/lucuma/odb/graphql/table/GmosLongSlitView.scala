@@ -34,7 +34,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
   }
 
-  object GmosNorthLongSlitView extends TableDef("v_gmos_north_long_slit") {
+  object GmosNorthLongSlitView extends TableDef("t_gmos_north_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
@@ -48,7 +48,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
 
   }
 
-  object GmosSouthLongSlitView extends TableDef("v_gmos_south_long_slit") {
+  object GmosSouthLongSlitView extends TableDef("t_gmos_south_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)
