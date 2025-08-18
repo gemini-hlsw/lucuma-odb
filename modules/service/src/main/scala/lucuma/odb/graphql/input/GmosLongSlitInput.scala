@@ -63,15 +63,15 @@ object GmosLongSlitInput {
       explicitAmpGain:        Option[GmosAmpGain],
       explicitRoi:            Option[GmosRoi],
       explicitλDithers:       Option[List[WavelengthDither]],
-      explicitSpatialOffsets: Option[List[Q]]
+      explicitOffsets:        Option[List[Q]]
     ) {
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedSpatialOffsets: Option[String] =
-        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
+      val formattedOffsets: Option[String] =
+        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -99,7 +99,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(North(
               grating,
@@ -113,7 +113,7 @@ object GmosLongSlitInput {
                 exAmpGain.toOption,
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
-                exSpatialOffsets.toOption
+                exOffsets.toOption
               )
             ))
           case _ =>
@@ -146,7 +146,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(South(
               grating,
@@ -160,7 +160,7 @@ object GmosLongSlitInput {
                 exAmpGain.toOption,
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
-                exSpatialOffsets.toOption
+                exOffsets.toOption
               )
             ))
           case _ =>
@@ -182,7 +182,7 @@ object GmosLongSlitInput {
       explicitAmpGain:        Nullable[GmosAmpGain],
       explicitRoi:            Nullable[GmosRoi],
       explicitλDithers:       Nullable[List[WavelengthDither]],
-      explicitSpatialOffsets: Nullable[List[Q]]
+      explicitOffsets:        Nullable[List[Q]]
     ) {
 
       def toCreate(site: Site): Result[Create.Common] =
@@ -195,7 +195,7 @@ object GmosLongSlitInput {
             explicitAmpGain.toOption,
             explicitRoi.toOption,
             explicitλDithers.toOption,
-            explicitSpatialOffsets.toOption
+            explicitOffsets.toOption
           )
         }
 
@@ -203,8 +203,8 @@ object GmosLongSlitInput {
       val formattedλDithers: Nullable[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedSpatialOffsets: Nullable[String] =
-        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
+      val formattedOffsets: Nullable[String] =
+        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -251,7 +251,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(North(
               grating,
@@ -265,7 +265,7 @@ object GmosLongSlitInput {
                 exAmpGain,
                 exRoi,
                 exWavelengthDithers,
-                exSpatialOffsets
+                exOffsets
               )
             ))
 
@@ -306,7 +306,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(South(
               grating,
@@ -320,7 +320,7 @@ object GmosLongSlitInput {
                 exAmpGain,
                 exRoi,
                 exWavelengthDithers,
-                exSpatialOffsets
+                exOffsets
               )
             ))
 
@@ -354,6 +354,7 @@ object GmosLongSlitInput {
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
+        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
         OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
       ) => (
         rGrating,
@@ -366,7 +367,9 @@ object GmosLongSlitInput {
         rExplicitAmpGain,
         rExplicitRoi,
         rWavelengthDithers,
-        rSpatialOffsets
+        (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
+          offsets.orElse(spatialOffsets)
+        }
       ).parTupled
     }
 
@@ -395,6 +398,7 @@ object GmosLongSlitInput {
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
           WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
+          OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
           OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
         ) => (
           rGrating,
@@ -407,8 +411,9 @@ object GmosLongSlitInput {
           rExplicitAmpGain,
           rExplicitRoi,
           rWavelengthDithers,
-          rSpatialOffsets
+          (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
+            offsets.orElse(spatialOffsets)
+          }
         ).parTupled
       }
 }
-

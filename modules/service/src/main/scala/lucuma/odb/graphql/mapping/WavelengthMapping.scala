@@ -10,12 +10,12 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
-import lucuma.odb.graphql.table.GmosLongSlitView
+import lucuma.odb.graphql.table.GmosLongSlitTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 
 trait WavelengthMapping[F[_]]
-  extends GmosLongSlitView[F]
+  extends GmosLongSlitTable[F]
      with ChronConditionsEntryView[F]
      with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
@@ -51,10 +51,10 @@ trait WavelengthMapping[F[_]]
   lazy val WavelengthMappings: List[TypeMapping] =
     List(
       wavelengthMappingAtPath(ConditionsMeasurementType / "wavelength", ChronConditionsEntryView.Measurement.Wavelength.Value, ChronConditionsEntryView.Measurement.Wavelength.SyntheticId),
-      wavelengthMappingAtPath(GmosNorthLongSlitType / "centralWavelength", GmosNorthLongSlitView.Common.CentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
-      wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitView.Common.InitialCentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
-      wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitView.Common.CentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
-      wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitView.Common.InitialCentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
+      wavelengthMappingAtPath(GmosNorthLongSlitType / "centralWavelength", GmosNorthLongSlitTable.Common.CentralWavelength, GmosNorthLongSlitTable.Common.ObservationId),
+      wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitTable.Common.InitialCentralWavelength, GmosNorthLongSlitTable.Common.ObservationId),
+      wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitTable.Common.CentralWavelength, GmosSouthLongSlitTable.Common.ObservationId),
+      wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitTable.Common.InitialCentralWavelength, GmosSouthLongSlitTable.Common.ObservationId),
       wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", Spectroscopy.ExposureTimeMode.SignalToNoise.At, Spectroscopy.ExposureTimeMode.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMax", SpectroscopyConfigOptionTable.WavelengthMax, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
