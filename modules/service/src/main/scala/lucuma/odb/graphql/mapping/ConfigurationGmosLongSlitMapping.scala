@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package mapping
 
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.GmosLongSlitView
+import lucuma.odb.graphql.table.GmosLongSlitTable
 
 trait ConfigurationGmosLongSlitMappings[F[_]]
-  extends GmosLongSlitView[F]
+  extends GmosLongSlitTable[F]
      with ConfigurationRequestView[F] {
 
   // North
@@ -20,8 +20,8 @@ trait ConfigurationGmosLongSlitMappings[F[_]]
 
   private lazy val ConfigurationGmosNorthLongSlitMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gmosNorthLongSlit")(
-      SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
-      SqlField("grating", GmosNorthLongSlitView.Grating),
+      SqlField("observationId", GmosNorthLongSlitTable.Common.ObservationId, key = true, hidden = true),
+      SqlField("grating", GmosNorthLongSlitTable.Grating),
     )
 
   private lazy val ConfigurationRequestGmosNorthLongSlitMapping: ObjectMapping =
@@ -36,11 +36,11 @@ trait ConfigurationGmosLongSlitMappings[F[_]]
     ConfigurationGmosSouthLongSlitMapping,
     ConfigurationRequestGmosSouthLongSlitMapping,
   )
-  
+
   private lazy val ConfigurationGmosSouthLongSlitMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gmosSouthLongSlit")(
-      SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
-      SqlField("grating", GmosSouthLongSlitView.Grating),
+      SqlField("observationId", GmosSouthLongSlitTable.Common.ObservationId, key = true, hidden = true),
+      SqlField("grating", GmosSouthLongSlitTable.Grating),
     )
 
   private lazy val ConfigurationRequestGmosSouthLongSlitMapping: ObjectMapping =

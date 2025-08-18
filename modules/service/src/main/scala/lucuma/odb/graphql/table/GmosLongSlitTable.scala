@@ -9,7 +9,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
+trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
 
   class CommonColumns(implicit val tableName: TableName) {
 
@@ -34,7 +34,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
   }
 
-  object GmosNorthLongSlitView extends TableDef("t_gmos_north_long_slit") {
+  object GmosNorthLongSlitTable extends TableDef("t_gmos_north_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
@@ -48,7 +48,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
 
   }
 
-  object GmosSouthLongSlitView extends TableDef("t_gmos_south_long_slit") {
+  object GmosSouthLongSlitTable extends TableDef("t_gmos_south_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)
