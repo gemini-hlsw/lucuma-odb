@@ -42,6 +42,13 @@ ThisBuild / Test / parallelExecution := false
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
+ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
+  Seq(
+    WorkflowStep.Run(List("chmod 600 test-cert/server.key"), name = Some("Set up cert permissions (1)")),
+    WorkflowStep.Run(List("sudo chown 999 test-cert/server.key"), name = Some("Set up cert permissions (2)")),
+  ) ++ steps
+}
+
 ThisBuild / githubWorkflowBuildPreamble +=
   WorkflowStep.Use(
     UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
