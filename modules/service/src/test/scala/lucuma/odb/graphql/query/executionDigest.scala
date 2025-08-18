@@ -31,7 +31,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.graphql.input.AddStepEventInput
-
+import lucuma.odb.service.Services
 
 class executionDigest extends ExecutionTestSupportForGmos {
 
@@ -726,4 +726,18 @@ class executionDigest extends ExecutionTestSupportForGmos {
         query    = executionStateQuery(oid),
         expected = expectedExecutionState(ExecutionState.Completed).asRight
       )
+
+  // This simulates a deleted calibration observation and checks that the foreign key violation is caught
+  test("insertOrUpdate with non-existent observation should not fail"):
+    createProgramAs(pi).flatMap: pid =>
+      withServices(pi): services =>
+        Services.asSuperUser:
+          services.session.transaction.use: xa =>
+            services.executionDigestService
+              .insertOrUpdate(
+                pid,
+                Observation.Id.fromLong(Long.MaxValue).get,
+                Md5Hash.Zero,
+                ExecutionDigest.Zero
+              )(using xa)
 }
