@@ -55,6 +55,12 @@ jobs:
         if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
 
+      - name: Set up cert permissions (1)
+        run: chmod 600 test-cert/server.key
+
+      - name: Set up cert permissions (2)
+        run: sudo chown 999 test-cert/server.key
+
       - name: Docker compose up
         run: docker compose up -d
 
