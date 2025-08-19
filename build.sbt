@@ -119,7 +119,7 @@ lazy val ssoBackendClient = project
 lazy val ssoService = project
   .in(file("modules/sso-service"))
   .dependsOn(ssoBackendClient)
-  .enablePlugins(NoPublishPlugin)
+  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-sso-service",
     libraryDependencies ++= Seq(
