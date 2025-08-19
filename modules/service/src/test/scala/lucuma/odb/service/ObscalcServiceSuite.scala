@@ -132,6 +132,30 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
 
 class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
 
+  extension (s: String)
+    def sec: BigDecimal =
+      BigDecimal(s).setScale(6)
+
+  val OneDataset =
+    "10.0".sec + // exposure time
+    "41.1".sec + // readout
+    "10.0".sec   // writeout
+
+  val CalTime =
+    "15.0".sec +  // science fold
+    "52.1".sec +  // arc
+    "57.1".sec    // flat
+
+  val Offset_15arcsec = "7.0".sec + "0.09375".sec
+  val Offset_30arcsec = "7.0".sec + "0.18750".sec
+
+
+  val Atom1 = CalTime + "15.0".sec + OneDataset + Offset_15arcsec + OneDataset
+  val Atom2 = Atom1
+  val Atom3 = CalTime + "15.0".sec + OneDataset + Offset_30arcsec + OneDataset
+
+  val ScienceSequence = Atom1 + Atom2 + Atom3
+
   val setup: IO[(Program.Id, Target.Id, Observation.Id)] =
     for
       _ <- cleanup
@@ -168,7 +192,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           ),
           SequenceDigest(
             ObserveClass.Science,
-            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(784200000L)),
+            CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
+//            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(784200000L)),
             SortedSet(Offset.microarcseconds.reverseGet(0L, 1295985000000L), Offset.Zero, Offset.microarcseconds.reverseGet(0L, 15000000L)),
             NonNegInt.unsafeFrom(3),
             ExecutionState.NotStarted
