@@ -7,9 +7,9 @@ echo "Applying SSO migrations to lucuma-sso database..."
 SSO_MIGRATIONS_DIR="/docker-entrypoint-initdb.d/sso-migrations"
 
 if [ -d "$SSO_MIGRATIONS_DIR" ]; then
-    for migration_file in "$SSO_MIGRATIONS_DIR"/*.sql; do
+    # Apply migrations in version order
+    for migration_file in $(ls "$SSO_MIGRATIONS_DIR"/V*.sql | sort -V); do
         if [ -f "$migration_file" ]; then
-            echo "Applying $(basename "$migration_file") to lucuma-sso"
             psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "lucuma-sso" < "$migration_file"
         fi
     done
@@ -17,4 +17,3 @@ else
     echo "Warning: SSO migrations directory $SSO_MIGRATIONS_DIR does not exist"
 fi
 
-echo "SSO migration complete."
