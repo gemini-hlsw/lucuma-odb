@@ -14,7 +14,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
 
   val validUsers = List(pi, admin).toList
 
-  test("select configuration for fully-configured observation with sidereal target") {
+  test("select configuration for fully-configured observation with sidereal target (gmos-n longslit)") {
     createCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
@@ -63,6 +63,15 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         gmosSouthLongSlit {
                           grating
                         }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
                       }
                     }
                   }
@@ -95,7 +104,440 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                         "gmosNorthLongSlit" : {
                           "grating" : "R831_G5302"
                         },
-                        "gmosSouthLongSlit" : null
+                        "gmosSouthLongSlit" : null,
+                        "gmosNorthImaging" : null,
+                        "gmosSouthImaging" : null,
+                        "flamingos2LongSlit" : null                      
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("select configuration for fully-configured observation with sidereal target (gmos-s longslit)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosSouthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_ONE",
+                        "cloudExtinction" : "POINT_ONE",
+                        "skyBackground" : "DARKEST",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
+                        },
+                        "region" : null
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_SOUTH",
+                        "mode" : "GMOS_SOUTH_LONG_SLIT",
+                        "gmosNorthLongSlit" : null,
+                        "gmosSouthLongSlit" : {
+                          "grating" : "R600_G5324"
+                        },
+                        "gmosNorthImaging" : null,
+                        "gmosSouthImaging" : null,
+                        "flamingos2LongSlit" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("select configuration for fully-configured observation with sidereal target (gmos-n imaging)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosNorthImagingObservationAs(pi, pid, None, tid).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_EIGHT",
+                        "cloudExtinction" : "POINT_THREE",
+                        "skyBackground" : "BRIGHT",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
+                        },
+                        "region" : null
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_NORTH",
+                        "mode" : "GMOS_NORTH_IMAGING",
+                        "gmosNorthLongSlit" : null,
+                        "gmosSouthLongSlit" : null,
+                        "gmosNorthImaging" : {
+                          "filters" : [
+                            "G_PRIME",
+                            "R_PRIME"
+                          ]
+                        },
+                        "gmosSouthImaging" : null,
+                        "flamingos2LongSlit" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("select configuration for fully-configured observation with sidereal target (gmos-s imaging)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosSouthImagingObservationAs(pi, pid, None, tid).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_EIGHT",
+                        "cloudExtinction" : "POINT_THREE",
+                        "skyBackground" : "BRIGHT",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
+                        },
+                        "region" : null
+                      },
+                      "observingMode" : {
+                        "instrument" : "GMOS_SOUTH",
+                        "mode" : "GMOS_SOUTH_IMAGING",
+                        "gmosNorthLongSlit" : null,
+                        "gmosSouthLongSlit" : null,
+                        "gmosNorthImaging" : null,
+                        "gmosSouthImaging" : {
+                          "filters" : [
+                            "G_PRIME",
+                            "R_PRIME"
+                          ]
+                        },
+                        "flamingos2LongSlit" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("select configuration for fully-configured observation with sidereal target (f2 logslit)") {
+    createCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createFlamingos2LongSlitObservationAs(pi, pid, tid).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
+                        }
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                          declinationArc {
+                            type
+                            start { degrees }
+                            end { degrees }
+                          }
+                        }
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "conditions" : {
+                        "imageQuality" : "POINT_EIGHT",
+                        "cloudExtinction" : "POINT_THREE",
+                        "skyBackground" : "BRIGHT",
+                        "waterVapor" : "WET"
+                      },
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
+                        },
+                        "region" : null
+                      },
+                      "observingMode" : {
+                        "instrument" : "FLAMINGOS2",
+                        "mode" : "FLAMINGOS_2_LONG_SLIT",
+                        "gmosNorthLongSlit" : null,
+                        "gmosSouthLongSlit" : null,
+                        "gmosNorthImaging" : null,
+                        "gmosSouthImaging" : null,
+                        "flamingos2LongSlit" : {
+                          "disperser" : "R1200_HK"
+                        }
                       }
                     }
                   }
