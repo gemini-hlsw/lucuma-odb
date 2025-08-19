@@ -21,6 +21,8 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.sequence.syntax.qastate.*
+import monocle.Focus
+import monocle.Lens
 
 case class StepRecord[D](
   id:               Step.Id,
@@ -69,3 +71,8 @@ case class StepRecord[D](
 
   def isScience: Boolean =
     stepConfig.stepType === StepType.Science
+
+object StepRecord:
+
+  def telescopeConfig[D]: Lens[StepRecord[D], TelescopeConfig] =
+    Focus[StepRecord[D]](_.telescopeConfig)

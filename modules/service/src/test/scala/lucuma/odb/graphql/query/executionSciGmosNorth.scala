@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -17,8 +18,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepType
 import lucuma.core.math.Angle
-import lucuma.core.math.Offset
-import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
@@ -45,11 +44,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
       PosInt.unsafeFrom(10)
     )
 
-  def adjustment(Δλnm: Int, qArcsec: Int): Science.Adjustment =
-    Science.Adjustment.apply(
-      WavelengthDither.intPicometers.get(Δλnm * 1000),
-      Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(qArcsec))
-    )
+  extension (Δλnm: Int)
+    def description: NonEmptyString =
+      NonEmptyString.unsafeFrom(s"${Δλnm}.000 nm")
 
   test("simple generation - limited future"):
     val setup: IO[Observation.Id] =
@@ -68,8 +65,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
             "executionConfig" -> Json.obj(
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, p = 0, q = 0, exposures = 3),
-                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, p = 0, q = 15, exposures = 3)).asJson,
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 15, -15)).asJson,
                   "hasMore" -> true.asJson
                 )
               )
@@ -95,11 +92,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom" ->
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0, 15, -15),
                   "possibleFuture" -> List(
-                    gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+                    gmosNorthExpectedScienceAtom(ditherNm =  5, 0, 15, -15),
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0)
                   ).asJson,
                   "hasMore" -> false.asJson
                 )
@@ -114,15 +111,14 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         "gmosNorth" -> Json.obj(
           "science" -> Json.obj(
             "nextAtom" ->
-              Json.obj(
-                "description" -> s"0.000 nm, 0.000000″".asJson,
-                "observeClass" -> "SCIENCE".asJson,
-                "steps" -> List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)).asJson
+              gmosNorthExpectedScienceAtom(
+                ditherNm = 0,
+                List(15, -15).map(q => gmosNorthExpectedScience(0, 0, q))
               ),
             "possibleFuture" -> List(
-              gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-              gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-              gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+              gmosNorthExpectedScienceAtom(ditherNm =  5, 0, 15, -15),
+              gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
+              gmosNorthExpectedScienceAtom(ditherNm =  0, 0)
             ).asJson,
             "hasMore" -> false.asJson
           )
@@ -173,15 +169,15 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
     import lucuma.odb.testsyntax.execution.*
 
     setup.map(_.gmosNorthScience).map: gn =>
-      // We did no science from (0nm, 0") but we're out of time.  The next
-      // atom should be for a (5nm, 15") block.
-      assertEquals(gn.nextAtom.description.get, adjustment(5, 15).description)
+      // We did no science from 0nm but we're out of time.  The next
+      // atom should be for a 5nm block.
+      assertEquals(gn.nextAtom.description.get, 5.description)
 
       // The last two atoms will be (0nm, 0").
 
       // The next to last atom should be full.
       val penultimateAtom = gn.possibleFuture.init.last
-      assertEquals(penultimateAtom.description.get, adjustment(0, 0).description)
+      assertEquals(penultimateAtom.description.get, 0.description)
 
       val penultimateCounts = penultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(penultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
@@ -189,7 +185,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
       // The last atom will have one left.
       val ultimateAtom    = gn.possibleFuture.last
-      assertEquals(ultimateAtom.description.get, adjustment(0, 0).description)
+      assertEquals(ultimateAtom.description.get, 0.description)
 
       val ultimateCounts = ultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(ultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
@@ -217,12 +213,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
     setup.map(_.gmosNorthScience).map: gn =>
       // We only did one step of (0nm, 0") but we're out of time.  The next
-      // atom should be for a (5nm, 15") block.
-      assertEquals(gn.nextAtom.description.get, adjustment(5, 15).description)
+      // atom should be for a 5nm block.
+      assertEquals(gn.nextAtom.description.get, 5.description)
 
-      // The last atom will be (0nm, 0")
+      // The last atom will be 0nm
       val lastAtom = gn.possibleFuture.last
-      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+      assertEquals(lastAtom.description.get, 0.description)
 
       // and it now has 3 science steps left
       val counts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -273,17 +269,17 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
     import lucuma.odb.testsyntax.execution.*
 
     setup.map(_.gmosNorthScience).map: gn =>
-      // We only did one step of (0nm, 0") but we're out of time.  There is a
+      // We only did one step of 0nm but we're out of time.  There is a
       // science dataset that doesn't have valid calibrations, but could be
       // salvaged if we repeated calibrations.
-      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      assertEquals(gn.nextAtom.description.get, 0.description)
       val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(nextCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(nextCounts.get(StepType.Science), none) // no time for more sci
 
-      // The last atom will also be (0nm, 0")
+      // The last atom will also be 0nm
       val lastAtom = gn.possibleFuture.last
-      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+      assertEquals(lastAtom.description.get, 0.description)
 
       // and it now has 3 science steps left
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -329,14 +325,14 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
     setup.map(_.gmosNorthScience).map: gn =>
       // There's only time left for one science step
-      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      assertEquals(gn.nextAtom.description.get, 0.description)
       val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(nextCounts.get(StepType.Gcal), none) // cals still valid
       assertEquals(nextCounts.get(StepType.Science), 1.some)
 
       // The last atom will also be (0nm, 0")
       val lastAtom = gn.possibleFuture.last
-      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+      assertEquals(lastAtom.description.get, 0.description)
 
       // and it now has 3 science steps left
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -373,14 +369,14 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
     setup.map(_.gmosNorthScience).map: gn =>
       // There's only time left for two science steps
-      assertEquals(gn.nextAtom.description.get, adjustment(0, 0).description)
+      assertEquals(gn.nextAtom.description.get, 0.description)
       val nextCounts = gn.nextAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(nextCounts.get(StepType.Gcal), none) // cals still valid
       assertEquals(nextCounts.get(StepType.Science), 2.some)
 
-      // The last atom will also be (0nm, 0")
+      // The last atom will also be 0nm
       val lastAtom = gn.possibleFuture.last
-      assertEquals(lastAtom.description.get, adjustment(0, 0).description)
+      assertEquals(lastAtom.description.get, 0.description)
 
       // and it now has 2 science steps left
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
@@ -397,14 +393,14 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         v  <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
 
-        // We'll add steps for the second block (5 nm, 15")
-        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
+        // We'll add steps for the second block 5 nm
+        s0 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s0)
 
-        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
+        s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
 
-        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
+        s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
 
         ic <- generateOrFail(p, o)
@@ -413,20 +409,13 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
     import lucuma.odb.testsyntax.execution.*
 
     setup.map(_.gmosNorthScience).map: gn =>
-
-      // Now we expect these adjustments (and science step counts)
-      // (5,   15) - 2   (next atom)
-      // (-5, -15) - 3   (head of pending)
-      // (0,    0) - 3
-      // (0,    0) - 1
-
       assertEquals(
         gn.nextAtom.description.get :: gn.possibleFuture.map(_.description.get),
         List(
-          adjustment(5, 15).description,
-          adjustment(-5, -15).description,
-          adjustment(0, 0).description,
-          adjustment(0, 0).description
+           5.description,
+          -5.description,
+           0.description,
+           0.description
         )
       )
 
@@ -532,18 +521,18 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom" ->
-                    Json.obj(
-                      "description" -> s"0.000 nm, 0.000000″".asJson,
-                      "observeClass" -> "SCIENCE".asJson,
-                      "steps" -> (
-                        List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)) :+
-                        gmosNorthExpectedFlat(ditherNm = 0, p = 0, q = 0)  // repeat the flat
-                      ).asJson
+                    gmosNorthExpectedScienceAtom(
+                      ditherNm = 0,
+                      List(
+                        gmosNorthExpectedScience(ditherNm = 0, p = 0, q =  15),
+                        gmosNorthExpectedScience(ditherNm = 0, p = 0, q = -15),
+                        gmosNorthExpectedFlat(ditherNm = 0, p = 0, q = -15)
+                      )
                     ),
                   "possibleFuture" -> List(
-                    gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+                    gmosNorthExpectedScienceAtom(ditherNm =  5, 0, 15, -15),
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0)
                   ).asJson,
                   "hasMore" -> false.asJson
                 )
@@ -568,17 +557,17 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         _  <- addEndStepEvent(s1)
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
+        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s5)
-        s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
+        s6 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthFlat(5), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s6)
-        s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
+        s7 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s7)
 
         d  <- recordDatasetAs(serviceUser, s2, "N20240905S1001.fits")
@@ -596,16 +585,16 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom" ->
-                    Json.obj(
-                      "description" -> s"5.000 nm, 15.000000″".asJson,
-                      "observeClass" -> "SCIENCE".asJson,
-                      "steps" -> (
-                        List.fill(2)(gmosNorthExpectedScience(ditherNm = 5, p = 0, q = 15))
-                      ).asJson
+                    gmosNorthExpectedScienceAtom(
+                      ditherNm = 5,
+                      List(
+                        gmosNorthExpectedScience(ditherNm = 5, p = 0, q =  15),
+                        gmosNorthExpectedScience(ditherNm = 5, p = 0, q = -15),
+                      )
                     ),
                   "possibleFuture" -> List(
-                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 2)  // 1 left over, 1 to make up failure
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, 0, 15, -15),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, 0, 0)  // 1 left over, 1 to make up failure
                   ).asJson,
                   "hasMore" -> false.asJson
                 )
@@ -645,12 +634,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         x3 <- nextAtomId(p, o)
 
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
         x4 <- nextAtomId(p, o)
 
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         x5 <- nextAtomId(p, o)
@@ -722,12 +711,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         }
       """
 
-    def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
-      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+    def atom(nm: Int, o0: Int, os: Int*): Json =
+      val desc = s"${BigDecimal(nm).setScale(3)} nm"
       json"""
         {
           "description": $desc,
-          "steps": ${gcalStep(arcsec) :: gcalStep(arcsec) :: List.fill(scienceSteps)(scienceStep(arcsec))}
+          "steps": ${gcalStep(o0) :: gcalStep(o0) :: (o0 :: os.toList).map(scienceStep)}
         }
       """
 
@@ -811,11 +800,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
               "executionConfig": {
                 "gmosNorth": {
                   "science": {
-                    "nextAtom": ${atom(0, -20, 3)},
+                    "nextAtom": ${atom(0, -20, 0, 20)},
                     "possibleFuture": ${List(
-                      atom( 5,   0, 3),
-                      atom(-5,  20, 3),
-                      atom( 0, -20, 1)
+                      atom( 5, -20, 0, 20),
+                      atom(-5, -20, 0, 20),
+                      atom( 0, -20)
                     )}
                   }
                 }
@@ -861,8 +850,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         }
       """
 
-    def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
-      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+    def atom(nm: Int, scienceSteps: Int): Json =
+      val desc = s"${BigDecimal(nm).setScale(3)} nm"
       json"""
         {
           "description": $desc,
@@ -910,11 +899,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
               "executionConfig": {
                 "gmosNorth": {
                   "science": {
-                    "nextAtom": ${atom(-7, 0, 3)},
+                    "nextAtom": ${atom(-7, 3)},
                     "possibleFuture": ${List(
-                      atom(0,  15, 3),
-                      atom(7, -15, 3),
-                      atom(-7,  0, 1)
+                      atom( 0,  3),
+                      atom( 7,  3),
+                      atom(-7,  1)
                     )}
                   }
                 }
@@ -1071,7 +1060,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
       """
 
     def atom(nm: Int, arcsec: Int, scienceSteps: Int): Json =
-      val desc = s"${BigDecimal(nm).setScale(3)} nm, ${BigDecimal(arcsec).setScale(6)}″"
+      val desc = s"${BigDecimal(nm).setScale(3)} nm"
       json"""
         {
           "description": $desc,
@@ -1126,7 +1115,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                 "gmosNorth": {
                   "science": {
                     "nextAtom": {
-                      "description": ${s"5.000 nm, 0.000000″".asJson},
+                      "description": ${s"5.000 nm".asJson},
                       "steps": ${List.fill(2)(scienceStepJson(0))}
                     },
                     "possibleFuture": ${List(
@@ -1171,12 +1160,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         x3 <- firstAcquisitionStepId(p, o)
 
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
         x4 <- firstAcquisitionStepId(p, o)
 
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         x5 <- firstAcquisitionStepId(p, o)
@@ -1221,12 +1210,12 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
         x3 <- nextAtomStepIds(p, o)
 
-        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s3 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(15), ObserveClass.Science)
         _  <- addEndStepEvent(s3)
 
         x4 <- nextAtomStepIds(p, o)
 
-        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
+        s4 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(-15), ObserveClass.Science)
         _  <- addEndStepEvent(s4)
 
         // Next atom
@@ -1234,7 +1223,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
         x5 <- nextAtomStepIds(p, o)
 
         a1 <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(15), ObserveClass.NightCal)
+        s5 <- recordStepAs(serviceUser, a1, Instrument.GmosNorth, gmosNorthArc(5), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s5)
 
         x6 <- nextAtomStepIds(p, o)

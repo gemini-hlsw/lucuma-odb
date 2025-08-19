@@ -346,6 +346,8 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
     //                    ----
     //                    67.1
 
+    val Arc = "67.1".sec
+
     // * Flat:
     //   * GCal Change..:  5.0
     //   * Exposure Time:  1.0
@@ -354,9 +356,9 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
     //                    ----
     //                    57.1
 
+    val Flat = "57.1".sec
+
     // * Science (1):
-    // (there is an offset cost for some steps but it is subsumed by the
-    //  science fold movement)
     //   * Science Fold:    15.0
     //   * Exposure Time: 1200.0
     //   * Readout......:   41.1
@@ -364,12 +366,27 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
     //                      ----
     //                    1266.1
 
-    // * Science (2 and 3):
+    val Step1 = "1266.1".sec
+
+    // * Science 2:
+    //   * Offset 15"...:    7.09375
     //   * Exposure Time: 1200.0
     //   * Readout......:   41.1
     //   * Writeout.....:   10.0
     //                      ----
-    //                    1251.1
+    //                    1258.19375
+
+    val Step2 = "1258.19375".sec
+
+    // * Science 3:
+    //   * Offset 30"...:    7.18750
+    //   * Exposure Time: 1200.0
+    //   * Readout......:   41.1
+    //   * Writeout.....:   10.0
+    //                      ----
+    //                    1258.2875
+
+    val Step3 = "1258.2875".sec
 
     val setup: IO[Observation.Id] =
       for {
@@ -378,27 +395,22 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
-    def step(time: String): Json =
+    def step(time: BigDecimal): Json =
       json"""
         {
           "estimate" : {
             "total" : {
-              "seconds" : ${time.sec.asJson}
+              "seconds" : ${time.asJson}
             }
           }
         }
       """
 
-    def atom(scienceObserves: Int): Json =
+    def atom(stepTime: BigDecimal*): Json =
       json"""
         {
           "steps" : ${
-            (List(step("67.1"), step("57.1")) ++ (
-              if scienceObserves > 0 then
-                step("1266.1") :: List.fill(scienceObserves - 1)(step("1251.1"))
-              else
-                Nil
-            )).asJson
+            (List(step(Arc), step(Flat)) ++ stepTime.toList.map(step)).asJson
           }
         }
       """
@@ -449,11 +461,11 @@ class executionPlannedTime extends ExecutionTestSupportForGmos {
                   "config" : {
                     "gmosNorth": {
                       "science" : {
-                        "nextAtom" : ${atom(3)},
+                        "nextAtom" : ${atom(Step1, Step2, Step3)},
                         "possibleFuture" : [
-                          ${atom(3)},
-                          ${atom(3)},
-                          ${atom(1)}
+                          ${atom(Step1, Step2, Step3)},
+                          ${atom(Step1, Step2, Step3)},
+                          ${atom(Step1)}
                         ]
                       }
                     }

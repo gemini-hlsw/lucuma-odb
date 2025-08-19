@@ -1,175 +1,334 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence
-package gmos
-package longslit
+package lucuma.odb.sequence.gmos.longslit
 
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.itc.IntegrationTime
 import munit.Location
 import munit.ScalaCheckSuite
 
-class ScienceSuite extends ScalaCheckSuite {
+class ScienceSuite extends ScalaCheckSuite:
 
-  private def integrationTime(time: TimeSpan, exposures: Int): IntegrationTime =
-    IntegrationTime(time, PosInt.unsafeFrom(exposures))
-
-  import Science.Adjustment
   import Science.Goal
+  import Science.SciencePeriod
 
-  private val Δλs = List(
-    WavelengthDither.Zero,
-    WavelengthDither.intPicometers.get(5000),
-    WavelengthDither.intPicometers.get(-5000)
-  )
+  def plan(
+    μs:    Long,
+    goals: NonEmptyList[Goal]
+  ): List[List[(Int, Int)]] =
+    val max  = (SciencePeriod.toMicroseconds / μs).toInt
 
-  private val Δqs = List(
-    Offset.Q.Zero,
-    Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("15.0")),
-    Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal("-15.0"))
-  )
+    def go(reqs: List[Remaining[Offset.Q]], idx: Int, acc: List[List[(Int, Int)]]): List[List[(Int, Int)]] =
+      if reqs.foldMap(_.total.value) === 0 then acc.reverse
+      else
+        val (qs, req) = reqs(idx % reqs.size).take(max)
+        val block =
+          qs.map(q => (Angle.signedMicroarcseconds.get(q.toAngle) / 1000000).toInt)
+            .tupleLeft(500 + goals.get(idx % reqs.size).get.Δλ.toPicometers.value / 1000)
+        go(reqs.updated(idx % reqs.size, req), idx + 1, block :: acc)
 
-  private val adjs = Δλs.zip(Δqs).map(Adjustment(_, _))
+    go(goals.toList.map(_.requirement), 0, List.empty)
 
-  private def goals(goal: List[(Int, Int)]): List[Goal] =
-    adjs.zip(goal).map { case (adj, (perBlock, total)) =>
-      Goal(adj, NonNegInt.unsafeFrom(perBlock), NonNegInt.unsafeFrom(total))
-    }
+  def compare(
+    num:      Int,
+    exptime:  Int,
+    spectral: List[Int],
+    spatial:  List[Int],
+    expected: List[List[(Int, Int)]]
+  ): Unit =
+    def formatResult(res: List[List[(Int, Int)]]): String =
+      res
+        .map: lst =>
+          lst
+            .map: (wave, q) =>
+              f"$wave\t$q%4d"
+            .mkString("\n")
+        .mkString("\n---\n")
 
-  case class Case(goal: Int*):
-    def expected(timeSpan: TimeSpan): List[Goal] =
-      goals(goal.toList.fproductLeft { total =>
-        val perBlock = (Science.SciencePeriod.toMicroseconds / timeSpan.toMicroseconds).toInt
-        perBlock min total
-      })
+    val μs    = exptime * 1000000L
+    val goals = Goal.compute(
+      spectral.map(d => WavelengthDither.intPicometers.get((d - 500) * 1000)),
+      spatial.map(q => Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))),
+      PosLong.unsafeFrom(μs),
+      PosInt.unsafeFrom(num)
+    )
 
-  def execCases(timeSpan: TimeSpan, cases: Case*): Unit =
-    cases.toList.zipWithIndex.foreach { case (c, idx) =>
-      assertEquals(
-        Science.Goal.compute(Δλs, Δqs, integrationTime(timeSpan, idx+1)),
-        NonEmptyList.fromListUnsafe(c.expected(timeSpan)),
-        s"""Failure: ${TimeSpan.format(timeSpan)}' x ${idx+1}"""
+    assertEquals(formatResult(plan(μs, goals)), formatResult(expected))
+
+  test("--num 1 --expTime  600 --spectral 500 --spatial 0"):
+    compare(
+      num      = 1,
+      exptime  = 600,
+      spectral = List(500),
+      spatial  = List(0),
+      expected = List(
+        List(
+          500 -> 0
+        )
       )
-    }
-
-  test("30 min tests") {
-    execCases(
-      30.minTimeSpan,
-      Case(1, 0, 0),
-      Case(1, 1, 0),
-      Case(1, 1, 1),
-      Case(2, 1, 1),
-      Case(2, 2, 1),
-      Case(2, 2, 2),
-      Case(3, 2, 2),
-      Case(4, 2, 2), // <-
-      Case(4, 3, 2),
-      Case(4, 4, 2),
     )
-  }
 
-  test("20 min tests") {
-    execCases(
-      20.minTimeSpan,
-      Case(1, 0, 0),
-      Case(1, 1, 0),
-      Case(1, 1, 1),
-      Case(2, 1, 1),
-      Case(2, 2, 1),
-      Case(2, 2, 2),
-      Case(3, 2, 2),
-      Case(3, 3, 2),
-      Case(3, 3, 3),
-      Case(4, 3, 3),
-      Case(5, 3, 3), // <-
-      Case(6, 3, 3),
-      Case(6, 4, 3),
-      Case(6, 5, 3),
-      Case(6, 6, 3),
-      Case(6, 6, 4),
-      Case(6, 6, 5),
-      Case(6, 6, 6),
-      Case(7, 6, 6)
+  test("--num 2 --expTime  600 --spectral 500 --spatial 0"):
+    compare(
+      num      = 2,
+      exptime  = 600,
+      spectral = List(500),
+      spatial  = List(0),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 0
+        )
+      )
     )
-  }
 
-  test("11 min tests") {
-    execCases(
-      11.minTimeSpan,
-      Case(1, 0, 0),
-      Case(1, 1, 0),
-      Case(1, 1, 1),
-      Case(2, 1, 1),
-      Case(2, 2, 1),
-      Case(2, 2, 2),
-      Case(3, 2, 2),
-      Case(3, 3, 2),
-      Case(3, 3, 3),
-      Case(4, 3, 3),
-      Case(4, 4, 3),
-      Case(4, 4, 4),
-      Case(5, 4, 4),
-      Case(5, 5, 4),
-      Case(5, 5, 5),
-      Case(6, 5, 5),
-      Case(7, 5, 5), // <-
-      Case(8, 5, 5),
-      Case(9, 5, 5),
-      Case(10, 5, 5),
-      Case(10, 6, 5),
+  test("--num 4 --expTime 1200 --spectral 500 --spatial 0"):
+    compare(
+      num      = 4,
+      exptime  = 1200,
+      spectral = List(500),
+      spatial  = List(0),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 0,
+          500 -> 0
+        ),
+        List(
+          500 -> 0
+        )
+      )
     )
-  }
 
-  test("15 min tests") {
-    execCases(
-      15.minTimeSpan,
-      Case(1, 0, 0),
-      Case(1, 1, 0),
-      Case(1, 1, 1),
-      Case(2, 1, 1),
-      Case(2, 2, 1),
-      Case(2, 2, 2),
-      Case(3, 2, 2),
-      Case(3, 3, 2),
-      Case(3, 3, 3),
-      Case(4, 3, 3),
-      Case(4, 4, 3),
-      Case(4, 4, 4),
-      Case(5, 4, 4),
-      Case(6, 4, 4), // <-
-      Case(7, 4, 4),
-      Case(8, 4, 4),
-      Case(8, 5, 4)
+  test("--num 4 --expTime 1200 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 4,
+      exptime  = 1200,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 15,
+        ),
+        List(
+          505 -> -15
+        ),
+        List(
+          495 -> 0
+        )
+      )
     )
-  }
 
-  test("45 min tests") {
-    execCases(
-      45.minTimeSpan,
-      Case(1, 0, 0),
-      Case(1, 1, 0),
-      Case(1, 1, 1),
-      Case(2, 1, 1),
-      Case(2, 2, 1),
-      Case(2, 2, 2),
-      Case(3, 2, 2),
-      Case(3, 3, 2),
-      Case(3, 3, 3),
-      Case(4, 3, 3),
-      Case(4, 4, 3),
-      Case(4, 4, 4),
-      Case(5, 4, 4),
-      Case(5, 5, 4),
-      Case(5, 5, 5),
-      Case(6, 5, 5)
+  test("--num 9 --expTime 1200 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 9,
+      exptime  = 1200,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 15,
+          500 -> -15
+        ),
+        List(
+          505 -> 0,
+          505 -> 15,
+          505 -> -15
+        ),
+        List(
+          495 -> 0,
+          495 -> 15,
+          495 -> -15
+        )
+      )
     )
-  }
-}
+
+  test("--num 11 --expTime 1200 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 11,
+      exptime  = 1200,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 15,
+          500 -> -15
+        ),
+        List(
+          505 -> 0,
+          505 -> 15,
+          505 -> -15
+        ),
+        List(
+          495 -> 0,
+          495 -> 15,
+          495 -> -15
+        ),
+        List(
+          500 -> 0,
+          500 -> 15
+        )
+      )
+    )
+
+  test("--num 13 --expTime 1200 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 13,
+      exptime  = 1200,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 -> 0,
+          500 -> 15,
+          500 -> -15
+        ),
+        List(
+          505 -> 0,
+          505 -> 15,
+          505 -> -15
+        ),
+        List(
+          495 -> 0,
+          495 -> 15,
+          495 -> -15
+        ),
+        List(
+          500 -> 0,
+          500 -> 15,
+          500 -> -15
+        ),
+        List(
+          505 -> 0
+        )
+      )
+    )
+
+  test("--num 13 --expTime 1201 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 13,
+      exptime  = 1201,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 ->  0,
+          500 -> 15
+        ),
+        List(
+          505 -> -15,
+          505 ->   0
+        ),
+        List(
+          495 ->   0,
+          495 ->  15
+        ),
+        List(
+          500 -> -15,
+          500 ->   0
+        ),
+        List(
+          505 ->  15,
+          505 -> -15
+        ),
+        List(
+          495 -> -15,
+          495 ->   0
+        ),
+        List(
+          500 -> 15
+        )
+      )
+    )
+
+  test("--num 10 --expTime 600 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 10,
+      exptime  = 600,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 ->   0,
+          500 ->   0,
+          500 ->  15,
+          500 -> -15
+        ),
+        List(
+          505 ->   0,
+          505 ->  15,
+          505 -> -15
+        ),
+        List(
+          495 ->   0,
+          495 ->  15,
+          495 -> -15
+        )
+      )
+    )
+
+  test("--num 20 --expTime 600 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 20,
+      exptime  = 600,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 ->   0,
+          500 ->   0,
+          500 ->  15,
+          500 ->  15,
+          500 -> -15,
+          500 -> -15
+        ),
+        List(
+          505 ->   0,
+          505 ->   0,
+          505 ->  15,
+          505 ->  15,
+          505 -> -15,
+          505 -> -15
+        ),
+        List(
+          495 ->   0,
+          495 ->   0,
+          495 ->  15,
+          495 ->  15,
+          495 -> -15,
+          495 -> -15
+        ),
+        List(
+          500 ->   0,
+          500 ->  15
+        )
+      )
+    )
+
+  test("--num 2 --expTime 1200 --spectral 500,505,495 --spatial 0,15,-15"):
+    compare(
+      num      = 2,
+      exptime  = 1200,
+      spectral = List(500,505,495),
+      spatial  = List(0,15,-15),
+      expected = List(
+        List(
+          500 ->   0
+        ),
+        List(
+          505 ->  15
+        )
+      )
+    )

@@ -326,13 +326,15 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       }
     """
 
-  protected def gmosNorthExpectedScienceAtom(ditherNm: Int, p: Int, q: Int, exposures: Int): Json =
-    val steps = List(
-      gmosNorthExpectedArc(ditherNm, p, q), gmosNorthExpectedFlat(ditherNm, p, q)
-    ) ++ List.fill(exposures)(gmosNorthExpectedScience(ditherNm, p, q))
-
+  protected def gmosNorthExpectedScienceAtom(ditherNm: Int, steps: List[Json]): Json =
     Json.obj(
-      "description" -> s"$ditherNm.000 nm, $q.000000″".asJson,
+      "description" -> s"$ditherNm.000 nm".asJson,
       "observeClass" -> "SCIENCE".asJson,
       "steps" -> steps.asJson
     )
+
+  protected def gmosNorthExpectedScienceAtom(ditherNm: Int, q0: Int, qs: Int*): Json =
+    val steps = List(
+      gmosNorthExpectedArc(ditherNm, 0, q0), gmosNorthExpectedFlat(ditherNm, 0, q0)
+    ) ++ (q0 :: qs.toList).map(q => gmosNorthExpectedScience(ditherNm, 0, q))
+    gmosNorthExpectedScienceAtom(ditherNm, steps)

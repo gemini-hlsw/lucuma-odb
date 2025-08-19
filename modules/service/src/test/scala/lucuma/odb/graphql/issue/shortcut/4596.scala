@@ -43,7 +43,7 @@ class ShortCut_4596 extends OdbSuite
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      PosInt.unsafeFrom(2)
+      PosInt.unsafeFrom(1)
     )
 
   def queryObservationWorkflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
@@ -73,9 +73,7 @@ class ShortCut_4596 extends OdbSuite
       _  <- addEndStepEvent(s0)
       s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, telescopeConfig(0, 0, StepGuideState.Disabled), ObserveClass.NightCal)
       _  <- addEndStepEvent(s1)
-      s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science)
-      _  <- addEndStepEvent(s2)
-      s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
+      _  <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
       _  <- computeItcResultAs(pi,o)
       _  <- runObscalcUpdateAs(serviceUser, p, o)
       _  <- assertIO(queryObservationWorkflowState(o), state)

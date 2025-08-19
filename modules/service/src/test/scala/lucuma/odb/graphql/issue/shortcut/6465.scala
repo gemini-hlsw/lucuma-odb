@@ -42,8 +42,8 @@ class ShortCut_6465 extends ExecutionTestSupportForGmos:
             "executionConfig" -> Json.obj(
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, p = 0, q = 0, exposures = 3),
-                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, p = 0, q = 15, exposures = 3)).asJson,
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 15, -15)).asJson,
                   "hasMore" -> true.asJson
                 )
               )
@@ -69,8 +69,8 @@ class ShortCut_6465 extends ExecutionTestSupportForGmos:
             "executionConfig" -> Json.obj(
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, p = 0, q = 0, exposures = 3),
-                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, p = 0, q = 15, exposures = 3)).asJson,
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 15, -15)).asJson,
                   "hasMore" -> true.asJson
                 )
               )

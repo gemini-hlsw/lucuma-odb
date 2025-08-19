@@ -42,6 +42,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
     )
 
   // * Arc:
+  // (there is an offset cost but it is subsumed by the science fold movement)
   //   * Science Fold.: 15.0
   //   * Exposure Time:  1.0
   //   * Readout......: 41.1
@@ -58,8 +59,6 @@ class executionDigest extends ExecutionTestSupportForGmos {
   //                    57.1
 
   // * Science (1):
-  // (there is an offset cost for some steps but it is subsumed by the
-  //  science fold movement)
   //   * Science Fold:    15.0
   //   * Exposure Time: 1200.0
   //   * Readout......:   41.1
@@ -67,12 +66,21 @@ class executionDigest extends ExecutionTestSupportForGmos {
   //                      ----
   //                    1266.1
 
-  // * Science (2 and 3):
+  // * Science (2):
+  //   * Offs 0-> 15..:    7.09375 (7 + 0.00625 * 15)
   //   * Exposure Time: 1200.0
   //   * Readout......:   41.1
   //   * Writeout.....:   10.0
   //                      ----
-  //                    1251.1
+  //                    1258.19375
+
+  // * Science (3):
+  //   * Offs 15-> -15:    7.1875 (7 + 0.00625 * 30)
+  //   * Exposure Time: 1200.0
+  //   * Readout......:   41.1
+  //   * Writeout.....:   10.0
+  //                      ----
+  //                    1258.2875
 
   extension (s: String)
     def sec: BigDecimal =
@@ -83,9 +91,9 @@ class executionDigest extends ExecutionTestSupportForGmos {
     ("67.1".sec * 4) + ("57.1".sec * 4)
 
   // 4 atoms, all of which incur the 1266.1 cost including the science fold
-  // move, 3 of them have an additional 2 steps each of 1251.1
+  // move, 3 of them have an additional 2 steps
   val ScienceTime: BigDecimal =
-    ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
+    ("1266.1".sec * 4) + ("1258.19375".sec + "1258.2875".sec) * 3
 
   val ProgramTime: BigDecimal = CalibrationTime + ScienceTime
 
@@ -696,14 +704,14 @@ class executionDigest extends ExecutionTestSupportForGmos {
         )
 
   test("executionState - COMPLETED"):
-    def atom(v: Visit.Id, ditherNm: Int, q: Int, n: Int): IO[Unit] =
+    def atom(v: Visit.Id, ditherNm: Int, q0: Int, qs: Int*): IO[Unit] =
       for
         a <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
+        c <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
         _ <- addEndStepEvent(c)
-        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
+        f <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
         _ <- addEndStepEvent(f)
-        s <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science).replicateA(n)
+        s <- (q0 :: qs.toList).traverse(q => recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(ditherNm), StepConfig.Science, sciTelescopeConfig(q), ObserveClass.Science))
         _ <- s.traverse(addEndStepEvent)
       yield ()
 
@@ -713,10 +721,10 @@ class executionDigest extends ExecutionTestSupportForGmos {
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
-        _ <- atom(v,  0,   0, 3)
-        _ <- atom(v,  5,  15, 3)
-        _ <- atom(v, -5, -15, 3)
-        _ <- atom(v,  0,   0, 1)
+        _ <- atom(v,  0, 0, 15, -15)
+        _ <- atom(v,  5, 0, 15, -15)
+        _ <- atom(v, -5, 0, 15, -15)
+        _ <- atom(v,  0, 0)
         _ <- runObscalcUpdate(p, o)
       yield o
 

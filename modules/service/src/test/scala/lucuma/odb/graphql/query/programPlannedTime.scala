@@ -33,8 +33,8 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
-      20.minTimeSpan,
-      PosInt.unsafeFrom(10)
+      10.minTimeSpan,
+      PosInt.unsafeFrom(18)
     )
 
   val user: User = serviceUser
@@ -59,30 +59,40 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
             nanometers: 500
           }
           explicitSpatialOffsets: [
-            {
-              arcseconds: 10.0
-            },
-            {
-              arcseconds: -10.0
-            },
-            {
-              arcseconds: -10.0
-            },
-            {
-              arcseconds: 10.0
-            }
+            { arcseconds: -10.0 },
+            { arcseconds:  -5.0 },
+            { arcseconds:   0.0 },
+            { arcseconds:   5.0 },
+            { arcseconds:  10.0 },
+            { arcseconds:  15.0 }
           ]
         }
       """
     )
 
-  //              full setup + arcs            + flats            + sci w/ config chg  + science w/o config change
-  val ShortTime = "960".sec + ("67.1".sec * 4) + ("57.1".sec * 4) + ("1266.1".sec * 4) + ("1251.1".sec * 3 * 2)
+  val OneDataset =
+    "600.0".sec + // exposure time
+    "41.1".sec  + // readout
+    "10.0".sec    // writeout
 
-  // This observation will have 12 goals (lcm(3 dithers, 4 offsets)) but only
-  // 10 datasets.  We spread out the 10 datasets as evenly as possible (1 per
-  // goal for the first 10 goals).
-  val LongTime  = "960".sec + ("67.1".sec * 10) + ("57.1".sec * 10) + ("1266.1".sec * 10)
+  val BaseTime =
+    "960.0".sec +                                // full setup
+    ("15.0".sec + "52.1".sec + "57.1".sec) * 3 + // (science fold + arc + flat)
+    "15".sec * 3 +                               // calibration -> science, 3 wavelength blocks
+    OneDataset * 18                              // 6 steps per 3 wavelength blocks
+
+  val Offset_5arcsec  = "7.0".sec + "0.03125".sec
+
+  val Offset_15arcsec = "7.0".sec + "0.09375".sec
+
+  val Offset_30arcsec = "7.0".sec + "0.18750".sec
+
+  // Only 2 offsets that matter in each of the 3 wavelength blocks.  The other
+  // offset happens at the same time the science fold is moving.
+  val ShortTime = BaseTime + (Offset_15arcsec + Offset_30arcsec) * 3
+
+  // Only 5 offsets that matter in each of the 3 wavelength blocks.
+  val LongTime  = BaseTime + Offset_5arcsec * 5 * 3
 
   private def createBandedGmosNorthLongSlitObservationAs(
     user: User,
