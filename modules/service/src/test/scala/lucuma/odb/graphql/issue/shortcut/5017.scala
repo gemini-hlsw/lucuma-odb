@@ -68,14 +68,14 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         d <- executeStep(c, s)
       yield (s, d)
 
-    def executeAtom(c: AtomicCell[IO, Int], v: Visit.Id, ditherNm: Int, q: Int, stepCount: Int): IO[(Atom.Id, List[(Step.Id, Dataset.Id)])] =
+    def executeAtom(c: AtomicCell[IO, Int], v: Visit.Id, ditherNm: Int, q0: Int, qs: Int*): IO[(Atom.Id, List[(Step.Id, Dataset.Id)])] =
       for
         a  <- recordAtomAs(serviceUser, Instrument.GmosNorth, v, SequenceType.Science)
-        sa <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
+        sa <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(ditherNm), ArcStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
         da <- executeStep(c, sa)
-        sf <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q), ObserveClass.NightCal)
+        sf <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(ditherNm), FlatStep, gcalTelescopeConfig(q0), ObserveClass.NightCal)
         df <- executeStep(c, sf)
-        ss <- recordAndExecuteScienceStep(c, a, ditherNm, q).replicateA(stepCount)
+        ss <- (q0 :: qs.toList).traverse(q => recordAndExecuteScienceStep(c, a, ditherNm, q))
       yield (a, (sa, da) :: (sf, df) :: ss)
 
     val setup: IO[(Program.Id, Observation.Id, (Atom.Id, List[(Step.Id, Dataset.Id)]))] =
@@ -86,10 +86,10 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         v <- recordVisitAs(serviceUser, Instrument.GmosNorth, o)
         c <- AtomicCell[IO].of(0)
-        _ <- executeAtom(c, v,  0,   0, 3).void
-        _ <- executeAtom(c, v,  5,  15, 3).void
-        _ <- executeAtom(c, v, -5, -15, 3).void
-        a <- executeAtom(c, v,  0,   0, 1)
+        _ <- executeAtom(c, v,  0,  0, 15, -15).void
+        _ <- executeAtom(c, v,  5,  0, 15, -15).void
+        _ <- executeAtom(c, v, -5,  0, 15, -15).void
+        a <- executeAtom(c, v,  0,  0)
       yield (p, o, a)
 
     def currentStateQuery(o: Observation.Id): String = s"""
