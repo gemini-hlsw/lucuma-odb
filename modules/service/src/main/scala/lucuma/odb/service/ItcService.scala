@@ -252,7 +252,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -407,7 +407,12 @@ object ItcService {
         results: AsterismResults
       )(using Transaction[F]): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
-        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results).void
+        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results)
+          .void
+          .recoverWith {
+            case SqlState.ForeignKeyViolation(ex) =>
+              Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+          }
     }
 
   object Statements {

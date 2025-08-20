@@ -28,7 +28,7 @@ import lucuma.odb.sequence.gmos.longslit.Config
 import scala.reflect.ClassTag
 
 trait GmosLongSlitMapping[F[_]]
-  extends GmosLongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
+  extends GmosLongSlitTable[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
 
   private class CommonFieldMappings(cc: CommonColumns) {
 
@@ -67,14 +67,41 @@ trait GmosLongSlitMapping[F[_]]
         List("wavelengthDithersString")
       )
 
+    val offsetsString: FieldMapping =
+      SqlField("offsetsString", cc.Offsets, hidden = true)
+
+    val offsets: FieldMapping =
+      CursorFieldJson("offsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.getOrElse(defaultSpatialOffsetsJson)),
+        List("explicitOffsets", "defaultOffsets")
+      )
+
+    val explicitOffsets: FieldMapping =
+      CursorFieldJson("explicitOffsets",
+        cursor =>
+          cursor
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.asJson),
+        List("offsetsString")
+      )
+
+    val defaultOffsets: FieldMapping =
+      CursorFieldJson("defaultOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+
+    // Deprecated spatial offsets fields - these map to the same data as the new offsets fields
     val spatialOffsetsString: FieldMapping =
-      SqlField("spatialOffsetsString", cc.SpatialOffsets, hidden = true)
+      SqlField("spatialOffsetsString", cc.Offsets, hidden = true)
 
     val spatialOffsets: FieldMapping =
       CursorFieldJson("spatialOffsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
+            .field("offsetsString", None)
             .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
             .map(_.getOrElse(defaultSpatialOffsetsJson)),
         List("explicitSpatialOffsets", "defaultSpatialOffsets")
@@ -84,9 +111,10 @@ trait GmosLongSlitMapping[F[_]]
       CursorFieldJson("explicitSpatialOffsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets).asJson)),
-        List("spatialOffsetsString")
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
+            .map(_.asJson),
+        List("offsetsString")
       )
 
     val defaultSpatialOffsets: FieldMapping =
@@ -104,15 +132,15 @@ trait GmosLongSlitMapping[F[_]]
 
     import GmosLongSlitMapping._
 
-    val common = new CommonFieldMappings(GmosNorthLongSlitView.Common)
+    val common = new CommonFieldMappings(GmosNorthLongSlitTable.Common)
 
     ObjectMapping(GmosNorthLongSlitType)(
 
-      SqlField("observationId", GmosNorthLongSlitView.Common.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GmosNorthLongSlitTable.Common.ObservationId, key = true, hidden = true),
 
-      SqlField("grating", GmosNorthLongSlitView.Grating),
-      SqlField("filter",  GmosNorthLongSlitView.Filter),
-      SqlField("fpu",     GmosNorthLongSlitView.Fpu),
+      SqlField("grating", GmosNorthLongSlitTable.Grating),
+      SqlField("filter",  GmosNorthLongSlitTable.Filter),
+      SqlField("fpu",     GmosNorthLongSlitTable.Fpu),
       SqlObject("centralWavelength"),
 
       // ---------------------
@@ -168,7 +196,15 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // spatialOffsets
+      // offsets
+      // ---------------------
+      common.offsetsString,
+      common.offsets,
+      common.explicitOffsets,
+      common.defaultOffsets,
+
+      // ---------------------
+      // spatialOffsets (deprecated)
       // ---------------------
       common.spatialOffsetsString,
       common.spatialOffsets,
@@ -187,9 +223,9 @@ trait GmosLongSlitMapping[F[_]]
 
       // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
       // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-      SqlField("initialGrating", GmosNorthLongSlitView.InitialGrating),
-      SqlField("initialFilter",  GmosNorthLongSlitView.InitialFilter),
-      SqlField("initialFpu",     GmosNorthLongSlitView.InitialFpu),
+      SqlField("initialGrating", GmosNorthLongSlitTable.InitialGrating),
+      SqlField("initialFilter",  GmosNorthLongSlitTable.InitialFilter),
+      SqlField("initialFpu",     GmosNorthLongSlitTable.InitialFpu),
       SqlObject("initialCentralWavelength")
     )
 
@@ -199,15 +235,15 @@ trait GmosLongSlitMapping[F[_]]
 
     import GmosLongSlitMapping._
 
-    val common = new CommonFieldMappings(GmosSouthLongSlitView.Common)
+    val common = new CommonFieldMappings(GmosSouthLongSlitTable.Common)
 
     ObjectMapping(GmosSouthLongSlitType)(
 
-      SqlField("observationId", GmosSouthLongSlitView.Common.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GmosSouthLongSlitTable.Common.ObservationId, key = true, hidden = true),
 
-      SqlField("grating", GmosSouthLongSlitView.Grating),
-      SqlField("filter",  GmosSouthLongSlitView.Filter),
-      SqlField("fpu",     GmosSouthLongSlitView.Fpu),
+      SqlField("grating", GmosSouthLongSlitTable.Grating),
+      SqlField("filter",  GmosSouthLongSlitTable.Filter),
+      SqlField("fpu",     GmosSouthLongSlitTable.Fpu),
       SqlObject("centralWavelength"),
 
       // ---------------------
@@ -263,7 +299,15 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // spatialOffsets
+      // offsets
+      // ---------------------
+      common.offsetsString,
+      common.offsets,
+      common.explicitOffsets,
+      common.defaultOffsets,
+
+      // ---------------------
+      // spatialOffsets (deprecated)
       // ---------------------
       common.spatialOffsetsString,
       common.spatialOffsets,
@@ -282,9 +326,9 @@ trait GmosLongSlitMapping[F[_]]
 
       // We keep up with (read-only) values that were used to create the GMOS LongSlit observing mode initially.
       // Any changes are made via editing `grating`, `filter`, `fpu` and `centralWavelength`.
-      SqlField("initialGrating", GmosSouthLongSlitView.InitialGrating),
-      SqlField("initialFilter",  GmosSouthLongSlitView.InitialFilter),
-      SqlField("initialFpu",     GmosSouthLongSlitView.InitialFpu),
+      SqlField("initialGrating", GmosSouthLongSlitTable.InitialGrating),
+      SqlField("initialFilter",  GmosSouthLongSlitTable.InitialFilter),
+      SqlField("initialFpu",     GmosSouthLongSlitTable.InitialFpu),
       SqlObject("initialCentralWavelength")
     )
 

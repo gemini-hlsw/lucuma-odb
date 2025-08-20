@@ -19,10 +19,10 @@ import lucuma.odb.sequence.flamingos2.longslit.Config
 trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F] with OptionalFieldMapping[F] { this: SkunkMapping[F] =>
 
-  private def decodeSpatialOffsets(s: String): Json =
+  private def decodeOffsets(s: String): Json =
     OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
 
-  private val defaultSpatialOffsetsJson: Json =
+  private val defaultOffsetsJson: Json =
     Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
   lazy val Flamingos2LongSlitMapping: ObjectMapping =
@@ -45,26 +45,26 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("defaultReadoutMode",  Flamingos2LongSlitView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2LongSlitView.ReadoutMode),
 
-      SqlField("spatialOffsetsString", Flamingos2LongSlitView.SpatialOffsets, hidden = true),
+      SqlField("offsetsString", Flamingos2LongSlitView.Offsets, hidden = true),
 
-      CursorFieldJson("spatialOffsets",
+      CursorFieldJson("offsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.getOrElse(defaultSpatialOffsetsJson)),
-        List("explicitSpatialOffsets", "defaultSpatialOffsets")
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets)))
+            .map(_.getOrElse(defaultOffsetsJson)),
+        List("explicitOffsets", "defaultOffsets")
       ),
 
-      CursorFieldJson("explicitSpatialOffsets",
+      CursorFieldJson("explicitOffsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets).asJson)),
-        List("spatialOffsetsString")
+            .field("offsetsString", None)
+            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets).asJson)),
+        List("offsetsString")
       ),
 
-      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil),
+      CursorFieldJson("defaultOffsets", _ => Result(defaultOffsetsJson), Nil),
 
       SqlField("initialDisperser", Flamingos2LongSlitView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2LongSlitView.InitialFilter),

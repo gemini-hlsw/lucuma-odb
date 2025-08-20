@@ -6,11 +6,11 @@ package mapping
 
 import grackle.Path
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ProgramUserTable
+import lucuma.odb.graphql.table.ProgramUserView
 import lucuma.odb.graphql.table.UserProfileTable
 import lucuma.odb.graphql.table.UserTable
 
-trait UserProfileMapping[F[_]] extends UserTable[F] with ProgramUserTable[F]:
+trait UserProfileMapping[F[_]] extends UserTable[F] with ProgramUserView[F]:
 
   private def profileMappingAt(
     path:    Path,
@@ -28,5 +28,5 @@ trait UserProfileMapping[F[_]] extends UserTable[F] with ProgramUserTable[F]:
   lazy val UserProfileMappings: List[TypeMapping] =
     List(
       profileMappingAt(UserType / "profile",  UserTable.Profile, UserTable.UserId),
-      profileMappingAt(ProgramUserType / "fallbackProfile", ProgramUserTable.Fallback, ProgramUserTable.UserId)
+      profileMappingAt(ProgramUserType / "preferredProfile", ProgramUserView.Preferred, ProgramUserView.UserId)
     )

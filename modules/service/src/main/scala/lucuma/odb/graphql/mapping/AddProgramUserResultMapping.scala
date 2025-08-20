@@ -6,12 +6,12 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.ProgramUserTable
+import table.ProgramUserView
 
-trait AddProgramUserResultMapping[F[_]] extends ProgramUserTable[F]:
+trait AddProgramUserResultMapping[F[_]] extends ProgramUserView[F]:
 
   lazy val AddProgramUserResultMapping: ObjectMapping =
     ObjectMapping(AddProgramUserResultType)(
-      SqlField("id", ProgramUserTable.ProgramUserId, key = true, hidden = true),
+      SqlField("id", ProgramUserView.ProgramUserId, key = true, hidden = true),
       SqlObject("programUser")
     )
