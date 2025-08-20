@@ -91,7 +91,7 @@ class programUsers extends OdbSuite:
   test("program user selection via id"):
     val lho = UserProfile("Lee".some, "Oswald".some, "Lee Harvey Oswald".some, "lee@oswald.co".some)
     createProgramAs(piJohn).flatMap: pid =>
-      addProgramUserAs(piJohn, pid, fallback = lho).flatMap: puid =>
+      addProgramUserAs(piJohn, pid, preferred = lho).flatMap: puid =>
         expect(
           user = staff,
           query = s"""
@@ -308,7 +308,7 @@ class programUsers extends OdbSuite:
           ) {
             matches {
               id
-              fallbackProfile { givenName }
+              preferredProfile { givenName }
             }
           }
         }
@@ -320,9 +320,9 @@ class programUsers extends OdbSuite:
 
     for
       pid  <- createProgramAs(pi2)
-      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.CA), fallback = cg)
-      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.UH), fallback = jwb)
-      rid2 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasNonPartner, fallback = lc)
+      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.CA), preferred = cg)
+      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.UH), preferred = jwb)
+      rid2 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasNonPartner, preferred = lc)
       _    <- linkUserAs(pi2, rid0, piCharles.id)
       _    <- linkUserAs(pi2, rid2, piLeon.id)
       _    <- expect(
@@ -335,7 +335,7 @@ class programUsers extends OdbSuite:
                        "matches": [
                          {
                            "id": $rid1,
-                           "fallbackProfile": { "givenName":  "John" }
+                           "preferredProfile": { "givenName":  "John" }
                          }
                        ]
                      }
@@ -353,15 +353,15 @@ class programUsers extends OdbSuite:
                        "matches": [
                          {
                            "id": $rid3,
-                           "fallbackProfile": { "givenName": null }
+                           "preferredProfile": { "givenName": null }
                          },
                          {
                            "id": $rid0,
-                           "fallbackProfile": { "givenName":  "Charles" }
+                           "preferredProfile": { "givenName":  "Charles" }
                          },
                          {
                            "id": $rid2,
-                           "fallbackProfile": { "givenName":  "Leon" }
+                           "preferredProfile": { "givenName":  "Leon" }
                          }
                        ]
                      }

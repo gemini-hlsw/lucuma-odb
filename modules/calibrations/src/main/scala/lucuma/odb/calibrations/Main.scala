@@ -26,10 +26,10 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
-import natchez.EntryPoint
+import lucuma.odb.util.LucumaEntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import org.http4s.Credentials
+import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
@@ -82,17 +82,17 @@ object CalibrationsMain extends CommandIOApp(
 object CMain extends MainParams {
 
   /** A startup action that prints a banner. */
-  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
+  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
     val banner =
         s"""|
             |$Header
             |
             |CommitHash. : ${config.commitHash.format}
             |PID         : ${ProcessHandle.current.pid}
+            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
-  }
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Network: Console](
@@ -113,16 +113,6 @@ object CMain extends MainParams {
   }
 
 
-  /** A resource that yields a Natchez tracing entry point. */
-  def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
-    Honeycomb.entryPoint(ServiceName) { cb =>
-      Sync[F].delay {
-        cb.setWriteKey(config.honeycomb.writeKey)
-        cb.setDataset(config.honeycomb.dataset)
-        cb.build()
-      }
-    }
-
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
@@ -137,7 +127,11 @@ object CMain extends MainParams {
     } yield (top, ctt)
 
   def runCalibrationsDaemon[F[_]: Async: Logger](
-    obsTopic: Topic[F, ObservationTopic.Element], calibTopic: Topic[F, CalibTimeTopic.Element], services: Resource[F, Services[F]]
+    emailConfig: Config.Email,
+    httpClient: Client[F],
+    obsTopic: Topic[F, ObservationTopic.Element],
+    calibTopic: Topic[F, CalibTimeTopic.Element],
+    services: Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
       _  <- Resource.eval(Logger[F].info("Start listening for program changes"))
@@ -146,7 +140,7 @@ object CMain extends MainParams {
                 requireServiceAccess:
                   for {
                     t <- Sync[F].delay(LocalDate.now(ZoneOffset.UTC))
-                    _ <- calibrationsService
+                    _ <- calibrationsService(emailConfig, httpClient)
                           .recalculateCalibrations(
                             elem.programId,
                             LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
@@ -158,7 +152,7 @@ object CMain extends MainParams {
       _  <- Resource.eval(calibTopic.subscribe(100).evalMap { elem =>
               services.useTransactionally {
                 requireServiceAccess:
-                  calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                  calibrationsService(emailConfig, httpClient).recalculateCalibrationTarget(elem.programId, elem.observationId)
                     .map(Result.success)
               }
             }.compile.drain.start.void)
@@ -190,12 +184,13 @@ object CMain extends MainParams {
     for {
       c           <- Resource.eval(Config.fromCiris.load[F])
       _           <- Resource.eval(banner[F](c))
-      ep          <- entryPointResource(c)
+      ep          <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       pool        <- databasePoolResource[F](c.database)
       enums       <- Resource.eval(pool.use(Enums.load))
       (obsT, ctT) <- topics(pool)
       user        <- Resource.eval(serviceUser[F](c))
-      _           <- runCalibrationsDaemon(obsT, ctT, pool.evalMap(services(user, enums)))
+      httpClient  <- c.httpClientResource
+      _           <- runCalibrationsDaemon(c.email, httpClient, obsT, ctT, pool.evalMap(services(user, enums)))
     } yield ExitCode.Success
 
   /** Our logical entry point. */
@@ -203,4 +198,3 @@ object CMain extends MainParams {
     server.use(_ => Concurrent[F].never[ExitCode])
 
 }
-

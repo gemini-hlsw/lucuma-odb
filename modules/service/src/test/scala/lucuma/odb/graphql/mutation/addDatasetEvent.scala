@@ -14,6 +14,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
@@ -247,5 +248,52 @@ class addDatasetEvent extends OdbSuite {
   test("addDatasetEvent - start, end, start") {
     timeTest("N18630101S0008.fits", DatasetStage.StartExpose, DatasetStage.EndWrite, DatasetStage.StartExpose)
   }
+
+  def addClientId(
+    did:         Dataset.Id,
+    cid:         Client.Id,
+    isDuplicate: Boolean
+  ): IO[Unit] =
+      expect(
+        service,
+        s"""
+          mutation {
+            addDatasetEvent(input: {
+              datasetId: "$did",
+              datasetStage: START_WRITE
+              clientId: "$cid"
+            }) {
+              event { clientId }
+            }
+          }
+        """,
+        Either.cond(
+          !isDuplicate,
+          json"""
+            {
+              "addDatasetEvent": {
+                "event": {
+                  "clientId": $cid
+                }
+              }
+            }
+          """,
+          List(s"An event with client id '$cid' has already been added.")
+        )
+      )
+
+
+  test("addDatasetEvent - client id"):
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+
+    recordDataset(mode, service, "N18630101S0009.fits").flatMap: (_, did) =>
+      addClientId(did, cid.get, isDuplicate = false)
+
+  test("addDatasetEvent - duplicate client id"):
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    recordDataset(mode, service, "N18630101S0010.fits").flatMap: (_, did) =>
+      addClientId(did, cid.get, isDuplicate = false) *>
+      addClientId(did, cid.get, isDuplicate = true)
 
 }

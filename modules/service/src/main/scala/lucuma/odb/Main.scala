@@ -34,10 +34,10 @@ import lucuma.odb.service.EmailWebhookService
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
+import lucuma.odb.util.LucumaEntryPoint
 import lucuma.sso.client.SsoClient
 import natchez.EntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
@@ -126,7 +126,7 @@ object Main extends CommandIOApp(
 
       for {
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
-        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))     
+        _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))
         e <- FMain.runF[IO](reset, skipMigration, Trace.ioTraceForEntryPoint)
       } yield e
     })
@@ -145,7 +145,7 @@ object FMain extends MainParams {
   val GraphQLServiceTTL = 30.minutes
 
   /** A startup action that prints a banner. */
-  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
+  def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
     val banner =
         s"""|
             |$Header
@@ -155,10 +155,10 @@ object FMain extends MainParams {
             |ITC Root    : ${config.itc.root}
             |Port        : ${config.port}
             |PID         : ${ProcessHandle.current.pid}
+            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
-  }
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Trace: Network: Console: Logger](
@@ -190,16 +190,6 @@ object FMain extends MainParams {
       .bindHttp(port.value, "0.0.0.0")
       .withHttpWebSocketApp(app)
       .resource
-
-  /** A resource that yields a Natchez tracing entry point. */
-  def entryPointResource[F[_]: Sync](config: Config): Resource[F, EntryPoint[F]] =
-    Honeycomb.entryPoint(ServiceName) { cb =>
-      Sync[F].delay {
-        cb.setWriteKey(config.honeycomb.writeKey)
-        cb.setDataset(config.honeycomb.dataset)
-        cb.build()
-      }
-    }
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Parallel: Trace: Logger: Network: Console: SecureRandom](
@@ -327,7 +317,7 @@ object FMain extends MainParams {
       _  <- Resource.eval(banner[F](c))
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
-      ep <- entryPointResource(c)
+      ep <- LucumaEntryPoint.entryPointResource(ServiceName, c)
       t  <- Resource.eval(mkTrace(ep))
       ap <- { given Trace[F] = t; routesResource(c).map(_.map(_.orNotFound)) }
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
@@ -343,4 +333,3 @@ object FMain extends MainParams {
     server(reset, skipMigration, mkTrace).use(_ => Concurrent[F].never[ExitCode])
 
 }
-

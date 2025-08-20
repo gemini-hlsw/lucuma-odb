@@ -370,7 +370,6 @@ object Config:
     defaultWavelengthDithers(grating match
       case GmosSouthGrating.B1200_G5321 |
            GmosSouthGrating.R831_G5322  |
-           GmosSouthGrating.B600_G5323  |
            GmosSouthGrating.R600_G5324  |
            GmosSouthGrating.B480_G5327  => 5
       case GmosSouthGrating.R400_G5325  => 8

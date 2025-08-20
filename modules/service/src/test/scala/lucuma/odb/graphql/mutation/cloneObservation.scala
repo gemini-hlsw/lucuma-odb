@@ -57,12 +57,24 @@ class cloneObservation extends OdbSuite {
           filter
           fpu
           centralWavelength { nanometers }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
+          spatialOffsets { arcseconds }
+          explicitSpatialOffsets { arcseconds }
+          defaultSpatialOffsets { arcseconds }
         }
         gmosSouthLongSlit {
           grating
           filter
           fpu
           centralWavelength { nanometers }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
+          spatialOffsets { arcseconds }
+          explicitSpatialOffsets { arcseconds }
+          defaultSpatialOffsets { arcseconds }
         }
         gmosNorthImaging {
           filters
@@ -72,7 +84,7 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
-          spatialOffsets {
+          offsets {
             p { arcseconds }
             q { arcseconds }
           }
@@ -85,7 +97,7 @@ class cloneObservation extends OdbSuite {
           ampReadMode
           ampGain
           roi
-          spatialOffsets {
+          offsets {
             p { arcseconds }
             q { arcseconds }
           }
@@ -576,7 +588,7 @@ class cloneObservation extends OdbSuite {
                   originalObservation {
                     observingMode {
                       gmosNorthImaging {
-                        spatialOffsets {
+                        offsets {
                           p { arcseconds }
                           q { arcseconds }
                         }
@@ -586,7 +598,7 @@ class cloneObservation extends OdbSuite {
                   newObservation {
                     observingMode {
                       gmosNorthImaging {
-                        spatialOffsets {
+                        offsets {
                           p { arcseconds }
                           q { arcseconds }
                         }
@@ -603,7 +615,7 @@ class cloneObservation extends OdbSuite {
                     "originalObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "spatialOffsets": [
+                          "offsets": [
                             { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                             { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
                           ]
@@ -613,7 +625,7 @@ class cloneObservation extends OdbSuite {
                     "newObservation": {
                       "observingMode": {
                         "gmosNorthImaging": {
-                          "spatialOffsets": [
+                          "offsets": [
                             { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                             { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
                           ]
@@ -650,7 +662,7 @@ class cloneObservation extends OdbSuite {
                   originalObservation {
                     observingMode {
                       flamingos2LongSlit {
-                        spatialOffsets {
+                        offsets {
                           p {
                             arcseconds
                           }
@@ -664,7 +676,7 @@ class cloneObservation extends OdbSuite {
                   newObservation {
                     observingMode {
                       flamingos2LongSlit {
-                        spatialOffsets {
+                        offsets {
                           p {
                             arcseconds
                           }
@@ -685,7 +697,7 @@ class cloneObservation extends OdbSuite {
                     "originalObservation": {
                       "observingMode": {
                         "flamingos2LongSlit": {
-                          "spatialOffsets": [
+                          "offsets": [
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
@@ -697,7 +709,7 @@ class cloneObservation extends OdbSuite {
                     "newObservation": {
                       "observingMode": {
                         "flamingos2LongSlit": {
-                          "spatialOffsets": [
+                          "offsets": [
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 1.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.500000 } },
                             { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 2.250000 } },
@@ -716,4 +728,3 @@ class cloneObservation extends OdbSuite {
     }
   }
 }
-

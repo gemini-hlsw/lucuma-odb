@@ -8,6 +8,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -19,10 +20,14 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
+
+import java.time.Instant
 
 class setProposalStatus extends OdbSuite
   with ObservingModeSetupOperations {
@@ -36,12 +41,18 @@ class setProposalStatus extends OdbSuite
 
   val validUsers = List(pi, pi2, ngo, staff, admin, guest)
 
+  val oneDay: TimeSpan     = TimeSpan.fromHours(24).get
+  val yesterday: Timestamp = Timestamp.unsafeFromInstantTruncated(Instant.now) -| oneDay
+
+  override val httpRequestHandler = invitationEmailRequestHandler
+
   test("✓ valid submission") {
     createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
-      createProgramAs(pi).flatMap { pid =>
+      createProgramWithNonPartnerPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
         addCoisAs(pi, pid) *>
+        ensureNoEmailsForAddress(defaultPiEmail) *>
         expect(
           user = pi,
           query = s"""
@@ -68,7 +79,8 @@ class setProposalStatus extends OdbSuite
                 }
               }
             """.asRight
-        )
+        ) *>
+        ensureSomeQueuedEmailsForAddress(defaultPiEmail, 1)
       }
     }
   }
@@ -184,7 +196,7 @@ class setProposalStatus extends OdbSuite
 
   test("✓ fast turnaround submission") {
     createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
-      createProgramAs(pi).flatMap { pid =>
+      createProgramWithUsPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some, "fastTurnaround: {}".some) *>
         addCoisAs(pi, pid, List(Partner.US)) *>
         expect(
@@ -463,7 +475,7 @@ class setProposalStatus extends OdbSuite
 
     for {
       c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
-      p <- createProgramAs(pi)
+      p <- createProgramWithNonPartnerPi(pi)
       _ <- addProposal(pi, p)
       _ <- setCallId(pi, p, c)
       _ <- addPartnerSplits(pi, p)
@@ -531,7 +543,7 @@ class setProposalStatus extends OdbSuite
 
     for {
       c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
-      p <- createProgramAs(pi)
+      p <- createProgramWithNonPartnerPi(pi)
       _ <- addProposal(pi, p)
       _ <- addPartnerSplits(pi, p)
       _ <- addCoisAs(pi, p)
@@ -593,7 +605,7 @@ class setProposalStatus extends OdbSuite
   test("ensure that configuration requests are created when the proposal is submitted, but not for inactive observations or calibrations") {
     for
       cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
-      pid <- createProgramAs(pi)
+      pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
@@ -649,7 +661,7 @@ class setProposalStatus extends OdbSuite
   test("ensure that configuration requests are deleted when the proposal is withdrawn") {
     for
       cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
-      pid <- createProgramAs(pi)
+      pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
@@ -712,8 +724,12 @@ class setProposalStatus extends OdbSuite
   }
 
   test("✓ A partner of 'HasNonPartner' counts as a US partner for validation"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap: cid =>
-      createProgramAs(pi).flatMap: pid =>
+    createCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester, 
+      partners = List((Partner.US, none), (Partner.CA, none))
+    ).flatMap: cid =>
+      createProgramWithCaPi(pi).flatMap: pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
         addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasPartner(Partner.CA)) *>
@@ -746,4 +762,188 @@ class setProposalStatus extends OdbSuite
             }
           """.asRight
         )
+
+  test("Cannot submit past deadline: PI HasNonPartner with US deadline override"):
+    createCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester, 
+      deadline = yesterday.some,
+      partners = List((Partner.US, none), (Partner.CA, none))
+    ).flatMap: cid =>
+      createProgramWithNonPartnerPi(pi).flatMap: pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100))) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.pastDeadline(pid).message).asLeft
+        )
+
+  test("Cannot submit past deadline: PI HasNonPartner with default US deadline"):
+    createCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester, 
+      partners = List((Partner.US, yesterday.some), (Partner.CA, none))
+    ).flatMap: cid =>
+      createProgramWithNonPartnerPi(pi).flatMap: pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100))) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.pastDeadline(pid).message).asLeft
+        )
+
+  test("Cannot submit past deadline: PI HasPartner with default deadline"):
+    createCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester, 
+      deadline = yesterday.some,
+      partners = List((Partner.US, none), (Partner.CA, none))
+    ).flatMap: cid =>
+      createProgramWithCaPi(pi).flatMap: pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid, partnerSplits = List((Partner.CA, 100))) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.pastDeadline(pid).message).asLeft
+        )
+
+  test("Cannot submit past deadline: PI HasPartner with deadline override"):
+    createCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester, 
+      partners = List((Partner.US, none), (Partner.CA, yesterday.some))
+    ).flatMap: cid =>
+      createProgramWithCaPi(pi).flatMap: pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid, partnerSplits = List((Partner.CA, 100))) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.pastDeadline(pid).message).asLeft
+        )
+
+  test("Cannot submit without a PI email address"):
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      mid <- piProgramUserIdAs(pi, pid)
+      _   <- updateProgramUserAs(pi, mid, PartnerLink.HasNonPartner, email = none)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <-
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.missingPiEmailAddress(pid).message).asLeft
+        )
+    yield ()
+
+  test("Cannot submit with an invalid PI email address"):
+    for
+      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      pid <- createProgramAs(pi)
+      mid <- piProgramUserIdAs(pi, pid)
+      em   = NonEmptyString.unsafeFrom("invalid")
+      _   <- updateProgramUserAs(pi, mid, PartnerLink.HasNonPartner, email = em.some)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <-
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            List(error.invalidPiEmailAddress(em.value, pid).message).asLeft
+        )
+    yield ()
+
 }

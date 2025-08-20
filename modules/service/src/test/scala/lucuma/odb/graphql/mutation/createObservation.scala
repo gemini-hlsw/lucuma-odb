@@ -135,7 +135,7 @@ class createObservation extends OdbSuite {
   }
 
   test("[general] can create observation with a program reference") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramWithUsPi(pi).flatMap { pid =>
       createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
@@ -168,7 +168,7 @@ class createObservation extends OdbSuite {
   }
 
   test("[general] can create an observation when both ref and pid are supplied if they correspond") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramWithUsPi(pi).flatMap { pid =>
       createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
@@ -202,7 +202,7 @@ class createObservation extends OdbSuite {
   }
 
   test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramWithUsPi(pi).flatMap { pid =>
       createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
@@ -232,7 +232,7 @@ class createObservation extends OdbSuite {
   }
 
   test("[general] cannot create an observation without a ref or pid") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramWithUsPi(pi).flatMap { pid =>
       createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
@@ -1360,7 +1360,7 @@ class createObservation extends OdbSuite {
                 disperser: R1200_HK
                 filter: Y
                 fpu: LONG_SLIT_2
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
                   { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
                   { p: { arcseconds: 0.0 }, q: { arcseconds:   5.5 } },
@@ -1376,7 +1376,7 @@ class createObservation extends OdbSuite {
                 disperser
                 filter
                 fpu
-                spatialOffsets {
+                offsets {
                   p {
                     microarcseconds
                     arcseconds
@@ -1386,7 +1386,7 @@ class createObservation extends OdbSuite {
                     arcseconds
                   }
                 }
-                explicitSpatialOffsets {
+                explicitOffsets {
                   p {
                     microarcseconds
                     arcseconds
@@ -1396,7 +1396,7 @@ class createObservation extends OdbSuite {
                     arcseconds
                   }
                 }
-                defaultSpatialOffsets {
+                defaultOffsets {
                   p {
                     microarcseconds
                     arcseconds
@@ -1422,9 +1422,9 @@ class createObservation extends OdbSuite {
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
            longSlit.downIO[Flamingos2Fpu]("fpu"),
-           longSlit.downIO[List[Json]]("spatialOffsets"),
-           longSlit.downIO[List[Json]]("explicitSpatialOffsets"),
-           longSlit.downIO[List[Json]]("defaultSpatialOffsets")
+           longSlit.downIO[List[Json]]("offsets"),
+           longSlit.downIO[List[Json]]("explicitOffsets"),
+           longSlit.downIO[List[Json]]("defaultOffsets")
           ).tupled,
           (Flamingos2Disperser.R1200HK,
            Some(Flamingos2Filter.Y),
@@ -1465,7 +1465,7 @@ class createObservation extends OdbSuite {
                     disperser: R1200_HK
                     filter: Y
                     fpu: LONG_SLIT_2
-                    explicitSpatialOffsets: [
+                    explicitOffsets: [
                       { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
                       { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
                       { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } }
@@ -1543,6 +1543,16 @@ class createObservation extends OdbSuite {
                 defaultWavelengthDithers {
                   nanometers
                 }
+                offsets {
+                  arcseconds
+                }
+                explicitOffsets {
+                  microarcseconds
+                  arcseconds
+                }
+                defaultOffsets {
+                  arcseconds
+                }
                 spatialOffsets {
                   arcseconds
                 }
@@ -1583,10 +1593,7 @@ class createObservation extends OdbSuite {
            longSlit.downIO[GmosRoi]("defaultRoi"),
            IO(longSlit.downField("wavelengthDithers").values.toList.flatMap(_.toList)),
            IO(longSlit.downField("explicitWavelengthDithers").values.map(_.toList)),
-           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
-           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+           IO(longSlit.downField("defaultWavelengthDithers").values.toList.flatMap(_.toList))
           ).tupled,
           (GmosXBinning.Four,
            Some(GmosXBinning.Four),
@@ -1619,6 +1626,33 @@ class createObservation extends OdbSuite {
              json"""{ "nanometers": 0.000 }""",
              json"""{ "nanometers": 5.000 }""",
              json"""{ "nanometers": -5.000 }"""
+           ),
+          )
+        ) *>
+        assertIO(
+          (IO(longSlit.downField("offsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
+           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+          ).tupled,
+          (List(
+             json"""{ "arcseconds": -10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds":  10.000000}""",
+             json"""{ "arcseconds": -10.000000}"""
+           ),
+           Some(List(
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
+             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }"""
+           )),
+           List(
+             json"""{ "arcseconds":  0.000000}""",
+             json"""{ "arcseconds": 15.000000}""",
+             json"""{ "arcseconds": -15.000000}"""
            ),
            List(
              json"""{ "arcseconds": -10.000000}""",
@@ -2319,7 +2353,7 @@ class createObservation extends OdbSuite {
                 observingMode: {
                   gmosNorthImaging: {
                     filters: [G_PRIME, R_PRIME]
-                    explicitSpatialOffsets: [
+                    offsets: [
                       { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
                       { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
                     ]
@@ -2331,15 +2365,7 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosNorthImaging {
                     filters
-                    spatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    explicitSpatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    defaultSpatialOffsets {
+                    offsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2355,15 +2381,10 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosNorthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "spatialOffsets": [
+                    "offsets": [
                       { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
                       { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                    ],
-                    "explicitSpatialOffsets": [
-                      { "p": { "arcseconds": 1.500000 }, "q": { "arcseconds": 2.000000 } },
-                      { "p": { "arcseconds": -0.500000 }, "q": { "arcseconds": 1.000000 } }
-                    ],
-                    "defaultSpatialOffsets": []
+                    ]
                   }
                 }
               }
@@ -2395,7 +2416,7 @@ class createObservation extends OdbSuite {
                 observingMode: {
                   gmosSouthImaging: {
                     filters: [G_PRIME, R_PRIME]
-                    explicitSpatialOffsets: [
+                    offsets: [
                       { p: { arcseconds: "2.5" }, q: { arcseconds: "-1.5" } }
                     ]
                   }
@@ -2406,15 +2427,7 @@ class createObservation extends OdbSuite {
                 observingMode {
                   gmosSouthImaging {
                     filters
-                    spatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    explicitSpatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    defaultSpatialOffsets {
+                    offsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2430,13 +2443,9 @@ class createObservation extends OdbSuite {
                 "observingMode": {
                   "gmosSouthImaging": {
                     "filters": ["G_PRIME", "R_PRIME"],
-                    "spatialOffsets": [
+                    "offsets": [
                       { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
-                    ],
-                    "explicitSpatialOffsets": [
-                      { "p": { "arcseconds": 2.500000 }, "q": { "arcseconds": -1.500000 } }
-                    ],
-                    "defaultSpatialOffsets": []
+                    ]
                   }
                 }
               }
@@ -2475,15 +2484,7 @@ class createObservation extends OdbSuite {
               observation {
                 observingMode {
                   gmosNorthImaging {
-                    spatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    explicitSpatialOffsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
-                    defaultSpatialOffsets {
+                    offsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -2498,9 +2499,7 @@ class createObservation extends OdbSuite {
               "observation": {
                 "observingMode": {
                   "gmosNorthImaging": {
-                    "spatialOffsets": [],
-                    "explicitSpatialOffsets": [],
-                    "defaultSpatialOffsets": []
+                    "offsets": []
                   }
                 }
               }
@@ -2529,15 +2528,15 @@ class createObservation extends OdbSuite {
             observation {
               observingMode {
                 flamingos2LongSlit {
-                  spatialOffsets {
+                  offsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  explicitSpatialOffsets {
+                  explicitOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  defaultSpatialOffsets {
+                  defaultOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
@@ -2552,14 +2551,14 @@ class createObservation extends OdbSuite {
             "observation": {
               "observingMode": {
                 "flamingos2LongSlit": {
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
                   ],
-                  "explicitSpatialOffsets": null,
-                  "defaultSpatialOffsets": [
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },

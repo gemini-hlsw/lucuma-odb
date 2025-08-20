@@ -10,17 +10,17 @@ val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.12.0"
-val grackleVersion             = "0.24.0"
+val grackleVersion             = "0.25.0"
 val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
-val lucumaItcVersion           = "0.42.2"
-val lucumaCoreVersion          = "0.139.0"
-val lucumaGraphQLRoutesVersion = "0.10.1"
-val lucumaSsoVersion           = "0.9.3"
+val lucumaItcVersion           = "0.42.4"
+val lucumaCoreVersion          = "0.141.0"
+val lucumaGraphQLRoutesVersion = "0.10.3"
+val lucumaSsoVersion           = "0.9.5"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -32,7 +32,7 @@ val pprintVersion              = "0.9.3"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.26"
+ThisBuild / tlBaseVersion      := "0.27"
 ThisBuild / scalaVersion       := "3.7.1"
 ThisBuild / crossScalaVersions := Seq("3.7.1")
 
@@ -164,6 +164,7 @@ lazy val service = project
       "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
+      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,
