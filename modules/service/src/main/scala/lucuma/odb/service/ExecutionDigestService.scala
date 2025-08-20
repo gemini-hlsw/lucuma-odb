@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.catsKernelOrderingForOrder
 import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
@@ -26,6 +27,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.numeric._int8
 import skunk.data.Arr
@@ -59,7 +61,7 @@ sealed trait ExecutionDigestService[F[_]] {
 
 object ExecutionDigestService {
 
-  def instantiate[F[_]: Concurrent](using Services[F]): ExecutionDigestService[F] =
+  def instantiate[F[_]: Concurrent: Logger](using Services[F]): ExecutionDigestService[F] =
     new ExecutionDigestService[F] {
 
       override def selectOne(
@@ -142,7 +144,11 @@ object ExecutionDigestService {
           digest.science.offsets.toList,
           digest.science.atomCount,
           digest.science.executionState
-        ).void
+        )
+        .void
+        .recoverWith:
+          case SqlState.ForeignKeyViolation(ex) =>
+            Logger[F].info(ex)(s"Failed to insert or update execution digest for program $pid, observation $oid. Probably due to a deleted calibration observation.")
 
     }
 
