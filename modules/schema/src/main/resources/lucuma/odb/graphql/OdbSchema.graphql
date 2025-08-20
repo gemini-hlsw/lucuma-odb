@@ -2055,7 +2055,13 @@ input GmosNorthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -2068,6 +2074,11 @@ input GmosNorthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosNorthFilter!]
+
+  """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
 
   """
   How sequences are generated when multiple filters are specified.
@@ -2094,11 +2105,6 @@ input GmosNorthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -2491,7 +2497,13 @@ input GmosSouthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -2504,6 +2516,11 @@ input GmosSouthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosSouthFilter!]
+
+  """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
 
   """
   How sequences are generated when multiple filters are specified.
@@ -2530,11 +2547,6 @@ input GmosSouthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -3681,10 +3693,9 @@ input ProgramUserPropertiesInput {
   partnerLink: PartnerLinkInput
 
   """
-  The fallback profile may used when the ORCiD user profile is not set or not
-  shared publicly.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfileInput
+  preferredProfile: UserProfileInput
 
   "The user's educational status."
   educationalStatus: EducationalStatus
@@ -3748,10 +3759,9 @@ type ProgramUser {
   partnerLink: PartnerLink!
 
   """
-  Profile information reported when the corresponding ORCiD profile is not set
-  or is not public.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfile!
+  preferredProfile: UserProfile!
 
   "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
@@ -3770,6 +3780,18 @@ type ProgramUser {
 
   "Has access to data."
   hasDataAccess: Boolean!
+
+  """
+  Name created preferentially from the fields of the preferred profile, falling back
+  to the Orcid profile if the preferred fields are not set.
+  """
+  displayName: String
+
+  """
+  The user's email address from the preferred profile, falling back to the Orcid profile
+  if the preferred email is not set.
+  """
+  email: String
 }
 
 """
@@ -7879,21 +7901,21 @@ type Flamingos2LongSlit {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  Spatial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
+  Offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
   """
-  spatialOffsets: [Offset!]!
+  offsets: [Offset!]!
 
   """
-  Default spatial offsets.
+  Default offsets.
   """
-  defaultSpatialOffsets: [Offset!]!
+  defaultOffsets: [Offset!]!
 
   """
-  Optional explicitly specified spatial offsets. If set it overrides the
+  Optional explicitly specified offsets. If set it overrides the
   the default.
   """
-  explicitSpatialOffsets: [Offset!]
+  explicitOffsets: [Offset!]
 
   """
   The disperser as it was initially selected.  See the `disperser` field for the
@@ -7955,9 +7977,9 @@ input Flamingos2LongSlitInput {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitSpatialOffsets: [OffsetInput!]
+  explicitOffsets: [OffsetInput!]
 
 }
 
@@ -8534,19 +8556,39 @@ type GmosNorthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 
@@ -8588,6 +8630,11 @@ type GmosNorthImaging {
   Initial GMOS North Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosNorthFilter!]!
+
+  """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
@@ -8671,23 +8718,6 @@ type GmosNorthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -9129,19 +9159,39 @@ type GmosSouthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 
@@ -9183,6 +9233,11 @@ type GmosSouthImaging {
   Initial GMOS South Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosSouthFilter!]!
+
+  """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
 
   """
   MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
@@ -9266,23 +9321,6 @@ type GmosSouthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -16778,9 +16816,9 @@ input WhereProgramUser {
   partnerLink: WherePartnerLink
 
   """
-  Matches the fallback profile.
+  Matches the preferred profile.
   """
-  fallbackProfile: WhereUserProfile
+  preferredProfile: WhereUserProfile
 
   """
   Matches the educational status.

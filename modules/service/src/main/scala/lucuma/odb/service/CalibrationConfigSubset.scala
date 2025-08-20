@@ -54,7 +54,7 @@ object CalibrationConfigSubset:
         explicitAmpGain        = ampGain.some,
         explicitRoi            = GmosRoi.CentralSpectrum.some,
         explicitλDithers       = none,
-        explicitSpatialOffsets = none
+        explicitOffsets        = none
       )
 
     def toLongSlitInput: ObservingModeInput.Create
@@ -128,7 +128,7 @@ object CalibrationConfigSubset:
             ampReadMode.some,
             ampGain.some,
             roi.some,
-            none // TODO do we need offsets here?
+            Nil // TODO do we need offsets here?
           )
         ).some,
         none,
@@ -156,7 +156,7 @@ object CalibrationConfigSubset:
             ampReadMode.some,
             ampGain.some,
             roi.some,
-            none // TODO do we need offsets here?
+            Nil // TODO do we need offsets here?
           )
         ).some,
         none
