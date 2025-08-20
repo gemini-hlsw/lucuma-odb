@@ -691,7 +691,7 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -722,7 +722,7 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -754,7 +754,7 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -786,7 +786,7 @@ class observation_workflow
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -869,7 +869,7 @@ class observation_workflow
     val oid1: IO[Observation.Id]  =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -883,7 +883,7 @@ class observation_workflow
 
     val oid2: IO[Observation.Id] =
       for
-        pid <- createProgramAs(pi)
+        pid <- createProgramWithNonPartnerPi(pi, "Bar")
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
         tid <- createTargetWithProfileAs(pi, pid)
@@ -926,7 +926,7 @@ class observation_workflow
     val setup: IO[(Program.Id, Observation.Id)] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
+        pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
@@ -977,7 +977,7 @@ class observation_workflow
     val setup: IO[(Program.Id, Observation.Id)] =
       for
         cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi)
+        pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)

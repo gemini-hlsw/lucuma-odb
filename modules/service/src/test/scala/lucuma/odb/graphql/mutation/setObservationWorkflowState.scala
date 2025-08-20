@@ -98,7 +98,7 @@ class setObservationWorkflowState
   test("Unapproved <-> Inactive") {
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi, "Foo")
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
@@ -128,7 +128,7 @@ class setObservationWorkflowState
   test("Defined    <-> Inactive, Ready (proposal accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi, "Foo")
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)

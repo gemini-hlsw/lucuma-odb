@@ -125,7 +125,7 @@ class constraintSetGroup extends OdbSuite {
 
   test("should be able to use a proposal reference") {
     List(pi).traverse { user =>
-      createProgramAs(user).flatMap { pid =>
+      createProgramWithUsPi(user).flatMap { pid =>
         def create2(iq: ImageQuality.Preset, sb: SkyBackground) = 
           createObservation(user, pid, iq, sb)
             .flatTap(setObservationWorkflowState(user, _, ObservationWorkflowState.Inactive)) // avoid submission error

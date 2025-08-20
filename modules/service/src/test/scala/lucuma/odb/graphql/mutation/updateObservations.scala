@@ -1906,7 +1906,7 @@ class updateObservations extends OdbSuite
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          explicitSpatialOffsets: [
+          explicitOffsets: [
             { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
@@ -1924,7 +1924,7 @@ class updateObservations extends OdbSuite
             disperser
             filter
             fpu
-            spatialOffsets {
+            offsets {
               p {
                 arcseconds
               }
@@ -1932,7 +1932,7 @@ class updateObservations extends OdbSuite
                 arcseconds
               }
             }
-            explicitSpatialOffsets {
+            explicitOffsets {
               p {
                 arcseconds
               }
@@ -1940,7 +1940,7 @@ class updateObservations extends OdbSuite
                 arcseconds
               }
             }
-            defaultSpatialOffsets {
+            defaultOffsets {
               p {
                 arcseconds
               }
@@ -1964,19 +1964,19 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
                   ],
-                  "explicitSpatialOffsets": [
+                  "explicitOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
                   ],
-                  "defaultSpatialOffsets": [
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -1993,7 +1993,7 @@ class updateObservations extends OdbSuite
     val update1 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitSpatialOffsets: [
+          explicitOffsets: [
             { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
             { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } },
@@ -2014,19 +2014,19 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
-                  "explicitSpatialOffsets": [
+                  "explicitOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
                   ],
-                  "defaultSpatialOffsets": [
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -2043,7 +2043,7 @@ class updateObservations extends OdbSuite
     val update2 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitSpatialOffsets: null
+          explicitOffsets: null
         }
       }
     """
@@ -2059,14 +2059,14 @@ class updateObservations extends OdbSuite
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "spatialOffsets": [
+                  "offsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
                   ],
-                  "explicitSpatialOffsets": null,
-                  "defaultSpatialOffsets": [
+                  "explicitOffsets": null,
+                  "defaultOffsets": [
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                     { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -2141,7 +2141,16 @@ class updateObservations extends OdbSuite
             explicitWavelengthDithers {
               picometers
             }
+            explicitOffsets {
+              arcseconds
+            }
             explicitSpatialOffsets {
+              arcseconds
+            }
+            offsets {
+              arcseconds
+            }
+            spatialOffsets {
               arcseconds
             }
           }
@@ -2175,7 +2184,25 @@ class updateObservations extends OdbSuite
                     { "picometers":  7100 },
                     { "picometers": -7500 }
                   ],
+                  "explicitOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
                   "explicitSpatialOffsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": -10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds":  10.000000 },
+                    { "arcseconds": -10.000000 }
+                  ],
+                  "spatialOffsets": [
                     { "arcseconds": -10.000000 },
                     { "arcseconds":  10.000000 },
                     { "arcseconds":  10.000000 },
@@ -2241,7 +2268,25 @@ class updateObservations extends OdbSuite
                     { "picometers": -10000 },
                     { "picometers":  10000 }
                   ],
+                  "explicitOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
                   "explicitSpatialOffsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": -2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds":  2.000000 },
+                    { "arcseconds": -2.000000 }
+                  ],
+                  "spatialOffsets": [
                     { "arcseconds": -2.000000 },
                     { "arcseconds":  2.000000 },
                     { "arcseconds":  2.000000 },
@@ -3649,7 +3694,7 @@ class updateObservations extends OdbSuite
                     disperser: R1200_HK
                     filter: Y
                     fpu: LONG_SLIT_2
-                    explicitSpatialOffsets: [
+                    explicitOffsets: [
                       { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
                       { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
                     ]
@@ -3663,7 +3708,7 @@ class updateObservations extends OdbSuite
               observations {
                 observingMode {
                   flamingos2LongSlit {
-                    spatialOffsets {
+                    offsets {
                       p { arcseconds }
                       q { arcseconds }
                     }
@@ -3690,7 +3735,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  explicitSpatialOffsets: [
+                  explicitOffsets: [
                     { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
                     { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
                     { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } },
@@ -3713,7 +3758,7 @@ class updateObservations extends OdbSuite
             SET: {
               observingMode: {
                 flamingos2LongSlit: {
-                  explicitSpatialOffsets: null
+                  explicitOffsets: null
                 }
               }
             }
@@ -3724,7 +3769,7 @@ class updateObservations extends OdbSuite
             observations {
               observingMode {
                 flamingos2LongSlit {
-                  spatialOffsets {
+                  offsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
@@ -3736,7 +3781,7 @@ class updateObservations extends OdbSuite
       """)
     } yield ()
 
-  test("[flamingos2] updateObservations with custom explicitSpatialOffsets"):
+  test("[flamingos2] updateObservations with custom explicitOffsets"):
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
@@ -3749,7 +3794,7 @@ class updateObservations extends OdbSuite
                   disperser: R1200_HK
                   filter: Y
                   fpu: LONG_SLIT_2
-                  explicitSpatialOffsets: [
+                  explicitOffsets: [
                     { p: { arcseconds: 1.0 }, q: { arcseconds: -3.0 } },
                     { p: { arcseconds: 2.0 }, q: { arcseconds:  4.0 } },
                     { p: { arcseconds: -1.5 }, q: { arcseconds: 2.5 } },
@@ -3766,15 +3811,15 @@ class updateObservations extends OdbSuite
               observingMode {
                 flamingos2LongSlit {
                   disperser
-                  spatialOffsets {
+                  offsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  explicitSpatialOffsets {
+                  explicitOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
-                  defaultSpatialOffsets {
+                  defaultOffsets {
                     p { arcseconds }
                     q { arcseconds }
                   }
@@ -3791,19 +3836,19 @@ class updateObservations extends OdbSuite
                 "observingMode": {
                   "flamingos2LongSlit": {
                     "disperser": "R1200_HK",
-                    "spatialOffsets": [
+                    "offsets": [
                       { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
                       { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
                       { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
                       { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
                     ],
-                    "explicitSpatialOffsets": [
+                    "explicitOffsets": [
                       { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
                       { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
                       { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
                       { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
                     ],
-                    "defaultSpatialOffsets": [
+                    "defaultOffsets": [
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
                       { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
@@ -3817,6 +3862,81 @@ class updateObservations extends OdbSuite
         }
       """.asRight)
     } yield ()
+
+  test("field precedence: new offset fields take priority over deprecated ones"):
+
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 500
+          }
+          explicitSpatialOffsets: [
+            { arcseconds: 100.0 },
+            { arcseconds: 200.0 }
+          ]
+          explicitOffsets: [
+            { arcseconds: 1.0 },
+            { arcseconds: 2.0 },
+            { arcseconds: 3.0 }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthLongSlit {
+            explicitOffsets { arcseconds }
+            explicitSpatialOffsets { arcseconds }
+            offsets { arcseconds }
+            spatialOffsets { arcseconds }
+          }
+        }
+      }
+    """
+
+    val expected =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthLongSlit": {
+                  "explicitOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "explicitSpatialOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "offsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ],
+                  "spatialOffsets": [
+                    { "arcseconds": 1.000000 },
+                    { "arcseconds": 2.000000 },
+                    { "arcseconds": 3.000000 }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    oneUpdateTest(pi, update, query, expected, Some(ObservingModeType.GmosNorthLongSlit))
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>

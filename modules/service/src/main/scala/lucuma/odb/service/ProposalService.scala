@@ -8,9 +8,11 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
@@ -18,10 +20,13 @@ import lucuma.core.enums.ToOActivation
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
+import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
+import lucuma.odb.Config
 import lucuma.odb.data.*
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CreateProposalInput
@@ -33,11 +38,15 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
+import org.http4s.Uri
+import org.http4s.client.Client
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Completion.Delete
 import skunk.data.Completion.Update
 import skunk.syntax.all.*
+
+import java.time.format.DateTimeFormatter
 
 import Services.Syntax.*
 
@@ -126,6 +135,13 @@ object ProposalService {
         case ps      =>
           s"Program $pid requests time from ${ps.init.mkString(", ")} and ${ps.last}, but there are no matching investigators with these partners.".invalidArg
 
+    // If all the other validations pass, I don't think we should get this...
+    def missingDeadline(pid: Program.Id): OdbError =
+      s"Could not determine the deadline for the call for proposals for program $pid.".invalidArg
+
+    def pastDeadline(pid: Program.Id): OdbError =
+      s"Call for proposals for program $pid has passed its deadline.".invalidArg
+
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
 
@@ -144,10 +160,16 @@ object ProposalService {
     def undefinedObservations(pid: Program.Id): OdbError =
       s"Submitted proposal $pid contains undefined observations.".invalidArg
 
+    def missingPiEmailAddress(pid: Program.Id): OdbError =
+      s"Missing email address for PI in program $pid".invalidArg
+
+    def invalidPiEmailAddress(email: String, pid: Program.Id): OdbError =
+      s"Invalid email address \"$email\" for PI in program $pid".invalidArg
+
   }
 
   /** Construct a `ProposalService` using the specified `Session`. */
-  def instantiate[F[_]: Concurrent](using Services[F]): ProposalService[F] =
+  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): ProposalService[F] =
     new ProposalService[F] {
 
       import error.*
@@ -178,17 +200,36 @@ object ProposalService {
       case class ProposalContext(
         statusTag:         Tag,
         hasProposal:       Boolean,
+        piEmailStr:        Option[NonEmptyString],
+        title:             Option[NonEmptyString],
+        reference:         Option[ProposalReference],
         semester:          Option[Semester],
         scienceSubtype:    Option[ScienceSubtype],
         splitsSum:         Long,
         availablePartners: Set[Tag],
         requestedPartners: Set[Tag],
         proprietary:       NonNegInt,
+        currentTime:       Timestamp,
+        deadline:          Option[Timestamp],
+        cfpTitle:          Option[NonEmptyString],
         cfp:               Option[CfpProperties]
       ) {
         val status: Result[enumsVal.ProposalStatus] =
           statusTag.toProposalStatus
 
+        val isPastDeadline: Option[Boolean] =
+          deadline.map(_ < currentTime)
+
+        val piEmailAddress: Option[EmailAddress] =
+          piEmailStr.flatMap(nes =>
+            EmailAddress.from(nes.value).toOption
+          )
+
+        def validatePiEmailAddress(pid: Program.Id): Result[Unit] =
+          piEmailStr.fold(missingPiEmailAddress(pid).asFailure)(emailStr =>
+            piEmailAddress.fold(invalidPiEmailAddress(emailStr.value, pid).asFailure)(_ => Result.unit)
+          )
+          
         def validateSubmission(
           pid: Program.Id,
           newStatus: enumsVal.ProposalStatus
@@ -206,8 +247,20 @@ object ProposalService {
                  (s === ScienceSubtype.Queue))
               )
             },
-            missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty)
+            missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
+            validatePiEmailAddress(pid)
           ).tupled.unlessA(newStatus === enumsVal.ProposalStatus.NotSubmitted)
+
+        def validateDeadline(
+          pid: Program.Id,
+          newStatus: enumsVal.ProposalStatus
+        ): Result[Unit] =
+          (
+            for
+              _ <- missingDeadline(pid).asFailure.unlessA(deadline.isDefined)
+              _ <- pastDeadline(pid).asFailure.whenA(isPastDeadline.exists(identity))
+            yield ()
+          ).whenA(newStatus === enumsVal.ProposalStatus.Submitted)
 
         def updateProgram(
           pid:            Program.Id,
@@ -241,14 +294,104 @@ object ProposalService {
             p <- eCfp.map(_.map(_.proprietary).getOrElse(proprietary))
           } yield copy(semester = s, scienceSubtype = t, splitsSum = eSum, proprietary = p, cfp = c)).value
         }
+
+        private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MMM-dd")
+        private def formatDate(t: Timestamp): String = dateFormatter.format(t.toLocalDateTime)
+
+        private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        private def formatTime(t: Timestamp): String = timeFormatter.format(t.toLocalDateTime)
+        
+        private def programUrl(newReference: ProposalReference): Uri = emailConfig.exploreUrl / newReference.label
+        
+        private def textSubmissionEmail(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
+          s"""Hello,
+          |
+          |Thanks for submitting a Gemini proposal!
+          |
+          |This email confirms that your proposal was received on ${formatDate(currentTime)} at ${formatTime(currentTime)} UT.
+          |
+          |Call for Proposals: ${cfpTitle.getOrElse("<Missing>")}
+          |Proposal Id: ${newReference.label} (${programUrl(newReference)})
+          |Proposal Title: ${title.getOrElse("<Missing>")}
+          |
+          |This proposal may be revised until the CfP deadline on ${deadline.fold("<Missing>")(formatDate)} at ${deadline.fold("<Missing>")(formatTime)} UT.
+          |
+          |If you have any questions or concerns, please submit a request to the Gemini Help Desk: https://www.gemini.edu/observing/helpdesk/submit-general-helpdesk-request
+          |
+          |Regards,
+          |Gemini Observatory
+          """.stripMargin
+        )
+        
+        private def htmlSubmissionEmail(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
+          s"""Hello,<br/>
+          <br/>
+          |Thanks for submitting a Gemini proposal!<br/>
+          |<br/>
+          |This email confirms that your proposal was received on ${formatDate(currentTime)} at ${formatTime(currentTime)} UT.<br/>
+          |<br/>
+          |Call for Proposals: ${cfpTitle.getOrElse("<Missing>")}<br/>
+          |Proposal Id: <a href="${programUrl(newReference)}">${newReference.label}</a><br/>
+          |Proposal Title: ${title.getOrElse("<Missing>")}<br/>
+          |<br/>
+          |This proposal may be revised until the CfP deadline on ${deadline.fold("<Missing>")(formatDate)} at ${deadline.fold("<Missing>")(formatTime)} UT.<br/>
+          |<br/>
+          |If you have any questions or concerns, please submit a request to the <a href="https://www.gemini.edu/observing/helpdesk/submit-general-helpdesk-request">Gemini Help Desk</a><br/>
+          |<br/>
+          |Regards,<br/>
+          |Gemini Observatory
+          """.stripMargin
+        )
+
+        private def emailSubject(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
+          s"Gemini Proposal ${newReference.label}"
+        )
+
+        private def getNewReference(pid: Program.Id): F[Result[ProposalReference]] =
+         // A proposal reference is generated by the database, so we should never fail to get one
+         session.unique(Statements.SelectProposalReference)(pid)
+           .map(_.fold(OdbError.UpdateFailed("System error: could not generate proposal reference".some).asFailure)(_.success))
+
+        private def sendEmailHelper(
+          pid: Program.Id,
+          recipient: EmailAddress,
+          subject: NonEmptyString,
+          text: NonEmptyString,
+          html: Option[NonEmptyString]
+        )(using Transaction[F]): F[Result[Unit]] =
+          Services.asSuperUser:
+            emailService(emailConfig, httpClient)
+              .send(pid, emailConfig.invitationFrom, recipient, subject, text, html)
+              .map(_ => Result.unit)
+
+        def sendSubmissionEmail(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
+          piEmailAddress // this has already been validated, so we should have one
+            .fold(Result.unit.pure)(email =>
+              (for {
+                newReference <- ResultT(getNewReference(pid))
+                _            <- ResultT(sendEmailHelper(pid, email, emailSubject(newReference), textSubmissionEmail(newReference), htmlSubmissionEmail(newReference).some))
+              } yield ()).value
+            )
+
+        def sendEmail(
+          pid: Program.Id,
+          newStatus: enumsVal.ProposalStatus
+         )(using Transaction[F]): F[Result[Unit]] =
+          // There might be other emails in the future
+          if newStatus === enumsVal.ProposalStatus.Submitted then sendSubmissionEmail(pid)
+          else Result.unit.pure
+
       }
 
       object ProposalContext {
         val parts: Decoder[Set[Tag]] =
           _tag.map(_.toList.toSet)
 
+        val coNames: Decoder[List[Option[NonEmptyString]]] =
+          _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
+
         val codec: Decoder[ProposalContext] =
-          (tag *: bool *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
+          (tag *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -360,7 +503,7 @@ object ProposalService {
           ).sequence.void)
 
         (for {
-          pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+          pid    <- ResultT(programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference))
           before <- ResultT(ProposalContext.lookup(pid))
           after  <- ResultT(before.edit(input.SET))
           _      <- checkCfpCompatibility(after)
@@ -407,13 +550,14 @@ object ProposalService {
             _ <- notAuthorizedNew(pid, user, Tag(newStatus.tag)).asFailure.unlessA(newStatus.userCanChangeStatus)
             _ <- notAuthorizedOld(pid, user, ctx.statusTag).asFailure.unlessA(oldStatus.userCanChangeStatus)
             _ <- ctx.validateSubmission(pid, newStatus)
+            _ <- ctx.validateDeadline(pid, newStatus)
           } yield ()
 
         def update(pid: Program.Id, tag: Tag): F[Unit] =
           val af = Statements.updateProposalStatus(user, pid, tag)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
+        ResultT(programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
             ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid, commitHash, itcClient, ptc))).flatMap: wfs =>
               val states = wfs.values.map(_.state).toSet
@@ -428,6 +572,7 @@ object ProposalService {
                       _         <- ResultT.liftF(update(pid, input.status))
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.NotSubmitted && newStatus === enumsVal.ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === enumsVal.ProposalStatus.Submitted && newStatus === enumsVal.ProposalStatus.NotSubmitted)
+                      _         <- ResultT(info.sendEmail(pid, newStatus))
                     yield pid
                   go2.value
           .value
@@ -542,6 +687,9 @@ object ProposalService {
           prog.c_program_type,
           prog.c_proposal_status,
           prop.c_program_id IS NOT NULL,
+          pi.c_email,
+          prog.c_name,
+          prog.c_proposal_reference,
           prog.c_semester,
           prog.c_science_subtype,
           COALESCE(
@@ -567,6 +715,13 @@ object ProposalService {
             '{}'
           ) AS c_requested_partners,
           prog.c_goa_proprietary,
+          LOCALTIMESTAMP,
+          COALESCE(
+            cfp_pi.c_deadline,
+            (SELECT cfp.c_non_partner_deadline
+             WHERE pi.c_partner_link = 'has_non_partner')
+          ) AS c_deadline,
+          cfp.c_title,
           cfp.c_cfp_id,
           cfp.c_type,
           cfp.c_semester,
@@ -574,8 +729,14 @@ object ProposalService {
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id
-        LEFT JOIN t_cfp cfp
+        LEFT JOIN v_cfp cfp
           ON prop.c_cfp_id = cfp.c_cfp_id
+        LEFT JOIN v_program_user pi
+          ON prog.c_program_id = pi.c_program_id
+          AND pi.c_role = 'pi'
+        LEFT JOIN v_cfp_partner cfp_pi
+          ON cfp.c_cfp_id = cfp_pi.c_cfp_id
+          AND cfp_pi.c_partner = pi.c_partner
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
@@ -588,6 +749,13 @@ object ProposalService {
         WHERE c_program_id = $program_id
       """.apply(status, pid) |+|
       ProgramUserService.Statements.andWhereUserWriteAccess(user, pid)
+
+    val SelectProposalReference: Query[Program.Id, Option[ProposalReference]] =
+      sql"""
+        SELECT c_proposal_reference
+        FROM t_program
+        WHERE c_program_id = $program_id
+      """.query(proposal_reference.opt)
 
   }
 }

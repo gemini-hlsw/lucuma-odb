@@ -16,7 +16,7 @@ import ObservingModeSetupOperations.*
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
-  private def formatExplicitOffsetsInput(arcsecs: List[Int]): String =
+  private def formatExplicitSpatialOffsetsInput(arcsecs: List[Int]): String =
     arcsecs.map(a => s"{ arcseconds: $a }").mkString("explicitSpatialOffsets: [", ", ", "]")
 
   def createFlamingos2LongSlitObservationAs(
@@ -56,7 +56,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
             nanometers: 500
           }
           explicitYBin: TWO
-          ${offsetArcsec.fold("")(formatExplicitOffsetsInput)}
+          ${offsetArcsec.fold("")(formatExplicitSpatialOffsetsInput)}
         }
       """
     )
