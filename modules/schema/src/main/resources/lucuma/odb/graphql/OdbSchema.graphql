@@ -16875,6 +16875,11 @@ input WhereProposal {
   """
   reference: WhereProposalReference
 
+  """
+  Matches on the CfP details (if any).
+  """
+  call: WhereCallForProposals
+
   #  """
   #  Matches the proposal TAC category.
   #  """
