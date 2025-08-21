@@ -408,7 +408,6 @@ object Services:
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def useTransactionally(fa: (Transaction[F], Services[F]) ?=> F[A])(
         using NoTransaction[F], NotGiven[Services[F]] // discourage nested calls
       ): F[A] =
