@@ -74,7 +74,8 @@ object configurationrequest:
       hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
       hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
-      hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit)
+      hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
+      Left(DecodingFailure(s"couldn't decode mode: ${hc.top}", Nil))
 
     given Encoder[ObservingMode] = m => 
       Json.obj(

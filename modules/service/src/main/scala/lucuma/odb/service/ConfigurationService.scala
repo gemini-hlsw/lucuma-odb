@@ -36,6 +36,7 @@ import lucuma.odb.json.arc.tag
 import lucuma.odb.json.configurationrequest.query.DecodingFailures
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
@@ -43,6 +44,7 @@ import skunk.Transaction
 import skunk.syntax.all.*
 
 import Services.Syntax.*
+import skunk.data.Arr
 
 trait ConfigurationService[F[_]] {
 
@@ -330,6 +332,15 @@ object ConfigurationService {
                     gmosSouthLongSlit {
                       grating
                     }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
+                    }
                   }
                 }
               }
@@ -381,6 +392,15 @@ object ConfigurationService {
                         }
                         gmosSouthLongSlit {
                           grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
                         }
                       }
                     }
@@ -467,6 +487,15 @@ object ConfigurationService {
                   gmosSouthLongSlit {
                     grating
                   }
+                  gmosNorthImaging {
+                    filters
+                  }
+                  gmosSouthImaging {
+                    filters
+                  }
+                  flamingos2LongSlit {
+                    disperser
+                  }
                 }
               }
             }
@@ -520,6 +549,15 @@ object ConfigurationService {
                       }
                       gmosSouthLongSlit {
                         grating
+                      }
+                      gmosNorthImaging {
+                        filters
+                      }
+                      gmosSouthImaging {
+                        filters
+                      }
+                      flamingos2LongSlit {
+                        disperser
                       }
                     }
                   }
@@ -603,6 +641,15 @@ object ConfigurationService {
                     gmosSouthLongSlit {
                       grating
                     }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
+                    }
                   }
                 }
                 program {
@@ -634,6 +681,15 @@ object ConfigurationService {
                           }
                           gmosSouthLongSlit {
                             grating
+                          }
+                          gmosNorthImaging {
+                            filters
+                          }
+                          gmosSouthImaging {
+                            filters
+                          }
+                          flamingos2LongSlit {
+                            disperser
                           }
                         }
                       }
@@ -691,6 +747,15 @@ object ConfigurationService {
                     gmosSouthLongSlit {
                       grating
                     }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
+                    }
                   }
                 }
               }
@@ -723,9 +788,12 @@ object ConfigurationService {
           c_region_dec_arc_start,
           c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
-        FROM t_configuration_request
+        FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
           c_cloud_extinction = $cloud_extinction_preset AND
@@ -740,10 +808,10 @@ object ConfigurationService {
           c_region_dec_arc_type is not distinct from ${arc_type.opt} AND
           c_region_dec_arc_start is not distinct from ${declination.opt} AND
           c_region_dec_arc_end is not distinct from ${declination.opt} AND
-
-
-
           c_observing_mode_type = $observing_mode_type AND
+          c_flamingos_2_longslit_disperser IS NOT DISTINCT FROM ${flamingos_2_disperser.opt} AND
+          COALESCE(c_gmos_north_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_north_filter.opt}, '{}'::_d_tag) AND
+          COALESCE(c_gmos_south_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_south_filter.opt}, '{}'::_d_tag) AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt}
         ) 
@@ -765,6 +833,9 @@ object ConfigurationService {
           declination.opt              *:
           declination.opt              *:
           observing_mode_type          *:
+          flamingos_2_disperser.opt    *:
+          _gmos_north_filter.opt       *:
+          _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
@@ -785,17 +856,29 @@ object ConfigurationService {
             decArcStart              *:
             decArcEnd                *:
             observingModeType        *:
+            flamingos2Disperser      *:
+            gmosNorthImagingFilters  *:
+            gmosSouthImagingFilters  *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] = 
-                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+                (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
-                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
+
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
+                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
                   
-                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
@@ -866,6 +949,9 @@ object ConfigurationService {
         cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
         cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
         cfg.observingMode.tpe                                     *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
         EmptyTuple
@@ -890,6 +976,9 @@ object ConfigurationService {
           c_region_dec_arc_start,
           c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
         ) VALUES (
@@ -908,6 +997,9 @@ object ConfigurationService {
           ${declination.opt},
           ${declination.opt},
           $observing_mode_type,
+          ${flamingos_2_disperser.opt},
+          ${_gmos_north_filter.opt},
+          ${_gmos_south_filter.opt},
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt}
         ) 
@@ -929,6 +1021,9 @@ object ConfigurationService {
           c_region_dec_arc_start,
           c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
       """.query(
@@ -949,6 +1044,9 @@ object ConfigurationService {
           declination.opt              *:
           declination.opt              *:
           observing_mode_type          *:
+          flamingos_2_disperser.opt    *:
+          _gmos_north_filter.opt       *:
+          _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
@@ -969,17 +1067,29 @@ object ConfigurationService {
             decArcStart              *:
             decArcEnd                *:
             observingModeType        *:
+            flamingos2LongSlitDisperser *:
+            gmosNorthFilters         *:
+            gmosSouthFilters         *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] = 
-                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+                (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
-                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
+
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
+                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
                   
-                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
@@ -1051,6 +1161,9 @@ object ConfigurationService {
         cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
         cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
         cfg.observingMode.tpe                                     *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
         EmptyTuple

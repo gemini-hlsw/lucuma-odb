@@ -46,8 +46,8 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
 
     object Flamingos2LongSlit:
-      val Id = col("c_flamingos2_longslit_id", configuration_request_id.embedded)
-      val Disperser = col("c_flamingos2_longslit_disperser", flamingos_2_disperser.embedded)
+      val Id = col("c_flamingos_2_longslit_id", configuration_request_id.embedded)
+      val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
 
     object GmosNorthLongSlit:
       val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
