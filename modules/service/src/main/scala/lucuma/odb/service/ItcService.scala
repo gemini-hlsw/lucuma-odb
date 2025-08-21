@@ -277,7 +277,6 @@ object ItcService {
         } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
-      @annotation.nowarn("msg=unused implicit parameter")
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
@@ -372,7 +371,6 @@ object ItcService {
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
