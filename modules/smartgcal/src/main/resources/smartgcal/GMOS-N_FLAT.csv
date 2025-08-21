@@ -1,6 +1,9 @@
-484,2022/10/05 22:33:41 HST
+503,2024/01/03 12:02:07 HST
 # GMOS_FLAT
 #
+# V , HS 2024Jan3 for B480/IFU-R, Updated
+# V , HS 2023Jun07 for B480, Updated
+# V , HS 2023Jun06 for B480, Updated
 # V , HS 2022oct05 for B480, Updated
 # V , HS 2022sep23 for B480, Updated
 # V , TM 2022sep08 for B480 (copy of B600)
@@ -952,7 +955,7 @@ $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,2,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quart
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
-$B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,1,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,16,1,Night
@@ -980,7 +983,7 @@ $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,300-450,1,Low,,,,1,GMOS balance,Visible
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
+$B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,12,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,8,1,Night
@@ -1000,14 +1003,14 @@ $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quart
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,7,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,8,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,5,1,Night
@@ -1028,14 +1031,14 @@ $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,300-450,1,Low,,,,1,GMOS balance,Visible
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,450-725,1,Low,,,,1,ND3.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
@@ -1045,68 +1048,68 @@ $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quart
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,9,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,9,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,450-725,1,Low,,,,1,ND3.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,450-725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,300-450,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,5,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,725-1200,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,3,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,3,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,450-725,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,1,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,450-725,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,3,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,300-450,1,Low,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,450-725,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,3,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,300-450,1,Low,,,,1,ND3.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,450-725,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,725-1200,1,Low,,,,1,ND4.0,Visible,Quartz Halogen,Closed,1,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,200,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,180,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,140,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,140,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,100,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,725 - 1200,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,100,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,90,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,70,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,70,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,50,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,725 - 1200,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,50,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,45,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,35,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,350 - 420,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,35,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,420 - 500,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,500 - 650,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,25,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,650 - 725,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,15,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,725 - 1200,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,15,1,Night
-$B480.*,$g.*,$IFU.* 2 Slits,1,1,400 - 560,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,200,1,Night
-$B480.*,$g.*,$IFU.* 2 Slits,2,1,400 - 560,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
+$B480.*,$g.*,$IFU.* 2 Slits,1,1,400 - 560,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,180,1,Night
+$B480.*,$g.*,$IFU.* 2 Slits,2,1,400 - 560,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,110,1,Night
 $B480.*,$g.*,$IFU.* 2 Slits,4,1,400 - 560,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
 $B480.*,$r.{6},$IFU.* 2 Slits,1,1,560 - 700,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,130,1,Night
 $B480.*,$r.{6},$IFU.* 2 Slits,2,1,560 - 700,1,Low,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,70,1,Night
@@ -2917,7 +2920,7 @@ $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,2,4,725-1200,1,High,,,,1,ND2.0,Visible,Quar
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
-$B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.50 arcsec,4,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,1,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,32,1,Night
@@ -2945,7 +2948,7 @@ $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,300-450,1,High,,,,1,GMOS balance,Visibl
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
+$B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 0.75 arcsec,4,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,24,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,16,1,Night
@@ -2965,14 +2968,14 @@ $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,1,725-1200,1,High,,,,1,ND2.0,Visible,Quar
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,1,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,2,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,14,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.00 arcsec,4,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,16,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,10,1,Night
@@ -2993,14 +2996,14 @@ $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,300-450,1,High,,,,1,GMOS balance,Visibl
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,1,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,2,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,450-725,1,High,,,,1,ND3.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 1.50 arcsec,4,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,12,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,8,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
@@ -3010,65 +3013,65 @@ $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,2,725-1200,1,High,,,,1,ND2.0,Visible,Quar
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,6,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,1,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,18,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,2,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,18,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,12,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
-$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,8,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,450-725,1,High,,,,1,ND3.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 2.00 arcsec,4,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,450-725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,300-450,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,20,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,2,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,1,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,16,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,10,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,3,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,1,4,725-1200,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,6,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,8,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,6,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
-$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,450-725,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,2,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,450-725,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,2,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,300-450,1,High,,,,1,ND2.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,450-725,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,6,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,2,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,300-450,1,High,,,,1,ND3.0,Visible,Quartz Halogen,Closed,4,1,Night
+$B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,450-725,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,4,1,Night
 $B480.*,$.*one|.*G.*,$.* 5.00 arcsec,4,4,725-1200,1,High,,,,1,ND4.0,Visible,Quartz Halogen,Closed,2,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,400,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,360,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,280,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,240,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,280,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,240,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,200,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,1,1,725 - 1200,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,200,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,180,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,140,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,140,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,120,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,100,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,2,1,725 - 1200,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,100,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,90,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,70,1,Night
-$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,350 - 420,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,70,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,420 - 500,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,60,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,500 - 650,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,50,1,Night
+$B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,650 - 725,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
 $B480.*,$.*one|.*G.*,$IFU.* Right Slit .*,4,1,725 - 1200,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,30,1,Night
 $B480.*,$g.*,$IFU.* 2 Slits,1,1,400 - 560,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,400,1,Night
 $B480.*,$g.*,$IFU.* 2 Slits,2,1,400 - 560,1,High,,,,1,GMOS balance,Visible,Quartz Halogen,Closed,240,1,Night

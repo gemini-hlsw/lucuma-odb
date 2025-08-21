@@ -71,10 +71,10 @@ trait GmosSouthParsers extends GmosCommonParsers {
       "IFU N and S Right Slit (red)" -> GmosSouthFpu.IfuNSRed
     ).withContext("GMOS South FPU")
 
-  val grating: Parser[NonEmptyList[Option[GmosSouthGrating]]] =
-    manyOfOptionEnumerated[GmosSouthGrating]("Mirror").withContext("GMOS South grating")
+  val grating: Parser[Availability[NonEmptyList[Option[GmosSouthGrating]]]] =
+    manyOfObsoletableOptionEnumerated[GmosSouthGrating]("Mirror", Set("B600_G5323")).withContext("GMOS South grating")
 
-  val fileKey: Parser[FileKey.South] =
+  val fileKey: Parser[Availability[FileKey.South]] =
     (
       (grating           <* columnSep) ~
       (filter            <* columnSep) ~
@@ -85,12 +85,12 @@ trait GmosSouthParsers extends GmosCommonParsers {
       (order             <* columnSep) ~
       gain
     ).map { case (((((((grating, filter), fpu), xBin), yBin), range), order), gain) =>
-      FileKey(grating, filter, fpu, xBin, yBin, range, order, gain)
+      grating.map(g => FileKey(g, filter, fpu, xBin, yBin, range, order, gain))
     }
 
-  def fileEntry: Parser[FileEntry.South] =
+  def fileEntry: Parser[Availability[FileEntry.South]] =
     ((fileKey <* file.keyValueSep) ~ file.legacyValue).map { case (k, v) =>
-      FileEntry(k, v)
+      k.map(k => FileEntry(k, v))
     }
 
 }

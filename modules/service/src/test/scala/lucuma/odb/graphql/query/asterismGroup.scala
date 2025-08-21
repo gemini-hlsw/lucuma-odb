@@ -192,7 +192,7 @@ class asterismGroup extends OdbSuite {
     List(pi).traverse { user =>
       for {
         cid  <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
-        pid  <- createProgramAs(user)
+        pid  <- createProgramWithUsPi(user)
         _    <- addDemoScienceProposal(user, pid, cid)
         _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(5)

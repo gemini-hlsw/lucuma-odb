@@ -26,6 +26,7 @@ scalar EmailAddress
 input AddAtomEventInput {
   atomId: AtomId!
   atomStage: AtomStage!
+  clientId: ClientId
 }
 
 "The result of adding a atom event."
@@ -41,6 +42,8 @@ input AddDatasetEventInput {
 
   "Dataset execution stage."
   datasetStage: DatasetStage!
+
+  clientId: ClientId
 }
 
 "The result of adding a dataset event."
@@ -63,6 +66,7 @@ type AddProgramUserResult {
 input AddSequenceEventInput {
   visitId: VisitId!
   command: SequenceCommand!
+  clientId: ClientId
 }
 
 "The result of adding a sequence event."
@@ -75,6 +79,7 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
+  clientId: ClientId
 }
 
 "The result of adding a slew event."
@@ -87,6 +92,7 @@ type AddSlewEventResult {
 input AddStepEventInput {
   stepId: StepId!
   stepStage: StepStage!
+  clientId: ClientId
 }
 
 "The result of adding a step event."
@@ -156,53 +162,6 @@ input AngleInput {
   hms: String
 }
 
-enum GcalLampType {
-
-  ARC
-
-  FLAT
-
-}
-
-type AtomDigest {
-
-  """
-  Atom id
-  """
-  id: AtomId!
-
-  """
-  Observe class for this atom as a whole (combined observe class for each of
-  its steps).
-  """
-  observeClass: ObserveClass!
-
-  """
-  Expected execution time for this atom.
-  """
-  timeEstimate: CategorizedTime!
-
-  """
-  Step types contained in this atom.
-  """
-  stepTypes: [StepType!]!
-
-  """
-  Gcal lamp types used in this atom, if any.
-  """
-  lampTypes: [GcalLampType!]!
-
-}
-
-type CalculatedAtomDigests {
-
-  "The current state of the background calculation."
-  state: CalculationState!
-
-  value: [AtomDigest!]!
-
-}
-
 """
 Atom-level events.  The execution of a single atom will generate multiple events.
 """
@@ -227,6 +186,9 @@ type AtomEvent implements ExecutionEvent {
 
   "Atom execution stage."
   atomStage: AtomStage!
+
+  "Client id, if any."
+  clientId: ClientId
 }
 
 enum AtomExecutionState {
@@ -509,11 +471,19 @@ scalar CallForProposalsId
 The properties of a Call for Proposal in an input for creation and editing.
 """
 input CallForProposalsPropertiesInput {
+
   "Type of the call. Required on create."
   type: CallForProposalsType
 
   "Semester associated with the call. Required on create."
   semester: Semester
+
+  """
+  The CfP title.  If not set then a title will be determined from the CfP
+  properties.  This property is not required on create and may be assigned
+  a null value to return to the default.
+  """
+  title: NonEmptyString
 
   """
   Coordinate limits.  If not specified, they will default according to the
@@ -723,6 +693,8 @@ Result of the program user role update, which is the updated program user itself
 type ChangeProgramUserRoleResult {
   programUser: ProgramUser!
 }
+
+scalar ClientId
 
 """
 Describes an observation clone operation, making any edits in the `SET`
@@ -1261,8 +1233,8 @@ input TimeAndCountExposureTimeModeInput {
   "Exposure time, which must be greater than zero."
   time: TimeSpanInput!
 
-  "Exposure count."
-  count: NonNegInt!
+  "Exposure count, which must be greater than zero."
+  count: PosInt!
 
   "S/N at wavelength."
   at: WavelengthInput!
@@ -2083,7 +2055,13 @@ input GmosNorthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -2096,6 +2074,17 @@ input GmosNorthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosNorthFilter!]
+
+  """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
+
+  """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2116,11 +2105,6 @@ input GmosNorthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -2513,7 +2497,13 @@ input GmosSouthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+  """
   The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetComponentInput!]
 }
@@ -2526,6 +2516,17 @@ input GmosSouthImagingInput {
   The filters field must be specified with at least one filter. It cannot be unset with a null value.
   """
   filters: [GmosSouthFilter!]
+
+  """
+  The offsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  offsets: [OffsetInput!]
+
+  """
+  How sequences are generated when multiple filters are specified.
+  Defaults to GROUPED.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   The explicitBin field may be unset by assigning a null value, or ignored by skipping it altogether
@@ -2546,11 +2547,6 @@ input GmosSouthImagingInput {
   The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitRoi: GmosRoi
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetInput!]
 }
 
 """
@@ -3621,10 +3617,6 @@ type ProgramEdit { #implements Event {
   Edited object
   """
   value: Program!
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -3701,10 +3693,9 @@ input ProgramUserPropertiesInput {
   partnerLink: PartnerLinkInput
 
   """
-  The fallback profile may used when the ORCiD user profile is not set or not
-  shared publicly.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfileInput
+  preferredProfile: UserProfileInput
 
   "The user's educational status."
   educationalStatus: EducationalStatus
@@ -3714,6 +3705,9 @@ input ProgramUserPropertiesInput {
 
   "The user's reported gender."
   gender: Gender
+
+  "Investigator affiliation."
+  affiliation: NonEmptyString
 
   """
   Whether the user has data access.  This property may be changed only by the
@@ -3765,10 +3759,9 @@ type ProgramUser {
   partnerLink: PartnerLink!
 
   """
-  Profile information reported when the corresponding ORCiD profile is not set
-  or is not public.
+  The preferred profile overrides any values that may be in the Orcid profile (user.profile).
   """
-  fallbackProfile: UserProfile!
+  preferredProfile: UserProfile!
 
   "User educational status. PHD/Undergrad/Grad/Other."
   educationalStatus: EducationalStatus
@@ -3782,8 +3775,23 @@ type ProgramUser {
   "User invitations, if any, associated with this program user."
   invitations: [UserInvitation!]!
 
+  "Investigator affiliation."
+  affiliation: NonEmptyString
+
   "Has access to data."
   hasDataAccess: Boolean!
+
+  """
+  Name created preferentially from the fields of the preferred profile, falling back
+  to the Orcid profile if the preferred fields are not set.
+  """
+  displayName: String
+
+  """
+  The user's email address from the preferred profile, falling back to the Orcid profile
+  if the preferred email is not set.
+  """
+  email: String
 }
 
 """
@@ -4222,13 +4230,11 @@ input RadialVelocityInput {
 
 """
 Input parameters for creating a new atom record.
-(stepCount is deprecated and will be ignored)
 """
 input RecordAtomInput {
   visitId: VisitId!
   instrument: Instrument!
   sequenceType: SequenceType!
-  stepCount: NonNegShort
   generatedId: AtomId
 }
 
@@ -4361,7 +4367,6 @@ type ResetAcquisitionResult {
 Right Ascension, choose one of the available units
 """
 input RightAscensionInput {
-  microarcseconds: Long
   microseconds: Long
   degrees: BigDecimal
   hours: BigDecimal
@@ -5196,10 +5201,6 @@ type GroupEdit {
   Edited group, or null if it's the top-level group.
   """
   value: Group
-  id: Long!
-    @deprecated(
-      reason: "id is no longer computed; a constant value is returned"
-    )
 }
 
 """
@@ -6350,6 +6351,11 @@ Cloud extinction
 """
 enum CloudExtinctionPreset {
   """
+  CloudExtinctionPreset Zero
+  """
+  ZERO
+
+  """
   CloudExtinctionPreset PointOne
   """
   POINT_ONE
@@ -6368,11 +6374,6 @@ enum CloudExtinctionPreset {
   CloudExtinctionPreset OnePointZero
   """
   ONE_POINT_ZERO
-
-  """
-  CloudExtinctionPreset OnePointFive
-  """
-  ONE_POINT_FIVE
 
   """
   CloudExtinctionPreset TwoPointZero
@@ -6627,6 +6628,158 @@ type Dataset {
 }
 
 """
+Database operations that provoke Chronicle table updates.
+"""
+enum DatabaseOperation {
+  INSERT
+  UPDATE
+  DELETE
+  TRUNCATE
+}
+
+"""
+The Chronicle entry for dataset updates.
+"""
+type DatasetChronicleEntry { # implements ChronicleEntry
+  id: ChronicleId!
+  transactionId: TransactionId!
+
+  "The user who performed the insertion or update."
+  user: User
+
+  "When the update happened."
+  timestamp: Timestamp!
+
+  "The database operation that was performed."
+  operation: DatabaseOperation!
+
+  "The dataset that was inserted or updated."
+  dataset: Dataset!
+
+  modDatasetId: Boolean!
+  modStepId: Boolean!
+  modObservationId: Boolean!
+  modVisitId: Boolean!
+
+  modReference: Boolean!
+  modFilename: Boolean!
+  modQaState: Boolean!
+  modInterval: Boolean!
+  modComment: Boolean!
+
+  newDatasetId: DatasetId
+  newStepId: StepId
+  newObservationId: ObservationId
+  newVisitId: VisitId
+
+  newReference: DatasetReferenceLabel
+  newFilename: DatasetFilename
+  newQaState: DatasetQaState
+  newInterval: TimestampInterval
+  newComment: NonEmptyString
+
+}
+
+"""
+Allows filtering of DatasetChronicleEntry (see Query -> datasetChronicleEntries)
+based on a number of criteria.
+"""
+input WhereDatasetChronicleEntry {
+
+  AND: [WhereDatasetChronicleEntry!]
+
+  OR: [WhereDatasetChronicleEntry!]
+
+  NOT: WhereDatasetChronicleEntry
+
+  """
+  Limits the results to those matching a chronicle id.
+  """
+  id: WhereOrderChronicleId
+
+  """
+  Limits the results to a particular user or users.
+  """
+  user: WhereUser
+
+  """
+  Limits the results to particular database operations.
+  """
+  operation: WhereEqDatabaseOperation
+
+  """
+  Limits the results based on timestamp of the change.
+  """
+  timestamp: WhereOrderTimestamp
+
+  """
+  Limits the results to specified datasets.
+  """
+  dataset: WhereOrderDatasetId
+
+  """
+  Add this item to match only when a dataset id is or isn't updated.
+  """
+  modDatasetId: WhereBoolean
+
+  """
+  Add this item to match only when a step id is or isn't updated.
+  """
+  modStepId: WhereBoolean
+
+  """
+  Add this item to match only when an observation id is or isn't updated.
+  """
+  modObservationId: WhereBoolean
+
+  """
+  Add this item to match only when a visit id is or isn't updated.
+  """
+  modVisitId: WhereBoolean
+
+  """
+  Add this item to match only when a dataset reference is or isn't updated.
+  """
+  modReference: WhereBoolean
+
+  """
+  Add this item to match only when a dataset filename is or isn't updated.
+  """
+  modFilename: WhereBoolean
+
+  """
+  Add this item to match only when a dataset QA state is or isn't updated.
+  """
+  modQaState: WhereBoolean
+
+  """
+  Add this item to match only when a dataset time interval (the range of time
+  during which it was collected) is or isn't updated.
+  """
+  modInterval: WhereBoolean
+
+  """
+  Add this item to match only when a dataset comment is or isn't updated.
+  """
+  modComment: WhereBoolean
+
+}
+
+type DatasetChronicleEntrySelectResult {
+
+  """
+  Matching entries up to the return size limit of 1000
+  """
+  matches: [DatasetChronicleEntry!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
+
+}
+
+"""
 Dataset-level events.  A single dataset will be associated with multiple events
 as it makes its way through observe, readout and write stages.
 """
@@ -6657,6 +6810,10 @@ type DatasetEvent implements ExecutionEvent {
 
   "The associated dataset."
   dataset: Dataset!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "Dataset filename in standard format."
@@ -6871,20 +7028,7 @@ type Execution {
   If a sequence cannot be generated for this observation, `null` is returned
   along with warning messages.
   """
-  digest: ExecutionDigest @deprecated(reason: "will be updated with a CalculatedExecutionDigest result, use calculatedDigest for now")
-
-  """
-  Calculations dependent on the sequence, such as planned time and offsets.
-  If a sequence cannot be generated for this observation, `null` is returned
-  along with warning messages.
-  """
-  calculatedDigest: CalculatedExecutionDigest
-
-  """
-  A summary of pending atoms in this observation's sequence.  This is intended
-  for the scheduler, but is available generally.
-  """
-  atomDigests: CalculatedAtomDigests!
+  digest: CalculatedExecutionDigest
 
   """
   Full execution config, including acquisition and science sequences.  If a
@@ -6901,7 +7045,7 @@ type Execution {
     projected atom count is available in the execution digest.
     """
     futureLimit: NonNegInt = 25
-  ): ExecutionConfig
+  ): ExecutionConfig @deprecated(reason: "moved to Query -> executionConfig")
 
   """
   Determines the execution state as a whole of this observation.
@@ -6995,6 +7139,9 @@ interface ExecutionEvent {
 
   "Event type."
   eventType: ExecutionEventType!
+
+  "Client id, if any."
+  clientId: ClientId
 }
 
 """
@@ -7754,21 +7901,21 @@ type Flamingos2LongSlit {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  Spatial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
+  Offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
   """
-  spatialOffsets: [Offset!]!
+  offsets: [Offset!]!
 
   """
-  Default spatial offsets.
+  Default offsets.
   """
-  defaultSpatialOffsets: [Offset!]!
+  defaultOffsets: [Offset!]!
 
   """
-  Optional explicitly specified spatial offsets. If set it overrides the
+  Optional explicitly specified offsets. If set it overrides the
   the default.
   """
-  explicitSpatialOffsets: [Offset!]
+  explicitOffsets: [Offset!]
 
   """
   The disperser as it was initially selected.  See the `disperser` field for the
@@ -7830,9 +7977,9 @@ input Flamingos2LongSlitInput {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitSpatialOffsets: [OffsetInput!]
+  explicitOffsets: [OffsetInput!]
 
 }
 
@@ -7853,7 +8000,7 @@ type TimeAndCountExposureTimeMode {
   time: TimeSpan!
 
   "Exposure count."
-  count: NonNegInt!
+  count: PosInt!
 
   "S/N at Wavelength."
   at: Wavelength!
@@ -8271,9 +8418,9 @@ enum GmosNorthGrating {
   B480_G5309
 
   """
-  GmosNorthGrating R400_G5305
+  GmosNorthGrating R400_G5310
   """
-  R400_G5305
+  R400_G5310
 
   """
   GmosNorthGrating R150_G5308
@@ -8409,19 +8556,39 @@ type GmosNorthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 
@@ -8463,6 +8630,28 @@ type GmosNorthImaging {
   Initial GMOS North Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosNorthFilter!]!
+
+  """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -8529,23 +8718,6 @@ type GmosNorthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -8839,11 +9011,6 @@ enum GmosSouthGrating {
   R831_G5322
 
   """
-  GmosSouthGrating B600_G5323
-  """
-  B600_G5323
-
-  """
   GmosSouthGrating R600_G5324
   """
   R600_G5324
@@ -8992,19 +9159,39 @@ type GmosSouthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
+  Q offsets, either explicitly specified in explicitOffsets
+  or else taken from defaultOffsets
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the
+  the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
   Spacial q offsets, either explicitly specified in explicitSpatialOffsets
   or else taken from defaultSpatialOffsets
+  @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
   """
   spatialOffsets: [OffsetQ!]!
 
   """
   Default spatial offsets.
+  @deprecated(reason: "Use 'defaultOffsets' instead.")
   """
   defaultSpatialOffsets: [OffsetQ!]!
 
   """
   Optional explicitly specified spatial q offsets. If set it overrides the
   the default.
+  @deprecated(reason: "Use 'explicitOffsets' instead.")
   """
   explicitSpatialOffsets: [OffsetQ!]
 
@@ -9046,6 +9233,28 @@ type GmosSouthImaging {
   Initial GMOS South Filters that were used when creating the imaging mode
   """
   initialFilters: [GmosSouthFilter!]!
+
+  """
+  Spatial offsets
+  """
+  offsets: [Offset!]!
+
+  """
+  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
+  from the defaultMultipleFiltersMode.
+  """
+  multipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Default MultipleFiltersMode (GROUPED).
+  """
+  defaultMultipleFiltersMode: MultipleFiltersMode!
+
+  """
+  Optional explictly specified MultipleFiltersMode. If set it overrides the
+  default.
+  """
+  explicitMultipleFiltersMode: MultipleFiltersMode
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
@@ -9112,23 +9321,6 @@ type GmosSouthImaging {
   Optional explicitly specified GMOS ROI.  If set it overrides the default.
   """
   explicitRoi: GmosRoi
-
-  """
-  Spacial offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [Offset!]!
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [Offset!]!
-
-  """
-  Optional explicitly specified spatial offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [Offset!]
 
 }
 
@@ -10118,18 +10310,14 @@ type Observation {
   """
   configurationRequests: [ConfigurationRequest!]!
 
-  workflow: ObservationWorkflow! @deprecated(reason: "will be updated with a CalculatedObservationWorkflow result, use calculatedWorkflow for now")
-
   """
   Obtains the current observation workflow state and valid transitions (and any
   validation errors). Because this calculation is expensive, it is performed in
   the background when something relevant changes and may be in a state of flux
   when queried.  The calculation state in the result can be used to determine
   whether a pending update is expected.
-
-  NOTE: Temporary - will replace the 'workflow' field.
   """
-  calculatedWorkflow: CalculatedObservationWorkflow
+  workflow: CalculatedObservationWorkflow
 }
 
 enum ExecutionState {
@@ -10272,6 +10460,17 @@ type ConfigurationRequestSelectResult {
   `true` when there were additional matches that were not returned.
   """
   hasMore: Boolean!
+}
+
+"""
+How sequences are generated when multiple filters are specified.
+"""
+enum MultipleFiltersMode {
+  "Grouped filters"
+  GROUPED
+
+  "Interleaved filters"
+  INTERLEAVED
 }
 
 """
@@ -10999,6 +11198,28 @@ type Query {
   ): DatasetSelectResult!
 
   """
+  Select all dataset chronicle entries.  This will contain detailed information
+  about dataset creation and updates.
+  """
+  datasetChronicleEntries(
+
+    """
+    Filters the selection of chronicle entries.
+    """
+    WHERE: WhereDatasetChronicleEntry
+
+    """
+    Starts the result set at (or after if not existent) the given id.
+    """
+    OFFSET: ChronicleId
+
+    """
+    Limits the result to at most this number of matches (but never more than 1000).
+    """
+    LIMIT:  NonNegInt
+  ): DatasetChronicleEntrySelectResult!
+
+  """
   Selects the first `LIMIT` matching execution events based on the provided `WHERE` parameter, if any.
   """
   events(
@@ -11017,6 +11238,29 @@ type Query {
     """
     LIMIT: NonNegInt
   ): ExecutionEventSelectResult!
+
+  """
+  Full execution config, including static values and acquisition and science
+  sequences.  If a sequence cannot be generated for this observation, `null`
+  is returned along with warning messages.
+  """
+  executionConfig(
+    "Specify to lookup the observation by its ID."
+    observationId: ObservationId
+
+    "Specify to lookup the observation by its reference."
+    observationReference: ObservationReferenceLabel
+
+    """
+    The maximum size (number of atoms) of the `possibleFuture` in the sequences.
+    If the projected future is longer, the size will be capped at this value.
+    Use 0 if only interested in the `nextAtom`.  The maximum is 100.  Each
+    sequence has a `hasMore` field that can be used to determine whether there
+    additional atoms beyond those returned in `possibleFuture`.  The total
+    projected atom count is available in the execution digest.
+    """
+    futureLimit: NonNegInt = 25
+  ): ExecutionConfig
 
   """
   Metadata for `enum FilterType`
@@ -11075,16 +11319,6 @@ type Query {
     """
     includeDeleted: Boolean! = false
   ): ObservationSelectResult!
-
-  """
-  Selects observations via a normal predicate *and* an additional filter for allowed
-  workflow states. This query is intended for operations and is available only for
-  service users.
-  """
-  observationsByWorkflowState(
-    WHERE: WhereObservation
-    states: [ObservationWorkflowState!]
-  ): [Observation!]! @deprecated(reason: "use 'workflow' field in WhereObservation filter")
 
   """
   Selects the first `LIMIT` matching configuration requests based on the provided `WHERE` parameter, if any.
@@ -11379,11 +11613,6 @@ type RightAscension {
   Right Ascension (RA) in degrees
   """
   degrees: BigDecimal!
-
-  """
-  Right Ascension (RA) in µas
-  """
-  microarcseconds: Long! @deprecated
 
   """
   Right Ascension (RA) in µs
@@ -11686,6 +11915,10 @@ type SequenceEvent implements ExecutionEvent {
 
   "Sequence event data."
   command: SequenceCommand!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 """
@@ -11825,6 +12058,10 @@ type SlewEvent implements ExecutionEvent {
 
   "Slew event data."
   slewStage: SlewStage!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "Slew stage"
@@ -12758,6 +12995,10 @@ type StepEvent implements ExecutionEvent {
 
   "Step execution stage."
   stepStage: StepStage!
+
+  "Client id, if any."
+  clientId: ClientId
+
 }
 
 "StepId id formatted as `s-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`"
@@ -13524,9 +13765,6 @@ interface TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13541,9 +13779,6 @@ time is not charged.
 type TimeChargeDaylightDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!
@@ -13564,9 +13799,6 @@ type TimeChargeNoDataDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13583,9 +13815,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
   interval: TimestampInterval!
 
   "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
-
-  "Time amount to discount from the program."
   amount: TimeSpan!
 
   "Additional detail."
@@ -13598,9 +13827,6 @@ type TimeChargeOverlapDiscount implements TimeChargeDiscount {
 type TimeChargeQaDiscount implements TimeChargeDiscount {
   "The interval during which this discount applies."
   interval: TimestampInterval!
-
-  "Time amount to discount from the program."
-  program: TimeSpan! @deprecated(reason: "renamed to 'amount'")
 
   "Time amount to discount from the program."
   amount: TimeSpan!
@@ -14268,6 +14494,33 @@ input WhereEqCallForProposalsType {
   Matches if the call for proposals type is none of the supplied values.
   """
   NIN: [CallForProposalsType!]
+}
+
+"""
+Filters on equality (or not) of the database operation.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereEqDatabaseOperation {
+
+  """
+  Matches if the database operation is exactly the supplied value.
+  """
+  EQ: DatabaseOperation
+
+  """
+  Matches if the database operation is not the supplied value.
+  """
+  NEQ: DatabaseOperation
+
+  """
+  Matches if the database operation is any of the supplied options.
+  """
+  IN: [DatabaseOperation!]
+
+  """
+  Matches if the database operation is none of the supplied values.
+  """
+  NIN: [DatabaseOperation!]
 }
 
 """
@@ -15274,6 +15527,52 @@ input WhereOrderCallForProposalsId {
   Matches if the id is ordered before or equal (<=) the supplied value.
   """
   LTE: CallForProposalsId
+}
+
+"""
+Filters on equality or order comparisons of the chronicle id.  All supplied
+criteria must match, but usually only one is selected.
+"""
+input WhereOrderChronicleId {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ChronicleId
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ChronicleId
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ChronicleId!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ChronicleId!]
+
+  """
+  Matches if the property is ordered after (>) the supplied value.
+  """
+  GT: ChronicleId
+
+  """
+  Matches if the property is ordered before (<) the supplied value.
+  """
+  LT: ChronicleId
+
+  """
+  Matches if the property is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ChronicleId
+
+  """
+  Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ChronicleId
 }
 
 """
@@ -16538,9 +16837,9 @@ input WhereProgramUser {
   partnerLink: WherePartnerLink
 
   """
-  Matches the fallback profile.
+  Matches the preferred profile.
   """
-  fallbackProfile: WhereUserProfile
+  preferredProfile: WhereUserProfile
 
   """
   Matches the educational status.
@@ -16596,6 +16895,11 @@ input WhereProposal {
   Matches on the proposal reference (if any).
   """
   reference: WhereProposalReference
+
+  """
+  Matches on the CfP details (if any).
+  """
+  call: WhereCallForProposals
 
   #  """
   #  Matches the proposal TAC category.

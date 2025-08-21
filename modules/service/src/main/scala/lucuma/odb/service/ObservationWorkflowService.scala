@@ -348,7 +348,6 @@ object ObservationWorkflowService {
                 }
             .toMap
 
-      @annotation.nowarn("msg=unused implicit parameter")
       // Computes the observation execution state if not cached
       private def executionStates(
         infos:      Map[Observation.Id, ObservationValidationInfo],
@@ -676,7 +675,6 @@ object ObservationWorkflowService {
           .flatMap: oids =>
             filterState(oids, states, commitHash, itcClient, ptc)
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def getObservationsForTargets(whichTargets: AppliedFragment)(using NoTransaction[F]): F[Map[Target.Id, List[Observation.Id]]] =
         services.transactionally:
           val af = Statements.selectObservationsForTargets(whichTargets)

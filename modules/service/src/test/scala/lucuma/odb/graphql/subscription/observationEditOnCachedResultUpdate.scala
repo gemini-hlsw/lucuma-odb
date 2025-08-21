@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package subscription
 
+import cats.syntax.either.*
 import io.circe.Json
+import io.circe.JsonObject
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -73,8 +75,10 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
             observation(observationId: "$oid") {
               execution {
                 digest {
-                  science {
-                    atomCount
+                  value {
+                    science {
+                      atomCount
+                    }
                   }
                 }
               }
@@ -106,7 +110,7 @@ class observationEditOnCachedResultUpdate extends ExecutionTestSupportForGmos wi
       _   <- subscriptionExpect(
         user      = pi,
         query     = observationUpdateSubscription(oid),
-        mutations = Right(requestSequenceDigest(pi, oid)),
+        mutations = runObscalcUpdate(pid, oid).asRight[List[(String, Option[JsonObject])]],
         expected  = List(updateResponse, updateResponse)  // caches ITC and then sequence digest
       )
     yield ()

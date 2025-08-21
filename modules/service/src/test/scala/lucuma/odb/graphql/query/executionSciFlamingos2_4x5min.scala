@@ -5,8 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.StepGuideState.Disabled
@@ -22,7 +21,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(4))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
 
   test("(60, 0), (0, 0), (0, 0), (60, 0)"):
     val setup: IO[Observation.Id] =
@@ -39,7 +38,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   {
                     p: { arcseconds: 60 }
                     q: { arcseconds:  0 }
@@ -66,30 +65,19 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
     // steps and ITC reports we need 4.
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
-                      "possibleFuture" -> List(
-                        flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
-                        flamingos2ExpectedGcals((60, 0))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
+                  "possibleFuture" -> List(
+                    flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
+                    flamingos2ExpectedGcals((60, 0))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -111,7 +99,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitSpatialOffsets: [
+                explicitOffsets: [
                   {
                     p: { arcseconds: 300 }
                     q: { arcseconds:  55 }
@@ -138,30 +126,19 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
     // steps and ITC reports we need 4.
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
-                      "possibleFuture" -> List(
-                        flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
-                        flamingos2ExpectedGcals((300, 65))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
+                  "possibleFuture" -> List(
+                    flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
+                    flamingos2ExpectedGcals((300, 65))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )

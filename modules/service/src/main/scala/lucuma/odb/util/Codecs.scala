@@ -48,6 +48,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -201,6 +202,9 @@ trait Codecs {
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
 
+  val client_id: Codec[Client.Id] =
+    uid[Client.Id]
+
   val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
     enumerated[CloudExtinction.Preset](Type.varchar)
 
@@ -344,6 +348,9 @@ trait Codecs {
     bool.imap(
       b => if (b) MosPreImaging.IsMosPreImaging else MosPreImaging.IsNotMosPreImaging
     )(_.toBoolean)
+
+  val multiple_filters_mode: Codec[MultipleFiltersMode] =
+    enumerated(Type("e_multiple_filters_mode"))
 
   val odb_error: Codec[OdbError] =
     jsonb.eimap(
@@ -554,6 +561,9 @@ trait Codecs {
 
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
+
+  val tg_op: Codec[DatabaseOperation] =
+    enumerated(Type("e_tg_op"))
 
   val time_accounting_category: Codec[TimeAccountingCategory] =
     enumerated(Type.varchar)

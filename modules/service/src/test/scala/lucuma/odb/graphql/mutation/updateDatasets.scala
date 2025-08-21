@@ -5,8 +5,11 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.OdbError
 
@@ -252,4 +255,57 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations {
 
       expect(staff, q, e)
   }
+
+  test("chronicle auditing"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, mode.some)
+      vid <- recordVisitAs(service, mode.instrument, oid)
+      aid <- recordAtomAs(service, mode.instrument, vid)
+      sid <- recordStepAs(service, mode.instrument, aid)
+      did <- recordDatasetAs(service, sid, "N18630703S0001.fits")
+      _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
+      _   <- assertIO(chronDatasetUpdates(did).map(_.drop(1)), List(
+          json"""
+            {
+              "c_user"                      : ${staff.id},
+              "c_operation"                 : "UPDATE",
+              "c_dataset_id"                : $did,
+              "c_mod_dataset_id"            : false,
+              "c_mod_step_id"               : false,
+              "c_mod_file_site"             : false,
+              "c_mod_file_date"             : false,
+              "c_mod_file_index"            : false,
+              "c_mod_filename"              : false,
+              "c_mod_qa_state"              : true,
+              "c_mod_start_time"            : false,
+              "c_mod_end_time"              : false,
+              "c_mod_observation_id"        : false,
+              "c_mod_visit_id"              : false,
+              "c_mod_observation_reference" : false,
+              "c_mod_step_index"            : false,
+              "c_mod_exposure_index"        : false,
+              "c_mod_dataset_reference"     : false,
+              "c_mod_comment"               : false,
+              "c_new_dataset_id"            : null,
+              "c_new_step_id"               : null,
+              "c_new_file_site"             : null,
+              "c_new_file_date"             : null,
+              "c_new_file_index"            : null,
+              "c_new_filename"              : null,
+              "c_new_qa_state"              : "Pass",
+              "c_new_start_time"            : null,
+              "c_new_end_time"              : null,
+              "c_new_observation_id"        : null,
+              "c_new_visit_id"              : null,
+              "c_new_observation_reference" : null,
+              "c_new_step_index"            : null,
+              "c_new_exposure_index"        : null,
+              "c_new_dataset_reference"     : null,
+              "c_new_comment"               : null
+            }
+          """
+      ))
+    yield ()
+
 }

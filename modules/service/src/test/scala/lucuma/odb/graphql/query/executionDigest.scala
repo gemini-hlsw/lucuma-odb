@@ -8,7 +8,7 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -31,14 +31,14 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.graphql.input.AddStepEventInput
-
+import lucuma.odb.service.Services
 
 class executionDigest extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10),
+      PosInt.unsafeFrom(10),
     )
 
   // * Arc:
@@ -94,7 +94,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       query {
         observation(observationId: "$oid") {
           execution {
-            calculatedDigest {
+            digest {
               state
               value {
                 setup {
@@ -126,7 +126,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "calculatedDigest": {
+            "digest": {
               "state": "READY",
               "value": {
                 "setup" : {
@@ -270,7 +270,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          state
                          value {
                            setup {
@@ -295,7 +295,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       {
                         "id": $oid,
                         "execution": {
-                          "calculatedDigest": {
+                          "digest": {
                             "state": "READY",
                             "value": null
                           }
@@ -330,7 +330,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          state
                          value {
                            setup {
@@ -354,7 +354,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "state": "READY",
                           "value": null
                         }
@@ -391,7 +391,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          value {
                            setup {
                              full { seconds }
@@ -414,7 +414,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -428,7 +428,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": null
                         }
                       }
@@ -464,7 +464,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                    matches {
                      id
                      execution {
-                       calculatedDigest {
+                       digest {
                          value {
                            setup {
                              full { seconds }
@@ -487,7 +487,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid0,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": null
                         }
                       }
@@ -495,7 +495,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     {
                       "id": $oid1,
                       "execution": {
-                        "calculatedDigest": {
+                        "digest": {
                           "value": {
                             "setup" : {
                               "full" : {
@@ -534,7 +534,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
           services.session.transaction.use: xa =>
             for
               _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep))(using xa, ().asInstanceOf) // shhh
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
 
@@ -545,7 +545,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
     s"""
       query {
         observation(observationId: "$oid") {
-          execution { calculatedDigest { value { science { executionState } } } }
+          execution { digest { value { science { executionState } } } }
         }
       }
     """
@@ -555,7 +555,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
       {
         "observation": {
           "execution": {
-            "calculatedDigest": {
+            "digest": {
               "value": {
                 "science" : {
                   "executionState": ${e.tag.toScreamingSnakeCase}
@@ -660,7 +660,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
             {
               "observation": {
                 "execution": {
-                  "calculatedDigest": {
+                  "digest": {
                     "state": "READY",
                     "value": {
                       "setup" : {
@@ -726,4 +726,18 @@ class executionDigest extends ExecutionTestSupportForGmos {
         query    = executionStateQuery(oid),
         expected = expectedExecutionState(ExecutionState.Completed).asRight
       )
+
+  // This simulates a deleted calibration observation and checks that the foreign key violation is caught
+  test("insertOrUpdate with non-existent observation should not fail"):
+    createProgramAs(pi).flatMap: pid =>
+      withServices(pi): services =>
+        Services.asSuperUser:
+          services.session.transaction.use: xa =>
+            services.executionDigestService
+              .insertOrUpdate(
+                pid,
+                Observation.Id.fromLong(Long.MaxValue).get,
+                Md5Hash.Zero,
+                ExecutionDigest.Zero
+              )(using xa)
 }

@@ -16,6 +16,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SlewStage
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.User
@@ -212,3 +213,49 @@ class addSlewEvent extends OdbSuite:
           }
         """.asRight
       )
+
+  def addClientId(
+    oid:         Observation.Id,
+    cid:         Client.Id,
+    isDuplicate: Boolean
+  ): IO[Unit] =
+      expect(
+        service,
+        s"""
+          mutation {
+            addSlewEvent(input: {
+              observationId: "$oid",
+              slewStage: START_SLEW,
+              clientId: "$cid"
+            }) {
+              event { clientId }
+            }
+          }
+        """,
+        Either.cond(
+          !isDuplicate,
+          json"""
+            {
+              "addSlewEvent": {
+                "event": {
+                  "clientId": $cid
+                }
+              }
+            }
+          """,
+          List(s"An event with client id '$cid' has already been added.")
+        )
+      )
+
+  test("addSlewEvent - client id"):
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+
+    createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
+      addClientId(oid, cid.get, isDuplicate = false)
+
+  test("addSlewEvent - duplicate client id"):
+    val cid  = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    createObservation(ObservingModeType.GmosNorthLongSlit, pi).flatMap: oid =>
+      addClientId(oid, cid.get, isDuplicate = false) *>
+      addClientId(oid, cid.get, isDuplicate = true)

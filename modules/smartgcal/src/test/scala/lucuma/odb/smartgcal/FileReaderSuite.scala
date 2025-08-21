@@ -57,10 +57,10 @@ final class FileReaderSuite extends munit.FunSuite:
     loadGmos("GMOS-N_FLAT", parsers.gmosNorth.fileEntry)
 
   test("GMOS-S_ARC"):
-    loadGmos("GMOS-S_ARC", parsers.gmosSouth.fileEntry.map(Availability.Current.apply))
+    loadGmos("GMOS-S_ARC", parsers.gmosSouth.fileEntry)
 
   test("GMOS-S_FLAT"):
-    loadGmos("GMOS-S_FLAT", parsers.gmosSouth.fileEntry.map(Availability.Current.apply))
+    loadGmos("GMOS-S_FLAT", parsers.gmosSouth.fileEntry)
 
   test("Flamingos2_ARC"):
     loadF2("Flamingos2_ARC")

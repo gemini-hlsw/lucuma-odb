@@ -91,7 +91,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
             object TimeAndCount:
               val SyntheticId: ColumnRef = col("c_etm_time_and_count_id",  observation_id.embedded)
               val Time: ColumnRef        = col("c_etm_exp_time",           time_span.embedded)
-              val Count: ColumnRef       = col("c_etm_exp_count",          int4_nonneg.embedded)
+              val Count: ColumnRef       = col("c_etm_exp_count",          int4_pos.embedded)
               val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
 
           object WavelengthCoverage:
@@ -128,7 +128,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
             object TimeAndCount:
               val SyntheticId: ColumnRef = col("c_etm_time_and_count_id",  observation_id.embedded)
               val Time: ColumnRef        = col("c_etm_exp_time",           time_span.embedded)
-              val Count: ColumnRef       = col("c_etm_exp_count",          int4_nonneg.embedded)
+              val Count: ColumnRef       = col("c_etm_exp_count",          int4_pos.embedded)
               val At: ColumnRef          = col("c_etm_signal_to_noise_at", wavelength_pm.embedded)
 
           object ImagingGmosNorthView extends TableDef("v_imaging_requirements_gmos_north"):

@@ -35,6 +35,7 @@ import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Client
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.AtomEvent
@@ -135,27 +136,41 @@ trait DatabaseOperations { this: OdbSuite =>
      semester:    Semester             = Semester.unsafeFromString("2025A"),
      activeStart: LocalDate            = LocalDate.parse("2025-02-01"),
      activeEnd:   LocalDate            = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]    = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
      other:       Option[String]       = None
   ): IO[CallForProposals.Id] =
+    val deadlineStr = deadline.foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
+    val partnerList =
+      partners.map((p, d) =>
+        s"""
+          {
+            partner: ${p.tag.toScreamingSnakeCase}
+            ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
+          }
+        """
+      ).mkString("[", ", ", "]")
     query(user, s"""
-        mutation {
-          createCallForProposals(
-            input: {
-              SET: {
-                type:        ${callType.tag.toScreamingSnakeCase}
-                semester:    "${semester.format}"
-                activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
-                activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
-                ${other.getOrElse("")}
-              }
-            }
-          ) {
-            callForProposals {
-              id
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              type:        ${callType.tag.toScreamingSnakeCase}
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              $deadlineStr
+              partners: $partnerList
+              ${other.getOrElse("")}
             }
           }
+        ) {
+          callForProposals {
+            id
+          }
         }
-      """
+      }
+    """
     ).flatMap { js =>
       js.hcursor
         .downFields("createCallForProposals", "callForProposals", "id")
@@ -194,6 +209,26 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createProgramWithPiAffiliation(
+    pi: User,
+    piPartnerLink: PartnerLink,
+    programName: String = null
+  ): IO[Program.Id] =
+    for
+      pid    <- createProgramAs(pi, programName)
+      piPuid <- piProgramUserIdAs(pi, pid)
+      _      <- updateProgramUserAs(pi, piPuid, piPartnerLink)
+    yield pid
+
+  def createProgramWithNonPartnerPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner, programName)
+
+  def createProgramWithUsPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US), programName)
+
+  def createProgramWithCaPi(pi: User, programName: String = null): IO[Program.Id] =
+    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA), programName)
 
   def createProgramNoteAs(
     user:      User,
@@ -467,8 +502,17 @@ trait DatabaseOperations { this: OdbSuite =>
   def addPartnerSplits(
     user: User,
     pid: Program.Id,
-    proposalType: String = "queue"
+    proposalType: String = "queue",
+    partnerSplits: List[(Partner, Int)] = List((Partner.US, 70), (Partner.CA, 30))
   ): IO[Unit] =
+    val splitsList = partnerSplits.map((p, v) =>
+      s"""
+        {
+          partner: ${p.tag.toScreamingSnakeCase}
+          percent: $v
+        }
+      """
+    ).mkString("[", ",", "]")
     query(user, s"""
       mutation {
         updateProposal(
@@ -477,16 +521,7 @@ trait DatabaseOperations { this: OdbSuite =>
             SET: {
               type: {
                 $proposalType: {
-                  partnerSplits: [
-                    {
-                      partner: US
-                      percent: 70
-                    },
-                    {
-                      partner: CA
-                      percent: 30
-                    }
-                  ]
+                  partnerSplits: $splitsList
                 }
               }
             }
@@ -559,22 +594,22 @@ trait DatabaseOperations { this: OdbSuite =>
   def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createGmosNorthImagingObservationAs(user, pid, None, tids*)
 
-  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, spatialOffsets, tids*)
+  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, offsets, tids*)
 
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createGmosSouthImagingObservationAs(user, pid, None, tids*)
 
-  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, spatialOffsets, tids*)
+  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, offsets, tids*)
 
   def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createFlamingos2LongSlitObservationAs(user, pid, None, tids*)
 
-  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, spatialOffsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, spatialOffsets, tids*)
+  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, offsets, tids*)
 
-  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, spatialOffsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -587,7 +622,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   asterism: ${tids.asJson}
                 }
                 scienceRequirements: ${scienceRequirementsObject(observingMode)}
-                observingMode: ${observingModeWithSpatialOffsets(observingMode, spatialOffsets)}
+                observingMode: ${observingModeWithSpatialOffsets(observingMode, offsets)}
               }
             }) {
               observation {
@@ -789,10 +824,10 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
 
-  private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, spatialOffsets: Option[String]): String =
+  private def observingModeWithSpatialOffsets(observingMode: ObservingModeType, offsets: Option[String]): String =
     observingMode match
       case ObservingModeType.GmosNorthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosNorthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -800,7 +835,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosSouthImaging =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", offsets: $offsets")
         s"""{
           gmosSouthImaging: {
             filters: [R_PRIME, G_PRIME]
@@ -808,7 +843,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
-        val offsetsField = spatialOffsets.fold("")(offsets => s", explicitSpatialOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
         s"""{
           flamingos2LongSlit: {
             disperser: R1200_HK
@@ -911,8 +946,8 @@ trait DatabaseOperations { this: OdbSuite =>
     pid:  Program.Id,
     sourceProfile: String = DefaultSourceProfile
   ): IO[List[Target.Id]] =
-    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
-     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile), 
+    (createSiderealTargetAs(user, pid, sourceProfile = sourceProfile),
+     createNonsiderealTargetAs(user, pid, sourceProfile = sourceProfile),
      createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile)
     ).mapN(List(_, _, _))
 
@@ -984,7 +1019,7 @@ trait DatabaseOperations { this: OdbSuite =>
                   region: {
                     rightAscensionArc: { type: FULL }
                     declinationArc: {
-                      type: PARTIAL 
+                      type: PARTIAL
                       start: { degrees: 10 }
                       end: { degrees: 70 }
                     }
@@ -1524,15 +1559,15 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
 
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addSequenceEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
-      } yield SequenceEvent(i, r, o, vid, cmd)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      yield SequenceEvent(i, r, o, vid, n, cmd)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
   }
 
   def addSlewEventAs(
@@ -1561,7 +1596,8 @@ trait DatabaseOperations { this: OdbSuite =>
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield SlewEvent(i, r, oid, v, stg)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      } yield SlewEvent(i, r, oid, v, n, stg)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1718,45 +1754,46 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        n <- c.downField("clientId").as[Option[Client.Id]]
         a <- c.downFields("atom", "id").as[Atom.Id]
-      } yield StepEvent(i, r, o, v, a, sid, stage)
+      } yield StepEvent(i, r, o, v, n, a, sid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
 
   def addAtomEventAs(
-    user:  User,
-    aid:   Atom.Id,
-    stage: AtomStage
-  ): IO[AtomEvent] = {
+    user:     User,
+    aid:      Atom.Id,
+    stage:    AtomStage,
+    clientId: Option[Client.Id] = None
+  ): IO[AtomEvent] =
     val q = s"""
       mutation {
         addAtomEvent(input: {
           atomId:    "$aid",
           atomStage: ${stage.tag.toScreamingSnakeCase}
+          ${clientId.fold("")(cid => s"clientId: \"$cid\"")}
         }) {
           event {
             id
             received
             observation { id }
             visit { id }
+            clientId
           }
         }
       }
     """
-
-    query(user = user, query = q).map { json =>
+    query(user = user, query = q).map: json =>
       val c = json.hcursor.downFields("addAtomEvent", "event")
-      val e = for {
+      val e = for
         i <- c.downField("id").as[ExecutionEvent.Id]
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
-      } yield AtomEvent(i, r, o, v, aid, stage)
+        n <- c.downField("clientId").as[Option[Client.Id]]
+      yield AtomEvent(i, r, o, v, n, aid, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
-    }
-  }
-
 
   def recordDatasetAs(
     user:     User,
@@ -1811,9 +1848,10 @@ trait DatabaseOperations { this: OdbSuite =>
         r <- c.downField("received").as[Timestamp]
         o <- c.downFields("observation", "id").as[Observation.Id]
         v <- c.downFields("visit", "id").as[Visit.Id]
+        n <- c.downFields("clientId").as[Option[Client.Id]]
         a <- c.downFields("atom", "id").as[Atom.Id]
         s <- c.downFields("step", "id").as[Step.Id]
-      } yield DatasetEvent(i, r, o, v, a, s, did, stage)
+      } yield DatasetEvent(i, r, o, v, n, a, s, did, stage)
       e.fold(f => throw new RuntimeException(f.message), identity)
     }
   }
@@ -1930,7 +1968,7 @@ trait DatabaseOperations { this: OdbSuite =>
     pid:         Program.Id,
     role:        ProgramUserRole   = ProgramUserRole.Coi,
     partnerLink: PartnerLink       = PartnerLink.HasPartner(Partner.US),
-    fallback:    UserProfile       = UserProfile.Empty,
+    preferred:   UserProfile       = UserProfile.Empty,
     education:   EducationalStatus = EducationalStatus.PhD,
     thesis:      Boolean           = false,
     gender:      Gender            = Gender.NotSpecified
@@ -1953,11 +1991,11 @@ trait DatabaseOperations { this: OdbSuite =>
                       case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                   }
                 }
-                fallbackProfile: {
-                  givenName: ${fallback.givenName.strOrNull}
-                  familyName: ${fallback.familyName.strOrNull}
-                  creditName: ${fallback.creditName.strOrNull}
-                  email: ${fallback.email.strOrNull}
+                preferredProfile: {
+                  givenName: ${preferred.givenName.strOrNull}
+                  familyName: ${preferred.familyName.strOrNull}
+                  creditName: ${preferred.creditName.strOrNull}
+                  email: ${preferred.email.strOrNull}
                 }
                 educationalStatus: ${education.tag.toScreamingSnakeCase}
                 thesis: $thesis
@@ -1969,6 +2007,48 @@ trait DatabaseOperations { this: OdbSuite =>
         """
     ).map: j =>
       j.hcursor.downFields("addProgramUser", "programUser", "id").require[ProgramUser.Id]
+
+  val defaultPiEmail: NonEmptyString = "pi@someprestigiousplace.com".refined
+
+  def updateProgramUserAs(
+    user:       User,
+    puid:       ProgramUser.Id,
+    partnerLink: PartnerLink,
+    email: Option[NonEmptyString] = defaultPiEmail.some
+  ): IO[Unit] =
+    val preferred = email.foldMap(e =>
+      s"""
+        preferredProfile: {
+          email: "$e"
+        }
+      """
+    )
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateProgramUsers(input: {
+            WHERE: {
+              id: {
+                EQ: "$puid"
+              }
+            }
+            SET: {
+              partnerLink: {
+                ${
+                  partnerLink match
+                    case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
+                    case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                }
+              }
+              $preferred
+            }
+          }) {
+            programUsers { id }
+          }
+        }
+      """
+    ).void
 
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
@@ -2098,6 +2178,25 @@ trait DatabaseOperations { this: OdbSuite =>
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(id)))
   }
+
+  def getEmailStatusesByAddress(address: NonEmptyString): IO[List[EmailStatus]] = {
+    val query = sql"select c_status from t_email where c_recipient_email = $text_nonempty".query(email_status)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream(address, chunkSize = 1024).compile.toList))
+  }
+
+  def ensureNoEmailsForAddress(address: NonEmptyString): IO[Unit] =
+    getEmailStatusesByAddress(address).flatMap: es =>
+      es match
+        case Nil => IO.unit
+        case _   => IO.raiseError(new Exception(s"Emails found for address $address"))
+
+  def ensureSomeQueuedEmailsForAddress(address: NonEmptyString, count: Int): IO[Unit] =
+    getEmailStatusesByAddress(address).flatMap: es =>
+      val queued = es.count(_ == EmailStatus.Queued)
+      if queued =!= count then
+        IO.raiseError(new Exception(s"Expected $count queued emails for address $address, found $queued"))
+      else IO.unit
 
   def updateEmailStatus(id: EmailId, status: EmailStatus): IO[Unit] = {
     val command = sql"update t_email set c_status = $email_status where c_email_id = $email_id".command

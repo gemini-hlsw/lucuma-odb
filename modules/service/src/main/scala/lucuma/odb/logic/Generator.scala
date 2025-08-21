@@ -243,13 +243,11 @@ object Generator {
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
-        @annotation.nowarn("msg=unused implicit parameter")
         def checkCache(using NoTransaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
           EitherT.right(services.transactionally {
             executionDigestService.selectOne(oid, hash)
           })
 
-        @annotation.nowarn("msg=unused implicit parameter")
         def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, OdbError, Unit] =
           EitherT.right(services.transactionally {
             executionDigestService.insertOrUpdate(pid, oid, hash, digest)
@@ -258,7 +256,6 @@ object Generator {
 
       private object Context {
 
-        @annotation.nowarn("msg=unused implicit parameter")
         def lookup(
           pid: Program.Id,
           oid: Observation.Id
@@ -303,7 +300,6 @@ object Generator {
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
         digestWithParamsAndHash(pid, oid, when).map(_.map(_._1))
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def digestWithParamsAndHash(
         context: Context,
         when: Option[Timestamp]
@@ -332,7 +328,6 @@ object Generator {
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
         calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def calcDigestThenCache(
         ctx:  Context,
         when: Option[Timestamp]
@@ -401,7 +396,6 @@ object Generator {
           p <- protoExecutionConfig(ctx, g, srs, when)
         yield p
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def calcDigestFromContext(
         ctx:  Context,
         when: Option[Timestamp]
@@ -438,7 +432,6 @@ object Generator {
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]] =
         scienceAtomDigestsFromContext(Context(pid, oid, ast, params), when).value
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def scienceAtomDigestsFromContext(
         ctx:  Context,
         when: Option[Timestamp]
@@ -474,7 +467,6 @@ object Generator {
           x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def calcExecutionConfigFromContext(
         ctx:      Context,
         lim:      FutureLimit,
@@ -505,8 +497,6 @@ object Generator {
         execState: ExecutionState,
         setupTime: SetupTime
       ): Either[OdbError, ExecutionDigest] =
-
-        // println(s"executionDigest: execState = $execState")
 
         if execState === ExecutionState.DeclaredComplete then
           ExecutionDigest(

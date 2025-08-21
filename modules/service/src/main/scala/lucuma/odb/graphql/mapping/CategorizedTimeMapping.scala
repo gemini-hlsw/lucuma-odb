@@ -6,21 +6,13 @@ package lucuma.odb.graphql.mapping
 import grackle.Path
 import io.circe.syntax.*
 import lucuma.core.util.TimeSpan
-import lucuma.odb.graphql.table.AtomDigestTable
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends AtomDigestTable[F] with VisitTable[F]:
+trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
-      categorizedTimeMappingAtPath(
-        AtomDigestType / "timeEstimate",
-        AtomDigestTable.AtomId,
-        AtomDigestTable.NonChargedEstimate,
-        AtomDigestTable.ProgramEstimate
-      ),
-
       categorizedTimeMappingAtPath(
         TimeChargeInvoiceType / "executionTime",
         VisitTable.Id,

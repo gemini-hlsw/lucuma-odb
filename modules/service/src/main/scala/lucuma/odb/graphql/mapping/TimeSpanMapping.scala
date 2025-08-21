@@ -7,7 +7,6 @@ import grackle.Path
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
-import lucuma.odb.graphql.table.AtomDigestTable
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
@@ -22,7 +21,6 @@ import lucuma.odb.graphql.table.TimingWindowView
 import lucuma.odb.graphql.table.VisitTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
-                               with AtomDigestTable[F]
                                with Flamingos2DynamicView[F]
                                with GmosDynamicTables[F]
                                with ProgramTable[F]
@@ -41,8 +39,6 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
   lazy val TimeSpanMappings: List[TypeMapping] =
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
-      timeSpanMappingAtPath(AtomDigestType / "timeEstimate" / "nonCharged", AtomDigestTable.NonChargedEstimate)(AtomDigestTable.AtomId),
-      timeSpanMappingAtPath(AtomDigestType / "timeEstimate" / "program",    AtomDigestTable.ProgramEstimate)(AtomDigestTable.AtomId),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
@@ -53,11 +49,6 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
       timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", ExposureTimeMode.TimeAndCount.Time)(ExposureTimeMode.SyntheticId),
       timeSpanMappingAtPath(TimeChargeCorrectionType / "amount", TimeChargeCorrectionTable.Amount)(TimeChargeCorrectionTable.Id),
-      timeSpanMappingAtPath(TimeChargeDiscountType / "program", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
-      timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "program", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
-      timeSpanMappingAtPath(TimeChargeNoDataDiscountType / "program", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
-      timeSpanMappingAtPath(TimeChargeOverlapDiscountType / "program", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
-      timeSpanMappingAtPath(TimeChargeQaDiscountType / "program", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeDiscountType / "amount", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeDaylightDiscountType / "amount", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),
       timeSpanMappingAtPath(TimeChargeNoDataDiscountType / "amount", TimeChargeDiscountTable.Amount)(TimeChargeDiscountTable.VisitId),

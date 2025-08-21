@@ -222,7 +222,6 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         subscription {
           programEdit {
             editType
-            id
           }
         }
       """,
@@ -231,10 +230,10 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           createProgramAs(pi).replicateA(2)
         ),
       expected = List(
-        json"""{"programEdit":{"editType":"CREATED","id":0}}""",
-        json"""{"programEdit":{"editType":"UPDATED","id":0}}""",
-        json"""{"programEdit":{"editType":"CREATED","id":0}}""",
-        json"""{"programEdit":{"editType":"UPDATED","id":0}}"""
+        json"""{"programEdit":{"editType":"CREATED"}}""",
+        json"""{"programEdit":{"editType":"UPDATED"}}""",
+        json"""{"programEdit":{"editType":"CREATED"}}""",
+        json"""{"programEdit":{"editType":"UPDATED"}}"""
       )
     )
   }

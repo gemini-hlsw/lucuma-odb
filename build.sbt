@@ -1,26 +1,26 @@
 val awsJavaSdkVersion          = "1.12.787"
 val catsParseVersion           = "1.1.0"
-val catsTimeVersion            = "0.5.1"
+val catsTimeVersion            = "0.6.0"
 val circeVersion               = "0.14.14"
 val circeRefinedVersion        = "0.15.1"
-val cirisVersion               = "3.9.0"
+val cirisVersion               = "3.10.0"
 val clueVersion                = "0.46.0"
 val declineVersion             = "2.5.0"
 val disciplineMunitVersion     = "1.0.9"
 val flywayVersion              = "9.20.0"
 val fs2AwsVersion              = "6.2.0"
 val fs2Version                 = "3.12.0"
-val grackleVersion             = "0.25.0-2-30f1622-20250728T195330Z-SNAPSHOT"                                  
+val grackleVersion             = "0.25.0"
 val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "5.0.0"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
-val lucumaItcVersion           = "0.40.0"
-val lucumaCoreVersion          = "0.138-ebee477-20250814T153508Z-SNAPSHOT"
-val lucumaGraphQLRoutesVersion = "0.10.1"
-val lucumaSsoVersion           = "0.9.0"
+val lucumaItcVersion           = "0.42.4"
+val lucumaCoreVersion          = "0.142-ddd9059-SNAPSHOT" //"0.141.0"
+val lucumaGraphQLRoutesVersion = "0.10.3"
+val lucumaSsoVersion           = "0.9.5"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
 val munitDisciplineVersion     = "1.0.9"   // check test output if you attempt to update this
@@ -28,13 +28,13 @@ val natchezHttp4sVersion       = "0.6.1"
 val natchezVersion             = "0.3.8"
 val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.7"
-val pprintVersion              = "0.9.0"
+val pprintVersion              = "0.9.3"
 val skunkVersion               = "0.6.4"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.25"
-ThisBuild / scalaVersion       := "3.7.1"
-ThisBuild / crossScalaVersions := Seq("3.7.1")
+ThisBuild / tlBaseVersion      := "0.27"
+ThisBuild / scalaVersion       := "3.7.2"
+ThisBuild / crossScalaVersions := Seq("3.7.2")
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
@@ -164,6 +164,7 @@ lazy val service = project
       "org.tpolecat"             %% "natchez-honeycomb"                  % natchezVersion,
       "org.tpolecat"             %% "natchez-http4s"                     % natchezHttp4sVersion,
       "org.tpolecat"             %% "natchez-log"                        % natchezVersion,
+      "org.tpolecat"             %% "natchez-noop"                       % natchezVersion,
       "org.tpolecat"             %% "skunk-core"                         % skunkVersion,
       "org.tpolecat"             %% "skunk-circe"                        % skunkVersion,
       "com.lihaoyi"              %% "pprint"                             % pprintVersion,

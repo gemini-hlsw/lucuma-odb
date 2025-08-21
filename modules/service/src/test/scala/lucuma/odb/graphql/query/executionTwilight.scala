@@ -6,7 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -31,7 +31,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   case class Calibrations(
@@ -82,7 +82,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
       _ <- withServices(serviceUser) { services =>
         services.session.transaction.use: xa =>
           services
-            .calibrationsService
+            .calibrationsService(emailConfig, httpClient)
             .recalculateCalibrations(p, when)(using xa)
             .map(_._1)
       }
@@ -243,7 +243,8 @@ class executionTwilight extends ExecutionTestSupportForGmos {
     }
 
   test("twilight - observation timeEstimate"):
-    setup.flatMap { case (_, _, Calibrations(_, oid)) =>
+    setup.flatMap { case (pid, _, Calibrations(_, oid)) =>
+      runObscalcUpdate(pid, oid) *>
       expect(
         user  = pi,
         query = s"""
@@ -251,12 +252,14 @@ class executionTwilight extends ExecutionTestSupportForGmos {
             observation(observationId: "$oid") {
               execution {
                 digest {
-                  science {
-                    observeClass
-                    timeEstimate {
-                      program { seconds }
-                      nonCharged { seconds }
-                      total { seconds }
+                  value {
+                    science {
+                      observeClass
+                      timeEstimate {
+                        program { seconds }
+                        nonCharged { seconds }
+                        total { seconds }
+                      }
                     }
                   }
                 }
@@ -269,12 +272,14 @@ class executionTwilight extends ExecutionTestSupportForGmos {
             "observation": {
               "execution": {
                 "digest": {
-                  "science": {
-                    "observeClass": "DAY_CAL",
-                    "timeEstimate": {
-                      "program": { "seconds":  0.000000 },
-                      "nonCharged": { "seconds":  50.700000 },
-                      "total": { "seconds":  50.700000 }
+                  "value": {
+                    "science": {
+                      "observeClass": "DAY_CAL",
+                      "timeEstimate": {
+                        "program": { "seconds":  0.000000 },
+                        "nonCharged": { "seconds":  50.700000 },
+                        "total": { "seconds":  50.700000 }
+                      }
                     }
                   }
                 }
@@ -306,7 +311,6 @@ class executionTwilight extends ExecutionTestSupportForGmos {
     ).map: json =>
       json.hcursor.downFields("program", "timeEstimateRange", "value", "maximum").require[CategorizedTime]
 
-  // OBSCALC TODO: this will be work with the obscalc digest when the API is updated
   def obsTimeEstimate(oid: Observation.Id): IO[CategorizedTime] =
     query(
       user  = pi,
@@ -315,17 +319,19 @@ class executionTwilight extends ExecutionTestSupportForGmos {
           observation(observationId: "$oid") {
             execution {
               digest {
-                setup {
-                  full {
-                    seconds
+                value {
+                  setup {
+                    full {
+                      seconds
+                    }
                   }
-                }
-                science {
-                  observeClass
-                  timeEstimate {
-                    program { seconds }
-                    nonCharged { seconds }
-                    total { seconds }
+                  science {
+                    observeClass
+                    timeEstimate {
+                      program { seconds }
+                      nonCharged { seconds }
+                      total { seconds }
+                    }
                   }
                 }
               }
@@ -334,7 +340,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
         }
       """
     ).map: json =>
-      val digest   = json.hcursor.downFields("observation", "execution", "digest")
+      val digest   = json.hcursor.downFields("observation", "execution", "digest", "value")
       val setup    = digest.downFields("setup", "full").require[TimeSpan]
       val obsClass = digest.downFields("science", "observeClass").require[ObserveClass]
       val catTime  = digest.downFields("science", "timeEstimate").require[CategorizedTime]

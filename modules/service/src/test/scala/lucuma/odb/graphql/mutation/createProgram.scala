@@ -509,7 +509,7 @@ class createProgram extends OdbSuite {
       pid <- withServices(service) { s =>
               Services.asSuperUser:
                 s.session.transaction.use { xa =>
-                  s.programService
+                  s.programService(emailConfig, httpClient)
                     .insertCalibrationProgram(
                       ProgramPropertiesInput.Create.Default.copy(
                         name = NonEmptyString.from(name).toOption

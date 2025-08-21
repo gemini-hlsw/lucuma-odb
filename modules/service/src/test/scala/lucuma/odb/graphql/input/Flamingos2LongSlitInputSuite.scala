@@ -21,17 +21,6 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
     forAll: (c: Flamingos2LongSlitInput.Create) =>
       assertEquals(c.observingModeType, ObservingModeType.Flamingos2LongSlit)
 
-  test("Flamingos2LongSlitInput.Create toObservingMode should preserve values"):
-    forAll: (c: Flamingos2LongSlitInput.Create) =>
-      val om = c.toObservingMode
-      assertEquals(om.disperser, c.disperser)
-      assertEquals(om.filter, c.filter)
-      assertEquals(om.fpu, c.fpu)
-      assertEquals(om.explicitReadMode, c.explicitReadMode)
-      assertEquals(om.explicitDecker, c.explicitDecker)
-      assertEquals(om.explicitReadoutMode, c.explicitReadoutMode)
-      assertEquals(om.explicitReads, c.explicitReads)
-
   test("Flamingos2LongSlitInput.Edit should have correct observingModeType"):
     forAll: (e: Flamingos2LongSlitInput.Edit) =>
       assertEquals(e.observingModeType, ObservingModeType.Flamingos2LongSlit)
@@ -57,7 +46,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       val noBoth = edit.copy(disperser = None, fpu = None)
       assert(noBoth.toCreate.isFailure, "Should fail when both grating and fpu are missing")
 
-  test("SpatialOffsetsFormat formattedSpatialOffsets works in Create"):
+  test("OffsetsFormat formattedOffsets works in Create"):
     val offsets = List(
       Offset.Zero.copy(q = 5.arcseconds.q),
       Offset.Zero.copy(q = 10.arcseconds.q)
@@ -67,12 +56,12 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = Flamingos2Disperser.R1200JH,
       filter = Flamingos2Filter.JH,
       fpu = Flamingos2Fpu.LongSlit2,
-      explicitSpatialOffsets = Some(offsets)
+      explicitOffsets = Some(offsets)
     )
 
-    assertEquals(create.formattedSpatialOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
+    assertEquals(create.formattedOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
 
-  test("SpatialOffsetsFormat formattedSpatialOffsets works in Edit"):
+  test("OffsetsFormat formattedOffsets works in Edit"):
     val offsets = List(
       Offset.Zero.copy(q = 5.arcseconds.q),
       Offset.Zero.copy(q = 10.arcseconds.q)
@@ -86,7 +75,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,
       explicitReadoutMode = lucuma.odb.data.Nullable.Null,
-      explicitSpatialOffsets = lucuma.odb.data.Nullable.NonNull(offsets)
+      explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets)
     )
 
-    assertEquals(edit.formattedSpatialOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))
+    assertEquals(edit.formattedOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))

@@ -64,11 +64,9 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
-      EffectField("calculatedDigest", calculatedDigestHandler, List("id", "programId")),
       EffectField("config", configHandler, List("id", "programId")),
       EffectField("executionState",  executionStateHandler, List("id", "programId")),
       SqlObject("atomRecords"),
-      SqlObject("atomDigests", Join(ObservationView.Id, ObscalcTable.ObservationId)),
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
@@ -159,17 +157,6 @@ trait ExecutionMapping[F[_]: Logger] extends ObservationEffectHandler[F]
     effectHandler(_ => ().success, calculate)
 
   private lazy val digestHandler: EffectHandler[F] =
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (pid, oid, _) =>
-        services.use: s =>
-          Services.asSuperUser:
-            s.generator(commitHash, itcClient, timeEstimateCalculator)
-             .digest(pid, oid)
-             .map(_.bimap(_.asWarning(Json.Null), _.asJson.success).merge)
-
-    effectHandler(_ => ().success, calculate)
-
-  private lazy val calculatedDigestHandler: EffectHandler[F] =
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
       (_, oid, _) =>
         services.useTransactionally:

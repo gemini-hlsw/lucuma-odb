@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
 import eu.timepit.refined.api.Refined.value
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
@@ -84,6 +83,10 @@ sealed trait ObservationService[F[_]] {
     oid: Option[Observation.Id],
     ref: Option[ObservationReference]
   )(using SuperUserAccess): F[Result[Observation.Id]]
+
+  def selectProgram(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Result[Program.Id]]
 
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id]
@@ -208,6 +211,12 @@ object ObservationService {
         ref: Option[ObservationReference]
       )(using SuperUserAccess): F[Result[Observation.Id]] =
         resolver.resolve(oid, ref)
+
+      override def selectProgram(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Result[Program.Id]] =
+        session.option(Statements.selectPid)(oid).map: p =>
+          p.fold(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some).asFailure)(_.success)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -547,6 +556,13 @@ object ObservationService {
          WHERE c_observation_reference = $observation_reference
       """.query(observation_id)
 
+    val selectPid: Query[Observation.Id, Program.Id] =
+      sql"""
+        SELECT c_program_id
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(program_id)
+
     def insertObservation(
       programId: Program.Id,
       SET:       ObservationPropertiesInput.Create,
@@ -680,7 +696,7 @@ object ObservationService {
       Option[Wavelength]               ,
       Option[SignalToNoise]            ,
       Option[TimeSpan]                 ,
-      Option[NonNegInt]                ,
+      Option[PosInt]                   ,
       Option[Wavelength]               ,
       Option[FocalPlane]               ,
       Option[Angle]                    ,
@@ -757,7 +773,7 @@ object ObservationService {
           ${wavelength_pm.opt},
           ${signal_to_noise.opt},
           ${time_span.opt},
-          ${int4_nonneg.opt},
+          ${int4_pos.opt},
           ${wavelength_pm.opt},
           ${focal_plane.opt},
           ${angle_µas.opt},
@@ -889,7 +905,7 @@ object ObservationService {
       val upSignalToNoiseAt    = sql"c_etm_signal_to_noise_at = ${wavelength_pm.opt}"
       val upSignalToNoise      = sql"c_etm_signal_to_noise = ${signal_to_noise.opt}"
       val upExpTime            = sql"c_etm_exp_time = ${time_span.opt}"
-      val upExpCount           = sql"c_etm_exp_count = ${int4_nonneg.opt}"
+      val upExpCount           = sql"c_etm_exp_count = ${int4_pos.opt}"
 
       val expTimeModeType   = in.exposureTimeMode.map(_.tpe)
       val signalToNoiseMode = in.exposureTimeMode.flatMap(etm => ExposureTimeMode.signalToNoise.getOption(etm).fold(Nullable.Absent)(Nullable.NonNull.apply))

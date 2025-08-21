@@ -109,7 +109,7 @@ class programs extends OdbSuite {
       pid  <- withServices(service) { s =>
                 Services.asSuperUser:
                   s.session.transaction.use { xa =>
-                    s.programService
+                    s.programService(emailConfig, httpClient)
                       .insertCalibrationProgram(
                         ProgramPropertiesInput.Create.Default.some,
                         CalibrationRole.Telluric,
@@ -318,5 +318,50 @@ class programs extends OdbSuite {
         )
       }
     }
+
+  test("program selection via cfp"):
+    for
+      cid0 <- createCallForProposalsAs(staff)
+      cid1 <- createCallForProposalsAs(staff)
+      pid0 <- createProgramAs(pi, "CfP Test 0")
+      pid1 <- createProgramAs(pi, "CfP Test 1")
+      pid2 <- createProgramAs(pi, "CfP Test 2")
+      _    <- addProposal(pi, pid0, cid0.some)
+      _    <- addProposal(pi, pid1, cid1.some)
+      _    <- addProposal(pi, pid2, cid0.some)
+      _    <- expect(
+                user     = pi,
+                query    = s"""
+                  query {
+                    programs(
+                      WHERE: {
+                        proposal: {
+                          call: {
+                            id: { EQ: "$cid0" }
+                          }
+                        }
+                      }
+                    ) {
+                      matches { id }
+                    }
+                  }
+                """,
+                expected =
+                  json"""
+                    {
+                      "programs": {
+                        "matches": [
+                          {
+                            "id": ${pid0.asJson}
+                          },
+                          {
+                            "id": ${pid2.asJson}
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight
+              )
+    yield ()
 
 }

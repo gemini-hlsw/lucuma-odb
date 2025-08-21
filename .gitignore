@@ -61,3 +61,7 @@ schemaspy/out
 
 setup_api.bash
 .direnv/
+logs/
+
+# SOPS secrets - private keys only (secrets.yaml is encrypted and safe to commit)
+odb-keys.txt
