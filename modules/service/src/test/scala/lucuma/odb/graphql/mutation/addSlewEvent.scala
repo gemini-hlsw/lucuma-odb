@@ -90,7 +90,7 @@ class addSlewEvent extends OdbSuite:
       """.asRight
     )
 
-  test("addSlewEvent - unknown visit"):
+  test("addSlewEvent - unknown observation"):
     def query: String =
       s"""
         mutation {
@@ -111,8 +111,16 @@ class addSlewEvent extends OdbSuite:
       ObservingModeType.GmosNorthLongSlit,
       service,
       _ => query,
-      _ => s"Observation 'o-42' not found.".asLeft
+      _ => s"Observation 'o-42' not found or is not associated with any instrument.".asLeft
     )
+
+  test("addSlewEvent - no instrument"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- interceptGraphQL(s"Observation '$oid' not found or is not associated with any instrument."):
+               addSlewEventAs(service, oid, SlewStage.StartSlew)
+    yield ()
 
   def visits(o: Observation.Id): IO[List[(Visit.Id, ObservingNight)]] =
     query(
