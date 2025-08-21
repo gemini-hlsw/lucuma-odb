@@ -154,7 +154,7 @@ class setObservationWorkflowState
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
       _   <- computeItcResultAs(pi, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
-      _   <- testTransitions(oid, Defined, Inactive)
+      _   <- testTransitions(pid, oid, Defined, Inactive)
     } yield ()
 
   // (see executionState.scala)

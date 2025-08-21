@@ -105,7 +105,7 @@ class observation_configurationRequests
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301)
-      case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B600_G5323)
+      case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324)
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
@@ -256,18 +256,18 @@ class observation_configurationRequests
       test(s"$prefix request should not apply for narrower conditions"):
         for
           oid  <- setup(too, mode)
-          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive)
+          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
           mid  <- createConfigurationRequestAs(pi, oid)
-          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // can't ask for better conditions
+          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointThree) // can't ask for better conditions
           _    <- expectRequests(pi, oid, Nil)
         yield ()
 
       test(s"$prefix request should apply for wider conditions"):
         for
           oid  <- setup(too, mode)
-          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive)
+          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointThree)
           mid  <- createConfigurationRequestAs(pi, oid)
-          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.OnePointFive) // ok to ask for worse conditions
+          _    <- updateCloudExtinction(pi, oid, CloudExtinction.Preset.PointFive) // ok to ask for worse conditions
           _    <- expectRequests(pi, oid, List(mid))
         yield ()
 
