@@ -204,11 +204,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("no observing mode") { (_, mkTarget) =>
-=======
-  test("no observing mode"):
->>>>>>> main
+  testWithTargetTypes("no observing mode"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -239,37 +235,10 @@ class observation_workflow
         pid <- createProgramAs(pi)
         tid <- createIncompleteTargetAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-<<<<<<< HEAD
-      } yield (tid, oid)
-    setup.flatMap { (_, oid) =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-          ObservationWorkflow(
-            ObservationWorkflowState.Undefined,
-            List(ObservationWorkflowState.Inactive),
-            List(ObservationValidation.configuration("Missing brightness measure"))
-          )
-        ).asRight
-      )
-    }
-  }
-
-  testWithTargetTypes("otherwise ok, but no itc results in cache") { (_, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        tid <- mkTarget(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      } yield oid
-    setup.flatMap { oid =>
-=======
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
     setup.flatMap: oid =>
->>>>>>> main
       expect(
         pi,
         workflowQuery(oid),
@@ -325,38 +294,7 @@ class observation_workflow
       """)
     )
 
-<<<<<<< HEAD
-  test("missing target info, invalid instrument") {
-    val setup: IO[(Target.Id, Observation.Id)] =
-      for {
-        pid <- createProgramAs(pi)
-        cid <- createCfp(List(Instrument.GmosSouth))
-        _   <- addProposal(pi, pid, cid.some)
-        tid <- createIncompleteTargetAs(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      } yield (tid, oid)
-    setup.flatMap { (_, oid) =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-          ObservationWorkflow(
-            ObservationWorkflowState.Undefined,
-            List(ObservationWorkflowState.Inactive),
-            List(
-              ObservationValidation.configuration("Missing brightness measure"),
-              ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
-            )
-          )
-        ).asRight
-      )
-    }
-  }
-
   testWithTargetTypes("no validations") { (_, mkTarget) =>
-=======
-  test("no validations"):
->>>>>>> main
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -384,12 +322,7 @@ class observation_workflow
           )
         ).asRight
       )
-<<<<<<< HEAD
-    }
-  }
-    
-  testWithTargetTypes("valid instrument") { (_, mkTarget) =>
-=======
+  }    
 
   test("missing target info, invalid instrument"):
     val setup: IO[Observation.Id] =
@@ -421,8 +354,7 @@ class observation_workflow
         ).asRight
       )
 
-  test("valid instrument"):
->>>>>>> main
+  testWithTargetTypes("valid instrument"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -451,11 +383,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("invalid instrument") { (_, mkTarget) =>
-=======
-  test("invalid instrument"):
->>>>>>> main
+  testWithTargetTypes("invalid instrument"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -483,37 +411,20 @@ class observation_workflow
           )
         ).asRight
       )
-<<<<<<< HEAD
-    }
-  }
-  testWithTargetTypes("explicit base within limits") { (_, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
-        _   <- addProposal(pi, pid, cid.some)
-        tid <- mkTarget(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))     
-         _   <- computeItcResultAs(pi, oid)
-      } yield oid
-    setup.flatMap { oid =>
-      List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse { (ra, dec) =>
-=======
 
-  test("explicit base within limits"):
+  testWithTargetTypes("explicit base within limits"): (_, mkTarget) =>
     val setup: IO[(Program.Id, Observation.Id)] =
       for
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
-        tid <- createTargetWithProfileAs(pi, pid)
+        tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- computeItcResultAs(pi, oid)
       yield (pid, oid)
 
     setup.flatMap: (pid, oid) =>
       List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse: (ra, dec) =>
->>>>>>> main
         setObservationExplicitBase(oid, ra, dec) >>
         createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
           runObscalcUpdateAs(serviceUser, pid, oid) >>
@@ -532,15 +443,9 @@ class observation_workflow
             ).asRight
           )
 
-<<<<<<< HEAD
-  testWithTargetTypes("explicit base within limits, CfP with wrapped RA limits") { (_, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-=======
-  test("explicit base within limits, CfP with wrapped RA limits"):
+  testWithTargetTypes("explicit base within limits, CfP with wrapped RA limits"): (_, mkTarget) =>
     val setup: IO[(Program.Id, Observation.Id)] =
       for
->>>>>>> main
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosNorth), limits = WrappedLimits.some)
         _   <- addProposal(pi, pid, cid.some)
@@ -569,15 +474,9 @@ class observation_workflow
             ).asRight
           )
 
-<<<<<<< HEAD
-  testWithTargetTypes("explicit base outside limits") { (_, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-=======
-  test("explicit base outside limits"):
+  testWithTargetTypes("explicit base outside limits"): (_, mkTarget) =>
     val setup: IO[(Program.Id, Observation.Id)] =
       for
->>>>>>> main
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
@@ -604,15 +503,9 @@ class observation_workflow
             ).asRight
           )
 
-<<<<<<< HEAD
-  testWithTargetTypes("explicit base outside limits, CfP with wrapped RA limits") { (_, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-=======
-  test("explicit base outside limits, CfP with wrapped RA limits"):
+  testWithTargetTypes("explicit base outside limits, CfP with wrapped RA limits"): (_, mkTarget) =>
     val setup: IO[(Program.Id, Observation.Id)] =
       for
->>>>>>> main
         pid <- createProgramAs(pi)
         cid <- createCfp(List(Instrument.GmosNorth), limits = WrappedLimits.some)
         _   <- addProposal(pi, pid, cid.some)
@@ -639,11 +532,7 @@ class observation_workflow
             ).asRight
           )
 
-<<<<<<< HEAD
-  testWithTargetTypes("asterism within limits, valid instrument") { (_, mkTarget) =>
-=======
-  test("asterism within limits, valid instrument"):
->>>>>>> main
+  testWithTargetTypes("asterism within limits, valid instrument"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -673,11 +562,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("asterism outside limits, valid instrument") { (_, mkTarget) =>
-=======
-  test("asterism outside limits, valid instrument"):
->>>>>>> main
+  testWithTargetTypes("asterism outside limits, valid instrument"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -705,11 +590,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("asterism outside limits, invalid instrument") { (_, mkTarget) =>
-=======
-  test("asterism outside limits, invalid instrument"):
->>>>>>> main
+  testWithTargetTypes("asterism outside limits, invalid instrument"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -742,11 +623,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("invalid band") { (_, mkTarget) =>
-=======
-  test("invalid band"):
->>>>>>> main
+  testWithTargetTypes("invalid band"): (_, mkTarget) =>
     val allocations = List(
       AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
       AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
@@ -784,11 +661,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("no configuration request checks if proposal is not approved") { (_, mkTarget) =>
-=======
-  test("no configuration request checks if proposal is not approved"):
->>>>>>> main
+  testWithTargetTypes("no configuration request checks if proposal is not approved"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -816,11 +689,7 @@ class observation_workflow
         ).asRight // no warnings!
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("no configuration request") { (_, mkTarget) =>
-=======
-  test("no configuration request"):
->>>>>>> main
+  testWithTargetTypes("no configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -851,11 +720,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("unapproved configuration request") { (_, mkTarget) =>
-=======
-  test("unapproved configuration request"):
->>>>>>> main
+  testWithTargetTypes("unapproved configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -887,11 +752,7 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  testWithTargetTypes("denied configuration request") { (_, mkTarget) =>
-=======
-  test("denied configuration request"):
->>>>>>> main
+  testWithTargetTypes("denied configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -912,202 +773,12 @@ class observation_workflow
         pi,
         workflowQuery(oid),
         expected = workflowQueryResult(
-<<<<<<< HEAD
-          ObservationWorkflow(          
-            ObservationWorkflowState.Unapproved,
-            List(ObservationWorkflowState.Inactive),
-            List(ObservationValidation.configurationRequestDenied)
-          )
-        ).asRight
-      )
-    }
-  }
-
-  testWithTargetTypes("approved configuration request") { (tt, mkTarget) =>
-    val setup: IO[Observation.Id] =
-      for {
-        cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
-        _   <- addProposal(pi, pid, Some(cfp), None)
-        _   <- addPartnerSplits(pi, pid)
-        _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
-        tid <- mkTarget(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResultAs(pi, oid)
-      } yield oid
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-          ObservationWorkflow(          
-            ObservationWorkflowState.Defined,
-            tt match
-              case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
-              case TargetType.Nonsidereal => ???
-              case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
-            ,
-            Nil
-          )
-        ).asRight
-      )
-    }
-  }
-
-  test("calibrations are not validated and are immediately Ready") {
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        oid <- createObservationAs(pi, pid) // is missing target
-        _   <- setObservationCalibratioRole(oid, CalibrationRole.SpectroPhotometric.some)
-      } yield oid
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-          ObservationWorkflow(          
-            ObservationWorkflowState.Ready,
-            Nil,
-            Nil
-          )
-        ).asRight
-      )
-    }
-  }
-
-  test("observations in engineering programs are not validated and are immediately Defined") {
-    val setup: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        _   <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
-        oid <- createObservationAs(pi, pid)
-      } yield oid
-    setup.flatMap { oid =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-          ObservationWorkflow(          
-            ObservationWorkflowState.Defined,
-            List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
-            Nil
-          )
-        ).asRight
-      )
-    }
-  }
-
-  testWithTargetTypes("approved configuration request AND asterism outside limits") { (tt, mkTarget) =>
-
-    val oid1: IO[Observation.Id]  =
-      for {
-        cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramAs(pi, "Foo")
-        _   <- addProposal(pi, pid, Some(cfp), None)
-        _   <- addPartnerSplits(pi, pid)
-        _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
-        tid <- mkTarget(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResultAs(pi, oid)
-      } yield oid
-
-    val oid2: IO[Observation.Id] =
-      for {
-        pid <- createProgramAs(pi)
-        cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
-        _   <- addProposal(pi, pid, cid.some)
-        tid <- mkTarget(pi, pid)
-        _   <- setTargetCoords(tid, RaStart - 20, DecCenter)
-        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
-      } yield oid
-
-    (oid1, oid2).tupled.flatMap { (oid1, oid2) =>
-      expect(
-        pi,
-        workflowQuery(oid1, oid2),
-        expected = workflowQueryResult(
-          ObservationWorkflow(          
-            ObservationWorkflowState.Defined,
-            tt match
-              case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
-              case TargetType.Nonsidereal => ???
-              case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
-            ,
-            Nil
-          ),
-          ObservationWorkflow(          
-            ObservationWorkflowState.Undefined,
-            List(ObservationWorkflowState.Inactive),
-            List(
-              ObservationValidation.callForProposals(
-                ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-                ObservationWorkflowService.Messages.CoordinatesOutOfRange
-              ),
-=======
           CalculatedValue(
             CalculationState.Ready,
             ObservationWorkflow(
               ObservationWorkflowState.Unapproved,
               List(ObservationWorkflowState.Inactive),
               List(ObservationValidation.configurationRequestDenied)
->>>>>>> main
-            )
-          )
-        ).asRight
-      )
-
-<<<<<<< HEAD
-    }
-
-  }
-
-
-  testWithTargetTypes("observation should move back to Unapproved if better conditions are requested") { (tt, mkTarget) =>
-
-=======
-  test("approved configuration request"):
->>>>>>> main
-    val setup: IO[Observation.Id] =
-      for
-        cfp <- createCallForProposalsAs(staff)
-        pid <- createProgramWithNonPartnerPi(pi, "Foo")
-        _   <- addProposal(pi, pid, Some(cfp), None)
-        _   <- addPartnerSplits(pi, pid)
-        _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
-        tid <- mkTarget(pi, pid)
-        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
-        _   <- computeItcResultAs(pi, oid)
-        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
-      yield oid
-
-    setup.flatMap: oid =>
-      expect(
-        pi,
-        workflowQuery(oid),
-        expected = workflowQueryResult(
-<<<<<<< HEAD
-          ObservationWorkflow(          
-            ObservationWorkflowState.Defined,
-            tt match
-              case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
-              case TargetType.Nonsidereal => ???
-              case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
-            ,
-            Nil
-=======
-          CalculatedValue(
-            CalculationState.Ready,
-            ObservationWorkflow(
-              ObservationWorkflowState.Defined,
-              List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
-              Nil
             )
           )
         ).asRight
@@ -1138,7 +809,7 @@ class observation_workflow
         ).asRight
       )
 
-  test("observartions in engineering programs are not validated and are immediately Defined"):
+  test("observations in engineering programs are not validated and are immediately Defined"):
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -1163,7 +834,7 @@ class observation_workflow
         ).asRight
       )
 
-  test("approved configuration request AND asterism outside limits"):
+  testWithTargetTypes("approved configuration request AND asterism outside limits") { (tt, mkTarget) =>
 
     val oid1: IO[Observation.Id]  =
       for
@@ -1173,7 +844,7 @@ class observation_workflow
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
-        tid <- createTargetWithProfileAs(pi, pid)
+        tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
         _   <- computeItcResultAs(pi, oid)
@@ -1185,7 +856,7 @@ class observation_workflow
         pid <- createProgramWithNonPartnerPi(pi, "Bar")
         cid <- createCfp(List(Instrument.GmosNorth), limits = Limits.some)
         _   <- addProposal(pi, pid, cid.some)
-        tid <- createTargetWithProfileAs(pi, pid)
+        tid <- mkTarget(pi, pid)
         _   <- setTargetCoords(tid, RaStart - 20, DecCenter)
         oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
@@ -1198,15 +869,19 @@ class observation_workflow
         expected = workflowQueryResult(
           CalculatedValue(
             CalculationState.Ready,
-            ObservationWorkflow(
+            ObservationWorkflow(          
               ObservationWorkflowState.Defined,
-              List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),
+              tt match
+                case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
+                case TargetType.Nonsidereal => ???
+                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
+              ,
               Nil
             )
           ),
           CalculatedValue(
             CalculationState.Ready,
-            ObservationWorkflow(
+            ObservationWorkflow(          
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
@@ -1219,6 +894,46 @@ class observation_workflow
           )
         ).asRight
       )
+  
+  }
+
+
+  testWithTargetTypes("approved configuration request") { (tt, mkTarget) =>
+    val setup: IO[Observation.Id] =
+      for
+        cfp <- createCallForProposalsAs(staff)
+        pid <- createProgramWithNonPartnerPi(pi, "Foo")
+        _   <- addProposal(pi, pid, Some(cfp), None)
+        _   <- addPartnerSplits(pi, pid)
+        _   <- addCoisAs(pi, pid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+        tid <- mkTarget(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- computeItcResultAs(pi, oid)
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Defined,
+              tt match
+                case TargetType.Sidereal    => List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready)
+                case TargetType.Nonsidereal => ???
+                case TargetType.Opportunity => List(ObservationWorkflowState.Inactive)             
+              ,
+              Nil
+            )
+          )
+        ).asRight
+      )
+  }
 
   test("observation should move back to Unapproved if better conditions are requested"):
 
@@ -1250,7 +965,6 @@ class observation_workflow
               List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Ready),  // intially approved
               Nil
             )
->>>>>>> main
           )
         ).asRight
       ) >>
@@ -1324,13 +1038,8 @@ class observation_workflow
         ).asRight
       )
 
-<<<<<<< HEAD
-  }
 
   testWithTargetTypes("calculated: default workflow"): (_, mkTarget) =>
-=======
-  test("default workflow"):
->>>>>>> main
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
