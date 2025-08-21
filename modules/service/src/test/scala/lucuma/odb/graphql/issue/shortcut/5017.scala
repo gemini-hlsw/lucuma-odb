@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.effect.IO
 import cats.effect.std.AtomicCell
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.Instrument
@@ -32,7 +32,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   test("Digest updates after dataset QA"):
@@ -96,7 +96,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
       query {
         observation(observationId: "$o") {
           execution {
-            calculatedDigest {
+            digest {
               value {
                 science {
                   timeEstimate {
@@ -106,7 +106,7 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
               }
             }
           }
-          calculatedWorkflow { value { state } }
+          workflow { value { state } }
         }
       }
     """
@@ -120,8 +120,8 @@ class ShortCut_5017 extends ExecutionTestSupportForGmos:
       ).flatMap: json =>
         val c = json.hcursor.downField("observation")
         (for
-          s <- c.downFields("calculatedWorkflow", "value", "state").as[ObservationWorkflowState]
-          t <- c.downFields("execution", "calculatedDigest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
+          s <- c.downFields("workflow", "value", "state").as[ObservationWorkflowState]
+          t <- c.downFields("execution", "digest", "value", "science", "timeEstimate", "total", "microseconds").as[Long]
         yield (s, t)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
     val result =

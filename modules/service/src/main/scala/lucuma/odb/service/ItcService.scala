@@ -24,7 +24,7 @@ import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -170,7 +170,7 @@ object ItcService {
         for {
           targetId        <- c.downField("targetId").as[Target.Id]
           exposureTime    <- c.downField("exposureTime").as[TimeSpan]
-          exposureCount   <- c.downField("exposureCount").as[NonNegInt]
+          exposureCount   <- c.downField("exposureCount").as[PosInt]
           signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
         } yield TargetResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
       }
@@ -252,7 +252,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -277,7 +277,6 @@ object ItcService {
         } yield r).value
 
       // Selects the parameters then selects the previously stored result set, if any.
-      @annotation.nowarn("msg=unused implicit parameter")
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
@@ -372,7 +371,6 @@ object ItcService {
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def callRemoteItc(
         targets: ItcInput
       )(using NoTransaction[F]): F[Either[OdbError, AsterismResults]] =
@@ -407,7 +405,12 @@ object ItcService {
         results: AsterismResults
       )(using Transaction[F]): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
-        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results).void
+        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results)
+          .void
+          .recoverWith {
+            case SqlState.ForeignKeyViolation(ex) =>
+              Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+          }
     }
 
   object Statements {

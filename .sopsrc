@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: secrets\.yaml$
+    age: age19v3jft9xygzcj78vgsd2swd728lyy7pj476qev7mrdp96tflh3lqrq3x4r
+    # Shared team age public key - private key must be distributed separately

@@ -7,7 +7,7 @@ package issue.shortcut
 import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -32,9 +32,9 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.json.all.transport.given
 
 //https://app.shortcut.com/lucuma/story/4596/api-should-prevent-editing-of-observations-for-which-execution-has-started
-class ShortCut_4596 extends OdbSuite 
+class ShortCut_4596 extends OdbSuite
   with ExecutionTestSupportForGmos
-  with ObservingModeSetupOperations 
+  with ObservingModeSetupOperations
   with UpdateConstraintSetOps {
 
   val guideTargetName: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
@@ -43,7 +43,7 @@ class ShortCut_4596 extends OdbSuite
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(2)
+      PosInt.unsafeFrom(2)
     )
 
   def queryObservationWorkflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
@@ -53,13 +53,15 @@ class ShortCut_4596 extends OdbSuite
         query {
           observation(observationId: "$oid") {
             workflow {
-              state
+              value {
+                state
+              }
             }
           }
         }
         """
     ).map: json =>
-      json.hcursor.downFields("observation", "workflow", "state").require[ObservationWorkflowState]
+      json.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState]
 
   def createExecutedObservationWithTarget(p: Program.Id, state: ObservationWorkflowState): IO[(Observation.Id, Target.Id)] =
     for
@@ -75,6 +77,7 @@ class ShortCut_4596 extends OdbSuite
       _  <- addEndStepEvent(s2)
       s3 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, telescopeConfig(0, 0, StepGuideState.Enabled), ObserveClass.Science).flatMap(addEndStepEvent).whenA(state === Completed)
       _  <- computeItcResultAs(pi,o)
+      _  <- runObscalcUpdateAs(serviceUser, p, o)
       _  <- assertIO(queryObservationWorkflowState(o), state)
     yield (o, t)
 
@@ -86,7 +89,7 @@ class ShortCut_4596 extends OdbSuite
     oids: List[Observation.Id],
     expected: Ior[List[String], Json]
   ) = expectIor(
-    user, 
+    user,
     s"""
       mutation {
         updateObservations(input: {
@@ -94,93 +97,8 @@ class ShortCut_4596 extends OdbSuite
             subtitle: "new value"
           }
           WHERE: {
-            id: { 
-              IN: ${oids.asJson.noSpaces} 
-            }
-          }
-        }) {
-          observations {
-            id
-          }
-        }
-      }
-    """, 
-    expected
-  )
-
-  def tryUpdatePositionAngleAs(
-    user: User,
-    oid: Observation.Id,
-    expected: Ior[List[String], Json]
-  ) = expectIor(
-    user, 
-    s"""
-      mutation {
-        updateObservations(input: {
-          SET: {
-            posAngleConstraint: {
-              mode: FIXED
-            }
-          }
-          WHERE: {
-            id: { 
-              EQ: ${oid.asJson} 
-            }
-          }
-        }) {
-          observations {
-            id
-          }
-        }
-      }
-    """, 
-    expected
-  )
-
-
-  def tryUpdateAsterismsAs(
-    user: User,
-    oid: Observation.Id,
-    tid: Target.Id,
-    expected: Ior[List[String], Json]
-  ) = expectIor(
-    user, 
-    s"""
-      mutation {
-        updateAsterisms(input: {
-          SET: {
-            ADD: [${tid.asJson}]
-          }
-          WHERE: {
-            id: { 
-              EQ: ${oid.asJson} 
-            }
-          }
-        }) {
-          observations {
-            id
-          }
-        }
-      }
-    """, 
-    expected
-  )
-
-  def tryUpdateGroupIndex(
-    user: User,
-    oids: List[Observation.Id],
-    expected: Ior[List[String], Json]
-  ) = expectIor(
-    user, 
-    s"""
-      mutation {
-        updateObservations(input: {
-          SET: {
-            groupIndex: 0
-          }
-          WHERE: {
-            id: { 
-              IN: ${oids.asJson.noSpaces} 
+            id: {
+              IN: ${oids.asJson.noSpaces}
             }
           }
         }) {
@@ -192,14 +110,99 @@ class ShortCut_4596 extends OdbSuite
     """,
     expected
   )
-  
+
+  def tryUpdatePositionAngleAs(
+    user: User,
+    oid: Observation.Id,
+    expected: Ior[List[String], Json]
+  ) = expectIor(
+    user,
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: {
+            posAngleConstraint: {
+              mode: FIXED
+            }
+          }
+          WHERE: {
+            id: {
+              EQ: ${oid.asJson}
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }
+    """,
+    expected
+  )
+
+
+  def tryUpdateAsterismsAs(
+    user: User,
+    oid: Observation.Id,
+    tid: Target.Id,
+    expected: Ior[List[String], Json]
+  ) = expectIor(
+    user,
+    s"""
+      mutation {
+        updateAsterisms(input: {
+          SET: {
+            ADD: [${tid.asJson}]
+          }
+          WHERE: {
+            id: {
+              EQ: ${oid.asJson}
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }
+    """,
+    expected
+  )
+
+  def tryUpdateGroupIndex(
+    user: User,
+    oids: List[Observation.Id],
+    expected: Ior[List[String], Json]
+  ) = expectIor(
+    user,
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: {
+            groupIndex: 0
+          }
+          WHERE: {
+            id: {
+              IN: ${oids.asJson.noSpaces}
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }
+    """,
+    expected
+  )
+
   test(s"Ongoing observations should not be editable"):
     val setup: IO[(Observation.Id, Observation.Id)] =
-      for 
+      for
         pid <- createProgramAs(pi)
         o1  <- createExecutedObservation(pid, Ongoing)
         o2  <- createObservationAs(pi, pid)
-      yield (o1,o2)      
+      yield (o1,o2)
     setup.flatMap: (ongoing, undefined) =>
       tryUpdateSubtitleAs(
         user = pi,
@@ -224,12 +227,12 @@ class ShortCut_4596 extends OdbSuite
 
   test(s"Ongoing observations should not be editable, even when set to Inactive"):
     val setup: IO[(Observation.Id, Observation.Id)] =
-      for 
+      for
         pid <- createProgramAs(pi)
         o1  <- createExecutedObservation(pid, Ongoing)
         _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
         o2  <- createObservationAs(pi, pid)
-      yield (o1,o2)      
+      yield (o1,o2)
     setup.flatMap: (inactive, undefined) =>
       tryUpdateSubtitleAs(
         user = pi,
@@ -254,7 +257,7 @@ class ShortCut_4596 extends OdbSuite
 
   test(s"Completed observations should not be editable"):
     val setup: IO[(Observation.Id, Observation.Id)] =
-      for 
+      for
         pid <- createProgramAs(pi)
         o1  <- createExecutedObservation(pid, Completed)
         o2  <- createObservationAs(pi, pid)
@@ -319,16 +322,16 @@ class ShortCut_4596 extends OdbSuite
                 ]
               }
             }
-          """)    
+          """)
         )
 
   test(s"Ongoing observations should not allow asterism edits"):
     val setup: IO[(Observation.Id, Target.Id)] =
-      for 
+      for
         pid <- createProgramAs(pi)
         oid <- createExecutedObservation(pid, Ongoing)
         tid <- createTargetAs(pi, pid)
-      yield (oid, tid)    
+      yield (oid, tid)
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
@@ -342,14 +345,14 @@ class ShortCut_4596 extends OdbSuite
           """
         )
       )
-  
+
   test(s"Completed observations should not allow asterism edits"):
     val setup: IO[(Observation.Id, Target.Id)] =
-      for 
+      for
         pid <- createProgramAs(pi)
         oid <- createExecutedObservation(pid, Completed)
         tid <- createTargetAs(pi, pid)
-      yield (oid, tid)    
+      yield (oid, tid)
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
@@ -363,11 +366,11 @@ class ShortCut_4596 extends OdbSuite
           """
         )
       )
- 
+
   List(Ongoing, Completed).foreach: state =>
     test(s"$state observations should not allow their asterisms' targets to be edited"):
       val setup: IO[(Target.Id, Target.Id)] =
-        for 
+        for
           pid     <- createProgramAs(pi)
           (_, t1) <- createExecutedObservationWithTarget(pid, state)
           t2      <- createTargetAs(pi, pid) // this one should be editable
@@ -400,7 +403,7 @@ class ShortCut_4596 extends OdbSuite
                 "updateTargets": {
                   "targets": [
                     { "id": $t2 }
-                  ]  
+                  ]
                 }
               }
             """
@@ -410,11 +413,11 @@ class ShortCut_4596 extends OdbSuite
   List(Ongoing, Completed).foreach: state =>
     test(s"$state observations *should* be movable"):
       val setup: IO[(Observation.Id, Observation.Id)] =
-        for 
+        for
           pid <- createProgramAs(pi)
           o1  <- createExecutedObservation(pid, state)
           o2  <- createObservationAs(pi, pid)
-        yield (o1,o2)        
+        yield (o1,o2)
       setup.flatMap: (ongoing, undefined) =>
         tryUpdateGroupIndex(
           user = pi,
@@ -436,7 +439,7 @@ class ShortCut_4596 extends OdbSuite
             """
           )
         )
-  
+
   test("Ongoing observations should not allow guide star changes (PI)"):
     createProgramAs(pi)
       .flatMap(createExecutedObservation(_, Ongoing))
@@ -460,7 +463,7 @@ class ShortCut_4596 extends OdbSuite
           expected = Ior.Left(List(
             s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
           ))
-        )  
+        )
 
   test("Ongoing observations *should* allow guide star changes (Staff)"):
     createProgramAs(pi)
@@ -500,7 +503,7 @@ class ShortCut_4596 extends OdbSuite
         tryUpdatePositionAngleAs(
           user = pi,
           oid = oid,
-          expected = 
+          expected =
             Ior.Both(
               List(
                 s"Observation $oid is ineligibile for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
@@ -522,7 +525,7 @@ class ShortCut_4596 extends OdbSuite
         tryUpdatePositionAngleAs(
           user = staff,
           oid = oid,
-          expected = 
+          expected =
             Ior.Right(
               json"""
                 {
@@ -530,7 +533,7 @@ class ShortCut_4596 extends OdbSuite
                     "observations": [
                       {
                         "id": $oid
-                      }  
+                      }
                     ]
                   }
                 }
@@ -546,5 +549,5 @@ class ShortCut_4596 extends OdbSuite
   test("Ongoing observations *should* allow acquisition time changes (Staff)".ignore):
     fail("not implemented")
 
-    
+
 }

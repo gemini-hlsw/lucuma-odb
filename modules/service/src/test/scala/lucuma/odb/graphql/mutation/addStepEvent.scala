@@ -12,6 +12,7 @@ import io.circe.literal.*
 import lucuma.core.enums.AtomStage
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
+import lucuma.core.model.Client
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
@@ -184,4 +185,49 @@ class addStepEvent extends OdbSuite with ExecutionState {
     }
   }
 
+  def addClientId(
+    sid:         Step.Id,
+    cid:         Client.Id,
+    isDuplicate: Boolean
+  ): IO[Unit] =
+    expect(
+      service,
+      s"""
+        mutation {
+          addStepEvent(input: {
+            stepId:    "$sid",
+            stepStage: START_STEP,
+            clientId:  "$cid"
+          }) {
+            event { clientId }
+          }
+        }
+      """,
+      Either.cond(
+        !isDuplicate,
+        json"""
+          {
+            "addStepEvent": {
+              "event": {
+                "clientId": $cid
+              }
+            }
+          }
+        """,
+        List(s"An event with client id '$cid' has already been added.")
+      )
+    )
+
+  test("addStepEvent - client id"):
+    val cid  = Client.Id.parse("c-530c979f-de98-472f-9c23-a3442f2a9f7f")
+
+    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
+      addClientId(sid, cid.get, isDuplicate = false)
+
+  test("addStepEvent - duplicate client id"):
+    val cid = Client.Id.parse("c-b7044cd8-38b5-4592-8d99-91d2c512041d")
+
+    recordStep(ObservingModeType.GmosNorthLongSlit, service).flatMap: (_, sid) =>
+      addClientId(sid, cid.get, isDuplicate = false) *>
+      addClientId(sid, cid.get, isDuplicate = true)
 }

@@ -9,7 +9,7 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
+trait GmosLongSlitTable[F[_]] extends BaseMapping[F] {
 
   class CommonColumns(implicit val tableName: TableName) {
 
@@ -26,7 +26,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
     val Roi: ColumnRef                      = col("c_roi", gmos_roi.opt)
 
     val WavelengthDithers: ColumnRef        = col("c_wavelength_dithers", text.opt)
-    val SpatialOffsets: ColumnRef           = col("c_spatial_offsets", text.opt)
+    val Offsets: ColumnRef                  = col("c_offsets", text.opt)
 
     val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)
 
@@ -34,7 +34,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
     val SourceProfile: ColumnRef            = col("c_source_profile", jsonb.opt)
   }
 
-  object GmosNorthLongSlitView extends TableDef("v_gmos_north_long_slit") {
+  object GmosNorthLongSlitTable extends TableDef("t_gmos_north_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
@@ -48,7 +48,7 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F] {
 
   }
 
-  object GmosSouthLongSlitView extends TableDef("v_gmos_south_long_slit") {
+  object GmosSouthLongSlitTable extends TableDef("t_gmos_south_long_slit") {
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)

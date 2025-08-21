@@ -7,11 +7,9 @@ package mapping
 import table.DatasetReferenceView
 import table.ObservationReferenceView
 
-
 trait DatasetReferenceMapping[F[_]]
-  extends BaseMapping[F]
-     with DatasetReferenceView[F]
-     with ObservationReferenceView[F] {
+  extends DatasetReferenceView[F]
+     with ObservationReferenceView[F]:
 
   lazy val DatasetReferenceMapping: ObjectMapping =
     ObjectMapping(DatasetReferenceType)(
@@ -24,5 +22,3 @@ trait DatasetReferenceMapping[F[_]]
       // Used for WHERE clause matching
       SqlField("labelString", DatasetReferenceView.DatasetReferenceString, hidden = true)
     )
-
-}

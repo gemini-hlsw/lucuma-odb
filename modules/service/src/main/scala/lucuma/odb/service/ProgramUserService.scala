@@ -46,6 +46,7 @@ import lucuma.odb.util.Codecs.program_user_id
 import lucuma.odb.util.Codecs.program_user_role
 import lucuma.odb.util.Codecs.user_id
 import lucuma.odb.util.Codecs.user_type
+import lucuma.odb.util.Codecs.varchar_nonempty
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.text.varchar
@@ -74,7 +75,7 @@ trait ProgramUserService[F[_]]:
   )(using Transaction[F]): F[Result[ProgramUser.Id]]
 
   /**
-   * Updates program user properties such as fallback profile, thesis and
+   * Updates program user properties such as preferred profile, thesis and
    * gender.
    *
    * @param SET property edits to apply
@@ -628,25 +629,27 @@ object ProgramUserService:
 
       val alias = "o"
 
-      val upGivenName         = sql"c_fallback_given_name  = ${varchar.opt}"
-      val upFamilyName        = sql"c_fallback_family_name = ${varchar.opt}"
-      val upCreditName        = sql"c_fallback_credit_name = ${varchar.opt}"
-      val upEmail             = sql"c_fallback_email       = ${varchar.opt}"
+      val upGivenName         = sql"c_preferred_given_name  = ${varchar.opt}"
+      val upFamilyName        = sql"c_preferred_family_name = ${varchar.opt}"
+      val upCreditName        = sql"c_preferred_credit_name = ${varchar.opt}"
+      val upEmail             = sql"c_preferred_email       = ${varchar.opt}"
 
       val upEducationalStatus = sql"c_educational_status   = ${educational_status.opt}"
       val upThesis            = sql"c_thesis               = ${bool.opt}"
       val upGender            = sql"c_gender               = ${gender.opt}"
+      val upAffiliation       = sql"c_affiliation          = ${varchar_nonempty.opt}"
       val upDataAccess        = sql"c_has_data_access      = $bool"
 
       val ups: Option[NonEmptyList[AppliedFragment]] = NonEmptyList.fromList(
         List(
-          SET.fallbackProfile.flatMap(_.givenName).foldPresent(upGivenName),
-          SET.fallbackProfile.flatMap(_.familyName).foldPresent(upFamilyName),
-          SET.fallbackProfile.flatMap(_.creditName).foldPresent(upCreditName),
-          SET.fallbackProfile.flatMap(_.email).foldPresent(upEmail),
+          SET.preferredProfile.flatMap(_.givenName).foldPresent(upGivenName),
+          SET.preferredProfile.flatMap(_.familyName).foldPresent(upFamilyName),
+          SET.preferredProfile.flatMap(_.creditName).foldPresent(upCreditName),
+          SET.preferredProfile.flatMap(_.email).foldPresent(upEmail),
           SET.educationalStatus.foldPresent(upEducationalStatus),
           SET.thesis.foldPresent(upThesis),
           SET.gender.foldPresent(upGender),
+          SET.affiliation.foldPresent(upAffiliation),
           SET.hasDataAccess.map(upDataAccess)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(

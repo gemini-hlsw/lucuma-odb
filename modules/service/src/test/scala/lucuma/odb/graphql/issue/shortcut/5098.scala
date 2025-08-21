@@ -51,7 +51,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
           s"""
              query {
                observation(observationId: "$oid") {
-                 calculatedWorkflow {
+                 workflow {
                    value {
                      validationErrors {
                        messages
@@ -59,7 +59,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                    }
                  }
                  execution {
-                   calculatedDigest {
+                   digest {
                      value {
                        science {
                          timeEstimate {
@@ -79,7 +79,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
           json"""
             {
               "observation": {
-                "calculatedWorkflow": {
+                "workflow": {
                   "value": {
                     "validationErrors": [
                       {
@@ -89,7 +89,7 @@ class ShortCut_5098 extends ExecutionTestSupportForGmos:
                   }
                 },
                 "execution": {
-                  "calculatedDigest": {
+                  "digest": {
                     "value": null
                   }
                 }

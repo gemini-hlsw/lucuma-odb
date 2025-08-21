@@ -21,6 +21,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
   val pi:    User = TestUsers.Standard.pi(1, 101)
   val coiRo: User = TestUsers.Standard.pi(2, 102)
   val staff: User = TestUsers.Standard.staff(3, 103)
+  val serviceUser = TestUsers.service(4)
 
   override val validUsers: List[User] =
     List(pi, coiRo, staff)
@@ -29,7 +30,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
     for
       _ <- createUsers(pi, coiRo, staff)
       c <- createCallForProposalsAs(staff, RegularSemester)
-      p <- createProgramAs(pi, "ShortCut 4457")
+      p <- createProgramWithNonPartnerPi(pi, "ShortCut 4457")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _ <- computeItcResultAs(pi, o)
@@ -39,6 +40,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
       _ <- acceptProposal(staff, p)
       m <- addProgramUserAs(pi, p, CoiRO)
       _ <- linkUserAs(pi, m, coiRo.id)
+      _ <- runObscalcUpdateAs(serviceUser, p, o)
     yield (p, o)
 
   test("Read-only Co-Investigators can access accepted program"):
@@ -74,7 +76,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
       query {
         observation(observationId: "$o") {
           index
-          workflow { state }
+          workflow { value { state } }
         }
       }
     """
@@ -84,7 +86,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
         {
           "observation": {
             "index": 1,
-            "workflow": { "state": "UNAPPROVED" }
+            "workflow": { "value" : { "state": "UNAPPROVED" } }
           }
         }
       """
@@ -105,7 +107,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
           observations {
             matches {
               index
-              workflow { state }
+              workflow { value { state } }
             }
           }
         }
@@ -120,7 +122,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
               "matches": [
                 {
                   "index": 1,
-                  "workflow": { "state": "UNAPPROVED" }
+                  "workflow": { "value": { "state": "UNAPPROVED" } }
                 }
               ]
             }

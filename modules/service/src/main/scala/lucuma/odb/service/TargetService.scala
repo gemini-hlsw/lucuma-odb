@@ -19,7 +19,9 @@ import lucuma.core.math.Arc
 import lucuma.core.math.Arc.Empty
 import lucuma.core.math.Arc.Full
 import lucuma.core.math.Arc.Partial
+import lucuma.core.math.Parallax
 import lucuma.core.math.ProperMotion
+import lucuma.core.math.RadialVelocity
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -247,10 +249,10 @@ object TargetService {
           ${right_ascension},
           ${declination},
           ${epoch},
-          ${int8.opt},
-          ${int8.opt},
-          ${radial_velocity.opt},
-          ${parallax.opt},
+          ${int8},
+          ${int8},
+          ${radial_velocity},
+          ${parallax},
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
@@ -262,10 +264,10 @@ object TargetService {
         si.ra,
         si.dec,
         si.epoch,
-        si.properMotion.map(_.ra.μasy.value),
-        si.properMotion.map(_.dec.μasy.value),
-        si.radialVelocity,
-        si.parallax, // TODO
+        si.properMotion.fold(0L)(_.ra.μasy.value),
+        si.properMotion.fold(0L)(_.dec.μasy.value),
+        si.radialVelocity.getOrElse(RadialVelocity.Zero),
+        si.parallax.getOrElse(Parallax.Zero),
         si.catalogInfo.flatMap(_.name),
         si.catalogInfo.flatMap(_.id),
         si.catalogInfo.flatMap(_.objectType),

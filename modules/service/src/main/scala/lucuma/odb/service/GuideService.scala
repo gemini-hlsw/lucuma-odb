@@ -52,7 +52,8 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.itc.client.json.given
+import lucuma.itc.client.ItcConstraintsInput
+import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.odb.data.ContiguousTimestampMap
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
@@ -227,8 +228,8 @@ object GuideService {
 
       md5.update(generatorHash.toByteArray)
 
-      given HashBytes[ConstraintSet] = HashBytes.forJsonEncoder
-      md5.update(constraints.hashBytes)
+      given HashBytes[ItcConstraintsInput] = HashBytes.forJsonEncoder
+      md5.update(constraints.toInput.hashBytes)
 
       // For our purposes, we don't care about the actual PosAngleConstraint, just what
       // angles we need to check.
@@ -246,8 +247,8 @@ object GuideService {
 
       md5.update(generatorHash.toByteArray)
 
-      given HashBytes[ConstraintSet] = HashBytes.forJsonEncoder
-      md5.update(constraints.hashBytes)
+      given HashBytes[ItcConstraintsInput] = HashBytes.forJsonEncoder
+      md5.update(constraints.toInput.hashBytes)
 
       given Encoder[PosAngleConstraint] = deriveEncoder
       given HashBytes[PosAngleConstraint] = HashBytes.forJsonEncoder
@@ -306,7 +307,6 @@ object GuideService {
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F], SuperUserAccess
       ): F[Result[NonEmptyList[Target]]] =
@@ -320,7 +320,6 @@ object GuideService {
               .toResult(generalError(s"No targets have been defined for observation $oid.").asProblem)
           )
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getObservationInfo(oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[ObservationInfo]] = {
@@ -334,7 +333,6 @@ object GuideService {
           )
       }
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Option[Md5Hash]] = {
@@ -354,7 +352,6 @@ object GuideService {
           .use(_.execute(af.argument).void)
       }
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[List[AvailabilityPeriod]] = {
@@ -394,7 +391,6 @@ object GuideService {
           .use(_.option(af.argument))
           .map(_.fold(OdbError.InvalidObservation(oid).asFailure)(_.success))
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
       ): F[ContiguousTimestampMap[List[Angle]]] =
@@ -448,7 +444,7 @@ object GuideService {
 
       def callGaia(
         query: ADQLQuery
-      ): F[Result[List[GuideStarCandidate]]] = 
+      ): F[Result[List[GuideStarCandidate]]] =
         Trace[F].span("callGaia"):
           val MaxTargets                     = 100
           given ADQLInterpreter          = ADQLInterpreter.nTarget(MaxTargets)

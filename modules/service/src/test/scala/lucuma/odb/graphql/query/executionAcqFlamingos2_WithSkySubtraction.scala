@@ -5,7 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
@@ -19,39 +19,35 @@ class executionAcqFlamingos2_WithSkySubtraction extends ExecutionTestSupportForF
   val ExposureTime: TimeSpan = 3.secTimeSpan
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(1))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
 
   val InitialAcquisition: Json =
     json"""
       {
-        "observation": {
-          "execution": {
-            "config": {
-              "flamingos2": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0, 10)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0,  0)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0, 10)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
+        "executionConfig": {
+          "flamingos2": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0, 10)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0,  0)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0, 10)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
+                ]
+              },
+              "possibleFuture": [
+                {
+                  "description": "Fine Adjustments",
+                  "observeClass": "ACQUISITION",
+                  "steps": [
+                    ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+                  ]
                 }
-              }
+              ],
+              "hasMore": false
             }
           }
         }
@@ -68,14 +64,7 @@ class executionAcqFlamingos2_WithSkySubtraction extends ExecutionTestSupportForF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2AcquisitionQuery(None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )

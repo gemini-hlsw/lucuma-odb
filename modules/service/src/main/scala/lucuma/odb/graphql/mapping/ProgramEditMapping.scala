@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 package mapping
 
-import grackle.Result
 import grackle.skunk.SkunkMapping
 import lucuma.odb.data.EditType
 
@@ -17,7 +16,6 @@ trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {
   lazy val ProgramEditMapping =
     ObjectMapping(ProgramEditType)(
       SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
-      CursorField("id", _ => Result(0L), List("synthetic-id")),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
       SqlObject("value")
     )

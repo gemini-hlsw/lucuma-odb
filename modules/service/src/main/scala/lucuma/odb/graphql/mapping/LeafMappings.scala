@@ -20,6 +20,7 @@ import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Client
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ExecutionEvent
@@ -46,6 +47,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AtomExecutionState
+import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
@@ -68,22 +70,24 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
-      LeafMapping[BigDecimal](BigDecimalType),
-      LeafMapping[Long](ChronicleIdType),
       LeafMapping[ArcType](ArcTypeType),
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
       LeafMapping[AtomStage](AtomStageType),
       LeafMapping[Attachment.Id](AttachmentIdType),
       LeafMapping[AttachmentType](AttachmentTypeType),
+      LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
+      LeafMapping[Long](ChronicleIdType),
+      LeafMapping[Client.Id](ClientIdType),
       LeafMapping[CloudExtinction.Preset](CloudExtinctionPresetType),
       LeafMapping[ConfigurationRequest.Id](ConfigurationRequestIdType),
       LeafMapping[ConfigurationRequestStatus](ConfigurationRequestStatusType),
+      LeafMapping[DatabaseOperation](DatabaseOperationType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
       LeafMapping[Tag](ConditionsExpectationTypeType),
@@ -119,7 +123,6 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GcalContinuum](GcalContinuumType),
       LeafMapping[GcalDiffuser](GcalDiffuserType),
       LeafMapping[GcalFilter](GcalFilterType),
-      LeafMapping[GcalLampType](GcalLampTypeType),
       LeafMapping[GcalShutter](GcalShutterType),
       LeafMapping[GmosAmpCount](GmosAmpCountType),
       LeafMapping[GmosAmpGain](GmosAmpGainType),
@@ -147,6 +150,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
+      LeafMapping[MultipleFiltersMode](MultipleFiltersModeType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),

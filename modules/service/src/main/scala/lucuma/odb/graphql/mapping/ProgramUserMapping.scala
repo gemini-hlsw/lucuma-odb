@@ -26,20 +26,23 @@ trait ProgramUserMapping[F[_]]
   extends ProgramTable[F]
      with UserTable[F]
      with UserInvitationTable[F]
-     with ProgramUserTable[F] { this: SkunkMapping[F] =>
+     with ProgramUserView[F] { this: SkunkMapping[F] =>
 
   lazy val ProgramUserMapping =
     ObjectMapping(ProgramUserType)(
-      SqlField("id", ProgramUserTable.ProgramUserId, key = true),
-      SqlField("programId", ProgramUserTable.ProgramId, hidden = true),
-      SqlField("userId", ProgramUserTable.UserId, hidden = true),
-      SqlField("role", ProgramUserTable.Role),
-      SqlField("linkType", ProgramUserTable.PartnerLink, hidden = true),
-      SqlField("partner", ProgramUserTable.Partner, hidden = true),
-      SqlField("educationalStatus", ProgramUserTable.EducationalStatus),
-      SqlField("thesis", ProgramUserTable.Thesis),
-      SqlField("gender", ProgramUserTable.Gender),
-      SqlField("hasDataAccess", ProgramUserTable.HasDataAccess),
+      SqlField("id", ProgramUserView.ProgramUserId, key = true),
+      SqlField("programId", ProgramUserView.ProgramId, hidden = true),
+      SqlField("userId", ProgramUserView.UserId, hidden = true),
+      SqlField("role", ProgramUserView.Role),
+      SqlField("linkType", ProgramUserView.PartnerLink, hidden = true),
+      SqlField("partner", ProgramUserView.Partner, hidden = true),
+      SqlField("educationalStatus", ProgramUserView.EducationalStatus),
+      SqlField("thesis", ProgramUserView.Thesis),
+      SqlField("gender", ProgramUserView.Gender),
+      SqlField("affiliation", ProgramUserView.Affiliation),
+      SqlField("hasDataAccess", ProgramUserView.HasDataAccess),
+      SqlField("displayName", ProgramUserView.DisplayName),
+      SqlField("email", ProgramUserView.Email),
       CursorFieldJson("partnerLink", c =>
         for {
           l <- c.fieldAs[PartnerLinkType]("linkType")
@@ -48,10 +51,10 @@ trait ProgramUserMapping[F[_]]
         } yield r.asJson,
         List("partner", "linkType")
       ),
-      SqlObject("program", Join(ProgramUserTable.ProgramId, ProgramTable.Id)),
-      SqlObject("user", Join(ProgramUserTable.UserId, UserTable.UserId)),
-      SqlObject("fallbackProfile"),
-      SqlObject("invitations", Join(ProgramUserTable.ProgramUserId, UserInvitationTable.ProgramUserId))
+      SqlObject("program", Join(ProgramUserView.ProgramId, ProgramTable.Id)),
+      SqlObject("user", Join(ProgramUserView.UserId, UserTable.UserId)),
+      SqlObject("preferredProfile"),
+      SqlObject("invitations", Join(ProgramUserView.ProgramUserId, UserInvitationTable.ProgramUserId))
     )
 
   lazy val ProgramUserElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -63,4 +66,3 @@ trait ProgramUserMapping[F[_]]
   }
 
 }
-

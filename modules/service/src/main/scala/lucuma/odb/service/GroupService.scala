@@ -13,6 +13,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.Config
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
@@ -24,6 +25,7 @@ import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.util.Codecs.*
+import org.http4s.client.Client
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -45,7 +47,7 @@ object GroupService {
 
   // TODO: check access control
 
-  def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
+  def instantiate[F[_]: Concurrent](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): GroupService[F] =
     new GroupService[F] {
 
       private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean)(using Transaction[F]): F[Group.Id] =
@@ -72,7 +74,7 @@ object GroupService {
         ).void
 
       override def createGroup(input: CreateGroupInput, system: Boolean)(using Transaction[F]): F[Result[Group.Id]] =
-        programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
+        programService(emailConfig, httpClient).resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
           r.traverse(createGroupImpl(_, input.SET, input.initialContents, system))
 
       // Clone `oid` into `dest`, at the end.

@@ -125,7 +125,7 @@ class createTarget extends OdbSuite {
                   "hms": "00:49:22.800000",
                   "hours": 0.823,
                   "degrees": 12.345,
-                  "microarcseconds": 44442000000
+                  "microseconds": 2962800000
                 },
                 "dec": {
                   "dms": "+45:40:40.800000",
@@ -170,6 +170,109 @@ class createTarget extends OdbSuite {
           val id = js.hcursor.downFields("createTarget", "targetId", "id").as[Target.Id].toOption.get
           getCalibrationRoleFromDb(id).map(role => assert(role.isEmpty))
         }
+    }
+  }
+
+  test("[general] create a sidereal target with defaults for pm/rv/parallax") {
+    createProgramAs(pi).flatMap { pid =>
+      expect(pi,
+        s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "Target with Defaults"
+                  sidereal: {
+                    ra: {
+                      degrees: "10.0"
+                    }
+                    dec: {
+                      degrees: "20.0"
+                    }
+                    epoch: "J2000.000"
+                  }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target {
+                existence
+                name
+                program {
+                  id
+                }
+                sidereal {
+                  ra {
+                    degrees
+                  }
+                  dec {
+                    degrees
+                  }
+                  epoch
+                  properMotion {
+                    ra {
+                      milliarcsecondsPerYear
+                    }
+                    dec {
+                      milliarcsecondsPerYear
+                    }
+                  }
+                  radialVelocity {
+                    metersPerSecond
+                  }
+                  parallax {
+                    microarcseconds
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json""" {
+          "createTarget": {
+            "target": {
+              "existence": "PRESENT",
+              "name": "Target with Defaults",
+              "program": {
+                "id": $pid
+              },
+              "sidereal": {
+                "ra": {
+                  "degrees": 10.0
+                },
+                "dec": {
+                  "degrees": 20.0
+                },
+                "epoch": "J2000.000",
+                "properMotion": {
+                  "ra": {
+                    "milliarcsecondsPerYear": 0.000
+                  },
+                  "dec": {
+                    "milliarcsecondsPerYear": 0.000
+                  }
+                },
+                "radialVelocity": {
+                  "metersPerSecond": 0.000
+                },
+                "parallax": {
+                  "microarcseconds": 0
+                }
+              }
+            }
+          }
+        }
+      """.asRight)
     }
   }
 
@@ -331,13 +434,13 @@ class createTarget extends OdbSuite {
                       "hms" : "00:40:00.000000",
                       "hours" : 0.6666666666666666,
                       "degrees" : 10.0,
-                      "microarcseconds" : 36000000000
+                      "microseconds" : 2400000000
                     },
                     "end" : {
                       "hms" : "01:20:00.000000",
                       "hours" : 1.3333333333333333,
                       "degrees" : 20.0,
-                      "microarcseconds" : 72000000000
+                      "microseconds" : 4800000000
                     }
                   },
                   "declinationArc" : {
@@ -464,7 +567,7 @@ class createTarget extends OdbSuite {
 
 
   test("[general] can create a target with a proposal reference") {
-    createProgramAs(pi).flatMap { pid =>
+    createProgramWithUsPi(pi).flatMap { pid =>
       createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
@@ -643,7 +746,7 @@ object createTarget {
             hms
             hours
             degrees
-            microarcseconds
+            microseconds
           }
           dec {
             dms
@@ -689,13 +792,13 @@ object createTarget {
                 hms
                 hours
                 degrees
-                microarcseconds
+                microseconds
               }
               end {
                 hms
                 hours
                 degrees
-                microarcseconds
+                microseconds
               }
             }
             declinationArc {

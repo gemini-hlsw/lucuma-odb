@@ -12,6 +12,7 @@ import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.MultipleFiltersMode
 import lucuma.core.math.Offset
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.table.*
@@ -24,9 +25,11 @@ trait GmosImagingMapping[F[_]]
 
   private object CommonImagingFields:
 
+    val multipleFiltersMode: FieldMapping        = explicitOrElseDefault[MultipleFiltersMode]("multipleFiltersMode", "explicitMultipleFiltersMode", "defaultMultipleFiltersMode")
+    val defaultMultipleFiltersMode: FieldMapping = CursorField[MultipleFiltersMode]("defaultMultipleFiltersMode", _ => Result(DefaultMultipleFiltersMode))
+
     val bin: FieldMapping        = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
     val defaultBin: FieldMapping = CursorField[GmosBinning]("defaultBin", _ => Result(DefaultBin))
-
 
     val ampReadMode: FieldMapping        = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
     val defaultAmpReadMode: FieldMapping = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode))
@@ -37,27 +40,14 @@ trait GmosImagingMapping[F[_]]
     val roi: FieldMapping        = explicitOrElseDefault[GmosRoi]("roi", "explicitRoi", "defaultRoi")
     val defaultRoi: FieldMapping = CursorField[GmosRoi]("defaultRoi", _ => Result(DefaultRoi))
 
-    val spatialOffsets: FieldMapping =
-      CursorFieldJson("spatialOffsets",
+    val offsets: FieldMapping =
+      CursorFieldJson("offsets",
         cursor =>
           cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.getOrElse(defaultSpatialOffsetsJson)),
-        List("explicitSpatialOffsets", "defaultSpatialOffsets")
+            .field("offsetsString", None)
+            .flatMap(_.as[String].map(s => if (s.isEmpty) defaultOffsetsJson else decodeSpatialOffsets(s))),
+        List("offsetsString")
       )
-
-    val explicitSpatialOffsets: FieldMapping =
-      CursorFieldJson("explicitSpatialOffsets",
-        cursor =>
-          cursor
-            .field("spatialOffsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.fold(defaultSpatialOffsetsJson)(decodeSpatialOffsets))),
-        List("spatialOffsetsString")
-      )
-
-    val defaultSpatialOffsets: FieldMapping =
-      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
 
   lazy val GmosNorthImagingMapping: ObjectMapping =
     ObjectMapping(GmosNorthImagingType)(
@@ -65,6 +55,13 @@ trait GmosImagingMapping[F[_]]
       SqlField("observationId", GmosNorthImagingView.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosNorthImagingView.Filters),
       SqlField("initialFilters", GmosNorthImagingView.InitialFilters),
+
+      SqlField("offsetsString", GmosNorthImagingView.Offsets, hidden = true),
+      CommonImagingFields.offsets,
+
+      CommonImagingFields.multipleFiltersMode,
+      SqlField("explicitMultipleFiltersMode", GmosNorthImagingView.ExplicitMultipleFiltersMode),
+      CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
@@ -81,11 +78,6 @@ trait GmosImagingMapping[F[_]]
       CommonImagingFields.roi,
       SqlField("explicitRoi", GmosNorthImagingView.ExplicitRoi),
       CommonImagingFields.defaultRoi,
-
-      SqlField("spatialOffsetsString", GmosNorthImagingView.ExplicitSpatialOffsets, hidden = true),
-      CommonImagingFields.spatialOffsets,
-      CommonImagingFields.explicitSpatialOffsets,
-      CommonImagingFields.defaultSpatialOffsets,
     )
 
   lazy val GmosSouthImagingMapping: ObjectMapping =
@@ -94,6 +86,13 @@ trait GmosImagingMapping[F[_]]
       SqlField("observationId", GmosSouthImagingView.ObservationId, key = true, hidden = true),
       SqlField("filters", GmosSouthImagingView.Filters),
       SqlField("initialFilters", GmosSouthImagingView.InitialFilters),
+
+      SqlField("offsetsString", GmosSouthImagingView.Offsets, hidden = true),
+      CommonImagingFields.offsets,
+
+      CommonImagingFields.multipleFiltersMode,
+      SqlField("explicitMultipleFiltersMode", GmosSouthImagingView.ExplicitMultipleFiltersMode),
+      CommonImagingFields.defaultMultipleFiltersMode,
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
@@ -110,11 +109,6 @@ trait GmosImagingMapping[F[_]]
       CommonImagingFields.roi,
       SqlField("explicitRoi", GmosSouthImagingView.ExplicitRoi),
       CommonImagingFields.defaultRoi,
-
-      SqlField("spatialOffsetsString", GmosSouthImagingView.ExplicitSpatialOffsets, hidden = true),
-      CommonImagingFields.spatialOffsets,
-      CommonImagingFields.explicitSpatialOffsets,
-      CommonImagingFields.defaultSpatialOffsets,
     )
 }
 
@@ -124,11 +118,11 @@ object GmosImagingMapping:
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
+  private val DefaultMultipleFiltersMode: MultipleFiltersMode = MultipleFiltersMode.Grouped
 
   def decodeSpatialOffsets(s: String): Json =
     if (s.trim.isEmpty) List.empty[Offset].asJson
     else OffsetsFormat.getOption(s).getOrElse(List.empty[Offset]).asJson
 
-  val defaultSpatialOffsetsJson: Json =
+  val defaultOffsetsJson: Json =
     List.empty[Offset].asJson
-

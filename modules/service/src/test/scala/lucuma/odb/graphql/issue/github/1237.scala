@@ -57,13 +57,13 @@ class GitHub_1237 extends OdbSuite {
       cid24B <- createCallForProposalsAs(staff, semester = sem24B)
       cid25A <- createCallForProposalsAs(staff, semester = sem25A)
 
-      pid1 <- createProgramAs(pi)
+      pid1 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)
       _    <- addPartnerSplits(pi, pid1)
       _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
-      pid2 <- createProgramAs(pi)
+      pid2 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid2, cid25A)
       _    <- addPartnerSplits(pi, pid2)
       _    <- addCoisAs(pi, pid2)
@@ -81,13 +81,13 @@ class GitHub_1237 extends OdbSuite {
       cid24B <- createCallForProposalsAs(staff, semester = sem24B)
       cid25A <- createCallForProposalsAs(staff, semester = sem25A)
 
-      pid1 <- createProgramAs(pi)
+      pid1 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)
       _    <- addPartnerSplits(pi, pid1)
       _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
-      pid2 <- createProgramAs(pi)
+      pid2 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid2, cid25A)
       _    <- addPartnerSplits(pi, pid2)
       _    <- addCoisAs(pi, pid2)

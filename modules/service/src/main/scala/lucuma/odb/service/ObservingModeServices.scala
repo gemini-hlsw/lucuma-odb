@@ -60,12 +60,12 @@ object ObservingModeServices {
           case (Flamingos2LongSlit, oids) =>
             flamingos2LongSlitService
               .select(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
 
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
 
           case (GmosNorthImaging, oids) =>
             gmosImagingService
@@ -75,7 +75,7 @@ object ObservingModeServices {
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
 
           case (GmosSouthImaging, oids) =>
             gmosImagingService

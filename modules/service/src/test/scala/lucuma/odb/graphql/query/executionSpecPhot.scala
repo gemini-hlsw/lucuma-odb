@@ -7,7 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
@@ -20,7 +20,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   test("spec phot") {
@@ -31,7 +31,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o
@@ -237,7 +237,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
              )
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o
@@ -358,7 +358,7 @@ class executionSpecPhot extends ExecutionTestSupportForGmos {
              )
         _ <- withServices(serviceUser) { services =>
                services.session.transaction.use { xa =>
-                 services.calibrationsService.setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
+                 services.calibrationsService(emailConfig, httpClient).setCalibrationRole(o, CalibrationRole.SpectroPhotometric.some)(using xa)
                }
              }
       } yield o

@@ -20,6 +20,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -755,12 +756,12 @@ object Science:
         case Some(CalibrationRole.SpectroPhotometric) =>
           val configʹ = calibrationObservationConfig(config)
           extractTime
-            .map(_.copy(exposureCount = NonNegInt.unsafeFrom(configʹ.wavelengthDithers.length)))
+            .map(_.copy(exposureCount = PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))))
             .tupleLeft(configʹ)
 
         case Some(CalibrationRole.Twilight)           =>
           val configʹ = calibrationObservationConfig(config)
-          val timeʹ   = IntegrationTime(TwilightExposureTime, NonNegInt.unsafeFrom(configʹ.wavelengthDithers.length))
+          val timeʹ   = IntegrationTime(TwilightExposureTime, PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1)))
           (configʹ, timeʹ).asRight[OdbError]
 
         case Some(c)                                  =>

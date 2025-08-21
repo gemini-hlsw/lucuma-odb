@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -37,12 +37,12 @@ import lucuma.odb.util.Codecs.step_id
 import skunk.*
 import skunk.implicits.*
 
-class executionSciGmosNorth extends ExecutionTestSupportForGmos {
+class executionSciGmosNorth extends ExecutionTestSupportForGmos:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      NonNegInt.unsafeFrom(10)
+      PosInt.unsafeFrom(10)
     )
 
   def adjustment(Δλnm: Int, qArcsec: Int): Science.Adjustment =
@@ -51,116 +51,88 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(qArcsec))
     )
 
-  test("simple generation - limited future") {
+  test("simple generation - limited future"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
+      yield o
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(1.some)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 1.some),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "gmosNorth" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, p = 0, q = 0, exposures = 3),
-                      "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, p = 0, q = 15, exposures = 3)).asJson,
-                      "hasMore" -> true.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "gmosNorth" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, p = 0, q = 0, exposures = 3),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, p = 0, q = 15, exposures = 3)).asJson,
+                  "hasMore" -> true.asJson
                 )
               )
             )
           ).asRight
       )
-  }
 
-  test("simple generation - unlimited future") {
+  test("simple generation - unlimited future"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      } yield o
+      yield o
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "gmosNorth" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" ->
-                        gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 3),
-                      "possibleFuture" -> List(
-                        gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-                        gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                        gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "gmosNorth" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" ->
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 3),
+                  "possibleFuture" -> List(
+                    gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
           ).asRight
       )
-  }
 
   private val ExpectedAfterCalsAndOneScience: Json =
     Json.obj(
-      "observation" -> Json.obj(
-        "execution" -> Json.obj(
-          "config" -> Json.obj(
-            "gmosNorth" -> Json.obj(
-              "science" -> Json.obj(
-                "nextAtom" ->
-                  Json.obj(
-                    "description" -> s"0.000 nm, 0.000000″".asJson,
-                    "observeClass" -> "SCIENCE".asJson,
-                    "steps" -> List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)).asJson
-                  ),
-                "possibleFuture" -> List(
-                  gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-                  gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                  gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
-                ).asJson,
-                "hasMore" -> false.asJson
-              )
-            )
+      "executionConfig" -> Json.obj(
+        "gmosNorth" -> Json.obj(
+          "science" -> Json.obj(
+            "nextAtom" ->
+              Json.obj(
+                "description" -> s"0.000 nm, 0.000000″".asJson,
+                "observeClass" -> "SCIENCE".asJson,
+                "steps" -> List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)).asJson
+              ),
+            "possibleFuture" -> List(
+              gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
+              gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
+              gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+            ).asJson,
+            "hasMore" -> false.asJson
           )
         )
       )
     )
 
-  test("execute arc, flat, one science") {
+  test("execute arc, flat, one science"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -173,27 +145,18 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s1)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-
-      } yield o
+      yield o
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-  }
 
-  test("arc, flat, <1.5 hours>") {
+  test("arc, flat, <1.5 hours>"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -205,7 +168,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         s1 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(0), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s1)
         ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -231,11 +194,10 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       val ultimateCounts = ultimateAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(ultimateCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(ultimateCounts.get(StepType.Science), 1.some)
-  }
 
-  test("arc, flat, science, <1.5 hours>") {
+  test("arc, flat, science, <1.5 hours>"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -249,7 +211,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthScience(0), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
         ic <- generateAfterOrFail(p, o, Science.CalValidityPeriod +| 1.secondTimeSpan)
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -266,7 +228,6 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       val counts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(counts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(counts.get(StepType.Science), 3.some)
-  }
 
   // Adjust the timestamp of step records precisely
   def adjustStepTime(s: Step.Id, t: Timestamp): IO[Unit] =
@@ -280,9 +241,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
     withSession: session =>
       session.execute(query)(s, t).void
 
-  test("arc, flat, <1.5 hours>, science") {
+  test("arc, flat, <1.5 hours>, science"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -307,7 +268,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         _  <- adjustStepTime(s2, timestamp)
 
         ic <- generateOrFail(p, o, when = timestamp.plusMicrosOption(1))
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -328,7 +289,6 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 3.some)
-  }
 
   // About how long it takes to move the science fold into position
   val ScienceFoldTime: TimeSpan = 15.secondTimeSpan
@@ -340,9 +300,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
   val ScienceTime: TimeSpan = 1300.secondTimeSpan
 
   // leave time for just one science
-  test("arc, flat, <1.5 hours - 1*science>") {
+  test("arc, flat, <1.5 hours - 1*science>"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -363,7 +323,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
 
         ic <- generateOrFail(p, o, when = timestamp)
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -382,12 +342,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 3.some)
-  }
 
   // leave time for two science
-  test("arc, flat, <1.5 hours - 2*science>") {
+  test("arc, flat, <1.5 hours - 2*science>"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -408,7 +367,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         timestamp = nw.plusMicrosOption(longDelay.toMicroseconds)
 
         ic <- generateOrFail(p, o, when = timestamp)
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -427,11 +386,10 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
       val lastCounts = lastAtom.steps.groupMapReduce(_.stepConfig.stepType)(_ => 1)
       assertEquals(lastCounts.get(StepType.Gcal), 2.some) // arc + flat
       assertEquals(lastCounts.get(StepType.Science), 2.some)
-  }
 
-  test("we can start anywhere") {
+  test("we can start anywhere"):
     val setup: IO[InstrumentExecutionConfig] =
-      for {
+      for
         p  <- createProgram
         t  <- createTargetWithProfileAs(pi, p)
         o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -450,7 +408,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s2)
 
         ic <- generateOrFail(p, o)
-      } yield ic
+      yield ic
 
     import lucuma.odb.testsyntax.execution.*
 
@@ -479,11 +437,10 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         scienceCount(gn.nextAtom) :: gn.possibleFuture.map(scienceCount),
         List(2, 3, 3, 1)
       )
-  }
 
-  test("order doesn't matter") {
+  test("order doesn't matter"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -497,27 +454,18 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s1)
         s2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthArc(0), ArcStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(s2)
-
-      } yield o
+      yield o
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-  }
 
-  test("irrelevant steps may be inserted") {
+  test("irrelevant steps may be inserted"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -542,27 +490,18 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
         x2 <- recordStepAs(serviceUser, a, Instrument.GmosNorth, gmosNorthFlat(8), FlatStep, gcalTelescopeConfig(0), ObserveClass.NightCal)
         _  <- addEndStepEvent(x2)
-
-      } yield o
+      yield o
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected = ExpectedAfterCalsAndOneScience.asRight
       )
-  }
 
-  test("execute arc, flat, one science, fail the flat") {
+  test("execute arc, flat, one science, fail the flat"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -578,57 +517,44 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
         d  <- recordDatasetAs(serviceUser, s1, "N20240905S1000.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
-
-      } yield o
+      yield o
 
     // since the atom is still in progress, finish out the science datasets to
     // avoid moving the science fold.  then add the failed flat
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "gmosNorth" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" ->
-                        Json.obj(
-                          "description" -> s"0.000 nm, 0.000000″".asJson,
-                          "observeClass" -> "SCIENCE".asJson,
-                          "steps" -> (
-                            List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)) :+
-                            gmosNorthExpectedFlat(ditherNm = 0, p = 0, q = 0)  // repeat the flat
-                          ).asJson
-                        ),
-                      "possibleFuture" -> List(
-                        gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
-                        gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                        gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "gmosNorth" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" ->
+                    Json.obj(
+                      "description" -> s"0.000 nm, 0.000000″".asJson,
+                      "observeClass" -> "SCIENCE".asJson,
+                      "steps" -> (
+                        List.fill(2)(gmosNorthExpectedScience(ditherNm = 0, p = 0, q = 0)) :+
+                        gmosNorthExpectedFlat(ditherNm = 0, p = 0, q = 0)  // repeat the flat
+                      ).asJson
+                    ),
+                  "possibleFuture" -> List(
+                    gmosNorthExpectedScienceAtom(ditherNm =  5, p = 0, q =  15, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 1)
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
           ).asRight
       )
-  }
 
-  test("execute the first atom, a step of the second, then fail a science dataset from the first") {
+  test("execute the first atom, a step of the second, then fail a science dataset from the first"):
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -657,58 +583,44 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
         d  <- recordDatasetAs(serviceUser, s2, "N20240905S1001.fits")
         _  <- setQaState(d, DatasetQaState.Usable)
-
-      } yield o
+      yield o
 
     // since the atom is done, redo the failed step at the end
-
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${gmosNorthScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "gmosNorth" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" ->
-                        Json.obj(
-                          "description" -> s"5.000 nm, 15.000000″".asJson,
-                          "observeClass" -> "SCIENCE".asJson,
-                          "steps" -> (
-                            List.fill(2)(gmosNorthExpectedScience(ditherNm = 5, p = 0, q = 15))
-                          ).asJson
-                        ),
-                      "possibleFuture" -> List(
-                        gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
-                        gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 2)  // 1 left over, 1 to make up failure
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "gmosNorth" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" ->
+                    Json.obj(
+                      "description" -> s"5.000 nm, 15.000000″".asJson,
+                      "observeClass" -> "SCIENCE".asJson,
+                      "steps" -> (
+                        List.fill(2)(gmosNorthExpectedScience(ditherNm = 5, p = 0, q = 15))
+                      ).asJson
+                    ),
+                  "possibleFuture" -> List(
+                    gmosNorthExpectedScienceAtom(ditherNm = -5, p = 0, q = -15, exposures = 3),
+                    gmosNorthExpectedScienceAtom(ditherNm =  0, p = 0, q =   0, exposures = 2)  // 1 left over, 1 to make up failure
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
           ).asRight
       )
-  }
 
   def nextAtomId(p: Program.Id, o: Observation.Id): IO[Atom.Id] =
     import lucuma.odb.testsyntax.execution.*
     generateOrFail(p, o, 5.some).map(_.gmosNorthScience.nextAtom.id)
 
-  test("nextAtom id doesn't change while executing") {
+  test("nextAtom id doesn't change while executing"):
     val setup: IO[(List[Atom.Id], List[Atom.Id])] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
@@ -748,20 +660,16 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         _  <- addEndStepEvent(s5)
 
         x6 <- nextAtomId(p, o)
+      yield (List(x0, x1, x2, x3, x4), List(x5, x6))
 
-      } yield (List(x0, x1, x2, x3, x4), List(x5, x6))
-
-    setup.map { (firstAtomIds, secondAtomIds) =>
+    setup.map: (firstAtomIds, secondAtomIds) =>
       assertEquals(firstAtomIds.distinct.length, 1, "first")
       assertEquals(secondAtomIds.distinct.length, 1, "second")
-    }
 
-  }
-
-  test("explicit offsets") {
+  test("explicit offsets"):
 
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithModeAs(pi, p, List(t),
@@ -780,7 +688,8 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
             }
           """
         )
-      } yield o
+        _ <- runObscalcUpdate(p, o)
+      yield o
 
     def telescopeConfig(arcsec: Int): Json =
       json"""
@@ -831,39 +740,41 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
                observation(observationId: "$oid") {
                  execution {
                    digest {
-                     science {
-                       offsets {
-                         q { arcseconds }
+                     value {
+                       science {
+                         offsets {
+                           q { arcseconds }
+                         }
                        }
                      }
                    }
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           description
-                           steps {
-                             stepConfig {
-                               stepType
-                             }
-                             telescopeConfig {
-                               offset {
-                                 q { arcseconds }
-                               }
-                             }
+                 }
+               }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       description
+                       steps {
+                         stepConfig {
+                           stepType
+                         }
+                         telescopeConfig {
+                           offset {
+                             q { arcseconds }
                            }
                          }
-                         possibleFuture {
-                           description
-                           steps {
-                             stepConfig {
-                               stepType
-                             }
-                             telescopeConfig {
-                               offset {
-                                 q { arcseconds }
-                               }
-                             }
+                       }
+                     }
+                     possibleFuture {
+                       description
+                       steps {
+                         stepConfig {
+                           stepType
+                         }
+                         telescopeConfig {
+                           offset {
+                             q { arcseconds }
                            }
                          }
                        }
@@ -879,43 +790,44 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
               "observation": {
                 "execution": {
                   "digest": {
-                    "science": {
-                      "offsets": [
-                        {
-                          "q": { "arcseconds": -20.000000 }
-                        },
-                        {
-                          "q": { "arcseconds": 0.000000 }
-                        },
-                        {
-                          "q": { "arcseconds": 20.000000 }
-                        }
-                      ]
-                    }
-                  },
-                  "config": {
-                    "gmosNorth": {
+                    "value": {
                       "science": {
-                        "nextAtom": ${atom(0, -20, 3)},
-                        "possibleFuture": ${List(
-                          atom( 5,   0, 3),
-                          atom(-5,  20, 3),
-                          atom( 0, -20, 1)
-                        )}
+                        "offsets": [
+                          {
+                            "q": { "arcseconds": -20.000000 }
+                          },
+                          {
+                            "q": { "arcseconds": 0.000000 }
+                          },
+                          {
+                            "q": { "arcseconds": 20.000000 }
+                          }
+                        ]
                       }
                     }
+                  }
+                }
+              },
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": ${atom(0, -20, 3)},
+                    "possibleFuture": ${List(
+                      atom( 5,   0, 3),
+                      atom(-5,  20, 3),
+                      atom( 0, -20, 1)
+                    )}
                   }
                 }
               }
             }
           """.asRight
       )
-  }
 
-  test("explicit wavelength dithers") {
+  test("explicit wavelength dithers"):
 
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithModeAs(pi, p, List(t),
@@ -934,7 +846,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
             }
           """
         )
-      } yield o
+      yield o
 
     def step(nm: Int): Json =
       json"""
@@ -964,29 +876,25 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           description
-                           steps {
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength { nanometers }
-                               }
-                             }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       description
+                       steps {
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength { nanometers }
                            }
                          }
-                         possibleFuture {
-                           description
-                           steps {
-                             instrumentConfig {
-                               gratingConfig {
-                                 wavelength { nanometers }
-                               }
-                             }
+                       }
+                     }
+                     possibleFuture {
+                       description
+                       steps {
+                         instrumentConfig {
+                           gratingConfig {
+                             wavelength { nanometers }
                            }
                          }
                        }
@@ -999,31 +907,26 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": ${atom(-7, 0, 3)},
-                        "possibleFuture": ${List(
-                          atom(0,  15, 3),
-                          atom(7, -15, 3),
-                          atom(-7,  0, 1)
-                        )}
-                      }
-                    }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": ${atom(-7, 0, 3)},
+                    "possibleFuture": ${List(
+                      atom(0,  15, 3),
+                      atom(7, -15, 3),
+                      atom(-7,  0, 1)
+                    )}
                   }
                 }
               }
             }
           """.asRight
       )
-  }
 
-  test("select min x-binning") {
+  test("select min x-binning"):
     val gaussianProfile = gaussianBandNormalizedProfile(Angle.fromMicroarcseconds(647_200L))
     val setup: IO[Observation.Id] =
-      for {
+      for
         p  <- createProgram
         t0 <- createTargetWithProfileAs(pi, p, gaussianProfile)  // X-binning of 4
         t1 <- createTargetWithProfileAs(pi, p)  // X-binning of 1
@@ -1041,7 +944,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
                  }
                """
              )
-      } yield o
+      yield o
 
     val step: Json =
       json"""
@@ -1061,19 +964,15 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           steps {
-                             instrumentConfig {
-                               readout {
-                                 xBin
-                                 yBin
-                               }
-                             }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       steps {
+                         instrumentConfig {
+                           readout {
+                             xBin
+                             yBin
                            }
                          }
                        }
@@ -1086,15 +985,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "steps": ${List.fill(5)(step)}
-                        }
-                      }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "steps": ${List.fill(5)(step)}
                     }
                   }
                 }
@@ -1102,12 +997,11 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
             }
           """.asRight
       )
-  }
 
-  test("duplicate offsets and dithers") {
+  test("duplicate offsets and dithers"):
 
     val setup: IO[Observation.Id] =
-      for {
+      for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithModeAs(pi, p, List(t),
@@ -1143,8 +1037,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
         s2 <- recordStepAs(serviceUser, a0, Instrument.GmosNorth, gmosNorthScience(5), StepConfig.Science, sciTelescopeConfig(0), ObserveClass.Science)
         _  <- addEndStepEvent(s2)
-
-      } yield o
+      yield o
 
     def telescopeConfigJson(arcsec: Int): Json =
       json"""
@@ -1192,35 +1085,31 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         query =
           s"""
              query {
-               observation(observationId: "$oid") {
-                 execution {
-                   config {
-                     gmosNorth {
-                       science {
-                         nextAtom {
-                           description
-                           steps {
-                             stepConfig {
-                               stepType
-                             }
-                             telescopeConfig {
-                               offset {
-                                 q { arcseconds }
-                               }
-                             }
+               executionConfig(observationId: "$oid") {
+                 gmosNorth {
+                   science {
+                     nextAtom {
+                       description
+                       steps {
+                         stepConfig {
+                           stepType
+                         }
+                         telescopeConfig {
+                           offset {
+                             q { arcseconds }
                            }
                          }
-                         possibleFuture {
-                           description
-                           steps {
-                             stepConfig {
-                               stepType
-                             }
-                             telescopeConfig {
-                               offset {
-                                 q { arcseconds }
-                               }
-                             }
+                       }
+                     }
+                     possibleFuture {
+                       description
+                       steps {
+                         stepConfig {
+                           stepType
+                         }
+                         telescopeConfig {
+                           offset {
+                             q { arcseconds }
                            }
                          }
                        }
@@ -1233,29 +1122,24 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "gmosNorth": {
-                      "science": {
-                        "nextAtom": {
-                          "description": ${s"5.000 nm, 0.000000″".asJson},
-                          "steps": ${List.fill(2)(scienceStepJson(0))}
-                        },
-                        "possibleFuture": ${List(
-                          atom(5, 0, 3),
-                          atom(5, 0, 3),
-                          atom(5, 0, 1)
-                        )}
-                      }
-                    }
+              "executionConfig": {
+                "gmosNorth": {
+                  "science": {
+                    "nextAtom": {
+                      "description": ${s"5.000 nm, 0.000000″".asJson},
+                      "steps": ${List.fill(2)(scienceStepJson(0))}
+                    },
+                    "possibleFuture": ${List(
+                      atom(5, 0, 3),
+                      atom(5, 0, 3),
+                      atom(5, 0, 1)
+                    )}
                   }
                 }
               }
             }
           """.asRight
       )
-    }
 
   def firstAcquisitionStepId(p: Program.Id, o: Observation.Id): IO[Step.Id] =
     import lucuma.odb.testsyntax.execution.*
@@ -1364,5 +1248,3 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos {
 
       checkAtom("Atom 0", atom0Ids)
       checkAtom("Atom 1", atom1Ids)
-
-}

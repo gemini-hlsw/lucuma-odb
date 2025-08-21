@@ -31,7 +31,6 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.ItcService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.SuperUserAccess
 import skunk.Transaction
 
 import table.AttachmentTable
@@ -86,8 +85,7 @@ trait ObservationMapping[F[_]]
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
-      EffectField("workflow", workflowQueryHandler, List("id", "programId")),
-      SqlObject("calculatedWorkflow", Join(ObservationView.Id, ObscalcTable.ObservationId))
+      SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId))
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -158,33 +156,6 @@ trait ObservationMapping[F[_]]
     services.useTransactionally:
       query.value
 
-  }
-
-  lazy val workflowQueryHandler: EffectHandler[F] = { pairs =>
-
-    // Here's the collection of stuff we need to deal with: an oid, the parent
-    // cursor, and the child context.
-    val sequence: ResultT[F, List[(Observation.Id, Cursor, Context)]] =
-      ResultT.fromResult:
-        pairs.traverse: (query, cursor) =>
-          for {
-            o <- cursor.fieldAs[Observation.Id]("id")
-            c <- Query.childContext(cursor.context, query)
-          } yield (o, cursor, c)
-
-    // Pass the oids to observationWorkflowService.getWorkflows to get the
-    // applicable workflows for each, then use this information to construct
-    // our list of outgoing cursors.
-    def query(using Services[F], SuperUserAccess): ResultT[F, List[Cursor]] =
-      sequence.flatMap: tuples =>
-        ResultT(observationWorkflowService.getWorkflows(tuples.map(_._1), commitHash, itcClient, timeEstimateCalculator)).map: reqs =>
-          tuples.map: (key, cursor, childContext) =>
-            CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
-
-    // Do it!
-    services.use: s =>
-      Services.asSuperUser:
-        query(using s).value
   }
 
 }

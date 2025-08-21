@@ -8,7 +8,6 @@ import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import coulomb.Quantity
-import eu.timepit.refined.types.numeric.PosDouble
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -26,13 +25,10 @@ import lucuma.core.enums.Site
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.ImageQuality
-import lucuma.core.model.SourceProfile
 import lucuma.core.optics.Format
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.sequence.gmos.longslit.Config
 
 import scala.util.Try
 
@@ -67,15 +63,15 @@ object GmosLongSlitInput {
       explicitAmpGain:        Option[GmosAmpGain],
       explicitRoi:            Option[GmosRoi],
       explicitλDithers:       Option[List[WavelengthDither]],
-      explicitSpatialOffsets: Option[List[Q]]
+      explicitOffsets:        Option[List[Q]]
     ) {
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedSpatialOffsets: Option[String] =
-        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
+      val formattedOffsets: Option[String] =
+        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -84,37 +80,9 @@ object GmosLongSlitInput {
       filter:  Option[GmosNorthFilter],
       fpu:     GmosNorthFpu,
       common:  Common
-    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] {
-
+    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
-
-      /**
-       * Creates a GMOS long slit observing mode based on input parameters.
-       */
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): Config.GmosNorth =
-        Config.GmosNorth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          grating,
-          filter,
-          fpu,
-          common.centralWavelength,
-          common.explicitXBin,
-          common.explicitYBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.explicitλDithers,
-          common.explicitSpatialOffsets
-        )
-
-    }
 
     object North {
 
@@ -131,7 +99,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(North(
               grating,
@@ -145,7 +113,7 @@ object GmosLongSlitInput {
                 exAmpGain.toOption,
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
-                exSpatialOffsets.toOption
+                exOffsets.toOption
               )
             ))
           case _ =>
@@ -159,37 +127,9 @@ object GmosLongSlitInput {
       filter:  Option[GmosSouthFilter],
       fpu:     GmosSouthFpu,
       common:  Common
-    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] {
-
+    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
-
-      /**
-       * Creates a GMOS long slit observing mode based on input parameters.
-       */
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): Config.GmosSouth =
-        Config.GmosSouth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          grating,
-          filter,
-          fpu,
-          common.centralWavelength,
-          common.explicitXBin,
-          common.explicitYBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.explicitλDithers,
-          common.explicitSpatialOffsets
-        )
-
-    }
 
     object South {
 
@@ -206,7 +146,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(South(
               grating,
@@ -220,7 +160,7 @@ object GmosLongSlitInput {
                 exAmpGain.toOption,
                 exRoi.toOption,
                 exWavelengthDithers.toOption,
-                exSpatialOffsets.toOption
+                exOffsets.toOption
               )
             ))
           case _ =>
@@ -242,7 +182,7 @@ object GmosLongSlitInput {
       explicitAmpGain:        Nullable[GmosAmpGain],
       explicitRoi:            Nullable[GmosRoi],
       explicitλDithers:       Nullable[List[WavelengthDither]],
-      explicitSpatialOffsets: Nullable[List[Q]]
+      explicitOffsets:        Nullable[List[Q]]
     ) {
 
       def toCreate(site: Site): Result[Create.Common] =
@@ -255,7 +195,7 @@ object GmosLongSlitInput {
             explicitAmpGain.toOption,
             explicitRoi.toOption,
             explicitλDithers.toOption,
-            explicitSpatialOffsets.toOption
+            explicitOffsets.toOption
           )
         }
 
@@ -263,8 +203,8 @@ object GmosLongSlitInput {
       val formattedλDithers: Nullable[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedSpatialOffsets: Nullable[String] =
-        explicitSpatialOffsets.map(SpatialOffsetsFormat.reverseGet)
+      val formattedOffsets: Nullable[String] =
+        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
 
     }
 
@@ -311,7 +251,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(North(
               grating,
@@ -325,7 +265,7 @@ object GmosLongSlitInput {
                 exAmpGain,
                 exRoi,
                 exWavelengthDithers,
-                exSpatialOffsets
+                exOffsets
               )
             ))
 
@@ -366,7 +306,7 @@ object GmosLongSlitInput {
             exAmpGain,
             exRoi,
             exWavelengthDithers,
-            exSpatialOffsets
+            exOffsets
             ) =>
             Result(South(
               grating,
@@ -380,7 +320,7 @@ object GmosLongSlitInput {
                 exAmpGain,
                 exRoi,
                 exWavelengthDithers,
-                exSpatialOffsets
+                exOffsets
               )
             ))
 
@@ -414,6 +354,7 @@ object GmosLongSlitInput {
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
+        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
         OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
       ) => (
         rGrating,
@@ -426,7 +367,9 @@ object GmosLongSlitInput {
         rExplicitAmpGain,
         rExplicitRoi,
         rWavelengthDithers,
-        rSpatialOffsets
+        (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
+          offsets.orElse(spatialOffsets)
+        }
       ).parTupled
     }
 
@@ -455,6 +398,7 @@ object GmosLongSlitInput {
           GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
           GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
           WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
+          OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
           OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets)
         ) => (
           rGrating,
@@ -467,8 +411,9 @@ object GmosLongSlitInput {
           rExplicitAmpGain,
           rExplicitRoi,
           rWavelengthDithers,
-          rSpatialOffsets
+          (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
+            offsets.orElse(spatialOffsets)
+          }
         ).parTupled
       }
 }
-

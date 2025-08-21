@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.Breakpoint
@@ -29,37 +29,33 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
   val ExposureTime: TimeSpan = 2.secTimeSpan
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(1))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(1))
 
   val InitialAcquisition: Json =
     json"""
       {
-        "observation": {
-          "execution": {
-            "config": {
-              "flamingos2": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0,  0)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
+        "executionConfig": {
+          "flamingos2": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${flamingos2ExpectedAcq(Flamingos2AcqImage, ExposureTime,    0,  0)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
+                ]
+              },
+              "possibleFuture": [
+                {
+                  "description": "Fine Adjustments",
+                  "observeClass": "ACQUISITION",
+                  "steps": [
+                    ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+                  ]
                 }
-              }
+              ],
+              "hasMore": false
             }
           }
         }
@@ -69,30 +65,26 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
   val FineAdjustments: Json =
     json"""
       {
-        "observation": {
-          "execution": {
-            "config": {
-              "flamingos2": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Fine Adjustments",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                    ]
-                  },
-                  "possibleFuture": [
-                    {
-                      "description": "Fine Adjustments",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
-                      ]
-                    }
-                  ],
-                  "hasMore": false
+        "executionConfig": {
+          "flamingos2": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Fine Adjustments",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+                ]
+              },
+              "possibleFuture": [
+                {
+                  "description": "Fine Adjustments",
+                  "observeClass": "ACQUISITION",
+                  "steps": [
+                    ${flamingos2ExpectedAcq(Flamingos2AcqSlit, ExposureTime, 0, 0)}
+                  ]
                 }
-              }
+              ],
+              "hasMore": false
             }
           }
         }
@@ -109,15 +101,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2AcquisitionQuery(None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
 
@@ -138,15 +123,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
 
@@ -172,15 +150,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = FineAdjustments.asRight
       )
 
@@ -200,43 +171,32 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "flamingos2": {
-                      "acquisition": {
-                        "nextAtom": {
-                          "description": "Initial Acquisition",
-                          "observeClass": "ACQUISITION",
-                          "steps": [
-                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
-                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
-                          ]
-                        },
-                        "possibleFuture": [
-                          {
-                            "description": "Fine Adjustments",
-                            "observeClass": "ACQUISITION",
-                            "steps": [
-                              ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime, 0,  0)}
-                            ]
-                          }
-                        ],
-                        "hasMore": false
+              "executionConfig": {
+                "flamingos2": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "observeClass": "ACQUISITION",
+                      "steps": [
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "description": "Fine Adjustments",
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime, 0,  0)}
+                        ]
                       }
-                    }
+                    ],
+                    "hasMore": false
                   }
                 }
               }
@@ -271,15 +231,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = FineAdjustments.asRight
       )
 
@@ -309,15 +262,8 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected = InitialAcquisition.asRight
       )
 
@@ -345,43 +291,32 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${excutionConfigQuery("flamingos2", "acquisition", Flamingos2AtomQuery, None)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2AcquisitionQuery(oid),
         expected =
           json"""
             {
-              "observation": {
-                "execution": {
-                  "config": {
-                    "flamingos2": {
-                      "acquisition": {
-                        "nextAtom": {
-                          "description": "Initial Acquisition",
-                          "observeClass": "ACQUISITION",
-                          "steps": [
-                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
-                            ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
-                          ]
-                        },
-                        "possibleFuture": [
-                          {
-                            "description": "Fine Adjustments",
-                            "observeClass": "ACQUISITION",
-                            "steps": [
-                              ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0)}
-                            ]
-                          }
-                        ],
-                        "hasMore": false
+              "executionConfig": {
+                "flamingos2": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "observeClass": "ACQUISITION",
+                      "steps": [
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  10.secTimeSpan, 10,  0)},
+                        ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0, Breakpoint.Enabled)}
+                      ]
+                    },
+                    "possibleFuture": [
+                      {
+                        "description": "Fine Adjustments",
+                        "observeClass": "ACQUISITION",
+                        "steps": [
+                          ${flamingos2ExpectedAcq(Flamingos2AcqSlit,  ExposureTime,    0,  0)}
+                        ]
                       }
-                    }
+                    ],
+                    "hasMore": false
                   }
                 }
               }

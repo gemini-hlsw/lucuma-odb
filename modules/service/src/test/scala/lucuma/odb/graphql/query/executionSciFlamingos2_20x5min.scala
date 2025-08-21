@@ -6,8 +6,7 @@ package lucuma.odb.graphql.query
 import cats.effect.Clock
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
@@ -35,7 +34,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, NonNegInt.unsafeFrom(20))
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(20))
 
   val abba = flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled))
 
@@ -49,34 +48,23 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> abba,
-                      "possibleFuture" -> List(
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15)),
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> abba,
+                  "possibleFuture" -> List(
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15)),
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -136,33 +124,22 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> abba,
-                      "possibleFuture" -> List(
-                        abba,
-                        flamingos2ExpectedGcals((0, 15)),
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> abba,
+                  "possibleFuture" -> List(
+                    abba,
+                    flamingos2ExpectedGcals((0, 15)),
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -184,32 +161,21 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> abba,
-                      "possibleFuture" -> List(
-                        flamingos2ExpectedGcals((0, 15)),
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> abba,
+                  "possibleFuture" -> List(
+                    flamingos2ExpectedGcals((0, 15)),
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -232,31 +198,20 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
-                      "possibleFuture" -> List(
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
+                  "possibleFuture" -> List(
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -280,30 +235,19 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> abba,
-                      "possibleFuture" -> List(
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> abba,
+                  "possibleFuture" -> List(
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -328,29 +272,18 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> abba,
-                      "possibleFuture" -> List(
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> abba,
+                  "possibleFuture" -> List(
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
@@ -376,33 +309,21 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
-                      "possibleFuture" -> List.empty[Json].asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
+                  "possibleFuture" -> List.empty[Json].asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )
           ).asRight
       )
-
 
   test("after end-science cals"):
     val setup: IO[Observation.Id] =
@@ -424,24 +345,13 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.Null
-                  )
-                )
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.Null
               )
             )
           ).asRight
@@ -462,39 +372,28 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
 
     setup.flatMap: oid =>
       expect(
-        user  = pi,
-        query =
-          s"""
-             query {
-               observation(observationId: "$oid") {
-                 ${flamingos2ScienceQuery(none)}
-               }
-             }
-           """,
+        user     = pi,
+        query    = flamingos2ScienceQuery(oid),
         expected =
           Json.obj(
-            "observation" -> Json.obj(
-              "execution" -> Json.obj(
-                "config" -> Json.obj(
-                  "flamingos2" -> Json.obj(
-                    "science" -> Json.obj(
-                      "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-                      "possibleFuture" -> List(
-                        // Gcals to finish up the "stopped" block
-                        flamingos2ExpectedGcals((0, 15)),
+            "executionConfig" -> Json.obj(
+              "flamingos2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
+                  "possibleFuture" -> List(
+                    // Gcals to finish up the "stopped" block
+                    flamingos2ExpectedGcals((0, 15)),
 
-                        // New block.  In theory the operator or scheduler will
-                        // stop after the gcals.  At any rate, only 80 minutes
-                        // remaining so no mid-period calibration
-                        abba,
-                        abba,
-                        abba,
-                        abba,
-                        flamingos2ExpectedGcals((0, 15))
-                      ).asJson,
-                      "hasMore" -> false.asJson
-                    )
-                  )
+                    // New block.  In theory the operator or scheduler will
+                    // stop after the gcals.  At any rate, only 80 minutes
+                    // remaining so no mid-period calibration
+                    abba,
+                    abba,
+                    abba,
+                    abba,
+                    flamingos2ExpectedGcals((0, 15))
+                  ).asJson,
+                  "hasMore" -> false.asJson
                 )
               )
             )

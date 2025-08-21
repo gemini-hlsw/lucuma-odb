@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -20,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.core.model.UserProfile
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
+import lucuma.refined.*
 
 class updateProgramUsers extends OdbSuite:
 
@@ -186,27 +188,13 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
-  def quotedOption(o: Option[String]): String =
-    o.fold("null")(s => s"\"$s\"")
-
-  def profileInput(o: Option[UserProfile]): String =
-    o.fold("null"): up =>
-      s"""
-        {
-          givenName: ${quotedOption(up.givenName)}
-          familyName: ${quotedOption(up.familyName)}
-          creditName: ${quotedOption(up.creditName)}
-          email: ${quotedOption(up.email)}
-        }
-      """
-
-  def updateFallback(p: Program.Id, u: User, profile: Option[UserProfile]): String =
+  def updateUserAffiliation(p: Program.Id, u: User, affiliation: Option[NonEmptyString]): String =
     s"""
       mutation {
         updateProgramUsers(
           input: {
             SET: {
-              fallbackProfile: ${profileInput(profile)}
+              affiliation: ${quotedOption(affiliation.map(_.value))}
             }
             WHERE: {
               user: {
@@ -221,7 +209,48 @@ class updateProgramUsers extends OdbSuite:
           programUsers {
             program { id }
             user { id }
-            fallbackProfile {
+            affiliation
+          }
+        }
+      }
+    """
+
+  def quotedOption(o: Option[String]): String =
+    o.fold("null")(s => s"\"$s\"")
+
+  def profileInput(o: Option[UserProfile]): String =
+    o.fold("null"): up =>
+      s"""
+        {
+          givenName: ${quotedOption(up.givenName)}
+          familyName: ${quotedOption(up.familyName)}
+          creditName: ${quotedOption(up.creditName)}
+          email: ${quotedOption(up.email)}
+        }
+      """
+
+  def updatePreferred(p: Program.Id, u: User, profile: Option[UserProfile]): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              preferredProfile: ${profileInput(profile)}
+            }
+            WHERE: {
+              user: {
+                id: { EQ: "${u.id}" }
+              },
+              program: {
+                id: { EQ: "${p.show}" }
+              }
+            }
+          }
+        ) {
+          programUsers {
+            program { id }
+            user { id }
+            preferredProfile {
               givenName
               familyName
               creditName
@@ -232,13 +261,13 @@ class updateProgramUsers extends OdbSuite:
       }
     """
 
-  def updateFallbackEmail(p: Program.Id, u: User, email: Option[String]): String =
+  def updatePreferredEmail(p: Program.Id, u: User, email: Option[String]): String =
     s"""
       mutation {
         updateProgramUsers(
           input: {
             SET: {
-              fallbackProfile: {
+              preferredProfile: {
                 email: ${quotedOption(email)}
               }
             }
@@ -255,7 +284,7 @@ class updateProgramUsers extends OdbSuite:
           programUsers {
             program { id }
             user { id }
-            fallbackProfile {
+            preferredProfile {
               email
             }
           }
@@ -307,6 +336,19 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
+  def expectedAffiliation(ts: (Program.Id, User, Option[NonEmptyString])*): Json =
+    Json.obj(
+      "updateProgramUsers" -> Json.obj(
+        "programUsers" -> ts.toList.map { case (pid, user, affiliation) =>
+          Json.obj(
+            "program"     -> Json.obj("id" -> pid.asJson),
+            "user"        -> Json.obj("id" -> user.id.asJson),
+            "affiliation" -> affiliation.map(_.value).asJson
+          )
+        }.asJson
+      )
+    )
+
   def expectedDataAccess(ts: (Program.Id, User, Boolean)*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
@@ -333,7 +375,7 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
-  def expectedFallback(ts: (Program.Id, User, Option[UserProfile])*): Json =
+  def expectedPreferred(ts: (Program.Id, User, Option[UserProfile])*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
         "programUsers" -> ts.toList.map { case (pid, user, prof) =>
@@ -341,7 +383,7 @@ class updateProgramUsers extends OdbSuite:
            Json.obj(
              "program" -> Json.obj("id" -> pid.asJson),
              "user"    -> Json.obj("id" -> user.id.asJson),
-             "fallbackProfile" -> Json.obj(
+             "preferredProfile" -> Json.obj(
                "givenName"  -> p.givenName.fold(Json.Null)(_.asJson),
                "familyName" -> p.familyName.fold(Json.Null)(_.asJson),
                "creditName" -> p.creditName.fold(Json.Null)(_.asJson),
@@ -352,14 +394,14 @@ class updateProgramUsers extends OdbSuite:
       )
     )
 
-  def expectedFallbackEmail(ts: (Program.Id, User, Option[String])*): Json =
+  def expectedPreferredEmail(ts: (Program.Id, User, Option[String])*): Json =
     Json.obj(
       "updateProgramUsers" -> Json.obj(
         "programUsers" -> ts.toList.map { case (pid, user, email) =>
            Json.obj(
              "program" -> Json.obj("id" -> pid.asJson),
              "user"    -> Json.obj("id" -> user.id.asJson),
-             "fallbackProfile" -> Json.obj(
+             "preferredProfile" -> Json.obj(
                "email" -> email.fold(Json.Null)(_.asJson)
              )
            )
@@ -436,6 +478,26 @@ class updateProgramUsers extends OdbSuite:
           expected = expectedThesis((pid, pi3, true)).asRight
         )
 
+  test("update coi affiliation"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserAffiliation(pid, pi3, Some("UTFSM".refined)),
+          expected = expectedAffiliation((pid, pi3, Some("UTFSM".refined))).asRight
+        )
+
+  test("update coi affiliation to null"):
+    createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi3.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserAffiliation(pid, pi3, None),
+          expected = expectedAffiliation((pid, pi3, None)).asRight
+        )
+
   test("update coi hasDataAccess flag"):
     createProgramAs(pi3) >> createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
@@ -471,46 +533,46 @@ class updateProgramUsers extends OdbSuite:
       "gprincip@mladabosna.org".some
     )
 
-  test("update fallback"):
+  test("update preferred"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
-          query    = updateFallback(pid, pi2, GavriloPrincip.some),
-          expected = expectedFallback((pid, pi2, GavriloPrincip.some)).asRight
+          query    = updatePreferred(pid, pi2, GavriloPrincip.some),
+          expected = expectedPreferred((pid, pi2, GavriloPrincip.some)).asRight
         )
 
-  test("unset fallback"):
+  test("unset preferred"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
-        query(pi, updateFallback(pid, pi2, GavriloPrincip.some)) >>
+        query(pi, updatePreferred(pid, pi2, GavriloPrincip.some)) >>
           expect(
             user     = pi,
-            query    = updateFallback(pid, pi2, none),
-            expected = expectedFallback((pid, pi2, none)).asRight
+            query    = updatePreferred(pid, pi2, none),
+            expected = expectedPreferred((pid, pi2, none)).asRight
           )
 
-  test("update fallback email"):
+  test("update preferred email"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi,
-          query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
-          expected = expectedFallbackEmail((pid, pi2, GavriloPrincip.email)).asRight
+          query    = updatePreferredEmail(pid, pi2, GavriloPrincip.email),
+          expected = expectedPreferredEmail((pid, pi2, GavriloPrincip.email)).asRight
         )
 
-  test("unset fallback email"):
+  test("unset preferred email"):
     createProgramAs(pi).flatMap: pid =>
       addProgramUserAs(pi, pid).flatMap: mid =>
         linkUserAs(pi, mid, pi2.id) >>
-        query(pi, updateFallbackEmail(pid, pi2, GavriloPrincip.email)) >>
+        query(pi, updatePreferredEmail(pid, pi2, GavriloPrincip.email)) >>
           expect(
             user     = pi,
-            query    = updateFallbackEmail(pid, pi2, none),
-            expected = expectedFallbackEmail((pid, pi2, none)).asRight
+            query    = updatePreferredEmail(pid, pi2, none),
+            expected = expectedPreferredEmail((pid, pi2, none)).asRight
           )
 
   test("cannot update another pi's partner as a PI"):
@@ -610,6 +672,6 @@ class updateProgramUsers extends OdbSuite:
         linkUserAs(pi, mid, pi2.id) >>
         expect(
           user     = pi2,
-          query    = updateFallbackEmail(pid, pi2, GavriloPrincip.email),
-          expected = expectedFallbackEmail((pid, pi2, GavriloPrincip.email)).asRight
+          query    = updatePreferredEmail(pid, pi2, GavriloPrincip.email),
+          expected = expectedPreferredEmail((pid, pi2, GavriloPrincip.email)).asRight
         )
