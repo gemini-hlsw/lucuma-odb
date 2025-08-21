@@ -302,7 +302,6 @@ object GuideService {
   )(using Services[F]): GuideService[F] =
     new GuideService[F] {
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAsterism(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F], SuperUserAccess
       ): F[Result[NonEmptyList[Target]]] =
@@ -316,7 +315,6 @@ object GuideService {
               .toResult(generalError(s"No targets have been defined for observation $oid.").asProblem)
           )
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getObservationInfo(oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[ObservationInfo]] = {
@@ -330,7 +328,6 @@ object GuideService {
           )
       }
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Option[Md5Hash]] = {
@@ -350,7 +347,6 @@ object GuideService {
           .use(_.execute(af.argument).void)
       }
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getAvailabilityPeriods(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
       ): F[List[AvailabilityPeriod]] = {
@@ -390,7 +386,6 @@ object GuideService {
           .use(_.option(af.argument))
           .map(_.fold(OdbError.InvalidObservation(oid).asFailure)(_.success))
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
       ): F[ContiguousTimestampMap[List[Angle]]] =

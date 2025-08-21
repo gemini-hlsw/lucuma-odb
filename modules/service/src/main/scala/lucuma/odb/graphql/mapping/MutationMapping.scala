@@ -690,7 +690,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   private lazy val UpdateAsterisms: MutationField =
     MutationField("updateAsterisms", UpdateAsterismsInput.binding(Path.from(ObservationType))) { (input, child) =>
 
-      @annotation.nowarn("msg=unused implicit parameter")
       def selectObservations(using Services[F], NoTransaction[F]): F[Result[(AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id], Query)]] =
         selectForUpdate(input, false /* exclude cals */).map { r =>
           r.flatMap { update =>

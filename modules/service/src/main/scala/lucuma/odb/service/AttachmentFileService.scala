@@ -117,7 +117,6 @@ object AttachmentFileService {
       EitherT.right(fa)
 
   extension [F[_]](svcs: Services[F])
-    @annotation.nowarn("msg=unused implicit parameter")
     def transactionallyEitherT[A](
       fa: (Transaction[F], Services[F]) ?=> EitherT[F, AttachmentException, A]
     )(using
