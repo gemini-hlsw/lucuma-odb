@@ -144,7 +144,7 @@ class setObservationWorkflowState
   test("[Opportunity] Defined    <-> Inactive        (proposal accepted)"):
     for {
       cfp <- createCallForProposalsAs(staff)
-      pid <- createProgramAs(pi, "Foo")
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
@@ -152,7 +152,7 @@ class setObservationWorkflowState
       tid <- createOpportunityTargetAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
-      _   <- computeItcResultAs(pi, oid)
+      _   <- runObscalcUpdate(pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(pid, oid, Defined, Inactive)
     } yield ()
