@@ -8,19 +8,19 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
-import lucuma.core.enums.ObservingModeType
-import lucuma.core.util.Enumerated
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.Flamingos2Disperser
-import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.syntax.string.*
+import lucuma.core.util.Enumerated
+import lucuma.odb.graphql.mutation.UpdateConstraintSetOps
 
 class observation_configurationRequests 
   extends OdbSuite 

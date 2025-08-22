@@ -12,11 +12,15 @@ import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Region
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
@@ -26,10 +30,6 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
-import lucuma.core.math.Region
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.Flamingos2Disperser
 
 object configurationrequest:
 

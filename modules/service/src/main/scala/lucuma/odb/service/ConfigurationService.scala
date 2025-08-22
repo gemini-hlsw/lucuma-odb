@@ -41,10 +41,10 @@ import lucuma.odb.util.GmosCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
+import skunk.data.Arr
 import skunk.syntax.all.*
 
 import Services.Syntax.*
-import skunk.data.Arr
 
 trait ConfigurationService[F[_]] {
 
