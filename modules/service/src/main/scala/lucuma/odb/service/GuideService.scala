@@ -611,7 +611,7 @@ object GuideService {
           neededLists  <- ResultT.fromResult:
                             neededPeriods.traverse: p =>
                               tracking match
-                                case None => ???
+                                case None => Result.success(ContiguousTimestampMap.empty[List[Angle]])
                                 case Some(t) => buildAvailabilityList(p, obsInfo, genInfo, genInfo.centralWavelength, asterism, t, candidates, positions)
           availability <- ResultT.fromResult(
                             neededLists.foldLeft(currentAvail.some)((acc, ele) => acc.flatMap(_.union(ele)))
