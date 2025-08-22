@@ -102,7 +102,7 @@ object VisitService:
       ): ResultT[F, ObsDescription] =
         ResultT:
           session.option(Statements.SelectObsDescription)(observationId).map: od =>
-            Result.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found.".some).asProblem)
+            Result.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not associated with any instrument.".some).asProblem)
 
 
       override def lookupOrInsert(
@@ -302,6 +302,7 @@ object VisitService:
                c_calibration_role
           FROM t_observation
          WHERE c_observation_id=$observation_id
+           AND c_instrument IS NOT NULL
       """.query(obs_description)
 
     val InsertVisit: Query[(Observation.Id, ObsDescription), Visit.Id] =
