@@ -40,6 +40,9 @@ ThisBuild / crossScalaVersions := Seq("3.7.2")
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false
 
+val herokuToken = "HEROKU_API_KEY" -> "${{ secrets.HEROKU_API_KEY }}"
+ThisBuild / githubWorkflowEnv += herokuToken
+
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
@@ -81,6 +84,68 @@ ThisBuild / githubWorkflowBuild ~= (_.map(step =>
   else step
 ))
 
+lazy val sbtDockerPublishLocal =
+  WorkflowStep.Sbt(
+    List(
+      "clean",
+      "service/docker:publishLocal",
+      "obscalc/docker:publishLocal",
+      "calibrations/docker:publishLocal",
+      "ssoService/docker:publishLocal"
+    ),
+    name = Some("Build Docker images")
+  )
+
+lazy val herokuOdbAppName = "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}"
+lazy val herokuSsoAppName = "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}"
+
+lazy val herokuPush =
+  WorkflowStep.Run(
+    List(
+      // Login
+      "npm install -g heroku",
+      "heroku container:login",
+      // Tag
+      s"docker tag noirlab/lucuma-sso-service registry.heroku.com/$herokuSsoAppName/web",
+      s"docker tag noirlab/lucuma-odb-service registry.heroku.com/$herokuOdbAppName/web",
+      s"docker tag noirlab/obscalc-service registry.heroku.com/$herokuOdbAppName/obscalc",
+      s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName/calibrations",
+      // Push
+      s"docker push registry.heroku.com/$herokuSsoAppName/web",
+      s"docker push registry.heroku.com/$herokuOdbAppName/web",
+      s"docker push registry.heroku.com/$herokuOdbAppName/obscalc",
+      s"docker push registry.heroku.com/$herokuOdbAppName/calibrations",
+    ),
+    name = Some("Push Docker images to Heroku")
+  )
+
+lazy val herokuRelease =
+  WorkflowStep.Run(
+    List(
+      s"heroku container:release web -a $herokuSsoAppName -v",
+      s"heroku container:release web obscalc calibrations -a $herokuOdbAppName -v"
+    ),
+    name = Some("Release dev app in Heroku")
+  )
+
+val mainCond                 = "github.ref == 'refs/heads/main'"
+val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
+def allConds(conds: String*) = conds.mkString("(", " && ", ")")
+
+ThisBuild / githubWorkflowAddedJobs +=
+  WorkflowJob(
+    "deploy",
+    "Build and publish Docker images / Deploy to Heroku",
+    githubWorkflowJobSetup.value.toList :::
+      sbtDockerPublishLocal ::
+      herokuPush ::
+      herokuRelease ::
+      Nil,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1),
+    cond = Some(allConds(mainCond, geminiRepoCond))
+  )
+
 lazy val ssoFrontendClient =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -119,33 +184,41 @@ lazy val ssoBackendClient = project
 lazy val ssoService = project
   .in(file("modules/sso-service"))
   .dependsOn(ssoBackendClient)
-  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
   .settings(
     name := "lucuma-sso-service",
     libraryDependencies ++= Seq(
-      "org.typelevel"     %% "grackle-skunk"           % grackleVersion,
-      "org.tpolecat"      %% "skunk-core"              % skunkVersion,
-      "org.tpolecat"      %% "skunk-circe"             % skunkVersion,
-      "org.flywaydb"       % "flyway-core"             % flywayVersion,
-      "org.postgresql"     % "postgresql"              % postgresVersion,
-      "org.http4s"        %% "http4s-blaze-server"     % http4sBlazeVersion,
-      "org.http4s"        %% "http4s-ember-client"     % http4sEmberVersion,
-      "org.http4s"        %% "http4s-circe"            % http4sEmberVersion,
-      "org.http4s"        %% "http4s-dsl"              % http4sEmberVersion,
-      "is.cir"            %% "ciris"                   % cirisVersion,
-      "com.monovore"      %% "decline-effect"          % declineVersion,
-      "org.typelevel"     %% "log4cats-slf4j"          % log4catsVersion,
-      "ch.qos.logback"     % "logback-classic"         % logbackVersion,
-      "io.circe"          %% "circe-generic"           % circeVersion,
-      "org.tpolecat"      %% "natchez-honeycomb"       % natchezVersion,
-      "org.tpolecat"      %% "natchez-http4s"          % natchezHttp4sVersion,
-      "org.tpolecat"      %% "natchez-log"             % natchezVersion,
+      "org.typelevel"       %% "grackle-skunk"           % grackleVersion,
+      "org.tpolecat"        %% "skunk-core"              % skunkVersion,
+      "org.tpolecat"        %% "skunk-circe"             % skunkVersion,
+      "org.flywaydb"         % "flyway-core"             % flywayVersion,
+      "org.postgresql"       % "postgresql"              % postgresVersion,
+      "org.http4s"          %% "http4s-blaze-server"     % http4sBlazeVersion,
+      "org.http4s"          %% "http4s-ember-client"     % http4sEmberVersion,
+      "org.http4s"          %% "http4s-circe"            % http4sEmberVersion,
+      "org.http4s"          %% "http4s-dsl"              % http4sEmberVersion,
+      "is.cir"              %% "ciris"                   % cirisVersion,
+      "com.monovore"        %% "decline-effect"          % declineVersion,
+      "org.typelevel"       %% "log4cats-slf4j"          % log4catsVersion,
+      "ch.qos.logback"       % "logback-classic"         % logbackVersion,
+      "io.circe"            %% "circe-generic"           % circeVersion,
+      "org.tpolecat"        %% "natchez-honeycomb"       % natchezVersion,
+      "org.tpolecat"        %% "natchez-http4s"          % natchezHttp4sVersion,
+      "org.tpolecat"        %% "natchez-log"             % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
       "io.circe"            %% "circe-literal"         % circeVersion  % Test,
       "com.disneystreaming" %% "weaver-cats"           % weaverVersion % Test,
       "com.disneystreaming" %% "weaver-scalacheck"     % weaverVersion % Test
     ),
-    testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    reStart / envVars += "PORT" -> "8082",
+    reStartArgs       += "serve",
+    description                     := "Lucuma SSO Service",
+    // Name of the launch script
+    executableScriptName            := "lucuma-sso-service",
+    dockerExposedPorts ++= Seq(8082),
+    // Truncate DYNO on first dot. For web dyno, execute "serve", otherwise execute whatever the dyno type is (eg: "create-service-user" or "create-jwt").
+    bashScriptExtraDefines += """DYNO_TYPE=${DYNO%%.*}; if [[ "$DYNO_TYPE" == "web" ]]; then set -- serve; else set; set -- $DYNO_TYPE $1 $2; fi"""
   )
 
 lazy val schema =
@@ -216,7 +289,7 @@ lazy val smartgcal = project
 lazy val service = project
   .in(file("modules/service"))
   .dependsOn(binding, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
-  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
   .settings(
     name                        := "lucuma-odb-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
@@ -262,27 +335,45 @@ lazy val service = project
       "com.github.vertical-blank" % "sql-formatter"                      % "2.0.5"
     ),
     reStart / envVars += "PORT" -> "8082",
-    reStartArgs += "serve"
+    reStartArgs += "serve",
+    description                     := "Lucuma ODB Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-service",
+    dockerExposedPorts ++= Seq(8082)
   )
 
 lazy val obscalc = project
   .in(file("modules/obscalc"))
   .dependsOn(service)
-  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
   .settings(
     name                        := "obscalc-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082"
+    reStart / envVars += "PORT" -> "8082",
+    description                     := "Lucuma ODB ObsCalc Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-obscalc-service",
+    dockerExposedPorts ++= Seq(8082)
   )
 
 lazy val calibrations = project
   .in(file("modules/calibrations"))
   .dependsOn(service)
-  .enablePlugins(NoPublishPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
   .settings(
     name                        := "calibrations-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082"
+    reStart / envVars += "PORT" -> "8082",
+    description                     := "Lucuma ODB Calibrations Service",
+    // Add command line parameters
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    // Name of the launch script
+    executableScriptName            := "lucuma-odb-calibrations-service",
+    dockerExposedPorts ++= Seq(8082)
   )
 
 lazy val phase0 = project
