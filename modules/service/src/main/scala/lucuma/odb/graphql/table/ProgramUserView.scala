@@ -23,7 +23,7 @@ trait ProgramUserView[F[_]] extends BaseMapping[F] {
     val Gender            = col("c_gender", gender.opt)
     val Affiliation       = col("c_affiliation", varchar_nonempty.opt)
     val HasDataAccess     = col("c_has_data_access", bool)
-    val DisplayName       = col("c_display_name", varchar.opt)
+    val DisplayName       = col("c_display_name", text.opt)
     val Email             = col("c_email", varchar.opt)
 
     object Preferred extends UserProfileTable[ColumnRef]:
