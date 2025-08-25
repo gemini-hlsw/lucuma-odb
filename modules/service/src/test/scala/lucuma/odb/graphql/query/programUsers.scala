@@ -49,6 +49,7 @@ class programUsers extends OdbSuite:
   val piJohn  = TestUsers.Standard(
     11,
     StandardRole.Pi(Gid[StandardRole.Id].fromLong.getOption(11).get),
+    familyName = "Booth".some,
     email = "john@wilkes.net".some
   )
 
@@ -369,3 +370,33 @@ class programUsers extends OdbSuite:
                  """.asRight
              )
     yield ()
+
+  test("diplay name"):
+    expect(
+      user = staff,
+      query = s"""
+        query {
+          programUsers(
+              WHERE: {
+                user: { id: { EQ: "${piJohn.id}" } }
+              }
+          ) {
+            matches {
+              displayName
+            }
+          }
+        }
+      """,
+      expected =
+        json"""
+          {
+            "programUsers": {
+              "matches": [
+                {
+                  "displayName": "Booth"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
