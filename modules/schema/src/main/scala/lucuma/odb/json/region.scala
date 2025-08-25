@@ -21,14 +21,14 @@ object region {
     import declination.decoder.given
     given Decoder[Region] = hc =>
       for 
-        ra <-  hc.downField("raArc").as[Arc[RightAscension]]
-        dec <- hc.downField("decArc").as[Arc[Declination]]
+        ra <-  hc.downField("rightAscensionArc").as[Arc[RightAscension]]
+        dec <- hc.downField("declinationArc").as[Arc[Declination]]
       yield Region(ra, dec)
 
   private def encoder(using Encoder[RightAscension], Encoder[Declination]): Encoder[Region] = a =>
     Json.obj(
-      "raArc" -> a.raArc.asJson,
-      "decArc" -> a.decArc.asJson
+      "rightAscensionArc" -> a.raArc.asJson,
+      "declinationArc" -> a.decArc.asJson
     )
 
   object query:

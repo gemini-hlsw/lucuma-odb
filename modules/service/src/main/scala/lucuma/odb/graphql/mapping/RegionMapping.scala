@@ -6,10 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ConfigurationRequestView
 
 import table.TargetView
 
-trait RegionMapping[F[_]] extends TargetView[F] {
+trait RegionMapping[F[_]] extends TargetView[F] with ConfigurationRequestView[F] {
 
   private lazy val OpportunityRegionMapping =
     ObjectMapping(OpportunityType / "region")(
@@ -18,8 +19,16 @@ trait RegionMapping[F[_]] extends TargetView[F] {
       SqlObject("declinationArc"),    
     )
 
+  private lazy val ConfigurationTargetRegionMapping =
+    ObjectMapping(ConfigurationTargetType / "region")(
+      SqlField("synthetic_id", ConfigurationRequestView.Target.Region.SyntheticId, key = true, hidden = true),
+      SqlObject("rightAscensionArc"),
+      SqlObject("declinationArc"),    
+    )
+
   lazy val RegionMappings = List(
-    OpportunityRegionMapping
+    OpportunityRegionMapping,
+    ConfigurationTargetRegionMapping
   )
 
 }

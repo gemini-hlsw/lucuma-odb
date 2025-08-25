@@ -10,8 +10,13 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.ArcType
+import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
 import lucuma.core.math.ProperMotion
+import lucuma.core.math.Region
+import lucuma.core.math.RightAscension
 import lucuma.core.model.CatalogInfo
 import lucuma.core.model.EphemerisKey
 import lucuma.core.model.Observation
@@ -305,6 +310,12 @@ object AsterismService {
           c_sid_catalog_object_type,
           c_nsid_des,
           c_nsid_key_type,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end,
           c_source_profile
         from t_target t
         inner join t_asterism_target a
@@ -332,6 +343,12 @@ object AsterismService {
           c_sid_catalog_object_type,
           c_nsid_des,
           c_nsid_key_type,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end,
           c_source_profile
         from t_target t
         inner join t_asterism_target a
@@ -360,6 +377,12 @@ object AsterismService {
         varchar.opt *:            // catalog object type
         varchar.opt *:            // ns des
         ephemeris_key_type.opt *: // ns ephemeris key type
+        arc_type.opt *:
+        right_ascension.opt *:
+        right_ascension.opt *:
+        arc_type.opt *:
+        declination.opt *:
+        declination.opt *:          
         jsonb                     // source profile
       ).emap {
         case (id,
@@ -376,6 +399,12 @@ object AsterismService {
               oCatType,
               oDes,
               oEphemKeyType,
+              oRaArcType,
+              oRaArcStart,
+              oRaArcEnd,
+              oDecArcType,
+              oDecArcStart,
+              oDecArcEnd,
               profile
             ) =>
           val oSourceProfile = profile.as[SourceProfile].toOption
@@ -399,6 +428,27 @@ object AsterismService {
                     .map(key => (id, Target.Nonsidereal(name, key, sourceProfile)))
                 )
                 .flatten
+            )
+            .orElse(
+              (oRaArcType, oDecArcType, oSourceProfile).tupled.flatMap: (raArcType, decArcType, sourceProfile) =>
+
+                val oRaArc: Option[Arc[RightAscension]] =
+                  (raArcType, oRaArcStart, oRaArcEnd) match
+                    case (ArcType.Empty, None, None) => Arc.Empty[RightAscension]().some
+                    case (ArcType.Full, None, None) => Arc.Full[RightAscension]().some
+                    case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
+                    case _ => None
+
+                val oDecArc: Option[Arc[Declination]] =
+                  (decArcType, oDecArcStart, oDecArcEnd) match
+                    case (ArcType.Empty, None, None) => Arc.Empty[Declination]().some
+                    case (ArcType.Full, None, None) => Arc.Full[Declination]().some
+                    case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
+                    case _ => None
+                  
+                (oRaArc, oDecArc).mapN: (raArc, decArc) =>
+                  (id, Target.Opportunity(name, Region(raArc, decArc), sourceProfile))
+
             )
             .toRight(s"Invalid target $id.")
       }

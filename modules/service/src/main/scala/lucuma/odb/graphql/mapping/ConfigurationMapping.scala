@@ -13,9 +13,11 @@ import grackle.Result
 import grackle.Result.Failure
 import grackle.Result.Warning
 import grackle.ResultT
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Region
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
@@ -23,6 +25,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.json.region.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
@@ -45,8 +48,8 @@ trait ConfigurationMapping[F[_]]
   private lazy val ConfigurationRequestConfigurationMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration")(
       SqlField("synthetic-id", ConfigurationRequestView.Id, key = true, hidden = true),
+      SqlObject("target"),
       SqlObject("conditions"),
-      SqlObject("referenceCoordinates"),
       SqlObject("observingMode"),
     )
 
@@ -62,36 +65,34 @@ trait ConfigurationMapping[F[_]]
       // associated CFP (if any). The reference time is used when computing coordintes for approved
       // configurations; it is not related to visualization time.
       SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
-
+      EffectField("target", targetQueryHandler, List("id", "programId", "referenceTime")),
       SqlObject("conditions"),
-      EffectField("referenceCoordinates", referencePositionQueryHandler, List("id", "programId", "referenceTime")),
       SqlObject("observingMode"),
     )
 
   // Use GuideService.getObjectTrackikng to compute thet location of this observation's asterism at the middle
   // of the CFP's active period (if we can).
-  def referencePositionQueryHandler: EffectHandler[F] =
+  def targetQueryHandler: EffectHandler[F] =
 
     // N.B. we can't use ObservationEffectHandler here because it doesn't gather all the infomation we need from
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
     new EffectHandler[F] {
 
-      def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Coordinates]]] =
-        oRefTime match
-          case None     =>
-            // If there is no reference time then we can't compute the reference coordinates in general,
-            // although we could do it for sidereal asterisms with no proper motion. At this point I don't
-            // think it's worthwhile; this computation is only meaningful for fully-defined programs.
-            Result(None).pure[F]
-          case Some(refTime) =>
-            services.use { implicit s =>
-              Services.asSuperUser:
-                s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
-                  .getObjectTracking(pid, oid)
-                  .map:
-                    case Failure(problems) => Warning(problems, None) // turn failure into a warning
-                    case other => other.map(_.at(refTime.toInstant).map(_.value))
-            }
+      def calculate(pid: Program.Id, oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
+        services.use { implicit s =>
+          Services.asSuperUser:
+            s.guideService(gaiaClient, itcClient, commitHash, timeEstimateCalculator)
+              .getObjectTrackingOrRegion(pid, oid)
+              .map:
+                case Failure(problems) => Warning(problems, None) // turn failure into a warning                
+                case other => 
+                  other.map:
+                    case Right(r) => Some(Right(r))
+                    case Left(cs) =>
+                      oRefTime.flatMap: refTime =>                        
+                        cs.at(refTime.toInstant).map: aliased =>
+                          Left(aliased.value)
+        }
 
       private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>
@@ -112,7 +113,15 @@ trait ConfigurationMapping[F[_]]
                    .zip(queries)
                    .traverse { case (result, (query, parentCursor)) =>
                      Query.childContext(parentCursor.context, query).map { childContext =>
-                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                       CirceCursor(
+                        childContext,
+                        Json.obj(
+                          "coordinates" -> result.flatMap(_.left.toOption).asJson,
+                          "region"      -> result.flatMap(_.toOption).asJson,
+                        ), 
+                        Some(parentCursor), 
+                        parentCursor.fullEnv
+                      )
                      }
                    }.pure[F]
                  )

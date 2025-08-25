@@ -13,6 +13,8 @@ import table.*
 trait ConfigurationObservingModeMappings[F[_]]
   extends ObservationView[F]
      with ConfigurationRequestView[F]
+     with Flamingos2LongSlitView[F]
+     with GmosImagingView[F]
      with GmosLongSlitTable[F] {
 
   lazy val ConfigurationObservingModeMappings = List(
@@ -25,17 +27,23 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
+      SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitTable.Common.ObservationId)),
-      SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitTable.Common.ObservationId))
+      SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitTable.Common.ObservationId)),
+      SqlObject("gmosNorthImaging", Join(ObservationView.Id, GmosNorthImagingView.ObservationId)),
+      SqlObject("gmosSouthImaging", Join(ObservationView.Id, GmosSouthImagingView.ObservationId))
     )
 
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
-      SqlField("mode", ConfigurationRequestView.ObservingModeType),
+      SqlField("mode", ConfigurationRequestView.ObservingModeType),      
+      SqlObject("flamingos2LongSlit"),
       SqlObject("gmosNorthLongSlit"),
       SqlObject("gmosSouthLongSlit"),
+      SqlObject("gmosNorthImaging"),
+      SqlObject("gmosSouthImaging"),
     )
 
 }

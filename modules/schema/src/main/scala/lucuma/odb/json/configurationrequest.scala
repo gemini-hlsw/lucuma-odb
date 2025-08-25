@@ -12,20 +12,24 @@ import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Region
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.Configuration.ObservingMode
-import lucuma.core.model.Configuration.ObservingMode.GmosNorthLongSlit
-import lucuma.core.model.Configuration.ObservingMode.GmosSouthLongSlit
+import lucuma.core.model.Configuration.ObservingMode.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
 import lucuma.odb.json.coordinates.query.given
+import lucuma.odb.json.region.query.given
 
 object configurationrequest:
 
@@ -56,24 +60,59 @@ object configurationrequest:
     val DecodeGmosSouthLongSlit: Decoder[GmosSouthLongSlit] = hc =>
       hc.downField("grating").as[GmosSouthGrating].map(GmosSouthLongSlit(_))
 
+    val DecodeGmosNorthImaging: Decoder[GmosNorthImaging] = hc =>
+      hc.downField("filters").as[List[GmosNorthFilter]].map(GmosNorthImaging(_))
+
+    val DecodeGmosSouthImaging: Decoder[GmosSouthImaging] = hc =>
+      hc.downField("filters").as[List[GmosSouthFilter]].map(GmosSouthImaging(_))
+
+    val DecodeFlamingos2LongSlit: Decoder[Flamingos2LongSlit] = hc =>
+      hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2LongSlit(_))
+
     given Decoder[ObservingMode] = hc =>
       hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
-      hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit)
+      hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
+      hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
+      hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
+      hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
+      Left(DecodingFailure(s"couldn't decode mode: ${hc.top}", Nil))
 
     given Encoder[ObservingMode] = m => 
       Json.obj(
         "gmosNorthLongSlit" -> Json.Null, // one of these will be replaced below
         "gmosSouthLongSlit" -> Json.Null, // one of these will be replaced below
+        "gmosNorthImaging" -> Json.Null, // one of these will be replaced below
+        "gmosSouthImaging" -> Json.Null, // one of these will be replaced below
+        "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
         m match
           case GmosNorthLongSlit(grating) => "gmosNorthLongSlit" -> Json.obj("grating" -> grating.asJson)
           case GmosSouthLongSlit(grating) => "gmosSouthLongSlit" -> Json.obj("grating" -> grating.asJson)
+          case GmosNorthImaging(filter) => "gmosNorthImaging" -> Json.obj("filter" -> filter.asJson)
+          case GmosSouthImaging(filter) => "gmosSouthImaging" -> Json.obj("filter" -> filter.asJson)
+          case Flamingos2LongSlit(disperser) => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
       )
+
+    given Encoder[Either[Coordinates, Region]] = e =>
+      Json.obj(
+        "coordinates" -> e.left.toOption.asJson,
+        "region" -> e.toOption.asJson,
+      )
+
+    given Decoder[Option[Either[Coordinates, Region]]] = hc =>
+      (
+        hc.downField("coordinates").as[Option[Coordinates]],
+        hc.downField("region").as[Option[Region]]
+      ).tupled.flatMap:
+        case (Some(c), None)    => Left(c).some.asRight
+        case (None, Some(r))    => Right(r).some.asRight
+        case (None, None)       => None.asRight
+        case (Some(_), Some(_)) => Left(DecodingFailure("Cannot decode target; both coords and region are defined.", Nil))
 
     /** A decoder based on the GraphQL schema, used for recursive service queries. */
     given Decoder[Configuration] = hc =>
       (
         hc.downField("conditions").as[Conditions],
-        hc.downField("referenceCoordinates").as[Option[Coordinates]],
+        hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
         hc.downField("observingMode").as[Option[ObservingMode]]
       ).tupled.flatMap:
         case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
@@ -83,7 +122,7 @@ object configurationrequest:
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
-        "referenceCoordinates" -> c.refererenceCoordinates.asJson,
+        "target" -> c.target.asJson,
         "observingMode" -> c.observingMode.asJson
       )
 
