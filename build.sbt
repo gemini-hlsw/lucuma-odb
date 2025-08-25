@@ -31,6 +31,7 @@ val paigesVersion              = "0.4.4"
 val postgresVersion            = "42.7.7"
 val pprintVersion              = "0.9.3"
 val skunkVersion               = "0.6.4"
+val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.27"
@@ -219,6 +220,22 @@ lazy val ssoService = project
     dockerExposedPorts ++= Seq(8082),
     // Truncate DYNO on first dot. For web dyno, execute "serve", otherwise execute whatever the dyno type is (eg: "create-service-user" or "create-jwt").
     bashScriptExtraDefines += """DYNO_TYPE=${DYNO%%.*}; if [[ "$DYNO_TYPE" == "web" ]]; then set -- serve; else set; set -- $DYNO_TYPE $1 $2; fi"""
+  )
+
+lazy val ssoBackendExample = project
+  .in(file("modules/sso-backend-example"))
+  .enablePlugins(NoPublishPlugin)
+  .dependsOn(ssoBackendClient)
+  .settings(
+    name := "lucuma-sso-backend-example",
+    libraryDependencies ++= Seq(
+      "is.cir"       %% "ciris"               % cirisVersion,
+      "org.http4s"   %% "http4s-ember-client" % http4sEmberVersion,
+      "org.http4s"   %% "http4s-ember-server" % http4sEmberVersion,
+      "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
+      "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
+      "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
+    )
   )
 
 lazy val schema =
