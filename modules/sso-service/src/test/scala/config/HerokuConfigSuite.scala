@@ -53,7 +53,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("HEROKU_DYNO_ID", "C637518A-1A35-4649-AB89-2CBDAC214F2D")
         _ <- putSystemProperty("HEROKU_RELEASE_CREATED_AT", "2020-08-28T21:05:15Z")
         _ <- putSystemProperty("HEROKU_RELEASE_VERSION", "...")
-        _ <- putSystemProperty("HEROKU_SLUG_COMMIT", "...")
+        _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
         _ <- HerokuConfig.default.load[IO]
       } yield expect(true)
@@ -80,7 +80,7 @@ object HerokuConfigSuite extends IOSuite {
         _ <- putSystemProperty("HEROKU_DYNO_ID", "C637518A-1A35-4649-AB89-2CBDAC214F2D")
         _ <- putSystemProperty("HEROKU_RELEASE_CREATED_AT", "2020-08-28T21:05:15Z")
         _ <- putSystemProperty("HEROKU_RELEASE_VERSION", "...")
-        _ <- putSystemProperty("HEROKU_SLUG_COMMIT", "...")
+        _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
         _ <- HerokuConfig.config.load[IO]
       } yield expect(true)
