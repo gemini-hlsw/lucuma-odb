@@ -208,13 +208,13 @@ jobs:
           docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}/web
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/web
           docker tag noirlab/obscalc-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/obscalc
-          docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibrations
+          docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibration
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}/web
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/web
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/obscalc
-          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibrations
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibration
 
       - name: Release dev app in Heroku
         run: |
           heroku container:release web -a ${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }} -v
-          heroku container:release web obscalc calibrations -a ${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }} -v
+          heroku container:release web obscalc calibration -a ${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }} -v
