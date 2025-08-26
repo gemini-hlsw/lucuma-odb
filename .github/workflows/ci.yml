@@ -16,6 +16,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
 
 
 concurrency:
@@ -54,6 +55,12 @@ jobs:
       - name: sbt update
         if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
+
+      - name: Set up cert permissions (1)
+        run: chmod 600 test-cert/server.key
+
+      - name: Set up cert permissions (2)
+        run: sudo chown 999 test-cert/server.key
 
       - name: Docker compose up
         run: docker compose up -d
@@ -159,3 +166,55 @@ jobs:
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
         run: sbt -v -J-Xmx6g tlCiRelease
+
+  deploy:
+    name: Build and publish Docker images / Deploy to Heroku
+    if: (github.ref == 'refs/heads/main' && startsWith(github.repository, 'gemini'))
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        scala: [3.7.2]
+        java: [temurin@17]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout current branch (full)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@17)
+        id: setup-java-temurin-17
+        if: matrix.java == 'temurin@17'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: sbt
+
+      - name: sbt update
+        if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
+        run: sbt -v -J-Xmx6g +update
+
+      - name: Build Docker images
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal ssoService/docker:publishLocal'
+
+      - name: Push Docker images to Heroku
+        run: |
+          npm install -g heroku
+          heroku container:login
+          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}/web
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/web
+          docker tag noirlab/obscalc-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/obscalc
+          docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibrations
+          docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}/web
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/web
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/obscalc
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}/calibrations
+
+      - name: Release dev app in Heroku
+        run: |
+          heroku container:release web -a ${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }} -v
+          heroku container:release web obscalc calibrations -a ${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }} -v

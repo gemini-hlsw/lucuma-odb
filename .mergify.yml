@@ -87,3 +87,35 @@ pull_request_rules:
       add:
       - smartgcal
       remove: []
+- name: Label sso-backend-client PRs
+  conditions:
+  - files~=^modules/sso-backend-client/
+  actions:
+    label:
+      add:
+      - sso-backend-client
+      remove: []
+- name: Label sso-backend-example PRs
+  conditions:
+  - files~=^modules/sso-backend-example/
+  actions:
+    label:
+      add:
+      - sso-backend-example
+      remove: []
+- name: Label sso-frontend-client PRs
+  conditions:
+  - files~=^modules/sso-frontend-client/
+  actions:
+    label:
+      add:
+      - sso-frontend-client
+      remove: []
+- name: Label sso-service PRs
+  conditions:
+  - files~=^modules/sso-service/
+  actions:
+    label:
+      add:
+      - sso-service
+      remove: []
