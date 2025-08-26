@@ -333,10 +333,9 @@ object GeneratorParamsService {
           (sourceProf.toValidNel(MissingParam.forTarget(tid, "source profile")),
            sed.toValidNel(MissingParam.forTarget(tid, "SED")),
            Validated.condNel(validBrightness, (), MissingParam.forTarget(tid, "brightness measure")),
-           targetParams.radialVelocity.toValidNel(MissingParam.forTarget(tid, "radial velocity")),
            Validated.condNel(validCustomSed, (), MissingParam.forTarget(tid, "custom SED attachment"))
-          ).mapN: (sp,_, _, rv, _) =>
-            (tid, TargetInput(sp, rv), targetParams.customSedTimestamp)
+          ).mapN: (sp,_, _, _) =>
+            (tid, TargetInput(sp, targetParams.radialVelocity.getOrElse(RadialVelocity.Zero)), targetParams.customSedTimestamp)
       }
 
     }

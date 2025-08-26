@@ -13,9 +13,15 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Angular
+import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.Region
+import lucuma.core.math.RightAscension
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
@@ -26,13 +32,16 @@ import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
 import lucuma.odb.graphql.input.ConfigurationRequestPropertiesInput
 import lucuma.odb.graphql.input.CreateConfigurationRequestInput
+import lucuma.odb.json.arc.tag
 import lucuma.odb.json.configurationrequest.query.DecodingFailures
 import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
+import skunk.data.Arr
 import skunk.syntax.all.*
 
 import Services.Syntax.*
@@ -136,7 +145,7 @@ object ConfigurationService {
                 val hc = json.hcursor
                 hc.downField("id").as[Observation.Id] match
                   case Left(value) => Result.internalError(value.getMessage) 
-                  case Right(obsid) =>                       
+                  case Right(obsid) =>     
                     hc.downField("configuration").as[Configuration] match
                       case Right(cfg) => Result(Map(obsid -> cfg))
                       case Left(DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
@@ -292,12 +301,26 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
-                    dec { 
-                      dms 
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { hms }
+                        end { hms }
+                      }
+                      declinationArc {
+                        type
+                        start { dms }
+                        end { dms }
+                      }
                     }
                   }
                   observingMode {
@@ -308,6 +331,15 @@ object ConfigurationService {
                     }
                     gmosSouthLongSlit {
                       grating
+                    }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
                     }
                   }
                 }
@@ -330,12 +362,26 @@ object ConfigurationService {
                         skyBackground
                         waterVapor
                       }
-                      referenceCoordinates {
-                        ra { 
-                          hms 
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
                         }
-                        dec { 
-                          dms 
+                        region {
+                          rightAscensionArc {
+                            type
+                            start { hms }
+                            end { hms }
+                          }
+                          declinationArc {
+                            type
+                            start { dms }
+                            end { dms }
+                          }
                         }
                       }
                       observingMode {
@@ -346,6 +392,15 @@ object ConfigurationService {
                         }
                         gmosSouthLongSlit {
                           grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
                         }
                       }
                     }
@@ -401,12 +456,26 @@ object ConfigurationService {
                   skyBackground
                   waterVapor
                 }
-                referenceCoordinates {
-                  ra { 
-                    hms 
+                target {
+                  coordinates {
+                    ra { 
+                      hms 
+                    }
+                    dec { 
+                      dms 
+                    }
                   }
-                  dec { 
-                    dms 
+                  region {
+                    rightAscensionArc {
+                      type
+                      start { hms }
+                      end { hms }
+                    }
+                    declinationArc {
+                      type
+                      start { dms }
+                      end { dms }
+                    }
                   }
                 }
                 observingMode {
@@ -417,6 +486,15 @@ object ConfigurationService {
                   }
                   gmosSouthLongSlit {
                     grating
+                  }
+                  gmosNorthImaging {
+                    filters
+                  }
+                  gmosSouthImaging {
+                    filters
+                  }
+                  flamingos2LongSlit {
+                    disperser
                   }
                 }
               }
@@ -441,12 +519,26 @@ object ConfigurationService {
                       skyBackground
                       waterVapor
                     }
-                    referenceCoordinates {
-                      ra { 
-                        hms 
+                    target {
+                      coordinates: {
+                        ra { 
+                          hms 
+                        }
+                        dec { 
+                          dms 
+                        }
                       }
-                      dec { 
-                        dms 
+                      region {
+                        rightAscensionArc {
+                          type
+                          start { hms }
+                          end { hms }
+                        }
+                        declinationArc {
+                          type
+                          start { dms }
+                          end { dms }
+                        }
                       }
                     }
                     observingMode {
@@ -457,6 +549,15 @@ object ConfigurationService {
                       }
                       gmosSouthLongSlit {
                         grating
+                      }
+                      gmosNorthImaging {
+                        filters
+                      }
+                      gmosSouthImaging {
+                        filters
+                      }
+                      flamingos2LongSlit {
+                        disperser
                       }
                     }
                   }
@@ -509,12 +610,26 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
-                    dec { 
-                      dms 
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { hms }
+                        end { hms }
+                      }
+                      declinationArc {
+                        type
+                        start { dms }
+                        end { dms }
+                      }
                     }
                   }
                   observingMode {
@@ -525,6 +640,15 @@ object ConfigurationService {
                     }
                     gmosSouthLongSlit {
                       grating
+                    }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
                     }
                   }
                 }
@@ -539,12 +663,14 @@ object ConfigurationService {
                           skyBackground
                           waterVapor
                         }
-                        referenceCoordinates {
-                          ra { 
-                            hms 
-                          }
-                          dec { 
-                            dms 
+                        target {
+                          coordinates {
+                            ra { 
+                              hms 
+                            }
+                            dec { 
+                              dms 
+                            }
                           }
                         }
                         observingMode {
@@ -555,6 +681,15 @@ object ConfigurationService {
                           }
                           gmosSouthLongSlit {
                             grating
+                          }
+                          gmosNorthImaging {
+                            filters
+                          }
+                          gmosSouthImaging {
+                            filters
+                          }
+                          flamingos2LongSlit {
+                            disperser
                           }
                         }
                       }
@@ -581,12 +716,26 @@ object ConfigurationService {
                     skyBackground
                     waterVapor
                   }
-                  referenceCoordinates {
-                    ra { 
-                      hms 
+                  target {
+                    coordinates {
+                      ra { 
+                        hms 
+                      }
+                      dec { 
+                        dms 
+                      }
                     }
-                    dec { 
-                      dms 
+                    region {
+                      rightAscensionArc {
+                        type
+                        start { hms }
+                        end { hms }
+                      }
+                      declinationArc {
+                        type
+                        start { dms }
+                        end { dms }
+                      }
                     }
                   }
                   observingMode {
@@ -597,6 +746,15 @@ object ConfigurationService {
                     }
                     gmosSouthLongSlit {
                       grating
+                    }
+                    gmosNorthImaging {
+                      filters
+                    }
+                    gmosSouthImaging {
+                      filters
+                    }
+                    flamingos2LongSlit {
+                      disperser
                     }
                   }
                 }
@@ -623,35 +781,62 @@ object ConfigurationService {
           c_water_vapor,
           c_reference_ra,
           c_reference_dec,
+          c_region_ra_arc_type,
+          c_region_ra_arc_start,
+          c_region_ra_arc_end,
+          c_region_dec_arc_type,
+          c_region_dec_arc_start,
+          c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
-        FROM t_configuration_request
+        FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
           c_cloud_extinction = $cloud_extinction_preset AND
           c_image_quality = $image_quality_preset AND
           c_sky_background = $sky_background AND
           c_water_vapor = $water_vapor AND
-          c_reference_ra = $right_ascension AND
-          c_reference_dec = $declination AND
+          c_reference_ra is not distinct from ${right_ascension.opt} AND
+          c_reference_dec is not distinct from ${declination.opt} AND
+          c_region_ra_arc_type is not distinct from ${arc_type.opt} AND
+          c_region_ra_arc_start is not distinct from ${right_ascension.opt} AND
+          c_region_ra_arc_end is not distinct from ${right_ascension.opt} AND
+          c_region_dec_arc_type is not distinct from ${arc_type.opt} AND
+          c_region_dec_arc_start is not distinct from ${declination.opt} AND
+          c_region_dec_arc_end is not distinct from ${declination.opt} AND
           c_observing_mode_type = $observing_mode_type AND
+          c_flamingos_2_longslit_disperser IS NOT DISTINCT FROM ${flamingos_2_disperser.opt} AND
+          COALESCE(c_gmos_north_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_north_filter.opt}, '{}'::_d_tag) AND
+          COALESCE(c_gmos_south_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_south_filter.opt}, '{}'::_d_tag) AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt}
         ) 
       """.query(
         (
-          configuration_request_id *:
+          configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt        *:
-          cloud_extinction_preset         *:
-          image_quality_preset            *:
-          sky_background           *:
-          water_vapor              *:
-          right_ascension          *:
-          declination              *:
-          observing_mode_type      *:
-          gmos_north_grating.opt   *:
+          text_nonempty.opt            *:
+          cloud_extinction_preset      *:
+          image_quality_preset         *:
+          sky_background               *:
+          water_vapor                  *:
+          right_ascension.opt          *:
+          declination.opt              *:
+          arc_type.opt                 *:
+          right_ascension.opt          *:
+          right_ascension.opt          *:
+          arc_type.opt                 *:
+          declination.opt              *:
+          declination.opt              *:
+          observing_mode_type          *:
+          flamingos_2_disperser.opt    *:
+          _gmos_north_filter.opt       *:
+          _gmos_south_filter.opt       *:
+          gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
           { case 
@@ -664,54 +849,111 @@ object ConfigurationService {
             waterVapor               *:
             rightAscension           *:
             declination              *:
+            raArcType                *:
+            raArcStart               *:
+            raArcEnd                 *:
+            decArcType               *:
+            decArcStart              *:
+            decArcEnd                *:
             observingModeType        *:
+            flamingos2Disperser      *:
+            gmosNorthImagingFilters  *:
+            gmosSouthImagingFilters  *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] = 
-                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+                (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
-                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
+
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
+                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
                   
-                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
-              mode.map: m =>
-                ConfigurationRequest(
-                  id, 
-                  status,
-                  justification,
-                  Configuration(
-                    Conditions(
-                      cloudExtinction,
-                      imageQuality,
-                      skyBackground,
-                      waterVapor
-                    ),
-                    Coordinates(
-                      rightAscension,
-                      declination
-                    ),
-                    m
+              val refCoords: Either[String, Option[Coordinates]] =
+                (rightAscension, declination) match
+                  case (Some(ra), Some(dec)) => Right(Some(Coordinates(ra, dec)))
+                  case (None, None) => Right(None)
+                  case _ => Left("Malformed reference coordinates.")
+
+              def arc[A: Angular](tpe: Option[ArcType], start: Option[A], end: Option[A]): Either[String, Option[Arc[A]]] =
+                (tpe, start, end) match
+                  case (Some(ArcType.Empty), None, None) => Right(Some(Arc.Empty()))
+                  case (Some(ArcType.Full), None, None) => Right(Some(Arc.Full()))
+                  case (Some(ArcType.Partial), Some(a), Some(b)) => Right(Some(Arc.Partial(a, b)))
+                  case (None, None, None) => Right(None)
+                  case _ => Left(s"Malformed arc.")
+
+              val raArc: Either[String, Option[Arc[RightAscension]]] =
+                arc(raArcType, raArcStart, raArcEnd)
+                
+              val decArc: Either[String, Option[Arc[Declination]]] =
+                arc(decArcType, decArcStart, decArcEnd)
+
+              val region: Either[String, Option[Region]] =
+                (raArc, decArc).tupled.flatMap:
+                  case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
+                  case (None, None) => Right(None)
+                  case _ => Left("Malformed region.")
+
+              val target: Either[String, Either[Coordinates, Region]] =
+                (refCoords, region).tupled.flatMap:
+                  case (Some(rc), None) => Right(Left(rc))
+                  case (None, Some(r))  => Right(Right(r))
+                  case _ => Left("Malformed configuration target.")
+
+              mode.flatMap: m =>
+                target.map: t =>
+                  ConfigurationRequest(
+                    id, 
+                    status,
+                    justification,
+                    Configuration(
+                      Conditions(
+                        cloudExtinction,
+                        imageQuality,
+                        skyBackground,
+                        waterVapor
+                      ),
+                      t,
+                      m
+                    )
                   )
-                )
 
           }
       ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
-        oid                                                         *:
-        cfg.conditions.cloudExtinction                              *:
-        cfg.conditions.imageQuality                                 *:
-        cfg.conditions.skyBackground                                *:
-        cfg.conditions.waterVapor                                   *:
-        cfg.refererenceCoordinates.ra                               *:
-        cfg.refererenceCoordinates.dec                              *:
-        cfg.observingMode.tpe                                       *:
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
+        oid                                                       *:
+        cfg.conditions.cloudExtinction                            *:
+        cfg.conditions.imageQuality                               *:
+        cfg.conditions.skyBackground                              *:
+        cfg.conditions.waterVapor                                 *:
+        cfg.target.left.toOption.map(_.ra)                        *:
+        cfg.target.left.toOption.map(_.dec)                       *:
+        cfg.target.toOption.map(_.raArc.tag)                      *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)  *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)    *:
+        cfg.target.toOption.map(_.decArc.tag)                     *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
+        cfg.observingMode.tpe                                     *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
         EmptyTuple
       }
 
@@ -727,7 +969,16 @@ object ConfigurationService {
           c_water_vapor,
           c_reference_ra,
           c_reference_dec,
+          c_region_ra_arc_type,
+          c_region_ra_arc_start,
+          c_region_ra_arc_end,
+          c_region_dec_arc_type,
+          c_region_dec_arc_start,
+          c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
         ) VALUES (
@@ -737,9 +988,18 @@ object ConfigurationService {
           $image_quality_preset,
           $sky_background,
           $water_vapor,
-          $right_ascension,
-          $declination,
+          ${right_ascension.opt},
+          ${declination.opt},
+          ${arc_type.opt},
+          ${right_ascension.opt},
+          ${right_ascension.opt},
+          ${arc_type.opt},
+          ${declination.opt},
+          ${declination.opt},
           $observing_mode_type,
+          ${flamingos_2_disperser.opt},
+          ${_gmos_north_filter.opt},
+          ${_gmos_south_filter.opt},
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt}
         ) 
@@ -754,22 +1014,40 @@ object ConfigurationService {
           c_water_vapor,
           c_reference_ra,
           c_reference_dec,
+          c_region_ra_arc_type,
+          c_region_ra_arc_start,
+          c_region_ra_arc_end,
+          c_region_dec_arc_type,
+          c_region_dec_arc_start,
+          c_region_dec_arc_end,
           c_observing_mode_type,
+          c_flamingos_2_longslit_disperser,
+          c_gmos_north_imaging_filters,
+          c_gmos_south_imaging_filters,
           c_gmos_north_longslit_grating,
           c_gmos_south_longslit_grating
       """.query(
         (
-          configuration_request_id *:
+          configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt        *:
-          cloud_extinction_preset         *:
-          image_quality_preset            *:
-          sky_background           *:
-          water_vapor              *:
-          right_ascension          *:
-          declination              *:
-          observing_mode_type      *:
-          gmos_north_grating.opt                  *:
+          text_nonempty.opt            *:
+          cloud_extinction_preset      *:
+          image_quality_preset         *:
+          sky_background               *:
+          water_vapor                  *:
+          right_ascension.opt          *:
+          declination.opt              *:
+          arc_type.opt                 *:
+          right_ascension.opt          *:
+          right_ascension.opt          *:
+          arc_type.opt                 *:
+          declination.opt              *:
+          declination.opt              *:
+          observing_mode_type          *:
+          flamingos_2_disperser.opt    *:
+          _gmos_north_filter.opt       *:
+          _gmos_south_filter.opt       *:
+          gmos_north_grating.opt       *:
           gmos_south_grating.opt
         ).emap:       
           { case 
@@ -782,55 +1060,112 @@ object ConfigurationService {
             waterVapor               *:
             rightAscension           *:
             declination              *:
+            raArcType                *:
+            raArcStart               *:
+            raArcEnd                 *:
+            decArcType               *:
+            decArcStart              *:
+            decArcEnd                *:
             observingModeType        *:
+            flamingos2LongSlitDisperser *:
+            gmosNorthFilters         *:
+            gmosSouthFilters         *:
             gmosNorthLongSlitGrating *:
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] = 
-                (observingModeType, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
+                (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
-                  case (ObservingModeType.GmosNorthLongSlit, Some(g), _) => 
+                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
+
+                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _) =>
+                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
+                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
+
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
                   
-                  case (ObservingModeType.GmosSouthLongSlit, _, Some(g)) => 
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
                   
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
-              mode.map: m =>
-                ConfigurationRequest(
-                  id, 
-                  status,
-                  justification,
-                  Configuration(
-                    Conditions(
-                      cloudExtinction,
-                      imageQuality,
-                      skyBackground,
-                      waterVapor
-                    ),
-                    Coordinates(
-                      rightAscension,
-                      declination
-                    ),
-                    m
+              val refCoords: Either[String, Option[Coordinates]] =
+                (rightAscension, declination) match
+                  case (Some(ra), Some(dec)) => Right(Some(Coordinates(ra, dec)))
+                  case (None, None) => Right(None)
+                  case _ => Left("Malformed reference coordinates.")
+
+              def arc[A: Angular](tpe: Option[ArcType], start: Option[A], end: Option[A]): Either[String, Option[Arc[A]]] =
+                (tpe, start, end) match
+                  case (Some(ArcType.Empty), None, None) => Right(Some(Arc.Empty()))
+                  case (Some(ArcType.Full), None, None) => Right(Some(Arc.Full()))
+                  case (Some(ArcType.Partial), Some(a), Some(b)) => Right(Some(Arc.Partial(a, b)))
+                  case (None, None, None) => Right(None)
+                  case _ => Left(s"Malformed arc.")
+
+              val raArc: Either[String, Option[Arc[RightAscension]]] =
+                arc(raArcType, raArcStart, raArcEnd)
+                
+              val decArc: Either[String, Option[Arc[Declination]]] =
+                arc(decArcType, decArcStart, decArcEnd)
+
+              val region: Either[String, Option[Region]] =
+                (raArc, decArc).tupled.flatMap:
+                  case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
+                  case (None, None) => Right(None)
+                  case _ => Left("Malformed region.")
+
+              val target: Either[String, Either[Coordinates, Region]] =
+                (refCoords, region).tupled.flatMap:
+                  case (Some(rc), None) => Right(Left(rc))
+                  case (None, Some(r))  => Right(Right(r))
+                  case _ => Left("Malformed configuration target.")
+
+              mode.flatMap: m =>
+                target.map: t =>
+                  ConfigurationRequest(
+                    id, 
+                    status,
+                    justification,
+                    Configuration(
+                      Conditions(
+                        cloudExtinction,
+                        imageQuality,
+                        skyBackground,
+                        waterVapor
+                      ),
+                      t,
+                      m
+                    )
                   )
-                )
 
           }
       ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) => 
-        input.oid                                                   *:
-        input.SET.justification                                     *:
-        cfg.conditions.cloudExtinction                              *:
-        cfg.conditions.imageQuality                                 *:
-        cfg.conditions.skyBackground                                *:
-        cfg.conditions.waterVapor                                   *:
-        cfg.refererenceCoordinates.ra                               *:
-        cfg.refererenceCoordinates.dec                              *:
-        cfg.observingMode.tpe                                       *:
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating) *:
+        input.oid                                                 *:
+        input.SET.justification                                   *:
+        cfg.conditions.cloudExtinction                            *:
+        cfg.conditions.imageQuality                               *:
+        cfg.conditions.skyBackground                              *:
+        cfg.conditions.waterVapor                                 *:
+        cfg.target.left.toOption.map(_.ra)                        *:
+        cfg.target.left.toOption.map(_.dec)                       *:
+        cfg.target.toOption.map(_.raArc.tag)                      *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)  *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)    *:
+        cfg.target.toOption.map(_.decArc.tag)                     *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
+        cfg.observingMode.tpe                                     *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)        *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)        *:
         EmptyTuple
       }
 

@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package table
 
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 
 trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
@@ -22,11 +23,31 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val SkyBackground = col("c_sky_background", sky_background)
       val WaterVapor = col("c_water_vapor", water_vapor)
 
-    object ReferenceCoordinates:
-      val Ra = col("c_reference_ra", right_ascension)
-      val Dec = col("c_reference_dec", declination)
+    object Target:
+      val Id = col("c_configuration_request_id", configuration_request_id.embedded)
+      object ReferenceCoordinates:
+        val SyntheticId = col("c_reference_id", configuration_request_id.embedded)
+        val Ra = col("c_reference_ra", right_ascension.embedded)
+        val Dec = col("c_reference_dec", declination.embedded)
+
+      object Region:
+        val SyntheticId = col("c_region_id", configuration_request_id.embedded)
+        object RightAscensionArc:
+          val PartialSyntheticId = col("c_partial_ra_region_id", configuration_request_id.embedded)
+          val Type  = col("c_region_ra_arc_type", arc_type.embedded)
+          val Start = col("c_region_ra_arc_start", right_ascension.embedded)
+          val End   = col("c_region_ra_arc_end", right_ascension.embedded)
+        object DeclinationArc:
+          val PartialSyntheticId = col("c_partial_dec_region_id", configuration_request_id.embedded)
+          val Type  = col("c_region_dec_arc_type", arc_type.embedded)
+          val Start = col("c_region_dec_arc_start", declination.embedded)
+          val End   = col("c_region_dec_arc_end", declination.embedded)
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
+
+    object Flamingos2LongSlit:
+      val Id = col("c_flamingos_2_longslit_id", configuration_request_id.embedded)
+      val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
 
     object GmosNorthLongSlit:
       val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
@@ -36,3 +57,10 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Id = col("c_gmos_south_longslit_id", configuration_request_id.embedded)
       val Grating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
 
+    object GmosNorthImaging:
+      val Id = col("c_gmos_north_imaging_id", configuration_request_id.embedded)
+      val Filters = col("c_gmos_north_imaging_filters", _gmos_north_filter.embedded)
+
+    object GmosSouthImaging:
+      val Id = col("c_gmos_south_imaging_id", configuration_request_id.embedded)
+      val Filters = col("c_gmos_south_imaging_filters", _gmos_south_filter.embedded)
