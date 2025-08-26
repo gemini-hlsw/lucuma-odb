@@ -15,7 +15,7 @@ val http4sBlazeVersion         = "0.23.17"
 val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "10.0.4"
-val bouncycastleVersion        = "1.70"
+val bouncycastleVersion        = "1.81"
 val weaverVersion              = "0.8.4"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
@@ -181,8 +181,8 @@ lazy val ssoBackendClient = project
     name := "lucuma-sso-backend-client",
     libraryDependencies ++= Seq(
       "com.github.jwt-scala" %% "jwt-circe"          % jwtVersion,
-      "org.bouncycastle"      % "bcpkix-jdk15on"     % bouncycastleVersion,
-      "org.bouncycastle"      % "bcpg-jdk15on"       % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpkix-jdk18on"     % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpg-jdk18on"       % bouncycastleVersion,
       "org.http4s"           %% "http4s-core"        % http4sEmberVersion,
       "org.http4s"           %% "http4s-client"      % http4sEmberVersion,
       "org.http4s"           %% "http4s-dsl"         % http4sEmberVersion,
