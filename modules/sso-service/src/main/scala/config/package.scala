@@ -63,7 +63,8 @@ package object config {
   def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name) or prop(name)
 
-  def optValue[A](value: => Option[A]): ConfigValue[Effect, A] =
-    value.fold(ConfigValue.failed(ConfigError("Missing value")))(default)
+  private def optValue[A](key: String, value: => Option[A]): ConfigValue[Effect, A] =
+    value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
+      ConfigValue.loaded(ConfigKey(key), v)
 
 }
