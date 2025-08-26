@@ -72,7 +72,7 @@ object HerokuConfig {
     envOrProp("HEROKU_DYNO_ID").as[UUID],
     envOrProp("HEROKU_RELEASE_CREATED_AT").as(using isoLocalDateTime),
     envOrProp("HEROKU_RELEASE_VERSION"),
-    optValue(BuildInfo.gitHeadCommit),
+    optValue("CommmitHash", BuildInfo.gitHeadCommit),
     envOrProp("HEROKU_SLUG_DESCRIPTION"),
   ).mapN(Default.apply)
 
