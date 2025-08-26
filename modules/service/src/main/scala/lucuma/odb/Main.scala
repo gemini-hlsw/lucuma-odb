@@ -146,16 +146,27 @@ object FMain extends MainParams {
 
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
+    val runtime    = Runtime.getRuntime
+    val memorySize = java.lang.management.ManagementFactory
+      .getOperatingSystemMXBean()
+      .asInstanceOf[com.sun.management.OperatingSystemMXBean]
+      .getTotalMemorySize()
     val banner =
         s"""|
             |$Header
             |
-            |CommitHash. : ${config.commitHash.format}
-            |CORS domains: ${config.domain.mkString(", ")}
-            |ITC Root    : ${config.itc.root}
-            |Port        : ${config.port}
-            |PID         : ${ProcessHandle.current.pid}
-            |Tracing     : ${LucumaEntryPoint.tracingBackend(config)}
+            | CommitHash         : ${config.commitHash.format}
+            | CORS domains       : ${config.domain.mkString(", ")}
+            | ITC Root           : ${config.itc.root}
+            | Port               : ${config.port}
+            | PID                : ${ProcessHandle.current.pid}
+            | Tracing            : ${LucumaEntryPoint.tracingBackend(config)}
+            |
+            | Cores              : ${runtime.availableProcessors()}
+            | Current JVM memory : ${runtime.totalMemory() / 1024 / 1024} MB
+            | Maximum JVM memory : ${runtime.maxMemory() / 1024 / 1024} MB
+            | Total RAM          : ${memorySize / 1024 / 1024} MB
+            | Java version       : ${System.getProperty("java.version")}
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
