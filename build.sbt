@@ -16,7 +16,7 @@ val http4sEmberVersion         = "0.23.30"
 val http4sJdkHttpClientVersion = "0.10.0"
 val jwtVersion                 = "10.0.4"
 val bouncycastleVersion        = "1.70"
-val weaverVersion              = "0.8.4"
+val weaverVersion              = "0.9.3"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
 val lucumaItcVersion           = "0.43.0"
@@ -218,8 +218,8 @@ lazy val ssoService = project
       "org.tpolecat"        %% "natchez-log"             % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes" % lucumaGraphQLRoutesVersion,
       "io.circe"            %% "circe-literal"         % circeVersion  % Test,
-      "com.disneystreaming" %% "weaver-cats"           % weaverVersion % Test,
-      "com.disneystreaming" %% "weaver-scalacheck"     % weaverVersion % Test
+      "org.typelevel" %% "weaver-cats"           % weaverVersion % Test,
+      "org.typelevel" %% "weaver-scalacheck"     % weaverVersion % Test
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",
