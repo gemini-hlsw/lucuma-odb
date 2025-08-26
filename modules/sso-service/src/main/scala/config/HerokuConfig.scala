@@ -3,6 +3,7 @@
 
 package lucuma.sso.service.config
 
+import buildinfo.BuildInfo
 import cats.implicits.*
 import ciris.*
 import lucuma.sso.service.config.HerokuConfig.Default
@@ -71,7 +72,7 @@ object HerokuConfig {
     envOrProp("HEROKU_DYNO_ID").as[UUID],
     envOrProp("HEROKU_RELEASE_CREATED_AT").as(using isoLocalDateTime),
     envOrProp("HEROKU_RELEASE_VERSION"),
-    envOrProp("HEROKU_SLUG_COMMIT"),
+    optValue(BuildInfo.gitHeadCommit),
     envOrProp("HEROKU_SLUG_DESCRIPTION"),
   ).mapN(Default.apply)
 
