@@ -110,12 +110,12 @@ lazy val herokuPush =
       s"docker tag noirlab/lucuma-sso-service registry.heroku.com/$herokuSsoAppName/web",
       s"docker tag noirlab/lucuma-odb-service registry.heroku.com/$herokuOdbAppName/web",
       s"docker tag noirlab/obscalc-service registry.heroku.com/$herokuOdbAppName/obscalc",
-      s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName/calibrations",
+      s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName/calibration",
       // Push
       s"docker push registry.heroku.com/$herokuSsoAppName/web",
       s"docker push registry.heroku.com/$herokuOdbAppName/web",
       s"docker push registry.heroku.com/$herokuOdbAppName/obscalc",
-      s"docker push registry.heroku.com/$herokuOdbAppName/calibrations",
+      s"docker push registry.heroku.com/$herokuOdbAppName/calibration",
     ),
     name = Some("Push Docker images to Heroku")
   )
@@ -124,7 +124,7 @@ lazy val herokuRelease =
   WorkflowStep.Run(
     List(
       s"heroku container:release web -a $herokuSsoAppName -v",
-      s"heroku container:release web obscalc calibrations -a $herokuOdbAppName -v"
+      s"heroku container:release web obscalc calibration -a $herokuOdbAppName -v"
     ),
     name = Some("Release dev app in Heroku")
   )
