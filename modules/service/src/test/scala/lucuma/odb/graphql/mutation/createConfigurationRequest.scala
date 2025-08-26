@@ -43,12 +43,14 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                         skyBackground
                         waterVapor
                       }
-                      referenceCoordinates {
-                        ra { 
-                          hms 
-                        }
-                        dec { 
-                          dms 
+                      target {
+                        coordinates {
+                          ra { 
+                            hms 
+                          }
+                          dec { 
+                            dms 
+                          }
                         }
                       }
                       observingMode {
@@ -77,12 +79,14 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                         "skyBackground" : "DARKEST",
                         "waterVapor" : "WET"
                       },
-                      "referenceCoordinates" : {
-                        "ra" : {
-                          "hms" : "05:46:13.138550"
-                        },
-                        "dec" : {
-                          "dms" : "-00:06:04.916777"
+                      "target" : {
+                        "coordinates" : {
+                          "ra" : {
+                            "hms" : "05:46:13.138550"
+                          },
+                          "dec" : {
+                            "dms" : "-00:06:04.916777"
+                          }
                         }
                       },
                       "observingMode" : {

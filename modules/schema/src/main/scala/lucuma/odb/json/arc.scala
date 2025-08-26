@@ -13,14 +13,14 @@ import lucuma.core.math.Arc
 
 object arc {
 
-  extension [A](a: Arc[A]) private def tag: ArcType =
+  extension [A](a: Arc[A]) def tag: ArcType =
     a match
       case Arc.Empty() => ArcType.Empty
       case Arc.Full() => ArcType.Full
       case Arc.Partial(_, _) => ArcType.Partial
 
   given [A: Decoder: Angular]: Decoder[Arc[A]] = hc =>
-    hc.downField("tag").as[ArcType].flatMap:
+    hc.downField("type").as[ArcType].flatMap:
       case ArcType.Empty   => Right(Arc.Empty())
       case ArcType.Full    => Right(Arc.Full())
       case ArcType.Partial =>
@@ -31,7 +31,7 @@ object arc {
 
   given [A: Encoder: Angular]: Encoder[Arc[A]] = a =>
     Json.obj(
-      "tag"   -> a.tag.asJson,
+      "type"   -> a.tag.asJson,
       "start" -> Arc.start.getOption(a).asJson,
       "end"   -> Arc.end.getOption(a).asJson,
     )

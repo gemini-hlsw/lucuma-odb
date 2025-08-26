@@ -11,6 +11,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import munit.TestOptions
 
 import ObservingModeSetupOperations.*
 
@@ -291,6 +292,25 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       }
     }
   """
+
+  enum TargetType:
+    case Sidereal, Nonsidereal, Opportunity
+
+  /** Create multiple tests that take an injected Target constructor. */
+  def testWithTargetTypes(
+    name: String | TestOptions,
+    ctors: Map[TargetType, (User, Program.Id) => IO[Target.Id]] =
+      Map(
+        TargetType.Sidereal    -> ((u, p) => createTargetWithProfileAs(u, p)),
+        TargetType.Opportunity -> ((u, p) => createOpportunityTargetAs(u, p)),
+      )
+  )(body: (TargetType, (User, Program.Id) => IO[Target.Id]) => Any) =
+    ctors.foreach: (tt, fun) =>
+      val prefix = s"[$tt]".padTo(13, ' ')
+      val ops = name match
+        case s: String => TestOptions(s"$prefix $name")
+        case o: TestOptions => o.withName(s"$prefix ${o.name}")          
+      test(ops)(body(tt, fun))
 
   def createTargetWithProfileAs(
     user:     User,
