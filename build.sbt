@@ -147,6 +147,15 @@ ThisBuild / githubWorkflowAddedJobs +=
     cond = Some(allConds(mainCond, geminiRepoCond))
   )
 
+lazy val buildInfoSettings = Seq(
+  buildInfoKeys         := Seq[BuildInfoKey](
+      scalaVersion,
+      sbtVersion,
+      git.gitHeadCommit,
+      "buildDateTime"       -> System.currentTimeMillis()
+    )
+)
+
 lazy val ssoFrontendClient =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -185,7 +194,8 @@ lazy val ssoBackendClient = project
 lazy val ssoService = project
   .in(file("modules/sso-service"))
   .dependsOn(ssoBackendClient)
-  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
+  .settings(buildInfoSettings)
   .settings(
     name := "lucuma-sso-service",
     libraryDependencies ++= Seq(
@@ -306,7 +316,8 @@ lazy val smartgcal = project
 lazy val service = project
   .in(file("modules/service"))
   .dependsOn(binding, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
-  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
+  .settings(buildInfoSettings)
   .settings(
     name                        := "lucuma-odb-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
@@ -360,6 +371,7 @@ lazy val service = project
     executableScriptName            := "lucuma-odb-service",
     dockerExposedPorts ++= Seq(8082)
   )
+  
 
 lazy val obscalc = project
   .in(file("modules/obscalc"))
