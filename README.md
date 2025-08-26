@@ -216,7 +216,6 @@ extension](https://devcenter.heroku.com/articles/dyno-metadata) to get the full 
 | `HEROKU_DYNO_ID` |
 | `HEROKU_RELEASE_CREATED_AT` |
 | `HEROKU_RELEASE_VERSION` |
-| `HEROKU_SLUG_COMMIT` |
 | `HEROKU_SLUG_DESCRIPTION` |
 
 
