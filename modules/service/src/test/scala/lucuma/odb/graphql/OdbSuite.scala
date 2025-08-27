@@ -240,7 +240,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcImagingResult), FakeBandOrLine, None, Nil).asRight
                 )
               )
             ).get
@@ -270,7 +270,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               NonEmptyChain.fromSeq(
                 List.fill(input.asterism.length)(
                   TargetIntegrationTimeOutcome(
-                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some).asRight
+                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some, Nil).asRight
                   )
                 )
               ).get
