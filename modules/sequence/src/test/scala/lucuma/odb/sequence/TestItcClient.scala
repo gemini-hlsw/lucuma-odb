@@ -68,7 +68,7 @@ object TestItcClient {
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine, snAt).asRight
+                  TargetIntegrationTime(Zipper.fromNel(NonEmptyList.one(resultʹ)), bandOrLine, snAt, Nil).asRight
                 )
               )
             ).get
@@ -85,7 +85,7 @@ object TestItcClient {
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine, None).asRight
+                  TargetIntegrationTime(Zipper.of(result, result), bandOrLine, None, Nil).asRight
                 )
               )
             ).get

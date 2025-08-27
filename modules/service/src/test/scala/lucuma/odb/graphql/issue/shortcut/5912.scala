@@ -53,7 +53,7 @@ class ShortCut_5912 extends ExecutionTestSupportForFlamingos2:
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine, fakeSignalToNoiseAt(Flamingos2Filter.JH.wavelength).some).asRight
+                  TargetIntegrationTime(Zipper.one(fakeItcSpectroscopyResult), FakeBandOrLine, fakeSignalToNoiseAt(Flamingos2Filter.JH.wavelength).some, Nil).asRight
                 )
               )
             ).get

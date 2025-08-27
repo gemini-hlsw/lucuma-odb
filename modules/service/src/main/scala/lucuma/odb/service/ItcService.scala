@@ -349,7 +349,8 @@ object ItcService {
                       TargetIntegrationTime(
                         Zipper.one(IntegrationTime(min, 1.refined)),
                         Band.R.asLeft, // Band is meaningless here, but we need to provide one
-                        None // Imaging doesn't return signal-to-noise at
+                        None, // Imaging doesn't return signal-to-noise at
+                        Nil // No ccd data for this case
                       ).asRight
                     case Right(r) if r.times.focus.exposureTime > max =>
                       r.copy(times = r.times.map(_.copy(exposureTime = max))).asRight
