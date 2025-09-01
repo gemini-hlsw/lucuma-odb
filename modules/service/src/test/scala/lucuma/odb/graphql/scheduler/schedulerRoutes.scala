@@ -62,7 +62,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     AtomDigest(
       Zero,  // we skip the atom id comparison
       ObserveClass.Science,
-      CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(3892500000L)),
+      CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(3906781250L)),
       Set(StepType.Gcal, StepType.Science),
       Set(GcalLampType.Arc, GcalLampType.Flat)
     )
