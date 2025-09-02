@@ -231,7 +231,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
-          createGmosNorthImagingObservationAs(pi, pid, None, tid).flatMap { oid =>
+          createGmosNorthImagingObservationAs(pi, pid, tid).flatMap { oid =>
             expect(
               user = pi,
               query = s"""
@@ -340,7 +340,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
-          createGmosSouthImagingObservationAs(pi, pid, None, tid).flatMap { oid =>
+          createGmosSouthImagingObservationAs(pi, pid, tid).flatMap { oid =>
             expect(
               user = pi,
               query = s"""

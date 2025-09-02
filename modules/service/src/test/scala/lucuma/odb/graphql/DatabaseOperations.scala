@@ -43,6 +43,7 @@ import lucuma.core.model.ExecutionEvent.DatasetEvent
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.ExecutionEvent.SlewEvent
 import lucuma.core.model.ExecutionEvent.StepEvent
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -592,24 +593,49 @@ trait DatabaseOperations { this: OdbSuite =>
     createObservationAs(user, pid, None, tids*)
 
   def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createGmosNorthImagingObservationAs(user, pid, None, tids*)
+    createGmosNorthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
 
-  def createGmosNorthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, offsets, tids*)
+  def createGmosNorthImagingObservationAs(
+    user:    User,
+    pid:     Program.Id,
+    iq:      ImageQuality.Preset = ImageQuality.Preset.PointEight,
+    offsets: Option[String] = None,
+    tids:    Target.Id*
+  ): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosNorthImaging, iq, offsets, tids*)
 
   def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createGmosSouthImagingObservationAs(user, pid, None, tids*)
+    createGmosSouthImagingObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
 
-  def createGmosSouthImagingObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, offsets, tids*)
+  def createGmosSouthImagingObservationAs(
+    user:    User,
+    pid:     Program.Id,
+    iq:      ImageQuality.Preset = ImageQuality.Preset.PointEight,
+    offsets: Option[String] = None,
+    tids:    Target.Id*
+  ): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GmosSouthImaging, iq, offsets, tids*)
 
   def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createFlamingos2LongSlitObservationAs(user, pid, None, tids*)
+    createFlamingos2LongSlitObservationAs(user, pid, ImageQuality.Preset.PointEight, None, tids*)
 
-  def createFlamingos2LongSlitObservationAs(user: User, pid: Program.Id, offsets: Option[String] = None, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, offsets, tids*)
+  def createFlamingos2LongSlitObservationAs(
+    user:    User,
+    pid:     Program.Id,
+    iq:      ImageQuality.Preset = ImageQuality.Preset.PointEight,
+    offsets: Option[String] = None,
+    tids:    Target.Id*
+    ): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
-  private def createObservationWithSpatialOffsets(user: User, pid: Program.Id, observingMode: ObservingModeType, offsets: Option[String], tids: Target.Id*): IO[Observation.Id] =
+  private def createObservationWithSpatialOffsets(
+    user:          User,
+    pid:           Program.Id,
+    observingMode: ObservingModeType,
+    iq:            ImageQuality.Preset,
+    offsets:       Option[String],
+    tids:          Target.Id*
+  ): IO[Observation.Id] =
     query(
       user = user,
       query =
@@ -623,6 +649,9 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
                 scienceRequirements: ${scienceRequirementsObject(observingMode)}
                 observingMode: ${observingModeWithSpatialOffsets(observingMode, offsets)}
+                constraintSet: {
+                  imageQuality: ${iq.tag.toScreamingSnakeCase}
+                }
               }
             }) {
               observation {
