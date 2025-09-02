@@ -2175,6 +2175,65 @@ class createObservation extends OdbSuite {
       }
     }
 
+  test("[gmos imaging] can create GMOS North imaging observation with default binning of 1"):
+    val gaussian: String = """
+      sourceProfile: {
+        gaussian: {
+          fwhm: { arcseconds: 0.1 }
+          spectralDefinition: {
+            bandNormalized: {
+              sed: {
+                stellarLibrary: B5_III
+              }
+              brightnesses: [
+                {
+                  band: R
+                  value: 15.0
+                  units: VEGA_MAGNITUDE
+                }
+              ]
+            }
+          }
+        }
+      }
+    """
+
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid, sourceProfile = gaussian).flatMap { tid =>
+        createGmosNorthImagingObservationAs(pi, pid, iq = ImageQuality.Preset.PointOne, offsets = None, tid).flatMap { oid =>
+          expect(pi, s"""
+            query {
+              observation(observationId: "$oid") {
+                observingMode {
+                  gmosNorthImaging {
+                    filters
+                    bin
+                    ampReadMode
+                    ampGain
+                    roi
+                  }
+                }
+              }
+            }
+          """, json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthImaging": {
+                    "filters": ["G_PRIME", "R_PRIME"],
+                    "bin": "ONE",
+                    "ampReadMode": "SLOW",
+                    "ampGain": "LOW",
+                    "roi": "FULL_FRAME"
+                  }
+                }
+              }
+            }
+          """.asRight)
+        }
+      }
+    }
+
   test("[gmos imaging] can create GMOS South imaging observation"):
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>

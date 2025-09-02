@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
@@ -573,7 +574,7 @@ class cloneObservation extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>
         // Create a GMOS North imaging observation with spatial offsets using the simplified helper
-        createGmosNorthImagingObservationAs(pi, pid, Some("""[
+        createGmosNorthImagingObservationAs(pi, pid, ImageQuality.Preset.PointEight, Some("""[
           { p: { arcseconds: "1.5" }, q: { arcseconds: "2.0" } },
           { p: { arcseconds: "-0.5" }, q: { arcseconds: "1.0" } }
         ]"""), tid).flatMap { oid =>
@@ -646,7 +647,7 @@ class cloneObservation extends OdbSuite {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).flatMap { tid =>
         // Create a Flamingos2 long slit observation with spatial offsets
-        createFlamingos2LongSlitObservationAs(pi, pid, Some("""[
+        createFlamingos2LongSlitObservationAs(pi, pid, ImageQuality.Preset.PointEight, Some("""[
           { p: { arcseconds: 0.0 }, q: { arcseconds: 1.5 } },
           { p: { arcseconds: 0.0 }, q: { arcseconds: 0.5 } },
           { p: { arcseconds: 0.0 }, q: { arcseconds: 2.25 } },
