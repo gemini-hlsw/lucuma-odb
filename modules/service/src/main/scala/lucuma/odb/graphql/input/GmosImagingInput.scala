@@ -5,13 +5,10 @@ package lucuma.odb.graphql.input
 
 import cats.data.NonEmptyList
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosDouble
 import grackle.Result
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosBinning
 import lucuma.core.math.Offset
-import lucuma.core.model.ImageQuality
-import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.binding.*
@@ -45,24 +42,6 @@ object GmosImagingInput:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthImaging
 
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): lucuma.odb.sequence.gmos.imaging.Config.GmosNorth =
-        lucuma.odb.sequence.gmos.imaging.Config.GmosNorth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          filters,
-          common.explicitMultipleFiltersMode,
-          common.explicitBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.offsets
-        )
-
     object North:
 
       val Binding: Matcher[North] =
@@ -93,24 +72,6 @@ object GmosImagingInput:
 
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthImaging
-
-      def toObservingMode(
-        sourceProfile: SourceProfile,
-        imageQuality:  ImageQuality.Preset,
-        sampling:      PosDouble
-      ): lucuma.odb.sequence.gmos.imaging.Config.GmosSouth =
-        lucuma.odb.sequence.gmos.imaging.Config.GmosSouth(
-          sourceProfile,
-          imageQuality,
-          sampling,
-          filters,
-          common.explicitMultipleFiltersMode,
-          common.explicitBin,
-          common.explicitAmpReadMode,
-          common.explicitAmpGain,
-          common.explicitRoi,
-          common.offsets
-        )
 
     object South:
 

@@ -5,8 +5,6 @@ package lucuma.odb.sequence
 package gmos.longslit
 
 import cats.Eq
-import cats.syntax.option.*
-import cats.syntax.order.*
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosAmpGain
@@ -222,22 +220,6 @@ object Config:
 
   object GmosNorth:
 
-    def reconcile(a: GmosNorth, modes: List[ObservingMode]): Option[GmosNorth] =
-      modes.headOption match
-        case None => a.some
-
-        case Some(b: GmosNorth) =>
-          if a === b then
-            reconcile(a, modes.tail)
-          else
-            val x  = a.xBin min b.xBin
-            val y  = a.yBin min b.yBin
-            val aʹ = a.copy(common = a.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
-            val bʹ = b.copy(common = b.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
-            if aʹ === bʹ then reconcile(aʹ, modes.tail) else none
-
-        case _  => none
-
     given Eq[GmosNorth] =
       Eq.by: a =>
         (
@@ -291,22 +273,6 @@ object Config:
       common.explicitSpatialOffsets
 
   object GmosSouth:
-
-    def reconcile(a: GmosSouth, modes: List[ObservingMode]): Option[GmosSouth] =
-      modes.headOption match
-        case None => a.some
-
-        case Some(b: GmosSouth) =>
-          if a === b then
-            reconcile(a, modes.tail)
-          else
-            val x  = a.xBin min b.xBin
-            val y  = a.yBin min b.yBin
-            val aʹ = a.copy(common = a.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
-            val bʹ = b.copy(common = b.common.copy(explicitXBin = none, defaultXBin = x, explicitYBin = none, defaultYBin = y))
-            if aʹ === bʹ then reconcile(aʹ, modes.tail) else none
-
-        case _ => none
 
     given Eq[GmosSouth] =
       Eq.by: a =>
