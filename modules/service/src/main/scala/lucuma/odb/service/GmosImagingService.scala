@@ -10,10 +10,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.sequence.gmos.binning.DefaultSampling
 import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.sequence.gmos.imaging.Config
@@ -29,11 +26,11 @@ sealed trait GmosImagingService[F[_]] {
 
   def selectNorth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]]
+  ): F[Map[Observation.Id, Config.GmosNorth]]
 
   def selectSouth(
     which: List[Observation.Id]
-  ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]]
+  ): F[Map[Observation.Id, Config.GmosSouth]]
 
   def insertNorth(
     input: GmosImagingInput.Create.North
@@ -78,64 +75,58 @@ object GmosImagingService {
         which:   List[Observation.Id],
         f:       NonEmptyList[Observation.Id] => AppliedFragment,
         decoder: Decoder[A]
-      ): F[List[(Observation.Id, ImageQuality.Preset, A)]] =
+      ): F[List[(Observation.Id, A)]] =
         NonEmptyList
           .fromList(which)
-          .fold(Applicative[F].pure(List.empty)) { oids =>
+          .fold(Applicative[F].pure(List.empty)): oids =>
             val af = f(oids)
-            session.prepareR(af.fragment.query(observation_id *: image_quality_preset *: decoder)).use { pq =>
+            session.prepareR(af.fragment.query(observation_id *: decoder)).use: pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList
-            }
-          }
 
-      val common: Decoder[GmosImagingInput.Create.Common] =
+      val common: Decoder[Config.Common] =
         (
-          multiple_filters_mode.opt ~
-          gmos_binning.opt       ~
-          gmos_amp_read_mode.opt ~
-          gmos_amp_gain.opt      ~
-          gmos_roi.opt           ~
+          multiple_filters_mode.opt *:
+          gmos_binning              *:
+          gmos_binning.opt          *:
+          gmos_amp_read_mode.opt    *:
+          gmos_amp_gain.opt         *:
+          gmos_roi.opt              *:
           text
-        ).emap { case (((((mf, b), arm), ag), roi), offsets) =>
-          if (offsets.isEmpty) {
-            GmosImagingInput.Create.Common(mf, b, arm, ag, roi, Nil).asRight
-          } else {
-            OffsetsFormat.getOption(offsets) match {
-              case Some(offs) => GmosImagingInput.Create.Common(mf, b, arm, ag, roi, offs).asRight
+        ).emap: (mf, defaultBin, explicitBin, arm, ag, roi, offsets) =>
+          if offsets.isEmpty then
+            Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, Nil).asRight
+          else
+            OffsetsFormat.getOption(offsets) match
+              case Some(offs) => Config.Common(defaultBin, explicitBin, mf, arm, ag, roi, offs).asRight
               case None => s"Could not parse '$offsets' as a spatial offsets list.".asLeft
-            }
-          }
-        }
 
-      val north: Decoder[GmosImagingInput.Create.North] =
+      val north: Decoder[Config.GmosNorth] =
         (_gmos_north_filter *:
          common
         ).emap { case (f, c) =>
           NonEmptyList.fromList(f.toList).fold(
             "Filters list cannot be empty".asLeft
-          )(GmosImagingInput.Create.North(_, c).asRight)
+          )(Config.GmosNorth(_, c).asRight)
         }
 
-      val south: Decoder[GmosImagingInput.Create.South] =
+      val south: Decoder[Config.GmosSouth] =
         (_gmos_south_filter *:
          common
         ).emap { case (f, c) =>
           NonEmptyList.fromList(f.toList).fold(
             "Filters list cannot be empty".asLeft
-          )(GmosImagingInput.Create.South(_, c).asRight)
+          )(Config.GmosSouth(_, c).asRight)
         }
 
       override def selectNorth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => Config.GmosNorth]] =
-        select(which, Statements.selectGmosNorthImaging, north)
-          .map(_.map { case (oid, iq, gn) => (oid, gn.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      ): F[Map[Observation.Id, Config.GmosNorth]] =
+        select(which, Statements.selectGmosNorthImaging, north).map(_.toMap)
 
       override def selectSouth(
         which: List[Observation.Id]
-      ): F[Map[Observation.Id, SourceProfile => Config.GmosSouth]] =
-        select(which, Statements.selectGmosSouthImaging, south)
-          .map(_.map { case (oid, iq, gs) => (oid, gs.toObservingMode(_, iq, DefaultSampling)) }.toMap)
+      ): F[Map[Observation.Id, Config.GmosSouth]] =
+        select(which, Statements.selectGmosSouthImaging, south).map(_.toMap)
 
       override def insertNorth(
         input: GmosImagingInput.Create.North
@@ -203,16 +194,15 @@ object GmosImagingService {
       sql"""
         SELECT
           img.c_observation_id,
-          ob.c_image_quality,
           img.c_filters,
           img.c_multiple_filters_mode,
+          img.c_bin_default,
           img.c_bin,
           img.c_amp_read_mode,
           img.c_amp_gain,
           img.c_roi,
           img.c_offsets
         FROM #$viewName img
-        INNER JOIN t_observation ob ON img.c_observation_id = ob.c_observation_id
       """(Void) |+|
       void"""
         WHERE

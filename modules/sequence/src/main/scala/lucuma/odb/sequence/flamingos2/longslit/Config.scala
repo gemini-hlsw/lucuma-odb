@@ -15,7 +15,6 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.math.Offset
 import lucuma.core.syntax.all.*
-import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -99,17 +98,3 @@ object Config:
       explicitReadoutMode,
       explicitSpatialOffsets
     )
-
-  def reconcile(a: Config, modes: List[ObservingMode]): Option[Config] =
-    modes.headOption match {
-      case None                                                  =>
-        a.some
-
-      case Some(b: Config) =>
-        Option.when(a === b)(
-          reconcile(a, modes.tail)
-        ).flatten
-
-      case _                                                     =>
-        none
-    }

@@ -43,8 +43,8 @@ import lucuma.core.model.ExecutionEvent.DatasetEvent
 import lucuma.core.model.ExecutionEvent.SequenceEvent
 import lucuma.core.model.ExecutionEvent.SlewEvent
 import lucuma.core.model.ExecutionEvent.StepEvent
-import lucuma.core.model.ImageQuality
 import lucuma.core.model.Group
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.PartnerLink

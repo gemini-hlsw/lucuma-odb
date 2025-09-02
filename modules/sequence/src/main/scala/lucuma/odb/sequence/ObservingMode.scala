@@ -4,7 +4,6 @@
 package lucuma.odb.sequence
 
 import cats.Eq
-import cats.data.NonEmptyList
 import cats.syntax.eq.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
@@ -38,14 +37,6 @@ extension (self: ObservingMode)
       case _: GmosSouthImaging    => ObservingModeType.GmosSouthImaging
 
 object ObservingMode:
-
-  def reconcile(modes: NonEmptyList[ObservingMode]): Option[ObservingMode] =
-    modes.head match
-      case f2:  Flamingos2Config    => Flamingos2Config.reconcile(f2, modes.tail)
-      case gnl: GmosNorthLongSlit   => GmosNorthLongSlit.reconcile(gnl, modes.tail)
-      case gsl: GmosSouthLongSlit   => GmosSouthLongSlit.reconcile(gsl, modes.tail)
-      case gni: GmosNorthImaging    => GmosNorthImaging.reconcile(gni, modes.tail)
-      case gsi: GmosSouthImaging    => GmosSouthImaging.reconcile(gsi, modes.tail)
 
   given HashBytes[ObservingMode] =
     case f2:  Flamingos2Config    => f2.hashBytes
