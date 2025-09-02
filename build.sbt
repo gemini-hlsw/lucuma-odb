@@ -97,25 +97,31 @@ lazy val sbtDockerPublishLocal =
     name = Some("Build Docker images")
   )
 
-lazy val herokuOdbAppName = "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb-dev' }}"
-lazy val herokuSsoAppName = "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso-dev' }}"
+lazy val herokuOdbAppName = "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}"
+lazy val herokuSsoAppName = "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}"
+
+lazy val environments = List("dev", "staging", "production")
 
 lazy val herokuPush =
   WorkflowStep.Run(
     List(
       // Login
       "npm install -g heroku",
-      "heroku container:login",
-      // Tag
-      s"docker tag noirlab/lucuma-sso-service registry.heroku.com/$herokuSsoAppName/web",
-      s"docker tag noirlab/lucuma-odb-service registry.heroku.com/$herokuOdbAppName/web",
-      s"docker tag noirlab/obscalc-service registry.heroku.com/$herokuOdbAppName/obscalc",
-      s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName/calibration",
-      // Push
-      s"docker push registry.heroku.com/$herokuSsoAppName/web",
-      s"docker push registry.heroku.com/$herokuOdbAppName/web",
-      s"docker push registry.heroku.com/$herokuOdbAppName/obscalc",
-      s"docker push registry.heroku.com/$herokuOdbAppName/calibration",
+      "heroku container:login"
+    ) ++
+      environments.flatMap(env =>
+        List(
+          // Tag
+          s"docker tag noirlab/lucuma-sso-service registry.heroku.com/$herokuSsoAppName-$env/web",
+          s"docker tag noirlab/lucuma-odb-service registry.heroku.com/$herokuOdbAppName-$env/web",
+          s"docker tag noirlab/obscalc-service registry.heroku.com/$herokuOdbAppName-$env/obscalc",
+          s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName-$env/calibration",
+          // Push
+          s"docker push registry.heroku.com/$herokuSsoAppName-$env/web",
+          s"docker push registry.heroku.com/$herokuOdbAppName-$env/web",
+          s"docker push registry.heroku.com/$herokuOdbAppName-$env/obscalc",
+          s"docker push registry.heroku.com/$herokuOdbAppName-$env/calibration",
+        )
     ),
     name = Some("Push Docker images to Heroku")
   )
@@ -123,8 +129,8 @@ lazy val herokuPush =
 lazy val herokuRelease =
   WorkflowStep.Run(
     List(
-      s"heroku container:release web -a $herokuSsoAppName -v",
-      s"heroku container:release web obscalc calibration -a $herokuOdbAppName -v"
+      s"heroku container:release web -a $herokuSsoAppName-${environments.head} -v",
+      s"heroku container:release web obscalc calibration -a $herokuOdbAppName-${environments.head} -v"
     ),
     name = Some("Release dev app in Heroku")
   )
