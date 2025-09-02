@@ -42,6 +42,6 @@ object OdbErrorExtensions:
     def fromGraphQLError(gqe: GraphQLError): Option[OdbError] =
       for
         ext <- gqe.extensions
-        obj <- ext.get(Key)
+        obj <- ext(Key)
         err <- obj.as[OdbError].toOption
       yield err
