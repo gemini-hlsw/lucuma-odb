@@ -10,7 +10,6 @@ import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
-import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.Services.SuperUserAccess
@@ -22,7 +21,7 @@ sealed trait ObservingModeServices[F[_]] {
 
   def selectObservingMode(
     which: List[(Observation.Id, ObservingModeType)]
-  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SourceProfile => ObservingMode]]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]]
 
   def createFunction(
     input: ObservingModeInput.Create
@@ -53,37 +52,36 @@ object ObservingModeServices {
 
       override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
-      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SourceProfile => ObservingMode]] = {
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]] =
         import ObservingModeType.*
 
         which.groupMap(_._2)(_._1).toList.traverse {
           case (Flamingos2LongSlit, oids) =>
             flamingos2LongSlitService
               .select(oids)
-              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
+              .map(_.widen[ObservingMode])
 
           case (GmosNorthLongSlit, oids) =>
             gmosLongSlitService
               .selectNorth(oids)
-              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
+              .map(_.widen[ObservingMode])
 
           case (GmosNorthImaging, oids) =>
             gmosImagingService
               .selectNorth(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+              .map(_.widen[ObservingMode])
 
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
-              .map(_.view.mapValues(c => ((_: SourceProfile) => c).widen[ObservingMode]).toMap)
+              .map(_.widen[ObservingMode])
 
           case (GmosSouthImaging, oids) =>
             gmosImagingService
               .selectSouth(oids)
-              .map(_.view.mapValues(_.widen[ObservingMode]).toMap)
+              .map(_.widen[ObservingMode])
 
-        }.map(_.fold(Map.empty[Observation.Id, SourceProfile => ObservingMode])(_ ++ _))
-      }
+        }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
       override def createFunction(
         input: ObservingModeInput.Create

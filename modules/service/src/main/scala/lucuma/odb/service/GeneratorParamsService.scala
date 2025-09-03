@@ -5,7 +5,6 @@ package lucuma.odb.service
 
 import cats.Eq
 import cats.Order
-import cats.data.EitherNel
 import cats.data.NonEmptyList
 import cats.data.Validated
 import cats.data.ValidatedNel
@@ -225,27 +224,28 @@ object GeneratorParamsService {
 
       private def observingMode(
         params: NonEmptyList[TargetParams],
-        config: Option[SourceProfile => ObservingMode]
+        config: Option[ObservingMode]
       ): Either[Error, ObservingMode] =
-        val configs: EitherNel[MissingParam, NonEmptyList[ObservingMode]] =
-          params.traverse: p =>
-            for
-              t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
-              s <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
-              f <- config.toRightNel(MissingParam.forObservation("observing mode"))
-            yield f(s)
+        val targetCheck =
+          params
+            .traverse: p =>
+              for
+                t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
+                _ <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
+              yield ()
+            .void
 
-        // All of the `ObservingMode`s that we compute have to be the same.
-        // Otherwise we would need to configure the instrument differently for
-        // different stars in the asterism.
-        configs
-          .leftMap(nel => Error.MissingData(MissingParamSet.fromParams(nel)))
-          .flatMap: modes =>
-            ObservingMode.reconcile(modes).fold(Error.ConflictingData.asLeft)(_.asRight)
+        val configCheck =
+          for
+            _ <- targetCheck
+            c <- config.toRightNel(MissingParam.forObservation("observing mode"))
+          yield c
+
+        configCheck.leftMap(nel => Error.MissingData(MissingParamSet.fromParams(nel)))
 
       private def toObsGeneratorParams(
         obsParams: ObsParams,
-        config:    Option[SourceProfile => ObservingMode]
+        config:    Option[ObservingMode]
       ): Either[Error, GeneratorParams] =
         observingMode(obsParams.targets, config).map:
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c) =>

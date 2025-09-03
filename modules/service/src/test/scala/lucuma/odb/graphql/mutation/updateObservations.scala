@@ -10,14 +10,17 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Group
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.ObservationService
@@ -3448,6 +3451,83 @@ class updateObservations extends OdbSuite
         }
       """.asRight
     oneUpdateTest(pi, update, query, expected, ObservingModeType.GmosSouthImaging.some)
+
+
+  test("observing mode: update default GMOS imaging bin by changing IQ"):
+    val gaussian: String = """
+      sourceProfile: {
+        gaussian: {
+          fwhm: { arcseconds: 0.1 }
+          spectralDefinition: {
+            bandNormalized: {
+              sed: {
+                stellarLibrary: B5_III
+              }
+              brightnesses: [
+                {
+                  band: R
+                  value: 15.0
+                  units: VEGA_MAGNITUDE
+                }
+              ]
+            }
+          }
+        }
+      }
+    """
+
+    def expectBinning(o: Observation.Id, b: GmosBinning): IO[Unit] =
+      expect(
+        user  = pi,
+        query = s"""
+            query {
+              observation(observationId: "$o") {
+                observingMode {
+                  gmosNorthImaging {
+                    bin
+                  }
+                }
+              }
+            }
+        """,
+        json"""
+          {
+            "observation": {
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "bin": ${b.tag.toScreamingSnakeCase}
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+    val update: String = """
+      constraintSet: {
+        imageQuality: POINT_ONE
+      }
+    """
+
+    val throwawayQuery = """
+      observations {
+        observingMode {
+          gmosSouthImaging {
+            defaultBin
+          }
+        }
+      }
+    """
+
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetAs(pi, p, sourceProfile = gaussian)
+      o <- createGmosNorthImagingObservationAs(pi, p, iq = ImageQuality.Preset.OnePointZero, offsets = None, t)
+      _ <- expectBinning(o, GmosBinning.Two)
+      _ <- query(pi, updateObservationsMutation(o, update, throwawayQuery))
+      _ <- expectBinning(o, GmosBinning.One)
+    yield ()
+
 
   test("observing mode: (fail to) update GMOS imaging with empty filters"):
 
