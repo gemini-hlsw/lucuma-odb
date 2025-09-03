@@ -182,8 +182,8 @@ class observation_configurationRequests
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-          case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, None, tid)
-          case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, None, tid)
+          case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
     yield oid
 
   Enumerated[ObservingModeType].all.foreach { mode =>

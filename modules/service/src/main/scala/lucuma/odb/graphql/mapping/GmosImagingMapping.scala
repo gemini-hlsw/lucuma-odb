@@ -28,8 +28,7 @@ trait GmosImagingMapping[F[_]]
     val multipleFiltersMode: FieldMapping        = explicitOrElseDefault[MultipleFiltersMode]("multipleFiltersMode", "explicitMultipleFiltersMode", "defaultMultipleFiltersMode")
     val defaultMultipleFiltersMode: FieldMapping = CursorField[MultipleFiltersMode]("defaultMultipleFiltersMode", _ => Result(DefaultMultipleFiltersMode))
 
-    val bin: FieldMapping        = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
-    val defaultBin: FieldMapping = CursorField[GmosBinning]("defaultBin", _ => Result(DefaultBin))
+    val bin: FieldMapping = explicitOrElseDefault[GmosBinning]("bin", "explicitBin", "defaultBin")
 
     val ampReadMode: FieldMapping        = explicitOrElseDefault[GmosAmpReadMode]("ampReadMode", "explicitAmpReadMode", "defaultAmpReadMode")
     val defaultAmpReadMode: FieldMapping = CursorField[GmosAmpReadMode]("defaultAmpReadMode", _ => Result(DefaultAmpReadMode))
@@ -65,7 +64,7 @@ trait GmosImagingMapping[F[_]]
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosNorthImagingView.ExplicitBin),
-      CommonImagingFields.defaultBin,
+      SqlField("defaultBin",  GmosNorthImagingView.DefaultBin),
 
       CommonImagingFields.ampReadMode,
       SqlField("explicitAmpReadMode", GmosNorthImagingView.ExplicitAmpReadMode),
@@ -96,7 +95,7 @@ trait GmosImagingMapping[F[_]]
 
       CommonImagingFields.bin,
       SqlField("explicitBin", GmosSouthImagingView.ExplicitBin),
-      CommonImagingFields.defaultBin,
+      SqlField("defaultBin",  GmosSouthImagingView.DefaultBin),
 
       CommonImagingFields.ampReadMode,
       SqlField("explicitAmpReadMode", GmosSouthImagingView.ExplicitAmpReadMode),
@@ -114,7 +113,6 @@ trait GmosImagingMapping[F[_]]
 
 object GmosImagingMapping:
 
-  private val DefaultBin: GmosBinning = GmosBinning.Two
   private val DefaultAmpReadMode: GmosAmpReadMode = GmosAmpReadMode.Slow
   private val DefaultAmpGain: GmosAmpGain = GmosAmpGain.Low
   private val DefaultRoi: GmosRoi = GmosRoi.FullFrame
