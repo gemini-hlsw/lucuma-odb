@@ -8617,41 +8617,17 @@ type GmosNorthLongSlit {
   initialCentralWavelength: Wavelength!
 }
 
+type GmosNorthImagingModeStep {
+  filter:       GmosNorthFilter!
+  exposureTime: TimeSpan!
+  offset:       TelescopeConfig!
+}
+
 """
 GMOS North Imaging mode
 """
 type GmosNorthImaging {
-  """
-  GMOS North Filters for imaging mode (multiple filters allowed)
-  """
-  filters: [GmosNorthFilter!]!
-
-  """
-  Initial GMOS North Filters that were used when creating the imaging mode
-  """
-  initialFilters: [GmosNorthFilter!]!
-
-  """
-  Spatial offsets
-  """
-  offsets: [Offset!]!
-
-  """
-  MultipleFiltersMode, either explicitly specified in explicitMultipleFiltersMode or else taken
-  from the defaultMultipleFiltersMode.
-  """
-  multipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Default MultipleFiltersMode (GROUPED).
-  """
-  defaultMultipleFiltersMode: MultipleFiltersMode!
-
-  """
-  Optional explictly specified MultipleFiltersMode. If set it overrides the
-  default.
-  """
-  explicitMultipleFiltersMode: MultipleFiltersMode
+  steps: [[GmosNorthImagingModeStep!]!]!
 
   """
   GMOS Binning, either explicitly specified in explicitBin or else taken
