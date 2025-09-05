@@ -10,6 +10,7 @@ import cats.effect.Temporal
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Env
+import grackle.Predicate.And
 import grackle.Query
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -19,6 +20,7 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -60,6 +62,13 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       Join(AsterismTargetTable.TargetId, TargetView.TargetId)
     )
 
+  private def blindOffsetTargetObject(name: String): SqlObject =
+    SqlObject(
+      name,
+      Join(ObservationView.Id, AsterismTargetTable.ObservationId),
+      Join(AsterismTargetTable.TargetId, TargetView.TargetId)
+    )
+
   lazy val TargetEnvironmentMapping: ObjectMapping =
     ObjectMapping(TargetEnvironmentType)(
       SqlField("programId", ObservationView.ProgramId, hidden = true),
@@ -67,6 +76,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
+      blindOffsetTargetObject("blindOffsetTarget"),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
@@ -76,10 +86,22 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
     FilterOrderByOffsetLimit(
-      pred   = Some(Predicates.target.existence.includeDeleted(includeDeleted)),
+      pred   = Some(And(
+        Predicates.target.existence.includeDeleted(includeDeleted),
+        Predicates.target.targetDisposition.eql(TargetDisposition.Science)
+      )),
       oss    = List(OrderSelection[Target.Id](TargetType / "id")).some,
       offset = none,
       limit  = Option.when(firstOnly)(1),
+      child  = child
+    )
+
+  private def blindOffsetTargetQuery(child: Query): Query =
+    FilterOrderByOffsetLimit(
+      pred   = none, // Blind offset targets are handled via database joins, not GraphQL predicates
+      oss    = none,
+      offset = none,
+      limit  = 1.some,
       child  = child
     )
 
@@ -116,6 +138,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       end   <- Elab.liftR(rEnd)
       env   <- Elab.env(AvailabilityStartParam -> start, AvailabilityEndParam -> end)
     } yield env
+
+    case (TargetEnvironmentType, "blindOffsetTarget", Nil) =>
+      Elab.transformChild { child =>
+        Unique(blindOffsetTargetQuery(child))
+      }
   }
 
   def basePositionQueryHandler: EffectHandler[F] = {
@@ -195,4 +222,3 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     effectHandler(readEnv, calculate)
   }
 }
-

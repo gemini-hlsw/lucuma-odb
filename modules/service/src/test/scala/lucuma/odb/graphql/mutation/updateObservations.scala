@@ -4017,6 +4017,33 @@ class updateObservations extends OdbSuite
       """.asRight
 
     oneUpdateTest(pi, update, query, expected, Some(ObservingModeType.GmosNorthLongSlit))
+
+  test("useBlindOffset field updates"):
+    def updateBlindOffsetTest(user: User, value: Boolean): IO[Unit] =
+      for
+        pid <- createProgramAs(user)
+        oid <- createObservationAs(user, pid)
+        _   <- updateObservation(
+          user = user,
+          oid = oid,
+          update = s"useBlindOffset: $value",
+          query = "observations { useBlindOffset }",
+          expected = Right(json"""
+            {
+              "updateObservations": {
+                "observations": [
+                  {
+                    "useBlindOffset": $value
+                  }
+                ]
+              }
+            }
+          """)
+        )
+      yield ()
+
+    updateBlindOffsetTest(pi, true) *>
+      updateBlindOffsetTest(pi, false)
 }
 
 trait UpdateConstraintSetOps { this: OdbSuite =>
