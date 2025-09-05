@@ -2729,4 +2729,52 @@ class createObservation extends OdbSuite {
           }
         """.asRight
       )
+
+  test("useBlindOffset field behavior") {
+    createProgramWithUsPi(pi).flatMap { pid =>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                subtitle: "default blind offset test"
+              }
+            }) {
+              observation {
+                useBlindOffset
+              }
+            }
+          }
+          """).flatMap { js =>
+        val useBlindOffset = js.hcursor
+          .downField("createObservation").downField("observation").downField("useBlindOffset")
+          .as[Boolean]
+          .liftTo[IO]
+        assertIO(useBlindOffset, false)
+      } *>
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                subtitle: "explicit true test"
+                useBlindOffset: true
+              }
+            }) {
+              observation {
+                useBlindOffset
+              }
+            }
+          }
+          """).flatMap { js =>
+        val useBlindOffset = js.hcursor
+          .downField("createObservation").downField("observation").downField("useBlindOffset")
+          .as[Boolean]
+          .liftTo[IO]
+        assertIO(useBlindOffset, true)
+      }
+    }
+  }
 }

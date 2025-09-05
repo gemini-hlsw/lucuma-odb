@@ -3400,6 +3400,11 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
+
+  """
+  Whether blind offset is enabled for this observation
+  """
+  useBlindOffset: Boolean
 }
 
 """
@@ -5212,6 +5217,11 @@ input TargetEnvironmentInput {
   """
   explicitBase: CoordinatesInput
   asterism: [TargetId!]
+
+  """
+  The target used for acquisition if a blind offset is needed.
+  """
+  blindOffsetTarget: TargetPropertiesInput
 }
 
 """
@@ -10318,6 +10328,12 @@ type Observation {
   whether a pending update is expected.
   """
   workflow: CalculatedObservationWorkflow
+
+  """
+  Whether blind offset is enabled for this observation
+  """
+  useBlindOffset: Boolean!
+
 }
 
 enum ExecutionState {
@@ -13592,6 +13608,11 @@ type TargetEnvironment {
   be returned.
   """
   guideTargetName: NonEmptyString
+
+  """
+  The target used for blind offset acquisition, if any
+  """
+  blindOffsetTarget: Target
 }
 
 type TargetEnvironmentGroup {
