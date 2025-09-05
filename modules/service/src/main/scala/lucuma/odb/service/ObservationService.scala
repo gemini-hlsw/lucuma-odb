@@ -61,6 +61,7 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
@@ -115,6 +116,20 @@ sealed trait ObservationService[F[_]] {
   def selectBands(
     pid: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
+
+  def handleBlindOffsetTarget(
+    programId: Program.Id,
+    observationId: Observation.Id,
+    input: lucuma.odb.graphql.input.TargetPropertiesInput.Create
+  )(using Transaction[F], ServiceAccess): F[Result[Target.Id]]
+
+  def removeBlindOffsetTarget(
+    observationId: Observation.Id
+  )(using Transaction[F], ServiceAccess): F[Result[Unit]]
+
+  def getCurrentBlindOffsetTarget(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Target.Id]]
 
 }
 
@@ -314,6 +329,15 @@ object ObservationService {
                     Services.asSuperUser:
                       asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
+            .flatMap: oid =>
+              SET
+                .targetEnvironment
+                .flatMap(_.blindOffsetTarget)
+                .traverse: targetInput =>
+                  ResultT:
+                    Services.asSuperUser:
+                      handleBlindOffsetTarget(pid, oid, targetInput)
+                .as(oid)
             .value
             .flatTap: r =>
               transaction.rollback.unlessA(r.hasValue)
@@ -402,7 +426,7 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-              SET.scienceBand.toOption.fold(ResultT.unit): band => 
+              SET.scienceBand.toOption.fold(ResultT.unit): band =>
                 ResultT:
                   Services.asSuperUser:
                     allocationService.validateBand(band, pids)
@@ -422,6 +446,9 @@ object ObservationService {
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
+                _ <- ResultT(Services.asSuperUser(g.toList.flatTraverse { case (pid, oids) =>
+                      oids.traverse(oid => handleBlindOffsetTargetUpdates(oid, SET.targetEnvironment))
+                    }.map(_.sequence)))
             } yield g
 
             for {
@@ -538,6 +565,57 @@ object ObservationService {
           .execute(Statements.SelectBands)(pid)
           .map(_.toMap)
 
+      override def handleBlindOffsetTarget(
+        programId: Program.Id,
+        observationId: Observation.Id,
+        input: lucuma.odb.graphql.input.TargetPropertiesInput.Create
+      )(using Transaction[F], ServiceAccess): F[Result[Target.Id]] =
+        Services.asSuperUser:
+          targetService.createTarget(AccessControl.unchecked(input, programId, program_id))
+            .flatMap: rTargetId =>
+              rTargetId.traverse: targetId =>
+                for {
+                  _ <- session.execute(Statements.addBlindOffsetToAsterismAndSetDisposition)(programId, observationId, targetId, targetId)
+                  _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
+                } yield targetId
+
+      override def removeBlindOffsetTarget(
+        observationId: Observation.Id
+      )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
+        for {
+          _ <- session.execute(Statements.removeBlindOffsetFromAsterism)(observationId)
+        } yield Result.unit
+
+      override def getCurrentBlindOffsetTarget(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[Option[Target.Id]] =
+        session.option(Statements.getCurrentBlindOffsetTargetFromAsterism)(observationId)
+
+
+
+      def handleBlindOffsetTargetUpdates(
+        observationId: Observation.Id,
+        targetEnvironment: Option[TargetEnvironmentInput.Edit]
+      )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
+        targetEnvironment.fold(Result.unit.pure[F]): te =>
+          te.blindOffsetTarget match
+            case Nullable.Absent => Result.unit.pure[F] // No change
+            case Nullable.Null =>
+              // Remove blind offset target and set acquisition reset time
+              for {
+                _ <- removeBlindOffsetTarget(observationId)
+                _ <- session.execute(sql"UPDATE t_observation SET c_acq_reset_time = now() WHERE c_observation_id = $observation_id".command)(observationId)
+              } yield Result.unit
+            case NonNull(targetInput: TargetPropertiesInput.Create) =>
+              // Handle blind offset target creation/replacement via update
+              for {
+                // First remove any existing blind offset target
+                _ <- removeBlindOffsetTarget(observationId)
+                // Then create the new one
+                rProgramId <- selectProgram(observationId)
+                result <- rProgramId.flatTraverse: programId =>
+                  handleBlindOffsetTarget(programId, observationId, targetInput).map(_.void)
+              } yield result
     }
 
 
@@ -584,6 +662,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
+          SET.useBlindOffset.getOrElse(false)
         )
       }
 
@@ -602,6 +681,7 @@ object ObservationService {
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
+      useBlindOffset:     Boolean,
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -660,6 +740,7 @@ object ObservationService {
            modeType                                                                                                                ,
            instrument                                                                                                              ,
            observerNotes                                                                                                           ,
+           useBlindOffset                                                                                                         ,
         )
       }
 
@@ -708,6 +789,7 @@ object ObservationService {
       Option[ObservingModeType]        ,
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
+      Boolean                          ,
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -746,7 +828,8 @@ object ObservationService {
           c_img_combined_filters,
           c_observing_mode_type,
           c_instrument,
-          c_observer_notes
+          c_observer_notes,
+          c_use_blind_offset
         )
         SELECT
           $program_id,
@@ -784,7 +867,8 @@ object ObservationService {
           ${bool.opt},
           ${observing_mode_type.opt},
           ${instrument.opt},
-          ${text_nonempty.opt}
+          ${text_nonempty.opt},
+          $bool
       """
 
     def selectObservingModes(
@@ -952,6 +1036,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upUseBlindOffset   = sql"c_use_blind_offset = $bool"
 
       val ups: List[AppliedFragment] =
         List(
@@ -959,6 +1044,7 @@ object ObservationService {
           SET.subtitle.foldPresent(upSubtitle),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
+          SET.useBlindOffset.map(upUseBlindOffset)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1177,6 +1263,56 @@ object ObservationService {
         FROM t_observation
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
+
+    val selectBlindOffsetTarget: Query[Target.Id, Target.Id] =
+      sql"""
+        SELECT t.c_target_id
+        FROM t_target t
+        WHERE t.c_target_id = $target_id
+        AND t.c_target_disposition = 'blind_offset'
+        AND t.c_existence = 'present'
+      """.query(target_id)
+
+    val addBlindOffsetToAsterismAndSetDisposition: Command[Program.Id *: Observation.Id *: Target.Id *: Target.Id *: EmptyTuple] =
+      sql"""
+        WITH asterism_insert AS (
+          INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
+          VALUES ($program_id, $observation_id, $target_id)
+          ON CONFLICT (c_observation_id, c_target_id) DO NOTHING
+          RETURNING c_target_id
+        )
+        UPDATE t_target
+        SET c_target_disposition = 'blind_offset'
+        WHERE c_target_id = $target_id
+      """.command
+
+
+    val removeBlindOffsetFromAsterism: Command[Observation.Id] =
+      sql"""
+        DELETE FROM t_asterism_target
+        WHERE c_observation_id = $observation_id
+        AND c_target_id IN (
+          SELECT c_target_id FROM t_target
+          WHERE c_target_disposition = 'blind_offset'
+        )
+      """.command
+
+    val getCurrentBlindOffsetTargetFromAsterism: Query[Observation.Id, Target.Id] =
+      sql"""
+        SELECT a.c_target_id
+        FROM t_asterism_target a
+        JOIN t_target t ON a.c_target_id = t.c_target_id
+        WHERE a.c_observation_id = $observation_id
+        AND t.c_target_disposition = 'blind_offset'
+      """.query(target_id)
+
+
+    val updateBlindOffsetFlag: Command[Boolean *: Observation.Id *: EmptyTuple] =
+      sql"""
+        UPDATE t_observation
+        SET c_use_blind_offset = $bool
+        WHERE c_observation_id = $observation_id
+      """.command
   }
 
 }

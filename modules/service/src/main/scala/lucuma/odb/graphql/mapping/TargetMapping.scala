@@ -26,4 +26,3 @@ trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
     )
 
 }
-
