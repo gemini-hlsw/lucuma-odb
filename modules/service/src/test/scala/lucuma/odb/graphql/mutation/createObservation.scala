@@ -185,6 +185,7 @@ class createObservation extends OdbSuite {
             }) {
               observation {
                 subtitle
+                useBlindOffset
               }
             }
           }
@@ -2630,4 +2631,92 @@ class createObservation extends OdbSuite {
         }
       """.asRight)
     }
+
+  test("useBlindOffset field behavior") {
+    createProgramWithUsPi(pi).flatMap { pid =>
+      // Test 1: Default behavior - useBlindOffset should be false when not specified
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                subtitle: "default blind offset test"
+              }
+            }) {
+              observation {
+                id
+                useBlindOffset
+                subtitle
+              }
+            }
+          }
+          """).flatMap { js =>
+        val useBlindOffset = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("useBlindOffset")
+          .as[Boolean]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(useBlindOffset, false)
+      } *>
+      // Test 2: Explicitly set useBlindOffset to false
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                subtitle: "explicit false test"
+                useBlindOffset: false
+              }
+            }) {
+              observation {
+                id
+                useBlindOffset
+                subtitle
+              }
+            }
+          }
+          """).flatMap { js =>
+        val useBlindOffset = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("useBlindOffset")
+          .as[Boolean]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(useBlindOffset, false)
+      } *>
+      // Test 3: Explicitly set useBlindOffset to true
+      query(pi,
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: "$pid"
+              SET: {
+                subtitle: "explicit true test"
+                useBlindOffset: true
+              }
+            }) {
+              observation {
+                id
+                useBlindOffset
+                subtitle
+              }
+            }
+          }
+          """).flatMap { js =>
+        val useBlindOffset = js.hcursor
+          .downField("createObservation")
+          .downField("observation")
+          .downField("useBlindOffset")
+          .as[Boolean]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+        assertIO(useBlindOffset, true)
+      }
+    }
+  }
 }

@@ -45,7 +45,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
-import lucuma.odb.graphql.input.ResetAcquisitionInput
+import lucuma.odb.graphql.input.ResetBlindOffsetTargetInput
 import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
@@ -532,7 +532,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   }
 
   def selectForUpdate(
-    input: ResetAcquisitionInput,
+    input: ResetBlindOffsetTargetInput,
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
      requireStaffAccess:
       Services.asSuperUser:

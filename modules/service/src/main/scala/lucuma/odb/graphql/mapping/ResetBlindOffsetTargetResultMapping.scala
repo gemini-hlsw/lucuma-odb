@@ -5,10 +5,10 @@ package lucuma.odb.graphql.mapping
 
 import lucuma.odb.graphql.table.ObservationView
 
-trait ResetAcquisitionResultMapping[F[_]] extends ResultMapping[F] with ObservationView[F]:
+trait ResetBlindOffsetTargetResultMapping[F[_]] extends ResultMapping[F] with ObservationView[F]:
 
-  lazy val ResetAcquisitionResultMapping: ObjectMapping =
-    ObjectMapping(ResetAcquisitionResultType)(
+  lazy val ResetBlindOffsetTargetResultMapping: ObjectMapping =
+    ObjectMapping(ResetBlindOffsetTargetResultType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlObject("observation")
     )

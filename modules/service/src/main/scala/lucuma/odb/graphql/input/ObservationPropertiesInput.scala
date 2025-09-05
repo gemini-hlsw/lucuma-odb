@@ -47,6 +47,8 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
+    useBlindOffset:     Option[Boolean],
+    blindOffsetTarget:   Option[TargetPropertiesInput.Create],
   ) extends AsterismInput
 
   object Create {
@@ -69,6 +71,8 @@ object ObservationPropertiesInput {
         group               = None,
         groupIndex          = None,
         observerNotes       = None,
+        useBlindOffset     = None,
+        blindOffsetTarget   = None,
       )
 
     val Binding: Matcher[Create] =
@@ -87,6 +91,8 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffsets),
+          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rAcquisitionTarget),
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -101,6 +107,8 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rUseBlindOffsets,
+            rAcquisitionTarget,
           ).parMapN(Create.apply)
       }
 
@@ -120,6 +128,8 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
+    useBlindOffset:     Option[Boolean],
+    blindOffsetTarget:   Nullable[TargetPropertiesInput.Edit],
   ) extends AsterismInput
 
   object Edit {
@@ -139,6 +149,8 @@ object ObservationPropertiesInput {
         group =               Nullable.Absent,
         groupIndex =          None,
         observerNotes =       Nullable.Absent,
+        useBlindOffset =     None,
+        blindOffsetTarget =   Nullable.Absent,
       )
 
     val Binding: Matcher[Edit] =
@@ -157,6 +169,8 @@ object ObservationPropertiesInput {
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
+          BooleanBinding.Option("useBlindOffset", rUseBlindOffsets),
+          TargetPropertiesInput.EditBinding.Nullable("blindOffsetTarget", rAcquisitionTarget),
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -171,6 +185,8 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rUseBlindOffsets,
+            rAcquisitionTarget,
           ).parMapN(apply)
       }
   }

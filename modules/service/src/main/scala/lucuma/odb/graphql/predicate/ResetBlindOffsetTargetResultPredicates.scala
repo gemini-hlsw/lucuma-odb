@@ -5,5 +5,5 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 
-class ResetAcquisitionResultPredicates(path: Path):
+class ResetBlindOffsetTargetResultPredicates(path: Path):
   val observation = ObservationPredicates(path / "observation")
