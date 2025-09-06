@@ -61,6 +61,7 @@ import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
+import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
@@ -108,7 +109,7 @@ sealed trait ObservationService[F[_]] {
     oids: NonEmptyList[Observation.Id]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
-  def resetBlindOffsetTarget(
+  def resetAcquisition(
     input: AccessControl.CheckedWithId[Unit, Observation.Id]
   )(using Transaction[F]): F[Result[Observation.Id]]
 
@@ -278,13 +279,6 @@ object ObservationService {
                       .map(_.map(_ => oid))
                   }
                 }
-              }.flatMap { rOid =>
-                SET.blindOffsetTarget.fold(rOid.pure[F]) { blindOffsetTargetInput =>
-                  rOid.flatTraverse { oid =>
-                    handleBlindOffsetTargetCreate(programId, oid, blindOffsetTargetInput)
-                      .map(_.map(_ => oid))
-                  }
-                }
               }
           }.recoverWith {
              case SqlState.CheckViolation(ex) =>
@@ -428,7 +422,7 @@ object ObservationService {
         Trace[F].span("updateObservation") {
           update.fold(Result(Map.empty).pure[F]): (SET, which) =>
             def validateBand(pids: => List[Program.Id]): ResultT[F, Unit] =
-              SET.scienceBand.toOption.fold(ResultT.unit): band =>
+              SET.scienceBand.toOption.fold(ResultT.unit): band => 
                 ResultT:
                   Services.asSuperUser:
                     allocationService.validateBand(band, pids)
@@ -448,9 +442,7 @@ object ObservationService {
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
-                _ <- ResultT(u.fold(Result.unit.pure[F]) { oids =>
-                      Services.asSuperUser(handleBlindOffsetTargetUpdates(oids.toList, SET.blindOffsetTarget))
-                    })
+                _ <- ResultT(Services.asSuperUser(u.foldMap(_.toList).traverse(oid => handleBlindOffsetTargetUpdates(oid, SET.targetEnvironment)).map(_.sequence)))
             } yield g
 
             for {
@@ -554,11 +546,11 @@ object ObservationService {
                   .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
                   .map(_.as(CloneIds(origOid, newOid)))
 
-      override def resetBlindOffsetTarget(
+      override def resetAcquisition(
         input: AccessControl.CheckedWithId[Unit, Observation.Id]
       )(using Transaction[F]): F[Result[Observation.Id]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
-          session.execute(Statements.ResetBlindOffsetTarget)(oid).as(oid.success)
+          session.execute(Statements.ResetAcquisition)(oid).as(oid.success)
 
       override def selectBands(
         pid: Program.Id
@@ -575,7 +567,7 @@ object ObservationService {
         for {
           rTargetId <- Services.asSuperUser(targetService.createTarget(AccessControl.unchecked(input, programId, program_id)))
           result <- rTargetId.flatTraverse { targetId =>
-            session.unique(Statements.linkBlindOffsetTarget)(targetId, observationId)
+            session.unique(Statements.linkBlindOffsetTarget)(observationId, targetId, programId)
               .as(targetId.success)
           }
         } yield result
@@ -613,26 +605,42 @@ object ObservationService {
       override def getCurrentBlindOffsetTarget(
         observationId: Observation.Id
       )(using Transaction[F], ServiceAccess): F[Result[Option[Target.Id]]] =
-        session.unique(Statements.getCurrentBlindOffsetTarget)(observationId)
+        session.option(Statements.getCurrentBlindOffsetTarget)(observationId)
           .map(Result.success)
 
-      private def handleBlindOffsetTargetUpdates(
-        observationIds: List[Observation.Id],
-        blindOffsetTarget: Nullable[lucuma.odb.graphql.input.TargetPropertiesInput.Edit]
+      def handleBlindOffsetTargetUpdates(
+        observationId: Observation.Id,
+        targetEnvironment: Option[TargetEnvironmentInput.Edit]
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
-        blindOffsetTarget match {
-          case Nullable.Null =>
-            // Remove blind offset targets from all observations
-            observationIds.traverse(removeBlindOffsetTarget).map(_.sequence.void)
-          case Nullable.NonNull(targetEdit) =>
-            // Edit existing blind offset targets for each observation
-            observationIds.traverse { oid =>
-              handleBlindOffsetTargetEdit(oid, targetEdit)
-            }.map(_.sequence.void)
-          case Nullable.Absent =>
-            // No change requested
-            Result.unit.pure[F]
-        }
+        targetEnvironment.fold(Result.unit.pure[F]): te =>
+          te.blindOffsetTarget match
+            case Nullable.Absent => Result.unit.pure[F] // No change
+            case Nullable.Null =>
+              // Remove blind offset target and set acquisition reset time
+              for {
+                _ <- removeBlindOffsetTarget(observationId)
+                _ <- session.execute(sql"UPDATE t_observation SET c_acq_reset_time = now() WHERE c_observation_id = $observation_id".command)(observationId)
+              } yield Result.unit
+            case NonNull(create: TargetPropertiesInput.Create) =>
+              for {
+                rCurrentTargetId <- getCurrentBlindOffsetTarget(observationId)
+                result <- rCurrentTargetId.flatTraverse {
+                  case Some(targetId) =>
+                    // Update existing target by deleting and recreating
+                    for {
+                      _ <- session.execute(Statements.unlinkBlindOffsetTarget)(observationId)
+                      programId <- session.unique(Statements.selectPid)(observationId)
+                      newTargetId <- handleBlindOffsetTargetCreate(programId, observationId, create)
+                    } yield newTargetId.void
+                  case None =>
+                    // Create new target
+                    session.unique(Statements.selectPid)(observationId).flatMap { programId =>
+                      handleBlindOffsetTargetCreate(programId, observationId, create)
+                        .map(_.void)
+                    }
+                }
+              } yield result
+
 
     }
 
@@ -680,8 +688,7 @@ object ObservationService {
           SET.observingMode.flatMap(_.observingModeType),
           SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
           SET.observerNotes,
-          SET.useBlindOffset.getOrElse(false),
-          None, // blindOffsetTarget will be handled separately
+          SET.useBlindOffset.getOrElse(false)
         )
       }
 
@@ -701,7 +708,6 @@ object ObservationService {
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:     Boolean,
-      blindOffsetTargetId: Option[Target.Id],
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -761,7 +767,6 @@ object ObservationService {
            instrument                                                                                                              ,
            observerNotes                                                                                                           ,
            useBlindOffset                                                                                                         ,
-           blindOffsetTargetId                                                                                                     ,
         )
       }
 
@@ -811,7 +816,6 @@ object ObservationService {
       Option[Instrument]               ,
       Option[NonEmptyString]           ,
       Boolean                          ,
-      Option[Target.Id]                ,
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -851,8 +855,7 @@ object ObservationService {
           c_observing_mode_type,
           c_instrument,
           c_observer_notes,
-          c_use_blind_offset,
-          c_blind_offset_target_id
+          c_use_blind_offset
         )
         SELECT
           $program_id,
@@ -891,8 +894,7 @@ object ObservationService {
           ${observing_mode_type.opt},
           ${instrument.opt},
           ${text_nonempty.opt},
-          $bool,
-          ${target_id.opt}
+          $bool
       """
 
     def selectObservingModes(
@@ -1061,7 +1063,6 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset   = sql"c_use_blind_offset = $bool"
-      // val upBlindOffsetTarget = sql"c_blind_offset_target_id = ${target_id.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1070,8 +1071,7 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.useBlindOffset.map(upUseBlindOffset),
-          // Note: Blind offset target updates are handled in handleBlindOffsetTargetUpdates
-          // The database column update is handled through linking/unlinking operations
+          // Note: Blind offset target updates are handled via TargetEnvironment
           None,
         ).flatten
 
@@ -1276,7 +1276,7 @@ object ObservationService {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-    val ResetBlindOffsetTarget: Command[Observation.Id] =
+    val ResetAcquisition: Command[Observation.Id] =
       sql"""
         UPDATE t_observation
            SET c_acq_reset_time = now()
@@ -1292,25 +1292,26 @@ object ObservationService {
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
 
-    val linkBlindOffsetTarget: Query[Target.Id *: Observation.Id *: EmptyTuple, Observation.Id] =
+    val linkBlindOffsetTarget: Query[Observation.Id *: Target.Id *: Program.Id *: EmptyTuple, Observation.Id] =
       sql"""
-        UPDATE t_observation
-        SET c_blind_offset_target_id = $target_id
-        WHERE c_observation_id = $observation_id
+        INSERT INTO t_target_environment_acquisition (c_observation_id, c_target_id, c_program_id)
+        VALUES ($observation_id, $target_id, $program_id)
+        ON CONFLICT (c_observation_id) DO UPDATE SET
+          c_target_id = EXCLUDED.c_target_id,
+          c_program_id = EXCLUDED.c_program_id
         RETURNING c_observation_id
       """.query(observation_id)
 
-    val getCurrentBlindOffsetTarget: Query[Observation.Id, Option[Target.Id]] =
+    val getCurrentBlindOffsetTarget: Query[Observation.Id, Target.Id] =
       sql"""
-        SELECT c_blind_offset_target_id
-        FROM t_observation
-        WHERE c_observation_id = $observation_id
-      """.query(target_id.opt)
+        SELECT tea.c_target_id
+        FROM t_target_environment_acquisition tea
+        WHERE tea.c_observation_id = $observation_id
+      """.query(target_id)
 
     val unlinkBlindOffsetTarget: Query[Observation.Id, Observation.Id] =
       sql"""
-        UPDATE t_observation
-        SET c_blind_offset_target_id = NULL
+        DELETE FROM t_target_environment_acquisition
         WHERE c_observation_id = $observation_id
         RETURNING c_observation_id
       """.query(observation_id)

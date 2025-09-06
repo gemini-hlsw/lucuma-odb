@@ -914,16 +914,6 @@ type CreateObservationResult {
 }
 
 """
-The result of resetting the blind offset target
-"""
-type ResetBlindOffsetTargetResult {
-  """
-  The updated observation with the blind offset target removed.
-  """
-  observation: Observation!
-}
-
-"""
 Program creation parameters
 """
 input CreateProgramInput {
@@ -3266,14 +3256,6 @@ type Mutation {
   setObservationWorkflowState(
     input: SetObservationWorkflowStateInput!
   ): ObservationWorkflow
-
-  """
-  Resets the blind offset target for the specified observation, removing any
-  existing blind offset target assignment.
-  """
-  resetBlindOffsetTarget(
-    observationId: ObservationId!
-  ): ResetBlindOffsetTargetResult!
 }
 
 input SetObservationWorkflowStateInput {
@@ -3423,11 +3405,6 @@ input ObservationPropertiesInput {
   Whether blind offset is enabled for this observation
   """
   useBlindOffset: Boolean
-
-  """
-  The target used for blind offset, if any
-  """
-  blindOffsetTarget: TargetPropertiesInput
 }
 
 """
@@ -5240,6 +5217,7 @@ input TargetEnvironmentInput {
   """
   explicitBase: CoordinatesInput
   asterism: [TargetId!]
+  blindOffsetTarget: TargetPropertiesInput
 }
 
 """
@@ -10352,10 +10330,6 @@ type Observation {
   """
   useBlindOffset: Boolean!
 
-  """
-  The target used for blind offset, if any
-  """
-  blindOffsetTarget: Target
 }
 
 enum ExecutionState {
@@ -13630,6 +13604,11 @@ type TargetEnvironment {
   be returned.
   """
   guideTargetName: NonEmptyString
+
+  """
+  The target used for blind offset acquisition, if any
+  """
+  blindOffsetTarget: Target
 }
 
 type TargetEnvironmentGroup {

@@ -41,6 +41,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
      with AsterismTargetTable[F]
      with ObservationView[F]
      with Predicates[F]
+     with TargetEnvironmentAcquisitionTable[F]
      with TargetView[F] { this: SkunkMapping[F] & TargetMapping[F] =>
 
   def itcClient: ItcClient[F]
@@ -60,6 +61,13 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       Join(AsterismTargetTable.TargetId, TargetView.TargetId)
     )
 
+  private def acquisitionTargetObject(name: String): SqlObject =
+    SqlObject(
+      name,
+      Join(ObservationView.Id, TargetEnvironmentAcquisitionTable.ObservationId),
+      Join(TargetEnvironmentAcquisitionTable.TargetId, TargetView.TargetId)
+    )
+
   lazy val TargetEnvironmentMapping: ObjectMapping =
     ObjectMapping(TargetEnvironmentType)(
       SqlField("programId", ObservationView.ProgramId, hidden = true),
@@ -67,6 +75,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
       SqlObject("explicitBase"),
+      acquisitionTargetObject("blindOffsetTarget"),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironments", guideEnvironmentsQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
@@ -195,4 +204,3 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     effectHandler(readEnv, calculate)
   }
 }
-

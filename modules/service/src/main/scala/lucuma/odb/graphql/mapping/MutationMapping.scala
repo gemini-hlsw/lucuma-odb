@@ -106,7 +106,6 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordGmosSouthVisit,
       RedeemUserInvitation,
       ResetAcquisition,
-      ResetBlindOffsetTarget,
       RevokeUserInvitation,
       SetAllocations,
       SetGuideTargetName,
@@ -339,9 +338,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       services.useTransactionally:
         selectForClone(input).flatMap: res =>
           res.flatTraverse: checked =>
-            if checked.isEmpty then
+            if checked.isEmpty then 
               OdbError.NotAuthorized(user.id).asFailureF
-            else
+            else 
               observationService.cloneObservation(checked).nestMap: ids =>
                 Filter(And(
                   Predicates.cloneObservationResult.originalObservation.id.eql(ids.originalId),
@@ -349,21 +348,15 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                 ), child)
 
   private lazy val ResetAcquisition: MutationField =
-    MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (_, _) =>
-      // TODO: Implement resetAcquisition functionality
-      // For now, return not implemented error
-      OdbError.InvalidArgument(Some("resetAcquisition is not yet implemented")).asFailureF
-
-  private lazy val ResetBlindOffsetTarget: MutationField =
-    MutationField("resetBlindOffsetTarget", ResetBlindOffsetTargetInput.Binding): (input, child) =>
+    MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
       services.useTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
             if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
             else
-              observationService.resetBlindOffsetTarget(checked).nestMap: oid =>
-                Filter(Predicates.resetBlindOffsetTargetResult.observation.id.eql(oid), child)
+              observationService.resetAcquisition(checked).nestMap: oid =>
+                Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
@@ -595,7 +588,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             child
           )
 
-
+  
   @annotation.nowarn("msg=unused implicit parameter")
   private def recordVisit(
     response:  F[Result[Visit.Id]],
@@ -658,7 +651,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               allocationResultSubquery(input.programId, child)
             )
 
-  private lazy val SetGuideTargetName =
+  private lazy val SetGuideTargetName = 
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
       services.useNonTransactionally:
         selectForUpdate(input, false /* ignore cals */).flatMap: r =>
@@ -811,7 +804,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           services.useTransactionally:
             approval.flatTraverse: edit =>
                 updateObservations(edit)
-                  .flatMap:
+                  .flatMap: 
                     case (map, query) =>
                       Services.asSuperUser:
                         setAsterisms(map)
@@ -853,7 +846,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               )
 
   private lazy val UpdatePrograms =
-    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>
+    MutationField("updatePrograms", UpdateProgramsInput.binding(Path.from(ProgramType))): (input, child) =>      
       services.useTransactionally:
         (for
           checked <- ResultT(selectForUpdate(input))
@@ -887,7 +880,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             ResultT(services.useTransactionally(targetService.updateTargets(checked)))
               .flatMap: selected =>
                 ResultT(targetResultSubquery(selected, input.LIMIT, child).pure[F])
-              .value
+              .value  
 
   def groupResultSubquery(pids: List[Group.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(

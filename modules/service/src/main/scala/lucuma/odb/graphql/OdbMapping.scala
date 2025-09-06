@@ -233,7 +233,7 @@ object OdbMapping {
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with RegionMapping[F]
-          with ResetBlindOffsetTargetResultMapping[F]
+          with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
           with RightAscensionMapping[F]
           with ScienceRequirementsMapping[F]
@@ -464,7 +464,7 @@ object OdbMapping {
                 RecordGmosSouthStepResultMapping,
                 RecordGmosSouthVisitResultMapping,
                 RedeemUserInvitationResultMapping,
-                ResetBlindOffsetTargetResultMapping,
+                ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 ScienceProgramReferenceMapping,
                 ScienceRequirementsMapping,

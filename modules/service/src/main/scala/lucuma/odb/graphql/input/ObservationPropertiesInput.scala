@@ -28,8 +28,8 @@ object ObservationPropertiesInput {
     def asterism: Nullable[NonEmptyList[Target.Id]] =
       Nullable.orAbsent(targetEnvironment).flatMap: t =>
         t match
-          case TargetEnvironmentInput.Create(_, asterism) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
-          case TargetEnvironmentInput.Edit(_, asterism)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
+          case TargetEnvironmentInput.Create(_, asterism, _) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
+          case TargetEnvironmentInput.Edit(_, asterism, _)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
 
   }
 
@@ -48,7 +48,6 @@ object ObservationPropertiesInput {
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
     useBlindOffset:     Option[Boolean],
-    blindOffsetTarget:   Option[TargetPropertiesInput.Create],
   ) extends AsterismInput
 
   object Create {
@@ -72,7 +71,6 @@ object ObservationPropertiesInput {
         groupIndex          = None,
         observerNotes       = None,
         useBlindOffset     = None,
-        blindOffsetTarget   = None,
       )
 
     val Binding: Matcher[Create] =
@@ -92,7 +90,6 @@ object ObservationPropertiesInput {
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffsets),
-          TargetPropertiesInput.Binding.Option("blindOffsetTarget", rAcquisitionTarget),
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -108,7 +105,6 @@ object ObservationPropertiesInput {
             rGroupIndex,
             rObserverNotes,
             rUseBlindOffsets,
-            rAcquisitionTarget,
           ).parMapN(Create.apply)
       }
 
@@ -129,7 +125,6 @@ object ObservationPropertiesInput {
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
     useBlindOffset:     Option[Boolean],
-    blindOffsetTarget:   Nullable[TargetPropertiesInput.Edit],
   ) extends AsterismInput
 
   object Edit {
@@ -150,7 +145,6 @@ object ObservationPropertiesInput {
         groupIndex =          None,
         observerNotes =       Nullable.Absent,
         useBlindOffset =     None,
-        blindOffsetTarget =   Nullable.Absent,
       )
 
     val Binding: Matcher[Edit] =
@@ -170,7 +164,6 @@ object ObservationPropertiesInput {
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffsets),
-          TargetPropertiesInput.EditBinding.Nullable("blindOffsetTarget", rAcquisitionTarget),
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -186,7 +179,6 @@ object ObservationPropertiesInput {
             rGroupIndex,
             rObserverNotes,
             rUseBlindOffsets,
-            rAcquisitionTarget,
           ).parMapN(apply)
       }
   }

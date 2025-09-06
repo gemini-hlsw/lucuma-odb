@@ -24,16 +24,18 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
           query {
             observation(observationId: "$oid") {
               useBlindOffset
-              blindOffsetTarget {
-                id
-                name
+              targetEnvironment {
+                blindOffsetTarget {
+                  id
+                  name
+                }
               }
             }
           }
         """
       )
     } yield {
-      val useBlindOffset = response.hcursor.downField("data").downField("observation").downField("useBlindOffset").as[Boolean]
+      val useBlindOffset = response.hcursor.downField("observation").downField("useBlindOffset").as[Boolean]
       assertEquals(useBlindOffset, Right(false))
     }
   }
@@ -53,7 +55,7 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         """
       )
     } yield {
-      val useBlindOffset = result.hcursor.downField("data").downField("observation").downField("useBlindOffset").as[Boolean]
+      val useBlindOffset = result.hcursor.downField("observation").downField("useBlindOffset").as[Boolean]
       assertEquals(useBlindOffset, Right(false))
     }
   }
@@ -67,15 +69,17 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           query {
             observation(observationId: "$oid") {
-              blindOffsetTarget {
-                id
+              targetEnvironment {
+                blindOffsetTarget {
+                  id
+                }
               }
             }
           }
         """
       )
     } yield {
-      val blindOffsetTarget = response.hcursor.downField("data").downField("observation").downField("blindOffsetTarget")
+      val blindOffsetTarget = response.hcursor.downField("observation").downField("targetEnvironment").downField("blindOffsetTarget")
       assert(blindOffsetTarget.focus.exists(_.isNull))
     }
   }
@@ -103,7 +107,6 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val useBlindOffset = result.hcursor
-        .downField("data")
         .downField("createObservation")
         .downField("observation")
         .downField("useBlindOffset")
@@ -122,21 +125,35 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
             createObservation(input: {
               programId: ${pid.asJson}
               SET: {
-                blindOffsetTarget: {
-                  name: "Blind Offset Star"
-                  sidereal: {
-                    ra: { degrees: "12.345" }
-                    dec: { degrees: "45.678" }
-                    epoch: "J2000.000"
+                targetEnvironment: {
+                  blindOffsetTarget: {
+                    name: "Blind Offset Star"
+                    sidereal: {
+                      ra: { degrees: "12.345" }
+                      dec: { degrees: "45.678" }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: {
+                            stellarLibrary: B5_III
+                          }
+                          brightnesses: []
+                        }
+                      }
+                    }
                   }
                 }
               }
             }) {
               observation {
                 id
-                blindOffsetTarget {
-                  id
-                  name
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                    name
+                  }
                 }
               }
             }
@@ -145,9 +162,9 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val blindOffsetTarget = result.hcursor
-        .downField("data")
         .downField("createObservation")
         .downField("observation")
+        .downField("targetEnvironment")
         .downField("blindOffsetTarget")
       val name = blindOffsetTarget.downField("name").as[String]
       assertEquals(name, Right("Blind Offset Star"))
@@ -164,23 +181,39 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
-                blindOffsetTarget: {
-                  name: "New Blind Offset Target"
-                  sidereal: {
-                    ra: { degrees: "98.765" }
-                    dec: { degrees: "-12.345" }
-                    epoch: "J2000.000"
+                targetEnvironment: {
+                  blindOffsetTarget: {
+                    name: "New Blind Offset Target"
+                    sidereal: {
+                      ra: { degrees: "98.765" }
+                      dec: { degrees: "-12.345" }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: {
+                            stellarLibrary: B5_III
+                          }
+                          brightnesses: []
+                        }
+                      }
+                    }
                   }
                 }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations {
                 id
-                blindOffsetTarget {
-                  id
-                  name
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                    name
+                  }
                 }
               }
             }
@@ -189,10 +222,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val blindOffsetTarget = result.hcursor
-        .downField("data")
         .downField("updateObservations")
         .downField("observations")
         .downN(0)
+        .downField("targetEnvironment")
         .downField("blindOffsetTarget")
       val name = blindOffsetTarget.downField("name").as[String]
       assertEquals(name, Right("New Blind Offset Target"))
@@ -210,9 +243,9 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
-                blindOffsetTarget: {
+                targetEnvironment: {
+                  blindOffsetTarget: {
                   name: "Original Target"
                   sidereal: {
                     ra: { degrees: "12.345" }
@@ -220,6 +253,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
                     epoch: "J2000.000"
                   }
                 }
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations { id }
@@ -233,23 +270,39 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
-                blindOffsetTarget: {
+                targetEnvironment: {
+                  blindOffsetTarget: {
                   name: "Modified Target"
                   sidereal: {
                     ra: { degrees: "99.999" }
                     dec: { degrees: "-88.888" }
                     epoch: "J2000.000"
                   }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          stellarLibrary: B5_III
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
                 }
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations {
                 id
-                blindOffsetTarget {
-                  id
-                  name
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                    name
+                  }
                 }
               }
             }
@@ -258,10 +311,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val blindOffsetTarget = result.hcursor
-        .downField("data")
         .downField("updateObservations")
         .downField("observations")
         .downN(0)
+        .downField("targetEnvironment")
         .downField("blindOffsetTarget")
       val name = blindOffsetTarget.downField("name").as[String]
       assertEquals(name, Right("Modified Target"))
@@ -278,9 +331,9 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
-                blindOffsetTarget: {
+                targetEnvironment: {
+                  blindOffsetTarget: {
                   name: "Target to Remove"
                   sidereal: {
                     ra: { degrees: "12.345" }
@@ -288,6 +341,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
                     epoch: "J2000.000"
                   }
                 }
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations { id }
@@ -301,16 +358,22 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
-                blindOffsetTarget: null
+                targetEnvironment: {
+                  blindOffsetTarget: null
+                }
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations {
                 id
-                blindOffsetTarget {
-                  id
-                  name
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                    name
+                  }
                 }
               }
             }
@@ -319,10 +382,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val blindOffsetTarget = result.hcursor
-        .downField("data")
         .downField("updateObservations")
         .downField("observations")
         .downN(0)
+        .downField("targetEnvironment")
         .downField("blindOffsetTarget")
       assert(blindOffsetTarget.focus.exists(_.isNull))
     }
@@ -337,9 +400,11 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid.asJson}]
               SET: {
                 useBlindOffset: true
+              }
+              WHERE: {
+                id: { EQ: ${oid.asJson} }
               }
             }) {
               observations {
@@ -352,7 +417,6 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
       )
     } yield {
       val useBlindOffset = result.hcursor
-        .downField("data")
         .downField("updateObservations")
         .downField("observations")
         .downN(0)
@@ -372,22 +436,38 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
         query = s"""
           mutation {
             updateObservations(input: {
-              observationIds: [${oid1.asJson}, ${oid2.asJson}]
               SET: {
-                blindOffsetTarget: {
-                  name: "Shared Blind Offset Target"
-                  sidereal: {
-                    ra: { degrees: "12.345" }
-                    dec: { degrees: "45.678" }
-                    epoch: "J2000.000"
+                targetEnvironment: {
+                  blindOffsetTarget: {
+                    name: "Shared Blind Offset Target"
+                    sidereal: {
+                      ra: { degrees: "12.345" }
+                      dec: { degrees: "45.678" }
+                      epoch: "J2000.000"
+                    }
+                    sourceProfile: {
+                      point: {
+                        bandNormalized: {
+                          sed: {
+                            stellarLibrary: B5_III
+                          }
+                          brightnesses: []
+                        }
+                      }
+                    }
                   }
                 }
+              }
+              WHERE: {
+                id: { IN: [${oid1.asJson}, ${oid2.asJson}] }
               }
             }) {
               observations {
                 id
-                blindOffsetTarget {
-                  id
+                targetEnvironment {
+                  blindOffsetTarget {
+                    id
+                  }
                 }
               }
             }
@@ -397,11 +477,10 @@ class BlindOffsetTargetBasicTest extends OdbSuite {
     } yield {
       // Should succeed because each observation gets its own copy of the target
       val observations = result.hcursor
-        .downField("data")
         .downField("updateObservations")
         .downField("observations")
-      val target1Id = observations.downN(0).downField("blindOffsetTarget").downField("id").as[Target.Id]
-      val target2Id = observations.downN(1).downField("blindOffsetTarget").downField("id").as[Target.Id]
+      val target1Id = observations.downN(0).downField("targetEnvironment").downField("blindOffsetTarget").downField("id").as[Target.Id]
+      val target2Id = observations.downN(1).downField("targetEnvironment").downField("blindOffsetTarget").downField("id").as[Target.Id]
       assert(target1Id.isRight)
       assert(target2Id.isRight)
       assert(target1Id != target2Id) // Each should get a different target ID
