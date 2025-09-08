@@ -11,12 +11,13 @@ import skunk.codec.all.*
 trait TargetView[F[_]] extends BaseMapping[F] {
 
   object TargetView extends TableDef("v_target") {
-    val ProgramId       = col("c_program_id", program_id)
-    val TargetId        = col("c_target_id", target_id)
-    val Name            = col("c_name", text_nonempty)
-    val Existence       = col("c_existence", existence)
-    val SourceProfile   = col("c_source_profile", jsonb)
-    val CalibrationRole = col("c_calibration_role", calibration_role.opt)
+    val ProgramId         = col("c_program_id", program_id)
+    val TargetId          = col("c_target_id", target_id)
+    val Name              = col("c_name", text_nonempty)
+    val Existence         = col("c_existence", existence)
+    val SourceProfile     = col("c_source_profile", jsonb)
+    val CalibrationRole   = col("c_calibration_role", calibration_role.opt)
+    val TargetDisposition = col("c_target_disposition", target_disposition)
     object Sidereal {
       val SyntheticId    = col("c_sidereal_id", target_id.embedded)
       val Ra             = col("c_sid_ra", right_ascension.embedded)
