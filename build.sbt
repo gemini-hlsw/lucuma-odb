@@ -163,7 +163,7 @@ lazy val recordDeploymentMetadata = WorkflowStep.Run(
   systems.flatMap( system =>
     List(
       s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
-      s"""curl -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": s"${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
+      s"""curl -s -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": "${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
     )
   ),
   name = Some("Record deployment in GHA")
