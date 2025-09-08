@@ -89,10 +89,10 @@ lazy val sbtDockerPublishLocal =
   WorkflowStep.Sbt(
     List(
       "clean",
+      "ssoService/docker:publishLocal",
       "service/docker:publishLocal",
       "obscalc/docker:publishLocal",
-      "calibrations/docker:publishLocal",
-      "ssoService/docker:publishLocal"
+      "calibrations/docker:publishLocal"
     ),
     name = Some("Build Docker images")
   )
@@ -105,6 +105,12 @@ lazy val appNames: Map[String, String] = Map(
 lazy val procTypes: Map[String, List[String]] = Map(
   "sso" -> List("web"),
   "odb" -> List("web", "obscalc", "calibration")
+)
+lazy val procTypeImageNames: Map[(String, String), String] = Map(
+  ("sso", "web")           -> "lucuma-sso-service",
+  ("odb", "web")           -> "lucuma-odb-service",
+  ("odb", "obscalc")       -> "obscalc-service",
+  ("odb", "calibration")   -> "calibrations-service"
 )
 lazy val environments: List[String] = List("dev", "staging", "production")
 lazy val systemProcTypes: List[(String, String, String)] =
@@ -122,14 +128,15 @@ lazy val herokuPush =
       "heroku container:login"
     ) ++
       systemProcTypes.flatMap { case (system, app, proc) =>
+        val procImage: String = procTypeImageNames((system, proc))
         environments.flatMap( env =>
           List(
-            s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
+            s"docker tag noirlab/$procImage registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
             s"docker push registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
           )
         ) ++
         List( // Retag for easy release to dev
-          s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-dev/$proc",
+          s"docker tag noirlab/$procImage registry.heroku.com/$app-dev/$proc",
           s"docker push registry.heroku.com/$app-dev/$proc",
         )
       },
@@ -163,7 +170,7 @@ lazy val recordDeploymentMetadata = WorkflowStep.Run(
   systems.flatMap( system =>
     List(
       s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
-      s"""curl -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": s"${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
+      s"""curl -s -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": "${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
     )
   ),
   name = Some("Record deployment in GHA")
