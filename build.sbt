@@ -97,10 +97,22 @@ lazy val sbtDockerPublishLocal =
     name = Some("Build Docker images")
   )
 
-lazy val herokuOdbAppName = "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}"
-lazy val herokuSsoAppName = "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}"
-
-lazy val environments = List("dev", "staging", "production")
+lazy val systems: List[String] = List("sso", "odb")
+lazy val appNames: Map[String, String] = Map(
+  "sso" -> "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}",
+  "odb" -> "${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}"
+)
+lazy val procTypes: Map[String, List[String]] = Map(
+  "sso" -> List("web"),
+  "odb" -> List("web", "obscalc", "calibration")
+)
+lazy val environments: List[String] = List("dev", "staging", "production")
+lazy val systemProcTypes: List[(String, String, String)] =
+  for {
+    system <- systems
+    app    = appNames(system)
+    proc   <- procTypes(system)
+  } yield (system, app, proc)
 
 lazy val herokuPush =
   WorkflowStep.Run(
@@ -109,31 +121,53 @@ lazy val herokuPush =
       "npm install -g heroku",
       "heroku container:login"
     ) ++
-      environments.flatMap(env =>
-        List(
-          // Tag
-          s"docker tag noirlab/lucuma-sso-service registry.heroku.com/$herokuSsoAppName-$env/web",
-          s"docker tag noirlab/lucuma-odb-service registry.heroku.com/$herokuOdbAppName-$env/web",
-          s"docker tag noirlab/obscalc-service registry.heroku.com/$herokuOdbAppName-$env/obscalc",
-          s"docker tag noirlab/calibrations-service registry.heroku.com/$herokuOdbAppName-$env/calibration",
-          // Push
-          s"docker push registry.heroku.com/$herokuSsoAppName-$env/web",
-          s"docker push registry.heroku.com/$herokuOdbAppName-$env/web",
-          s"docker push registry.heroku.com/$herokuOdbAppName-$env/obscalc",
-          s"docker push registry.heroku.com/$herokuOdbAppName-$env/calibration",
+      systemProcTypes.flatMap { case (system, app, proc) =>
+        environments.flatMap( env =>
+          List(
+            s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-$env/$proc::$${{ github.sha }}",
+            s"docker push registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
+          )
+        ) ++
+        List( // Retag for easy release to dev
+          s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-dev/$proc",
+          s"docker push registry.heroku.com/$app-dev/$proc",
         )
-    ),
+      },
     name = Some("Push Docker images to Heroku")
   )
 
 lazy val herokuRelease =
   WorkflowStep.Run(
-    List(
-      s"heroku container:release web -a $herokuSsoAppName-${environments.head} -v",
-      s"heroku container:release web obscalc calibration -a $herokuOdbAppName-${environments.head} -v"
+    systems.map( system =>
+      s"heroku container:release ${procTypes(system).mkString(" ")} -a ${appNames(system)}-dev -v"
     ),
     name = Some("Release dev app in Heroku")
   )
+
+def imageShaEnvVar(system: String, proc: String): String =
+  s"DOCKER_IMAGE_SHA_${system.toUpperCase}_${proc.toUpperCase}"
+
+lazy val retrieveDockerImageShas = WorkflowStep.Run(
+  systemProcTypes.map { case (system, app, proc) =>
+    s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
+  },
+  name = Some("Get Docker image SHA")
+)
+
+def dockerImageShasObject(system: String): String = "{ " +
+  procTypes(system).map ( proc =>
+    s""""${proc}": "$${{ env.${imageShaEnvVar(system, proc)} }}""""
+  ).mkString(", ") + " }"
+
+lazy val recordDeploymentMetadata = WorkflowStep.Run(
+  systems.flatMap( system =>
+    List(
+      s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
+      s"""curl -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": s"${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
+    )
+  ),
+  name = Some("Record deployment in GHA")
+)
 
 val mainCond                 = "github.ref == 'refs/heads/main'"
 val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
@@ -147,6 +181,8 @@ ThisBuild / githubWorkflowAddedJobs +=
       sbtDockerPublishLocal ::
       herokuPush ::
       herokuRelease ::
+      retrieveDockerImageShas ::
+      recordDeploymentMetadata ::
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1),
