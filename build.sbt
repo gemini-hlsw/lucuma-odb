@@ -124,7 +124,7 @@ lazy val herokuPush =
       systemProcTypes.flatMap { case (system, app, proc) =>
         environments.flatMap( env =>
           List(
-            s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-$env/$proc::$${{ github.sha }}",
+            s"docker tag noirlab/lucuma-$system-service registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
             s"docker push registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
           )
         ) ++

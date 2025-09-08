@@ -205,35 +205,35 @@ jobs:
         run: |
           npm install -g heroku
           heroku container:login
-          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web::${{ github.sha }}
+          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }}
-          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-staging/web::${{ github.sha }}
+          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-staging/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-staging/web:${{ github.sha }}
-          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-production/web::${{ github.sha }}
+          docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-production/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-production/web:${{ github.sha }}
           docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/web::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/web:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/web::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/web:${{ github.sha }}
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/obscalc::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/obscalc:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/obscalc:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/obscalc::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/obscalc:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/obscalc:${{ github.sha }}
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/calibration::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/calibration:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/calibration:${{ github.sha }}
-          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration::${{ github.sha }}
+          docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration:${{ github.sha }}
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
