@@ -556,6 +556,9 @@ trait Codecs {
   val calibration_role: Codec[CalibrationRole] =
     enumerated(Type("e_calibration_role"))
 
+  val target_disposition: Codec[TargetDisposition] =
+    enumerated(Type("e_target_disposition"))
+
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
 
