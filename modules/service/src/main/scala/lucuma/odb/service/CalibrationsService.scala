@@ -480,6 +480,7 @@ object CalibrationsService extends CalibrationObservations {
             WHERE t_program.c_calibration_role IN(${calibration_role.list(roles.length)})
               AND t_program.c_existence='present'
               AND t_target.c_existence='present'
+              AND t_target.c_target_disposition = 'calibration'
             ORDER BY c_target_id
           """.query(target_id *: text *: calibration_role *: right_ascension *: declination *: epoch *: int8.opt *: int8.opt *: radial_velocity.opt *: parallax.opt)
 
