@@ -15,6 +15,13 @@ alter column c_target_disposition set not null;
 alter table t_target
 alter column c_target_disposition set default 'science'::e_target_disposition;
 
+alter table t_target
+add constraint target_disposition_calibration_role_check check (
+  (c_target_disposition = 'calibration' AND c_calibration_role IS NOT NULL)
+  OR
+  (c_target_disposition <> 'calibration' AND c_calibration_role IS NULL)
+);
+
 -- Update target view
 drop view if exists v_target;
 create view v_target as
@@ -32,3 +39,23 @@ create view v_target as
   case when c_type='opportunity' and c_opp_ra_arc_type  = 'partial' then c_target_id end as c_opportunity_ra_arc_start_end_synthetic_id
   from t_target;
 
+-- Update trigger to also set target_disposition when calibration_role is set
+CREATE OR REPLACE FUNCTION calibration_targets_on_calibration_programs()
+  RETURNS trigger AS $$
+DECLARE
+    calibration_role e_calibration_role;
+BEGIN
+    -- Fetch the value from the source table
+    SELECT c_calibration_role INTO calibration_role
+    FROM t_program
+    WHERE c_program_id = NEW.c_program_id;
+
+    -- Only set NEW.c_calibration_role if calibration_role is not null
+    IF calibration_role IS NOT NULL THEN
+        NEW.c_calibration_role := calibration_role;
+        NEW.c_target_disposition := 'calibration';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
