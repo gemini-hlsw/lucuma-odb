@@ -582,6 +582,7 @@ object TargetService {
       sql"""
       DELETE FROM t_target
       WHERE  c_calibration_role IS NOT NULL AND
+             c_target_disposition = 'calibration' AND
              c_program_id = $program_id AND NOT EXISTS (
                SELECT 1 FROM t_asterism_target WHERE c_target_id = t_target.c_target_id
              )

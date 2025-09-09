@@ -66,7 +66,7 @@ trait ConfigurationService[F[_]] {
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
 
-  /** 
+  /**
    * Updates the requests specified by `where`, which is an `AppliedFragment` that should return a stream
    * of request ids filtered to those where the caller has write access.
    */
@@ -80,8 +80,8 @@ object ConfigurationService {
     self match
       case Result.Warning(problems, value) => Result(value)
       case other => other
-    
-  extension (hc: ACursor) def downFields(fields: String*): ACursor = 
+
+  extension (hc: ACursor) def downFields(fields: String*): ACursor =
     fields.foldLeft(hc)(_.downField(_))
 
   def instantiate[F[_]: Concurrent](using Services[F]): ConfigurationService[F] =
@@ -101,14 +101,14 @@ object ConfigurationService {
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
 
-      override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =        
+      override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
         SET.status match
-          case None                                       | 
-               Some(ConfigurationRequestStatus.Requested) | 
+          case None                                       |
+               Some(ConfigurationRequestStatus.Requested) |
                Some(ConfigurationRequestStatus.Withdrawn) => requirePiAccess(doUpdate)
           case Some(ConfigurationRequestStatus.Approved)  |
-               Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)                  
+               Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)
 
       override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
         impl.selectRequests(pairs).value
@@ -126,7 +126,7 @@ object ConfigurationService {
         selectConfigurations(List(oid)).value.map: result =>
           result.flatMap: map =>
             map.get(oid) match
-              case Some(config) => Result(config)          
+              case Some(config) => Result(config)
               case None => OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asFailure
 
     // A monoid specifically for the fold below, which concatenates maps
@@ -144,8 +144,8 @@ object ConfigurationService {
               jsons.foldMap: json =>
                 val hc = json.hcursor
                 hc.downField("id").as[Observation.Id] match
-                  case Left(value) => Result.internalError(value.getMessage) 
-                  case Right(obsid) =>     
+                  case Left(value) => Result.internalError(value.getMessage)
+                  case Right(obsid) =>
                     hc.downField("configuration").as[Configuration] match
                       case Right(cfg) => Result(Map(obsid -> cfg))
                       case Left(DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
@@ -167,9 +167,9 @@ object ConfigurationService {
             json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
-            
+
     private def queryRequestsAndConfigurations(
-      pids: List[Program.Id], 
+      pids: List[Program.Id],
       oids: List[Observation.Id]
     ): ResultT[F, (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
       if pids.isEmpty && oids.isEmpty then
@@ -199,7 +199,7 @@ object ConfigurationService {
         else selectConfiguration(oid).map: cfg =>
           crs.filter(_.configuration.subsumes(cfg))
 
-    def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): ResultT[F, ConfigurationRequest] = 
+    def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
       selectConfiguration(input.oid).flatMap(canonicalizeRequest(input, _))
 
     def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
@@ -243,17 +243,17 @@ object ConfigurationService {
                 case Left(other) => Result.internalError(other.getMessage)
 
     def selectObservations(rids: List[ConfigurationRequest.Id]): ResultT[F, Map[ConfigurationRequest.Id, List[Observation.Id]]] =
-      queryRequestsAndObservations(rids.distinct).map: result =>         
+      queryRequestsAndObservations(rids.distinct).map: result =>
         result
           .map:
             case (req, list) =>
               req.id ->
                 list.collect:
                   case (oid, cfg) if req.configuration.subsumes(cfg) => oid
-          .toMap        
+          .toMap
           .withDefaultValue(Nil)
 
-  } 
+  }
 
   object Queries {
 
@@ -280,13 +280,13 @@ object ConfigurationService {
         yield (m1.toMap, m2.collect { case ((pid, oid), Some(cfg)) => ((pid, oid), cfg) }.toMap)
 
       def apply(
-        pids: List[Program.Id], 
+        pids: List[Program.Id],
         oids: List[Observation.Id]
       ): String =
         s"""
           query {
 
-            observations(           
+            observations(
               ${whereIdsIn(oids)}
             ) {
               matches {
@@ -303,11 +303,11 @@ object ConfigurationService {
                   }
                   target {
                     coordinates {
-                      ra { 
-                        hms 
+                      ra {
+                        hms
                       }
-                      dec { 
-                        dms 
+                      dec {
+                        dms
                       }
                     }
                     region {
@@ -364,11 +364,11 @@ object ConfigurationService {
                       }
                       target {
                         coordinates {
-                          ra { 
-                            hms 
+                          ra {
+                            hms
                           }
-                          dec { 
-                            dms 
+                          dec {
+                            dms
                           }
                         }
                         region {
@@ -443,7 +443,7 @@ object ConfigurationService {
     private def selectConfigurations(where: String): String =
       s"""
         query {
-          observations(           
+          observations(
             $where
             LIMIT: 1000 # TODO: we need unlimited in this case
           ) {
@@ -458,11 +458,11 @@ object ConfigurationService {
                 }
                 target {
                   coordinates {
-                    ra { 
-                      hms 
+                    ra {
+                      hms
                     }
-                    dec { 
-                      dms 
+                    dec {
+                      dms
                     }
                   }
                   region {
@@ -502,7 +502,7 @@ object ConfigurationService {
           }
         }
       """
-  
+
     def selectAllRequestsForProgram(oid: Observation.Id) =
       s"""
         query {
@@ -521,11 +521,11 @@ object ConfigurationService {
                     }
                     target {
                       coordinates: {
-                        ra { 
-                          hms 
+                        ra {
+                          hms
                         }
-                        dec { 
-                          dms 
+                        dec {
+                          dms
                         }
                       }
                       region {
@@ -585,7 +585,7 @@ object ConfigurationService {
           req <- hc.as[ConfigurationRequest]
           obs <- hc.downFields("program", "observations", "matches").as(using Decoder.decodeList(using da))
         yield (req, obs.flatten)
- 
+
       given Decoder[Response] = hc =>
         hc.downFields("configurationRequests", "matches")
           .as(using Decoder.decodeList(using db))
@@ -612,11 +612,11 @@ object ConfigurationService {
                   }
                   target {
                     coordinates {
-                      ra { 
-                        hms 
+                      ra {
+                        hms
                       }
-                      dec { 
-                        dms 
+                      dec {
+                        dms
                       }
                     }
                     region {
@@ -665,11 +665,11 @@ object ConfigurationService {
                         }
                         target {
                           coordinates {
-                            ra { 
-                              hms 
+                            ra {
+                              hms
                             }
-                            dec { 
-                              dms 
+                            dec {
+                              dms
                             }
                           }
                         }
@@ -718,11 +718,11 @@ object ConfigurationService {
                   }
                   target {
                     coordinates {
-                      ra { 
-                        hms 
+                      ra {
+                        hms
                       }
-                      dec { 
-                        dms 
+                      dec {
+                        dms
                       }
                     }
                     region {
@@ -814,7 +814,7 @@ object ConfigurationService {
           COALESCE(c_gmos_south_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_south_filter.opt}, '{}'::_d_tag) AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt}
-        ) 
+        )
       """.query(
         (
           configuration_request_id     *:
@@ -838,8 +838,8 @@ object ConfigurationService {
           _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt
-        ).emap:       
-          { case 
+        ).emap:
+          { case
             id                       *:
             status                   *:
             justification            *:
@@ -863,7 +863,7 @@ object ConfigurationService {
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
-              val mode: Either[String, Configuration.ObservingMode] = 
+              val mode: Either[String, Configuration.ObservingMode] =
                 (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
@@ -875,12 +875,12 @@ object ConfigurationService {
                   case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
-                  
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
+
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
-                  
+
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
               val refCoords: Either[String, Option[Coordinates]] =
@@ -899,7 +899,7 @@ object ConfigurationService {
 
               val raArc: Either[String, Option[Arc[RightAscension]]] =
                 arc(raArcType, raArcStart, raArcEnd)
-                
+
               val decArc: Either[String, Option[Arc[Declination]]] =
                 arc(decArcType, decArcStart, decArcEnd)
 
@@ -918,7 +918,7 @@ object ConfigurationService {
               mode.flatMap: m =>
                 target.map: t =>
                   ConfigurationRequest(
-                    id, 
+                    id,
                     status,
                     justification,
                     Configuration(
@@ -934,7 +934,7 @@ object ConfigurationService {
                   )
 
           }
-      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) => 
+      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) =>
         oid                                                       *:
         cfg.conditions.cloudExtinction                            *:
         cfg.conditions.imageQuality                               *:
@@ -1002,7 +1002,7 @@ object ConfigurationService {
           ${_gmos_south_filter.opt},
           ${gmos_north_grating.opt},
           ${gmos_south_grating.opt}
-        ) 
+        )
         ON CONFLICT DO NOTHING
         RETURNING
           c_configuration_request_id,
@@ -1049,8 +1049,8 @@ object ConfigurationService {
           _gmos_south_filter.opt       *:
           gmos_north_grating.opt       *:
           gmos_south_grating.opt
-        ).emap:       
-          { case 
+        ).emap:
+          { case
             id                       *:
             status                   *:
             justification            *:
@@ -1074,7 +1074,7 @@ object ConfigurationService {
             gmosSouthLongSlitGrating *:
             EmptyTuple =>
 
-              val mode: Either[String, Configuration.ObservingMode] = 
+              val mode: Either[String, Configuration.ObservingMode] =
                 (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating) match
 
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _) =>
@@ -1086,12 +1086,12 @@ object ConfigurationService {
                   case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _) =>
                     Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
 
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) => 
+                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _) =>
                     Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
-                  
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) => 
+
+                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g)) =>
                     Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
-                  
+
                   case _ => Left(s"Malformed observing mode for configuration request $configuration_request_id")
 
               val refCoords: Either[String, Option[Coordinates]] =
@@ -1110,7 +1110,7 @@ object ConfigurationService {
 
               val raArc: Either[String, Option[Arc[RightAscension]]] =
                 arc(raArcType, raArcStart, raArcEnd)
-                
+
               val decArc: Either[String, Option[Arc[Declination]]] =
                 arc(decArcType, decArcStart, decArcEnd)
 
@@ -1129,7 +1129,7 @@ object ConfigurationService {
               mode.flatMap: m =>
                 target.map: t =>
                   ConfigurationRequest(
-                    id, 
+                    id,
                     status,
                     justification,
                     Configuration(
@@ -1145,7 +1145,7 @@ object ConfigurationService {
                   )
 
           }
-      ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) => 
+      ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) =>
         input.oid                                                 *:
         input.SET.justification                                   *:
         cfg.conditions.cloudExtinction                            *:
@@ -1196,8 +1196,7 @@ object ConfigurationService {
         and c_workflow_user_state is distinct from 'inactive'::e_workflow_user_state
         and c_calibration_role is null
       """.query(observation_id)
-    
+
   }
 
 }
-
