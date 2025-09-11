@@ -1245,7 +1245,7 @@ Flux density entry
 """
 input FluxDensity {
   wavelength: WavelengthInput!
-  density: PosBigDecimal!
+  density: BigDecimal!
 }
 
 """
@@ -8050,7 +8050,7 @@ enum FluxDensityContinuumSurfaceUnits {
 
 type FluxDensityEntry {
   wavelength: Wavelength!
-  density: PosBigDecimal!
+  density: BigDecimal!
 }
 
 """

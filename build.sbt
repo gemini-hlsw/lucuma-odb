@@ -19,8 +19,8 @@ val bouncycastleVersion        = "1.70"
 val weaverVersion              = "0.8.4"
 val logbackVersion             = "1.5.18"
 val log4catsVersion            = "2.7.1"
-val lucumaItcVersion           = "0.45.3"
-val lucumaCoreVersion          = "0.143.0"
+val lucumaItcVersion           = "0.46.0"
+val lucumaCoreVersion          = "0.143.2"
 val lucumaGraphQLRoutesVersion = "0.11.2"
 val munitVersion               = "0.7.29"  // check test output if you attempt to update this
 val munitCatsEffectVersion     = "1.0.7"   // check test output if you attempt to update this
@@ -35,8 +35,8 @@ val slf4jVersion               = "2.0.17"
 val testcontainersScalaVersion = "0.40.14" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.28"
-ThisBuild / scalaVersion       := "3.7.2"
-ThisBuild / crossScalaVersions := Seq("3.7.2")
+ThisBuild / scalaVersion       := "3.7.3"
+ThisBuild / crossScalaVersions := Seq("3.7.3")
 
 ThisBuild / Test / fork              := false
 ThisBuild / Test / parallelExecution := false

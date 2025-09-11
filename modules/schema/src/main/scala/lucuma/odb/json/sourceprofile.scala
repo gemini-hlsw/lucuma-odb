@@ -10,7 +10,6 @@ import cats.syntax.traverse.*
 import coulomb.Quantity
 import coulomb.units.si.Kelvin
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.ACursor
 import io.circe.Codec
@@ -155,10 +154,10 @@ trait SourceProfileCodec {
       )
     }
 
-  val DecoderFluxDensityEntry: Decoder[(Wavelength, PosBigDecimal)] =
+  val DecoderFluxDensityEntry: Decoder[(Wavelength, BigDecimal)] =
     entryDecoder("wavelength", "density")
 
-  def EncoderFluxDensityEntry(using Encoder[Wavelength]): Encoder[(Wavelength, PosBigDecimal)] =
+  def EncoderFluxDensityEntry(using Encoder[Wavelength]): Encoder[(Wavelength, BigDecimal)] =
     entryEncoder("wavelength", "density")
 
   given Decoder[UnnormalizedSED] =
@@ -372,4 +371,3 @@ trait SourceProfileCodec {
 }
 
 object sourceprofile extends SourceProfileCodec
-
