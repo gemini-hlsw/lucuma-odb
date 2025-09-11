@@ -2630,4 +2630,103 @@ class createObservation extends OdbSuite {
         }
       """.asRight)
     }
+
+  test("create target with flux densities"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createTarget(
+              input: {
+                programId: ${pid.asJson}
+                SET: {
+                  name: "test with flux",
+                  sidereal: {
+                    ra: { degrees: "10.0" }
+                    dec: { degrees: "20.0" }
+                    epoch: "J2000.000"
+                  }
+                  sourceProfile: {
+                    point: {
+                      bandNormalized: {
+                        sed: {
+                          fluxDensities: [
+                            {
+                              wavelength: { nanometers: 500 }
+                              density: 1.5
+                            },
+                            {
+                              wavelength: { nanometers: 600 }
+                              density: 0.0
+                            },
+                            {
+                              wavelength: { nanometers: 700 }
+                              density: -2.2
+                            }
+                          ]
+                        }
+                        brightnesses: []
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              target {
+                sourceProfile {
+                  point {
+                    bandNormalized {
+                      sed {
+                        fluxDensities {
+                          wavelength {
+                            nanometers
+                          }
+                          density
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          """,
+        expected = json"""
+          {
+            "createTarget": {
+              "target": {
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "sed": {
+                        "fluxDensities": [
+                          {
+                            "wavelength": {
+                              "nanometers": 500.000
+                            },
+                            "density": "1.5"
+                          },
+                          {
+                            "wavelength": {
+                              "nanometers": 600.000
+                            },
+                            "density": "0.0"
+                          },
+                          {
+                            "wavelength": {
+                              "nanometers": 700.000
+                            },
+                            "density": "-2.2"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
 }
