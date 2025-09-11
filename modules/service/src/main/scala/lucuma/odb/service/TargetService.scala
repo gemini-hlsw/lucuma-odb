@@ -59,7 +59,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait TargetService[F[_]] {
-  def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]] 
+  def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
   def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
@@ -240,7 +240,8 @@ object TargetService {
           c_sid_catalog_name,
           c_sid_catalog_id,
           c_sid_catalog_object_type,
-          c_source_profile
+          c_source_profile,
+          c_target_disposition
         )
         select
           $program_id,
@@ -256,7 +257,8 @@ object TargetService {
           ${catalog_name.opt},
           ${text_nonempty.opt},
           ${text_nonempty.opt},
-          $json
+          $json,
+          'science'
         returning c_target_id
       """.apply(
         pid,
@@ -289,7 +291,8 @@ object TargetService {
           c_nsid_des,
           c_nsid_key_type,
           c_nsid_key,
-          c_source_profile
+          c_source_profile,
+          c_target_disposition
         )
         select
           $program_id,
@@ -298,7 +301,8 @@ object TargetService {
           ${text_nonempty},
           ${ephemeris_key_type},
           ${text_nonempty},
-          $json
+          $json,
+          'science'
         returning c_target_id
       """.apply(
         pid,
@@ -340,7 +344,8 @@ object TargetService {
           c_opp_dec_arc_type,
           c_opp_dec_arc_start,
           c_opp_dec_arc_end,
-          c_source_profile
+          c_source_profile,
+          c_target_disposition
         )
         select
           $program_id,
@@ -348,7 +353,8 @@ object TargetService {
           'opportunity',
           ${arc(right_ascension)},
           ${arc(declination)},
-          $json
+          $json,
+          'science'
         returning c_target_id
       """.apply(
         pid,
@@ -392,7 +398,7 @@ object TargetService {
         case Empty() => ArcType.Empty
         case Full() => ArcType.Full
         case Partial(_, _) => ArcType.Partial
-      
+
     // When we update tracking, set the opposite tracking fields to null.
     // If this causes a constraint error it means that the user changed the target type but did not
     // specify every field. We can catch this case and report a useful error.
@@ -427,7 +433,7 @@ object TargetService {
           void"c_opp_dec_arc_type = null",
           void"c_opp_dec_arc_start = null",
           void"c_opp_dec_arc_end = null",
-          
+
         )
 
       tracking match {
@@ -443,19 +449,19 @@ object TargetService {
           ).flatten ++
           properMotionUpdates(sid.properMotion) ++
           catalogInfoUpdates(sid.catalogInfo) ++
-          NullOutNonsiderealFields ++ 
+          NullOutNonsiderealFields ++
           NullOutOpportunityFields
-        
+
         case ek: EphemerisKey =>
           void"c_type = 'nonsidereal'" ::
           List(
             sql"c_nsid_des = $text".apply(ek.des),
             sql"c_nsid_key_type = $ephemeris_key_type".apply(ek.keyType),
             sql"c_nsid_key = $text".apply(EphemerisKey.fromString.reverseGet(ek)),
-          ) ++ 
-          NullOutSiderealFields ++ 
+          ) ++
+          NullOutSiderealFields ++
           NullOutOpportunityFields
-        
+
         case opp: OpportunityInput.Edit =>
           void"c_type = 'opportunity'" ::
           List(
@@ -465,10 +471,10 @@ object TargetService {
             opp.region.decArc.map(_.tpe).asUpdate("c_opp_dec_arc_type", arc_type),
             opp.region.decArc.map(Arc.start.getOption).asUpdate("c_opp_dec_arc_start", declination.opt),
             opp.region.decArc.map(Arc.end.getOption).asUpdate("c_opp_dec_arc_end", declination.opt),
-          ) ++ 
+          ) ++
           NullOutSiderealFields ++
           NullOutNonsiderealFields
-      
+
       }
 
     def updates(SET: TargetPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] =
@@ -519,6 +525,7 @@ object TargetService {
           c_nsid_key,
           c_source_profile,
           c_calibration_role,
+          c_target_disposition,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,
@@ -545,6 +552,7 @@ object TargetService {
           c_nsid_key,
           c_source_profile,
           c_calibration_role,
+          c_target_disposition,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,
@@ -574,6 +582,7 @@ object TargetService {
       sql"""
       DELETE FROM t_target
       WHERE  c_calibration_role IS NOT NULL AND
+             c_target_disposition = 'calibration' AND
              c_program_id = $program_id AND NOT EXISTS (
                SELECT 1 FROM t_asterism_target WHERE c_target_id = t_target.c_target_id
              )
