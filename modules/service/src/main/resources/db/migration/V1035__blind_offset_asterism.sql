@@ -126,31 +126,38 @@ ORDER BY
   o.c_observation_id,
   t.c_target_id;
 
--- Update asterism_update function to exclude non-science targets from asterism groups and observation titles
--- This ensures that observation titles and asterism grouping only consider science targets,
--- while blind offset and calibration targets can still be in the asterism table for other purposes.
-
+-- Context-aware asterism update function
+-- Science observations use science targets, calibration observations use calibration targets
 CREATE OR REPLACE FUNCTION asterism_update()
   RETURNS trigger AS $$
 DECLARE
   obsid d_observation_id;
+  is_calibration boolean;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     obsid := OLD.c_observation_id;
   ELSE
     obsid := NEW.c_observation_id;
   END IF;
+
+  -- Check if this is a calibration observation
+  SELECT (c_calibration_role IS NOT NULL) INTO is_calibration
+  FROM t_observation WHERE c_observation_id = obsid;
+
   update t_observation a
   set c_asterism_group = coalesce(
-    -- ensure that the lists are sorted so we can compare them
-    -- Only include science targets in asterism group calculation
+    -- Asterism grouping: science targets for science obs, calibration targets for calibration obs
     (select to_json(array_agg(b.c_target_id order by b.c_target_id))::jsonb
     from t_asterism_target b
     join t_target t on b.c_target_id = t.c_target_id
     where a.c_observation_id = b.c_observation_id
-      and t.c_target_disposition = 'science'),
+      and t.c_target_disposition = CASE
+        WHEN is_calibration THEN 'calibration'::e_target_disposition
+        ELSE 'science'::e_target_disposition
+      END),
     '[]'::jsonb
   ), c_title = (
+    -- Title generation: science targets for science obs, calibration targets for calibration obs
     select array_to_string(
       coalesce(
           array_agg(coalesce(t.c_name, 'Unnamed') order by t.c_target_id),
@@ -162,7 +169,10 @@ BEGIN
     join t_target t on b.c_target_id = t.c_target_id
     where a.c_observation_id = b.c_observation_id
       and t.c_existence = 'present'
-      and t.c_target_disposition = 'science'
+      and t.c_target_disposition = CASE
+        WHEN is_calibration THEN 'calibration'::e_target_disposition
+        ELSE 'science'::e_target_disposition
+      END
   )
   where a.c_observation_id = obsid;
   RETURN NEW;

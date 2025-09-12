@@ -116,7 +116,6 @@ sealed trait ObservationService[F[_]] {
     pid: Program.Id
   )(using Transaction[F]): F[Map[Observation.Id, Option[ScienceBand]]]
 
-
 }
 
 object ObservationService {
@@ -616,7 +615,7 @@ object ObservationService {
       modeType:            Option[ObservingModeType],
       instrument:          Option[Instrument],
       observerNotes:       Option[NonEmptyString],
-      useBlindOffset:     Boolean,
+      useBlindOffset:      Boolean,
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -675,7 +674,7 @@ object ObservationService {
            modeType                                                                                                                ,
            instrument                                                                                                              ,
            observerNotes                                                                                                           ,
-           useBlindOffset                                                                                                         ,
+           useBlindOffset                                                                                                          ,
         )
       }
 
@@ -1198,7 +1197,6 @@ object ObservationService {
         FROM t_observation
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
-
   }
 
 }

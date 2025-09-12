@@ -14,6 +14,7 @@ import grackle.Result
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Arc.Empty

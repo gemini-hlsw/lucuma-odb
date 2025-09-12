@@ -272,10 +272,11 @@ object CalibrationsService extends CalibrationObservations {
         }.sequence.map(_.flatten)
       }
 
-      // Set the calibration role of the observations in bulk
+      // Set the calibration role of the observations and target disposition in bulk
       @annotation.nowarn("msg=unused implicit parameter")
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
-        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
+        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void *>
+        session.executeCommand(Statements.setTargetDisposition(oids)).void
 
       private def generateGMOSLSCalibrations(
         pid:     Program.Id,
@@ -426,6 +427,14 @@ object CalibrationsService extends CalibrationObservations {
             _ <- (o.map(_._1), tgts).mapN { (oid, tgtid) =>
                     for {
                       ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                      // Set target disposition to calibration for cloned targets
+                      _  <- ct.traverse(ct =>
+                              session.execute(sql"""
+                                UPDATE t_target
+                                SET c_target_disposition = 'calibration'::e_target_disposition
+                                WHERE c_target_id = $target_id
+                              """.command)(ct)
+                            )
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
                                 Services.asSuperUser:
@@ -461,6 +470,15 @@ object CalibrationsService extends CalibrationObservations {
         sql"SET c_calibration_role = $calibration_role "(role) |+|
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
+    def setTargetDisposition(oids: List[Observation.Id]): AppliedFragment =
+      void"""UPDATE t_target
+        SET c_target_disposition = 'calibration'::e_target_disposition
+        WHERE c_target_id IN (
+          SELECT c_target_id
+          FROM t_asterism_target
+          WHERE c_observation_id IN (""" |+|
+          oids.map(sql"$observation_id").intercalate(void", ") |+| void"))"
 
     def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT

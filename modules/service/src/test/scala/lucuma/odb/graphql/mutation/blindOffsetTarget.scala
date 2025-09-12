@@ -14,8 +14,7 @@ class blindOffsetTarget extends OdbSuite:
 
   override lazy val validUsers: List[User] = List(pi, pi2)
 
-  // Generate inline blind offset target creation input
-  private def blindOffsetTargetCreateInput(name: String, ra: String, dec: String): String =
+  private def blindOffsetInput(name: String, ra: String, dec: String): String =
     s"""
       name: "$name"
       sidereal: {
@@ -36,7 +35,6 @@ class blindOffsetTarget extends OdbSuite:
     """
 
 
-  // Common GraphQL query fragments
   private val targetEnvironmentFields =
     """
       targetEnvironment {
@@ -73,7 +71,7 @@ class blindOffsetTarget extends OdbSuite:
               programId: ${pid.asJson}
               SET: {
                 targetEnvironment: {
-                  ${blindOffsetTargetInput(blindOffsetTargetCreateInput("Blind Offset Star", "12.345", "45.678"))}
+                  ${blindOffsetTargetInput(blindOffsetInput("Blind Offset Star", "12.345", "45.678"))}
                 }
               }
             }) {
@@ -106,7 +104,7 @@ class blindOffsetTarget extends OdbSuite:
             updateObservations(input: {
               SET: {
                 targetEnvironment: {
-                  ${blindOffsetTargetInput(blindOffsetTargetCreateInput("New Blind Offset Target", "98.765", "-12.345"))}
+                  ${blindOffsetTargetInput(blindOffsetInput("New Blind Offset Target", "98.765", "-12.345"))}
                 }
               }
               WHERE: {
@@ -133,7 +131,6 @@ class blindOffsetTarget extends OdbSuite:
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      // Set initial blind offset target
       _ <- query(
         user = pi,
         query = s"""
@@ -141,7 +138,7 @@ class blindOffsetTarget extends OdbSuite:
             updateObservations(input: {
               SET: {
                 targetEnvironment: {
-                  ${blindOffsetTargetInput(blindOffsetTargetCreateInput("Original Target", "12.345", "45.678"))}
+                  ${blindOffsetTargetInput(blindOffsetInput("Original Target", "12.345", "45.678"))}
                 }
               }
               WHERE: {
@@ -153,7 +150,6 @@ class blindOffsetTarget extends OdbSuite:
           }
         """
       )
-      // Replace with a new blind offset target
       result <- query(
         user = pi,
         query = s"""
@@ -161,7 +157,7 @@ class blindOffsetTarget extends OdbSuite:
             updateObservations(input: {
               SET: {
                 targetEnvironment: {
-                  ${blindOffsetTargetInput(blindOffsetTargetCreateInput("Replacement Target", "99.999", "-88.888"))}
+                  ${blindOffsetTargetInput(blindOffsetInput("Replacement Target", "99.999", "-88.888"))}
                 }
               }
               WHERE: {
@@ -188,7 +184,6 @@ class blindOffsetTarget extends OdbSuite:
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      // Set the initial blind offset target
       _ <- query(
         user = pi,
         query = s"""
@@ -196,7 +191,7 @@ class blindOffsetTarget extends OdbSuite:
             updateObservations(input: {
               SET: {
                 targetEnvironment: {
-                  ${blindOffsetTargetInput(blindOffsetTargetCreateInput("Target to Remove", "12.345", "45.678"))}
+                  ${blindOffsetTargetInput(blindOffsetInput("Target to Remove", "12.345", "45.678"))}
                 }
               }
               WHERE: {
