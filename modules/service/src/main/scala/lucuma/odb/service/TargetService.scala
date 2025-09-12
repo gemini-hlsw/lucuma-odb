@@ -14,6 +14,7 @@ import grackle.Result
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Arc.Empty
@@ -62,7 +63,7 @@ trait TargetService[F[_]] {
   def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
-  def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
+  def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
   def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
 }
 
@@ -155,8 +156,8 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      private def clone(targetId: Target.Id, pid: Program.Id): F[Target.Id] =
-        val stmt = Statements.cloneTarget(pid, targetId)
+      private def clone(targetId: Target.Id, pid: Program.Id, targetDisposition: TargetDisposition): F[Target.Id] =
+        val stmt = Statements.cloneTarget(pid, targetId, targetDisposition)
         session.prepareR(stmt.fragment.query(target_id)).use(_.unique(stmt.argument))
 
       override def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]] =
@@ -173,14 +174,14 @@ object TargetService {
               session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
             }
 
-          clone(input.targetId, pid).flatMap: tid =>
+          clone(input.targetId, pid, TargetDisposition.Science).flatMap { tid =>
             update(tid).flatMap {
               case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
               case _ => replaceIn(tid) as Success(input.targetId, tid)
             }.map(cloneResultTranslation)
+          }
 
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id)(using Transaction[F]): F[CloneTargetResponse] = {
+      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
 
         // Ensure the destination program exists
@@ -192,7 +193,7 @@ object TargetService {
         pid.flatMap {
           case None      => NoSuchProgram(programId).pure[F]
           case Some(pid) =>
-            clone(targetId, pid).flatMap: tid =>
+            clone(targetId, pid, targetDisposition).flatMap: tid =>
               Success(targetId, tid).pure[F]
         }
       }
@@ -206,8 +207,8 @@ object TargetService {
             case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
-      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
-        cloneTargetIntoImpl(targetId, programId).map(cloneResultTranslation)
+      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
+        cloneTargetIntoImpl(targetId, programId, targetDisposition).map(cloneResultTranslation)
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
         val s = Statements.deleteOrphanCalibrationTargets(pid)
@@ -504,7 +505,8 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
-    def cloneTarget(pid: Program.Id, tid: Target.Id): AppliedFragment =
+    // targetDisposition mest be passed explicitly
+    def cloneTarget(pid: Program.Id, tid: Target.Id, targetDisposition: TargetDisposition): AppliedFragment =
       sql"""
         INSERT INTO t_target(
           c_program_id,
@@ -552,7 +554,7 @@ object TargetService {
           c_nsid_key,
           c_source_profile,
           c_calibration_role,
-          c_target_disposition,
+          $target_disposition,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,
@@ -562,7 +564,7 @@ object TargetService {
         FROM t_target
         WHERE c_target_id = $target_id
         RETURNING c_target_id
-      """.apply(pid, tid)
+      """.apply(pid, targetDisposition, tid)
 
     def dropItcCache(which: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""

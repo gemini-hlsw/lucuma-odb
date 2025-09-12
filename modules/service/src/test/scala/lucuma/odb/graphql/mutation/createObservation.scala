@@ -2730,7 +2730,7 @@ class createObservation extends OdbSuite {
         """.asRight
       )
 
-  test("useBlindOffset field behavior") {
+  test("useBlindOffset field behavior"):
     createProgramWithUsPi(pi).flatMap { pid =>
       query(pi,
         s"""
@@ -2776,5 +2776,4 @@ class createObservation extends OdbSuite {
         assertIO(useBlindOffset, true)
       }
     }
-  }
 }
