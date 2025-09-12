@@ -15,6 +15,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
@@ -257,7 +258,7 @@ object CalibrationsService extends CalibrationObservations {
             // We don't want to create a target if there are no pending configurations
             if (configs.nonEmpty) {
               (for {
-                cta <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
+                cta <- Nested(targetService.cloneTargetInto(tgtid, pid, Some(TargetDisposition.Calibration))).map(_._2).value
                 o   <- cta.traverse(calibObservation(ct, site, pid, gid, props, configs, _))
               } yield o).orError.map(_.map((ct, _)))
             } else {
@@ -426,15 +427,7 @@ object CalibrationsService extends CalibrationObservations {
             // Update the target on the calibration
             _ <- (o.map(_._1), tgts).mapN { (oid, tgtid) =>
                     for {
-                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid)).map(_._2).value
-                      // Set target disposition to calibration for cloned targets
-                      _  <- ct.traverse(ct =>
-                              session.execute(sql"""
-                                UPDATE t_target
-                                SET c_target_disposition = 'calibration'::e_target_disposition
-                                WHERE c_target_id = $target_id
-                              """.command)(ct)
-                            )
+                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid, Some(TargetDisposition.Calibration))).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
                                 Services.asSuperUser:
@@ -471,14 +464,6 @@ object CalibrationsService extends CalibrationObservations {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-    def setTargetDisposition(oids: List[Observation.Id]): AppliedFragment =
-      void"""UPDATE t_target
-        SET c_target_disposition = 'calibration'::e_target_disposition
-        WHERE c_target_id IN (
-          SELECT c_target_id
-          FROM t_asterism_target
-          WHERE c_observation_id IN (""" |+|
-          oids.map(sql"$observation_id").intercalate(void", ") |+| void"))"
 
     def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
