@@ -575,8 +575,7 @@ object ObservationService {
             .flatMap: rTargetId =>
               rTargetId.traverse: targetId =>
                 for {
-                  _ <- session.execute(Statements.addBlindOffsetToAsterism)(programId, observationId, targetId)
-                  _ <- session.execute(Statements.setTargetDisposition)(lucuma.core.enums.TargetDisposition.BlindOffset, targetId)
+                  _ <- session.execute(Statements.addBlindOffsetToAsterismAndSetDisposition)(programId, observationId, targetId, targetId)
                   _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
                 } yield targetId
 
@@ -585,7 +584,6 @@ object ObservationService {
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
         for {
           _ <- session.execute(Statements.removeBlindOffsetFromAsterism)(observationId)
-          _ <- session.execute(Statements.updateBlindOffsetFlag)(false, observationId)
         } yield Result.unit
 
       override def getCurrentBlindOffsetTarget(
@@ -593,25 +591,6 @@ object ObservationService {
       )(using Transaction[F]): F[Option[Target.Id]] =
         session.option(Statements.getCurrentBlindOffsetTargetFromAsterism)(observationId)
 
-      private def handleBlindOffsetTargetEdit(
-        observationId: Observation.Id,
-        targetEdit: TargetPropertiesInput.Edit
-      )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
-        getCurrentBlindOffsetTarget(observationId).flatMap {
-          case Some(currentTargetId) =>
-            // Update existing blind offset target
-            Services.asSuperUser:
-              val targetFragment = sql"SELECT c_target_id FROM t_target WHERE c_target_id = $target_id"(currentTargetId)
-              targetService.updateTargets(AccessControl.unchecked(targetEdit, targetFragment))
-                .flatMap: r =>
-                  r.traverse: _ =>
-                    // Reset acquisition time after edit
-                    session.execute(sql"UPDATE t_observation SET c_acq_reset_time = now() WHERE c_observation_id = $observation_id".command)(observationId)
-                      .as(())
-          case None =>
-            // No existing blind offset target - cannot edit what doesn't exist
-            OdbError.InvalidArgument(Some("No blind offset target exists to edit")).asFailureF
-        }
 
 
       def handleBlindOffsetTargetUpdates(
@@ -627,9 +606,16 @@ object ObservationService {
                 _ <- removeBlindOffsetTarget(observationId)
                 _ <- session.execute(sql"UPDATE t_observation SET c_acq_reset_time = now() WHERE c_observation_id = $observation_id".command)(observationId)
               } yield Result.unit
-            case NonNull(targetInput: TargetPropertiesInput.Edit) =>
-              // Handle blind offset target edit
-              handleBlindOffsetTargetEdit(observationId, targetInput)
+            case NonNull(targetInput: TargetPropertiesInput.Create) =>
+              // Handle blind offset target creation/replacement via update
+              for {
+                // First remove any existing blind offset target
+                _ <- removeBlindOffsetTarget(observationId)
+                // Then create the new one
+                rProgramId <- selectProgram(observationId)
+                result <- rProgramId.flatTraverse: programId =>
+                  handleBlindOffsetTarget(programId, observationId, targetInput).map(_.void)
+              } yield result
     }
 
 
@@ -1287,19 +1273,19 @@ object ObservationService {
         AND t.c_existence = 'present'
       """.query(target_id)
 
-    val addBlindOffsetToAsterism: Command[Program.Id *: Observation.Id *: Target.Id *: EmptyTuple] =
+    val addBlindOffsetToAsterismAndSetDisposition: Command[Program.Id *: Observation.Id *: Target.Id *: Target.Id *: EmptyTuple] =
       sql"""
-        INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
-        VALUES ($program_id, $observation_id, $target_id)
-        ON CONFLICT (c_observation_id, c_target_id) DO NOTHING
+        WITH asterism_insert AS (
+          INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
+          VALUES ($program_id, $observation_id, $target_id)
+          ON CONFLICT (c_observation_id, c_target_id) DO NOTHING
+          RETURNING c_target_id
+        )
+        UPDATE t_target
+        SET c_target_disposition = 'blind_offset'
+        WHERE c_target_id = $target_id
       """.command
 
-    val ensureBlindOffsetInAsterism: Command[Program.Id *: Observation.Id *: Target.Id *: EmptyTuple] =
-      sql"""
-        INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
-        VALUES ($program_id, $observation_id, $target_id)
-        ON CONFLICT (c_observation_id, c_target_id) DO NOTHING
-      """.command
 
     val removeBlindOffsetFromAsterism: Command[Observation.Id] =
       sql"""
@@ -1320,12 +1306,6 @@ object ObservationService {
         AND t.c_target_disposition = 'blind_offset'
       """.query(target_id)
 
-    val setTargetDisposition: Command[lucuma.core.enums.TargetDisposition *: Target.Id *: EmptyTuple] =
-      sql"""
-        UPDATE t_target
-        SET c_target_disposition = $target_disposition
-        WHERE c_target_id = $target_id
-      """.command
 
     val updateBlindOffsetFlag: Command[Boolean *: Observation.Id *: EmptyTuple] =
       sql"""

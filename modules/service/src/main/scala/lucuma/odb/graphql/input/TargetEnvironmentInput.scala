@@ -32,7 +32,7 @@ object TargetEnvironmentInput:
   final case class Edit(
     explicitBase:      Nullable[CoordinatesInput.Edit],
     asterism:          Nullable[List[Target.Id]],
-    blindOffsetTarget: Nullable[TargetPropertiesInput.Edit]
+    blindOffsetTarget: Nullable[TargetPropertiesInput.Create]
   ) extends TargetEnvironmentInput
 
   object Edit:
@@ -41,6 +41,6 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
           TargetIdBinding.List.Nullable("asterism", rAsterism),
-          TargetPropertiesInput.EditBinding.Nullable("blindOffsetTarget", rBlindOffsetTarget)
+          TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget)
         ) => (rBase, rAsterism, rBlindOffsetTarget).parMapN(Edit(_, _, _))
       }
