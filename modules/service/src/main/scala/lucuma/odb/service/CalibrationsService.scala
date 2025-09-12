@@ -258,7 +258,7 @@ object CalibrationsService extends CalibrationObservations {
             // We don't want to create a target if there are no pending configurations
             if (configs.nonEmpty) {
               (for {
-                cta <- Nested(targetService.cloneTargetInto(tgtid, pid, Some(TargetDisposition.Calibration))).map(_._2).value
+                cta <- Nested(targetService.cloneTargetInto(tgtid, pid, TargetDisposition.Calibration)).map(_._2).value
                 o   <- cta.traverse(calibObservation(ct, site, pid, gid, props, configs, _))
               } yield o).orError.map(_.map((ct, _)))
             } else {
@@ -276,8 +276,7 @@ object CalibrationsService extends CalibrationObservations {
       // Set the calibration role of the observations and target disposition in bulk
       @annotation.nowarn("msg=unused implicit parameter")
       private def setCalibRoleAndGroup(oids: List[Observation.Id], calibrationRole: CalibrationRole)(using Transaction[F]): F[Unit] =
-        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void *>
-        session.executeCommand(Statements.setTargetDisposition(oids)).void
+        session.executeCommand(Statements.setCalibRole(oids, calibrationRole)).void
 
       private def generateGMOSLSCalibrations(
         pid:     Program.Id,
@@ -427,7 +426,7 @@ object CalibrationsService extends CalibrationObservations {
             // Update the target on the calibration
             _ <- (o.map(_._1), tgts).mapN { (oid, tgtid) =>
                     for {
-                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid, Some(TargetDisposition.Calibration))).map(_._2).value
+                      ct <- Nested(targetService.cloneTargetInto(tgtid, pid, TargetDisposition.Calibration)).map(_._2).value
                       _  <- ct.traverse(ct => asterismService
                               .updateAsterism(
                                 Services.asSuperUser:

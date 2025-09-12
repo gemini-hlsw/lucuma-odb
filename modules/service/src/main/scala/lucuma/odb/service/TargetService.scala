@@ -63,7 +63,7 @@ trait TargetService[F[_]] {
   def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
-  def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: Option[TargetDisposition] = None)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
+  def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition = TargetDisposition.Science)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
   def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
 }
 
@@ -156,7 +156,7 @@ object TargetService {
               UpdateTargetsResponse.TrackingSwitchFailed("Sidereal targets require RA, Dec, and Epoch to be defined.")
           }
 
-      private def clone(targetId: Target.Id, pid: Program.Id, targetDisposition: Option[TargetDisposition] = None): F[Target.Id] =
+      private def clone(targetId: Target.Id, pid: Program.Id, targetDisposition: TargetDisposition): F[Target.Id] =
         val stmt = Statements.cloneTarget(pid, targetId, targetDisposition)
         session.prepareR(stmt.fragment.query(target_id)).use(_.unique(stmt.argument))
 
@@ -174,14 +174,15 @@ object TargetService {
               session.prepareR(s2.fragment.command).use(_.execute(s2.argument))
             }
 
-          clone(input.targetId, pid).flatMap: tid =>
+          clone(input.targetId, pid, TargetDisposition.Science).flatMap { tid =>
             update(tid).flatMap {
               case Some(err: UpdateTargetsError) => transaction.rollback.as(UpdateFailed(err))
               case _ => replaceIn(tid) as Success(input.targetId, tid)
             }.map(cloneResultTranslation)
+          }
 
       @annotation.nowarn("msg=unused implicit parameter")
-      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id, targetDisposition: Option[TargetDisposition])(using Transaction[F]): F[CloneTargetResponse] = {
+      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F]): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
 
         // Ensure the destination program exists
@@ -207,7 +208,7 @@ object TargetService {
             case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
-      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: Option[TargetDisposition] = None)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
+      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition = TargetDisposition.Science)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
         cloneTargetIntoImpl(targetId, programId, targetDisposition).map(cloneResultTranslation)
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
@@ -505,127 +506,68 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
-    def cloneTarget(pid: Program.Id, tid: Target.Id, targetDisposition: Option[TargetDisposition] = None): AppliedFragment =
-      targetDisposition match {
-        case Some(disposition) =>
-          sql"""
-            INSERT INTO t_target(
-              c_program_id,
-              c_name,
-              c_type,
-              c_sid_ra,
-              c_sid_dec,
-              c_sid_epoch,
-              c_sid_pm_ra,
-              c_sid_pm_dec,
-              c_sid_rv,
-              c_sid_parallax,
-              c_sid_catalog_name,
-              c_sid_catalog_id,
-              c_sid_catalog_object_type,
-              c_nsid_des,
-              c_nsid_key_type,
-              c_nsid_key,
-              c_source_profile,
-              c_calibration_role,
-              c_target_disposition,
-              c_opp_ra_arc_type,
-              c_opp_ra_arc_start,
-              c_opp_ra_arc_end,
-              c_opp_dec_arc_type,
-              c_opp_dec_arc_start,
-              c_opp_dec_arc_end
-            )
-            SELECT
-              $program_id,
-              c_name,
-              c_type,
-              c_sid_ra,
-              c_sid_dec,
-              c_sid_epoch,
-              c_sid_pm_ra,
-              c_sid_pm_dec,
-              c_sid_rv,
-              c_sid_parallax,
-              c_sid_catalog_name,
-              c_sid_catalog_id,
-              c_sid_catalog_object_type,
-              c_nsid_des,
-              c_nsid_key_type,
-              c_nsid_key,
-              c_source_profile,
-              c_calibration_role,
-              $target_disposition,
-              c_opp_ra_arc_type,
-              c_opp_ra_arc_start,
-              c_opp_ra_arc_end,
-              c_opp_dec_arc_type,
-              c_opp_dec_arc_start,
-              c_opp_dec_arc_end
-            FROM t_target
-            WHERE c_target_id = $target_id
-            RETURNING c_target_id
-          """.apply(pid, disposition, tid)
-        case None =>
-          sql"""
-            INSERT INTO t_target(
-              c_program_id,
-              c_name,
-              c_type,
-              c_sid_ra,
-              c_sid_dec,
-              c_sid_epoch,
-              c_sid_pm_ra,
-              c_sid_pm_dec,
-              c_sid_rv,
-              c_sid_parallax,
-              c_sid_catalog_name,
-              c_sid_catalog_id,
-              c_sid_catalog_object_type,
-              c_nsid_des,
-              c_nsid_key_type,
-              c_nsid_key,
-              c_source_profile,
-              c_calibration_role,
-              c_target_disposition,
-              c_opp_ra_arc_type,
-              c_opp_ra_arc_start,
-              c_opp_ra_arc_end,
-              c_opp_dec_arc_type,
-              c_opp_dec_arc_start,
-              c_opp_dec_arc_end
-            )
-            SELECT
-              $program_id,
-              c_name,
-              c_type,
-              c_sid_ra,
-              c_sid_dec,
-              c_sid_epoch,
-              c_sid_pm_ra,
-              c_sid_pm_dec,
-              c_sid_rv,
-              c_sid_parallax,
-              c_sid_catalog_name,
-              c_sid_catalog_id,
-              c_sid_catalog_object_type,
-              c_nsid_des,
-              c_nsid_key_type,
-              c_nsid_key,
-              c_source_profile,
-              c_calibration_role,
-              c_target_disposition,
-              c_opp_ra_arc_type,
-              c_opp_ra_arc_start,
-              c_opp_ra_arc_end,
-              c_opp_dec_arc_type,
-              c_opp_dec_arc_start,
-              c_opp_dec_arc_end
-            FROM t_target
-            WHERE c_target_id = $target_id
-            RETURNING c_target_id
-          """.apply(pid, tid)
-      }
+    def cloneTarget(pid: Program.Id, tid: Target.Id, targetDisposition: TargetDisposition): AppliedFragment =
+      sql"""
+        INSERT INTO t_target(
+          c_program_id,
+          c_name,
+          c_type,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_nsid_key,
+          c_source_profile,
+          c_calibration_role,
+          c_target_disposition,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end
+        )
+        SELECT
+          $program_id,
+          c_name,
+          c_type,
+          c_sid_ra,
+          c_sid_dec,
+          c_sid_epoch,
+          c_sid_pm_ra,
+          c_sid_pm_dec,
+          c_sid_rv,
+          c_sid_parallax,
+          c_sid_catalog_name,
+          c_sid_catalog_id,
+          c_sid_catalog_object_type,
+          c_nsid_des,
+          c_nsid_key_type,
+          c_nsid_key,
+          c_source_profile,
+          c_calibration_role,
+          CASE
+            WHEN c_calibration_role IS NOT NULL THEN 'calibration'::e_target_disposition
+            ELSE $target_disposition
+          END,
+          c_opp_ra_arc_type,
+          c_opp_ra_arc_start,
+          c_opp_ra_arc_end,
+          c_opp_dec_arc_type,
+          c_opp_dec_arc_start,
+          c_opp_dec_arc_end
+        FROM t_target
+        WHERE c_target_id = $target_id
+        RETURNING c_target_id
+      """.apply(pid, targetDisposition, tid)
 
     def dropItcCache(which: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
