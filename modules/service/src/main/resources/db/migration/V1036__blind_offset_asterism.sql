@@ -1,23 +1,10 @@
 -- add blind offset flag and target
 ALTER TABLE t_observation ADD COLUMN IF NOT EXISTS c_use_blind_offset boolean NOT NULL DEFAULT false;
 
--- Add unique constraint on (c_observation_id, c_target_id) if it doesn't exist
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints
-        WHERE constraint_name = 'uq_asterism_target_observation_target'
-        AND table_name = 't_asterism_target'
-    ) THEN
-        ALTER TABLE t_asterism_target ADD CONSTRAINT uq_asterism_target_observation_target UNIQUE (c_observation_id, c_target_id);
-    END IF;
-END $$;
-
 -- Create a function to enforce blind offset uniqueness
 CREATE OR REPLACE FUNCTION check_blind_offset_unique()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Check if we're adding/updating a blind offset target
   IF EXISTS (
     SELECT 1 FROM t_target t
     WHERE t.c_target_id = NEW.c_target_id
@@ -44,11 +31,9 @@ CREATE TRIGGER trg_blind_offset_unique
   FOR EACH ROW
   EXECUTE FUNCTION check_blind_offset_unique();
 
--- Update the observation view to derive blind offset target from asterism
 DROP VIEW IF EXISTS v_generator_params;
 DROP VIEW IF EXISTS v_observation;
 
--- Recreate observation view with blind offset target from asterism
 CREATE OR REPLACE VIEW v_observation AS
   SELECT o.*,
   CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
@@ -70,11 +55,11 @@ CREATE OR REPLACE VIEW v_observation AS
 
   -- Include blind offset target from asterism (derived from target_disposition)
   (SELECT a.c_target_id
-   FROM t_asterism_target a
-   JOIN t_target t ON a.c_target_id = t.c_target_id
-   WHERE a.c_observation_id = o.c_observation_id
-   AND t.c_target_disposition = 'blind_offset'
-   LIMIT 1) AS c_blind_offset_target_id
+    FROM t_asterism_target a
+    JOIN t_target t ON a.c_target_id = t.c_target_id
+    WHERE a.c_observation_id = o.c_observation_id
+    AND t.c_target_disposition = 'blind_offset'
+    LIMIT 1) AS c_blind_offset_target_id
 
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
@@ -121,36 +106,43 @@ LEFT JOIN LATERAL (
       ON a.c_target_id = t.c_target_id
      AND t.c_existence = 'present'
    WHERE a.c_observation_id = o.c_observation_id
+     -- Don't include blind offset for sequence generation
+     AND (t.c_target_disposition = 'calibration'::e_target_disposition
+       OR t.c_target_disposition = 'science'::e_target_disposition)
 ) t ON TRUE
 ORDER BY
   o.c_observation_id,
   t.c_target_id;
 
--- Update asterism_update function to exclude non-science targets from asterism groups and observation titles
--- This ensures that observation titles and asterism grouping only consider science targets,
--- while blind offset and calibration targets can still be in the asterism table for other purposes.
-
+-- Science observations use science targets, calibration observations use calibration targets
 CREATE OR REPLACE FUNCTION asterism_update()
   RETURNS trigger AS $$
 DECLARE
   obsid d_observation_id;
+  is_calibration boolean;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     obsid := OLD.c_observation_id;
   ELSE
     obsid := NEW.c_observation_id;
   END IF;
+
+  -- Check if this is a calibration observation
+  SELECT (c_calibration_role IS NOT NULL) INTO is_calibration
+  FROM t_observation WHERE c_observation_id = obsid;
+
   update t_observation a
   set c_asterism_group = coalesce(
-    -- ensure that the lists are sorted so we can compare them
-    -- Only include science targets in asterism group calculation
+    -- Asterism grouping: science targets for science obs, calibration targets for calibration obs
     (select to_json(array_agg(b.c_target_id order by b.c_target_id))::jsonb
     from t_asterism_target b
     join t_target t on b.c_target_id = t.c_target_id
     where a.c_observation_id = b.c_observation_id
-      and t.c_target_disposition = 'science'),
+     and (t.c_target_disposition = 'calibration'::e_target_disposition
+       or t.c_target_disposition = 'science'::e_target_disposition)),
     '[]'::jsonb
   ), c_title = (
+    -- Title generation: science targets for science obs, calibration targets for calibration obs
     select array_to_string(
       coalesce(
           array_agg(coalesce(t.c_name, 'Unnamed') order by t.c_target_id),
@@ -162,7 +154,8 @@ BEGIN
     join t_target t on b.c_target_id = t.c_target_id
     where a.c_observation_id = b.c_observation_id
       and t.c_existence = 'present'
-      and t.c_target_disposition = 'science'
+      and (t.c_target_disposition = 'calibration'::e_target_disposition
+       or t.c_target_disposition = 'science'::e_target_disposition)
   )
   where a.c_observation_id = obsid;
   RETURN NEW;

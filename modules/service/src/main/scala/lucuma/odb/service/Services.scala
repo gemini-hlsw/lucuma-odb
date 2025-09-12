@@ -100,6 +100,9 @@ trait Services[F[_]]:
   /** The `AttachmentMetadataService`. */
   def attachmentMetadataService: AttachmentMetadataService[F]
 
+  /** The `BlindOffsetsService`. */
+  def blindOffsetsService: BlindOffsetsService[F]
+
   /** The `CalibrationsService`. */
   def calibrationsService(emailConfig: Config.Email, httpClient: Client[F]): CalibrationsService[F]
 
@@ -278,6 +281,7 @@ object Services:
       lazy val allocationService = AllocationService.instantiate
       lazy val asterismService = AsterismService.instantiate
       lazy val attachmentMetadataService = AttachmentMetadataService.instantiate
+      lazy val blindOffsetsService = BlindOffsetsService.instantiate
       lazy val callForProposalsService = CallForProposalsService.instantiate
       lazy val chronicleService = ChronicleService.instantiate
       lazy val configurationService = ConfigurationService.instantiate
@@ -335,6 +339,7 @@ object Services:
     def asterismService[F[_]](using Services[F]): AsterismService[F] = summon[Services[F]].asterismService
     def attachmentFileService[F[_]](s3: S3FileService[F])(using Services[F]): AttachmentFileService[F] = summon[Services[F]].attachmentFileService(s3)
     def attachmentMetadataService[F[_]](using Services[F]): AttachmentMetadataService[F] = summon[Services[F]].attachmentMetadataService
+    def blindOffsetsService[F[_]](using Services[F]): BlindOffsetsService[F] = summon[Services[F]].blindOffsetsService
     def calibrationsService[F[_]](emailConfig: Config.Email, httpClient: Client[F])(using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService(emailConfig, httpClient)
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
