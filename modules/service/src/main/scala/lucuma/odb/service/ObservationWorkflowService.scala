@@ -355,7 +355,7 @@ object ObservationWorkflowService {
         commitHash: CommitHash,
         itcClient:  ItcClient[F],
         ptc:        TimeEstimateCalculatorImplementation.ForInstrumentMode
-      )(using NoTransaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ExecutionState]] =
         generator(commitHash, itcClient, ptc)
           .executionStates:
             infos
@@ -545,28 +545,15 @@ object ObservationWorkflowService {
         itcClient: ItcClient[F],
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
-
-        // Data obtained from the database, requiring a transaction.
-        val select: F[Result[(
-          Map[Observation.Id, ObservationValidationInfo],
-          Map[Observation.Id, ObservationValidationMap],
-          Map[Observation.Id, ItcService.AsterismResults]
-        )]] =
-          services.transactionally:
-            (
-              for
-                infos  <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
-                itcRes <- ResultT.liftF(lookupCachedItcResults(infos, itcClient)) // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
-              yield (infos, errs, itcRes)
-            ).value
-
-        (for
-          (infos, errs, itcRes) <- ResultT(select)
-          errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
-          execs                 <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, itcClient, ptc))
-          workflows             <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
-        yield workflows).value
+        services.transactionally:
+          (for
+            infos     <- ResultT.liftF(lookupObsDefinitions(oids))               // Map[Observation.Id, ObsDefinition]
+            itcRes    <- ResultT.liftF(lookupCachedItcResults(infos, itcClient)) // Map[Observation.Id, ItcService.AsterismResults]
+            errs      <- validateObsDefinition(infos, itcRes.keySet.apply)       // Map[Observation.Id, ObservationValidationMap]
+            errorFree  = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
+            execs     <- ResultT.liftF(executionStates(errorFree, itcRes, commitHash, itcClient, ptc))
+            workflows <- ResultT.fromResult(computeWorkflows(infos, errs, execs))
+          yield workflows).value
 
       override def getWorkflow(
         oid: Observation.Id,

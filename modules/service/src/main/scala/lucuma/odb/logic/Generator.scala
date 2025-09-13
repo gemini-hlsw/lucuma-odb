@@ -114,7 +114,7 @@ sealed trait Generator[F[_]] {
     asterismResult: Either[OdbError, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]]
 
   def calculateScienceAtomDigests(
     programId:      Program.Id,
@@ -122,7 +122,7 @@ sealed trait Generator[F[_]] {
     asterismResult: Either[OdbError, ItcService.AsterismResults],
     params:         GeneratorParams,
     when:           Option[Timestamp] = None
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -162,17 +162,17 @@ sealed trait Generator[F[_]] {
    * Equivalent to executionState above, but uses provided asterism results and
    * generator params rather than computing them.
    */
-  def executionState(
-    pid:    Program.Id,
-    oid:    Observation.Id,
-    itcRes: ItcService.AsterismResults,
-    params: GeneratorParams,
-  )(using Services.ServiceAccess): F[ExecutionState]
+//  def executionState(
+//    pid:    Program.Id,
+//    oid:    Observation.Id,
+//    itcRes: ItcService.AsterismResults,
+//    params: GeneratorParams,
+//  )(using Services.ServiceAccess): F[ExecutionState]
 
   /** Equivalent to executionState above, but computes many results. */
   def executionStates(
     input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]]
+  )(using Transaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]]
 
 }
 
@@ -251,15 +251,13 @@ object Generator {
           Md5Hash.unsafeFromByteArray(md5.digest())
         }
 
-        def checkCache(using NoTransaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
-          EitherT.right(services.transactionally {
+        def checkCache(using Transaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
+          EitherT.right:
             executionDigestService.selectOne(oid, hash)
-          })
 
-        def cache(digest: ExecutionDigest)(using NoTransaction[F]): EitherT[F, OdbError, Unit] =
-          EitherT.right(services.transactionally {
+        def cache(digest: ExecutionDigest)(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          EitherT.right:
             executionDigestService.insertOrUpdate(pid, oid, hash, digest)
-          })
       }
 
       private object Context:
@@ -319,21 +317,27 @@ object Generator {
       private def digestWithParamsAndHash(
         context: Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)] =
         context
           .checkCache
           .flatMap:
             case Some(digest) => digest.pure
-            case None => calcDigestThenCache(context, when)
+            case None         => calcDigestThenCache(context, when)
           .map: digest =>
             (digest, context.params, context.hash)
 
-      def digestWithParamsAndHash(
+      override def digestWithParamsAndHash(
         pid:  Program.Id,
         oid:  Observation.Id,
         when: Option[Timestamp] = None
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
-        Context.lookup(pid, oid).flatMap(digestWithParamsAndHash(_, when)).value
+        Context
+          .lookup(pid, oid)
+          .flatMap: ctx =>
+            EitherT:
+              services.transactionally:
+                digestWithParamsAndHash(ctx, when).value
+          .value
 
       override def calculateDigest(
         pid:             Program.Id,
@@ -341,13 +345,13 @@ object Generator {
         asterismResults: Either[OdbError, ItcService.AsterismResults],
         params:          GeneratorParams,
         when:            Option[Timestamp] = None
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, ExecutionDigest]] =
         calcDigestThenCache(Context(pid, oid, asterismResults, params), when).value
 
       private def calcDigestThenCache(
         ctx:  Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
         calcDigestFromContext(ctx, when).flatTap(ctx.cache)
 
       type ProtoFlamingos2 = ProtoExecutionConfig[Flamingos2StaticConfig,  Atom[Flamingos2DynamicConfig]]
@@ -359,7 +363,7 @@ object Generator {
         gen:      ExecutionConfigGenerator[S, D],
         steps:    Stream[F, StepRecord[D]],
         when:     Option[Timestamp]
-      )(using Eq[D], Services.ServiceAccess): EitherT[F, OdbError, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
+      )(using Eq[D], Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ProtoExecutionConfig[S, Atom[D]], ExecutionState)] =
         if ctx.params.declaredComplete then
           EitherT.pure:
             (ProtoExecutionConfig(gen.static, Stream.empty, Stream.empty), ExecutionState.DeclaredComplete)
@@ -367,17 +371,16 @@ object Generator {
           val visits = services.visitService.selectAll(ctx.oid)
           val events = services.executionEventService.selectSequenceEvents(ctx.oid)
           EitherT.liftF:
-            services.transactionally:
-              for
-                t <- when.fold(timeService.transactionTime)(_.pure[F])
-                p <- gen.executionConfig(visits, events, steps, t)
-              yield p
+            for
+              t <- when.fold(timeService.transactionTime)(_.pure[F])
+              p <- gen.executionConfig(visits, events, steps, t)
+            yield p
 
       private def flamingos2LongSlit(
         ctx:    Context,
         config: lucuma.odb.sequence.flamingos2.longslit.Config,
         when:   Option[Timestamp]
-      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ProtoFlamingos2, ExecutionState)] =
         import lucuma.odb.sequence.flamingos2.longslit.LongSlit
         val gen = LongSlit.instantiate(ctx.oid, calculator.flamingos2, ctx.namespace, exp.flamingos2, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, ctx.params.acqResetTime)
         val srs = services.flamingos2SequenceService.selectStepRecords(ctx.oid)
@@ -391,7 +394,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosNorth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosNorth, ExecutionState)] =
         val gen = LongSlit.gmosNorth(ctx.oid, calculator.gmosNorth, ctx.namespace, exp.gmosNorth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosNorthStepRecords(ctx.oid)
         for
@@ -404,7 +407,7 @@ object Generator {
         config: lucuma.odb.sequence.gmos.longslit.Config.GmosSouth,
         role:   Option[CalibrationRole],
         when:   Option[Timestamp]
-      )(using Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, (ProtoGmosSouth, ExecutionState)] =
         val gen = LongSlit.gmosSouth(ctx.oid, calculator.gmosSouth, ctx.namespace, exp.gmosSouth, config, ctx.acquisitionIntegrationTime, ctx.scienceIntegrationTime, role, ctx.params.acqResetTime)
         val srs = services.gmosSequenceService.selectGmosSouthStepRecords(ctx.oid)
         for
@@ -415,7 +418,7 @@ object Generator {
       private def calcDigestFromContext(
         ctx:  Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, ExecutionDigest] =
         EitherT
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
@@ -445,13 +448,13 @@ object Generator {
         ast:    Either[OdbError, ItcService.AsterismResults],
         params: GeneratorParams,
         when:   Option[Timestamp] = None
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Stream[Pure, AtomDigest]]] =
         scienceAtomDigestsFromContext(Context(pid, oid, ast, params), when).value
 
       private def scienceAtomDigestsFromContext(
         ctx:  Context,
         when: Option[Timestamp]
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, Stream[Pure, AtomDigest]] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, Stream[Pure, AtomDigest]] =
         EitherT
           .fromEither(Error.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
           .unlessA(ctx.scienceIntegrationTime.toOption.forall(_.exposureCount.value <= SequenceAtomLimit)) *>
@@ -480,7 +483,9 @@ object Generator {
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, InstrumentExecutionConfig]] =
         (for {
           c <- Context.lookup(pid, oid)
-          x <- calcExecutionConfigFromContext(c, lim, when)
+          x <- EitherT:
+                 services.transactionally:
+                   calcExecutionConfigFromContext(c, lim, when).value
         } yield x).value
 
       override def nextAtomId(
@@ -516,7 +521,7 @@ object Generator {
         ctx:      Context,
         lim:      FutureLimit,
         when:     Option[Timestamp]
-      )(using Services.ServiceAccess): EitherT[F, OdbError, InstrumentExecutionConfig] =
+      )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, InstrumentExecutionConfig] =
         ctx.params match
           case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).map: (p, _) =>
@@ -595,6 +600,7 @@ object Generator {
             _.science.executionState
           ))
 
+/*
       override def executionState(
         pid:    Program.Id,
         oid:    Observation.Id,
@@ -607,36 +613,35 @@ object Generator {
           .map:
             case Left(_)  => ExecutionState.NotDefined
             case Right(d) => d.science.executionState
-
+*/
       override def executionStates(
         input: Map[Observation.Id, (Program.Id, ItcService.AsterismResults, GeneratorParams)]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]] =
-        services
-          .transactionally:
-            Context.checkCache:
+      )(using Transaction[F], Services.ServiceAccess): F[Map[Observation.Id, ExecutionState]] =
+          Context
+            .checkCache:
               input
                 .toList
                 .map:
                   case (oid, (pid, itc, gps)) =>
                     Context(pid, oid, Right(itc), gps)
-          .flatMap: cached =>
-            input
-              .view
-              .filterKeys(a => !cached.contains(a))     // remove cached subset
-              .toList
-              .traverse:
-                case (oid, (pid, itc, gps)) =>
-                  calculateDigest(pid, oid, Right(itc), gps, None).map(oid -> _)  // compute one by one
-              .map: list =>
-                list
-                  .collect:
-                    case (oid, Right(d)) => (oid, d)    // filter out failures
-                  .toMap ++ cached                      // combine with cached results
-              .map: all =>
-                all
-                  .view
-                  .mapValues(_.science.executionState)  // narrow to just the execution state
-                  .toMap
+            .flatMap: cached =>
+              input
+                .view
+                .filterKeys(a => !cached.contains(a))     // remove cached subset
+                .toList
+                .traverse:
+                  case (oid, (pid, itc, gps)) =>
+                    calculateDigest(pid, oid, Right(itc), gps, None).map(oid -> _)  // compute one by one
+                .map: list =>
+                  list
+                    .collect:
+                      case (oid, Right(d)) => (oid, d)    // filter out failures
+                    .toMap ++ cached                      // combine with cached results
+                .map: all =>
+                  all
+                    .view
+                    .mapValues(_.science.executionState)  // narrow to just the execution state
+                    .toMap
 
   }
 }

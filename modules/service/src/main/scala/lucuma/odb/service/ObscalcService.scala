@@ -287,13 +287,14 @@ object ObscalcService:
         val gen = generator(commitHash, itcClient, calculator)
 
         def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
-          Logger[F].info(s"${pending.observationId}: calculating digest") *>
-          ((for
-            p <- params
-            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
-            a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
-          yield (d, a)).value).flatTap: da =>
-            Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
+          services.transactionally:
+            Logger[F].info(s"${pending.observationId}: calculating digest") *>
+            ((for
+              p <- params
+              d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
+              a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
+            yield (d, a)).value).flatTap: da =>
+              Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
         val result = for
           r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
