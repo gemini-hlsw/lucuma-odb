@@ -9,33 +9,34 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
+import lucuma.core.model.ProposalReference
 import lucuma.odb.graphql.binding.*
 
 case class SetAllocationsInput(
-  programId:   Program.Id,
-  allocations: List[AllocationInput]
-) {
+  programId:         Option[Program.Id],
+  proposalReference: Option[ProposalReference],
+  programReference:  Option[ProgramReference],
+  allocations:       List[AllocationInput]
+):
 
   def bands: Set[ScienceBand] =
     allocations.map(_.scienceBand).toSet
 
-}
-
-object SetAllocationsInput {
+object SetAllocationsInput:
 
   val Binding: Matcher[SetAllocationsInput] =
     ObjectFieldsBinding.rmap {
       case List(
-        ProgramIdBinding("programId", rProgramId),
+        ProgramIdBinding.Option("programId", rPid),
+        ProposalReferenceBinding.Option("proposalReference", rProp),
+        ProgramReferenceBinding.Option("programReference", rProg),
         AllocationInput.Binding.List("allocations", rAllocations)
       ) =>
-        val rValidAllocations = rAllocations.flatMap { allocations =>
+        val rValidAllocations = rAllocations.flatMap: allocations =>
           Matcher
             .validationFailure("Each category + band combination may only appear once.")
             .unlessA(allocations.map(a => (a.category, a.scienceBand)).toSet.size === allocations.size)
             .as(allocations)
-        }
-        (rProgramId, rValidAllocations).mapN(apply)
+        (rPid, rProp, rProg, rValidAllocations).mapN(apply)
     }
-
-}
