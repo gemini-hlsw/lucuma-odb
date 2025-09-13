@@ -593,9 +593,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: SetAllocationsInput
   )(using Services[F]): F[Result[AccessControl.CheckedWithId[List[AllocationInput], Program.Id]]] =
-    requireStaffAccess: // this is the only check
-      Services.asSuperUser:
-        Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
+    requireStaffAccess:
+      programService(emailConfig, httpClient)
+        .resolvePid(input.programId, input.proposalReference, input.programReference)
+        .map: r =>
+          r.map: pid =>
+            Services.asSuperUser:
+              AccessControl.unchecked(input.allocations, pid, program_id)
+
+//    requireStaffAccess: // this is the only check
+//      Services.asSuperUser:
+//        Result(AccessControl.unchecked(input.allocations, input.programId, program_id)).pure[F]
 
   @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
