@@ -30,7 +30,7 @@ trait AllocationService[F[_]] {
    */
   def selectScienceBands(pid: Program.Id)(using SuperUserAccess): F[Set[ScienceBand]]
 
-  def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Unit]]
+  def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Validates that the given `band` may be assigned to observations in the
@@ -57,7 +57,7 @@ object AllocationService {
           }
         }
 
-      override def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Unit]] =
+      override def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF) { (allocations, pid) =>
           val bands = allocations.map(_.scienceBand).toSet
           deleteAllocations(pid) *>
@@ -67,7 +67,7 @@ object AllocationService {
           session
             .execute(Statements.SetScienceBandWhereNull)(pid, bands.head)
             .whenA(bands.sizeIs == 1)  *>
-          validateObservations(bands, pid)
+          validateObservations(bands, pid).map(_.as(pid))
         }
 
       @annotation.nowarn("msg=unused implicit parameter")

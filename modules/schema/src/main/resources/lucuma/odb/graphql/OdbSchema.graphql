@@ -4458,10 +4458,14 @@ input ScienceRequirementsInput {
 
 """
 Describes the program allocations.  Each partner and band combination should
-appear at most once in the 'allocations' array.
+appear at most once in the 'allocations' array. One of programId,
+programReference or proposalReference is required. (If two or more are provided,
+they must refer to the same program.)
 """
 input SetAllocationsInput {
-  programId: ProgramId!
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
   allocations: [AllocationInput!]!
 }
 
