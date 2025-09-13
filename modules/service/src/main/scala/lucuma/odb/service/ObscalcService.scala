@@ -264,21 +264,19 @@ object ObscalcService:
         def sequenceUnavailable(msg: String): OdbError =
           OdbError.SequenceUnavailable(pending.observationId, s"Could not generate a sequence for ${pending.observationId}: $msg".some)
 
-        val params: EitherT[F, OdbError, GeneratorParams] =
+        def params(using Transaction[F]): EitherT[F, OdbError, GeneratorParams] =
           EitherT:
-            services.transactionally:
-              generatorParamsService
-                .selectOne(pending.programId, pending.observationId)
-                .map(_.leftMap(e => sequenceUnavailable(e.format)))
+            generatorParamsService
+              .selectOne(pending.programId, pending.observationId)
+              .map(_.leftMap(e => sequenceUnavailable(e.format)))
 
         def workflow(
           itc: Option[ItcService.AsterismResults],
           dig: Option[ExecutionDigest]
-        ): F[ObservationWorkflow] =
+        )(using Transaction[F]): F[ObservationWorkflow] =
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
-          services
-            .transactionally:
-              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+          observationWorkflowService
+            .getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
             .flatMap: r =>
               r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
             .flatTap: r =>
@@ -286,21 +284,30 @@ object ObscalcService:
 
         val gen = generator(commitHash, itcClient, calculator)
 
-        def digest(itcResult: Either[OdbError, ItcService.AsterismResults]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
+        def digest(
+          itcResult: Either[OdbError, ItcService.AsterismResults]
+        )(using Transaction[F]): F[Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])]] =
+          Logger[F].info(s"${pending.observationId}: calculating digest") *>
+          ((for
+            p <- params
+            d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
+            a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
+          yield (d, a)).value).flatTap: da =>
+            Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
+
+        def calc(
+          itcResult: Either[OdbError, ItcService.AsterismResults]
+        ): F[(Either[OdbError, (ExecutionDigest, Stream[Pure, AtomDigest])], ObservationWorkflow)] =
           services.transactionally:
-            Logger[F].info(s"${pending.observationId}: calculating digest") *>
-            ((for
-              p <- params
-              d <- EitherT(gen.calculateDigest(pending.programId, pending.observationId, itcResult, p))
-              a <- EitherT(gen.calculateScienceAtomDigests(pending.programId, pending.observationId, itcResult, p))
-            yield (d, a)).value).flatTap: da =>
-              Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
+            for
+              d <- digest(itcResult)
+              w <- workflow(itcResult.toOption, d.toOption.map(_._1))
+            yield (d, w)
 
         val result = for
-          r <- itcService(itcClient).lookup(pending.programId, pending.observationId)
-          _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
-          d <- digest(r)
-          w <- workflow(r.toOption, d.toOption.map(_._1))
+          r      <- itcService(itcClient).lookup(pending.programId, pending.observationId)
+          _      <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
+          (d, w) <- calc(r)
         yield d.fold(
           err => (Obscalc.Result.Error(err, w), Stream.empty),
           dig => (
