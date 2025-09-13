@@ -31,6 +31,8 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.graphql.input.AddStepEventInput
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 
 class executionDigest extends ExecutionTestSupportForGmos {
@@ -542,9 +544,16 @@ class executionDigest extends ExecutionTestSupportForGmos {
           services.session.transaction.use: xa =>
             for
               _ <- services.executionDigestService.insertOrUpdate(p, o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
+              e <- TimeEstimateCalculatorImplementation.fromSession(services.session, services.enums)
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, StepStage.EndStep, None), CommitHash.Zero, itcClient, e)(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
+
+/*
+        db   <- FMain.databasePoolResource[IO](databaseConfig)
+        enm  <- db.evalMap(Enums.load)
+        ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+ */
 
     assertIOBoolean(isEmpty, "The execution digest should be removed")
 

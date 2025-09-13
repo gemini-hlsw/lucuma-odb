@@ -21,6 +21,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Atom
@@ -141,6 +142,13 @@ sealed trait Generator[F[_]] {
     when:          Option[Timestamp] = None
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, InstrumentExecutionConfig]]
 
+  def nextAtomId(
+    pid:     Program.Id,
+    oid:     Observation.Id,
+    seqType: SequenceType,
+    when:    Option[Timestamp] = None
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Option[Atom.Id]]]
+
   /**
    * Determines the execution state of the given observation by looking at the
    * remaining science steps (if any) and past visits.
@@ -254,12 +262,24 @@ object Generator {
           })
       }
 
-      private object Context {
+      private object Context:
+
+        def lookupIfCached(
+          pid: Program.Id,
+          oid: Observation.Id
+        )(using Transaction[F]): EitherT[F, OdbError, Option[Context]] =
+          for
+            p  <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(e => Error.sequenceUnavailable(oid, e.format))))
+            c  <- EitherT.liftF(itcService(itcClient).selectOne(pid, oid, p))  // Option[AsterismResults]
+          yield p.itcInput.fold(
+            m => Context(pid, oid, Error.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft, p).some,
+            _ => c.map(as => Context(pid, oid, as.asRight, p))
+          )
 
         def lookup(
           pid: Program.Id,
           oid: Observation.Id
-        )(using NoTransaction[F]): EitherT[F, OdbError, Context] = {
+        )(using NoTransaction[F]): EitherT[F, OdbError, Context] =
           val itc = itcService(itcClient)
 
           val opc: F[Either[OdbError, (GeneratorParams, Option[ItcService.AsterismResults])]] =
@@ -272,7 +292,7 @@ object Generator {
           def callItc(p: GeneratorParams): EitherT[F, OdbError, ItcService.AsterismResults] =
             EitherT(itc.callRemote(pid, oid, p))
 
-          for {
+          for
             pc <- EitherT(opc)
             (params, cached) = pc
             // This will be confusing, but the idea here is that if the observation
@@ -280,18 +300,14 @@ object Generator {
             // Context.  On the other hand if there is an error calling the ITC then
             // we cannot create the Context.
             as <- params.itcInput.fold(
-              m => EitherT.pure(Error.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),
-              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)
+              m => EitherT.pure(Error.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),  // i.e., a Right containing a Left
+              _ => cached.fold(callItc(params))(EitherT.pure(_)).map(_.asRight)                              // Left if the callItc is Left, Right containing a Right otherwise
             )
-          } yield Context(pid, oid, as, params)
-
-        }
-
+          yield Context(pid, oid, as, params)
 
         def checkCache(contexts: List[Context])(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
           executionDigestService.selectMany(contexts.map(c => (c.oid, c.hash)))
 
-      }
 
       override def digest(
         pid:  Program.Id,
@@ -467,11 +483,40 @@ object Generator {
           x <- calcExecutionConfigFromContext(c, lim, when)
         } yield x).value
 
+      override def nextAtomId(
+        pid:     Program.Id,
+        oid:     Observation.Id,
+        seqType: SequenceType,
+        when:    Option[Timestamp] = None
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Option[Atom.Id]]] =
+        // TODO: Move into InstrumentExecutionConfig
+        extension (c: InstrumentExecutionConfig)
+          def nextAtomId: Option[Atom.Id] =
+            val ec = c match
+              case InstrumentExecutionConfig.Flamingos2(ec) =>
+                seqType match
+                  case SequenceType.Acquisition => ec.acquisition
+                  case SequenceType.Science     => ec.science
+              case InstrumentExecutionConfig.GmosNorth(ec)  =>
+                seqType match
+                  case SequenceType.Acquisition => ec.acquisition
+                  case SequenceType.Science     => ec.science
+              case InstrumentExecutionConfig.GmosSouth(ec)  =>
+                seqType match
+                  case SequenceType.Acquisition => ec.acquisition
+                  case SequenceType.Science     => ec.science
+            ec.map(_.nextAtom.id)
+
+        (for
+          c <- Context.lookupIfCached(pid, oid)
+          x <- c.traverse(context => calcExecutionConfigFromContext(context, FutureLimit.Min, when))
+        yield x.flatMap(_.nextAtomId)).value
+
       private def calcExecutionConfigFromContext(
         ctx:      Context,
         lim:      FutureLimit,
         when:     Option[Timestamp]
-      )(using NoTransaction[F], Services.ServiceAccess): EitherT[F, OdbError, InstrumentExecutionConfig] =
+      )(using Services.ServiceAccess): EitherT[F, OdbError, InstrumentExecutionConfig] =
         ctx.params match
           case GeneratorParams(_, _, config: flamingos2.longslit.Config, role, _, _) =>
             flamingos2LongSlit(ctx, config, when).map: (p, _) =>
