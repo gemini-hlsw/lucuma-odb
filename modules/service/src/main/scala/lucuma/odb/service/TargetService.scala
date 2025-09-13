@@ -63,7 +63,7 @@ trait TargetService[F[_]] {
   def createTarget(input: CheckedWithId[TargetPropertiesInput.Create, Program.Id])(using Transaction[F]): F[Result[Target.Id]]
   def updateTargets(checked: AccessControl.Checked[TargetPropertiesInput.Edit])(using Transaction[F]): F[Result[List[Target.Id]]]
   def cloneTarget(input: AccessControl.CheckedWithId[CloneTargetInput, Program.Id])(using Transaction[F]): F[Result[(Target.Id, Target.Id)]]
-  def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition = TargetDisposition.Science)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
+  def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]]
   def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
 }
 
@@ -207,7 +207,7 @@ object TargetService {
             case SourceProfileUpdatesFailed(ps) => Result.Failure(ps.map(p => OdbError.UpdateFailed(Some(p.message)).asProblem))
             case TrackingSwitchFailed(p)        => OdbError.UpdateFailed(Some(p)).asFailure
 
-      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition = TargetDisposition.Science)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
+      override def cloneTargetInto(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F], ServiceAccess): F[Result[(Target.Id, Target.Id)]] =
         cloneTargetIntoImpl(targetId, programId, targetDisposition).map(cloneResultTranslation)
 
       override def deleteOrphanCalibrationTargets(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] = {
