@@ -303,7 +303,7 @@ object SequenceService:
           _ <- setStepExecutionState(stepId, stepStage, time)
           s <- newAtomExecutionState
           _ <- session.execute(Statements.SetAtomExecutionState)(s, atomId).void
-          _ <- abandonOngoingAtomsExcept(observationId, atomId)
+          _ <- abandonOngoingStepsExcept(observationId, atomId, stepId)
         yield ()
 
       override def abandonOngoingAtomsExcept(
