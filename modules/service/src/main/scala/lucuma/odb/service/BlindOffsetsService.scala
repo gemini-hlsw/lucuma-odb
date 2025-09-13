@@ -20,37 +20,36 @@ import skunk.*
 import skunk.codec.boolean.bool
 import skunk.implicits.*
 
-sealed trait BlindOffsetsService[F[_]] {
+sealed trait BlindOffsetsService[F[_]]:
 
-  def handleBlindOffsetTarget(
+  def createBlindOffset(
     programId: Program.Id,
     observationId: Observation.Id,
     input: TargetPropertiesInput.Create
   )(using Transaction[F], ServiceAccess): F[Result[Target.Id]]
 
-  def removeBlindOffsetTarget(
+  def removeBlindOffset(
     observationId: Observation.Id
-  )(using Transaction[F], ServiceAccess): F[Result[Unit]]
+  )(using Transaction[F], ServiceAccess): F[Unit]
 
-  def getCurrentBlindOffsetTarget(
+  def getBlindOffset(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[Target.Id]]
 
-  def handleBlindOffsetTargetUpdates(
+  def updateBlindOffset(
+    programId: Program.Id,
     observationId: Observation.Id,
     targetEnvironment: Option[TargetEnvironmentInput.Edit]
   )(using Transaction[F], ServiceAccess): F[Result[Unit]]
 
-}
-
-object BlindOffsetsService {
+object BlindOffsetsService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): BlindOffsetsService[F] =
-    new BlindOffsetsService[F] {
+    new BlindOffsetsService[F]:
 
       import Services.Syntax.*
 
-      override def handleBlindOffsetTarget(
+      override def createBlindOffset(
         programId: Program.Id,
         observationId: Observation.Id,
         input: TargetPropertiesInput.Create
@@ -60,23 +59,22 @@ object BlindOffsetsService {
             .flatMap: rTargetId =>
               rTargetId.traverse: targetId =>
                 for {
-                  _ <- session.execute(Statements.addBlindOffsetToAsterismAndSetDisposition)(programId, observationId, targetId, targetId)
+                  _ <- session.execute(Statements.addBlindOffset)(programId, observationId, targetId, targetId)
                   _ <- session.execute(Statements.updateBlindOffsetFlag)(true, observationId)
                 } yield targetId
 
-      override def removeBlindOffsetTarget(
+      override def removeBlindOffset(
         observationId: Observation.Id
-      )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
-        for {
-          _ <- session.execute(Statements.removeBlindOffsetFromAsterism)(observationId)
-        } yield Result.unit
+      )(using Transaction[F], ServiceAccess): F[Unit] =
+        session.execute(Statements.removeBlindOffset)(observationId).void
 
-      override def getCurrentBlindOffsetTarget(
+      override def getBlindOffset(
         observationId: Observation.Id
       )(using Transaction[F]): F[Option[Target.Id]] =
-        session.option(Statements.getCurrentBlindOffsetTargetFromAsterism)(observationId)
+        session.option(Statements.selectBlindOffset)(observationId)
 
-      override def handleBlindOffsetTargetUpdates(
+      override def updateBlindOffset(
+        programId: Program.Id,
         observationId: Observation.Id,
         targetEnvironment: Option[TargetEnvironmentInput.Edit]
       )(using Transaction[F], ServiceAccess): F[Result[Unit]] =
@@ -84,25 +82,18 @@ object BlindOffsetsService {
           te.blindOffsetTarget match
             case Nullable.Absent => Result.unit.pure[F] // No change
             case Nullable.Null =>
-              // Remove blind offset target and set acquisition reset time
-              for {
-                _ <- removeBlindOffsetTarget(observationId)
-                _ <- session.execute(Statements.setAcquisitionResetTime)(observationId)
-              } yield Result.unit
+              removeBlindOffset(observationId).as(Result.unit)
             case NonNull(targetInput: TargetPropertiesInput.Create) =>
-              // Handle blind offset target creation/replacement via update
               for {
-                // First remove any existing blind offset target
-                _ <- removeBlindOffsetTarget(observationId)
+                // Remove existi
+                _          <- removeBlindOffset(observationId)
                 // Then create the new one
-                rProgramId <- observationService.selectProgram(observationId)
-                result <- rProgramId.flatTraverse: programId =>
-                  handleBlindOffsetTarget(programId, observationId, targetInput).map(_.void)
-              } yield result
+                result     <- createBlindOffset(programId, observationId, targetInput)
+              } yield result.void
 
-      private object Statements {
+      private object Statements:
 
-        val addBlindOffsetToAsterismAndSetDisposition: Command[Program.Id *: Observation.Id *: Target.Id *: Target.Id *: EmptyTuple] =
+        val addBlindOffset: Command[Program.Id *: Observation.Id *: Target.Id *: Target.Id *: EmptyTuple] =
           sql"""
             WITH asterism_insert AS (
               INSERT INTO t_asterism_target (c_program_id, c_observation_id, c_target_id)
@@ -115,7 +106,7 @@ object BlindOffsetsService {
             WHERE c_target_id = $target_id
           """.command
 
-        val removeBlindOffsetFromAsterism: Command[Observation.Id] =
+        val removeBlindOffset: Command[Observation.Id] =
           sql"""
             DELETE FROM t_asterism_target
             WHERE c_observation_id = $observation_id
@@ -125,7 +116,7 @@ object BlindOffsetsService {
             )
           """.command
 
-        val getCurrentBlindOffsetTargetFromAsterism: Query[Observation.Id, Target.Id] =
+        val selectBlindOffset: Query[Observation.Id, Target.Id] =
           sql"""
             SELECT a.c_target_id
             FROM t_asterism_target a
@@ -140,13 +131,3 @@ object BlindOffsetsService {
             SET c_use_blind_offset = ${bool}
             WHERE c_observation_id = $observation_id
           """.command
-
-        val setAcquisitionResetTime: Command[Observation.Id] =
-          sql"""
-            UPDATE t_observation
-            SET c_acq_reset_time = now()
-            WHERE c_observation_id = $observation_id
-          """.command
-      }
-    }
-}

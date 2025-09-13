@@ -463,7 +463,6 @@ object CalibrationsService extends CalibrationObservations {
         void"WHERE c_observation_id IN (" |+|
           oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-
     def selectCalibrationTargets(roles: List[CalibrationRole]): Query[List[CalibrationRole], (Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[Long], Option[Long], Option[RadialVelocity], Option[Parallax])] =
       sql"""SELECT
               c_target_id,

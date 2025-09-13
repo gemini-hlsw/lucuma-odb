@@ -321,7 +321,7 @@ object ObservationService {
                 .traverse: targetInput =>
                   ResultT:
                     Services.asSuperUser:
-                      blindOffsetsService.handleBlindOffsetTarget(pid, oid, targetInput)
+                      blindOffsetsService.createBlindOffset(pid, oid, targetInput)
                 .as(oid)
             .value
             .flatTap: r =>
@@ -432,7 +432,7 @@ object ObservationService {
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
                     }.map(_.sequence))
                 _ <- ResultT(Services.asSuperUser(g.toList.flatTraverse { case (pid, oids) =>
-                      oids.traverse(oid => blindOffsetsService.handleBlindOffsetTargetUpdates(oid, SET.targetEnvironment))
+                      oids.traverse(oid => blindOffsetsService.updateBlindOffset(pid, oid, SET.targetEnvironment))
                     }.map(_.sequence)))
             } yield g
 
@@ -970,7 +970,7 @@ object ObservationService {
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
-      val upUseBlindOffset   = sql"c_use_blind_offset = $bool"
+      val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
 
       val ups: List[AppliedFragment] =
         List(

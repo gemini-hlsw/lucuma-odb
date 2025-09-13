@@ -181,8 +181,7 @@ object TargetService {
             }.map(cloneResultTranslation)
           }
 
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition)(using Transaction[F]): F[CloneTargetResponse] = {
+      private def cloneTargetIntoImpl(targetId: Target.Id, programId: Program.Id, targetDisposition: TargetDisposition): F[CloneTargetResponse] = {
         import CloneTargetResponse.*
 
         // Ensure the destination program exists
@@ -506,6 +505,7 @@ object TargetService {
     }
 
     // an exact clone, except for c_target_id and c_existence (which are defaulted)
+    // targetDisposition mest be passed explicitly
     def cloneTarget(pid: Program.Id, tid: Target.Id, targetDisposition: TargetDisposition): AppliedFragment =
       sql"""
         INSERT INTO t_target(
@@ -554,10 +554,7 @@ object TargetService {
           c_nsid_key,
           c_source_profile,
           c_calibration_role,
-          CASE
-            WHEN c_calibration_role IS NOT NULL THEN 'calibration'::e_target_disposition
-            ELSE $target_disposition
-          END,
+          $target_disposition,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,
